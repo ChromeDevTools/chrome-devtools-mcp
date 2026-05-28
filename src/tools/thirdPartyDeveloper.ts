@@ -48,6 +48,7 @@ export const listThirdPartyDeveloperTools = definePageTool({
   annotations: {
     category: ToolCategory.THIRD_PARTY,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {},
   blockedByDialog: false,
@@ -62,6 +63,7 @@ export const executeThirdPartyDeveloperTool = definePageTool({
   annotations: {
     category: ToolCategory.THIRD_PARTY,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     toolName: zod.string().describe('The name of the tool to execute'),

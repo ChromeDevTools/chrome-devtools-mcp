@@ -142,6 +142,44 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
+function getFieldPathValue(
+  params: Record<string, unknown>,
+  fieldPath: string,
+): unknown {
+  let value: unknown = params;
+  for (const field of fieldPath.split('.')) {
+    if (!field) {
+      throw new Error(`Invalid empty field in file path annotation.`);
+    }
+    if (
+      value === null ||
+      typeof value !== 'object' ||
+      !Object.hasOwn(value, field)
+    ) {
+      return undefined;
+    }
+    value = Object.getOwnPropertyDescriptor(value, field)?.value;
+  }
+  return value;
+}
+
+async function validateFilePathFields(
+  context: McpContext,
+  params: Record<string, unknown>,
+  filePathFields: string[],
+): Promise<void> {
+  for (const fieldPath of filePathFields) {
+    const value = getFieldPathValue(params, fieldPath);
+    if (value === undefined) {
+      continue;
+    }
+    if (typeof value !== 'string') {
+      throw new Error(`File path field "${fieldPath}" must be a string.`);
+    }
+    await context.validatePath(value);
+  }
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
@@ -214,6 +252,11 @@ export class ToolHandler {
       const context = await this.getContext();
       logger(`${this.tool.name} context: resolved`);
       await context.detectOpenDevToolsWindows();
+      await validateFilePathFields(
+        context,
+        params,
+        this.tool.annotations.filePathFields,
+      );
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);

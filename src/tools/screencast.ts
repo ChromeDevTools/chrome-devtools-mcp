@@ -28,6 +28,7 @@ export const startScreencast = definePageTool(args => ({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    filePathFields: ['filePath'],
     conditions: ['experimentalScreencast'],
   },
   schema: {
@@ -40,7 +41,6 @@ export const startScreencast = definePageTool(args => ({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
     if (context.getScreenRecorder() !== null) {
       response.appendResponseLine(
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
@@ -99,6 +99,7 @@ export const stopScreencast = definePageTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    filePathFields: [],
     conditions: ['experimentalScreencast'],
   },
   schema: {},

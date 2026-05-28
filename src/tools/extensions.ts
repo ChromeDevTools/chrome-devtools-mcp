@@ -15,6 +15,7 @@ export const installExtension = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
+    filePathFields: ['path'],
   },
   schema: {
     path: zod
@@ -24,7 +25,6 @@ export const installExtension = defineTool({
   blockedByDialog: false,
   handler: async (request, response, context) => {
     const {path} = request.params;
-    await context.validatePath(path);
     const id = await context.installExtension(path);
     response.appendResponseLine(`Extension installed. Id: ${id}`);
   },
@@ -36,6 +36,7 @@ export const uninstallExtension = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     id: zod.string().describe('ID of the extension to uninstall.'),
@@ -55,6 +56,7 @@ export const listExtensions = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {},
   blockedByDialog: false,
@@ -69,6 +71,7 @@ export const reloadExtension = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     id: zod.string().describe('ID of the extension to reload.'),
@@ -92,6 +95,7 @@ export const triggerExtensionAction = defineTool({
   annotations: {
     category: ToolCategory.EXTENSIONS,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     id: zod.string().describe('ID of the extension to trigger the action for.'),

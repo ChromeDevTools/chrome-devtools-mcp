@@ -15,6 +15,7 @@ export const listWebMcpTools = definePageTool({
   annotations: {
     category: ToolCategory.WEBMCP,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {},
   blockedByDialog: false,
@@ -29,6 +30,7 @@ export const executeWebMcpTool = definePageTool({
   annotations: {
     category: ToolCategory.WEBMCP,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     toolName: zod.string().describe('The name of the WebMCP tool to execute'),

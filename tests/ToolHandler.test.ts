@@ -34,6 +34,7 @@ describe('ToolHandler', () => {
       annotations: {
         category: ToolCategory.INPUT,
         readOnlyHint: false,
+        filePathFields: [],
       },
       schema: {},
       blockedByDialog: false,
@@ -75,6 +76,7 @@ describe('ToolHandler', () => {
       annotations: {
         category: ToolCategory.NAVIGATION,
         readOnlyHint: true,
+        filePathFields: [],
       },
       schema: {},
       blockedByDialog: false,
@@ -115,6 +117,7 @@ describe('ToolHandler', () => {
       annotations: {
         category: ToolCategory.NAVIGATION,
         readOnlyHint: true,
+        filePathFields: [],
       },
       schema: {
         url: zod.string(),
@@ -164,6 +167,7 @@ describe('ToolHandler', () => {
       annotations: {
         category: ToolCategory.EMULATION,
         readOnlyHint: true,
+        filePathFields: [],
       },
       schema: {},
       blockedByDialog: false,
@@ -194,6 +198,55 @@ describe('ToolHandler', () => {
     assert.match(
       result.content[0].type === 'text' ? result.content[0].text : '',
       /is currently disabled/,
+    );
+    assert.strictEqual(handlerCalled, false);
+  });
+
+  it('validates annotated file path fields before running the handler', async () => {
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'file_tool',
+      description: 'A tool with a file path',
+      annotations: {
+        category: ToolCategory.DEBUGGING,
+        readOnlyHint: false,
+        filePathFields: ['filePath'],
+      },
+      schema: {
+        filePath: zod.string(),
+      },
+      blockedByDialog: false,
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.detectOpenDevToolsWindows.resolves();
+    mockContext.validatePath.rejects(new Error('Access denied'));
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    const result = await toolHandler.handle({filePath: '/outside.txt'});
+
+    assert.strictEqual(result.isError, true);
+    assert.match(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      /Access denied/,
+    );
+    sinon.assert.calledOnceWithExactly(
+      mockContext.validatePath,
+      '/outside.txt',
     );
     assert.strictEqual(handlerCalled, false);
   });

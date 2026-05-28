@@ -46,6 +46,7 @@ export const listConsoleMessages = definePageTool(cliArgs => {
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: true,
+      filePathFields: [],
     },
     schema: {
       pageSize: zod
@@ -96,6 +97,7 @@ export const getConsoleMessage = definePageTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {
     msgid: zod

@@ -82,6 +82,7 @@ export const listPages = defineTool(args => {
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: true,
+      filePathFields: [],
     },
     schema: {},
     blockedByDialog: false,
@@ -99,6 +100,7 @@ export const selectPage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {
     pageId: zod
@@ -130,6 +132,7 @@ export const closePage = defineTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     pageId: zod
@@ -159,6 +162,7 @@ export const newPage = defineTool(args => {
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: false,
+      filePathFields: [],
     },
     schema: {
       url: zod.string().describe('URL to load in a new page.'),
@@ -218,6 +222,7 @@ export const navigatePage = definePageTool(args => {
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: false,
+      filePathFields: [],
     },
     schema: {
       type: zod
@@ -385,6 +390,7 @@ export const resizePage = definePageTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     width: zod.number().describe('Page width'),
@@ -425,6 +431,7 @@ export const handleDialog = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     action: zod
@@ -477,6 +484,7 @@ export const getTabId = definePageTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    filePathFields: [],
     conditions: ['experimentalInteropTools'],
   },
   schema: {

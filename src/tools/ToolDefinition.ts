@@ -41,6 +41,11 @@ export interface BaseToolDefinition<
     title?: string;
     category: ToolCategory;
     /**
+     * Request parameter field paths that need workspace root validation before
+     * the tool handler runs.
+     */
+    filePathFields: string[];
+    /**
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;

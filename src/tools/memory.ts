@@ -16,6 +16,7 @@ export const takeHeapSnapshot = definePageTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: false,
+    filePathFields: ['filePath'],
   },
   schema: {
     filePath: zod
@@ -23,9 +24,8 @@ export const takeHeapSnapshot = definePageTool({
       .describe('A path to a .heapsnapshot file to save the heapsnapshot to.'),
   },
   blockedByDialog: true,
-  handler: async (request, response, context) => {
+  handler: async (request, response, _context) => {
     const page = request.page;
-    await context.validatePath(request.params.filePath);
 
     await page.pptrPage.captureHeapSnapshot({
       path: ensureExtension(request.params.filePath, '.heapsnapshot'),
@@ -44,6 +44,7 @@ export const getHeapSnapshotSummary = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
+    filePathFields: ['filePath'],
     conditions: ['experimentalMemory'],
   },
   schema: {
@@ -51,7 +52,6 @@ export const getHeapSnapshotSummary = defineTool({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
     const stats = await context.getHeapSnapshotStats(request.params.filePath);
     const staticData = await context.getHeapSnapshotStaticData(
       request.params.filePath,
@@ -68,6 +68,7 @@ export const getHeapSnapshotDetails = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
+    filePathFields: ['filePath'],
     conditions: ['experimentalMemory'],
   },
   schema: {
@@ -83,7 +84,6 @@ export const getHeapSnapshotDetails = defineTool({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
     const aggregates = await context.getHeapSnapshotAggregates(
       request.params.filePath,
     );
@@ -102,6 +102,7 @@ export const getHeapSnapshotClassNodes = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
+    filePathFields: ['filePath'],
     conditions: ['experimentalMemory'],
   },
   schema: {
@@ -112,7 +113,6 @@ export const getHeapSnapshotClassNodes = defineTool({
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
     const nodes = await context.getHeapSnapshotNodesById(
       request.params.filePath,
       request.params.id,
@@ -132,6 +132,7 @@ export const getHeapSnapshotRetainers = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
+    filePathFields: ['filePath'],
     conditions: ['experimentalMemory'],
   },
   blockedByDialog: false,
@@ -142,8 +143,6 @@ export const getHeapSnapshotRetainers = defineTool({
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
-
     const retainers = await context.getHeapSnapshotRetainers(
       request.params.filePath,
       request.params.nodeId,

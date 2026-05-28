@@ -41,6 +41,7 @@ describe('metricsRegistry', () => {
         annotations: {
           category: ToolCategory.INPUT,
           readOnlyHint: true,
+          filePathFields: [],
         },
         schema: {
           argStr: zod.string(),
@@ -67,6 +68,7 @@ describe('metricsRegistry', () => {
         annotations: {
           category: ToolCategory.INPUT,
           readOnlyHint: true,
+          filePathFields: [],
         },
         schema: {
           argEnum: zod.enum(['foo', 'bar']),
@@ -90,6 +92,7 @@ describe('metricsRegistry', () => {
         annotations: {
           category: ToolCategory.THIRD_PARTY,
           readOnlyHint: true,
+          filePathFields: [],
         },
         schema: {},
         blockedByDialog: false,

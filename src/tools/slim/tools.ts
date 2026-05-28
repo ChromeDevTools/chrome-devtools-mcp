@@ -16,6 +16,7 @@ export const screenshot = definePageTool({
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {},
   blockedByDialog: true,
@@ -39,6 +40,7 @@ export const navigate = definePageTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     url: zod.string().describe('URL to navigate to'),
@@ -77,6 +79,7 @@ export const evaluate = definePageTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     script: zod.string().describe(`JS script to run on the page`),

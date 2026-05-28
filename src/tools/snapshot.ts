@@ -18,6 +18,7 @@ in the DevTools Elements panel (if any).`,
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    filePathFields: ['filePath'],
   },
   schema: {
     verbose: zod
@@ -34,8 +35,7 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   blockedByDialog: true,
-  handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
+  handler: async (request, response, _context) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
@@ -49,6 +49,7 @@ export const waitFor = definePageTool({
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {
     text: zod

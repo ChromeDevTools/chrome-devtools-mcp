@@ -26,6 +26,7 @@ export const lighthouseAudit = definePageTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    filePathFields: ['outputDirPath'],
   },
   schema: {
     mode: zod
@@ -58,9 +59,6 @@ export const lighthouseAudit = definePageTool({
       device = 'desktop',
       outputDirPath,
     } = request.params;
-
-    await context.validatePath(outputDirPath);
-
     const flags: Flags = {
       onlyCategories: categories,
       output: formats,

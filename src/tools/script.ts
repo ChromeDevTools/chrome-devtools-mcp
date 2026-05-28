@@ -22,6 +22,7 @@ so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
+      filePathFields: ['filePath'],
     },
     schema: {
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
@@ -80,8 +81,6 @@ Example with arguments: \`(el) => {
         dialogAction,
         filePath,
       } = request.params;
-
-      await context.validatePath(filePath);
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {

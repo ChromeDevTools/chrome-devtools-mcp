@@ -17,6 +17,7 @@ export const screenshot = definePageTool({
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
+    filePathFields: ['filePath'],
   },
   schema: {
     format: zod
@@ -52,7 +53,6 @@ export const screenshot = definePageTool({
   },
   blockedByDialog: true,
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.filePath);
     if (request.params.uid && request.params.fullPage) {
       throw new Error('Providing both "uid" and "fullPage" is not allowed.');
     }

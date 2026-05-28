@@ -92,6 +92,7 @@ export const click = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     uid: zod
@@ -145,6 +146,7 @@ export const clickAt = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
     conditions: ['experimentalVision'],
   },
   schema: {
@@ -179,6 +181,7 @@ export const hover = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     uid: zod
@@ -301,6 +304,7 @@ export const fill = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     uid: zod
@@ -340,6 +344,7 @@ export const typeText = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     text: zod.string().describe('The text to type'),
@@ -369,6 +374,7 @@ export const drag = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     from_uid: zod.string().describe('The uid of the element to drag'),
@@ -405,6 +411,7 @@ export const fillForm = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     elements: zod
@@ -450,6 +457,7 @@ export const uploadFile = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: ['filePath'],
   },
   schema: {
     uid: zod
@@ -461,9 +469,8 @@ export const uploadFile = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  handler: async (request, response, context) => {
+  handler: async (request, response, _context) => {
     const {uid, filePath} = request.params;
-    await context.validatePath(filePath);
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
@@ -502,6 +509,7 @@ export const pressKey = definePageTool({
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     key: zod

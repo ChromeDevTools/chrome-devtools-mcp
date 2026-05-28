@@ -51,6 +51,7 @@ export const emulate = definePageTool({
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
+    filePathFields: [],
   },
   schema: {
     networkConditions: zod

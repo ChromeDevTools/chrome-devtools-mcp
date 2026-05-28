@@ -38,6 +38,7 @@ export const listNetworkRequests = definePageTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
+    filePathFields: [],
   },
   schema: {
     pageSize: zod
@@ -93,6 +94,7 @@ export const getNetworkRequest = definePageTool({
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
+    filePathFields: ['requestFilePath', 'responseFilePath'],
   },
   schema: {
     reqid: zod
@@ -116,8 +118,6 @@ export const getNetworkRequest = definePageTool({
   },
   blockedByDialog: true,
   handler: async (request, response, context) => {
-    await context.validatePath(request.params.requestFilePath);
-    await context.validatePath(request.params.responseFilePath);
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid, {
         requestFilePath: request.params.requestFilePath,
