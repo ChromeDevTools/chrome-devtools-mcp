@@ -55,6 +55,14 @@ Each uninstall script accepts `-RestoreStdio` (PowerShell) or `RESTORE_STDIO=1` 
 
 `-KeepTokenAndLogs` (PowerShell) / `KEEP_DATA=1` (bash) skips the prompt that offers to delete the token and log directories.
 
+## Verification status
+
+| OS      | Status                                                                                                                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Windows | ✅ Verified end-to-end on Windows 11 / PowerShell 5.1 / Node 22. Scheduled Task → powershell launcher → node, server reachable, `claude mcp get` reports Status: Connected.                                              |
+| macOS   | ⚠️ Unverified — same logical fixes applied as Windows (URL position in `claude mcp add`, etc.), parse-checked with `bash -n`. launchd has no analog of the Windows wscript-orphan bug. Please file an issue if it fails. |
+| Linux   | ⚠️ Unverified — same as macOS. systemd has no analog of the Windows wscript-orphan bug. Please file an issue if it fails.                                                                                                |
+
 ## Caveats
 
 - All Claude Code windows on the machine will share **one Chrome profile**. Cookies, login sessions, and tabs are visible across sessions. That's the whole point — see [`../CLAUDE.md`](../CLAUDE.md) for the multi-session etiquette rules agents should follow.

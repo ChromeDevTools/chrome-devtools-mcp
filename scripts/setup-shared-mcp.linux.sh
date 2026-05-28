@@ -93,11 +93,12 @@ $ready || { echo "FAILED"; echo "See log: $LOG_DIR/server.log"; exit 1; }
 echo "ready"
 
 claude mcp remove chrome-devtools --scope user >/dev/null 2>&1 || true
-claude mcp add chrome-devtools \
+# URL is the second positional after the server name; the CLI doesn't
+# accept it as a trailing token after the flags.
+claude mcp add chrome-devtools "http://127.0.0.1:$PORT/mcp" \
     --scope user \
     --transport http \
-    --header "Authorization: Bearer $TOKEN" \
-    "http://127.0.0.1:$PORT/mcp"
+    --header "Authorization: Bearer $TOKEN"
 echo "Claude Code:     chrome-devtools rewired to http://127.0.0.1:$PORT/mcp"
 
 echo
