@@ -32,7 +32,9 @@ import type {
   ToolDefinition as ThirdPartyDeveloperToolDefinition,
 } from './thirdPartyDeveloper.js';
 
-export interface BaseToolDefinition<Schema extends zod.ZodRawShape = zod.ZodRawShape> {
+export interface BaseToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> {
   name: string;
   description: string;
   annotations: {
