@@ -118,16 +118,23 @@ $launcher | Out-File -Encoding utf8 -FilePath $LauncherFile -Force
 Write-Host "Launcher:        $LauncherFile"
 
 # --- 5. Register the Scheduled Task ------------------------------------------
-# Task action invokes PowerShell directly with -WindowStyle Hidden. An
-# earlier iteration used a wscript.exe + .vbs wrapper to avoid a brief
-# console flash, but Task Scheduler's wscript context can't reliably
-# spawn long-lived child processes (it returns "success" while the
-# spawned tree dies almost immediately). Direct powershell.exe works,
-# stays "Running" as long as `& node ...` is alive inside the launcher,
-# and -WindowStyle Hidden suppresses the console in practice.
+# Task action launches PowerShell via `conhost.exe --headless`. The
+# headless conhost allocates a pseudoconsole with NO window ever, so
+# there is no logon-time flash and nothing for the user to accidentally
+# close (closing a visible host window is what kills the server tree).
+# The powershell + node tree stays attached to the task, so the task
+# remains "Running" for as long as `& node ...` is alive inside the
+# launcher and the -RestartCount/-RestartInterval restart-on-failure
+# policy below still applies.
+#
+# An earlier iteration used a wscript.exe + .vbs wrapper to avoid the
+# flash, but Task Scheduler's wscript context can't reliably spawn
+# long-lived child processes (it returns "success" while the spawned
+# tree dies almost immediately). conhost --headless avoids that: it is
+# the real process host, not a fire-and-forget launcher.
 $action = New-ScheduledTaskAction `
-    -Execute 'powershell.exe' `
-    -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$LauncherFile`""
+    -Execute 'conhost.exe' `
+    -Argument "--headless powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$LauncherFile`""
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 
