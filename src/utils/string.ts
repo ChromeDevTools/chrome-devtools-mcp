@@ -36,3 +36,12 @@ export function toSnakeCase(text: string): string {
 
   return result;
 }
+
+/**
+ * A tab is reusable / disposable when it holds no real content: the freshly
+ * launched blank tab, or a tab orphaned by a navigation that never landed
+ * anywhere.
+ */
+export function isBlankUrl(url: string): boolean {
+  return url === '' || url === 'about:blank';
+}

@@ -180,9 +180,11 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getPageById(pageId: number): ContextPage;
+  getPageId(page: Page): number | undefined;
   newPage(
     background?: boolean,
     isolatedContextName?: string,
+    reuseExisting?: boolean,
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;

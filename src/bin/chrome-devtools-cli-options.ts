@@ -671,6 +671,13 @@ export const commands: Commands = {
           'If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.',
         required: false,
       },
+      reuseExisting: {
+        name: 'reuseExisting',
+        type: 'boolean',
+        description:
+          'Reuse an existing blank (about:blank) tab in the target context instead of opening a new one, when such a tab exists. Avoids accumulating idle tabs. Defaults to false. Note: in a shared isolated context the blank tab may belong to another agent, so only enable this when you own the context.',
+        required: false,
+      },
       timeout: {
         name: 'timeout',
         type: 'integer',

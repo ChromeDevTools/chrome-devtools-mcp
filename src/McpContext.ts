@@ -51,6 +51,7 @@ import {
   getTempFilePath,
   resolveCanonicalPath,
 } from './utils/files.js';
+import {isBlankUrl} from './utils/string.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
@@ -290,20 +291,39 @@ export class McpContext implements Context {
   async newPage(
     background?: boolean,
     isolatedContextName?: string,
+    reuseExisting = false,
   ): Promise<McpPage> {
-    let page: Page;
+    let ctx: BrowserContext;
     if (isolatedContextName !== undefined) {
-      let ctx = this.#isolatedContexts.get(isolatedContextName);
-      if (!ctx) {
-        ctx = await this.browser.createBrowserContext();
-        this.#isolatedContexts.set(isolatedContextName, ctx);
+      let isolated = this.#isolatedContexts.get(isolatedContextName);
+      if (!isolated) {
+        isolated = await this.browser.createBrowserContext();
+        this.#isolatedContexts.set(isolatedContextName, isolated);
       }
-      page = await ctx.newPage();
+      ctx = isolated;
     } else {
-      page = await this.browser.newPage({background});
+      ctx = this.browser.defaultBrowserContext();
     }
+
+    // Many short-lived agents share this browser, so blank/idle tabs pile up.
+    // When the caller opts in, hand back an existing blank (about:blank) tab in
+    // the target context instead of opening another one. Off by default: in a
+    // shared isolated context the blank tab could belong to another agent that
+    // just opened it and hasn't navigated yet, so reuse is the caller's call.
+    let page: Page | undefined;
+    if (reuseExisting) {
+      const existing = await ctx.pages();
+      page = existing.find(p => !p.isClosed() && isBlankUrl(p.url()));
+    }
+    if (!page) {
+      // `background` is honored in both the default and isolated paths so
+      // agent tabs don't steal foreground focus.
+      page = await ctx.newPage({background});
+    }
+
     await this.createPagesSnapshot();
     this.selectPage(this.#getMcpPage(page));
+    // addPage is idempotent, so this is a no-op for an already-tracked page.
     this.#networkCollector.addPage(page);
     this.#consoleCollector.addPage(page);
     return this.#getMcpPage(page);

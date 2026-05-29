@@ -7,6 +7,7 @@
 import {logger} from '../logger.js';
 import type {CdpPage, Dialog, HTTPRequest} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
+import {isBlankUrl} from '../utils/string.js';
 
 import {ToolCategory} from './categories.js';
 import type {ContextPage} from './ToolDefinition.js';
@@ -176,6 +177,15 @@ export const newPage = defineTool(args => {
             'Pages in the same browser context share cookies and storage. ' +
             'Pages in different browser contexts are fully isolated.',
         ),
+      reuseExisting: zod
+        .boolean()
+        .optional()
+        .describe(
+          'Reuse an existing blank (about:blank) tab in the target context instead of ' +
+            'opening a new one, when such a tab exists. Avoids accumulating idle tabs. ' +
+            'Defaults to false. Note: in a shared isolated context the blank tab may belong ' +
+            'to another agent, so only enable this when you own the context.',
+        ),
       ...(args?.experimentalNavigationAllowlist
         ? {
             allowList: zod
@@ -193,17 +203,40 @@ export const newPage = defineTool(args => {
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
+        request.params.reuseExisting,
       );
 
-      await navigateWithInterception(
-        page,
-        () =>
-          page.pptrPage.goto(request.params.url, {
-            timeout: request.params.timeout,
-          }),
-        request.params.allowList,
-        request.params.timeout,
-      );
+      try {
+        await navigateWithInterception(
+          page,
+          () =>
+            page.pptrPage.goto(request.params.url, {
+              timeout: request.params.timeout,
+            }),
+          request.params.allowList,
+          request.params.timeout,
+        );
+      } catch (error) {
+        // A tab whose navigation never landed would otherwise linger at
+        // about:blank and tempt a retry that opens yet another one. If it's
+        // still blank, close it (best effort) so failures don't pile up. The
+        // last remaining tab can't be closed (closePage guards that) and a tab
+        // that did navigate somewhere is left alone.
+        if (isBlankUrl(page.pptrPage.url())) {
+          const pageId = context.getPageId(page.pptrPage);
+          if (pageId !== undefined) {
+            await context.closePage(pageId).catch(err => {
+              logger('Failed to close orphaned blank tab', err);
+            });
+          }
+        }
+        response.appendResponseLine(
+          `Unable to open ${request.params.url}: ${error.message}`,
+        );
+        response.setIncludePages(true);
+        response.setListThirdPartyDeveloperTools();
+        return;
+      }
 
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();

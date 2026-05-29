@@ -42,6 +42,16 @@ Each HTTP session gets its own `McpServer` instance but shares the same Chrome b
 
 `createSharedState()` lazily launches/connects Chrome and owns the `MutexRegistry`. Multiple servers (stdio + N HTTP sessions) call into the same state, so the browser is launched once and all sessions cooperate via the same mutex registry.
 
+### 4. Page-lifecycle hygiene for many short-lived agents
+
+With dozens of agents sharing one browser, `new_page` accumulated tabs:
+
+- **Failed navigations no longer orphan blank tabs.** Upstream's `new_page` creates the tab first, then calls `goto`; a failed `goto` (timeout, refused connection, blocked navigation) threw and left the tab parked at `about:blank`, and agents would retry — multiplying blank tabs. The fork wraps the navigation, and if it fails while the tab is still blank, closes that tab (best-effort; the last tab is never closed) and reports the failure gracefully instead of throwing.
+- **`background` is honored for isolated contexts.** Upstream dropped the `background` flag on the `isolatedContext` path, so agent tabs always stole foreground focus. The fork passes `{background}` through both paths.
+- **Opt-in tab reuse.** `new_page` accepts `reuseExisting` (default `false`): when set, it reuses an existing blank (`about:blank`) tab in the target context instead of opening another. Off by default because, in a shared isolated context, a blank tab may belong to another agent that just opened it and hasn't navigated yet.
+
+These changes touch `src/McpContext.ts`, `src/tools/pages.ts`, and `src/tools/ToolDefinition.ts`. Tested via `tests/tools/pages.test.ts`.
+
 ## Keeping in sync with upstream
 
 ```sh
@@ -61,6 +71,9 @@ The modifications are concentrated in a handful of files:
 - `src/bin/chrome-devtools-mcp-cli-options.ts` (http-\* flags + validation)
 - `src/third_party/index.ts` (re-export `StreamableHTTPServerTransport`)
 - `src/HttpTransport.ts` (new file — entirely fork-owned)
+- `src/McpContext.ts` (`newPage` reuse + background; `isBlankUrl` helper)
+- `src/tools/pages.ts` (`new_page` failed-navigation cleanup + `reuseExisting`)
+- `src/tools/ToolDefinition.ts` (`Context` interface: `getPageId`, `newPage` arg)
 
 ## Attribution
 

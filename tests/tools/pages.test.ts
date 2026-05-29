@@ -406,6 +406,55 @@ describe('pages', () => {
     });
   });
 
+  describe('new_page reuseExisting', () => {
+    it('reuses a blank tab instead of opening a new one when enabled', async () => {
+      await withMcpContext(async (response, context) => {
+        // The initial tab is a blank about:blank page.
+        const initial = context.getSelectedMcpPage();
+        const before = (await context.browser.pages()).length;
+        await newPage().handler(
+          {params: {url: 'about:blank', reuseExisting: true}},
+          response,
+          context,
+        );
+        // No new tab was opened; the blank tab was reused.
+        assert.strictEqual((await context.browser.pages()).length, before);
+        assert.strictEqual(context.getSelectedMcpPage(), initial);
+      });
+    });
+
+    it('opens a new tab by default even when a blank tab exists', async () => {
+      await withMcpContext(async (response, context) => {
+        const before = (await context.browser.pages()).length;
+        await newPage().handler(
+          {params: {url: 'about:blank'}},
+          response,
+          context,
+        );
+        assert.strictEqual((await context.browser.pages()).length, before + 1);
+      });
+    });
+  });
+
+  describe('new_page failed navigation', () => {
+    it('closes the orphaned blank tab when navigation fails', async () => {
+      await withMcpContext(async (response, context) => {
+        const before = (await context.browser.pages()).length;
+        // Connection refused — goto rejects, leaving the new tab at about:blank.
+        await newPage().handler(
+          {params: {url: 'http://127.0.0.1:1/', timeout: 5000}},
+          response,
+          context,
+        );
+        // The orphaned blank tab was cleaned up rather than left behind.
+        assert.strictEqual((await context.browser.pages()).length, before);
+        assert.ok(
+          response.responseLines.some(line => line.includes('Unable to open')),
+        );
+      });
+    });
+  });
+
   it('navigate_page targets the pageId page, not the global selection', async () => {
     await withMcpContext(async (response, context) => {
       await newPage().handler(
