@@ -56,6 +56,22 @@
       {
         "name": "include_snapshot",
         "argType": "boolean"
+      },
+      {
+        "name": "to_offset_x",
+        "argType": "number"
+      },
+      {
+        "name": "to_offset_y",
+        "argType": "number"
+      },
+      {
+        "name": "to_fraction_x",
+        "argType": "number"
+      },
+      {
+        "name": "to_fraction_y",
+        "argType": "number"
       }
     ]
   },

@@ -1053,6 +1053,66 @@ describe('input', () => {
         assert.ok(await page.$('text/dropped'));
       });
     });
+
+    it('drags onto a biased point inside the target bounding box', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<div
+              role="button"
+              id="drag"
+              draggable="true"
+              >drag me</div
+            >
+            <div
+              id="drop"
+              aria-label="drop"
+              style="width: 120px; height: 120px; border: 1px solid black;"
+            ></div>
+            <script>
+              drag.addEventListener('dragstart', event => {
+                event.dataTransfer.setData('text/plain', event.target.id);
+              });
+              drop.addEventListener('dragover', event => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              });
+              drop.addEventListener('drop', event => {
+                event.preventDefault();
+                const rect = event.currentTarget.getBoundingClientRect();
+                const relativeY = event.clientY - rect.top;
+                event.currentTarget.setAttribute(
+                  'data-region',
+                  relativeY < rect.height / 2 ? 'top' : 'bottom',
+                );
+              });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await drag.handler(
+          {
+            params: {
+              from_uid: '1_1',
+              to_uid: '1_2',
+              to_offset_y: 10,
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully dragged an element',
+        );
+        assert.strictEqual(
+          await page.$eval('#drop', el => el.getAttribute('data-region')),
+          'top',
+        );
+      });
+    });
   });
 
   describe('fill form', () => {

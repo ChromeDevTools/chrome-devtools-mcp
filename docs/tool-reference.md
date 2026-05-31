@@ -81,6 +81,10 @@
 - **from_uid** (string) **(required)**: The uid of the element to [`drag`](#drag)
 - **to_uid** (string) **(required)**: The uid of the element to drop into
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
+- **to_fraction_x** (number) _(optional)_: Optional x fraction within the target element bounding rect. 0 is the left edge and 1 is the right edge. Cannot be combined with to_offset_x.
+- **to_fraction_y** (number) _(optional)_: Optional y fraction within the target element bounding rect. 0 is the top edge and 1 is the bottom edge. Cannot be combined with to_offset_y.
+- **to_offset_x** (number) _(optional)_: Optional x offset in CSS pixels from the target element bounding rect top-left corner. Cannot be combined with to_fraction_x.
+- **to_offset_y** (number) _(optional)_: Optional y offset in CSS pixels from the target element bounding rect top-left corner. Cannot be combined with to_fraction_y.
 
 ---
 

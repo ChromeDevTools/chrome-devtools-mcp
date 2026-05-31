@@ -111,6 +111,34 @@ export const commands: Commands = {
         description: 'The uid of the element to drop into',
         required: true,
       },
+      to_offset_x: {
+        name: 'to_offset_x',
+        type: 'number',
+        description:
+          'Optional x offset in CSS pixels from the target element bounding rect top-left corner. Cannot be combined with to_fraction_x.',
+        required: false,
+      },
+      to_offset_y: {
+        name: 'to_offset_y',
+        type: 'number',
+        description:
+          'Optional y offset in CSS pixels from the target element bounding rect top-left corner. Cannot be combined with to_fraction_y.',
+        required: false,
+      },
+      to_fraction_x: {
+        name: 'to_fraction_x',
+        type: 'number',
+        description:
+          'Optional x fraction within the target element bounding rect. 0 is the left edge and 1 is the right edge. Cannot be combined with to_offset_x.',
+        required: false,
+      },
+      to_fraction_y: {
+        name: 'to_fraction_y',
+        type: 'number',
+        description:
+          'Optional y fraction within the target element bounding rect. 0 is the top edge and 1 is the bottom edge. Cannot be combined with to_offset_y.',
+        required: false,
+      },
       includeSnapshot: {
         name: 'includeSnapshot',
         type: 'boolean',

@@ -33,6 +33,108 @@ const submitKeySchema = zod
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
   );
 
+const dragOffsetXSchema = zod
+  .number()
+  .optional()
+  .describe(
+    'Optional x offset in CSS pixels from the target element bounding rect top-left corner. Cannot be combined with to_fraction_x.',
+  );
+
+const dragOffsetYSchema = zod
+  .number()
+  .optional()
+  .describe(
+    'Optional y offset in CSS pixels from the target element bounding rect top-left corner. Cannot be combined with to_fraction_y.',
+  );
+
+const dragFractionXSchema = zod
+  .number()
+  .min(0)
+  .max(1)
+  .optional()
+  .describe(
+    'Optional x fraction within the target element bounding rect. 0 is the left edge and 1 is the right edge. Cannot be combined with to_offset_x.',
+  );
+
+const dragFractionYSchema = zod
+  .number()
+  .min(0)
+  .max(1)
+  .optional()
+  .describe(
+    'Optional y fraction within the target element bounding rect. 0 is the top edge and 1 is the bottom edge. Cannot be combined with to_offset_y.',
+  );
+
+const CUSTOM_DRAG_DELAY_MS = 150;
+
+interface DragCustomDropParams {
+  to_offset_x?: number;
+  to_offset_y?: number;
+  to_fraction_x?: number;
+  to_fraction_y?: number;
+}
+
+function hasCustomDropPoint(params: DragCustomDropParams): boolean {
+  return (
+    params.to_offset_x !== undefined ||
+    params.to_offset_y !== undefined ||
+    params.to_fraction_x !== undefined ||
+    params.to_fraction_y !== undefined
+  );
+}
+
+function assertValidCustomDropPoint(params: DragCustomDropParams): void {
+  if (params.to_offset_x !== undefined && params.to_fraction_x !== undefined) {
+    throw new Error(
+      'Specify only one of to_offset_x or to_fraction_x for drag().',
+    );
+  }
+  if (params.to_offset_y !== undefined && params.to_fraction_y !== undefined) {
+    throw new Error(
+      'Specify only one of to_offset_y or to_fraction_y for drag().',
+    );
+  }
+}
+
+function resolveDropAxisCoordinate(
+  origin: number,
+  size: number,
+  offset?: number,
+  fraction?: number,
+): number {
+  if (offset !== undefined) {
+    return origin + offset;
+  }
+  if (fraction !== undefined) {
+    return origin + size * fraction;
+  }
+  return origin + size / 2;
+}
+
+async function resolveCustomDropPoint(
+  handle: ElementHandle<Element>,
+  params: DragCustomDropParams,
+): Promise<{x: number; y: number}> {
+  const box = await handle.boundingBox();
+  if (!box) {
+    throw new Error('Failed to compute the drag drop target bounding box.');
+  }
+  return {
+    x: resolveDropAxisCoordinate(
+      box.x,
+      box.width,
+      params.to_offset_x,
+      params.to_fraction_x,
+    ),
+    y: resolveDropAxisCoordinate(
+      box.y,
+      box.height,
+      params.to_offset_y,
+      params.to_fraction_y,
+    ),
+  };
+}
+
 function handleActionError(error: unknown, uid: string) {
   logger('failed to act using a locator', error);
   throw new Error(
@@ -378,6 +480,10 @@ export const drag = definePageTool({
   schema: {
     from_uid: zod.string().describe('The uid of the element to drag'),
     to_uid: zod.string().describe('The uid of the element to drop into'),
+    to_offset_x: dragOffsetXSchema,
+    to_offset_y: dragOffsetYSchema,
+    to_fraction_x: dragFractionXSchema,
+    to_fraction_y: dragFractionYSchema,
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
@@ -387,11 +493,37 @@ export const drag = definePageTool({
       request.params.from_uid,
     );
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
+    const customDropParams: DragCustomDropParams = {
+      to_offset_x: request.params.to_offset_x,
+      to_offset_y: request.params.to_offset_y,
+      to_fraction_x: request.params.to_fraction_x,
+      to_fraction_y: request.params.to_fraction_y,
+    };
     try {
       const result = await request.page.waitForEventsAfterAction(async () => {
-        await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await toHandle.drop(fromHandle);
+        if (!hasCustomDropPoint(customDropParams)) {
+          await fromHandle.drag(toHandle);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          await toHandle.drop(fromHandle);
+          return;
+        }
+
+        assertValidCustomDropPoint(customDropParams);
+
+        await fromHandle.scrollIntoView();
+        await toHandle.scrollIntoView();
+
+        const targetPoint = await resolveCustomDropPoint(
+          toHandle,
+          customDropParams,
+        );
+        const mouse = request.page.pptrPage.mouse;
+
+        await fromHandle.hover();
+        await mouse.down();
+        await mouse.move(targetPoint.x, targetPoint.y);
+        await new Promise(resolve => setTimeout(resolve, CUSTOM_DRAG_DELAY_MS));
+        await mouse.up();
       });
       response.appendResponseLine(`Successfully dragged an element`);
       response.attachWaitForResult(result);
