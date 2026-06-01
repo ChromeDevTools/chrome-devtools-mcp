@@ -107,11 +107,7 @@ export class McpContext implements Context {
     locatorClass: typeof Locator,
   ) {
     this.browser = browser;
-    this.logger =
-      logger ??
-      (() => {
-        return;
-      });
+    this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
 
