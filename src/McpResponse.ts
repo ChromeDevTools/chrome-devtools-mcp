@@ -675,7 +675,7 @@ export class McpResponse implements Response {
     });
   }
 
-  format(
+  async format(
     toolName: string,
     context: McpContext,
     data: {
@@ -692,7 +692,7 @@ export class McpResponse implements Response {
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
-  ): {content: Array<TextContent | ImageContent>; structuredContent: object} {
+  ): Promise<{content: Array<TextContent | ImageContent>; structuredContent: object}> {
     const structuredContent: {
       snapshot?: object;
       snapshotFilePath?: string;
@@ -810,10 +810,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
+          const title = await page.title().catch(() => '');
+          const pageLabel = title ? `${title} (${page.url()})` : page.url();
           parts.push(
-            `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+            `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
           );
-          structuredPages.push(createStructuredPage(page, context));
+          structuredPages.push(await createStructuredPage(page, context));
         }
         response.push(...parts);
         structuredContent.pages = structuredPages;
@@ -828,10 +830,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
+            const title = await page.title().catch(() => '');
+            const pageLabel = title ? `${title} (${page.url()})` : page.url();
             response.push(
-              `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+              `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
             );
-            structuredExtensionPages.push(createStructuredPage(page, context));
+            structuredExtensionPages.push(
+              await createStructuredPage(page, context),
+            );
           }
           structuredContent.extensionPages = structuredExtensionPages;
         }
@@ -1157,16 +1163,19 @@ Call ${handleDialog.name} to handle it before continuing.`);
     this.#textResponseLines = [];
   }
 }
-function createStructuredPage(page: Page, context: McpContext) {
+async function createStructuredPage(page: Page, context: McpContext) {
   const isolatedContextName = context.getIsolatedContextName(page);
+  const title = await page.title().catch(() => '');
   const entry: {
     id: number | undefined;
     url: string;
+    title: string;
     selected: boolean;
     isolatedContext?: string;
   } = {
     id: context.getPageId(page),
     url: page.url(),
+    title,
     selected: context.isPageSelected(page),
   };
   if (isolatedContextName) {

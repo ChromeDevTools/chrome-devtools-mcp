@@ -324,6 +324,7 @@ exports[`McpResponse > list pages 2`] = `
     {
       "id": 1,
       "url": "about:blank",
+      "title": "",
       "selected": true
     }
   ]
@@ -1295,6 +1296,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
+      "title": "",
       "selected": true
     }
   ],
@@ -1323,6 +1325,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
+      "title": "",
       "selected": true
     }
   ],
@@ -1349,6 +1352,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
+      "title": "",
       "selected": true
     }
   ],
@@ -1375,6 +1379,7 @@ exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
     {
       "id": 1,
       "url": "about:blank",
+      "title": "",
       "selected": true
     }
   ]
