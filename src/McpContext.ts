@@ -40,6 +40,7 @@ import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import type {Logger} from './types.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
@@ -66,7 +67,7 @@ const NAVIGATION_TIMEOUT = 10_000;
 
 export class McpContext implements Context {
   browser: Browser;
-  logger: (...args: any[]) => void;
+  logger: Logger;
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
@@ -101,12 +102,16 @@ export class McpContext implements Context {
 
   private constructor(
     browser: Browser,
-    logger: ((...args: any[]) => void) | undefined,
+    logger: Logger,
     options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
     this.browser = browser;
-    this.logger = logger ?? (() => { return; });
+    this.logger =
+      logger ??
+      (() => {
+        return;
+      });
     this.#locatorClass = locatorClass;
     this.#options = options;
 
@@ -152,7 +157,7 @@ export class McpContext implements Context {
 
   static async from(
     browser: Browser,
-    logger: ((...args: any[]) => void) | undefined,
+    logger: Logger,
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,

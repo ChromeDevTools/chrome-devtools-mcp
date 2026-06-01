@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 
 import {debug} from './third_party/index.js';
+import type {Logger} from './types.js';
 
 const mcpDebugNamespace = 'mcp:log';
 
@@ -44,6 +45,4 @@ export function flushLogs(
   });
 }
 
-export const logger: ((...args: any[]) => void) | undefined = debug(
-  mcpDebugNamespace,
-) as ((...args: any[]) => void) | undefined;
+export const logger: Logger = debug(mcpDebugNamespace) as Logger;
