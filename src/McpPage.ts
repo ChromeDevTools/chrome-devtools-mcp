@@ -283,7 +283,7 @@ export class McpPage implements ContextPage {
       for (const handle of oldHandles) {
         await handle
           .dispose()
-          .catch(e => logger('Failed to dispose old handle', e));
+          .catch(e => logger?.('Failed to dispose old handle', e));
       }
     }
 
@@ -291,14 +291,14 @@ export class McpPage implements ContextPage {
       elementHandles.map(async (elementHandle, index) => {
         const backendNodeId = await elementHandle.backendNodeId();
         if (!backendNodeId) {
-          logger(
+          logger?.(
             `No backendNodeId for stashed DOM element with index ${index}`,
           );
           return `stashed-${index}`;
         }
         const cdpElementId = this.resolveCdpElementId(backendNodeId);
         if (!cdpElementId) {
-          logger(
+          logger?.(
             `Could not get cdpElementId for backend node ${backendNodeId}`,
           );
           return `stashed-${index}`;
@@ -371,12 +371,12 @@ export class McpPage implements ContextPage {
 
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
     if (!cdpBackendNodeId) {
-      logger('no cdpBackendNodeId');
+      logger?.('no cdpBackendNodeId');
       return;
     }
     const snapshot = this.textSnapshot;
     if (!snapshot) {
-      logger('no text snapshot');
+      logger?.('no text snapshot');
       return;
     }
     // TODO: index by backendNodeId instead.
@@ -395,10 +395,10 @@ export class McpPage implements ContextPage {
 
   async getDevToolsData(): Promise<DevToolsData> {
     try {
-      logger('Getting DevTools UI data');
+      logger?.('Getting DevTools UI data');
       const devtoolsPage = this.devToolsPage;
       if (!devtoolsPage) {
-        logger('No DevTools page detected');
+        logger?.('No DevTools page detected');
         return {};
       }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
@@ -421,7 +421,7 @@ export class McpPage implements ContextPage {
       );
       return {cdpBackendNodeId, cdpRequestId};
     } catch (err) {
-      logger('error getting devtools data', err);
+      logger?.('error getting devtools data', err);
     }
     return {};
   }

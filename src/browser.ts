@@ -119,7 +119,7 @@ export async function ensureBrowserConnected(options: {
     );
   }
 
-  logger('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+  logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
   try {
     // Assign mode before browser so a concurrent closeBrowser() never sees
     // `browser` set with `browserMode` still undefined (would fall through
@@ -135,7 +135,7 @@ export async function ensureBrowserConnected(options: {
       },
     );
   }
-  logger('Connected Puppeteer');
+  logger?.('Connected Puppeteer');
   return browser;
 }
 
@@ -296,12 +296,12 @@ export async function closeBrowser(): Promise<void> {
   }
   if (mode === 'launched') {
     await b.close().catch(err => {
-      logger('Failed to close browser', err);
+      logger?.('Failed to close browser', err);
     });
     return;
   }
   await b.disconnect().catch(err => {
-    logger('Failed to disconnect from browser', err);
+    logger?.('Failed to disconnect from browser', err);
   });
 }
 

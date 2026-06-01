@@ -29,7 +29,7 @@ const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
 if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
   process.on('unhandledRejection', (reason, promise) => {
-    logger('Unhandled promise rejection', promise, reason);
+    logger?.('Unhandled promise rejection', promise, reason);
   });
 }
 
@@ -43,13 +43,13 @@ async function shutdown(reason: string): Promise<void> {
     return;
   }
   shuttingDown = true;
-  logger(`Shutting down (${reason})`);
+  logger?.(`Shutting down (${reason})`);
   // Backstop in case browser teardown hangs (e.g. unresponsive Chrome,
   // slow beforeunload handlers, many tabs). Exits 0 because we still
   // honored the shutdown request; the log line preserves observability.
   // Unref'd so it doesn't keep the loop alive on the clean path.
   setTimeout(() => {
-    logger('Shutdown timeout exceeded, forcing exit');
+    logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
   }, 10000).unref();
   await closeBrowser();
@@ -71,13 +71,13 @@ process.on('SIGHUP', () => {
   void shutdown('SIGHUP');
 });
 
-logger(`Starting Chrome DevTools MCP Server v${VERSION}`);
+logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const {server} = await createMcpServer(args, {
   logFile,
 });
 const transport = new StdioServerTransport();
 await server.connect(transport);
-logger('Chrome DevTools MCP Server connected');
+logger?.('Chrome DevTools MCP Server connected');
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
 void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, cliOptions));

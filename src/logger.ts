@@ -44,4 +44,6 @@ export function flushLogs(
   });
 }
 
-export const logger = debug(mcpDebugNamespace);
+export const logger: ((...args: any[]) => void) | undefined = debug(
+  mcpDebugNamespace,
+) as ((...args: any[]) => void) | undefined;

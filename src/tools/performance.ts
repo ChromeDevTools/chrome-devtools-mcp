@@ -234,7 +234,7 @@ async function stopTracingAndAppendOutput(
 
 /** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
 async function populateCruxData(result: TraceResult): Promise<void> {
-  logger('populateCruxData called');
+  logger?.('populateCruxData called');
   const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
   // go/jtfbx. Yes, we're aware this API key is public. ;)
   cruxManager.setEndpointForTesting(
@@ -254,17 +254,17 @@ async function populateCruxData(result: TraceResult): Promise<void> {
   const urlSet = new Set(urls);
 
   if (urlSet.size === 0) {
-    logger('No URLs found for CrUX data');
+    logger?.('No URLs found for CrUX data');
     return;
   }
 
-  logger(
+  logger?.(
     `Fetching CrUX data for ${urlSet.size} URLs: ${Array.from(urlSet).join(', ')}`,
   );
   const cruxData = await Promise.all(
     Array.from(urlSet).map(async url => {
       const data = await cruxManager.getFieldDataForPage(url);
-      logger(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
+      logger?.(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
       return data;
     }),
   );

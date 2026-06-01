@@ -77,13 +77,13 @@ export function getPidFilePath(sessionId: string) {
 export function getDaemonPid(sessionId: string) {
   try {
     const pidFile = getPidFilePath(sessionId);
-    logger(`Daemon pid file ${pidFile} sessionId=${sessionId}`);
+    logger?.(`Daemon pid file ${pidFile} sessionId=${sessionId}`);
     if (!fs.existsSync(pidFile)) {
       return null;
     }
     const pidContent = fs.readFileSync(pidFile, 'utf-8');
     const pid = parseInt(pidContent.trim(), 10);
-    logger(`Daemon pid: ${pid}`);
+    logger?.(`Daemon pid: ${pid}`);
     if (isNaN(pid)) {
       return null;
     }

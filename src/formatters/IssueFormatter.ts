@@ -156,7 +156,7 @@ export class IssueFormatter {
     const markdownDescription = this.#issue.getDescription();
     const filename = markdownDescription?.file;
     if (!filename) {
-      logger(`no description found for issue:` + this.#issue.code());
+      logger?.(`no description found for issue:` + this.#issue.code());
       return undefined;
     }
 
@@ -166,7 +166,7 @@ export class IssueFormatter {
 
     const rawMarkdown = ISSUE_UTILS.getIssueDescription(filename);
     if (!rawMarkdown) {
-      logger(`no markdown ${filename} found for issue:` + this.#issue.code());
+      logger?.(`no markdown ${filename} found for issue:` + this.#issue.code());
       return undefined;
     }
 
@@ -180,12 +180,12 @@ export class IssueFormatter {
       const title =
         DevTools.MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
       if (!title) {
-        logger('cannot read issue title from ' + filename);
+        logger?.('cannot read issue title from ' + filename);
         return undefined;
       }
       return title;
     } catch {
-      logger('error parsing markdown for issue ' + this.#issue.code());
+      logger?.('error parsing markdown for issue ' + this.#issue.code());
       return undefined;
     }
   }

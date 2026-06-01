@@ -34,7 +34,7 @@ const submitKeySchema = zod
   );
 
 function handleActionError(error: unknown, uid: string) {
-  logger('failed to act using a locator', error);
+  logger?.('failed to act using a locator', error);
   throw new Error(
     `Failed to interact with the element with uid ${uid}. The element did not become interactive within the configured timeout.`,
     {

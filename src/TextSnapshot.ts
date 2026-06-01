@@ -262,7 +262,7 @@ export class TextSnapshot {
           collect(node);
         }
       } catch (e) {
-        logger(
+        logger?.(
           `Failed to collect descendants for backend node ${backendNodeId}`,
           e,
         );

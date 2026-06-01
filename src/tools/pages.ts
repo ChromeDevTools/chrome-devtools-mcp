@@ -40,7 +40,7 @@ async function navigateWithInterception(
     if (isAllowed) {
       void interceptedRequest.continue();
     } else {
-      logger(`Blocking request to: ${requestUrl}`);
+      logger?.(`Blocking request to: ${requestUrl}`);
       void interceptedRequest.abort('blockedbyclient');
     }
   };
@@ -49,7 +49,7 @@ async function navigateWithInterception(
     if (allowList) {
       page.pptrPage.off('request', requestHandler);
       await page.pptrPage.setRequestInterception(false).catch(error => {
-        logger(`Failed to disable request interception`, error);
+        logger?.(`Failed to disable request interception`, error);
       });
     }
   };
@@ -372,7 +372,7 @@ export const navigatePage = definePageTool(args => {
           await page.pptrPage
             .removeScriptToEvaluateOnNewDocument(initScriptId)
             .catch(error => {
-              logger(`Failed to remove init script`, error);
+              logger?.(`Failed to remove init script`, error);
             });
         }
       }
@@ -456,7 +456,7 @@ export const handleDialog = definePageTool({
           await dialog.accept(request.params.promptText);
         } catch (err) {
           // Likely already handled by the user outside of MCP.
-          logger(err);
+          logger?.(err);
         }
         response.appendResponseLine('Successfully accepted the dialog');
         break;
@@ -466,7 +466,7 @@ export const handleDialog = definePageTool({
           await dialog.dismiss();
         } catch (err) {
           // Likely already handled.
-          logger(err);
+          logger?.(err);
         }
         response.appendResponseLine('Successfully dismissed the dialog');
         break;

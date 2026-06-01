@@ -27,7 +27,6 @@ import {
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
-  type Debugger,
   type HTTPRequest,
   type Page,
   type ScreenRecorder,
@@ -67,7 +66,7 @@ const NAVIGATION_TIMEOUT = 10_000;
 
 export class McpContext implements Context {
   browser: Browser;
-  logger: Debugger;
+  logger: (...args: any[]) => void;
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
@@ -102,12 +101,12 @@ export class McpContext implements Context {
 
   private constructor(
     browser: Browser,
-    logger: Debugger,
+    logger: ((...args: any[]) => void) | undefined,
     options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
     this.browser = browser;
-    this.logger = logger;
+    this.logger = logger ?? (() => { return; });
     this.#locatorClass = locatorClass;
     this.#options = options;
 
@@ -153,7 +152,7 @@ export class McpContext implements Context {
 
   static async from(
     browser: Browser,
-    logger: Debugger,
+    logger: ((...args: any[]) => void) | undefined,
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,

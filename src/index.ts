@@ -69,7 +69,7 @@ export async function createMcpServer(
       );
       context?.setRoots(roots.roots);
     } catch (e) {
-      logger('Failed to list roots', e);
+      logger?.('Failed to list roots', e);
     }
   };
 

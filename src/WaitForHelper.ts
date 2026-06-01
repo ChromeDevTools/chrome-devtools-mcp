@@ -162,7 +162,7 @@ export class WaitForHelper {
         }
         return;
       })
-      .catch(error => logger(error));
+      .catch(error => logger?.(error));
 
     try {
       await action();
@@ -183,7 +183,7 @@ export class WaitForHelper {
       // the correct context
       await this.waitForStableDom();
     } catch (error) {
-      logger(error);
+      logger?.(error);
     } finally {
       this.#abortController.abort();
     }
