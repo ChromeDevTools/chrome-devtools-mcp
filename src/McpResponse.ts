@@ -99,9 +99,9 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
-async function getToolGroup(
+async function getToolGroups(
   page: McpPage,
-): Promise<ToolGroup<ToolDefinition> | undefined | null> {
+): Promise<Array<Partial<ToolGroup<ToolDefinition>>> | undefined | null> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
@@ -114,48 +114,85 @@ async function getToolGroup(
     return;
   }
 
-  const toolGroup = await page.pptrPage.evaluate(() => {
-    return new Promise<ToolGroup<ToolDefinition> | undefined | null>(
-      resolve => {
-        const event = new CustomEvent('devtoolstooldiscovery');
-        // @ts-expect-error Adding custom property
-        event.respondWith = (toolGroup: ToolGroup) => {
-          if (!window.__dtmcp) {
-            window.__dtmcp = {};
+  const toolGroups = await page.pptrPage.evaluate(() => {
+    return new Promise<Array<
+      Partial<
+        ToolGroup<
+          ToolDefinition & {
+            execute: (args: Record<string, unknown>) => unknown;
           }
-          window.__dtmcp.toolGroup = toolGroup;
+        >
+      >
+    > | null>(resolve => {
+      const event = new CustomEvent('devtoolstooldiscovery');
+      const groups: Array<
+        Partial<
+          ToolGroup<
+            ToolDefinition & {
+              execute: (args: Record<string, unknown>) => unknown;
+            }
+          >
+        >
+      > = [];
+      event.respondWith = toolGroup => {
+        if (!window.__dtmcp) {
+          window.__dtmcp = {};
+        }
+        if (!window.__dtmcp.toolGroups) {
+          window.__dtmcp.toolGroups = [];
+        }
+        window.__dtmcp.toolGroups.push(toolGroup);
 
-          // When receiving a toolGroup for the first time, expose a simple execution helper
-          if (!window.__dtmcp.executeTool) {
-            window.__dtmcp.executeTool = async (toolName, args) => {
-              if (!window.__dtmcp?.toolGroup) {
-                throw new Error('No tools found on the page');
+        // When receiving a toolGroup for the first time, expose a simple execution helper
+        if (!window.__dtmcp.executeTool) {
+          window.__dtmcp.executeTool = async (toolName, args) => {
+            if (
+              !window.__dtmcp?.toolGroups ||
+              window.__dtmcp.toolGroups.length === 0
+            ) {
+              throw new Error('No tools found on the page');
+            }
+            for (const group of window.__dtmcp.toolGroups) {
+              const tool = group.tools?.find(t => t.name === toolName);
+              if (tool) {
+                return await tool.execute(args);
               }
-              const tool = window.__dtmcp.toolGroup.tools.find(
-                t => t.name === toolName,
-              );
-              if (!tool) {
-                throw new Error(`Tool ${toolName} not found`);
-              }
-              return await tool.execute(args);
-            };
-          }
+            }
+            throw new Error(`Tool ${toolName} not found`);
+          };
+        }
 
-          resolve(toolGroup);
-        };
-        window.dispatchEvent(event);
-        // If the page does not synchronously call `event.respondWith`, return instead of timing out
+        groups.push(toolGroup);
+      };
+      window.dispatchEvent(event);
+      // If at least one toolGroup was added synchronously, resolve with the array.
+      // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve null.
+      if (groups.length > 0) {
+        resolve(groups);
+      } else {
         setTimeout(() => {
-          resolve(null);
+          if (groups.length > 0) {
+            resolve(groups);
+          } else {
+            resolve(null);
+          }
         }, 0);
-      },
-    );
+      }
+    });
   });
 
-  for (const tool of toolGroup?.tools ?? []) {
-    replaceHtmlElementsWithUids(tool.inputSchema);
+  if (toolGroups === undefined || toolGroups === null) {
+    return toolGroups;
   }
-  return toolGroup;
+
+  const groupsArray = Array.isArray(toolGroups) ? toolGroups : [toolGroups];
+
+  for (const group of groupsArray) {
+    for (const tool of group.tools ?? []) {
+      replaceHtmlElementsWithUids(tool.inputSchema);
+    }
+  }
+  return groupsArray;
 }
 
 export class McpResponse implements Response {
@@ -563,13 +600,16 @@ export class McpResponse implements Response {
     }
 
     // Null indicates no tools.
-    let thirdPartyDeveloperTools: ToolGroup<ToolDefinition> | undefined | null;
+    let thirdPartyDeveloperTools:
+      | Array<Partial<ToolGroup<ToolDefinition>>>
+      | undefined
+      | null;
     if (
       this.#args.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
       this.#page
     ) {
-      thirdPartyDeveloperTools = await getToolGroup(this.#page);
+      thirdPartyDeveloperTools = await getToolGroups(this.#page);
       if (thirdPartyDeveloperTools) {
         this.#page.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
       }
@@ -707,7 +747,9 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      thirdPartyDeveloperTools?: ToolGroup<ToolDefinition> | null;
+      thirdPartyDeveloperTools?: Array<
+        Partial<ToolGroup<ToolDefinition>>
+      > | null;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
@@ -724,7 +766,7 @@ export class McpResponse implements Response {
       traceInsights?: Array<{insightName: string; insightKey: string}>;
       lighthouseResult?: object;
       extensions?: object[];
-      thirdPartyDeveloperTools?: object;
+      thirdPartyDeveloperTools?: object[];
       webmcpTools?: object[];
       message?: string;
       networkConditions?: string;
@@ -1060,21 +1102,24 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push('## Third-party developer tools');
       if (
         data.thirdPartyDeveloperTools === null ||
-        !data.thirdPartyDeveloperTools?.tools
+        data.thirdPartyDeveloperTools.length === 0
       ) {
         response.push('No third-party developer tools available.');
       } else {
-        const toolGroup = data.thirdPartyDeveloperTools;
-        response.push(`${toolGroup.name}: ${toolGroup.description}`);
-        response.push('Available tools:');
-        const toolDefinitionsMessage = toolGroup.tools
-          .map(tool => {
-            return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
-              tool.inputSchema,
-            )}`;
-          })
-          .join('\n');
-        response.push(toolDefinitionsMessage);
+        for (const toolGroup of data.thirdPartyDeveloperTools) {
+          response.push(
+            `${toolGroup.name ?? ''}: ${toolGroup.description ?? ''}`,
+          );
+          response.push('Available tools:');
+          const toolDefinitionsMessage = (toolGroup.tools ?? [])
+            .map(tool => {
+              return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
+                tool.inputSchema,
+              )}`;
+            })
+            .join('\n');
+          response.push(toolDefinitionsMessage);
+        }
       }
     }
 

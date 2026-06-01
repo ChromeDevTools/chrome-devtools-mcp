@@ -1261,24 +1261,26 @@ name="myTool", description="Does something", inputSchema={"type":"object","prope
 
 exports[`third-party developer tools > lists third-party developer tools 2`] = `
 {
-  "thirdPartyDeveloperTools": {
-    "name": "My Tool Group",
-    "description": "A group of tools",
-    "tools": [
-      {
-        "name": "myTool",
-        "description": "Does something",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "foo": {
-              "type": "string"
+  "thirdPartyDeveloperTools": [
+    {
+      "name": "My Tool Group",
+      "description": "A group of tools",
+      "tools": [
+        {
+          "name": "myTool",
+          "description": "Does something",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "foo": {
+                "type": "string"
+              }
             }
           }
         }
-      }
-    ]
-  }
+      ]
+    }
+  ]
 }
 `;
 

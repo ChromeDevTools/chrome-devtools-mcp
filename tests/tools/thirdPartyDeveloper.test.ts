@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import {parseArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -22,6 +22,14 @@ import type {
   ToolDefinition,
 } from '../../src/tools/thirdPartyDeveloper.js';
 import {withMcpContext} from '../utils.js';
+
+interface ToolsResult {
+  thirdPartyDeveloperTools?: Array<Partial<ToolGroup<ToolDefinition>>>;
+}
+
+function asToolsResult(obj: unknown): obj is ToolsResult {
+  return typeof obj === 'object' && obj !== null;
+}
 
 describe('thirdPartyDeveloperTools', () => {
   describe('list_3p_developer_tools', () => {
@@ -52,8 +60,9 @@ describe('thirdPartyDeveloperTools', () => {
               },
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-              // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              if (e.respondWith && window.__dtmcp?.toolGroup) {
+                e.respondWith(window.__dtmcp.toolGroup);
+              }
             });
           });
 
@@ -67,10 +76,13 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          // @ts-expect-error `structuredContent` has `thirdPartyDeveloperTools`
-          const actualGroup = result.structuredContent.thirdPartyDeveloperTools;
+          assert.ok(asToolsResult(result.structuredContent));
+          const actualGroup =
+            result.structuredContent.thirdPartyDeveloperTools?.[0];
+          assert.ok(actualGroup);
           assert.strictEqual(actualGroup.name, 'test-group');
           assert.strictEqual(actualGroup.description, 'test description');
+          assert.ok(actualGroup.tools);
           assert.strictEqual(actualGroup.tools.length, 1);
           assert.strictEqual(actualGroup.tools[0].name, 'test-tool');
           assert.strictEqual(
@@ -85,7 +97,11 @@ describe('thirdPartyDeveloperTools', () => {
           });
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -96,8 +112,7 @@ describe('thirdPartyDeveloperTools', () => {
           response.setPage(page);
           await page.pptrPage.evaluate(() => {
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-              // @ts-expect-error Event has `respondWith`
-              e.respondWith({});
+              e.respondWith?.({});
             });
           });
 
@@ -111,18 +126,17 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
-          assert.deepEqual(
-            (
-              result.structuredContent as {
-                thirdPartyDeveloperTools: ToolGroup<ToolDefinition>;
-              }
-            ).thirdPartyDeveloperTools,
+          assert.ok(asToolsResult(result.structuredContent));
+          assert.deepEqual(result.structuredContent.thirdPartyDeveloperTools, [
             {},
-          );
+          ]);
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -147,17 +161,18 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
+          assert.ok(asToolsResult(result.structuredContent));
           assert.strictEqual(
-            (
-              result.structuredContent as {
-                thirdPartyDeveloperTools: ToolGroup<ToolDefinition>;
-              }
-            ).thirdPartyDeveloperTools,
+            result.structuredContent.thirdPartyDeveloperTools,
             undefined,
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -176,14 +191,82 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
+          assert.ok(asToolsResult(result.structuredContent));
           assert.strictEqual(
-            (result.structuredContent as {thirdPartyDeveloperTools: undefined})
-              .thirdPartyDeveloperTools,
+            result.structuredContent.thirdPartyDeveloperTools,
             undefined,
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
+      );
+    });
+
+    it('lists multiple toolgroups', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          await page.pptrPage.evaluate(() => {
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              e.respondWith?.({
+                name: 'group-1',
+                description: 'desc-1',
+                tools: [
+                  {
+                    name: 'tool-1',
+                    description: 'tool-1-desc',
+                    inputSchema: {},
+                    execute: () => 'r1',
+                  },
+                ],
+              });
+            });
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              e.respondWith?.({
+                name: 'group-2',
+                description: 'desc-2',
+                tools: [
+                  {
+                    name: 'tool-2',
+                    description: 'tool-2-desc',
+                    inputSchema: {},
+                    execute: () => 'r2',
+                  },
+                ],
+              });
+            });
+          });
+
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
+
+          const result = await response.handle(
+            'list_3p_developer_tools',
+            context,
+          );
+          assert.ok(asToolsResult(result.structuredContent));
+          const actualGroups =
+            result.structuredContent.thirdPartyDeveloperTools;
+          assert.ok(actualGroups);
+          assert.strictEqual(actualGroups.length, 2);
+          assert.strictEqual(actualGroups[0].name, 'group-1');
+          assert.strictEqual(actualGroups[1].name, 'group-2');
+        },
+        undefined,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
   });
@@ -252,7 +335,11 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -339,7 +426,11 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -384,7 +475,11 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -393,23 +488,25 @@ describe('thirdPartyDeveloperTools', () => {
         const page = await context.newPage();
         response.setPage(page);
 
-        page.thirdPartyDeveloperTools = {
-          name: 'test-group',
-          description: 'test description',
-          tools: [
-            {
-              name: 'test-tool',
-              description: 'test tool description',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  element: {type: 'object'},
+        page.thirdPartyDeveloperTools = [
+          {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    element: {type: 'object'},
+                  },
+                  required: ['element'],
                 },
-                required: ['element'],
               },
-            },
-          ],
-        };
+            ],
+          },
+        ];
 
         await page.pptrPage.evaluate(() => {
           window.__dtmcp = {
@@ -523,7 +620,11 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -572,7 +673,11 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -627,7 +732,11 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -637,17 +746,19 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
@@ -684,7 +795,11 @@ describe('thirdPartyDeveloperTools', () => {
           stub.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -694,17 +809,19 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
@@ -750,7 +867,11 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
 
@@ -760,17 +881,19 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
@@ -808,7 +931,11 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        parseArguments('1.0.0', [
+          'node',
+          'test.js',
+          '--categoryExperimentalThirdParty',
+        ]),
       );
     });
   });
