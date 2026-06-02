@@ -28,7 +28,7 @@ import type {
   Extension,
 } from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
-import type {ToolGroup, ToolDefinition} from './tools/thirdPartyDeveloper.js';
+import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
   ImageContentData,
@@ -99,9 +99,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
-async function getToolGroups(
-  page: McpPage,
-): Promise<Array<ToolGroup<ToolDefinition>>> {
+async function getToolGroups(page: McpPage): Promise<ToolGroups> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
@@ -115,9 +113,9 @@ async function getToolGroups(
   }
 
   const toolGroups = await page.pptrPage.evaluate(() => {
-    return new Promise<Array<ToolGroup<ToolDefinition>>>(resolve => {
+    return new Promise<ToolGroups>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
-      const groups: Array<ToolGroup<ToolDefinition>> = [];
+      const groups: ToolGroups = [];
       // @ts-expect-error Adding custom property
       event.respondWith = toolGroup => {
         if (!window.__dtmcp) {
@@ -599,7 +597,7 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    let thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>> = [];
+    let thirdPartyDeveloperTools: ToolGroups = [];
     if (
       this.#args.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
@@ -743,7 +741,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
+      thirdPartyDeveloperTools: ToolGroups;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },

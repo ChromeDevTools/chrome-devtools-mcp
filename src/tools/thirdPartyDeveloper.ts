@@ -21,6 +21,8 @@ export interface ToolGroup<T extends ToolDefinition> {
   tools: T[];
 }
 
+export type ToolGroups = Array<ToolGroup<ToolDefinition>>;
+
 declare global {
   interface Window {
     __dtmcp?: {

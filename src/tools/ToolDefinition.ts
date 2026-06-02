@@ -27,10 +27,7 @@ import type {PaginationOptions} from '../utils/types.js';
 import type {WaitForEventsResult} from '../WaitForHelper.js';
 
 import type {ToolCategory} from './categories.js';
-import type {
-  ToolGroup,
-  ToolDefinition as ThirdPartyDeveloperToolDefinition,
-} from './thirdPartyDeveloper.js';
+import type {ToolGroups} from './thirdPartyDeveloper.js';
 
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -270,9 +267,8 @@ export type ContextPage = Readonly<{
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<WaitForEventsResult>;
-  getThirdPartyDeveloperTools(): Array<
-    ToolGroup<ThirdPartyDeveloperToolDefinition>
-  >;
+  getThirdPartyDeveloperTools(): ToolGroups;
+
   executeThirdPartyDeveloperTool(
     toolName: string,
     params: Record<string, unknown>,

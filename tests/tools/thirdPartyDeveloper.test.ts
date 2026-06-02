@@ -17,10 +17,7 @@ import {
   executeThirdPartyDeveloperTool,
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
-import type {
-  ToolGroup,
-  ToolDefinition,
-} from '../../src/tools/thirdPartyDeveloper.js';
+import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
 import {withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
@@ -119,7 +116,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>>;
+                thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
             undefined,
@@ -155,7 +152,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>>;
+                thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
             undefined,
@@ -185,7 +182,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>>;
+                thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
             undefined,
