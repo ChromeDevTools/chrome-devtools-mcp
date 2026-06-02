@@ -24,12 +24,10 @@ export interface ToolGroup<T extends ToolDefinition> {
 declare global {
   interface Event {
     respondWith?: (
-      toolGroup: Partial<
-        ToolGroup<
-          ToolDefinition & {
-            execute: (args: Record<string, unknown>) => unknown;
-          }
-        >
+      toolGroup: ToolGroup<
+        ToolDefinition & {
+          execute: (args: Record<string, unknown>) => unknown;
+        }
       >,
     ) => void;
   }
@@ -42,12 +40,10 @@ declare global {
         }
       >;
       toolGroups?: Array<
-        Partial<
-          ToolGroup<
-            ToolDefinition & {
-              execute: (args: Record<string, unknown>) => unknown;
-            }
-          >
+        ToolGroup<
+          ToolDefinition & {
+            execute: (args: Record<string, unknown>) => unknown;
+          }
         >
       >;
       stashedElements?: Element[];

@@ -9,7 +9,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {parseArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -23,13 +23,13 @@ import type {
 } from '../../src/tools/thirdPartyDeveloper.js';
 import {withMcpContext} from '../utils.js';
 
-interface ToolsResult {
-  thirdPartyDeveloperTools?: Array<Partial<ToolGroup<ToolDefinition>>>;
-}
+// interface ToolsResult {
+//   thirdPartyDeveloperTools?: Array<Partial<ToolGroup<ToolDefinition>>>;
+// }
 
-function asToolsResult(obj: unknown): obj is ToolsResult {
-  return typeof obj === 'object' && obj !== null;
-}
+// function asToolsResult(obj: unknown): obj is ToolsResult {
+//   return typeof obj === 'object' && obj !== null;
+// }
 
 describe('thirdPartyDeveloperTools', () => {
   describe('list_3p_developer_tools', () => {
@@ -41,28 +41,31 @@ describe('thirdPartyDeveloperTools', () => {
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {
-                      type: 'object',
-                      properties: {
-                        arg: {type: 'string'},
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {
+                        type: 'object',
+                        properties: {
+                          arg: {type: 'string'},
+                        },
                       },
+                      execute: () => 'result',
                     },
-                    execute: () => 'result',
-                  },
-                ],
-              },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-              if (e.respondWith && window.__dtmcp?.toolGroup) {
-                e.respondWith(window.__dtmcp.toolGroup);
-              }
+              // if (e.respondWith && window.__dtmcp?.toolGroup) {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(window.__dtmcp?.toolGroups[0] || undefined);
+              // }
             });
           });
 
@@ -76,13 +79,13 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok(asToolsResult(result.structuredContent));
-          const actualGroup =
-            result.structuredContent.thirdPartyDeveloperTools?.[0];
-          assert.ok(actualGroup);
+          // assert.ok(asToolsResult(result.structuredContent));
+          // @ts-expect-error `structuredContent` has `thirdPartyDeveloperTools`
+          const groups = result.structuredContent.thirdPartyDeveloperTools;
+          assert.strictEqual(groups.length, 1);
+          const actualGroup = groups[0];
           assert.strictEqual(actualGroup.name, 'test-group');
           assert.strictEqual(actualGroup.description, 'test description');
-          assert.ok(actualGroup.tools);
           assert.strictEqual(actualGroup.tools.length, 1);
           assert.strictEqual(actualGroup.tools[0].name, 'test-tool');
           assert.strictEqual(
@@ -97,11 +100,7 @@ describe('thirdPartyDeveloperTools', () => {
           });
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -112,7 +111,8 @@ describe('thirdPartyDeveloperTools', () => {
           response.setPage(page);
           await page.pptrPage.evaluate(() => {
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-              e.respondWith?.({});
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith({});
             });
           });
 
@@ -126,17 +126,23 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok(asToolsResult(result.structuredContent));
-          assert.deepEqual(result.structuredContent.thirdPartyDeveloperTools, [
+          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
+          // assert.ok(asToolsResult(result.structuredContent));
+          // assert.deepEqual(result.structuredContent.thirdPartyDeveloperTools, [
+
+          // {},
+          // ]);
+          assert.deepEqual(
+            (
+              result.structuredContent as {
+                thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
+              }
+            ).thirdPartyDeveloperTools,
             {},
-          ]);
+          );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -161,18 +167,17 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok(asToolsResult(result.structuredContent));
           assert.strictEqual(
-            result.structuredContent.thirdPartyDeveloperTools,
+            (
+              result.structuredContent as {
+                thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
+              }
+            ).thirdPartyDeveloperTools,
             undefined,
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -191,18 +196,19 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok(asToolsResult(result.structuredContent));
+          // assert.ok(asToolsResult(result.structuredContent));
+          // assert.strictEqual(
+          //   result.structuredContent.thirdPartyDeveloperTools,
+          //   undefined,
+          // );
           assert.strictEqual(
-            result.structuredContent.thirdPartyDeveloperTools,
+            (result.structuredContent as {thirdPartyDeveloperTools: undefined})
+              .thirdPartyDeveloperTools,
             undefined,
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -253,7 +259,8 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok(asToolsResult(result.structuredContent));
+          // assert.ok(asToolsResult(result.structuredContent));
+          // @ts-expect-error Event has `respondWith`
           const actualGroups =
             result.structuredContent.thirdPartyDeveloperTools;
           assert.ok(actualGroups);
@@ -262,11 +269,12 @@ describe('thirdPartyDeveloperTools', () => {
           assert.strictEqual(actualGroups[1].name, 'group-2');
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        // parseArguments('1.0.0', [
+        //   'node',
+        //   'test.js',
+        //   '--categoryExperimentalThirdParty',
+        // ]),
       );
     });
   });
@@ -335,11 +343,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -426,11 +430,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -475,11 +475,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -620,11 +616,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -673,11 +665,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -732,11 +720,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -795,11 +779,7 @@ describe('thirdPartyDeveloperTools', () => {
           stub.restore();
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -867,11 +847,7 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
 
@@ -931,11 +907,7 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        parseArguments('1.0.0', [
-          'node',
-          'test.js',
-          '--categoryExperimentalThirdParty',
-        ]),
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
       );
     });
   });

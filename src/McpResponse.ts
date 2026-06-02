@@ -101,7 +101,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
 
 async function getToolGroups(
   page: McpPage,
-): Promise<Array<Partial<ToolGroup<ToolDefinition>>> | undefined | null> {
+): Promise<Array<ToolGroup<ToolDefinition>> | undefined | null> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
@@ -116,24 +116,20 @@ async function getToolGroups(
 
   const toolGroups = await page.pptrPage.evaluate(() => {
     return new Promise<Array<
-      Partial<
-        ToolGroup<
-          ToolDefinition & {
-            execute: (args: Record<string, unknown>) => unknown;
-          }
-        >
-      >
+      ToolGroup<// ToolDefinition & {
+      //   execute: (args: Record<string, unknown>) => unknown;
+      // }
+      ToolDefinition>
     > | null>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
-      const groups: Array<
-        Partial<
-          ToolGroup<
-            ToolDefinition & {
-              execute: (args: Record<string, unknown>) => unknown;
-            }
-          >
-        >
-      > = [];
+      // const groups: Array<
+      //   ToolGroup<
+      //     ToolDefinition & {
+      //       execute: (args: Record<string, unknown>) => unknown;
+      //     }
+      //   >
+      // > = [];
+      const groups: Array<ToolGroup<ToolDefinition>> = [];
       event.respondWith = toolGroup => {
         if (!window.__dtmcp) {
           window.__dtmcp = {};
@@ -601,7 +597,7 @@ export class McpResponse implements Response {
 
     // Null indicates no tools.
     let thirdPartyDeveloperTools:
-      | Array<Partial<ToolGroup<ToolDefinition>>>
+      | Array<ToolGroup<ToolDefinition>>
       | undefined
       | null;
     if (
@@ -747,9 +743,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      thirdPartyDeveloperTools?: Array<
-        Partial<ToolGroup<ToolDefinition>>
-      > | null;
+      thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>> | null;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
@@ -1107,11 +1101,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push('No third-party developer tools available.');
       } else {
         for (const toolGroup of data.thirdPartyDeveloperTools) {
-          response.push(
-            `${toolGroup.name ?? ''}: ${toolGroup.description ?? ''}`,
-          );
+          response.push(`${toolGroup.name}: ${toolGroup.description}`);
           response.push('Available tools:');
-          const toolDefinitionsMessage = (toolGroup.tools ?? [])
+          const toolDefinitionsMessage = toolGroup.tools
             .map(tool => {
               return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
                 tool.inputSchema,
