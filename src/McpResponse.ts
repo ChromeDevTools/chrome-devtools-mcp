@@ -127,11 +127,24 @@ async function getToolGroups(
           window.__dtmcp.toolGroups = [];
         }
 
-        // Verify toolGroup
-        // TODO: verify tools
-        if (!toolGroup.name || !toolGroup.description || !toolGroup.tools) {
+        if (
+          typeof toolGroup.name !== 'string' ||
+          typeof toolGroup.description !== 'string' ||
+          !Array.isArray(toolGroup.tools)
+        ) {
           console.error('Invalid toolGroup:', toolGroup);
           return;
+        }
+        for (const tool of toolGroup.tools) {
+          if (
+            typeof tool.name !== 'string' ||
+            typeof tool.description !== 'string' ||
+            typeof tool.inputSchema !== 'object' ||
+            typeof tool.execute !== 'function'
+          ) {
+            console.error('Invalid tool:', tool);
+            return;
+          }
         }
 
         window.__dtmcp.toolGroups.push(toolGroup);
@@ -160,7 +173,6 @@ async function getToolGroups(
       window.dispatchEvent(event);
       // If at least one toolGroup was added synchronously, resolve with the array.
       // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve with an empty array.
-      // TODO: needed?
       if (groups.length > 0) {
         resolve(groups);
       } else {
