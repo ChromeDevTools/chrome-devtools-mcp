@@ -39,12 +39,13 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (6 tools)
+- **[Memory](#memory)** (7 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
+  - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
@@ -500,6 +501,20 @@ in the DevTools Elements panel (if any).
 - **nodeId** (number) **(required)**: The node ID to get retainers for.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
+
+---
+
+### `get_heapsnapshot_retaining_paths`
+
+**Description:** Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **nodeId** (number) **(required)**: The node ID to get retaining paths for.
+- **maxDepth** (number) _(optional)_: The maximum depth to search for retaining paths.
+- **maxNodes** (number) _(optional)_: The maximum number of nodes to return.
+- **maxSiblings** (number) _(optional)_: The maximum number of siblings to return.
 
 ---
 

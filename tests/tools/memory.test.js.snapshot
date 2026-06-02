@@ -184,6 +184,32 @@ initial_string_prototype,internal,7199,system / NativeContext
 Showing 1-3 of 3 (Page 1 of 1).
 `;
 
+exports[`memory > get_heapsnapshot_retaining_paths > with valid nodeId 1`] = `
+## Heap Snapshot Data
+### Retaining Paths
+<- @45891 system / Context via context builtinToJSONs (distance: 4)
+  <- @34237 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Promise> (distance: 2)
+    <- @34235 system / PropertyCell via internal value (distance: 4)
+      <- @50423 (object properties) via internal 1912 (distance: 3)
+        <- @27635 Window (global*) / https://example.com via internal properties (distance: 2)
+  <- @34213 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Error> (distance: 2)
+  <- @34197 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::RegExp> (distance: 2)
+  <- @34185 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::String> (distance: 2)
+  <- @34145 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Array> (distance: 2)
+  <- @34069 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Function> (distance: 2)
+  <- @34047 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Object> (distance: 2)
+  <- @46063 stringify via internal context (distance: 4)
+    <- @34247 {parse, stringify} via property stringify (distance: 3)
+      <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::JSON> (distance: 2)
+`;
+
 exports[`memory > get_heapsnapshot_summary > with default options 1`] = `
 ## Heap Snapshot Data
 Statistics: {

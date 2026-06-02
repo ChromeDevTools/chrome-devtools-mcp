@@ -150,6 +150,26 @@ export class HeapSnapshotManager {
     return await provider.serializeItemsRange(0, Infinity);
   }
 
+  async getRetainingPaths(
+    filePath: string,
+    nodeId: number,
+    maxDepth?: number,
+    maxNodes?: number,
+    maxSiblings?: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths> {
+    const nodeIndex = await this.findNodeIndexById(filePath, nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getRetainingPaths(
+      nodeIndex,
+      maxDepth,
+      maxNodes,
+      maxSiblings,
+    );
+  }
+
   #getCachedSnapshot(filePath: string) {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);

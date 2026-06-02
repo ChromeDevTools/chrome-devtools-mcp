@@ -157,4 +157,41 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(result[1][0], 'ObjectB');
     });
   });
+
+  describe('formatRetainingPaths', () => {
+    it('formats retaining paths correctly', () => {
+      const mockRetainingPaths = [
+        {
+          edgeIndex: 0,
+          edgeName: 'foo',
+          edgeType: 'property',
+          nodeId: 10,
+          nodeIndex: 1,
+          nodeName: 'ClassA',
+          distance: 2,
+          children: [
+            {
+              edgeIndex: 0,
+              edgeName: 'bar',
+              edgeType: 'element',
+              nodeId: 20,
+              nodeIndex: 2,
+              nodeName: 'ClassB',
+              distance: 1,
+              children: [],
+            },
+          ],
+        },
+      ] as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge[];
+
+      const result =
+        HeapSnapshotFormatter.formatRetainingPaths(mockRetainingPaths);
+      const expected = [
+        '<- @10 ClassA via property foo (distance: 2)',
+        '  <- @20 ClassB via element bar (distance: 1)',
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+  });
 });

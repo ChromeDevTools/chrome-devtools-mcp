@@ -219,6 +219,7 @@ export class McpResponse implements Response {
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
+    retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -469,6 +470,16 @@ export class McpResponse implements Response {
       include: true,
       nodes,
       pagination: options,
+    };
+  }
+
+  setHeapSnapshotRetainingPaths(
+    retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      retainingPaths,
     };
   }
 
@@ -780,6 +791,7 @@ export class McpResponse implements Response {
       };
       heapSnapshotData?: object[];
       heapSnapshotNodes?: readonly object[];
+      heapSnapshotRetainingPaths?: object;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1055,6 +1067,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(...paginationData.info);
 
         structuredContent.heapSnapshotNodes = paginationData.items;
+      }
+      const retainingPaths = this.#heapSnapshotOptions.retainingPaths;
+      if (retainingPaths) {
+        response.push('### Retaining Paths');
+        const {paths, limitsReached} = retainingPaths;
+        if (paths.length === 0) {
+          response.push('No retaining paths found.');
+        } else {
+          response.push(HeapSnapshotFormatter.formatRetainingPaths(paths));
+        }
+        const reached = Object.entries(limitsReached)
+          .filter(([, hit]) => hit)
+          .map(([limit]) => limit);
+        if (reached.length > 0) {
+          response.push(
+            `Note: results are truncated, the following limits were reached: ${reached.join(', ')}.`,
+          );
+        }
+        structuredContent.heapSnapshotRetainingPaths =
+          retainingPaths as unknown as object;
       }
     }
 

@@ -747,5 +747,30 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "get_heapsnapshot_retaining_paths",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "max_depth",
+        "argType": "number"
+      },
+      {
+        "name": "max_nodes",
+        "argType": "number"
+      },
+      {
+        "name": "max_siblings",
+        "argType": "number"
+      }
+    ]
   }
 ]
