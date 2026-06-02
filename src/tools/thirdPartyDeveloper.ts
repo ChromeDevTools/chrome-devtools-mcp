@@ -24,11 +24,6 @@ export interface ToolGroup<T extends ToolDefinition> {
 declare global {
   interface Window {
     __dtmcp?: {
-      // toolGroup?: ToolGroup<
-      //   ToolDefinition & {
-      //     execute: (args: Record<string, unknown>) => unknown;
-      //   }
-      // >;
       toolGroups?: Array<
         ToolGroup<
           ToolDefinition & {

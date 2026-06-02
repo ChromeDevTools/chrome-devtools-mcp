@@ -1070,22 +1070,24 @@ describe('third-party developer tools', () => {
       async (response, context) => {
         const mcpPage = context.getSelectedMcpPage();
         stubToolDiscovery(mcpPage.pptrPage);
-        sinon.stub(mcpPage.pptrPage, 'evaluate').resolves({
-          name: 'My Tool Group',
-          description: 'A group of tools',
-          tools: [
-            {
-              name: 'myTool',
-              description: 'Does something',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  foo: {type: 'string'},
+        sinon.stub(mcpPage.pptrPage, 'evaluate').resolves([
+          {
+            name: 'My Tool Group',
+            description: 'A group of tools',
+            tools: [
+              {
+                name: 'myTool',
+                description: 'Does something',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    foo: {type: 'string'},
+                  },
                 },
               },
-            },
-          ],
-        });
+            ],
+          },
+        ]);
         response.setListThirdPartyDeveloperTools();
         const {content, structuredContent} = await response.handle(
           'test',

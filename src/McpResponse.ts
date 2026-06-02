@@ -115,22 +115,8 @@ async function getToolGroups(
   }
 
   const toolGroups = await page.pptrPage.evaluate(() => {
-    return new Promise<
-      Array<
-        ToolGroup<// ToolDefinition & {
-        //   execute: (args: Record<string, unknown>) => unknown;
-        // }
-        ToolDefinition>
-      >
-    >(resolve => {
+    return new Promise<Array<ToolGroup<ToolDefinition>>>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
-      // const groups: Array<
-      //   ToolGroup<
-      //     ToolDefinition & {
-      //       execute: (args: Record<string, unknown>) => unknown;
-      //     }
-      //   >
-      // > = [];
       const groups: Array<ToolGroup<ToolDefinition>> = [];
       // @ts-expect-error Adding custom property
       event.respondWith = toolGroup => {
@@ -142,6 +128,7 @@ async function getToolGroups(
         }
 
         // Verify toolGroup
+        // TODO: verify tools
         if (!toolGroup.name || !toolGroup.description || !toolGroup.tools) {
           console.error('Invalid toolGroup:', toolGroup);
           return;
@@ -172,7 +159,8 @@ async function getToolGroups(
       };
       window.dispatchEvent(event);
       // If at least one toolGroup was added synchronously, resolve with the array.
-      // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve null.
+      // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve with an empty array.
+      // TODO: needed?
       if (groups.length > 0) {
         resolve(groups);
       } else {
@@ -187,19 +175,12 @@ async function getToolGroups(
     });
   });
 
-  // if (toolGroups === undefined || toolGroups === null) {
-  //   return toolGroups;
-  // }
-
-  // SIMPLIFY?
-  const groupsArray = Array.isArray(toolGroups) ? toolGroups : [toolGroups];
-
-  for (const group of groupsArray) {
+  for (const group of toolGroups) {
     for (const tool of group.tools ?? []) {
       replaceHtmlElementsWithUids(tool.inputSchema);
     }
   }
-  return groupsArray;
+  return toolGroups;
 }
 
 export class McpResponse implements Response {
@@ -606,8 +587,6 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    // TODO: fix comment
-    // Null indicates no tools.
     let thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>> = [];
     if (
       this.#args.categoryExperimentalThirdParty &&
