@@ -59,7 +59,7 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>> | undefined;
+  thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>> = [];
 
   constructor(page: Page, id: number) {
     this.pptrPage = page;
@@ -90,7 +90,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  getThirdPartyDeveloperTools(): Array<ToolGroup<ToolDefinition>> | undefined {
+  getThirdPartyDeveloperTools(): Array<ToolGroup<ToolDefinition>> {
     return this.thirdPartyDeveloperTools;
   }
 

@@ -115,12 +115,14 @@ async function getToolGroups(
   }
 
   const toolGroups = await page.pptrPage.evaluate(() => {
-    return new Promise<Array<
-      ToolGroup<// ToolDefinition & {
-      //   execute: (args: Record<string, unknown>) => unknown;
-      // }
-      ToolDefinition>
-    >>(resolve => {
+    return new Promise<
+      Array<
+        ToolGroup<// ToolDefinition & {
+        //   execute: (args: Record<string, unknown>) => unknown;
+        // }
+        ToolDefinition>
+      >
+    >(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
       // const groups: Array<
       //   ToolGroup<
@@ -144,7 +146,6 @@ async function getToolGroups(
           console.error('Invalid toolGroup:', toolGroup);
           return;
         }
-
 
         window.__dtmcp.toolGroups.push(toolGroup);
 
@@ -186,10 +187,11 @@ async function getToolGroups(
     });
   });
 
-  if (toolGroups === undefined || toolGroups === null) {
-    return toolGroups;
-  }
+  // if (toolGroups === undefined || toolGroups === null) {
+  //   return toolGroups;
+  // }
 
+  // SIMPLIFY?
   const groupsArray = Array.isArray(toolGroups) ? toolGroups : [toolGroups];
 
   for (const group of groupsArray) {
@@ -604,11 +606,9 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
+    // TODO: fix comment
     // Null indicates no tools.
-    let thirdPartyDeveloperTools:
-      | Array<ToolGroup<ToolDefinition>>
-      | undefined
-      | null;
+    let thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>> = [];
     if (
       this.#args.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
@@ -752,7 +752,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>> | null;
+      thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
@@ -1097,30 +1097,21 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    if (data.thirdPartyDeveloperTools !== undefined) {
-      if (data.thirdPartyDeveloperTools) {
-        structuredContent.thirdPartyDeveloperTools =
-          data.thirdPartyDeveloperTools;
-      }
+    if (data.thirdPartyDeveloperTools.length) {
+      structuredContent.thirdPartyDeveloperTools =
+        data.thirdPartyDeveloperTools;
       response.push('## Third-party developer tools');
-      if (
-        data.thirdPartyDeveloperTools === null ||
-        data.thirdPartyDeveloperTools.length === 0
-      ) {
-        response.push('No third-party developer tools available.');
-      } else {
-        for (const toolGroup of data.thirdPartyDeveloperTools) {
-          response.push(`${toolGroup.name}: ${toolGroup.description}`);
-          response.push('Available tools:');
-          const toolDefinitionsMessage = toolGroup.tools
-            .map(tool => {
-              return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
-                tool.inputSchema,
-              )}`;
-            })
-            .join('\n');
-          response.push(toolDefinitionsMessage);
-        }
+      for (const toolGroup of data.thirdPartyDeveloperTools) {
+        response.push(`${toolGroup.name}: ${toolGroup.description}`);
+        response.push('Available tools:');
+        const toolDefinitionsMessage = toolGroup.tools
+          .map(tool => {
+            return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
+              tool.inputSchema,
+            )}`;
+          })
+          .join('\n');
+        response.push(toolDefinitionsMessage);
       }
     }
 

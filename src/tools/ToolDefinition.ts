@@ -270,9 +270,9 @@ export type ContextPage = Readonly<{
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
   ): Promise<WaitForEventsResult>;
-  getThirdPartyDeveloperTools():
-    | Array<ToolGroup<ThirdPartyDeveloperToolDefinition>>
-    | undefined;
+  getThirdPartyDeveloperTools(): Array<
+    ToolGroup<ThirdPartyDeveloperToolDefinition>
+  >;
   executeThirdPartyDeveloperTool(
     toolName: string,
     params: Record<string, unknown>,

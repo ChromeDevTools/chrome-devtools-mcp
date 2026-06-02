@@ -64,7 +64,7 @@ describe('thirdPartyDeveloperTools', () => {
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // if (e.respondWith && window.__dtmcp?.toolGroup) {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroups[0] || undefined);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
               // }
             });
           });
@@ -126,19 +126,20 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
+          // assert.strictEqual(result.structuredContent.thirdPartyDeveloperTools, undefined);
+          assert.ok(result.structuredContent);
           // assert.ok(asToolsResult(result.structuredContent));
           // assert.deepEqual(result.structuredContent.thirdPartyDeveloperTools, [
 
           // {},
           // ]);
-          assert.deepEqual(
+          assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
+                thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>>;
               }
             ).thirdPartyDeveloperTools,
-            [],
+            undefined,
           );
         },
         undefined,
@@ -167,13 +168,14 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
+          assert.ok(result.structuredContent);
           assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
+                thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>>;
               }
             ).thirdPartyDeveloperTools,
-            [],
+            undefined,
           );
         },
         undefined,
@@ -202,9 +204,12 @@ describe('thirdPartyDeveloperTools', () => {
           //   undefined,
           // );
           assert.deepStrictEqual(
-            (result.structuredContent as {thirdPartyDeveloperTools: undefined})
-              .thirdPartyDeveloperTools,
-            [],
+            (
+              result.structuredContent as {
+                thirdPartyDeveloperTools?: Array<ToolGroup<ToolDefinition>>;
+              }
+            ).thirdPartyDeveloperTools,
+            undefined,
           );
         },
         undefined,
@@ -263,7 +268,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
           // assert.ok(asToolsResult(result.structuredContent));
           const actualGroups =
-          // @ts-expect-error Event has `respondWith`
+            // @ts-expect-error Event has `respondWith`
             result.structuredContent.thirdPartyDeveloperTools;
           assert.ok(actualGroups);
           assert.strictEqual(actualGroups.length, 2);
@@ -303,28 +308,30 @@ describe('thirdPartyDeveloperTools', () => {
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {
-                      type: 'object',
-                      properties: {
-                        arg: {type: 'string'},
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {
+                        type: 'object',
+                        properties: {
+                          arg: {type: 'string'},
+                        },
+                        required: ['arg'],
                       },
-                      required: ['arg'],
+                      execute: () => 'result',
                     },
-                    execute: () => 'result',
-                  },
-                ],
-              },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
             });
           });
 
@@ -353,15 +360,17 @@ describe('thirdPartyDeveloperTools', () => {
       await withMcpContext(async (response, context) => {
         await setupThirdPartyDeveloperTools(response, context, () => {
           window.__dtmcp = {
-            toolGroup: {
-              name: 'test-group',
-              description: 'test description',
-              tools: [],
-            },
+            toolGroups: [
+              {
+                name: 'test-group',
+                description: 'test description',
+                tools: [],
+              },
+            ],
           };
           window.addEventListener('devtoolstooldiscovery', (e: Event) => {
             // @ts-expect-error Event has `respondWith`
-            e.respondWith(window.__dtmcp?.toolGroup);
+            e.respondWith(window.__dtmcp?.toolGroups[0]);
           });
         });
 
@@ -389,28 +398,30 @@ describe('thirdPartyDeveloperTools', () => {
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {
-                      type: 'object',
-                      properties: {
-                        arg: {type: 'string'},
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {
+                        type: 'object',
+                        properties: {
+                          arg: {type: 'string'},
+                        },
+                        required: ['arg'],
                       },
-                      required: ['arg'],
+                      execute: () => 'result',
                     },
-                    execute: () => 'result',
-                  },
-                ],
-              },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
             });
           });
 
@@ -441,22 +452,24 @@ describe('thirdPartyDeveloperTools', () => {
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => ({foo: 'bar'}),
-                  },
-                ],
-              },
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {},
+                      execute: () => ({foo: 'bar'}),
+                    },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
             });
           });
 
@@ -579,25 +592,27 @@ describe('thirdPartyDeveloperTools', () => {
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => ({
-                      foo: 'bar',
-                      func: () => undefined,
-                    }),
-                  },
-                ],
-              },
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {},
+                      execute: () => ({
+                        foo: 'bar',
+                        func: () => undefined,
+                      }),
+                    },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
             });
           });
 
@@ -627,26 +642,28 @@ describe('thirdPartyDeveloperTools', () => {
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => {
-                      const obj: Record<string, unknown> = {foo: 'bar'};
-                      obj.self = obj;
-                      return obj;
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {},
+                      execute: () => {
+                        const obj: Record<string, unknown> = {foo: 'bar'};
+                        obj.self = obj;
+                        return obj;
+                      },
                     },
-                  },
-                ],
-              },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
             });
           });
 
@@ -679,25 +696,27 @@ describe('thirdPartyDeveloperTools', () => {
               val = 'value';
             }
             window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => ({
-                      foo: 'bar',
-                      custom: new CustomClass(),
-                    }),
-                  },
-                ],
-              },
+              toolGroups: [
+                {
+                  name: 'test-group',
+                  description: 'test description',
+                  tools: [
+                    {
+                      name: 'test-tool',
+                      description: 'test tool description',
+                      inputSchema: {},
+                      execute: () => ({
+                        foo: 'bar',
+                        custom: new CustomClass(),
+                      }),
+                    },
+                  ],
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(window.__dtmcp?.toolGroups[0]);
             });
           });
 
