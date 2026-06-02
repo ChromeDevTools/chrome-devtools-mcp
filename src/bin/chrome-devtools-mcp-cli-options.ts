@@ -161,9 +161,10 @@ export const cliOptions = {
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
   },
-  experimentalMemory: {
+  memoryDebugging: {
     type: 'boolean',
-    describe: 'Whether to enable experimental memory tools.',
+    describe: 'Whether to enable memory debugging tools.',
+    alias: 'experimentalMemory',
   },
   experimentalStructuredContent: {
     type: 'boolean',

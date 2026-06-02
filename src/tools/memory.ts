@@ -44,7 +44,7 @@ export const getHeapSnapshotSummary = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
@@ -68,7 +68,7 @@ export const getHeapSnapshotDetails = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
@@ -102,7 +102,7 @@ export const getHeapSnapshotClassNodes = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
@@ -132,7 +132,7 @@ export const getHeapSnapshotRetainers = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
   verifyFilesSchema: ['filePath'],

@@ -306,7 +306,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_class_nodes: {
     description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)',
+      'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -337,7 +337,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_details: {
     description:
-      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)',
+      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -362,7 +362,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_retainers: {
     description:
-      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)',
+      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -393,7 +393,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_summary: {
     description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)',
+      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {

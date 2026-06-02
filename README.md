@@ -609,8 +609,8 @@ The Chrome DevTools MCP server supports the following configuration option:
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean
 
-- **`--experimentalMemory`/ `--experimental-memory`**
-  Whether to enable experimental memory tools.
+- **`--memoryDebugging`/ `--memory-debugging`, `-experimentalMemory`**
+  Whether to enable memory debugging tools.
   - **Type:** boolean
 
 - **`--experimentalStructuredContent`/ `--experimental-structured-content`**
