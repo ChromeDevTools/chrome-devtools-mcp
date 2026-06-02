@@ -22,15 +22,15 @@ export interface ToolGroup<T extends ToolDefinition> {
 }
 
 declare global {
-  interface Event {
-    respondWith?: (
-      toolGroup: ToolGroup<
-        ToolDefinition & {
-          execute: (args: Record<string, unknown>) => unknown;
-        }
-      >,
-    ) => void;
-  }
+  // interface Event {
+  //   respondWith?: (
+  //     toolGroup: ToolGroup<
+  //       ToolDefinition & {
+  //         execute: (args: Record<string, unknown>) => unknown;
+  //       }
+  //     >,
+  //   ) => void;
+  // }
 
   interface Window {
     __dtmcp?: {

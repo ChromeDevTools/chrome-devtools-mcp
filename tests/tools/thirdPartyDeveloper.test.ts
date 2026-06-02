@@ -138,7 +138,7 @@ describe('thirdPartyDeveloperTools', () => {
                 thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
               }
             ).thirdPartyDeveloperTools,
-            {},
+            [],
           );
         },
         undefined,
@@ -167,13 +167,13 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.strictEqual(
+          assert.deepStrictEqual(
             (
               result.structuredContent as {
                 thirdPartyDeveloperTools: Array<ToolGroup<ToolDefinition>>;
               }
             ).thirdPartyDeveloperTools,
-            undefined,
+            [],
           );
         },
         undefined,
@@ -201,10 +201,10 @@ describe('thirdPartyDeveloperTools', () => {
           //   result.structuredContent.thirdPartyDeveloperTools,
           //   undefined,
           // );
-          assert.strictEqual(
+          assert.deepStrictEqual(
             (result.structuredContent as {thirdPartyDeveloperTools: undefined})
               .thirdPartyDeveloperTools,
-            undefined,
+            [],
           );
         },
         undefined,
@@ -220,6 +220,7 @@ describe('thirdPartyDeveloperTools', () => {
 
           await page.pptrPage.evaluate(() => {
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
               e.respondWith?.({
                 name: 'group-1',
                 description: 'desc-1',
@@ -234,6 +235,7 @@ describe('thirdPartyDeveloperTools', () => {
               });
             });
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
               e.respondWith?.({
                 name: 'group-2',
                 description: 'desc-2',
@@ -260,8 +262,8 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
           // assert.ok(asToolsResult(result.structuredContent));
-          // @ts-expect-error Event has `respondWith`
           const actualGroups =
+          // @ts-expect-error Event has `respondWith`
             result.structuredContent.thirdPartyDeveloperTools;
           assert.ok(actualGroups);
           assert.strictEqual(actualGroups.length, 2);

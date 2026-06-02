@@ -101,7 +101,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
 
 async function getToolGroups(
   page: McpPage,
-): Promise<Array<ToolGroup<ToolDefinition>> | undefined | null> {
+): Promise<Array<ToolGroup<ToolDefinition>>> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
@@ -111,7 +111,7 @@ async function getToolGroups(
       objectId: windowHandle.remoteObject().objectId,
     });
   if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-    return;
+    return [];
   }
 
   const toolGroups = await page.pptrPage.evaluate(() => {
@@ -120,7 +120,7 @@ async function getToolGroups(
       //   execute: (args: Record<string, unknown>) => unknown;
       // }
       ToolDefinition>
-    > | null>(resolve => {
+    >>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
       // const groups: Array<
       //   ToolGroup<
@@ -130,6 +130,7 @@ async function getToolGroups(
       //   >
       // > = [];
       const groups: Array<ToolGroup<ToolDefinition>> = [];
+      // @ts-expect-error Adding custom property
       event.respondWith = toolGroup => {
         if (!window.__dtmcp) {
           window.__dtmcp = {};
@@ -137,6 +138,14 @@ async function getToolGroups(
         if (!window.__dtmcp.toolGroups) {
           window.__dtmcp.toolGroups = [];
         }
+
+        // Verify toolGroup
+        if (!toolGroup.name || !toolGroup.description || !toolGroup.tools) {
+          console.error('Invalid toolGroup:', toolGroup);
+          return;
+        }
+
+
         window.__dtmcp.toolGroups.push(toolGroup);
 
         // When receiving a toolGroup for the first time, expose a simple execution helper
@@ -170,7 +179,7 @@ async function getToolGroups(
           if (groups.length > 0) {
             resolve(groups);
           } else {
-            resolve(null);
+            resolve([]);
           }
         }, 0);
       }
