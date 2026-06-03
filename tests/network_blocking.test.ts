@@ -21,7 +21,7 @@ describe('Network Blocking Integration', () => {
     server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
     server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
 
-    const blockedUrlPattern= [server.getRoute('/blocked.html')]; 
+    const blockedUrlPattern = [server.getRoute('/blocked.html')];
     await withMcpContext(
       async (response, context) => {
         const allowedUrl = server.getRoute('/allowed.html');
@@ -85,7 +85,7 @@ describe('Network Blocking Integration', () => {
     server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
     server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
 
-    const allowedUrlPattern= [server.getRoute('/allowed.html')]; 
+    const allowedUrlPattern = [server.getRoute('/allowed.html')];
 
     await withMcpContext(
       async (response, context) => {
@@ -235,7 +235,7 @@ describe('Network Blocking Integration', () => {
         );
       },
       {
-        blockedUrlPattern
+        blockedUrlPattern,
       },
     );
   });
