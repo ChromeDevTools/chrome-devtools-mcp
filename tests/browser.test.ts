@@ -126,64 +126,54 @@ describe('browser', () => {
         assert.strictEqual(content, 'Allowed');
 
         // Fetch of blocked URL from the page
-        const fetchResult = await page.evaluate(async url => {
+        const fetchSucceeded = await page.evaluate(async url => {
           try {
             await fetch(url);
-            return 'SUCCESS';
-          } catch (err) {
-            return err instanceof Error ? err.message : String(err);
+            return true;
+          } catch {
+            return false;
           }
         }, server.getRoute('/blocked.html'));
 
-        assert.strictEqual(fetchResult, 'Failed to fetch');
+        assert.strictEqual(fetchSucceeded, false);
       } finally {
         await browser.close();
       }
     });
 
-    it(
-      'blocks URLs not in allowlist',
-      {skip: 'Requires Chrome 149 or greater'},
-      async () => {
-        server.addHtmlRoute(
-          '/allowed.html',
-          '<html><body>Allowed</body></html>',
-        );
-        server.addHtmlRoute(
-          '/blocked.html',
-          '<html><body>Blocked</body></html>',
-        );
+    it('blocks URLs not in allowlist', async () => {
+      server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
+      server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
 
-        const browser = await launch({
-          headless: true,
-          isolated: true,
-          executablePath: await executablePath(),
-          devtools: false,
-          allowlist: ['*://*/allowed.html'],
-        });
-        try {
-          const page = await browser.newPage();
+      const browser = await launch({
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+        allowlist: ['*://*:*/allowed.html'],
+      });
+      try {
+        const page = await browser.newPage();
 
-          // Access allowed URL
-          await page.goto(server.getRoute('/allowed.html'));
-          const content = await page.evaluate(() => document.body.textContent);
-          assert.strictEqual(content, 'Allowed');
+        // Access allowed URL
+        await page.goto(server.getRoute('/allowed.html'));
+        const content = await page.evaluate(() => document.body.textContent);
+        assert.strictEqual(content, 'Allowed');
 
-          // Fetch of blocked URL from the page
-          const fetchResult = await page.evaluate(async url => {
-            try {
-              await fetch(url);
-              return 'SUCCESS';
-            } catch (err) {
-              return err instanceof Error ? err.message : String(err);
-            }
-          }, server.getRoute('/blocked.html'));
+        // Fetch of blocked URL from the page
+        const fetchSucceeded = await page.evaluate(async url => {
+          try {
+            await fetch(url);
+            return true;
+          } catch {
+            return false;
+          }
+        }, server.getRoute('/blocked.html'));
 
-          assert.strictEqual(fetchResult, 'Failed to fetch');
-        } finally {
-          await browser.close();
-        }
-      },
-    );
+        assert.strictEqual(fetchSucceeded, false);
+      } finally {
+        await browser.close();
+      }
+    });
   });
 });
