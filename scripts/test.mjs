@@ -103,7 +103,6 @@ async function runTests(attempt) {
   });
 }
 
-
 const maxAttempts = shouldRetry ? 3 : 1;
 let exitCode = 1;
 
