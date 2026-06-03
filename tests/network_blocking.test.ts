@@ -21,6 +21,7 @@ describe('Network Blocking Integration', () => {
     server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
     server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
 
+    const blockedUrlPattern= [server.getRoute('/blocked.html')]; 
     await withMcpContext(
       async (response, context) => {
         const allowedUrl = server.getRoute('/allowed.html');
@@ -75,7 +76,7 @@ describe('Network Blocking Integration', () => {
         );
       },
       {
-        blockedUrlPattern: [server.getRoute('/blocked.html')],
+        blockedUrlPattern,
       },
     );
   });
@@ -84,6 +85,8 @@ describe('Network Blocking Integration', () => {
     server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
     server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
 
+    const allowedUrlPattern= [server.getRoute('/allowed.html')]; 
+
     await withMcpContext(
       async (response, context) => {
         const allowedUrl = server.getRoute('/allowed.html');
@@ -138,8 +141,7 @@ describe('Network Blocking Integration', () => {
         );
       },
       {
-        allowedUrlPattern: [server.getRoute('/allowed.html')],
-        executablePath: process.env.CHROME_M149_EXECUTABLE_PATH,
+        allowedUrlPattern,
       },
     );
   });
@@ -148,6 +150,7 @@ describe('Network Blocking Integration', () => {
     server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
     server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
 
+    const blockedUrlPattern = [server.getRoute('/blocked.html')];
     await withMcpContext(
       async (response, context) => {
         const allowedUrl = server.getRoute('/allowed.html');
@@ -232,8 +235,7 @@ describe('Network Blocking Integration', () => {
         );
       },
       {
-        blockedUrlPattern: [server.getRoute('/blocked.html')],
-        executablePath: process.env.CHROME_M149_EXECUTABLE_PATH,
+        blockedUrlPattern
       },
     );
   });
