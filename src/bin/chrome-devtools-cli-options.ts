@@ -81,6 +81,19 @@ export const commands: Commands = {
       },
     },
   },
+  close_heapsnapshot: {
+    description:
+      'Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --experimentalMemory=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to the .heapsnapshot file to close.',
+        required: true,
+      },
+    },
+  },
   close_page: {
     description:
       'Closes the page by its index. The last open page cannot be closed.',

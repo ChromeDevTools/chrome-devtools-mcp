@@ -17,6 +17,7 @@ import {
   getHeapSnapshotDetails,
   getHeapSnapshotClassNodes,
   getHeapSnapshotRetainers,
+  closeHeapSnapshot,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -173,6 +174,52 @@ describe('memory', () => {
           .join('\n');
 
         t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('close_heapsnapshot', () => {
+    it('with default options', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotSummary.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        assert.ok(context.hasHeapSnapshots());
+
+        await closeHeapSnapshot.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        assert.ok(
+          response.responseLines.includes(`Closed heap snapshot: ${filePath}`),
+        );
+        assert.ok(!context.hasHeapSnapshots());
+      });
+    });
+
+    it('with non-existent snapshot', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await assert.rejects(
+          closeHeapSnapshot.handler({params: {filePath}}, response, context),
+          {
+            message: `Failed to close heap snapshot: ${filePath} was not loaded.`,
+          },
+        );
       });
     });
   });

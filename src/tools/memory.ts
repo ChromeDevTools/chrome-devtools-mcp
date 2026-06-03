@@ -154,3 +154,32 @@ export const getHeapSnapshotRetainers = defineTool({
     });
   },
 });
+
+export const closeHeapSnapshot = defineTool({
+  name: 'close_heapsnapshot',
+  description:
+    'Closes a previously loaded memory heapsnapshot, freeing its memory.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: false,
+    conditions: ['experimentalMemory'],
+  },
+  verifyFilesSchema: ['filePath'],
+  schema: {
+    filePath: zod
+      .string()
+      .describe('A path to the .heapsnapshot file to close.'),
+  },
+  blockedByDialog: false,
+  handler: async (request, response, context) => {
+    const closed = await context.closeHeapSnapshot(request.params.filePath);
+    if (!closed) {
+      throw new Error(
+        `Failed to close heap snapshot: ${request.params.filePath} was not loaded.`,
+      );
+    }
+    response.appendResponseLine(
+      `Closed heap snapshot: ${request.params.filePath}`,
+    );
+  },
+});

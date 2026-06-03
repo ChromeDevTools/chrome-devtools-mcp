@@ -39,8 +39,9 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (5 tools)
+- **[Memory](#memory)** (6 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
+  - [`close_heapsnapshot`](#close_heapsnapshot)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
@@ -451,6 +452,16 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to save the heapsnapshot to.
+
+---
+
+### `close_heapsnapshot`
+
+**Description:** Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --experimentalMemory=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to the .heapsnapshot file to close.
 
 ---
 

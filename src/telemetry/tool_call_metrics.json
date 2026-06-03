@@ -738,5 +738,14 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "close_heapsnapshot",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
   }
 ]
