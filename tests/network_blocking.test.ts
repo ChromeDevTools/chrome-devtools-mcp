@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
+import {emulate} from '../src/tools/emulation.js';
 import {lighthouseAudit} from '../src/tools/lighthouse.js';
 import {navigatePage} from '../src/tools/pages.js';
 import {evaluateScript} from '../src/tools/script.js';
@@ -232,6 +233,46 @@ describe('Network Blocking Integration', () => {
           JSON.parse(response.responseLines.at(2)!),
           'Failed to fetch',
           'Fetch should still be blocked after audit',
+        );
+      },
+      {
+        blockedUrlPattern,
+      },
+    );
+  });
+
+  it('throws error when trying to emulate network conditions while blocklist is configured', async () => {
+    const blockedUrlPattern = ['*://*/*'];
+    await withMcpContext(
+      async (response, context) => {
+        // Attempting to emulate network conditions should throw an error.
+        await assert.rejects(async () => {
+          await emulate.handler(
+            {
+              params: {
+                networkConditions: 'Offline',
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+        }, /Network throttling is not supported when network blocking \(allowlist\/blocklist\) is configured\./);
+
+        // Attempting to emulate CPU rate or other things should succeed without errors.
+        await emulate.handler(
+          {
+            params: {
+              cpuThrottlingRate: 2,
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Emulation configured successfully',
         );
       },
       {
