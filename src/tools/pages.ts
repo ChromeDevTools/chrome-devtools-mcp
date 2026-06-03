@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {closeBrowser} from '../browser.js';
 import {logger} from '../logger.js';
 import type {CdpPage, Dialog, HTTPRequest} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
@@ -500,4 +501,54 @@ export const getTabId = definePageTool({
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
     response.setTabId(tabId);
   },
+});
+
+export const connectToBrowser = defineTool(args => {
+  return {
+    name: 'connect_to_browser',
+    description: `Connects to a running Chrome instance using either a debugging URL or a WebSocket endpoint. Disconnects from any currently connected/launched browser first.`,
+    annotations: {
+      category: ToolCategory.NAVIGATION,
+      readOnlyHint: false,
+    },
+    schema: {
+      browserUrl: zod
+        .string()
+        .optional()
+        .describe(
+          'Connect to a running, debuggable Chrome instance (e.g. http://127.0.0.1:9222).',
+        ),
+      wsEndpoint: zod
+        .string()
+        .optional()
+        .describe(
+          'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>).',
+        ),
+      wsHeaders: zod
+        .record(zod.string())
+        .optional()
+        .describe('Custom headers for WebSocket connection in JSON format.'),
+    },
+    blockedByDialog: false,
+    verifyFilesSchema: [],
+    handler: async (request, response) => {
+      const {browserUrl, wsEndpoint, wsHeaders} = request.params;
+      if (!browserUrl && !wsEndpoint) {
+        throw new Error('Either browserUrl or wsEndpoint must be provided.');
+      }
+
+      await closeBrowser();
+
+      if (args) {
+        args.browserUrl = browserUrl;
+        args.wsEndpoint = wsEndpoint;
+        args.wsHeaders = wsHeaders;
+      }
+
+      const newDestination = browserUrl || wsEndpoint;
+      response.appendResponseLine(
+        `Successfully disconnected from the previous browser and configured connection to the new browser at: ${newDestination}`,
+      );
+    },
+  };
 });

@@ -13,8 +13,9 @@
   - [`type_text`](#type_text)
   - [`upload_file`](#upload_file)
   - [`click_at`](#click_at)
-- **[Navigation automation](#navigation-automation)** (6 tools)
+- **[Navigation automation](#navigation-automation)** (7 tools)
   - [`close_page`](#close_page)
+  - [`connect_to_browser`](#connect_to_browser)
   - [`list_pages`](#list_pages)
   - [`navigate_page`](#navigate_page)
   - [`new_page`](#new_page)
@@ -185,6 +186,18 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: The ID of the page to close. Call [`list_pages`](#list_pages) to list pages.
+
+---
+
+### `connect_to_browser`
+
+**Description:** Connects to a running Chrome instance using either a debugging URL or a WebSocket endpoint. Disconnects from any currently connected/launched browser first.
+
+**Parameters:**
+
+- **browserUrl** (string) _(optional)_: Connect to a running, debuggable Chrome instance (e.g. http://127.0.0.1:9222).
+- **wsEndpoint** (string) _(optional)_: WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/&lt;id&gt;).
+- **wsHeaders** (unknown) _(optional)_: Custom headers for WebSocket connection in JSON format.
 
 ---
 

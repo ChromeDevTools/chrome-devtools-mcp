@@ -738,5 +738,22 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "connect_to_browser",
+    "args": [
+      {
+        "name": "browser_url_length",
+        "argType": "number"
+      },
+      {
+        "name": "ws_endpoint_length",
+        "argType": "number"
+      },
+      {
+        "name": "ws_headers_count",
+        "argType": "number"
+      }
+    ]
   }
 ]

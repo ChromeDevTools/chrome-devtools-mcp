@@ -95,6 +95,33 @@ export const commands: Commands = {
       },
     },
   },
+  connect_to_browser: {
+    description:
+      'Connects to a running Chrome instance using either a debugging URL or a WebSocket endpoint. Disconnects from any currently connected/launched browser first.',
+    category: 'Navigation automation',
+    args: {
+      browserUrl: {
+        name: 'browserUrl',
+        type: 'string',
+        description:
+          'Connect to a running, debuggable Chrome instance (e.g. http://127.0.0.1:9222).',
+        required: false,
+      },
+      wsEndpoint: {
+        name: 'wsEndpoint',
+        type: 'string',
+        description:
+          'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>).',
+        required: false,
+      },
+      wsHeaders: {
+        name: 'wsHeaders',
+        type: 'object',
+        description: 'Custom headers for WebSocket connection in JSON format.',
+        required: false,
+      },
+    },
+  },
   drag: {
     description: 'Drag an element onto another element',
     category: 'Input automation',

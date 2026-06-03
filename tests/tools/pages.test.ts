@@ -11,7 +11,10 @@ import {afterEach, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import {
+  parseArguments,
+  type ParsedArguments,
+} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {
   listPages,
   newPage,
@@ -21,6 +24,7 @@ import {
   resizePage,
   handleDialog,
   getTabId,
+  connectToBrowser,
 } from '../../src/tools/pages.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
@@ -1280,6 +1284,55 @@ describe('pages', () => {
         // @ts-expect-error _tabId is internal.
         assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
         assert.deepStrictEqual(response.responseLines, []);
+      });
+    });
+  });
+
+  describe('connect_to_browser', () => {
+    it('throws an error if neither browserUrl nor wsEndpoint is provided', async () => {
+      const testArgs = parseArguments('1.0.0', []);
+      const tool = connectToBrowser(testArgs);
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          async () => {
+            await tool.handler({params: {}}, response, context);
+          },
+          (err: Error) => {
+            assert.strictEqual(
+              err.message,
+              'Either browserUrl or wsEndpoint must be provided.',
+            );
+            return true;
+          },
+        );
+      });
+    });
+
+    it('updates browser connection arguments and closes current browser', async () => {
+      const testArgs = parseArguments('1.0.0', []);
+      const tool = connectToBrowser(testArgs);
+      await withMcpContext(async (response, context) => {
+        await tool.handler(
+          {
+            params: {
+              browserUrl: 'http://127.0.0.1:9223',
+              wsHeaders: {Authorization: 'Bearer test-token'},
+            },
+          },
+          response,
+          context,
+        );
+
+        assert.strictEqual(testArgs.browserUrl, 'http://127.0.0.1:9223');
+        assert.strictEqual(testArgs.wsEndpoint, undefined);
+        assert.deepStrictEqual(testArgs.wsHeaders, {
+          Authorization: 'Bearer test-token',
+        });
+        assert.ok(
+          response.responseLines[0]?.includes(
+            'Successfully disconnected from the previous browser and configured connection to the new browser at: http://127.0.0.1:9223',
+          ),
+        );
       });
     });
   });
