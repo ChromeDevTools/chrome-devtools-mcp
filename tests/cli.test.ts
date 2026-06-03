@@ -373,6 +373,22 @@ describe('cli args parsing', () => {
       'https://a.com/*',
       'https://b.com/*',
     ]);
+
+    const spaceSeparatedArgs = parseArguments(
+      '1.0.0',
+      [
+        'node',
+        'main.js',
+        '--blocked-url-pattern',
+        'https://a.com/*',
+        'https://b.com/*',
+      ],
+      {},
+    );
+    assert.deepStrictEqual(spaceSeparatedArgs.blockedUrlPattern, [
+      'https://a.com/*',
+      'https://b.com/*',
+    ]);
   });
 
   it('parses allowed-url-pattern flags as array', async () => {
@@ -399,6 +415,22 @@ describe('cli args parsing', () => {
       {},
     );
     assert.deepStrictEqual(repeatedArgs.allowedUrlPattern, [
+      'https://a.com/*',
+      'https://b.com/*',
+    ]);
+
+    const spaceSeparatedArgs = parseArguments(
+      '1.0.0',
+      [
+        'node',
+        'main.js',
+        '--allowed-url-pattern',
+        'https://a.com/*',
+        'https://b.com/*',
+      ],
+      {},
+    );
+    assert.deepStrictEqual(spaceSeparatedArgs.allowedUrlPattern, [
       'https://a.com/*',
       'https://b.com/*',
     ]);
