@@ -1287,7 +1287,7 @@ exports[`third-party developer tools > lists third-party developer tools 2`] = `
 
 exports[`webmcp > includes webmcp tools in list_pages response 1`] = `
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1298,7 +1298,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1319,7 +1319,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
 exports[`webmcp > includes webmcp tools in navigate_page response 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1331,7 +1331,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1351,7 +1351,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
 
 exports[`webmcp > includes webmcp tools in select_page response 1`] = `
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1362,7 +1362,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1383,7 +1383,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 `;
 
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
@@ -1393,7 +1393,7 @@ exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ]
