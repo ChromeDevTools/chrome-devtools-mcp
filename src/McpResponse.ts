@@ -692,7 +692,10 @@ export class McpResponse implements Response {
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
-  ): Promise<{content: Array<TextContent | ImageContent>; structuredContent: object}> {
+  ): Promise<{
+    content: Array<TextContent | ImageContent>;
+    structuredContent: object;
+  }> {
     const structuredContent: {
       snapshot?: object;
       snapshotFilePath?: string;
@@ -810,12 +813,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await page.title().catch(() => '');
-          const pageLabel = title ? `${title} (${page.url()})` : page.url();
+          const title = await fetchPageTitle(page);
+          const pageLabel = title
+            ? `${truncateTitle(title)} (${page.url()})`
+            : page.url();
           parts.push(
             `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
           );
-          structuredPages.push(await createStructuredPage(page, context));
+          structuredPages.push(createStructuredPage(page, context, title));
         }
         response.push(...parts);
         structuredContent.pages = structuredPages;
@@ -830,13 +835,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await page.title().catch(() => '');
-            const pageLabel = title ? `${title} (${page.url()})` : page.url();
+            const title = await fetchPageTitle(page);
+            const pageLabel = title
+              ? `${truncateTitle(title)} (${page.url()})`
+              : page.url();
             response.push(
               `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
             );
             structuredExtensionPages.push(
-              await createStructuredPage(page, context),
+              createStructuredPage(page, context, title),
             );
           }
           structuredContent.extensionPages = structuredExtensionPages;
@@ -1163,9 +1170,27 @@ Call ${handleDialog.name} to handle it before continuing.`);
     this.#textResponseLines = [];
   }
 }
-async function createStructuredPage(page: Page, context: McpContext) {
+function truncateTitle(title: string, maxLength = 50): string {
+  if (title.length <= maxLength) {
+    return title;
+  }
+  return title.slice(0, maxLength - 3) + '...';
+}
+
+async function fetchPageTitle(page: Page): Promise<string> {
+  return Promise.race([
+    page.title().catch(() => ''),
+    new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
+  ]);
+}
+
+function createStructuredPage(
+  page: Page,
+  context: McpContext,
+  rawTitle: string,
+) {
   const isolatedContextName = context.getIsolatedContextName(page);
-  const title = await page.title().catch(() => '');
+  const title = truncateTitle(rawTitle);
   const entry: {
     id: number | undefined;
     url: string;
