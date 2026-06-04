@@ -879,14 +879,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         const parts = [`## Pages`];
         const structuredPages = [];
         for (const page of regularPages) {
+          const title = getPageTitle(page);
           const isolatedContextName = context.getIsolatedContextName(page);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
           parts.push(
-            `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+            `${context.getPageId(page)}: ${title} (${page.url()})${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
           );
-          structuredPages.push(createStructuredPage(page, context));
+          structuredPages.push(createStructuredPage(page, context, title));
         }
         response.push(...parts);
         structuredContent.pages = structuredPages;
@@ -897,14 +898,17 @@ Call ${handleDialog.name} to handle it before continuing.`);
           response.push(`## Extension Pages`);
           const structuredExtensionPages = [];
           for (const page of extensionPages) {
+            const title = getPageTitle(page);
             const isolatedContextName = context.getIsolatedContextName(page);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
             response.push(
-              `${context.getPageId(page)}: ${page.url()}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+              `${context.getPageId(page)}: ${title} (${page.url()})${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
             );
-            structuredExtensionPages.push(createStructuredPage(page, context));
+            structuredExtensionPages.push(
+              createStructuredPage(page, context, title),
+            );
           }
           structuredContent.extensionPages = structuredExtensionPages;
         }
@@ -1233,20 +1237,40 @@ Call ${handleDialog.name} to handle it before continuing.`);
     this.#textResponseLines = [];
   }
 }
-function createStructuredPage(page: Page, context: McpContext) {
+function createStructuredPage(page: Page, context: McpContext, title: string) {
   const isolatedContextName = context.getIsolatedContextName(page);
   const entry: {
     id: number | undefined;
     url: string;
+    title: string;
     selected: boolean;
     isolatedContext?: string;
   } = {
     id: context.getPageId(page),
     url: page.url(),
+    title,
     selected: context.isPageSelected(page),
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
   }
   return entry;
+}
+
+function getPageTitle(page: Page): string {
+  const target = page.target();
+  if (
+    '_getTargetInfo' in target &&
+    typeof target._getTargetInfo === 'function'
+  ) {
+    const targetInfo = target._getTargetInfo();
+    if (isTargetInfo(targetInfo)) {
+      return targetInfo.title ?? '';
+    }
+  }
+  return '';
+}
+
+function isTargetInfo(value: unknown): value is {title?: string} {
+  return typeof value === 'object' && value !== null && 'title' in value;
 }
