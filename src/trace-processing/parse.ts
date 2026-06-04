@@ -26,6 +26,10 @@ export interface TraceParseError {
 
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
+  metadata?: {
+    cpuThrottling?: number;
+    networkThrottling?: string;
+  },
 ): Promise<TraceResult | TraceParseError> {
   engine.resetProcessor();
   if (!buffer) {
@@ -47,7 +51,7 @@ export async function parseRawTraceBuffer(
       | DevTools.TraceEngine.Types.Events.Event[];
 
     const events = Array.isArray(data) ? data : data.traceEvents;
-    await engine.parse(events);
+    await engine.parse(events, {metadata});
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
       return {
@@ -63,7 +67,7 @@ export async function parseRawTraceBuffer(
     };
   } catch (e) {
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Unexpected error parsing trace: ${errorText}`);
+    logger?.(`Unexpected error parsing trace: ${errorText}`);
     return {
       error: errorText,
     };
@@ -76,9 +80,12 @@ ${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
 
 ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
-export function getTraceSummary(result: TraceResult): string {
+export function getTraceSummary(
+  result: TraceResult,
+  deviceScope?: DevTools.CrUXManager.DeviceScope | null,
+): string {
   const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
-  const formatter = new DevTools.PerformanceTraceFormatter(focus);
+  const formatter = new DevTools.PerformanceTraceFormatter(focus, deviceScope);
   const summaryText = formatter.formatTraceSummary();
   return `## Summary of Performance trace findings:
 ${summaryText}
@@ -95,6 +102,7 @@ export function getInsightOutput(
   result: TraceResult,
   insightSetId: string,
   insightName: InsightName,
+  deviceScope?: DevTools.CrUXManager.DeviceScope | null,
 ): InsightOutput {
   if (!result.insights) {
     return {
@@ -121,6 +129,7 @@ export function getInsightOutput(
   const formatter = new DevTools.PerformanceInsightFormatter(
     DevTools.AgentFocus.fromParsedTrace(result.parsedTrace),
     matchingInsight,
+    deviceScope,
   );
   return {output: formatter.formatInsight()};
 }

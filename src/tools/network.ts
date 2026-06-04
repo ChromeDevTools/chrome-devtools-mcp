@@ -71,6 +71,7 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   blockedByDialog: false,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const data = await request.page.getDevToolsData();
     response.attachDevToolsData(data);
@@ -115,9 +116,8 @@ export const getNetworkRequest = definePageTool({
       ),
   },
   blockedByDialog: true,
+  verifyFilesSchema: ['requestFilePath', 'responseFilePath'],
   handler: async (request, response, context) => {
-    context.validatePath(request.params.requestFilePath);
-    context.validatePath(request.params.responseFilePath);
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid, {
         requestFilePath: request.params.requestFilePath,

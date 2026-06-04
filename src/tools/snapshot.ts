@@ -34,8 +34,8 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   blockedByDialog: true,
-  handler: async (request, response, context) => {
-    context.validatePath(request.params.filePath);
+  verifyFilesSchema: ['filePath'],
+  handler: async (request, response) => {
     response.includeSnapshot({
       verbose: request.params.verbose ?? false,
       filePath: request.params.filePath,
@@ -60,6 +60,7 @@ export const waitFor = definePageTool({
     ...timeoutSchema,
   },
   blockedByDialog: true,
+  verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const page = request.page;
     await context.waitForTextOnPage(

@@ -6,8 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fs, {constants, openSync, writeSync, closeSync} from 'node:fs';
 import {createServer, type Server} from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -30,17 +31,89 @@ import {
 } from './utils.js';
 
 const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
-logger(`Daemon sessionId: ${sessionId}`);
+logger?.(`Daemon sessionId: ${sessionId}`);
 if (isDaemonRunning(sessionId)) {
-  logger('Another daemon process is running.');
+  logger?.('Another daemon process is running.');
   process.exit(1);
 }
 const pidFilePath = getPidFilePath(sessionId);
-fs.mkdirSync(path.dirname(pidFilePath), {
-  recursive: true,
-});
-fs.writeFileSync(pidFilePath, process.pid.toString());
-logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
+const pidDir = path.dirname(pidFilePath);
+const currentUserUid = os.userInfo().uid;
+
+try {
+  fs.mkdirSync(pidDir, {recursive: true});
+  if (os.platform() !== 'win32') {
+    // POSIX specific checks
+    try {
+      const stats = fs.statSync(pidDir);
+
+      // 1. Check Ownership: Ensure the directory is owned by the current user.
+      if (stats.uid !== currentUserUid) {
+        console.error(
+          `[MCP Daemon] Critical error: PID directory ${pidDir} is not owned by the current user (Expected: ${currentUserUid}, Found: ${stats.uid}). Possible tampering.`,
+        );
+        process.exit(1);
+      }
+
+      // 2. Check Permissions: Ensure the directory is not group or world-writable.
+      // Mode is a number, e.g., 0o700. We check if bits for group/world write are set.
+      const mode = stats.mode;
+      if (mode & constants.S_IWGRP || mode & constants.S_IWOTH) {
+        console.error(
+          `[MCP Daemon] Critical error: PID directory ${pidDir} has insecure permissions (Mode: ${mode.toString(8)}). It should not be writable by group or others.`,
+        );
+        process.exit(1);
+      }
+    } catch (statErr) {
+      console.error(
+        `[MCP Daemon] Critical error stating PID directory ${pidDir}:`,
+        statErr,
+      );
+      process.exit(1);
+    }
+  }
+} catch (err) {
+  console.error(
+    `[MCP Daemon] Critical error creating/validating PID directory: ${pidDir}`,
+    err,
+  );
+  process.exit(1);
+}
+
+let fd = -1;
+try {
+  // Open the file with flags to:
+  // - O_WRONLY: Write-only
+  // - O_CREAT: Create if it doesn't exist
+  // - O_TRUNC: Truncate to zero length if it exists
+  // - O_NOFOLLOW: DO NOT follow symlinks.
+  // - 0o600: Permissions: read/write for owner, no permissions for others.
+  fd = openSync(
+    pidFilePath,
+    constants.O_WRONLY |
+      constants.O_CREAT |
+      constants.O_TRUNC |
+      constants.O_NOFOLLOW,
+    0o600,
+  );
+  writeSync(fd, process.pid.toString());
+} catch (err) {
+  console.error(
+    `[MCP Daemon] Critical error writing PID file: ${pidFilePath}`,
+    err,
+  );
+  // If openSync fails due to O_NOFOLLOW on a symlink, the error will be caught here.
+  process.exit(1);
+} finally {
+  if (fd !== -1) {
+    try {
+      closeSync(fd);
+    } catch (err) {
+      console.error(`[MCP Daemon] Error closing PID file: ${pidFilePath}`, err);
+    }
+  }
+}
+logger?.(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
 const socketPath = getSocketPath(sessionId);
 
@@ -152,13 +225,13 @@ async function startSocketServer() {
     server = createServer(socket => {
       const transport = new PipeTransport(socket, socket);
       transport.onmessage = async (message: string) => {
-        logger('onmessage', message);
+        logger?.('onmessage', message);
         const response = await handleRequest(JSON.parse(message));
         transport.send(JSON.stringify(response));
         socket.end();
       };
       socket.on('error', error => {
-        logger('Socket error:', error);
+        logger?.('Socket error:', error);
       });
     });
 
@@ -182,7 +255,7 @@ async function startSocketServer() {
     );
 
     server.on('error', error => {
-      logger('Server error:', error);
+      logger?.('Server error:', error);
       reject(error);
     });
   });
@@ -194,12 +267,12 @@ async function cleanup() {
   try {
     await mcpClient?.close();
   } catch (error) {
-    logger('Error closing MCP client:', error);
+    logger?.('Error closing MCP client:', error);
   }
   try {
     await mcpTransport?.close();
   } catch (error) {
-    logger('Error closing MCP transport:', error);
+    logger?.('Error closing MCP transport:', error);
   }
   if (server) {
     await new Promise<void>(resolve => {
@@ -213,7 +286,7 @@ async function cleanup() {
       // ignore errors
     }
   }
-  logger(`unlinking ${pidFilePath}`);
+  logger?.(`unlinking ${pidFilePath}`);
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);
   }
@@ -233,14 +306,14 @@ process.on('SIGHUP', () => {
 
 // Handle uncaught errors
 process.on('uncaughtException', error => {
-  logger('Uncaught exception:', error);
+  logger?.('Uncaught exception:', error);
 });
 process.on('unhandledRejection', error => {
-  logger('Unhandled rejection:', error);
+  logger?.('Unhandled rejection:', error);
 });
 
 // Start the server
 const started = startSocketServer().catch(error => {
-  logger('Failed to start daemon server:', error);
+  logger?.('Failed to start daemon server:', error);
   process.exit(1);
 });

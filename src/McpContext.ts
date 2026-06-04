@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs/promises';
+import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -12,7 +13,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import type {TargetUniverse} from './DevtoolsUtils.js';
 import {UniverseManager} from './DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
-import type {AggregatedInfoWithUid} from './HeapSnapshotManager.js';
+import type {AggregatedInfoWithId} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -26,7 +27,6 @@ import {
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
-  type Debugger,
   type HTTPRequest,
   type Page,
   type ScreenRecorder,
@@ -40,12 +40,17 @@ import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import type {Logger} from './types.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
   ExtensionServiceWorker,
 } from './types.js';
-import {ensureExtension, getTempFilePath} from './utils/files.js';
+import {
+  ensureExtension,
+  getTempFilePath,
+  resolveCanonicalPath,
+} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
@@ -62,7 +67,7 @@ const NAVIGATION_TIMEOUT = 10_000;
 
 export class McpContext implements Context {
   browser: Browser;
-  logger: Debugger;
+  logger: Logger;
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
@@ -97,7 +102,7 @@ export class McpContext implements Context {
 
   private constructor(
     browser: Browser,
-    logger: Debugger,
+    logger: Logger,
     options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
@@ -148,7 +153,7 @@ export class McpContext implements Context {
 
   static async from(
     browser: Browser,
-    logger: Debugger,
+    logger: Logger,
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
@@ -175,7 +180,7 @@ export class McpContext implements Context {
     this.#roots = roots;
   }
 
-  validatePath(filePath?: string): void {
+  async validatePath(filePath?: string): Promise<void> {
     if (filePath === undefined) {
       return;
     }
@@ -183,24 +188,55 @@ export class McpContext implements Context {
     if (roots === undefined) {
       return;
     }
-    const absolutePath = path.resolve(filePath);
+
+    let canonicalPath: string;
+
+    try {
+      canonicalPath = await resolveCanonicalPath(filePath);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[MCP Context] Error resolving real path for ${filePath}: ${errMsg}`,
+      );
+      throw new Error(
+        `Access denied: Cannot resolve base path for ${filePath}.`,
+      );
+    }
+
+    let allowed = false;
     for (const root of roots) {
-      const rootPath = path.resolve(fileURLToPath(root.uri));
-      if (
-        absolutePath === rootPath ||
-        absolutePath.startsWith(rootPath + path.sep)
-      ) {
-        return;
+      try {
+        const rootPathUri = root.uri;
+        const rootPath = path.resolve(fileURLToPath(rootPathUri));
+        const canonicalRoot = await fsPromises.realpath(rootPath);
+
+        if (
+          canonicalPath === canonicalRoot ||
+          canonicalPath.startsWith(canonicalRoot + path.sep)
+        ) {
+          allowed = true;
+          break;
+        }
+      } catch (rootErr) {
+        const errMsg =
+          rootErr instanceof Error ? rootErr.message : String(rootErr);
+        console.warn(
+          `[MCP Context] Could not resolve configured root ${root.uri}: ${errMsg}`,
+        );
+        // Skip this root if it cannot be resolved.
       }
     }
-    throw new Error(
-      `Access denied: path ${filePath} is not within any of the workspace roots ${JSON.stringify(roots)}.`,
-    );
+
+    if (!allowed) {
+      throw new Error(
+        `Access denied: path ${filePath} (canonical: ${canonicalPath}) is not within any of the configured workspace roots.`,
+      );
+    }
   }
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
     if (!cdpRequestId) {
-      this.logger('no network request');
+      this.logger?.('no network request');
       return;
     }
     const request = this.#networkCollector.find(page.pptrPage, request => {
@@ -208,7 +244,7 @@ export class McpContext implements Context {
       return request.id === cdpRequestId;
     });
     if (!request) {
-      this.logger('no network request for ' + cdpRequestId);
+      this.logger?.('no network request for ' + cdpRequestId);
       return;
     }
     return this.#networkCollector.getIdForResource(request);
@@ -301,6 +337,7 @@ export class McpContext implements Context {
       userAgent?: string;
       colorScheme?: 'dark' | 'light' | 'auto';
       viewport?: Viewport;
+      extraHttpHeaders?: Record<string, string> | undefined;
     },
     targetPage?: Page,
   ): Promise<void> {
@@ -328,11 +365,22 @@ export class McpContext implements Context {
       newSettings.networkConditions = options.networkConditions;
     }
 
+    const secondarySession = this.getDevToolsUniverse(mcpPage)?.session;
     if (!options.cpuThrottlingRate) {
       await page.emulateCPUThrottling(1);
+      if (secondarySession) {
+        await secondarySession.send('Emulation.setCPUThrottlingRate', {
+          rate: 1,
+        });
+      }
       delete newSettings.cpuThrottlingRate;
     } else {
       await page.emulateCPUThrottling(options.cpuThrottlingRate);
+      if (secondarySession) {
+        await secondarySession.send('Emulation.setCPUThrottlingRate', {
+          rate: options.cpuThrottlingRate,
+        });
+      }
       newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
     }
 
@@ -365,7 +413,6 @@ export class McpContext implements Context {
     }
 
     if (!options.viewport) {
-      await page.setViewport(null);
       delete newSettings.viewport;
     } else {
       const defaults = {
@@ -374,9 +421,15 @@ export class McpContext implements Context {
         hasTouch: false,
         isLandscape: false,
       };
-      const viewport = {...defaults, ...options.viewport};
-      await page.setViewport(viewport);
-      newSettings.viewport = viewport;
+      newSettings.viewport = {...defaults, ...options.viewport};
+    }
+
+    if (options.extraHttpHeaders !== undefined) {
+      await page.setExtraHTTPHeaders(options.extraHttpHeaders);
+      newSettings.extraHttpHeaders = options.extraHttpHeaders;
+      if (Object.keys(options.extraHttpHeaders).length === 0) {
+        delete newSettings.extraHttpHeaders;
+      }
     }
 
     mcpPage.emulationSettings = Object.keys(newSettings).length
@@ -384,6 +437,10 @@ export class McpContext implements Context {
       : {};
 
     this.#updateSelectedPageTimeouts();
+
+    // This should happen after updating the page timeouts.
+    // Setting the viewport can trigger a reload which we don't want to timeout.
+    await page.setViewport(newSettings.viewport ?? null);
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -467,12 +524,12 @@ export class McpContext implements Context {
     page.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
-    // Increased in case we throttle the network requests
+    // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       page.networkConditions,
     );
     page.pptrPage.setDefaultNavigationTimeout(
-      NAVIGATION_TIMEOUT * networkMultiplier,
+      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
     );
   }
 
@@ -534,7 +591,7 @@ export class McpContext implements Context {
         this.#mcpPages.set(page, mcpPage);
         // We emulate a focused page for all pages to support multi-agent workflows.
         void page.emulateFocusedPage(true).catch(error => {
-          this.logger('Error turning on focused page emulation', error);
+          this.logger?.('Error turning on focused page emulation', error);
         });
       }
       mcpPage.isolatedContextName = isolatedContextNames.get(page);
@@ -598,7 +655,7 @@ export class McpContext implements Context {
             page = await target.asPage();
             this.#extensionPages.set(target, page);
           } catch (e) {
-            this.logger('Failed to get page for extension target', e);
+            this.logger?.('Failed to get page for extension target', e);
           }
         }
       }
@@ -639,7 +696,7 @@ export class McpContext implements Context {
   }
 
   async detectOpenDevToolsWindows() {
-    this.logger('Detecting open DevTools windows');
+    this.logger?.('Detecting open DevTools windows');
     const {pages} = await this.#getAllPages();
 
     await Promise.all(
@@ -688,7 +745,7 @@ export class McpContext implements Context {
     filename: string,
   ): Promise<{filepath: string}> {
     const filepath = await getTempFilePath(filename);
-    this.validatePath(filepath);
+    await this.validatePath(filepath);
     try {
       await fs.writeFile(filepath, data);
     } catch (err) {
@@ -702,7 +759,7 @@ export class McpContext implements Context {
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}> {
-    this.validatePath(clientProvidedFilePath);
+    await this.validatePath(clientProvidedFilePath);
     try {
       const filePath = ensureExtension(
         path.resolve(clientProvidedFilePath),
@@ -712,7 +769,7 @@ export class McpContext implements Context {
       await fs.writeFile(filePath, data);
       return {filename: filePath};
     } catch (err) {
-      this.logger(err);
+      this.logger?.(err);
       throw new Error('Could not save a file', {cause: err});
     }
   }
@@ -774,7 +831,6 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    this.validatePath(extensionPath);
     const id = await this.browser.installExtension(extensionPath);
     return id;
   }
@@ -804,30 +860,33 @@ export class McpContext implements Context {
 
   async getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<Record<string, AggregatedInfoWithUid>> {
-    this.validatePath(filePath);
+  ): Promise<Record<string, AggregatedInfoWithId>> {
     return await this.#heapSnapshotManager.getAggregates(filePath);
   }
 
   async getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
-    this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStats(filePath);
   }
 
   async getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
-    this.validatePath(filePath);
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
-  async getHeapSnapshotNodesByUid(
+  async getHeapSnapshotNodesById(
     filePath: string,
-    uid: number,
+    id: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    this.validatePath(filePath);
-    return await this.#heapSnapshotManager.getNodesByUid(filePath, uid);
+    return await this.#heapSnapshotManager.getNodesById(filePath, id);
+  }
+
+  async getHeapSnapshotRetainers(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 }

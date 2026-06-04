@@ -11,8 +11,9 @@ import {McpResponse} from './McpResponse.js';
 import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/metricUtils.js';
-import type {CallToolResult, zod} from './third_party/index.js';
+import {bucketizeLatency} from './telemetry/transformation.js';
+import type {CallToolResult} from './third_party/index.js';
+import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -121,8 +122,29 @@ function isPageScopedTool(
   return 'pageScoped' in tool && tool.pageScoped === true;
 }
 
+function formatArgumentNames(names: string[]): string {
+  return names.map(name => `"${name}"`).join(', ');
+}
+
+function buildUnknownArgumentsMessage(
+  toolName: string,
+  unknownArgumentNames: string[],
+  expectedArgumentNames: string[],
+): string {
+  const unknownLabel =
+    unknownArgumentNames.length === 1 ? 'argument' : 'arguments';
+  const expectedArguments = expectedArgumentNames.length
+    ? `Expected arguments: ${formatArgumentNames(expectedArgumentNames)}.`
+    : 'This tool does not accept any arguments.';
+  const correction =
+    unknownArgumentNames.length === 1 ? 'Remove it' : 'Remove them';
+
+  return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
+  readonly registeredInputSchema: zod.ZodTypeAny;
   readonly shouldRegister: boolean;
   private readonly disabledReason?: string;
 
@@ -141,8 +163,15 @@ export class ToolHandler {
       tool.pageScoped &&
       serverArgs.experimentalPageIdRouting &&
       !serverArgs.slim
-        ? {...tool.schema, ...pageIdSchema}
+        ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
+    this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
+  }
+
+  unknownArgumentNames(params: Record<string, unknown>): string[] {
+    return Object.keys(params).filter(
+      key => !Object.hasOwn(this.inputSchema, key),
+    );
   }
 
   async handle(params: Record<string, unknown>): Promise<CallToolResult> {
@@ -158,15 +187,32 @@ export class ToolHandler {
       };
     }
 
+    const unknownArgumentNames = this.unknownArgumentNames(params);
+    if (unknownArgumentNames.length) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: buildUnknownArgumentsMessage(
+              this.tool.name,
+              unknownArgumentNames,
+              Object.keys(this.inputSchema),
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
     try {
-      logger(
+      logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
       const context = await this.getContext();
-      logger(`${this.tool.name} context: resolved`);
+      logger?.(`${this.tool.name} context: resolved`);
       await context.detectOpenDevToolsWindows();
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
@@ -174,6 +220,12 @@ export class ToolHandler {
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
       try {
+        if (this.tool.verifyFilesSchema) {
+          for (const key of this.tool.verifyFilesSchema) {
+            const filePath = params[key];
+            await context.validatePath(filePath as string);
+          }
+        }
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
@@ -225,7 +277,7 @@ export class ToolHandler {
       }
       return result;
     } catch (err) {
-      logger(`${this.tool.name} error:`, err, err?.stack);
+      logger?.(`${this.tool.name} error:`, err, err?.stack);
       let errorText = err && 'message' in err ? err.message : String(err);
       if ('cause' in err && err.cause) {
         errorText += `\nCause: ${err.cause.message}`;

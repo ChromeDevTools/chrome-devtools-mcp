@@ -1,5 +1,5 @@
 name: Task
-description: Work tracking for mainainers only!
+description: Work tracking for maintainers only!
 title: '[Task]:'
 type: 'Task'
 body:

@@ -13,6 +13,7 @@ import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {Mutex} from '../src/Mutex.js';
+import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import type {
@@ -36,6 +37,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      verifyFilesSchema: [],
       pageScoped: true,
       handler: async () => {
         handlerCalled = true;
@@ -77,6 +79,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      verifyFilesSchema: [],
       handler: async () => {
         handlerCalled = true;
       },
@@ -106,6 +109,56 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
   });
 
+  it('reports unknown registered tool arguments clearly', async () => {
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'lenient_tool',
+      description: 'A tool with a required argument',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {
+        url: zod.string(),
+      },
+      blockedByDialog: false,
+      verifyFilesSchema: [],
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.detectOpenDevToolsWindows.resolves();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    const params = {url: 'https://example.com', description: 'open the page'};
+    assert.strictEqual(
+      toolHandler.registeredInputSchema.safeParse(params).success,
+      true,
+    );
+
+    const result = await toolHandler.handle(params);
+
+    assert.strictEqual(result.isError, true);
+    assert.match(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      /Unknown argument for tool "lenient_tool": "description"\. Expected arguments: "url"\./,
+    );
+    assert.strictEqual(handlerCalled, false);
+  });
+
   it('sets shouldRegister to false and returns disabled reason when category is disabled', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
@@ -117,6 +170,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      verifyFilesSchema: [],
       handler: async () => {
         handlerCalled = true;
       },

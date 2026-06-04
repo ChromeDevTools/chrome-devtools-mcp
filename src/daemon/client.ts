@@ -69,7 +69,7 @@ function waitForFile(filePath: string, removed = false) {
 
 export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   if (isDaemonRunning(sessionId)) {
-    logger('Daemon is already running');
+    logger?.('Daemon is already running');
     return;
   }
 
@@ -79,7 +79,7 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
     fs.unlinkSync(pidFilePath);
   }
 
-  logger('Starting daemon...', ...mcpArgs);
+  logger?.('Starting daemon...', ...mcpArgs);
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',
@@ -116,27 +116,27 @@ export async function sendCommand(
     const transport = new PipeTransport(socket, socket);
     transport.onmessage = async (message: string) => {
       clearTimeout(timer);
-      logger('onmessage', message);
+      logger?.('onmessage', message);
       resolve(JSON.parse(message));
     };
     socket.on('error', error => {
       clearTimeout(timer);
-      logger('Socket error:', error);
+      logger?.('Socket error:', error);
       reject(error);
     });
     socket.on('close', () => {
       clearTimeout(timer);
-      logger('Socket closed:');
+      logger?.('Socket closed:');
       reject(new Error('Socket closed'));
     });
-    logger('Sending message', command);
+    logger?.('Sending message', command);
     transport.send(JSON.stringify(command));
   });
 }
 
 export async function stopDaemon(sessionId: string) {
   if (!isDaemonRunning(sessionId)) {
-    logger('Daemon is not running');
+    logger?.('Daemon is not running');
     return;
   }
 
@@ -154,13 +154,8 @@ export async function handleResponse(
   if (response.isError) {
     return JSON.stringify(response.content);
   }
-  if (format === 'json') {
-    if (response.structuredContent) {
-      return JSON.stringify(response.structuredContent);
-    }
-    // Fall-through to text for backward compatibility.
-  }
   const chunks = [];
+  const images: Array<{filePath: string; mimeType: string}> = [];
   for (const content of response.content) {
     if (content.type === 'text') {
       chunks.push(content.text);
@@ -181,10 +176,21 @@ export async function handleResponse(
       const name = crypto.randomUUID();
       const filepath = await getTempFilePath(`${name}${extension}`);
       fs.writeFileSync(filepath, data);
+      images.push({filePath: filepath, mimeType});
       chunks.push(`Saved to ${filepath}.`);
     } else {
       throw new Error('Not supported response content type');
     }
+  }
+  if (format === 'json') {
+    if (response.structuredContent) {
+      const structuredContent = {
+        ...response.structuredContent,
+        ...(images.length ? {images} : {}),
+      };
+      return JSON.stringify(structuredContent);
+    }
+    // Fall-through to text for backward compatibility.
   }
   return format === 'md' ? chunks.join(' ') : JSON.stringify(chunks);
 }

@@ -9,7 +9,7 @@ import type {WebMCPTool} from 'puppeteer-core';
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
-import {isNodeLike} from './formatters/HeapSnapshotFormatter.js';
+import {isEdgeLike, isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
@@ -28,7 +28,7 @@ import type {
   Extension,
 } from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
-import type {ToolGroup, ToolDefinition} from './tools/thirdPartyDeveloper.js';
+import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
   ImageContentData,
@@ -40,6 +40,7 @@ import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
+import type {WaitForEventsResult} from './WaitForHelper.js';
 
 interface TraceInsightData {
   trace: TraceResult;
@@ -98,9 +99,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
-async function getToolGroup(
-  page: McpPage,
-): Promise<ToolGroup<ToolDefinition> | undefined> {
+async function getToolGroups(page: McpPage): Promise<ToolGroups> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
   // @ts-expect-error internal API
@@ -110,49 +109,88 @@ async function getToolGroup(
       objectId: windowHandle.remoteObject().objectId,
     });
   if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-    return;
+    return [];
   }
 
-  const toolGroup = await page.pptrPage.evaluate(() => {
-    return new Promise<ToolGroup<ToolDefinition> | undefined>(resolve => {
+  const toolGroups = await page.pptrPage.evaluate(() => {
+    return new Promise<ToolGroups>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
+      const groups: ToolGroups = [];
       // @ts-expect-error Adding custom property
-      event.respondWith = (toolGroup: ToolGroup) => {
+      event.respondWith = toolGroup => {
         if (!window.__dtmcp) {
           window.__dtmcp = {};
         }
-        window.__dtmcp.toolGroup = toolGroup;
+        if (!window.__dtmcp.toolGroups) {
+          window.__dtmcp.toolGroups = [];
+        }
+
+        if (
+          typeof toolGroup.name !== 'string' ||
+          typeof toolGroup.description !== 'string' ||
+          !Array.isArray(toolGroup.tools)
+        ) {
+          console.error('Invalid toolGroup:', toolGroup);
+          return;
+        }
+        for (const tool of toolGroup.tools) {
+          if (
+            typeof tool.name !== 'string' ||
+            typeof tool.description !== 'string' ||
+            typeof tool.inputSchema !== 'object' ||
+            typeof tool.execute !== 'function'
+          ) {
+            console.error('Invalid tool:', tool);
+            return;
+          }
+        }
+
+        window.__dtmcp.toolGroups.push(toolGroup);
 
         // When receiving a toolGroup for the first time, expose a simple execution helper
         if (!window.__dtmcp.executeTool) {
           window.__dtmcp.executeTool = async (toolName, args) => {
-            if (!window.__dtmcp?.toolGroup) {
+            if (
+              !window.__dtmcp?.toolGroups ||
+              window.__dtmcp.toolGroups.length === 0
+            ) {
               throw new Error('No tools found on the page');
             }
-            const tool = window.__dtmcp.toolGroup.tools.find(
-              t => t.name === toolName,
-            );
-            if (!tool) {
-              throw new Error(`Tool ${toolName} not found`);
+            for (const group of window.__dtmcp.toolGroups) {
+              const tool = group.tools?.find(t => t.name === toolName);
+              if (tool) {
+                return await tool.execute(args);
+              }
             }
-            return await tool.execute(args);
+            throw new Error(`Tool ${toolName} not found`);
           };
         }
 
-        resolve(toolGroup);
+        groups.push(toolGroup);
       };
       window.dispatchEvent(event);
-      // If the page does not synchronously call `event.respondWith`, return instead of timing out
-      setTimeout(() => {
-        resolve(undefined);
-      }, 0);
+      // If at least one toolGroup was added synchronously, resolve with the array.
+      // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve with an empty array.
+      if (groups.length > 0) {
+        resolve(groups);
+      } else {
+        setTimeout(() => {
+          if (groups.length > 0) {
+            resolve(groups);
+          } else {
+            resolve([]);
+          }
+        }, 0);
+      }
     });
   });
 
-  for (const tool of toolGroup?.tools ?? []) {
-    replaceHtmlElementsWithUids(tool.inputSchema);
+  for (const group of toolGroups) {
+    for (const tool of group.tools ?? []) {
+      replaceHtmlElementsWithUids(tool.inputSchema);
+    }
   }
-  return toolGroup;
+  return toolGroups;
 }
 
 export class McpResponse implements Response {
@@ -204,6 +242,11 @@ export class McpResponse implements Response {
   #page?: McpPage;
   #redactNetworkHeaders = true;
   #error?: Error;
+  #attachedWaitForResult?: WaitForEventsResult;
+
+  get #deviceScope(): DevTools.CrUXManager.DeviceScope {
+    return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
+  }
 
   constructor(args: ParsedArguments) {
     this.#args = args;
@@ -245,9 +288,7 @@ export class McpResponse implements Response {
   }
 
   setListThirdPartyDeveloperTools(): void {
-    if (this.#args.categoryExperimentalThirdParty) {
-      this.#listThirdPartyDeveloperTools = true;
-    }
+    this.#listThirdPartyDeveloperTools = true;
   }
 
   setListWebMcpTools(): void {
@@ -386,6 +427,10 @@ export class McpResponse implements Response {
 
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
+  }
+
+  attachWaitForResult(result: WaitForEventsResult): void {
+    this.#attachedWaitForResult = result;
   }
 
   setHeapSnapshotAggregates(
@@ -552,17 +597,25 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    let thirdPartyDeveloperTools: ToolGroup<ToolDefinition> | undefined;
-    if (this.#listThirdPartyDeveloperTools) {
-      const page = this.#page ?? context.getSelectedMcpPage();
-      thirdPartyDeveloperTools = await getToolGroup(page);
-      page.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
+    let thirdPartyDeveloperTools: ToolGroups = [];
+    if (
+      this.#args.categoryExperimentalThirdParty &&
+      this.#listThirdPartyDeveloperTools &&
+      this.#page
+    ) {
+      thirdPartyDeveloperTools = await getToolGroups(this.#page);
+      if (thirdPartyDeveloperTools) {
+        this.#page.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
+      }
     }
 
     let webmcpTools: WebMCPTool[] | undefined;
-    if (this.#listWebMcpTools && this.#args.categoryExperimentalWebmcp) {
-      const page = this.#page ?? context.getSelectedMcpPage();
-      webmcpTools = page.getWebMcpTools();
+    if (
+      this.#args.categoryExperimentalWebmcp &&
+      this.#listWebMcpTools &&
+      this.#page
+    ) {
+      webmcpTools = this.#page.getWebMcpTools();
     }
 
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
@@ -688,7 +741,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      thirdPartyDeveloperTools?: ToolGroup<ToolDefinition>;
+      thirdPartyDeveloperTools: ToolGroups;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
@@ -708,7 +761,7 @@ export class McpResponse implements Response {
       traceInsights?: Array<{insightName: string; insightKey: string}>;
       lighthouseResult?: object;
       extensions?: object[];
-      thirdPartyDeveloperTools?: object;
+      thirdPartyDeveloperTools?: object[];
       webmcpTools?: object[];
       message?: string;
       networkConditions?: string;
@@ -733,12 +786,24 @@ export class McpResponse implements Response {
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
+      navigatedToUrl?: string;
+      geolocation?: {latitude: number; longitude: number};
     } = {};
 
     const response = [];
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);
+    }
+
+    if (this.#attachedWaitForResult) {
+      if (this.#attachedWaitForResult.navigatedToUrl) {
+        response.push(
+          `Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`,
+        );
+        structuredContent.navigatedToUrl =
+          this.#attachedWaitForResult.navigatedToUrl;
+      }
     }
 
     const networkConditions = this.#page?.networkConditions;
@@ -748,6 +813,14 @@ export class McpResponse implements Response {
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
       structuredContent.navigationTimeout = timeout;
+    }
+
+    const geolocation = this.#page?.geolocation;
+    if (geolocation) {
+      response.push(
+        `Emulating geolocation: latitude=${geolocation.latitude}, longitude=${geolocation.longitude}`,
+      );
+      structuredContent.geolocation = geolocation;
     }
 
     const viewport = this.#page?.viewport;
@@ -876,7 +949,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     if (data.traceSummary) {
-      const summary = getTraceSummary(data.traceSummary);
+      const summary = getTraceSummary(data.traceSummary, this.#deviceScope);
       response.push(summary);
       structuredContent.traceSummary = summary;
       structuredContent.traceInsights = [];
@@ -895,6 +968,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         data.traceInsight.trace,
         data.traceInsight.insightSetId,
         data.traceInsight.insightName,
+        this.#deviceScope,
       );
       if ('error' in insightOutput) {
         response.push(insightOutput.error);
@@ -971,12 +1045,20 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
       const nodes = this.#heapSnapshotOptions.nodes;
       if (nodes) {
-        const sortedItems = nodes.items
-          .filter(isNodeLike)
-          .sort((a, b) => b.retainedSize - a.retainedSize);
+        let items = Array.from(nodes.items);
+        const firstItem = nodes.items[0];
+        if (firstItem) {
+          if (isNodeLike(firstItem)) {
+            items = items
+              .filter(isNodeLike)
+              .sort((a, b) => b.retainedSize - a.retainedSize);
+          } else if (isEdgeLike(firstItem)) {
+            items = items.filter(isEdgeLike);
+          }
+        }
 
         const paginationData = this.#dataWithPagination(
-          sortedItems,
+          items,
           this.#heapSnapshotOptions.pagination,
         );
 
@@ -1017,17 +1099,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    if (this.#listThirdPartyDeveloperTools) {
+    if (data.thirdPartyDeveloperTools.length) {
       structuredContent.thirdPartyDeveloperTools =
-        data.thirdPartyDeveloperTools ?? undefined;
+        data.thirdPartyDeveloperTools;
       response.push('## Third-party developer tools');
-      if (
-        !data.thirdPartyDeveloperTools ||
-        !data.thirdPartyDeveloperTools.tools
-      ) {
-        response.push('No third-party developer tools available.');
-      } else {
-        const toolGroup = data.thirdPartyDeveloperTools;
+      for (const toolGroup of data.thirdPartyDeveloperTools) {
         response.push(`${toolGroup.name}: ${toolGroup.description}`);
         response.push('Available tools:');
         const toolDefinitionsMessage = toolGroup.tools

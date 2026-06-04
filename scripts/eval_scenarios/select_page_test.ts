@@ -18,23 +18,10 @@ export const scenario: TestScenario = {
       <h1>test</h1>
     `,
   },
-  expectations: calls => {
-    assert.strictEqual(calls.length, 3);
-    assert.ok(calls[0].name === 'new_page', 'First call should be navigation');
-    assert.ok(calls[1].name === 'new_page', 'Second call should be navigation');
-    assert.ok(
-      calls[2].name === 'select_page',
-      'Third call should be select_page',
-    );
-    assert.strictEqual(
-      calls[2].args.pageId,
-      2,
-      'PageId has to be set to 2. about:blank is 1, <TEST_URL> is 2, https://developers.chrome.com is 3.',
-    );
-    assert.strictEqual(
-      calls[2].args.bringToFront,
-      undefined,
-      'bringToFront should use the default value.',
-    );
+  expectations: result => {
+    result.consumePageNavigation();
+    assert.strictEqual(result.remainingCalls.length, 2);
+    result.assertNextCall('new_page');
+    result.assertNextCall('select_page', {pageId: 2, bringToFront: undefined});
   },
 };

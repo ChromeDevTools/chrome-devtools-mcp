@@ -26,7 +26,7 @@ describe('slim', () => {
         response,
         context,
       );
-      t.assert.snapshot?.(response.responseLines.join('\n'));
+      t.assert.snapshot(response.responseLines.join('\n'));
     });
   });
 
@@ -42,7 +42,7 @@ describe('slim', () => {
         response,
         context,
       );
-      t.assert.snapshot?.(response.responseLines.join('\n'));
+      t.assert.snapshot(response.responseLines.join('\n'));
     });
   });
 
@@ -62,7 +62,7 @@ describe('slim', () => {
         'Hello MCP',
       );
       assert(!response.includePages);
-      t.assert.snapshot?.(response.responseLines.join('\n'));
+      t.assert.snapshot(response.responseLines.join('\n'));
     });
   });
 

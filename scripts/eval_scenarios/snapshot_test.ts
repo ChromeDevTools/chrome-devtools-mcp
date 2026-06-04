@@ -10,16 +10,17 @@ import type {TestScenario} from '../eval_gemini.ts';
 
 export const scenario: TestScenario = {
   prompt: 'Read the content of <TEST_URL>',
-  maxTurns: 3,
+  maxTurns: 4,
   htmlRoute: {
     path: '/test.html',
     htmlContent: '<h1>Hello World</h1><p>This is a test.</p>',
   },
-  expectations: calls => {
-    assert.strictEqual(calls.length, 2);
-    assert.ok(
-      calls[0].name === 'navigate_page' || calls[0].name === 'new_page',
+  expectations: result => {
+    const pageId = result.consumePageNavigation();
+    assert.strictEqual(result.remainingCalls.length, 1);
+    result.assertNextCall(
+      'take_snapshot',
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
-    assert.ok(calls[1].name === 'take_snapshot');
   },
 };

@@ -76,7 +76,7 @@ export class ClearcutSender {
       app_version: this.#appVersion,
       os_type: this.#osType,
     };
-    logger('Enqueing telemetry event', JSON.stringify(eventToSend, null, 2));
+    logger?.('Enqueing telemetry event', JSON.stringify(eventToSend, null, 2));
     this.#addToBuffer(eventToSend);
 
     if (!this.#timerStarted) {
@@ -101,9 +101,9 @@ export class ClearcutSender {
         this.#finalFlush(),
         new Promise(resolve => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
       ]);
-      logger('Final flush completed');
+      logger?.('Final flush completed');
     } catch (error) {
-      logger('Final flush failed:', error);
+      logger?.('Final flush failed:', error);
     }
   }
 
@@ -136,7 +136,7 @@ export class ClearcutSender {
           );
         }
       } else if (result.isPermanentError) {
-        logger(
+        logger?.(
           'Permanent error, dropped batch of',
           eventsToSend.length,
           'events',
@@ -149,7 +149,7 @@ export class ClearcutSender {
     } catch (error) {
       // Safety catch for unexpected errors, requeue events
       this.#buffer = [...eventsToSend, ...this.#buffer];
-      logger('Flush failed unexpectedly:', error);
+      logger?.('Flush failed unexpectedly:', error);
     } finally {
       this.#isFlushing = false;
       this.#scheduleFlush(nextDelayMs);
@@ -159,7 +159,7 @@ export class ClearcutSender {
   #addToBuffer(event: ChromeDevToolsMcpExtension): void {
     if (this.#buffer.length >= MAX_BUFFER_SIZE) {
       this.#buffer.shift();
-      logger('Telemetry buffer overflow: dropped oldest event');
+      logger?.('Telemetry buffer overflow: dropped oldest event');
     }
     this.#buffer.push({
       event,
@@ -168,13 +168,13 @@ export class ClearcutSender {
   }
 
   #scheduleFlush(delayMs: number): void {
-    logger(`Scheduling flush in ${delayMs}`);
+    logger?.(`Scheduling flush in ${delayMs}`);
     if (this.#flushTimer) {
       clearTimeout(this.#flushTimer);
     }
     this.#flushTimer = setTimeout(() => {
       this.#flush().catch(err => {
-        logger('Flush error:', err);
+        logger?.('Flush error:', err);
       });
     }, delayMs);
   }
@@ -184,7 +184,7 @@ export class ClearcutSender {
     isPermanentError?: boolean;
     nextRequestWaitMs?: number;
   }> {
-    logger(`Sending batch of ${events.length}`);
+    logger?.(`Sending batch of ${events.length}`);
     const requestBody: LogRequest = {
       log_source: LOG_SOURCE,
       request_time_ms: Date.now().toString(),
@@ -227,7 +227,7 @@ export class ClearcutSender {
         return {success: false};
       }
 
-      logger('Telemetry permanent error:', status);
+      logger?.('Telemetry permanent error:', status);
       return {success: false, isPermanentError: true};
     } catch {
       clearTimeout(timeoutId);

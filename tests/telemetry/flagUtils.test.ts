@@ -106,6 +106,18 @@ describe('computeFlagUsage', () => {
       const usage = computeFlagUsage(args, mockOptions);
       assert.equal(usage.string_flag_present, false);
     });
+
+    it('sanitizes flag names containing underscores before numbers', () => {
+      const mock3pOptions = {
+        experimental3pTool: {
+          type: 'boolean' as const,
+          description: 'A 3p flag',
+        },
+      } as unknown as typeof cliOptions;
+      const args = {experimental3pTool: true};
+      const usage = computeFlagUsage(args, mock3pOptions);
+      assert.equal(usage.experimental3p_tool, true);
+    });
   });
 });
 
@@ -139,6 +151,21 @@ describe('getPossibleFlagMetrics', () => {
         flagType: 'enum',
         choices: ['ENUM_FLAG_UNSPECIFIED', 'ENUM_FLAG_A', 'ENUM_FLAG_B'],
       },
+    ]);
+  });
+
+  it('sanitizes flag names containing underscores before numbers', () => {
+    const mock3pOptions = {
+      experimental3pTool: {
+        type: 'boolean' as const,
+        description: 'A 3p flag',
+      },
+    } as unknown as typeof cliOptions;
+    const metrics = getPossibleFlagMetrics(mock3pOptions);
+
+    assert.deepEqual(metrics, [
+      {name: 'experimental3p_tool_present', flagType: 'boolean'},
+      {name: 'experimental3p_tool', flagType: 'boolean'},
     ]);
   });
 });

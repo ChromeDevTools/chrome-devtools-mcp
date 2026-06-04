@@ -39,11 +39,11 @@ function formatterTestConcise(
 ) {
   it(label + ' toString', async t => {
     const formatter = await setup(t);
-    t.assert.snapshot?.(formatter.toString());
+    t.assert.snapshot(formatter.toString());
   });
   it(label + ' toJSON', async t => {
     const formatter = await setup(t);
-    t.assert.snapshot?.(JSON.stringify(formatter.toJSON(), null, 2));
+    t.assert.snapshot(JSON.stringify(formatter.toJSON(), null, 2));
   });
 }
 
@@ -53,11 +53,11 @@ function formatterTestDetailed(
 ) {
   it(label + ' toStringDetailed', async t => {
     const formatter = await setup(t);
-    t.assert.snapshot?.(formatter.toStringDetailed());
+    t.assert.snapshot(formatter.toStringDetailed());
   });
   it(label + ' toJSONDetailed', async t => {
     const formatter = await setup(t);
-    t.assert.snapshot?.(JSON.stringify(formatter.toJSONDetailed(), null, 2));
+    t.assert.snapshot(JSON.stringify(formatter.toJSONDetailed(), null, 2));
   });
 }
 

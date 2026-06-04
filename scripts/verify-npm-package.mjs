@@ -14,7 +14,7 @@ function verifyPackageContents() {
     });
     // skip non-JSON output from prepare.
     const data = JSON.parse(output.substring(output.indexOf('{')));
-    const files = data.files.map(f => f.path);
+    const files = data['chrome-devtools-mcp'].files.map(f => f.path);
     // Check some important files.
     const requiredPaths = [
       'build/src/index.js',

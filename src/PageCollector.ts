@@ -92,7 +92,7 @@ export class PageCollector<T> {
       }
       this.addPage(page);
     } catch (err) {
-      logger('Error getting a page for a target onTargetCreated', err);
+      logger?.('Error getting a page for a target onTargetCreated', err);
     }
   };
 
@@ -104,7 +104,7 @@ export class PageCollector<T> {
       }
       this.cleanupPageDestroyed(page);
     } catch (err) {
-      logger('Error getting a page for a target onTargetDestroyed', err);
+      logger?.('Error getting a page for a target onTargetDestroyed', err);
     }
   };
 
@@ -335,7 +335,7 @@ class PageEventSubscriber {
         inspectorIssue,
       )[0];
       if (!issue) {
-        logger('No issue mapping for for the issue: ', inspectorIssue.code);
+        logger?.('No issue mapping for for the issue: ', inspectorIssue.code);
         return;
       }
 
@@ -353,7 +353,7 @@ class PageEventSubscriber {
         },
       );
     } catch (error) {
-      logger('Error creating a new issue', error);
+      logger?.('Error creating a new issue', error);
     }
   };
 }

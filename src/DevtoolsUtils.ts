@@ -9,6 +9,7 @@ import {Mutex} from './Mutex.js';
 import {DevTools} from './third_party/index.js';
 import type {
   Browser,
+  CDPSession,
   ConsoleMessage,
   Page,
   Protocol,
@@ -49,6 +50,8 @@ export interface TargetUniverse {
   /** The DevTools target corresponding to the puppeteer Page */
   target: DevTools.Target;
   universe: DevTools.Foundation.Universe.Universe;
+  /** The secondary session created for this page */
+  session: CDPSession;
 }
 export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
 
@@ -144,6 +147,10 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
 
   const targetManager = universe.context.get(DevTools.TargetManager);
   targetManager.observeModels(DevTools.DebuggerModel, SKIP_ALL_PAUSES);
+  targetManager.observeModels(
+    DevTools.NetworkManager.NetworkManager,
+    DISABLE_NETWORK,
+  );
 
   const target = targetManager.createTarget(
     'main',
@@ -154,7 +161,7 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
     undefined,
     connection,
   );
-  return {target, universe};
+  return {target, universe, session};
 };
 
 // We don't want to pause any DevTools universe session ever on the MCP side.
@@ -165,6 +172,20 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
 const SKIP_ALL_PAUSES = {
   modelAdded(model: DevTools.DebuggerModel): void {
     void model.agent.invoke_setSkipAllPauses({skip: true});
+  },
+
+  modelRemoved(): void {
+    // Do nothing.
+  },
+};
+
+// Not recording network requests in the DevTools universe.
+//
+// The network requests are collected through pptr and there isn't a use case for
+// enabling devtools SDK's network domain.
+const DISABLE_NETWORK = {
+  modelAdded(model: DevTools.NetworkManager.NetworkManager): void {
+    void model.target().networkAgent().invoke_disable();
   },
 
   modelRemoved(): void {

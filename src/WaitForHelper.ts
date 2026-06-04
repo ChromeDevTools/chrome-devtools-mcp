@@ -16,6 +16,9 @@ export class WaitForHelper {
   #expectNavigationIn: number;
   #navigationTimeout: number;
 
+  #dialogOpened = false;
+  #initialUrl: string;
+
   constructor(
     page: Page,
     cpuTimeoutMultiplier: number,
@@ -26,6 +29,7 @@ export class WaitForHelper {
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
     this.#page = page as unknown as CdpPage;
+    this.#initialUrl = page.url();
   }
 
   /**
@@ -127,11 +131,13 @@ export class WaitForHelper {
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
     options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
-  ): Promise<void> {
-    let dialogOpened = false;
+  ): Promise<WaitForEventsResult> {
+    if (this.#abortController.signal.aborted) {
+      throw new Error("Can't re-use a WaitForHelper");
+    }
     if (options?.handleDialog) {
       const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
-        dialogOpened = true;
+        this.#dialogOpened = true;
         if (options.handleDialog === 'dismiss') {
           void dialog.dismiss();
         } else if (options.handleDialog === 'accept') {
@@ -156,7 +162,7 @@ export class WaitForHelper {
         }
         return;
       })
-      .catch(error => logger(error));
+      .catch(error => logger?.(error));
 
     try {
       await action();
@@ -169,19 +175,38 @@ export class WaitForHelper {
     try {
       await navigationFinished;
 
-      if (dialogOpened) {
-        return;
+      if (this.#dialogOpened) {
+        return this.#getResult();
       }
 
       // Wait for stable dom after navigation so we execute in
       // the correct context
       await this.waitForStableDom();
     } catch (error) {
-      logger(error);
+      logger?.(error);
     } finally {
       this.#abortController.abort();
     }
+
+    return this.#getResult();
   }
+
+  #getResult(): WaitForEventsResult {
+    const urlAfterAction = this.#page.url();
+    return {
+      ...(urlAfterAction !== this.#initialUrl
+        ? {navigatedToUrl: urlAfterAction}
+        : {}),
+    };
+  }
+}
+
+export interface WaitForEventsResult {
+  /**
+   * The URL the page navigated to during the action, if a navigation
+   * occurred.
+   */
+  navigatedToUrl?: string;
 }
 
 export function getNetworkMultiplierFromString(

@@ -21,11 +21,17 @@ export interface ToolGroup<T extends ToolDefinition> {
   tools: T[];
 }
 
+export type ToolGroups = Array<ToolGroup<ToolDefinition>>;
+
 declare global {
   interface Window {
     __dtmcp?: {
-      toolGroup?: ToolGroup<
-        ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}
+      toolGroups?: Array<
+        ToolGroup<
+          ToolDefinition & {
+            execute: (args: Record<string, unknown>) => unknown;
+          }
+        >
       >;
       stashedElements?: Element[];
       executeTool?: (
@@ -51,6 +57,7 @@ export const listThirdPartyDeveloperTools = definePageTool({
   },
   schema: {},
   blockedByDialog: false,
+  verifyFilesSchema: [],
   handler: async (_request, response, _context) => {
     response.setListThirdPartyDeveloperTools();
   },
@@ -71,6 +78,7 @@ export const executeThirdPartyDeveloperTool = definePageTool({
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
   blockedByDialog: false,
+  verifyFilesSchema: [],
   handler: async (request, response) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};
@@ -88,8 +96,16 @@ export const executeThirdPartyDeveloperTool = definePageTool({
       }
     }
 
-    const toolGroup = request.page.getThirdPartyDeveloperTools();
-    const tool = toolGroup?.tools.find(t => t.name === toolName);
+    const toolGroups = request.page.getThirdPartyDeveloperTools();
+    let tool;
+    if (toolGroups) {
+      for (const group of toolGroups) {
+        tool = group.tools?.find(t => t.name === toolName);
+        if (tool) {
+          break;
+        }
+      }
+    }
     if (!tool) {
       throw new Error(`Tool ${toolName} not found`);
     }

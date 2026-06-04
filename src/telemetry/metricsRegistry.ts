@@ -11,7 +11,8 @@ import {
   transformArgType,
   getZodType,
   PARAM_BLOCKLIST,
-} from './ClearcutLogger.js';
+  stripUnderscoreBeforeNumber,
+} from './transformation.js';
 
 /**
  * Validates that all values in an enum are of the homogeneous primitive type.
@@ -118,7 +119,7 @@ export function generateToolMetrics(tools: ToolDefinition[]): ToolMetric[] {
     }
 
     return {
-      name: tool.name,
+      name: stripUnderscoreBeforeNumber(tool.name),
       args,
     };
   });

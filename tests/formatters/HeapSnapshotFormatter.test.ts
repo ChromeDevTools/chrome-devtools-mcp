@@ -8,10 +8,19 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.js';
-import type {DevTools} from '../../src/third_party/index.js';
+import {DevTools} from '../../src/third_party/index.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 
 describe('HeapSnapshotFormatter', () => {
+  DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
+    create: true,
+    data: {
+      navigatorLanguage: 'en-US',
+      settingLanguage: 'en-US',
+      lookupClosestDevToolsLocale: l => l,
+    },
+  });
+  DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
   const mockAggregates: Record<
     string,
     DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
@@ -40,7 +49,7 @@ describe('HeapSnapshotFormatter', () => {
     it('formats data as CSV and sorts by retained size', t => {
       const formatter = new HeapSnapshotFormatter(mockAggregates);
       const result = formatter.toString();
-      t.assert.snapshot?.(result);
+      t.assert.snapshot(result);
     });
   });
 
@@ -50,20 +59,74 @@ describe('HeapSnapshotFormatter', () => {
       const result = formatter.toJSON();
       assert.deepStrictEqual(result, [
         {
-          uid: 1,
+          id: 1,
           className: 'ObjectA',
           count: 10,
-          selfSize: 100,
-          retainedSize: 1000,
+          selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(100),
+          retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(1000),
         },
         {
-          uid: 2,
+          id: 2,
           className: 'ObjectB',
           count: 5,
-          selfSize: 50,
-          retainedSize: 500,
+          selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(50),
+          retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(500),
         },
       ]);
+    });
+  });
+
+  describe('formatNodes', () => {
+    it('formats edges correctly', () => {
+      const mockEdges = [
+        {
+          name: 'edge1',
+          type: 'property',
+          edgeIndex: 0,
+          isAddedNotRemoved: null,
+          node: {
+            id: 1,
+            name: 'NodeA',
+            distance: 0,
+            nodeIndex: 0,
+            retainedSize: 0,
+            selfSize: 0,
+            type: 'object',
+            canBeQueried: false,
+            detachedDOMTreeNode: false,
+            ignored: false,
+            isAddedNotRemoved: null,
+          },
+        },
+        {
+          name: 'edge2',
+          type: 'element',
+          edgeIndex: 1,
+          isAddedNotRemoved: null,
+          node: {
+            id: 2,
+            name: 'NodeB',
+            distance: 0,
+            nodeIndex: 0,
+            retainedSize: 0,
+            selfSize: 0,
+            type: 'object',
+            canBeQueried: false,
+            detachedDOMTreeNode: false,
+            ignored: false,
+            isAddedNotRemoved: null,
+          },
+        },
+      ];
+
+      const result = HeapSnapshotFormatter.formatNodes(mockEdges);
+      const expected = [
+        'name,type,nodeId,nodeName',
+        'edge1,property,1,NodeA',
+        'edge2,element,2,NodeB',
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
     });
   });
 

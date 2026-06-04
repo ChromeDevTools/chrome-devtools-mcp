@@ -14,6 +14,32 @@ import {
   viewportTransform,
 } from './ToolDefinition.js';
 
+function headerStringTransform(
+  value: string | undefined,
+): Record<string, string> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === '') {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error('Headers must be a JSON object');
+    }
+    return parsed as Record<string, string>;
+  } catch (error) {
+    throw new Error(
+      `Invalid JSON for headers: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 const throttlingOptions: [string, ...string[]] = [
   'Offline',
   ...Object.keys(PredefinedNetworkConditions),
@@ -44,7 +70,7 @@ export const emulate = definePageTool({
       .optional()
       .transform(geolocationTransform)
       .describe(
-        'Geolocation (`<latitude>x<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
+        'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
       ),
     userAgent: zod
       .string()
@@ -65,10 +91,19 @@ export const emulate = definePageTool({
       .describe(
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
       ),
+    extraHttpHeaders: zod
+      .string()
+      .optional()
+      .transform(headerStringTransform)
+      .describe(
+        'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
+      ),
   },
   blockedByDialog: true,
-  handler: async (request, _response, context) => {
+  verifyFilesSchema: [],
+  handler: async (request, response, context) => {
     const page = request.page;
     await context.emulate(request.params, page.pptrPage);
+    response.appendResponseLine('Emulation configured successfully');
   },
 });

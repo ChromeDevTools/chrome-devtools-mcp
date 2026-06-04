@@ -305,7 +305,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
       const result = formatter.toStringDetailed();
-      t.assert.snapshot?.(result);
+      t.assert.snapshot(result);
     });
     it('shows saved to file message in toStringDetailed', async () => {
       const request = {

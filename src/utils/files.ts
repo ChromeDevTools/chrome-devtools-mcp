@@ -22,3 +22,51 @@ export function ensureExtension(
   const ext = path.extname(filepath);
   return filepath.slice(0, filepath.length - ext.length) + extension;
 }
+
+export async function resolveCanonicalPath(filePath: string): Promise<string> {
+  const absolutePath = path.resolve(filePath);
+  try {
+    // Get the true canonical path, resolving all symlinks.
+    return await fs.realpath(absolutePath);
+  } catch (err) {
+    if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      err.code === 'ENOENT'
+    ) {
+      // Find the nearest existing ancestor directory on the filesystem.
+      let current = absolutePath;
+      const missingSegments: string[] = [];
+      while (true) {
+        const parent = path.dirname(current);
+        if (parent === current) {
+          // Reached root directory but still couldn't resolve anything.
+          throw err;
+        }
+        try {
+          const canonicalParent = await fs.realpath(parent);
+          return path.join(
+            canonicalParent,
+            path.basename(current),
+            ...missingSegments,
+          );
+        } catch (parentErr) {
+          if (
+            parentErr &&
+            typeof parentErr === 'object' &&
+            'code' in parentErr &&
+            parentErr.code === 'ENOENT'
+          ) {
+            missingSegments.unshift(path.basename(current));
+            current = parent;
+          } else {
+            throw parentErr;
+          }
+        }
+      }
+    } else {
+      throw err;
+    }
+  }
+}
