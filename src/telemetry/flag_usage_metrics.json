@@ -301,6 +301,14 @@
     "flagType": "boolean"
   },
   {
+    "name": "memory_debugging_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "memory_debugging",
+    "flagType": "boolean"
+  },
+  {
     "name": "page_id_routing_present",
     "flagType": "boolean"
   },
