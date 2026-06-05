@@ -83,7 +83,7 @@ export const commands: Commands = {
   },
   close_heapsnapshot: {
     description:
-      'Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --experimentalMemory=true)',
+      'Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {

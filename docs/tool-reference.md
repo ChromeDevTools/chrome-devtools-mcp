@@ -457,7 +457,7 @@ in the DevTools Elements panel (if any).
 
 ### `close_heapsnapshot`
 
-**Description:** Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --experimentalMemory=true)
+**Description:** Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 

@@ -162,7 +162,7 @@ export const closeHeapSnapshot = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: false,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   verifyFilesSchema: ['filePath'],
   schema: {
