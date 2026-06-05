@@ -110,7 +110,7 @@ export const lighthouseAudit = definePageTool({
     const reportPaths: string[] = [];
 
     const encoder = new TextEncoder();
-    for (const format of formats) {
+    const savePromises = formats.map(async format => {
       const report = generateReport(lhr, format);
       const data = encoder.encode(report);
       if (outputDirPath) {
@@ -120,14 +120,21 @@ export const lighthouseAudit = definePageTool({
           reportPath,
           `.${format}`,
         );
-        reportPaths.push(filename);
-      } else {
-        const {filepath} = await context.saveTemporaryFile(
-          data,
-          `report.${format}`,
-        );
-        reportPaths.push(filepath);
+        return filename;
       }
+      const {filepath} = await context.saveTemporaryFile(
+        data,
+        `report.${format}`,
+      );
+      return filepath;
+    });
+
+    const results = await Promise.allSettled(savePromises);
+    for (const res of results) {
+      if (res.status === 'rejected') {
+        throw res.reason;
+      }
+      reportPaths.push(res.value);
     }
 
     const categoryScores = Object.values(lhr.categories).map(c => ({
