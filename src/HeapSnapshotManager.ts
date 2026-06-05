@@ -148,6 +148,19 @@ export class HeapSnapshotManager {
     );
   }
 
+  async getEdges(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    const provider = snapshot.createEdgesProvider(nodeIndex);
+    return await provider.serializeItemsRange(0, Infinity);
+  }
+
   #getCachedSnapshot(filePath: string) {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);

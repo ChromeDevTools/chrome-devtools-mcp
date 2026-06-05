@@ -175,6 +175,77 @@ id,name,count,selfSize,maxRetainedSize
 108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
 `;
 
+exports[`memory > get_heapsnapshot_edges > with pagination 1`] = `
+## Heap Snapshot Data
+name,type,nodeId,nodeName
+constructor,property,25575,String
+anchor,property,29295,anchor
+Showing 1-2 of 56 (Page 1 of 28).
+Next page: 1
+`;
+
+exports[`memory > get_heapsnapshot_edges > with valid nodeId 1`] = `
+## Heap Snapshot Data
+name,type,nodeId,nodeName
+constructor,property,25575,String
+anchor,property,29295,anchor
+at,property,29297,at
+big,property,29299,big
+blink,property,29301,blink
+bold,property,29303,bold
+charAt,property,29305,charAt
+charCodeAt,property,29307,charCodeAt
+codePointAt,property,29309,codePointAt
+concat,property,29311,concat
+endsWith,property,29313,endsWith
+fontcolor,property,29315,fontcolor
+fontsize,property,29317,fontsize
+fixed,property,29319,fixed
+includes,property,29321,includes
+indexOf,property,29323,indexOf
+isWellFormed,property,29325,isWellFormed
+italics,property,29327,italics
+lastIndexOf,property,29329,lastIndexOf
+link,property,29331,link
+localeCompare,property,29333,localeCompare
+match,property,29335,match
+matchAll,property,29337,matchAll
+normalize,property,29339,normalize
+padEnd,property,29341,padEnd
+padStart,property,29343,padStart
+repeat,property,29345,repeat
+replace,property,29347,replace
+replaceAll,property,29349,replaceAll
+search,property,29351,search
+slice,property,29353,slice
+small,property,29355,small
+split,property,29357,split
+strike,property,29359,strike
+sub,property,29361,sub
+substr,property,29363,substr
+substring,property,29365,substring
+sup,property,29367,sup
+startsWith,property,29369,startsWith
+toString,property,29371,toString
+toWellFormed,property,29373,toWellFormed
+trim,property,29375,trim
+trimStart,property,29377,trimStart
+trimLeft,property,29377,trimStart
+trimEnd,property,29379,trimEnd
+trimRight,property,29379,trimEnd
+toLocaleLowerCase,property,29381,toLocaleLowerCase
+toLocaleUpperCase,property,29383,toLocaleUpperCase
+toLowerCase,property,29385,toLowerCase
+toUpperCase,property,29387,toUpperCase
+valueOf,property,29389,valueOf
+<symbol Symbol.iterator>,property,29391,[Symbol.iterator]
+__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString}
+properties,internal,29393,system / PropertyArray
+map,internal,25577,system / Map
+1,hidden,71,
+Showing 1-56 of 56 (Page 1 of 1).
+`;
+
 exports[`memory > get_heapsnapshot_retainers > with valid nodeId 1`] = `
 ## Heap Snapshot Data
 name,type,nodeId,nodeName

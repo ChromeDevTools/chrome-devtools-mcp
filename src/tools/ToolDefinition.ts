@@ -260,6 +260,10 @@ export type Context = Readonly<{
     maxNodes?: number,
     maxSiblings?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths>;
+  getHeapSnapshotEdges(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
 /**

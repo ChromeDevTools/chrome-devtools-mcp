@@ -968,4 +968,11 @@ export class McpContext implements Context {
         throw new Error(`Unsupported protocol for: ${url}`);
     }
   }
+
+  async getHeapSnapshotEdges(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getEdges(filePath, nodeId);
+  }
 }

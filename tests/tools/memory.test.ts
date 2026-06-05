@@ -19,6 +19,7 @@ import {
   getHeapSnapshotRetainers,
   closeHeapSnapshot,
   getHeapSnapshotRetainingPaths,
+  getHeapSnapshotEdges,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -277,6 +278,58 @@ describe('memory', () => {
           output,
           /Note: results are truncated, the following limits were reached: depth\./,
         );
+      });
+    });
+  });
+
+  describe('get_heapsnapshot_edges', () => {
+    it('with valid nodeId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotEdges.handler(
+          {params: {filePath, nodeId: 25341}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotEdges.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with pagination', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotEdges.handler(
+          {params: {filePath, nodeId: 25341, pageSize: 2}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotEdges.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
       });
     });
   });
