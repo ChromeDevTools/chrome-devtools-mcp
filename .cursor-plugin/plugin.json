@@ -6,7 +6,7 @@
     "name": "Google Chrome"
   },
   "logo": "https://github.com/ChromeDevTools/devtools-logo/blob/master/logos/svg/chrome-devtools-square-responsive.svg",
-  "homepage": "https://cursor.com/marketplace/devtools-for-agents",
+  "homepage": "https://developer.chrome.com/docs/devtools/agents",
   "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
   "mcpServers": {
     "chrome-devtools": {

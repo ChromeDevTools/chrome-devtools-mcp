@@ -740,18 +740,10 @@
     ]
   },
   {
-    "name": "connect_to_browser",
+    "name": "close_heapsnapshot",
     "args": [
       {
-        "name": "browser_url_length",
-        "argType": "number"
-      },
-      {
-        "name": "ws_endpoint_length",
-        "argType": "number"
-      },
-      {
-        "name": "ws_headers_count",
+        "name": "file_path_length",
         "argType": "number"
       }
     ]

@@ -248,6 +248,7 @@ export type Context = Readonly<{
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  closeHeapSnapshot(filePath: string): Promise<boolean>;
 }>;
 
 /**

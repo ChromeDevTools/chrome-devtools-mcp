@@ -515,8 +515,9 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
-- **Memory** (5 tools)
+- **Memory** (6 tools)
   - [`take_heapsnapshot`](docs/tool-reference.md#take_heapsnapshot)
+  - [`close_heapsnapshot`](docs/tool-reference.md#close_heapsnapshot)
   - [`get_heapsnapshot_class_nodes`](docs/tool-reference.md#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](docs/tool-reference.md#get_heapsnapshot_details)
   - [`get_heapsnapshot_retainers`](docs/tool-reference.md#get_heapsnapshot_retainers)
@@ -609,8 +610,8 @@ The Chrome DevTools MCP server supports the following configuration option:
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean
 
-- **`--experimentalMemory`/ `--experimental-memory`**
-  Whether to enable experimental memory tools.
+- **`--memoryDebugging`/ `--memory-debugging`, `-experimentalMemory`**
+  Whether to enable memory debugging tools.
   - **Type:** boolean
 
 - **`--experimentalStructuredContent`/ `--experimental-structured-content`**

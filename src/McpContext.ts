@@ -889,4 +889,12 @@ export class McpContext implements Context {
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
+
+  async closeHeapSnapshot(filePath: string): Promise<boolean> {
+    return this.#heapSnapshotManager.dispose(filePath);
+  }
+
+  hasHeapSnapshots(): boolean {
+    return this.#heapSnapshotManager.hasSnapshots();
+  }
 }

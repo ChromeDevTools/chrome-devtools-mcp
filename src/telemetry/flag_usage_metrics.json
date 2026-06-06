@@ -222,11 +222,13 @@
   },
   {
     "name": "experimental_memory",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_memory_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_navigation_allowlist",
@@ -294,6 +296,14 @@
   },
   {
     "name": "category_experimental_third_party",
+    "flagType": "boolean"
+  },
+  {
+    "name": "memory_debugging_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "memory_debugging",
     "flagType": "boolean"
   }
 ]

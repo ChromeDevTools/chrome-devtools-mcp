@@ -44,7 +44,7 @@ export const getHeapSnapshotSummary = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
@@ -68,7 +68,7 @@ export const getHeapSnapshotDetails = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
@@ -102,7 +102,7 @@ export const getHeapSnapshotClassNodes = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
@@ -132,7 +132,7 @@ export const getHeapSnapshotRetainers = defineTool({
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
-    conditions: ['experimentalMemory'],
+    conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
   verifyFilesSchema: ['filePath'],
@@ -152,5 +152,34 @@ export const getHeapSnapshotRetainers = defineTool({
       pageIdx: request.params.pageIdx,
       pageSize: request.params.pageSize,
     });
+  },
+});
+
+export const closeHeapSnapshot = defineTool({
+  name: 'close_heapsnapshot',
+  description:
+    'Closes a previously loaded memory heapsnapshot, freeing its memory.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: false,
+    conditions: ['memoryDebugging'],
+  },
+  verifyFilesSchema: ['filePath'],
+  schema: {
+    filePath: zod
+      .string()
+      .describe('A path to the .heapsnapshot file to close.'),
+  },
+  blockedByDialog: false,
+  handler: async (request, response, context) => {
+    const closed = await context.closeHeapSnapshot(request.params.filePath);
+    if (!closed) {
+      throw new Error(
+        `Failed to close heap snapshot: ${request.params.filePath} was not loaded.`,
+      );
+    }
+    response.appendResponseLine(
+      `Closed heap snapshot: ${request.params.filePath}`,
+    );
   },
 });

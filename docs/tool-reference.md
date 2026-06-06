@@ -40,8 +40,9 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (5 tools)
+- **[Memory](#memory)** (6 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
+  - [`close_heapsnapshot`](#close_heapsnapshot)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
@@ -467,9 +468,19 @@ in the DevTools Elements panel (if any).
 
 ---
 
+### `close_heapsnapshot`
+
+**Description:** Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to the .heapsnapshot file to close.
+
+---
+
 ### `get_heapsnapshot_class_nodes`
 
-**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)
+**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -482,7 +493,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_details`
 
-**Description:** Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)
+**Description:** Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -494,7 +505,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_retainers`
 
-**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)
+**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -507,7 +518,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)
+**Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 

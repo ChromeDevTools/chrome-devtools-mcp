@@ -201,12 +201,18 @@ export class HeapSnapshotManager {
     return {snapshot, worker: workerProxy};
   }
 
-  dispose(filePath: string): void {
+  hasSnapshots(): boolean {
+    return this.#snapshots.size > 0;
+  }
+
+  dispose(filePath: string): boolean {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {
       cached.worker.dispose();
       this.#snapshots.delete(absolutePath);
+      return true;
     }
+    return false;
   }
 }

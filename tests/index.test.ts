@@ -171,6 +171,19 @@ describe('e2e', () => {
     );
   });
 
+  it('has memory debugging tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const getHeapSnapshotSummary = tools.find(
+          t => t.name === 'get_heapsnapshot_summary',
+        );
+        assert.ok(getHeapSnapshotSummary);
+      },
+      ['--memoryDebugging'],
+    );
+  });
+
   it('updates roots when client notifies', async () => {
     const roots = [{uri: 'file:///test-root', name: 'test-root'}];
     let resolvePromise: () => void;
