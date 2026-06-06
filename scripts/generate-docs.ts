@@ -274,6 +274,9 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
         result.items = getZodTypeInfo(def.type);
       }
       break;
+    case 'ZodRecord':
+      result.type = 'object';
+      break;
     default:
       result.type = 'unknown';
   }

@@ -198,7 +198,7 @@
 
 - **browserUrl** (string) _(optional)_: Connect to a running, debuggable Chrome instance (e.g. http://127.0.0.1:9222).
 - **wsEndpoint** (string) _(optional)_: WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/&lt;id&gt;).
-- **wsHeaders** (unknown) _(optional)_: Custom headers for WebSocket connection in JSON format.
+- **wsHeaders** (object) _(optional)_: Custom headers for WebSocket connection in JSON format.
 
 ---
 
