@@ -408,3 +408,20 @@ export async function assertDaemonIsRunning(sessionId?: string) {
     'chrome-devtools-mcp daemon is not running',
   );
 }
+
+export async function waitExecutionFor(
+  func: () => Promise<void>,
+  timeout: number,
+) {
+  const start = Date.now();
+  while (Date.now() - start < 10000) {
+    try {
+      await func();
+      return;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 100)); // wait and retry
+    }
+  }
+
+  throw new Error(`Timeout of ${timeout} reached.`);
+}

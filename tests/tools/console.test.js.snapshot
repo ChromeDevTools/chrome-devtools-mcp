@@ -1,3 +1,11 @@
+exports[`console > captures logs and errors from extension service worker 1`] = `
+## Console messages
+Showing 1-3 of 3 (Page 1 of 1).
+msgid=1 [log] Service Worker starting... (1 args)
+msgid=2 [warn] This is a warning from Service Worker (1 args)
+msgid=3 [error] Uncaught Error: Intentional error from Service Worker (0 args)
+`;
+
 exports[`console > get_console_message > applies source maps to stack traces of Error object (with cause) console.log arguments 1`] = `
 ID: 1
 Message: log> foo failed Error: bar failed

@@ -555,6 +555,13 @@ export const commands: Commands = {
         required: false,
         default: false,
       },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          'Filter messages to only return messages of the specified service worker.',
+        required: false,
+      },
     },
   },
   list_extensions: {

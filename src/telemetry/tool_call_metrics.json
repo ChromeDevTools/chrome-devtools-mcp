@@ -254,6 +254,10 @@
       {
         "name": "include_preserved_messages",
         "argType": "boolean"
+      },
+      {
+        "name": "service_worker_id_length",
+        "argType": "number"
       }
     ]
   },
