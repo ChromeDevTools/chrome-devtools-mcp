@@ -9,7 +9,7 @@
 import type {DevTools} from '../third_party/index.js';
 
 /**
- * BaseClass that throws for all host methods.
+ * BaseClass that is noop or throws for methods.
  * the McpHostBidningAdapter should only implement methods
  * that it needs to support.
  */
