@@ -41,6 +41,21 @@ You can send multiple tool calls in parallel, but maintain correct order: naviga
 
 ### Testing an extension
 
+> **Before proceeding**: Extension tools (`install_extension`, `list_extensions`, etc.) are only available when the MCP server is started with the `--categoryExtensions` flag. If these tools are not in your tool list, stop and ask the user to update their MCP server configuration:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "chrome-devtools": {
+>       "command": "npx",
+>       "args": ["chrome-devtools-mcp@latest", "--categoryExtensions"]
+>     }
+>   }
+> }
+> ```
+>
+> After updating, the user must restart the MCP server (or their AI client) for the change to take effect.
+
 1. **Install**: Use `install_extension` with the path to the unpacked extension.
 2. **Identify**: Get the extension ID from the response or by calling `list_extensions`.
 3. **Trigger Action**: Use `trigger_extension_action` to open the popup or side panel if applicable.
