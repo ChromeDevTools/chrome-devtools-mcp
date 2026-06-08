@@ -12,7 +12,7 @@ import {
   parseRawTraceBuffer,
 } from '../../src/trace-processing/parse.js';
 
-import '../../src/DevtoolsUtils.js';
+import '../../src/devtools/DevtoolsUtils.js';
 
 import {loadTraceAsBuffer} from './fixtures/load.js';
 

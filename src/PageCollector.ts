@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
   Target,

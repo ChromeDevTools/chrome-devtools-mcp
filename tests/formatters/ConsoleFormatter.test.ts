@@ -6,7 +6,7 @@
 
 import {describe, it} from 'node:test';
 
-import {SymbolizedError} from '../../src/DevtoolsUtils.js';
+import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/PageCollector.js';
 import type {ConsoleMessage, Protocol} from '../../src/third_party/index.js';

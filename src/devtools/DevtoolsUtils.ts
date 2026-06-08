@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
-import {Mutex} from './Mutex.js';
-import {DevTools} from './third_party/index.js';
+import {Mutex} from '../Mutex.js';
+import {DevTools} from '../third_party/index.js';
 import type {
   Browser,
   CDPSession,
@@ -14,7 +13,14 @@ import type {
   Page,
   Protocol,
   Target as PuppeteerTarget,
-} from './third_party/index.js';
+} from '../third_party/index.js';
+
+import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
+import {McpHostBidningAdapter} from './McpHostBindingAdapter.js';
+
+DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
+  new McpHostBidningAdapter(),
+);
 
 /**
  * A mock implementation of an issues manager that only implements the methods
