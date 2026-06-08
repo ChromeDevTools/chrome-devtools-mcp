@@ -262,6 +262,7 @@ export class ToolHandler {
       const {content, structuredContent} = await response.handle(
         this.tool.name,
         context,
+        this.serverArgs.experimentalToonFormat ?? false,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
