@@ -309,6 +309,14 @@
     "flagType": "boolean"
   },
   {
+    "name": "blocked_url_pattern_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allowed_url_pattern_present",
+    "flagType": "boolean"
+  },
+  {
     "name": "page_id_routing_present",
     "flagType": "boolean"
   },
