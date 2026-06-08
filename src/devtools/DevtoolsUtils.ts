@@ -18,10 +18,6 @@ import type {
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {McpHostBidningAdapter} from './McpHostBindingAdapter.js';
 
-DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
-  new McpHostBidningAdapter(),
-);
-
 /**
  * A mock implementation of an issues manager that only implements the methods
  * that are actually used by the IssuesAggregator
@@ -33,89 +29,100 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
   }
 }
 
-// DevTools CDP errors can get noisy.
-DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
-
-// Stub out Network emulation commands on the DevTools Agent prototype globally.
-// This prevents the DevTools Frontend from ever resetting/clearing Puppeteer's
-// active network blocking/throttling rules during target setup or session lifetime.
-const networkAgentPrototype =
-  DevTools.ProtocolClient.InspectorBackend.inspectorBackend.agentPrototypes.get(
-    'Network',
+export function overrideDevToolsGlobals(): void {
+  DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
+    new McpHostBidningAdapter(),
   );
-if (networkAgentPrototype) {
-  Object.defineProperty(
-    networkAgentPrototype,
-    'invoke_emulateNetworkConditionsByRule',
-    {
+
+  // DevTools CDP errors can get noisy.
+  DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
+
+  // Stub out Network emulation commands on the DevTools Agent prototype globally.
+  // This prevents the DevTools Frontend from ever resetting/clearing Puppeteer's
+  // active network blocking/throttling rules during target setup or session lifetime.
+  const networkAgentPrototype =
+    DevTools.ProtocolClient.InspectorBackend.inspectorBackend.agentPrototypes.get(
+      'Network',
+    );
+  if (networkAgentPrototype) {
+    Object.defineProperty(
+      networkAgentPrototype,
+      'invoke_emulateNetworkConditionsByRule',
+      {
+        value: () => {
+          return Promise.resolve({
+            ruleIds: [],
+            getError: () => undefined,
+          });
+        },
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+    );
+    Object.defineProperty(
+      networkAgentPrototype,
+      'invoke_overrideNetworkState',
+      {
+        value: () => {
+          return Promise.resolve({
+            getError: () => undefined,
+          });
+        },
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+    );
+    Object.defineProperty(networkAgentPrototype, 'invoke_enable', {
       value: () => {
         return Promise.resolve({
-          ruleIds: [],
           getError: () => undefined,
         });
       },
       writable: true,
       configurable: true,
       enumerable: true,
+    });
+    Object.defineProperty(networkAgentPrototype, 'invoke_disable', {
+      value: () => {
+        return Promise.resolve({
+          getError: () => undefined,
+        });
+      },
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+    Object.defineProperty(networkAgentPrototype, 'invoke_setBlockedURLs', {
+      value: () => {
+        return Promise.resolve({
+          getError: () => undefined,
+        });
+      },
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+
+  DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
+    create: true,
+    data: {
+      navigatorLanguage: 'en-US',
+      settingLanguage: 'en-US',
+      lookupClosestDevToolsLocale: l => l,
     },
-  );
-  Object.defineProperty(networkAgentPrototype, 'invoke_overrideNetworkState', {
-    value: () => {
-      return Promise.resolve({
-        getError: () => undefined,
-      });
-    },
-    writable: true,
-    configurable: true,
-    enumerable: true,
   });
-  Object.defineProperty(networkAgentPrototype, 'invoke_enable', {
-    value: () => {
-      return Promise.resolve({
-        getError: () => undefined,
-      });
-    },
-    writable: true,
-    configurable: true,
-    enumerable: true,
-  });
-  Object.defineProperty(networkAgentPrototype, 'invoke_disable', {
-    value: () => {
-      return Promise.resolve({
-        getError: () => undefined,
-      });
-    },
-    writable: true,
-    configurable: true,
-    enumerable: true,
-  });
-  Object.defineProperty(networkAgentPrototype, 'invoke_setBlockedURLs', {
-    value: () => {
-      return Promise.resolve({
-        getError: () => undefined,
-      });
-    },
-    writable: true,
-    configurable: true,
-    enumerable: true,
+
+  DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
+
+  DevTools.Formatter.FormatterWorkerPool.FormatterWorkerPool.instance({
+    forceNew: true,
+    entrypointURL: import.meta
+      .resolve('../third_party/devtools-formatter-worker.js'),
   });
 }
-
-DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
-  create: true,
-  data: {
-    navigatorLanguage: 'en-US',
-    settingLanguage: 'en-US',
-    lookupClosestDevToolsLocale: l => l,
-  },
-});
-DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
-
-DevTools.Formatter.FormatterWorkerPool.FormatterWorkerPool.instance({
-  forceNew: true,
-  entrypointURL: import.meta
-    .resolve('./third_party/devtools-formatter-worker.js'),
-});
 
 export interface TargetUniverse {
   /** The DevTools target corresponding to the puppeteer Page */
