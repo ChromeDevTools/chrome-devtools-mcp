@@ -961,7 +961,7 @@ export class McpContext implements Context {
 
       case 'file:': {
         await this.validatePath(fileURLToPath(url));
-        return await fsPromises.readFile(fileURLToPath(url), 'utf-8');
+        return await fsPromises.readFile(url, 'utf-8');
       }
 
       default:
