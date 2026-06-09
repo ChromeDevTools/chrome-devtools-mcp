@@ -113,7 +113,11 @@ export class McpContext implements Context {
     options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
-    overrideDevToolsGlobals();
+    overrideDevToolsGlobals({
+      loadResource: (url: string) => {
+        return this.loadResource(url);
+      },
+    });
 
     this.browser = browser;
     this.logger = logger;
@@ -939,5 +943,29 @@ export class McpContext implements Context {
       maxNodes,
       maxSiblings,
     );
+  }
+
+  async loadResource(path: string): Promise<string> {
+    const url = new URL(path);
+
+    switch (url.protocol) {
+      case 'https:':
+      case 'http:': {
+        // TODO: Vefigy allow/block list
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to load resource: ${url}`);
+        }
+        return response.text();
+      }
+
+      case 'file:': {
+        await this.validatePath(fileURLToPath(url));
+        return await fsPromises.readFile(fileURLToPath(url), 'utf-8');
+      }
+
+      default:
+        throw new Error(`Unsupported protocol: ${url.protocol}`);
+    }
   }
 }

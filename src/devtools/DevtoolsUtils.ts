@@ -29,9 +29,13 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
   }
 }
 
-export function overrideDevToolsGlobals(): void {
+export function overrideDevToolsGlobals({
+  loadResource,
+}: {
+  loadResource: (url: string) => Promise<string>;
+}): void {
   DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
-    new McpHostBindingAdapter(),
+    new McpHostBindingAdapter(loadResource),
   );
 
   // DevTools CDP errors can get noisy.

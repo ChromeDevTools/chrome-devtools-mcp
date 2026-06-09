@@ -12,7 +12,9 @@ import {before, it} from 'node:test';
 import {overrideDevToolsGlobals} from '../src/devtools/DevtoolsUtils.js';
 
 before(() => {
-  overrideDevToolsGlobals();
+  overrideDevToolsGlobals({
+    loadResource: async () => '',
+  });
 });
 
 // This is run by Node when we execute the tests via the --import flag.

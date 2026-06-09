@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import type {DevTools} from '../third_party/index.js';
+import {DevTools} from '../third_party/index.js';
 
 /**
  * BaseClass that is noop or throws for methods.
@@ -218,10 +218,24 @@ class BaseMcpHostBindingAdapter
 
   requestRestart(): void {}
 
-  loadNetworkResource(): void {}
+  loadNetworkResource(
+    _urlString: string,
+    _headers: string,
+    _streamId: number,
+    _callback: (
+      arg0: DevTools.Host.InspectorFrontendHostAPI.LoadNetworkResourceResult,
+    ) => void,
+  ): void {}
 }
 
 export class McpHostBindingAdapter extends BaseMcpHostBindingAdapter {
+  #loadResource: (path: string) => Promise<string>;
+
+  constructor(loadResource: (path: string) => Promise<string>) {
+    super();
+    this.#loadResource = loadResource;
+  }
+
   override isolatedFileSystem(): null {
     return null;
   }
@@ -249,7 +263,29 @@ export class McpHostBindingAdapter extends BaseMcpHostBindingAdapter {
     return Promise.resolve(null);
   }
 
-  override loadNetworkResource(): void {
-    // TODO(nvitkov): Add support for this
+  override loadNetworkResource(
+    urlString: string,
+    _headers: string,
+    streamId: number,
+    callback: (
+      arg0: DevTools.Host.InspectorFrontendHostAPI.LoadNetworkResourceResult,
+    ) => void,
+  ): void {
+    if (!URL.canParse(urlString)) {
+      callback({
+        statusCode: 404,
+        urlValid: false,
+      });
+      return;
+    }
+
+    this.#loadResource(urlString)
+      .then(content => {
+        DevTools.Host.ResourceLoader.streamWrite(streamId, content);
+        callback({statusCode: 200});
+      })
+      .catch(() => {
+        callback({statusCode: 404});
+      });
   }
 }
