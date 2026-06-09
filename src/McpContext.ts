@@ -951,7 +951,7 @@ export class McpContext implements Context {
     switch (url.protocol) {
       case 'https:':
       case 'http:': {
-        // TODO: Vefigy allow/block list
+        // TODO: Verify allow/block list
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${url}`);
