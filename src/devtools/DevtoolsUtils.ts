@@ -16,7 +16,7 @@ import type {
 } from '../third_party/index.js';
 
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
-import {McpHostBidningAdapter} from './McpHostBindingAdapter.js';
+import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
 /**
  * A mock implementation of an issues manager that only implements the methods
@@ -31,7 +31,7 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
 
 export function overrideDevToolsGlobals(): void {
   DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
-    new McpHostBidningAdapter(),
+    new McpHostBindingAdapter(),
   );
 
   // DevTools CDP errors can get noisy.

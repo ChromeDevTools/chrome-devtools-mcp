@@ -10,10 +10,10 @@ import type {DevTools} from '../third_party/index.js';
 
 /**
  * BaseClass that is noop or throws for methods.
- * the McpHostBidningAdapter should only implement methods
+ * the McpHostBindingAdapter should only implement methods
  * that it needs to support.
  */
-class BaseMcpHostBidningAdapter
+class BaseMcpHostBindingAdapter
   implements DevTools.Host.InspectorFrontendHostAPI.InspectorFrontendHostAPI
 {
   declare events: DevTools.Common.EventTarget.EventTarget<DevTools.Host.InspectorFrontendHostAPI.EventTypes>;
@@ -221,7 +221,7 @@ class BaseMcpHostBidningAdapter
   loadNetworkResource(): void {}
 }
 
-export class McpHostBidningAdapter extends BaseMcpHostBidningAdapter {
+export class McpHostBindingAdapter extends BaseMcpHostBindingAdapter {
   override isolatedFileSystem(): null {
     return null;
   }
@@ -250,6 +250,6 @@ export class McpHostBidningAdapter extends BaseMcpHostBidningAdapter {
   }
 
   override loadNetworkResource(): void {
-    // TODO(nvitkov):
+    // TODO(nvitkov): Add support for this
   }
 }
