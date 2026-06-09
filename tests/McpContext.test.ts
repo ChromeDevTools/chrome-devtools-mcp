@@ -298,4 +298,22 @@ describe('McpContext', () => {
       );
     });
   });
+
+  describe('loadResource', () => {
+    it('file protocol calls validatePath', async () => {
+      await withMcpContext(async (_response, context) => {
+        const validatePathSpy = sinon.spy(context, 'validatePath');
+        const testFilePath = path.join(os.tmpdir(), 'load-resource-test.txt');
+        await fs.writeFile(testFilePath, 'test content');
+        try {
+          const url = pathToFileURL(testFilePath).href;
+          const content = await context.loadResource(url);
+          assert.strictEqual(content, 'test content');
+          sinon.assert.calledWith(validatePathSpy, testFilePath);
+        } finally {
+          await fs.rm(testFilePath, {force: true});
+        }
+      });
+    });
+  });
 });
