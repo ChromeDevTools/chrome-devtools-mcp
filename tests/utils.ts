@@ -74,6 +74,8 @@ export async function withBrowser(
     autoOpenDevTools?: boolean;
     executablePath?: string;
     args?: string[];
+    blockedUrlPattern?: string[];
+    allowedUrlPattern?: string[];
   } = {},
 ) {
   const launchOptions: LaunchOptions = {
@@ -86,6 +88,8 @@ export async function withBrowser(
     handleDevToolsAsPage: true,
     args: [...(options.args || []), '--screen-info={3840x2160}'],
     enableExtensions: true,
+    blocklist: options.blockedUrlPattern,
+    allowlist: options.allowedUrlPattern,
   };
   const key = JSON.stringify(launchOptions);
 
@@ -115,6 +119,8 @@ export async function withMcpContext(
     performanceCrux?: boolean;
     executablePath?: string;
     args?: string[];
+    blockedUrlPattern?: string[];
+    allowedUrlPattern?: string[];
   } = {},
   args: ParsedArguments = {} as ParsedArguments,
 ) {
@@ -130,6 +136,10 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        hasNetworkBlockOrAllowlist: Boolean(
+          (options.blockedUrlPattern && options.blockedUrlPattern.length > 0) ||
+          (options.allowedUrlPattern && options.allowedUrlPattern.length > 0),
+        ),
       },
       Locator,
     );
@@ -397,4 +407,21 @@ export async function assertDaemonIsRunning(sessionId?: string) {
     result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
     'chrome-devtools-mcp daemon is not running',
   );
+}
+
+export async function waitExecutionFor(
+  func: () => Promise<void>,
+  timeout: number,
+) {
+  const start = Date.now();
+  while (Date.now() - start < 10000) {
+    try {
+      await func();
+      return;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 100)); // wait and retry
+    }
+  }
+
+  throw new Error(`Timeout of ${timeout} reached.`);
 }

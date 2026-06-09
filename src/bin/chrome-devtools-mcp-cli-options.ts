@@ -161,13 +161,20 @@ export const cliOptions = {
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
   },
-  experimentalMemory: {
+  memoryDebugging: {
     type: 'boolean',
-    describe: 'Whether to enable experimental memory tools.',
+    describe: 'Whether to enable memory debugging tools.',
+    alias: 'experimentalMemory',
   },
   experimentalStructuredContent: {
     type: 'boolean',
     describe: 'Whether to output structured formatted content.',
+  },
+  experimentalToonFormat: {
+    type: 'boolean',
+    describe:
+      'Whether to format structured data in text response using Token-Oriented Object Notation. Defaults to false which represents the embedded content as formatted JSON instead.',
+    hidden: true,
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
@@ -203,6 +210,18 @@ export const cliOptions = {
     type: 'array',
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+  },
+  blockedUrlPattern: {
+    type: 'array',
+    describe:
+      'Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+    conflicts: ['allowedUrlPattern'],
+  },
+  allowedUrlPattern: {
+    type: 'array',
+    describe:
+      'Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+    conflicts: ['blockedUrlPattern'],
   },
   ignoreDefaultChromeArg: {
     type: 'array',
@@ -293,7 +312,7 @@ export function parseArguments(
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
-    .check(args => {
+    .middleware(args => {
       // We can't set default in the options else
       // Yargs will complain
       if (
@@ -310,7 +329,6 @@ export function parseArguments(
         );
         args.usageStatistics = false;
       }
-      return true;
     })
     .example([
       [

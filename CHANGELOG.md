@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.2.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.1.1...chrome-devtools-mcp-v1.2.0) (2026-06-08)
+
+
+### 🎉 Features
+
+* add experimental TOON support for structured content output ([#2042](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2042)) ([aa33bff](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/aa33bff19fcbf87949eec152c4b49d74e0a9330d))
+* Adds close_heapsnapshot MCP tool ([#2174](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2174)) ([8713b93](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8713b93b41ce301acf0ebc555c9a1b25d29bc526))
+* Handle multiple providers of third-party developer tools ([#2168](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2168)) ([30d59a7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/30d59a78727c31ec9d70d2bd6d9310e78f1888b3))
+* implement extension service worker logs ([#1915](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1915)) ([29e3898](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/29e389848fd0cae1116620d44fbce508b4404137))
+* memory debugging tools ([#2169](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2169)) ([0217397](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/02173972574241049885171c5a6fc0ba998a20cc))
+* support allowedUrlPattern & blockedUrlPattern Options ([#2037](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2037)) ([02b4492](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/02b4492ca605755f67f016ee1de98aa1f506168c))
+
+
+### 🛠️ Fixes
+
+* Cursor plugin homepage setting field ([#2173](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2173)) ([8971890](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/89718901174be7c0c58a1a2b29281ab2f053cd53))
+
+
+### 📄 Documentation
+
+* **skill:** guide agent to prompt for --categoryExtensions  ([#2189](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2189)) ([8b458f7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8b458f7ad194b52305b831d5bfd6c0b6f5a53376))
+
+
+### ⚡ Performance
+
+* lighthouse file saves to run concurrently ([#2178](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2178)) ([f90f863](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f90f863d4b9d643ab880c9dc8cdd78b6c88ae38d))
+
+
+### 🏗️ Refactor
+
+* change type of logger ([#2165](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2165)) ([bf0574d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/bf0574da8ce0986beb5dd2f026a2332a7e63b791))
+* use validate files on the tool level ([#2152](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2152)) ([2e039c0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2e039c09e1a273581d9b51081a0feb8a57791947)), closes [#2150](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2150)
+
 ## [1.1.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.1.0...chrome-devtools-mcp-v1.1.1) (2026-05-27)
 
 

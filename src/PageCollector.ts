@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
   Target,
@@ -194,11 +194,11 @@ export class PageCollector<T> {
 
     const item = this.find(page, item => item[stableIdSymbol] === stableId);
 
-    if (item) {
-      return item;
+    if (!item) {
+      throw new Error('Request not found for selected page');
     }
 
-    throw new Error('Request not found for selected page');
+    return item;
   }
 
   find(

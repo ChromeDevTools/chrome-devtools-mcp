@@ -7,7 +7,13 @@
 import '../src/polyfill.js';
 
 import path from 'node:path';
-import {it} from 'node:test';
+import {before, it} from 'node:test';
+
+import {overrideDevToolsGlobals} from '../src/devtools/DevtoolsUtils.js';
+
+before(() => {
+  overrideDevToolsGlobals();
+});
 
 // This is run by Node when we execute the tests via the --import flag.
 it.snapshot.setResolveSnapshotPath(testPath => {

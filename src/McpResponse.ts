@@ -17,7 +17,7 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, type Protocol} from './third_party/index.js';
+import {DevTools, toonEncode, type Protocol} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -219,6 +219,7 @@ export class McpResponse implements Response {
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
+    retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -232,6 +233,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     types?: string[];
     includePreservedMessages?: boolean;
+    serviceWorkerId?: string;
   };
   #listExtensions?: boolean;
   #listThirdPartyDeveloperTools?: boolean;
@@ -328,6 +330,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      serviceWorkerId?: string;
     },
   ): void {
     if (!value) {
@@ -346,6 +349,7 @@ export class McpResponse implements Response {
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
+      serviceWorkerId: options?.serviceWorkerId,
     };
   }
 
@@ -472,6 +476,16 @@ export class McpResponse implements Response {
     };
   }
 
+  setHeapSnapshotRetainingPaths(
+    retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      retainingPaths,
+    };
+  }
+
   attachImage(value: ImageContentData): void {
     this.#images.push(value);
   }
@@ -495,6 +509,7 @@ export class McpResponse implements Response {
   async handle(
     toolName: string,
     context: McpContext,
+    useToon = false,
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
@@ -620,14 +635,23 @@ export class McpResponse implements Response {
 
     let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
     if (this.#consoleDataOptions?.include) {
-      if (!this.#page) {
-        throw new Error(`Response must have an McpPage`);
+      let messages;
+      let page: McpPage | undefined;
+
+      if (this.#consoleDataOptions.serviceWorkerId) {
+        messages = context.getServiceWorkerConsoleData(
+          this.#consoleDataOptions.serviceWorkerId,
+        );
+      } else {
+        page = this.#page;
+        if (!page) {
+          throw new Error(`Response must have an McpPage`);
+        }
+        messages = context.getConsoleData(
+          page,
+          this.#consoleDataOptions.includePreservedMessages,
+        );
       }
-      const page = this.#page;
-      let messages = context.getConsoleData(
-        this.#page,
-        this.#consoleDataOptions.includePreservedMessages,
-      );
 
       if (this.#consoleDataOptions.types?.length) {
         const normalizedTypes = new Set(this.#consoleDataOptions.types);
@@ -650,7 +674,9 @@ export class McpResponse implements Response {
                 context.getConsoleMessageStableId(item);
               if ('args' in item || item instanceof UncaughtError) {
                 const consoleMessage = item as ConsoleMessage | UncaughtError;
-                const devTools = context.getDevToolsUniverse(page);
+                const devTools = page
+                  ? context.getDevToolsUniverse(page)
+                  : null;
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,
                   fetchDetailedData: false,
@@ -712,20 +738,25 @@ export class McpResponse implements Response {
       }
     }
 
-    return this.format(toolName, context, {
-      detailedConsoleMessage,
-      consoleMessages,
-      snapshot,
-      detailedNetworkRequest,
-      networkRequests,
-      traceInsight: this.#attachedTraceInsight,
-      traceSummary: this.#attachedTraceSummary,
-      extensions,
-      lighthouseResult: this.#attachedLighthouseResult,
-      thirdPartyDeveloperTools,
-      webmcpTools,
-      errorMessage: this.#error?.message,
-    });
+    return this.format(
+      toolName,
+      context,
+      {
+        detailedConsoleMessage,
+        consoleMessages,
+        snapshot,
+        detailedNetworkRequest,
+        networkRequests,
+        traceInsight: this.#attachedTraceInsight,
+        traceSummary: this.#attachedTraceSummary,
+        extensions,
+        lighthouseResult: this.#attachedLighthouseResult,
+        thirdPartyDeveloperTools,
+        webmcpTools,
+        errorMessage: this.#error?.message,
+      },
+      useToon,
+    );
   }
 
   async format(
@@ -745,6 +776,7 @@ export class McpResponse implements Response {
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
+    useToon: boolean,
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
@@ -783,6 +815,7 @@ export class McpResponse implements Response {
       };
       heapSnapshotData?: object[];
       heapSnapshotNodes?: readonly object[];
+      heapSnapshotRetainingPaths?: object;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1005,9 +1038,13 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(`Saved snapshot to ${data.snapshot}.`);
         structuredContent.snapshotFilePath = data.snapshot;
       } else {
-        response.push('## Latest page snapshot');
-        response.push(data.snapshot.toString());
         structuredContent.snapshot = data.snapshot.toJSON();
+        response.push('## Latest page snapshot');
+        response.push(
+          useToon
+            ? toonEncode(structuredContent.snapshot)
+            : data.snapshot.toString(),
+        );
       }
     }
 
@@ -1040,8 +1077,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
         const paginatedRecord = Object.fromEntries(paginationData.items);
         const formatter = new HeapSnapshotFormatter(paginatedRecord);
 
-        response.push(formatter.toString());
         structuredContent.heapSnapshotData = formatter.toJSON();
+        response.push(
+          useToon
+            ? toonEncode(structuredContent.heapSnapshotData)
+            : formatter.toString(),
+        );
       }
       const nodes = this.#heapSnapshotOptions.nodes;
       if (nodes) {
@@ -1068,6 +1109,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(...paginationData.info);
 
         structuredContent.heapSnapshotNodes = paginationData.items;
+      }
+      const retainingPaths = this.#heapSnapshotOptions.retainingPaths;
+      if (retainingPaths) {
+        response.push('### Retaining Paths');
+        const {paths, limitsReached} = retainingPaths;
+        if (paths.length === 0) {
+          response.push('No retaining paths found.');
+        } else {
+          response.push(HeapSnapshotFormatter.formatRetainingPaths(paths));
+        }
+        const reached = Object.entries(limitsReached)
+          .filter(([, hit]) => hit)
+          .map(([limit]) => limit);
+        if (reached.length > 0) {
+          response.push(
+            `Note: results are truncated, the following limits were reached: ${reached.join(', ')}.`,
+          );
+        }
+        structuredContent.heapSnapshotRetainingPaths =
+          retainingPaths as unknown as object;
       }
     }
 
@@ -1153,11 +1214,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
         if (data.networkRequests) {
-          structuredContent.networkRequests = [];
-          for (const formatter of paginationData.items) {
-            response.push(formatter.toString());
-            structuredContent.networkRequests.push(formatter.toJSON());
-          }
+          structuredContent.networkRequests = paginationData.items.map(i =>
+            i.toJSON(),
+          );
+          response.push(
+            ...(useToon
+              ? [toonEncode(structuredContent.networkRequests)]
+              : paginationData.items.map(i => i.toString())),
+          );
         }
       } else {
         response.push('No requests found.');
@@ -1175,11 +1239,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
           this.#consoleDataOptions.pagination,
         );
         structuredContent.pagination = paginationData.pagination;
-        response.push(...paginationData.info);
-        response.push(...paginationData.items.map(item => item.toString()));
         structuredContent.consoleMessages = paginationData.items.map(item =>
           item.toJSON(),
         );
+        response.push(...paginationData.info);
+        if (useToon) {
+          response.push(toonEncode(structuredContent.consoleMessages));
+        } else {
+          response.push(...paginationData.items.map(item => item.toString()));
+        }
       } else {
         response.push('<no console messages found>');
       }

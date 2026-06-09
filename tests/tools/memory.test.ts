@@ -17,6 +17,8 @@ import {
   getHeapSnapshotDetails,
   getHeapSnapshotClassNodes,
   getHeapSnapshotRetainers,
+  closeHeapSnapshot,
+  getHeapSnapshotRetainingPaths,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -173,6 +175,108 @@ describe('memory', () => {
           .join('\n');
 
         t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('close_heapsnapshot', () => {
+    it('with default options', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotSummary.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        assert.ok(context.hasHeapSnapshots());
+
+        await closeHeapSnapshot.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        assert.ok(
+          response.responseLines.includes(`Closed heap snapshot: ${filePath}`),
+        );
+        assert.ok(!context.hasHeapSnapshots());
+      });
+    });
+
+    it('with non-existent snapshot', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await assert.rejects(
+          closeHeapSnapshot.handler({params: {filePath}}, response, context),
+          {
+            message: `Failed to close heap snapshot: ${filePath} was not loaded.`,
+          },
+        );
+      });
+    });
+  });
+
+  describe('get_heapsnapshot_retaining_paths', () => {
+    it('with valid nodeId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotRetainingPaths.handler(
+          {params: {filePath, nodeId: 45901}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotRetainingPaths.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('reports when limits are reached', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotRetainingPaths.handler(
+          {params: {filePath, nodeId: 45901, maxDepth: 1}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotRetainingPaths.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        assert.match(output, /No retaining paths found\./);
+        assert.match(
+          output,
+          /Note: results are truncated, the following limits were reached: depth\./,
+        );
       });
     });
   });

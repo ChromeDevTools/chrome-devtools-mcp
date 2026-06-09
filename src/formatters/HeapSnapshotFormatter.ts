@@ -79,6 +79,31 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
+  static formatRetainingPaths(
+    retainingPaths: readonly DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge[],
+  ): string {
+    const lines: string[] = [];
+
+    function formatEdge(
+      edge: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge,
+      depth: number,
+    ) {
+      const indent = '  '.repeat(depth);
+      lines.push(
+        `${indent}<- @${edge.nodeId} ${edge.nodeName} via ${edge.edgeType} ${edge.edgeName} (distance: ${edge.distance})`,
+      );
+      for (const child of edge.children) {
+        formatEdge(child, depth + 1);
+      }
+    }
+
+    for (const path of retainingPaths) {
+      formatEdge(path, 0);
+    }
+
+    return lines.join('\n');
+  }
+
   #getSortedAggregates(): AggregatedInfoWithId[] {
     return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
   }

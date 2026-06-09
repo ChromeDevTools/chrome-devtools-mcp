@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-plugins",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Bundled plugins for actuating and debugging the Chrome browser.",
   "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
   "owner": {

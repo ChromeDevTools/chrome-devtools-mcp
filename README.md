@@ -514,11 +514,13 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
-- **Memory** (5 tools)
+- **Memory** (7 tools)
   - [`take_heapsnapshot`](docs/tool-reference.md#take_heapsnapshot)
+  - [`close_heapsnapshot`](docs/tool-reference.md#close_heapsnapshot)
   - [`get_heapsnapshot_class_nodes`](docs/tool-reference.md#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](docs/tool-reference.md#get_heapsnapshot_details)
   - [`get_heapsnapshot_retainers`](docs/tool-reference.md#get_heapsnapshot_retainers)
+  - [`get_heapsnapshot_retaining_paths`](docs/tool-reference.md#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](docs/tool-reference.md#get_heapsnapshot_summary)
 - **Extensions** (5 tools)
   - [`install_extension`](docs/tool-reference.md#install_extension)
@@ -608,8 +610,8 @@ The Chrome DevTools MCP server supports the following configuration option:
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean
 
-- **`--experimentalMemory`/ `--experimental-memory`**
-  Whether to enable experimental memory tools.
+- **`--memoryDebugging`/ `--memory-debugging`, `-experimentalMemory`**
+  Whether to enable memory debugging tools.
   - **Type:** boolean
 
 - **`--experimentalStructuredContent`/ `--experimental-structured-content`**
@@ -634,6 +636,14 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--chromeArg`/ `--chrome-arg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+
+- **`--blockedUrlPattern`/ `--blocked-url-pattern`**
+  Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
+  - **Type:** array
+
+- **`--allowedUrlPattern`/ `--allowed-url-pattern`**
+  Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
   - **Type:** array
 
 - **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**

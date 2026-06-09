@@ -5,9 +5,13 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 
 ## Core Concepts
 
-**Browser lifecycle**: Browser starts automatically on first tool call using a persistent Chrome profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`. To enable extensions, use `--categoryExtensions`.
-**Page selection**: Tools operate on the currently selected page. Use `list_pages` to see available pages, then `select_page` to switch context.
+**Browser lifecycle**: Browser starts automatically on first tool call using a persistent Chrome profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`.
+Addional tooling can be enabled by providing the following flags:
 
+- For extension tooling, use the `--categoryExtensions` flag.
+- For memory tooling, use the `--memoryDebugging` flag.
+
+**Page selection**: Tools operate on the currently selected page. Use `list_pages` to see available pages, then `select_page` to switch context.
 **Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.
 
 ## Workflow Patterns
@@ -36,6 +40,21 @@ description: Uses Chrome DevTools via MCP for efficient debugging, troubleshooti
 You can send multiple tool calls in parallel, but maintain correct order: navigate → wait → snapshot → interact.
 
 ### Testing an extension
+
+> **Before proceeding**: Extension tools (`install_extension`, `list_extensions`, etc.) are only available when the MCP server is started with the `--categoryExtensions` flag. If these tools are not in your tool list, stop and ask the user to update their MCP server configuration:
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "chrome-devtools": {
+>       "command": "npx",
+>       "args": ["chrome-devtools-mcp@latest", "--categoryExtensions"]
+>     }
+>   }
+> }
+> ```
+>
+> After updating, the user must restart the MCP server (or their AI client) for the change to take effect.
 
 1. **Install**: Use `install_extension` with the path to the unpacked extension.
 2. **Identify**: Get the extension ID from the response or by calling `list_extensions`.

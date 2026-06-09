@@ -116,6 +116,9 @@ export interface Response {
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
     options?: PaginationOptions,
   ): void;
+  setHeapSnapshotRetainingPaths(
+    retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+  ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
     value: boolean,
@@ -130,6 +133,7 @@ export interface Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      serviceWorkerId?: string;
     },
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
@@ -248,6 +252,14 @@ export type Context = Readonly<{
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  closeHeapSnapshot(filePath: string): Promise<boolean>;
+  getHeapSnapshotRetainingPaths(
+    filePath: string,
+    nodeId: number,
+    maxDepth?: number,
+    maxNodes?: number,
+    maxSiblings?: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths>;
 }>;
 
 /**
