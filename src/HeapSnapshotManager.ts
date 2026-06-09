@@ -7,7 +7,6 @@
 import fsSync from 'node:fs';
 import path from 'node:path';
 
-import {isNodeLike} from './formatters/HeapSnapshotFormatter.js';
 import {DevTools} from './third_party/index.js';
 import {
   createIdGenerator,
@@ -116,36 +115,15 @@ export class HeapSnapshotManager {
     return await provider.serializeItemsRange(0, Infinity);
   }
 
-  async findNodeIndexById(
-    filePath: string,
-    nodeId: number,
-  ): Promise<number | undefined> {
-    const snapshot = await this.getSnapshot(filePath);
-    const aggregates = await this.getAggregates(filePath);
-    const filter =
-      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
-
-    for (const classKey of Object.keys(aggregates)) {
-      const provider = snapshot.createNodesProviderForClass(classKey, filter);
-      const range = await provider.serializeItemsRange(0, Infinity);
-      for (const item of range.items) {
-        if (isNodeLike(item) && item.id === nodeId) {
-          return item.nodeIndex;
-        }
-      }
-    }
-    return undefined;
-  }
-
   async getRetainers(
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    const nodeIndex = await this.findNodeIndexById(filePath, nodeId);
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
       throw new Error(`Node with ID ${nodeId} not found`);
     }
-    const snapshot = await this.getSnapshot(filePath);
     const provider = snapshot.createRetainingEdgesProvider(nodeIndex);
     return await provider.serializeItemsRange(0, Infinity);
   }
@@ -157,11 +135,11 @@ export class HeapSnapshotManager {
     maxNodes?: number,
     maxSiblings?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths> {
-    const nodeIndex = await this.findNodeIndexById(filePath, nodeId);
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
       throw new Error(`Node with ID ${nodeId} not found`);
     }
-    const snapshot = await this.getSnapshot(filePath);
     return await snapshot.getRetainingPaths(
       nodeIndex,
       maxDepth,
