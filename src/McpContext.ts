@@ -965,7 +965,7 @@ export class McpContext implements Context {
       }
 
       default:
-        throw new Error(`Unsupported protocol: ${url.protocol}`);
+        throw new Error(`Unsupported protocol for: ${url}`);
     }
   }
 }
