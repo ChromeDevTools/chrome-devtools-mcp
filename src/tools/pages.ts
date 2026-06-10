@@ -5,75 +5,16 @@
  */
 
 import {logger} from '../logger.js';
-import type {CdpPage, Dialog, HTTPRequest} from '../third_party/index.js';
+import type {CdpPage, Dialog} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
 import {
   CLOSE_PAGE_ERROR,
   definePageTool,
   defineTool,
   timeoutSchema,
 } from './ToolDefinition.js';
-
-async function navigateWithInterception(
-  page: ContextPage,
-  action: () => Promise<unknown>,
-  allowListString?: string,
-  timeout?: number,
-): Promise<void> {
-  const allowList = allowListString
-    ? allowListString.split(',').map((p: string) => new URLPattern(p.trim()))
-    : undefined;
-
-  const requestHandler = (interceptedRequest: HTTPRequest) => {
-    if (!interceptedRequest.isNavigationRequest()) {
-      void interceptedRequest.continue();
-      return;
-    }
-    const requestUrl = interceptedRequest.url();
-    const isAllowed = allowList!.some((pattern: URLPattern) =>
-      pattern.test(requestUrl),
-    );
-
-    if (isAllowed) {
-      void interceptedRequest.continue();
-    } else {
-      logger?.(`Blocking request to: ${requestUrl}`);
-      void interceptedRequest.abort('blockedbyclient');
-    }
-  };
-
-  const cleanupInterception = async () => {
-    if (allowList) {
-      page.pptrPage.off('request', requestHandler);
-      await page.pptrPage.setRequestInterception(false).catch(error => {
-        logger?.(`Failed to disable request interception`, error);
-      });
-    }
-  };
-
-  if (allowList) {
-    await page.pptrPage.setRequestInterception(true);
-    page.pptrPage.on('request', requestHandler);
-  }
-
-  try {
-    await page.waitForEventsAfterAction(
-      async () => {
-        try {
-          await action();
-        } finally {
-          await cleanupInterception();
-        }
-      },
-      {timeout},
-    );
-  } finally {
-    await cleanupInterception();
-  }
-}
 
 export const listPages = defineTool(args => {
   return {
@@ -179,16 +120,6 @@ export const newPage = defineTool(args => {
             'Pages in the same browser context share cookies and storage. ' +
             'Pages in different browser contexts are fully isolated.',
         ),
-      ...(args?.experimentalNavigationAllowlist
-        ? {
-            allowList: zod
-              .string()
-              .optional()
-              .describe(
-                'Optional comma-separated list of URL patterns to allow. If provided, all other navigations will be blocked.',
-              ),
-          }
-        : {}),
       ...timeoutSchema,
     },
     blockedByDialog: false,
@@ -199,15 +130,9 @@ export const newPage = defineTool(args => {
         request.params.isolatedContext,
       );
 
-      await navigateWithInterception(
-        page,
-        () =>
-          page.pptrPage.goto(request.params.url, {
-            timeout: request.params.timeout,
-          }),
-        request.params.allowList,
-        request.params.timeout,
-      );
+      await page.pptrPage.goto(request.params.url, {
+        timeout: request.params.timeout,
+      });
 
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();
@@ -247,16 +172,7 @@ export const navigatePage = definePageTool(args => {
         .describe(
           'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
         ),
-      ...(args?.experimentalNavigationAllowlist
-        ? {
-            allowList: zod
-              .string()
-              .optional()
-              .describe(
-                'Optional comma-separated list of URL patterns to allow. If provided, all other navigations will be blocked.',
-              ),
-          }
-        : {}),
+
       ...timeoutSchema,
     },
     blockedByDialog: false,
@@ -301,71 +217,60 @@ export const navigatePage = definePageTool(args => {
       page.pptrPage.on('dialog', dialogHandler);
 
       try {
-        await navigateWithInterception(
-          page,
-          async () => {
-            switch (request.params.type) {
-              case 'url':
-                if (!request.params.url) {
-                  throw new Error(
-                    'A URL is required for navigation of type=url.',
-                  );
-                }
-                try {
-                  await page.pptrPage.goto(request.params.url, options);
-                  response.appendResponseLine(
-                    `Successfully navigated to ${request.params.url}.`,
-                  );
-                } catch (error) {
-                  response.appendResponseLine(
-                    `Unable to navigate in the selected page: ${error.message}.`,
-                  );
-                }
-                break;
-              case 'back':
-                try {
-                  await page.pptrPage.goBack(options);
-                  response.appendResponseLine(
-                    `Successfully navigated back to ${page.pptrPage.url()}.`,
-                  );
-                } catch (error) {
-                  response.appendResponseLine(
-                    `Unable to navigate back in the selected page: ${error.message}.`,
-                  );
-                }
-                break;
-              case 'forward':
-                try {
-                  await page.pptrPage.goForward(options);
-                  response.appendResponseLine(
-                    `Successfully navigated forward to ${page.pptrPage.url()}.`,
-                  );
-                } catch (error) {
-                  response.appendResponseLine(
-                    `Unable to navigate forward in the selected page: ${error.message}.`,
-                  );
-                }
-                break;
-              case 'reload':
-                try {
-                  await page.pptrPage.reload({
-                    ...options,
-                    ignoreCache: request.params.ignoreCache,
-                  });
-                  response.appendResponseLine(
-                    `Successfully reloaded the page.`,
-                  );
-                } catch (error) {
-                  response.appendResponseLine(
-                    `Unable to reload the selected page: ${error.message}.`,
-                  );
-                }
-                break;
+        switch (request.params.type) {
+          case 'url':
+            if (!request.params.url) {
+              throw new Error('A URL is required for navigation of type=url.');
             }
-          },
-          request.params.allowList,
-          request.params.timeout,
-        );
+            try {
+              await page.pptrPage.goto(request.params.url, options);
+              response.appendResponseLine(
+                `Successfully navigated to ${request.params.url}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'back':
+            try {
+              await page.pptrPage.goBack(options);
+              response.appendResponseLine(
+                `Successfully navigated back to ${page.pptrPage.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate back in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'forward':
+            try {
+              await page.pptrPage.goForward(options);
+              response.appendResponseLine(
+                `Successfully navigated forward to ${page.pptrPage.url()}.`,
+              );
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to navigate forward in the selected page: ${error.message}.`,
+              );
+            }
+            break;
+          case 'reload':
+            try {
+              await page.pptrPage.reload({
+                ...options,
+                ignoreCache: request.params.ignoreCache,
+              });
+              response.appendResponseLine(`Successfully reloaded the page.`);
+            } catch (error) {
+              response.appendResponseLine(
+                `Unable to reload the selected page: ${error.message}.`,
+              );
+            }
+            break;
+        }
       } finally {
         page.pptrPage.off('dialog', dialogHandler);
         if (initScriptId) {
