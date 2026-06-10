@@ -810,5 +810,35 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "compare_heapsnapshots_class_nodes",
+    "args": [
+      {
+        "name": "base_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "current_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "class_index",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "compare_heapsnapshots_summary",
+    "args": [
+      {
+        "name": "base_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "current_file_path_length",
+        "argType": "number"
+      }
+    ]
   }
 ]

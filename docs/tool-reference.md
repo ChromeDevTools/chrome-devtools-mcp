@@ -39,9 +39,11 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (9 tools)
+- **[Memory](#memory)** (11 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
+  - [`compare_heapsnapshots_class_nodes`](#compare_heapsnapshots_class_nodes)
+  - [`compare_heapsnapshots_summary`](#compare_heapsnapshots_summary)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
@@ -466,6 +468,29 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to the .heapsnapshot file to close.
+
+---
+
+### `compare_heapsnapshots_class_nodes`
+
+**Description:** Loads two memory heapsnapshots and returns the diff details (added/deleted instances) for a specific class. (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
+- **classIndex** (number) **(required)**: 0-based index of the class in the summary list to filter results, showing individual objects.
+- **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
+
+---
+
+### `compare_heapsnapshots_summary`
+
+**Description:** Loads two memory heapsnapshots and returns the summary diff between them (classes with changes). (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
+- **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
 
 ---
 

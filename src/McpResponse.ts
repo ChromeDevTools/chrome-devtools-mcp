@@ -8,11 +8,18 @@ import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
-import {HeapSnapshotFormatter} from './formatters/HeapSnapshotFormatter.js';
-import {isEdgeLike, isNodeLike} from './formatters/HeapSnapshotFormatter.js';
+import {
+  HeapSnapshotFormatter,
+  isEdgeLike,
+  isNodeLike,
+} from './formatters/HeapSnapshotFormatter.js';
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
+import type {
+  HeapSnapshotClassDiff,
+  HeapSnapshotDetailedClassDiff,
+} from './HeapSnapshotManager.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
@@ -225,6 +232,8 @@ export class McpResponse implements Response {
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
+    classDiffs?: HeapSnapshotClassDiff[];
+    detailedClassDiff?: HeapSnapshotDetailedClassDiff;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -498,6 +507,24 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       dominators,
+    };
+  }
+
+  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      classDiffs,
+    };
+  }
+
+  setHeapSnapshotDetailedClassDiff(
+    detailedClassDiff: HeapSnapshotDetailedClassDiff,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      detailedClassDiff,
     };
   }
 
@@ -832,6 +859,8 @@ export class McpResponse implements Response {
       heapSnapshotNodes?: readonly object[];
       heapSnapshotRetainingPaths?: object;
       heapSnapshotDominators?: readonly object[];
+      heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
+      heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1169,6 +1198,26 @@ Call ${handleDialog.name} to handle it before continuing.`);
           response.push(HeapSnapshotFormatter.formatDominators(dominators));
         }
         structuredContent.heapSnapshotDominators = dominators;
+      }
+      const classDiffs = this.#heapSnapshotOptions.classDiffs;
+      if (classDiffs) {
+        response.push('### Heap Snapshot Diff');
+        response.push(
+          useToon && toonEncode
+            ? toonEncode(classDiffs)
+            : HeapSnapshotFormatter.formatDiffSummary(classDiffs),
+        );
+        structuredContent.heapSnapshotClassDiffs = classDiffs;
+      }
+      const detailedClassDiff = this.#heapSnapshotOptions.detailedClassDiff;
+      if (detailedClassDiff) {
+        response.push('### Heap Snapshot Detailed Diff');
+        response.push(
+          useToon && toonEncode
+            ? toonEncode(detailedClassDiff)
+            : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
+        );
+        structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
       }
     }
 

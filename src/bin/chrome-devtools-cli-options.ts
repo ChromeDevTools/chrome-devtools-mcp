@@ -108,6 +108,55 @@ export const commands: Commands = {
       },
     },
   },
+  compare_heapsnapshots_class_nodes: {
+    description:
+      'Loads two memory heapsnapshots and returns the diff details (added/deleted instances) for a specific class. (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      baseFilePath: {
+        name: 'baseFilePath',
+        type: 'string',
+        description:
+          'A path to the base .heapsnapshot file (earlier snapshot).',
+        required: true,
+      },
+      currentFilePath: {
+        name: 'currentFilePath',
+        type: 'string',
+        description:
+          'A path to the current .heapsnapshot file (later snapshot).',
+        required: true,
+      },
+      classIndex: {
+        name: 'classIndex',
+        type: 'number',
+        description:
+          '0-based index of the class in the summary list to filter results, showing individual objects.',
+        required: true,
+      },
+    },
+  },
+  compare_heapsnapshots_summary: {
+    description:
+      'Loads two memory heapsnapshots and returns the summary diff between them (classes with changes). (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      baseFilePath: {
+        name: 'baseFilePath',
+        type: 'string',
+        description:
+          'A path to the base .heapsnapshot file (earlier snapshot).',
+        required: true,
+      },
+      currentFilePath: {
+        name: 'currentFilePath',
+        type: 'string',
+        description:
+          'A path to the current .heapsnapshot file (later snapshot).',
+        required: true,
+      },
+    },
+  },
   drag: {
     description: 'Drag an element onto another element',
     category: 'Input automation',
