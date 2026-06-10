@@ -104,6 +104,19 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
+  static formatDominators(
+    dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+  ): string {
+    const lines: string[] = [];
+    lines.push('nodeId,nodeName,selfSize,retainedSize');
+    for (const node of dominators) {
+      lines.push(
+        `${node.nodeId},${node.nodeName},${DevTools.I18n.ByteUtilities.formatBytesToKb(node.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(node.retainedSize)}`,
+      );
+    }
+    return lines.join('\n');
+  }
+
   #getSortedAggregates(): AggregatedInfoWithId[] {
     return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
   }

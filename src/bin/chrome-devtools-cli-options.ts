@@ -360,6 +360,25 @@ export const commands: Commands = {
       },
     },
   },
+  get_heapsnapshot_dominators: {
+    description:
+      'Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      nodeId: {
+        name: 'nodeId',
+        type: 'number',
+        description: 'The node ID to get the dominator chain for.',
+        required: true,
+      },
+    },
+  },
   get_heapsnapshot_edges: {
     description:
       'Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',

@@ -175,6 +175,15 @@ id,name,count,selfSize,maxRetainedSize
 108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
 `;
 
+exports[`memory > get_heapsnapshot_dominators > with valid nodeId 1`] = `
+## Heap Snapshot Data
+### Dominator Chain
+nodeId,nodeName,selfSize,retainedSize
+25341,String,0.2 kB,1.6 kB
+7199,system / NativeContext,1.2 kB,84.4 kB
+1,,0.0 kB,802 kB
+`;
+
 exports[`memory > get_heapsnapshot_edges > with pagination 1`] = `
 ## Heap Snapshot Data
 name,type,nodeId,nodeName
