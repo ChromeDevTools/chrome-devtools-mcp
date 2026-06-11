@@ -113,6 +113,9 @@ async function getToolGroups(page: McpPage): Promise<ToolGroups> {
   }
 
   const toolGroups = await page.pptrPage.evaluate(() => {
+    if (window.__dtmcp) {
+      window.__dtmcp.toolGroups = [];
+    }
     return new Promise<ToolGroups>(resolve => {
       const event = new CustomEvent('devtoolstooldiscovery');
       const groups: ToolGroups = [];
