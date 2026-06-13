@@ -56,6 +56,53 @@ describe('screencast', () => {
       });
     });
 
+    it('records WebM for an uppercase extension (case-insensitive)', async () => {
+      await withMcpContext(async (response, context) => {
+        const mockRecorder = createMockRecorder();
+        const selectedPage = context.getSelectedPptrPage();
+        const screencastStub = sinon
+          .stub(selectedPage, 'screencast')
+          .resolves(mockRecorder as never);
+
+        await startScreencast().handler(
+          {
+            params: {filePath: '/tmp/test-recording.WEBM'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnce(screencastStub);
+        const callArgs = screencastStub.firstCall.args[0];
+        assert.ok(callArgs);
+        assert.strictEqual(callArgs.format, 'webm');
+        assert.ok(callArgs.path?.endsWith('.webm'));
+      });
+    });
+
+    it('rejects an unsupported extension instead of silently using mp4', async () => {
+      await withMcpContext(async (response, context) => {
+        const selectedPage = context.getSelectedPptrPage();
+        const screencastStub = sinon.stub(selectedPage, 'screencast');
+
+        await assert.rejects(
+          startScreencast().handler(
+            {
+              params: {filePath: '/tmp/recording.avi'},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /Unsupported screencast file extension/,
+        );
+
+        sinon.assert.notCalled(screencastStub);
+        assert.strictEqual(context.getScreenRecorder(), null);
+      });
+    });
+
     it('starts a screencast recording with temp file when no filePath', async () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();
