@@ -107,6 +107,9 @@ export const stopScreencast = definePageTool({
   handler: async (_request, response, context) => {
     const data = context.getScreenRecorder();
     if (!data) {
+      response.appendResponseLine(
+        'Error: no active screencast recording to stop.',
+      );
       return;
     }
     try {
