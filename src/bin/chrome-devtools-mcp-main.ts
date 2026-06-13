@@ -9,6 +9,7 @@ import '../polyfill.js';
 import process from 'node:process';
 
 import {closeBrowser} from '../browser.js';
+import {startChatGptHttpServer} from '../chatgpt-http-server.js';
 import {createMcpServer, logDisclaimers} from '../index.js';
 import {logger, saveLogsToFile} from '../logger.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
@@ -33,10 +34,7 @@ if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
   });
 }
 
-// Shutdown on stdin EOF (stdio MCP convention — the client closes the
-// transport to signal exit) and on standard termination signals. Without
-// this, an active Chrome subprocess keeps the Node event loop ref'd after
-// stdin closes and the server hangs until something else kills it.
+const shutdownTasks: Array<() => Promise<void>> = [];
 let shuttingDown = false;
 async function shutdown(reason: string): Promise<void> {
   if (shuttingDown) {
@@ -44,23 +42,22 @@ async function shutdown(reason: string): Promise<void> {
   }
   shuttingDown = true;
   logger?.(`Shutting down (${reason})`);
-  // Backstop in case browser teardown hangs (e.g. unresponsive Chrome,
-  // slow beforeunload handlers, many tabs). Exits 0 because we still
-  // honored the shutdown request; the log line preserves observability.
-  // Unref'd so it doesn't keep the loop alive on the clean path.
   setTimeout(() => {
     logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
   }, 10000).unref();
+
+  for (const task of shutdownTasks) {
+    try {
+      await task();
+    } catch (error) {
+      logger?.('Shutdown task failed', error);
+    }
+  }
   await closeBrowser();
   process.exit(0);
 }
-process.stdin.on('end', () => {
-  void shutdown('stdin end');
-});
-process.stdin.on('close', () => {
-  void shutdown('stdin close');
-});
+
 process.on('SIGTERM', () => {
   void shutdown('SIGTERM');
 });
@@ -71,13 +68,36 @@ process.on('SIGHUP', () => {
   void shutdown('SIGHUP');
 });
 
-logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const {server} = await createMcpServer(args, {
-  logFile,
-});
-const transport = new StdioServerTransport();
-await server.connect(transport);
-logger?.('Chrome DevTools MCP Server connected');
+if (args.chatgpt) {
+  logger?.(`Starting Chrome DevTools MCP ChatGPT HTTP Server v${VERSION}`);
+  const httpServer = await startChatGptHttpServer(args, {logFile});
+  shutdownTasks.push(httpServer.close);
+  logger?.(`Chrome DevTools MCP ChatGPT HTTP Server listening at ${httpServer.url}`);
+} else {
+  // Shutdown on stdin EOF (stdio MCP convention — the client closes the
+  // transport to signal exit). Without this, an active Chrome subprocess keeps
+  // the Node event loop ref'd after stdin closes and the server hangs until
+  // something else kills it.
+  process.stdin.on('end', () => {
+    void shutdown('stdin end');
+  });
+  process.stdin.on('close', () => {
+    void shutdown('stdin close');
+  });
+
+  logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
+  const {server} = await createMcpServer(args, {
+    logFile,
+  });
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  shutdownTasks.push(async () => {
+    await transport.close();
+    await server.close();
+  });
+  logger?.('Chrome DevTools MCP Server connected');
+}
+
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
 void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, cliOptions));
