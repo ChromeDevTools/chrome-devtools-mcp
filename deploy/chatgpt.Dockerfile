@@ -24,7 +24,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY scripts ./scripts
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY . .
 RUN npm run build
