@@ -23,6 +23,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY package*.json ./
+COPY scripts ./scripts
 RUN npm ci
 
 COPY . .
