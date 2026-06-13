@@ -286,7 +286,7 @@ export const cliOptions = {
   slim: {
     type: 'boolean',
     describe:
-      'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
+      'Exposes a "slim" set of 3 tools covering navigation, JavaScript execution and screenshots only. Useful for basic browser tasks.',
   },
   viaCli: {
     type: 'boolean',
@@ -299,6 +299,43 @@ export const cliOptions = {
     describe:
       'If true, redacts some of the network headers considered sensitive before returning to the client.',
     default: false,
+  },
+  chatgpt: {
+    type: 'boolean',
+    describe:
+      'Serve a ChatGPT Connector-compatible Streamable HTTP MCP endpoint with OAuth login instead of stdio.',
+  },
+  chatgptPort: {
+    type: 'number',
+    describe:
+      'Port for --chatgpt Streamable HTTP mode. Defaults to CHATGPT_MCP_PORT, PORT, or 3000.',
+    implies: 'chatgpt',
+  },
+  chatgptBaseUrl: {
+    type: 'string',
+    describe:
+      'Public base URL for ChatGPT OAuth metadata, for example https://chrome-devtools.example.com. Defaults to CHATGPT_MCP_BASE_URL or OAUTH_BASE_URL.',
+    implies: 'chatgpt',
+  },
+  chatgptAllowedOrigin: {
+    type: 'array',
+    describe:
+      'Allowed browser Origin for --chatgpt MCP requests. Defaults to ChatGPT origins or CHATGPT_MCP_ALLOWED_ORIGINS/ALLOWED_ORIGINS.',
+    implies: 'chatgpt',
+  },
+  chatgptToken: {
+    type: 'string',
+    describe:
+      'Static Bearer token for --chatgpt mode. Prefer CHATGPT_MCP_TOKEN or MCP_TOKEN instead of passing this on the command line.',
+    hidden: true,
+    implies: 'chatgpt',
+  },
+  chatgptLoginSecret: {
+    type: 'string',
+    describe:
+      'Single-user OAuth login secret for --chatgpt mode. Prefer CHATGPT_MCP_LOGIN_SECRET or OAUTH_LOGIN_SECRET instead of passing this on the command line.',
+    hidden: true,
+    implies: 'chatgpt',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -390,6 +427,10 @@ export function parseArguments(
       [
         '$0 --slim',
         'Only 3 tools: navigation, JavaScript execution and screenshot',
+      ],
+      [
+        '$0 --chatgpt --headless --chrome-arg=--no-sandbox',
+        'Serve a ChatGPT Connector endpoint with OAuth login on HTTP.',
       ],
     ]);
 
