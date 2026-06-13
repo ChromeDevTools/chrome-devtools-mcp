@@ -30,11 +30,4 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD [
-  "node",
-  "build/src/bin/chrome-devtools-mcp.js",
-  "--chatgpt",
-  "--headless",
-  "--chrome-arg=--no-sandbox",
-  "--chrome-arg=--disable-dev-shm-usage"
-]
+CMD ["node", "build/src/bin/chrome-devtools-mcp.js", "--chatgpt", "--headless", "--chrome-arg=--no-sandbox", "--chrome-arg=--disable-dev-shm-usage"]
