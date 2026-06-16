@@ -314,7 +314,9 @@ function converNetworkRequestDetailedToStringDetailed(
   if (redirectChain?.length) {
     response.push(`### Redirect chain`);
     let indent = 0;
-    for (const request of redirectChain.reverse()) {
+    // `redirectChain` is already ordered by toJSONDetailed(); don't reverse it
+    // again here or the text output contradicts structuredContent (the JSON).
+    for (const request of redirectChain) {
       response.push(
         `${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)}`,
       );

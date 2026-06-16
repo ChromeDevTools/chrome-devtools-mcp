@@ -200,7 +200,10 @@ export function getMockRequest(
       );
     },
     redirectChain(): HTTPRequest[] {
-      return options.redirectChain ?? [];
+      // Puppeteer returns a fresh copy on every call (HTTPRequest returns
+      // `this._redirectChain.slice()`); mirror that so formatters can't share
+      // and accidentally mutate the same array across calls.
+      return [...(options.redirectChain ?? [])];
     },
     isNavigationRequest() {
       return options.navigationRequest ?? false;

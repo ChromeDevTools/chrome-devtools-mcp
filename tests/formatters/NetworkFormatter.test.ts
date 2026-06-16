@@ -307,6 +307,38 @@ describe('NetworkFormatter', () => {
       const result = formatter.toStringDetailed();
       t.assert.snapshot(result);
     });
+    it('renders the redirect chain in the same order in text and JSON', async () => {
+      // A >=2 element chain makes ordering observable (a single redirect hides
+      // the bug). toStringDetailed() and toJSONDetailed() are emitted from the
+      // same get_network_request call, so they must agree on the order.
+      const first = getMockRequest({url: 'http://example.com/first'});
+      const second = getMockRequest({url: 'http://example.com/second'});
+      const request = getMockRequest({
+        url: 'http://example.com/final',
+        redirectChain: [first, second],
+      });
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        requestIdResolver: () => 2,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      const text = formatter.toStringDetailed();
+      const json = formatter.toJSONDetailed();
+
+      const textOrder = [
+        ...text.matchAll(/http:\/\/example\.com\/(first|second)/g),
+      ].map(m => m[0]);
+      const jsonOrder = (json.redirectChain ?? []).map(entry => entry.url);
+
+      assert.deepStrictEqual(
+        textOrder,
+        jsonOrder,
+        `redirect chain order differs between text (${JSON.stringify(textOrder)}) ` +
+          `and JSON (${JSON.stringify(jsonOrder)})`,
+      );
+    });
     it('shows saved to file message in toStringDetailed', async () => {
       const request = {
         method: () => 'POST',
