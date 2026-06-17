@@ -18,9 +18,12 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
+import {serverHooks} from './server.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
+  const server = serverHooks();
+
   afterEach(() => {
     sinon.restore();
   });
@@ -314,6 +317,74 @@ describe('McpContext', () => {
           await fs.rm(testFilePath, {force: true});
         }
       });
+    });
+
+    it('http protocol respects the network blocklist', async () => {
+      server.addRoute('/blocked.map', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end('{}');
+      });
+
+      const blockedUrl = server.getRoute('/blocked.map');
+      await withMcpContext(
+        async (_response, context) => {
+          await assert.rejects(
+            context.loadResource(blockedUrl),
+            /blocked by network blocklist/,
+          );
+        },
+        {
+          blockedUrlPattern: [blockedUrl],
+        },
+      );
+    });
+
+    it('http protocol respects the network allowlist', async () => {
+      server.addRoute('/allowed.map', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end('{"version":3}');
+      });
+      server.addRoute('/blocked.map', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end('{}');
+      });
+
+      const allowedUrl = server.getRoute('/allowed.map');
+      const blockedUrl = server.getRoute('/blocked.map');
+      await withMcpContext(
+        async (_response, context) => {
+          assert.strictEqual(
+            await context.loadResource(allowedUrl),
+            '{"version":3}',
+          );
+          await assert.rejects(
+            context.loadResource(blockedUrl),
+            /not allowed by network allowlist/,
+          );
+        },
+        {
+          allowedUrlPattern: [allowedUrl],
+        },
+      );
+    });
+
+    it('http protocol ignores an empty network allowlist', async () => {
+      server.addRoute('/source.map', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end('{"version":3}');
+      });
+
+      await withMcpContext(
+        async (_response, context) => {
+          assert.strictEqual(
+            await context.loadResource(server.getRoute('/source.map')),
+            '{"version":3}',
+          );
+        },
+        {
+          allowedUrlPattern: [],
+        },
+      );
     });
   });
 });

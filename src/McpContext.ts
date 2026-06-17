@@ -66,6 +66,10 @@ interface McpContextOptions {
   performanceCrux: boolean;
   // Whether allowlist/blocklist is configured.
   hasNetworkBlockOrAllowlist?: boolean;
+  // URL patterns to block for direct resource loads.
+  blocklist?: string[];
+  // URL patterns to allow for direct resource loads.
+  allowlist?: string[];
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -106,6 +110,8 @@ export class McpContext implements Context {
   #options: McpContextOptions;
   #heapSnapshotManager = new HeapSnapshotManager();
   #roots: Root[] | undefined = undefined;
+  #blocklist: URLPattern[];
+  #allowlist: URLPattern[] | undefined;
 
   private constructor(
     browser: Browser,
@@ -123,6 +129,12 @@ export class McpContext implements Context {
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
+    this.#blocklist =
+      options.blocklist?.map(pattern => new URLPattern(pattern)) ?? [];
+    this.#allowlist =
+      options.allowlist && options.allowlist.length > 0
+        ? options.allowlist.map(pattern => new URLPattern(pattern))
+        : undefined;
 
     this.#networkCollector = new NetworkCollector(this.browser);
 
@@ -958,7 +970,7 @@ export class McpContext implements Context {
     switch (url.protocol) {
       case 'https:':
       case 'http:': {
-        // TODO: Verify allow/block list
+        this.#validateNetworkResource(url);
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${url}`);
@@ -974,6 +986,31 @@ export class McpContext implements Context {
       default:
         throw new Error(`Unsupported protocol for: ${url}`);
     }
+  }
+
+  #validateNetworkResource(url: URL): void {
+    const urlString = url.href;
+    for (const pattern of this.#blocklist) {
+      if (pattern.test(urlString)) {
+        throw new Error(
+          `Access denied: URL ${urlString} is blocked by network blocklist.`,
+        );
+      }
+    }
+
+    if (!this.#allowlist) {
+      return;
+    }
+
+    for (const pattern of this.#allowlist) {
+      if (pattern.test(urlString)) {
+        return;
+      }
+    }
+
+    throw new Error(
+      `Access denied: URL ${urlString} is not allowed by network allowlist.`,
+    );
   }
 
   async getHeapSnapshotEdges(

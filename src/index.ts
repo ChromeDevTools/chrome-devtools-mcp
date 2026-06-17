@@ -148,6 +148,8 @@ export async function createMcpServer(
           (blocklist && blocklist.length > 0) ||
           (allowlist && allowlist.length > 0),
         ),
+        blocklist,
+        allowlist,
       });
       await updateRoots();
     }

@@ -140,6 +140,8 @@ export async function withMcpContext(
           (options.blockedUrlPattern && options.blockedUrlPattern.length > 0) ||
           (options.allowedUrlPattern && options.allowedUrlPattern.length > 0),
         ),
+        blocklist: options.blockedUrlPattern,
+        allowlist: options.allowedUrlPattern,
       },
       Locator,
     );
