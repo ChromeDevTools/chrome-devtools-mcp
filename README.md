@@ -633,7 +633,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
 
 - **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
-  Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
+  Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCP,DevToolsWebMCPSupport`
   - **Type:** boolean
 
 - **`--chromeArg`/ `--chrome-arg`**

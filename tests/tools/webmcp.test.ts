@@ -77,7 +77,7 @@ describe('webmcp', () => {
             JSON.stringify({status: 'Completed', output: 'hello'}, null, 2),
           );
         },
-        {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+        {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
         {categoryExperimentalWebmcp: true} as ParsedArguments,
       );
     });
@@ -99,7 +99,7 @@ describe('webmcp', () => {
             {message: /Tool missing-tool not found/},
           );
         },
-        {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+        {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
         {categoryExperimentalWebmcp: true} as ParsedArguments,
       );
     });
@@ -124,7 +124,7 @@ describe('webmcp', () => {
             },
           );
         },
-        {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+        {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
         {categoryExperimentalWebmcp: true} as ParsedArguments,
       );
     });
