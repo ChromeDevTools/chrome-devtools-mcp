@@ -22,6 +22,7 @@ import {
   getHeapSnapshotEdges,
   getHeapSnapshotDominators,
   compareHeapSnapshots,
+  getHeapSnapshotDuplicateStrings,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -524,6 +525,33 @@ describe('memory', () => {
       assert.ok(secondNewObjectDiff);
       assert.equal(firstNewObjectDiff.addedCount, 7);
       assert.equal(secondNewObjectDiff.addedCount, 5);
+    });
+  });
+
+  describe('get_heapsnapshot_duplicate_strings', () => {
+    it('with default options', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDuplicateStrings.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDuplicateStrings.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
     });
   });
 });

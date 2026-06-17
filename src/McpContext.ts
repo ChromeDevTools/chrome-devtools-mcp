@@ -20,6 +20,7 @@ import type {
   AggregatedInfoWithId,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
+  DuplicateStringGroup,
 } from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
@@ -903,6 +904,12 @@ export class McpContext implements Context {
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
     return await this.#heapSnapshotManager.getAggregates(filePath);
+  }
+
+  async getHeapSnapshotDuplicateStrings(
+    filePath: string,
+  ): Promise<DuplicateStringGroup[]> {
+    return await this.#heapSnapshotManager.getDuplicateStrings(filePath);
   }
 
   async getHeapSnapshotStats(

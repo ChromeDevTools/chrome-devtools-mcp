@@ -407,6 +407,31 @@ export const commands: Commands = {
       },
     },
   },
+  get_heapsnapshot_duplicate_strings: {
+    description:
+      'Loads a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination.',
+        required: false,
+      },
+    },
+  },
   get_heapsnapshot_edges: {
     description:
       'Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',

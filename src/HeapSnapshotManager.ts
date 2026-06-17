@@ -34,6 +34,9 @@ export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
   deletedSelfSizes: number[];
 }
 
+export type DuplicateStringGroup =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.DuplicateStringGroup;
+
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
   #snapshots = new Map<
@@ -322,6 +325,11 @@ export class HeapSnapshotManager {
 
     const snapshot = await snapshotPromise;
     return {snapshot, worker: workerProxy};
+  }
+
+  async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getDuplicateStrings();
   }
 
   hasSnapshots(): boolean {

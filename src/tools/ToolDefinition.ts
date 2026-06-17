@@ -9,6 +9,7 @@ import type {
   AggregatedInfoWithId,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
+  DuplicateStringGroup,
 } from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
@@ -118,6 +119,10 @@ export interface Response {
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
+    options?: PaginationOptions,
+  ): void;
+  setHeapSnapshotDuplicateStrings(
+    duplicateStrings: DuplicateStringGroup[],
     options?: PaginationOptions,
   ): void;
   setHeapSnapshotRetainingPaths(
@@ -249,6 +254,9 @@ export type Context = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>>;
+  getHeapSnapshotDuplicateStrings(
+    filePath: string,
+  ): Promise<DuplicateStringGroup[]>;
   getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;

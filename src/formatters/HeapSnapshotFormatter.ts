@@ -8,6 +8,7 @@ import type {
   AggregatedInfoWithId,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
+  DuplicateStringGroup,
 } from '../HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import {stableIdSymbol} from '../utils/id.js';
@@ -116,6 +117,21 @@ export class HeapSnapshotFormatter {
     for (const node of dominators) {
       lines.push(
         `${node.nodeId},${node.nodeName},${DevTools.I18n.ByteUtilities.formatBytesToKb(node.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(node.retainedSize)}`,
+      );
+    }
+    return lines.join('\n');
+  }
+
+  static formatDuplicateStrings(
+    groups: readonly DuplicateStringGroup[],
+  ): string {
+    const lines: string[] = [];
+    lines.push('value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds');
+    for (const group of groups) {
+      const nodeIds = group.nodes.map(n => `@${n.id}`).join(' ');
+      const truncated = group.truncated ?? false;
+      lines.push(
+        `${JSON.stringify(group.value)},${group.count},${DevTools.I18n.ByteUtilities.formatBytesToKb(group.totalSelfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}`,
       );
     }
     return lines.join('\n');

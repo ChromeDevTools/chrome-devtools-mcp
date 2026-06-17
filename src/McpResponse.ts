@@ -19,6 +19,7 @@ import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
+  DuplicateStringGroup,
 } from './HeapSnapshotManager.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
@@ -234,6 +235,7 @@ export class McpResponse implements Response {
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
     classDiffs?: HeapSnapshotClassDiff[];
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
+    duplicateStrings?: DuplicateStringGroup[];
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -486,6 +488,18 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       nodes,
+      pagination: options,
+    };
+  }
+
+  setHeapSnapshotDuplicateStrings(
+    duplicateStrings: DuplicateStringGroup[],
+    options?: PaginationOptions,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      duplicateStrings,
       pagination: options,
     };
   }
@@ -861,6 +875,7 @@ export class McpResponse implements Response {
       heapSnapshotDominators?: readonly object[];
       heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
+      heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1218,6 +1233,24 @@ Call ${handleDialog.name} to handle it before continuing.`);
             : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
         );
         structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
+      }
+      const duplicateStrings = this.#heapSnapshotOptions.duplicateStrings;
+      if (duplicateStrings) {
+        response.push('### Duplicate Strings');
+        const paginationData = this.#dataWithPagination(
+          duplicateStrings,
+          this.#heapSnapshotOptions.pagination,
+        );
+
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+
+        const formatted = HeapSnapshotFormatter.formatDuplicateStrings(
+          paginationData.items,
+        );
+        response.push(formatted);
+
+        structuredContent.heapSnapshotDuplicateStrings = paginationData.items;
       }
     }
 

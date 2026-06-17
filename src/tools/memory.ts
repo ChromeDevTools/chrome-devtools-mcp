@@ -323,3 +323,31 @@ export const compareHeapSnapshots = defineTool({
     }
   },
 });
+
+export const getHeapSnapshotDuplicateStrings = defineTool({
+  name: 'get_heapsnapshot_duplicate_strings',
+  description:
+    'Loads a memory heapsnapshot and returns duplicate strings grouped by their value.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  blockedByDialog: false,
+  verifyFilesSchema: ['filePath'],
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    pageIdx: zod.number().optional().describe('The page index for pagination.'),
+    pageSize: zod.number().optional().describe('The page size for pagination.'),
+  },
+  handler: async (request, response, context) => {
+    const duplicateStrings = await context.getHeapSnapshotDuplicateStrings(
+      request.params.filePath,
+    );
+
+    response.setHeapSnapshotDuplicateStrings(duplicateStrings, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+});

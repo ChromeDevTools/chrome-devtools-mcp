@@ -39,13 +39,14 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (10 tools)
+- **[Memory](#memory)** (11 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
   - [`compare_heapsnapshots`](#compare_heapsnapshots)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
+  - [`get_heapsnapshot_duplicate_strings`](#get_heapsnapshot_duplicate_strings)
   - [`get_heapsnapshot_edges`](#get_heapsnapshot_edges)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
   - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
@@ -508,6 +509,18 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get the dominator chain for.
+
+---
+
+### `get_heapsnapshot_duplicate_strings`
+
+**Description:** Loads a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **pageIdx** (number) _(optional)_: The page index for pagination.
+- **pageSize** (number) _(optional)_: The page size for pagination.
 
 ---
 
