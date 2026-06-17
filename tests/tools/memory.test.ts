@@ -24,6 +24,7 @@ import {
   compareHeapSnapshots,
   getHeapSnapshotDuplicateStrings,
 } from '../../src/tools/memory.js';
+import {stableIdSymbol} from '../../src/utils/id.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
@@ -104,6 +105,31 @@ describe('memory', () => {
         t.assert.snapshot(output);
       });
     });
+
+    it('with objectsRetainedByContexts filterName', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDetails.handler(
+          {params: {filePath, filterName: 'objectsRetainedByContexts'}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDetails.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
   });
 
   describe('get_heapsnapshot_class_nodes', () => {
@@ -118,6 +144,43 @@ describe('memory', () => {
 
         await getHeapSnapshotClassNodes.handler(
           {params: {filePath, id: 19}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotClassNodes.name,
+          context,
+        );
+
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with objectsRetainedByContexts filterName', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        const aggregates = await context.getHeapSnapshotAggregates(
+          filePath,
+          'objectsRetainedByContexts',
+        );
+        const aggregate = Object.values(aggregates).find(
+          a => a.name === 'Function',
+        );
+        assert.ok(aggregate);
+        const id = aggregate[stableIdSymbol];
+        assert.ok(id);
+
+        await getHeapSnapshotClassNodes.handler(
+          {params: {filePath, id, filterName: 'objectsRetainedByContexts'}},
           response,
           context,
         );

@@ -484,6 +484,7 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **id** (number) **(required)**: The ID for the class, obtained from details.
+- **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts") _(optional)_: An optional filter to apply to the nodes.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 
@@ -496,6 +497,7 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts") _(optional)_: An optional filter to apply to the aggregates.
 - **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
 - **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
 

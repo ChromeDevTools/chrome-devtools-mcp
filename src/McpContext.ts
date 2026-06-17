@@ -952,8 +952,9 @@ export class McpContext implements Context {
 
   async getHeapSnapshotAggregates(
     filePath: string,
+    filterName?: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
-    return await this.#heapSnapshotManager.getAggregates(filePath);
+    return await this.#heapSnapshotManager.getAggregates(filePath, filterName);
   }
 
   async getHeapSnapshotDuplicateStrings(
@@ -977,8 +978,13 @@ export class McpContext implements Context {
   async getHeapSnapshotNodesById(
     filePath: string,
     id: number,
+    filterName?: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    return await this.#heapSnapshotManager.getNodesById(filePath, id);
+    return await this.#heapSnapshotManager.getNodesById(
+      filePath,
+      id,
+      filterName,
+    );
   }
 
   async getHeapSnapshotRetainers(

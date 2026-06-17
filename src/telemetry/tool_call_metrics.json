@@ -684,6 +684,10 @@
       {
         "name": "id",
         "argType": "number"
+      },
+      {
+        "name": "filter_name",
+        "argType": "string"
       }
     ]
   },
@@ -701,6 +705,10 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "filter_name",
+        "argType": "string"
       }
     ]
   },

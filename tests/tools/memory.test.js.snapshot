@@ -49,6 +49,18 @@ nodeId,nodeName,type,distance,selfSize,retainedSize
 Showing 1-8 of 8 (Page 1 of 1).
 `;
 
+exports[`memory > get_heapsnapshot_class_nodes > with objectsRetainedByContexts filterName 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+45897,makeCallable,closure,5,0.0 kB,0.2 kB
+46147,makeCallable,closure,5,0.0 kB,0.2 kB
+45893,Apply,closure,5,0.0 kB,0.0 kB
+45895,Save,closure,5,0.0 kB,0.0 kB
+46143,Apply,closure,5,0.0 kB,0.0 kB
+46145,Save,closure,5,0.0 kB,0.0 kB
+Showing 1-6 of 6 (Page 1 of 1).
+`;
+
 exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Showing 1-157 of 157 (Page 1 of 1).
@@ -210,6 +222,16 @@ id,name,count,selfSize,maxRetainedSize
 97,HTMLDocument (internal cache) / https://example.com,1,0.0 kB,0.0 kB
 107,MutationObserver (internal cache) / https://example.com,1,0.0 kB,0.0 kB
 108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+`;
+
+exports[`memory > get_heapsnapshot_details > with objectsRetainedByContexts filterName 1`] = `
+## Heap Snapshot Data
+Showing 1-4 of 4 (Page 1 of 1).
+id,name,count,selfSize,maxRetainedSize
+1,system / Context,116,2.5 kB,3.5 kB
+3,Function,6,0.2 kB,0.7 kB
+2,(compiled code),22,0.5 kB,0.5 kB
+4,Array,4,0.3 kB,0.3 kB
 `;
 
 exports[`memory > get_heapsnapshot_dominators > with valid nodeId 1`] = `

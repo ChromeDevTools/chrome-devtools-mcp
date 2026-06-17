@@ -73,10 +73,14 @@ export class HeapSnapshotManager {
 
   async getAggregates(
     filePath: string,
+    filterName?: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    if (filterName) {
+      filter.filterName = filterName;
+    }
     const aggregates: Record<string, AggregatedInfoWithId> =
       await snapshot.aggregatesWithFilter(filter);
 
@@ -122,10 +126,14 @@ export class HeapSnapshotManager {
   async getNodesById(
     filePath: string,
     id: number,
+    filterName?: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    if (filterName) {
+      filter.filterName = filterName;
+    }
     const className = await this.resolveClassKeyFromId(filePath, id);
     if (!className) {
       throw new Error(`Class with ID ${id} not found in heap snapshot`);
