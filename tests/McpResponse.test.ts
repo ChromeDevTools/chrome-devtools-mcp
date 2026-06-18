@@ -1502,7 +1502,7 @@ describe('webmcp', () => {
           ),
         );
       },
-      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+      {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
       parseArguments,
     );
   }
@@ -1567,7 +1567,7 @@ describe('webmcp', () => {
           ),
         );
       },
-      {args: ['--enable-features=WebMCPTesting,DevToolsWebMCPSupport']},
+      {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
       {categoryExperimentalWebmcp: true} as ParsedArguments,
     );
   });

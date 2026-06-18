@@ -945,6 +945,13 @@ export class McpContext implements Context {
     );
   }
 
+  async getHeapSnapshotDominators(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain> {
+    return await this.#heapSnapshotManager.getDominatorsOf(filePath, nodeId);
+  }
+
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
 

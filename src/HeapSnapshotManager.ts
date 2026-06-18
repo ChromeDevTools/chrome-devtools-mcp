@@ -148,6 +148,18 @@ export class HeapSnapshotManager {
     );
   }
 
+  async getDominatorsOf(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    return await snapshot.getDominatorsOf(nodeIndex);
+  }
+
   async getEdges(
     filePath: string,
     nodeId: number,

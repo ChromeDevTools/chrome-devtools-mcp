@@ -130,7 +130,8 @@ async function getToolGroups(page: McpPage): Promise<ToolGroups> {
 
         if (
           typeof toolGroup.name !== 'string' ||
-          typeof toolGroup.description !== 'string' ||
+          (toolGroup.description &&
+            typeof toolGroup.description !== 'string') ||
           !Array.isArray(toolGroup.tools)
         ) {
           console.error('Invalid toolGroup:', toolGroup);
@@ -223,6 +224,7 @@ export class McpResponse implements Response {
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
+    dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -486,6 +488,16 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       retainingPaths,
+    };
+  }
+
+  setHeapSnapshotDominators(
+    dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      dominators,
     };
   }
 
@@ -819,6 +831,7 @@ export class McpResponse implements Response {
       heapSnapshotData?: object[];
       heapSnapshotNodes?: readonly object[];
       heapSnapshotRetainingPaths?: object;
+      heapSnapshotDominators?: readonly object[];
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1132,6 +1145,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
         }
         structuredContent.heapSnapshotRetainingPaths =
           retainingPaths as unknown as object;
+      }
+      const dominators = this.#heapSnapshotOptions.dominators;
+      if (dominators) {
+        response.push('### Dominator Chain');
+        if (dominators.length === 0) {
+          response.push('No dominators found.');
+        } else {
+          response.push(HeapSnapshotFormatter.formatDominators(dominators));
+        }
+        structuredContent.heapSnapshotDominators = dominators;
       }
     }
 

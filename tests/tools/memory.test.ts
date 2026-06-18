@@ -20,6 +20,7 @@ import {
   closeHeapSnapshot,
   getHeapSnapshotRetainingPaths,
   getHeapSnapshotEdges,
+  getHeapSnapshotDominators,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -323,6 +324,33 @@ describe('memory', () => {
 
         const responseData = await response.handle(
           getHeapSnapshotEdges.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('get_heapsnapshot_dominators', () => {
+    it('with valid nodeId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDominators.handler(
+          {params: {filePath, nodeId: 25341}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDominators.name,
           context,
         );
         const output = responseData.content
