@@ -345,4 +345,94 @@ describe('cli args parsing', () => {
     );
     assert.strictEqual(disabledArgs.performanceCrux, false);
   });
+
+  it('parses blocked-url-pattern flags as array', async () => {
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.blockedUrlPattern, undefined);
+
+    const singleArgs = parseArguments(
+      '1.0.0',
+      ['node', 'main.js', '--blocked-url-pattern=https://example.com/*'],
+      {},
+    );
+    assert.deepStrictEqual(singleArgs.blockedUrlPattern, [
+      'https://example.com/*',
+    ]);
+
+    const repeatedArgs = parseArguments(
+      '1.0.0',
+      [
+        'node',
+        'main.js',
+        '--blocked-url-pattern=https://a.com/*',
+        '--blocked-url-pattern=https://b.com/*',
+      ],
+      {},
+    );
+    assert.deepStrictEqual(repeatedArgs.blockedUrlPattern, [
+      'https://a.com/*',
+      'https://b.com/*',
+    ]);
+
+    const spaceSeparatedArgs = parseArguments(
+      '1.0.0',
+      [
+        'node',
+        'main.js',
+        '--blocked-url-pattern',
+        'https://a.com/*',
+        'https://b.com/*',
+      ],
+      {},
+    );
+    assert.deepStrictEqual(spaceSeparatedArgs.blockedUrlPattern, [
+      'https://a.com/*',
+      'https://b.com/*',
+    ]);
+  });
+
+  it('parses allowed-url-pattern flags as array', async () => {
+    const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
+    assert.strictEqual(defaultArgs.allowedUrlPattern, undefined);
+
+    const singleArgs = parseArguments(
+      '1.0.0',
+      ['node', 'main.js', '--allowed-url-pattern=https://example.com/*'],
+      {},
+    );
+    assert.deepStrictEqual(singleArgs.allowedUrlPattern, [
+      'https://example.com/*',
+    ]);
+
+    const repeatedArgs = parseArguments(
+      '1.0.0',
+      [
+        'node',
+        'main.js',
+        '--allowed-url-pattern=https://a.com/*',
+        '--allowed-url-pattern=https://b.com/*',
+      ],
+      {},
+    );
+    assert.deepStrictEqual(repeatedArgs.allowedUrlPattern, [
+      'https://a.com/*',
+      'https://b.com/*',
+    ]);
+
+    const spaceSeparatedArgs = parseArguments(
+      '1.0.0',
+      [
+        'node',
+        'main.js',
+        '--allowed-url-pattern',
+        'https://a.com/*',
+        'https://b.com/*',
+      ],
+      {},
+    );
+    assert.deepStrictEqual(spaceSeparatedArgs.allowedUrlPattern, [
+      'https://a.com/*',
+      'https://b.com/*',
+    ]);
+  });
 });

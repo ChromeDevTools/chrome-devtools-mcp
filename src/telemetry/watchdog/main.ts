@@ -100,7 +100,7 @@ function main() {
     });
   };
 
-  logger(
+  logger?.(
     'Watchdog started',
     JSON.stringify(
       {
@@ -129,15 +129,15 @@ function main() {
     }
 
     isShuttingDown = true;
-    logger(`Parent death detected (${reason}). Sending shutdown event...`);
+    logger?.(`Parent death detected (${reason}). Sending shutdown event...`);
     sender
       .sendShutdownEvent()
       .then(() => {
-        logger('Shutdown event sent. Exiting.');
+        logger?.('Shutdown event sent. Exiting.');
         exit(0);
       })
       .catch(err => {
-        logger('Failed to send shutdown event', err);
+        logger?.('Failed to send shutdown event', err);
         exit(1);
       });
   }
@@ -162,7 +162,7 @@ function main() {
         sender.enqueueEvent(msg.payload);
       }
     } catch (err) {
-      logger('Failed to parse IPC message', err);
+      logger?.('Failed to parse IPC message', err);
     }
   });
 }

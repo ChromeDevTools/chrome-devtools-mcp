@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "Test Extension for Logging",
+  "version": "1.0",
+  "background": {
+    "service_worker": "sw.js"
+  }
+}

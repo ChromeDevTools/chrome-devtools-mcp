@@ -151,7 +151,7 @@ describe('screencast', () => {
   });
 
   describe('screencast_stop', () => {
-    it('does nothing if no recording is active', async () => {
+    it('returns an error message if no recording is active', async () => {
       await withMcpContext(async (response, context) => {
         assert.strictEqual(context.getScreenRecorder(), null);
         await stopScreencast.handler(
@@ -159,7 +159,11 @@ describe('screencast', () => {
           response,
           context,
         );
-        assert.strictEqual(response.responseLines.length, 0);
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .includes('no active screencast recording to stop'),
+        );
       });
     });
 

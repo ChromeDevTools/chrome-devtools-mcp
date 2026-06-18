@@ -33,3 +33,5 @@ export interface EmulationSettings {
   viewport?: Viewport;
   extraHttpHeaders?: Record<string, string>;
 }
+
+export type Logger = ((...args: unknown[]) => void) | undefined;

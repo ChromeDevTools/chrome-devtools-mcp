@@ -208,11 +208,11 @@ export class ToolHandler {
     const startTime = Date.now();
     let success = false;
     try {
-      logger(
+      logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
       const context = await this.getContext();
-      logger(`${this.tool.name} context: resolved`);
+      logger?.(`${this.tool.name} context: resolved`);
       await context.detectOpenDevToolsWindows();
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
@@ -262,6 +262,7 @@ export class ToolHandler {
       const {content, structuredContent} = await response.handle(
         this.tool.name,
         context,
+        this.serverArgs.experimentalToonFormat ?? false,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
@@ -277,7 +278,7 @@ export class ToolHandler {
       }
       return result;
     } catch (err) {
-      logger(`${this.tool.name} error:`, err, err?.stack);
+      logger?.(`${this.tool.name} error:`, err, err?.stack);
       let errorText = err && 'message' in err ? err.message : String(err);
       if ('cause' in err && err.cause) {
         errorText += `\nCause: ${err.cause.message}`;

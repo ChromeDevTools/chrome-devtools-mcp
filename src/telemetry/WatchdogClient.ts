@@ -59,10 +59,10 @@ export class WatchdogClient {
     });
     this.#childProcess.unref();
     this.#childProcess.on('error', err => {
-      logger('Watchdog process error:', err);
+      logger?.('Watchdog process error:', err);
     });
     this.#childProcess.on('exit', (code, signal) => {
-      logger(`Watchdog exited with code ${code} and signal ${signal}`);
+      logger?.(`Watchdog exited with code ${code} and signal ${signal}`);
     });
   }
 
@@ -76,10 +76,10 @@ export class WatchdogClient {
         const line = JSON.stringify(message) + '\n';
         this.#childProcess.stdin.write(line);
       } catch (err) {
-        logger('Failed to write to watchdog stdin', err);
+        logger?.('Failed to write to watchdog stdin', err);
       }
     } else {
-      logger('Watchdog stdin not available, dropping message');
+      logger?.('Watchdog stdin not available, dropping message');
     }
   }
 }

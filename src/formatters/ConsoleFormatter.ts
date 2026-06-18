@@ -8,7 +8,7 @@ import {
   createStackTraceForConsoleMessage,
   type TargetUniverse,
   SymbolizedError,
-} from '../DevtoolsUtils.js';
+} from '../devtools/DevtoolsUtils.js';
 import {UncaughtError} from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';

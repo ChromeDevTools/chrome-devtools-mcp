@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type * as puppeteer from './third_party/index.js';
-import type {DevTools} from './third_party/index.js';
-import {CDPSessionEvent} from './third_party/index.js';
+import type * as puppeteer from '../third_party/index.js';
+import type {DevTools} from '../third_party/index.js';
+import {CDPSessionEvent} from '../third_party/index.js';
 
 /**
  * This class makes a puppeteer connection look like DevTools CDPConnection.

@@ -17,10 +17,7 @@ import {
   executeThirdPartyDeveloperTool,
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
-import type {
-  ToolGroup,
-  ToolDefinition,
-} from '../../src/tools/thirdPartyDeveloper.js';
+import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
 import {withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
@@ -32,28 +29,26 @@ describe('thirdPartyDeveloperTools', () => {
           response.setPage(page);
 
           await page.pptrPage.evaluate(() => {
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {
-                      type: 'object',
-                      properties: {
-                        arg: {type: 'string'},
-                      },
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      arg: {type: 'string'},
                     },
-                    execute: () => 'result',
                   },
-                ],
-              },
+                  execute: () => 'result',
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -68,7 +63,9 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
           // @ts-expect-error `structuredContent` has `thirdPartyDeveloperTools`
-          const actualGroup = result.structuredContent.thirdPartyDeveloperTools;
+          const groups = result.structuredContent.thirdPartyDeveloperTools;
+          assert.strictEqual(groups.length, 1);
+          const actualGroup = groups[0];
           assert.strictEqual(actualGroup.name, 'test-group');
           assert.strictEqual(actualGroup.description, 'test description');
           assert.strictEqual(actualGroup.tools.length, 1);
@@ -111,14 +108,14 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.ok('thirdPartyDeveloperTools' in result.structuredContent);
-          assert.deepEqual(
+          assert.ok(result.structuredContent);
+          assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools: ToolGroup<ToolDefinition>;
+                thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
-            {},
+            undefined,
           );
         },
         undefined,
@@ -147,10 +144,11 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.strictEqual(
+          assert.ok(result.structuredContent);
+          assert.deepStrictEqual(
             (
               result.structuredContent as {
-                thirdPartyDeveloperTools: ToolGroup<ToolDefinition>;
+                thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
             undefined,
@@ -176,11 +174,131 @@ describe('thirdPartyDeveloperTools', () => {
             'list_3p_developer_tools',
             context,
           );
-          assert.strictEqual(
-            (result.structuredContent as {thirdPartyDeveloperTools: undefined})
-              .thirdPartyDeveloperTools,
+          assert.ok(result.structuredContent);
+          assert.deepStrictEqual(
+            (
+              result.structuredContent as {
+                thirdPartyDeveloperTools?: ToolGroups;
+              }
+            ).thirdPartyDeveloperTools,
             undefined,
           );
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
+      );
+    });
+
+    it('lists multiple toolgroups', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          await page.pptrPage.evaluate(() => {
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith?.({
+                name: 'group-1',
+                description: 'desc-1',
+                tools: [
+                  {
+                    name: 'tool-1',
+                    description: 'tool-1-desc',
+                    inputSchema: {},
+                    execute: () => 'r1',
+                  },
+                ],
+              });
+            });
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith?.({
+                name: 'group-2',
+                description: 'desc-2',
+                tools: [
+                  {
+                    name: 'tool-2',
+                    description: 'tool-2-desc',
+                    inputSchema: {},
+                    execute: () => 'r2',
+                  },
+                ],
+              });
+            });
+          });
+
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
+
+          const result = await response.handle(
+            'list_3p_developer_tools',
+            context,
+          );
+          const actualGroups =
+            // @ts-expect-error structuredContent has `thirdPartyDeveloperTools`
+            result.structuredContent.thirdPartyDeveloperTools;
+          assert.ok(actualGroups);
+          assert.strictEqual(actualGroups.length, 2);
+          assert.strictEqual(actualGroups[0].name, 'group-1');
+          assert.strictEqual(actualGroups[1].name, 'group-2');
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true} as ParsedArguments,
+      );
+    });
+
+    it('clears window.__dtmcp.toolGroups on subsequent getToolGroups calls', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          await page.pptrPage.evaluate(() => {
+            const mockToolGroup = {
+              name: 'group-1',
+              description: 'desc-1',
+              tools: [
+                {
+                  name: 'tool-1',
+                  description: 'tool-1-desc',
+                  inputSchema: {},
+                  execute: () => 'r1',
+                },
+              ],
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(mockToolGroup);
+            });
+          });
+
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
+          await response.handle('list_3p_developer_tools', context);
+
+          let groupsLength = await page.pptrPage.evaluate(
+            () => window.__dtmcp?.toolGroups?.length,
+          );
+          assert.strictEqual(groupsLength, 1);
+
+          await listThirdPartyDeveloperTools.handler(
+            {params: {}, page},
+            response,
+            context,
+          );
+          await response.handle('list_3p_developer_tools', context);
+
+          groupsLength = await page.pptrPage.evaluate(
+            () => window.__dtmcp?.toolGroups?.length,
+          );
+          assert.strictEqual(groupsLength, 1);
         },
         undefined,
         {categoryExperimentalThirdParty: true} as ParsedArguments,
@@ -209,29 +327,27 @@ describe('thirdPartyDeveloperTools', () => {
       await withMcpContext(
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {
-                      type: 'object',
-                      properties: {
-                        arg: {type: 'string'},
-                      },
-                      required: ['arg'],
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      arg: {type: 'string'},
                     },
-                    execute: () => 'result',
+                    required: ['arg'],
                   },
-                ],
-              },
+                  execute: () => 'result',
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -259,16 +375,14 @@ describe('thirdPartyDeveloperTools', () => {
     it('throws if tool not found in list', async () => {
       await withMcpContext(async (response, context) => {
         await setupThirdPartyDeveloperTools(response, context, () => {
-          window.__dtmcp = {
-            toolGroup: {
-              name: 'test-group',
-              description: 'test description',
-              tools: [],
-            },
+          const mockToolGroup = {
+            name: 'test-group',
+            description: 'test description',
+            tools: [],
           };
           window.addEventListener('devtoolstooldiscovery', (e: Event) => {
             // @ts-expect-error Event has `respondWith`
-            e.respondWith(window.__dtmcp?.toolGroup);
+            e.respondWith(mockToolGroup);
           });
         });
 
@@ -295,29 +409,27 @@ describe('thirdPartyDeveloperTools', () => {
       await withMcpContext(
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {
-                      type: 'object',
-                      properties: {
-                        arg: {type: 'string'},
-                      },
-                      required: ['arg'],
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      arg: {type: 'string'},
                     },
-                    execute: () => 'result',
+                    required: ['arg'],
                   },
-                ],
-              },
+                  execute: () => 'result',
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -347,23 +459,21 @@ describe('thirdPartyDeveloperTools', () => {
       await withMcpContext(
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => ({foo: 'bar'}),
-                  },
-                ],
-              },
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                  execute: () => ({foo: 'bar'}),
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -393,23 +503,25 @@ describe('thirdPartyDeveloperTools', () => {
         const page = await context.newPage();
         response.setPage(page);
 
-        page.thirdPartyDeveloperTools = {
-          name: 'test-group',
-          description: 'test description',
-          tools: [
-            {
-              name: 'test-tool',
-              description: 'test tool description',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  element: {type: 'object'},
+        page.thirdPartyDeveloperTools = [
+          {
+            name: 'test-group',
+            description: 'test description',
+            tools: [
+              {
+                name: 'test-tool',
+                description: 'test tool description',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    element: {type: 'object'},
+                  },
+                  required: ['element'],
                 },
-                required: ['element'],
               },
-            },
-          ],
-        };
+            ],
+          },
+        ];
 
         await page.pptrPage.evaluate(() => {
           window.__dtmcp = {
@@ -483,26 +595,24 @@ describe('thirdPartyDeveloperTools', () => {
       await withMcpContext(
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => ({
-                      foo: 'bar',
-                      func: () => undefined,
-                    }),
-                  },
-                ],
-              },
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                  execute: () => ({
+                    foo: 'bar',
+                    func: () => undefined,
+                  }),
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -531,27 +641,25 @@ describe('thirdPartyDeveloperTools', () => {
       await withMcpContext(
         async (response, context) => {
           await setupThirdPartyDeveloperTools(response, context, () => {
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => {
-                      const obj: Record<string, unknown> = {foo: 'bar'};
-                      obj.self = obj;
-                      return obj;
-                    },
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                  execute: () => {
+                    const obj: Record<string, unknown> = {foo: 'bar'};
+                    obj.self = obj;
+                    return obj;
                   },
-                ],
-              },
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -583,26 +691,24 @@ describe('thirdPartyDeveloperTools', () => {
             class CustomClass {
               val = 'value';
             }
-            window.__dtmcp = {
-              toolGroup: {
-                name: 'test-group',
-                description: 'test description',
-                tools: [
-                  {
-                    name: 'test-tool',
-                    description: 'test tool description',
-                    inputSchema: {},
-                    execute: () => ({
-                      foo: 'bar',
-                      custom: new CustomClass(),
-                    }),
-                  },
-                ],
-              },
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                  execute: () => ({
+                    foo: 'bar',
+                    custom: new CustomClass(),
+                  }),
+                },
+              ],
             };
             window.addEventListener('devtoolstooldiscovery', (e: Event) => {
               // @ts-expect-error Event has `respondWith`
-              e.respondWith(window.__dtmcp?.toolGroup);
+              e.respondWith(mockToolGroup);
             });
           });
 
@@ -637,17 +743,19 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
@@ -694,17 +802,19 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {
@@ -760,17 +870,19 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [
-              {
-                name: 'test-tool',
-                description: 'test tool description',
-                inputSchema: {},
-              },
-            ],
-          };
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
 
           await page.pptrPage.evaluate(() => {
             window.__dtmcp = {

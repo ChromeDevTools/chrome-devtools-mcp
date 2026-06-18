@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {FakeIssuesManager} from './DevtoolsUtils.js';
+import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
   Target,
@@ -92,7 +92,7 @@ export class PageCollector<T> {
       }
       this.addPage(page);
     } catch (err) {
-      logger('Error getting a page for a target onTargetCreated', err);
+      logger?.('Error getting a page for a target onTargetCreated', err);
     }
   };
 
@@ -104,7 +104,7 @@ export class PageCollector<T> {
       }
       this.cleanupPageDestroyed(page);
     } catch (err) {
-      logger('Error getting a page for a target onTargetDestroyed', err);
+      logger?.('Error getting a page for a target onTargetDestroyed', err);
     }
   };
 
@@ -194,11 +194,11 @@ export class PageCollector<T> {
 
     const item = this.find(page, item => item[stableIdSymbol] === stableId);
 
-    if (item) {
-      return item;
+    if (!item) {
+      throw new Error('Request not found for selected page');
     }
 
-    throw new Error('Request not found for selected page');
+    return item;
   }
 
   find(
@@ -335,7 +335,7 @@ class PageEventSubscriber {
         inspectorIssue,
       )[0];
       if (!issue) {
-        logger('No issue mapping for for the issue: ', inspectorIssue.code);
+        logger?.('No issue mapping for for the issue: ', inspectorIssue.code);
         return;
       }
 
@@ -353,7 +353,7 @@ class PageEventSubscriber {
         },
       );
     } catch (error) {
-      logger('Error creating a new issue', error);
+      logger?.('Error creating a new issue', error);
     }
   };
 }

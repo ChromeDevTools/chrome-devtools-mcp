@@ -176,7 +176,7 @@ export class ClearcutLogger {
         await this.#persistence.saveState(state);
       }
     } catch (err) {
-      logger('Error in logDailyActiveIfNeeded:', err);
+      logger?.('Error in logDailyActiveIfNeeded:', err);
     }
   }
 

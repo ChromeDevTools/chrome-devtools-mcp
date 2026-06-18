@@ -222,11 +222,13 @@
   },
   {
     "name": "experimental_memory",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_memory_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_navigation_allowlist",
@@ -294,6 +296,56 @@
   },
   {
     "name": "category_experimental_third_party",
+    "flagType": "boolean"
+  },
+  {
+    "name": "memory_debugging_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "memory_debugging",
+    "flagType": "boolean"
+  },
+  {
+    "name": "blocked_url_pattern_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allowed_url_pattern_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_toon_format_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_toon_format",
+    "flagType": "boolean"
+  },
+  {
+    "name": "screenshot_format_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "screenshot_format",
+    "flagType": "enum",
+    "choices": [
+      "SCREENSHOT_FORMAT_UNSPECIFIED",
+      "SCREENSHOT_FORMAT_JPEG",
+      "SCREENSHOT_FORMAT_PNG",
+      "SCREENSHOT_FORMAT_WEBP"
+    ]
+  },
+  {
+    "name": "screenshot_quality_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "screenshot_max_width_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "screenshot_max_height_present",
     "flagType": "boolean"
   }
 ]

@@ -9,18 +9,17 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {UniverseManager} from '../src/DevtoolsUtils.js';
-import {DevTools} from '../src/third_party/index.js';
-import type {Browser, Target} from '../src/third_party/index.js';
-
-import {serverHooks} from './server.js';
+import {UniverseManager} from '../../src/devtools/DevtoolsUtils.js';
+import {DevTools} from '../../src/third_party/index.js';
+import type {Browser, Target} from '../../src/third_party/index.js';
+import {serverHooks} from '../server.js';
 import {
   getMockBrowser,
   getMockPage,
   html,
   mockListener,
   withBrowser,
-} from './utils.js';
+} from '../utils.js';
 
 describe('UniverseManager', () => {
   const server = serverHooks();

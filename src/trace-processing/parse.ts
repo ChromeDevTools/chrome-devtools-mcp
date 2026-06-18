@@ -67,7 +67,7 @@ export async function parseRawTraceBuffer(
     };
   } catch (e) {
     const errorText = e instanceof Error ? e.message : JSON.stringify(e);
-    logger(`Unexpected error parsing trace: ${errorText}`);
+    logger?.(`Unexpected error parsing trace: ${errorText}`);
     return {
       error: errorText,
     };

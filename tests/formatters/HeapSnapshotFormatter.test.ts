@@ -157,4 +157,80 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(result[1][0], 'ObjectB');
     });
   });
+
+  describe('formatRetainingPaths', () => {
+    it('formats retaining paths correctly', () => {
+      const mockRetainingPaths = [
+        {
+          edgeIndex: 0,
+          edgeName: 'foo',
+          edgeType: 'property',
+          nodeId: 10,
+          nodeIndex: 1,
+          nodeName: 'ClassA',
+          distance: 2,
+          children: [
+            {
+              edgeIndex: 0,
+              edgeName: 'bar',
+              edgeType: 'element',
+              nodeId: 20,
+              nodeIndex: 2,
+              nodeName: 'ClassB',
+              distance: 1,
+              children: [],
+            },
+          ],
+        },
+      ] as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge[];
+
+      const result =
+        HeapSnapshotFormatter.formatRetainingPaths(mockRetainingPaths);
+      const expected = [
+        '<- @10 ClassA via property foo (distance: 2)',
+        '  <- @20 ClassB via element bar (distance: 1)',
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+  });
+
+  describe('formatDominators', () => {
+    it('formats dominator chain correctly', () => {
+      const mockDominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain =
+        [
+          {
+            nodeId: 10,
+            nodeIndex: 1,
+            nodeName: 'ClassA',
+            retainedSize: 1000,
+            selfSize: 100,
+          },
+          {
+            nodeId: 20,
+            nodeIndex: 2,
+            nodeName: 'ClassB',
+            retainedSize: 500,
+            selfSize: 50,
+          },
+        ];
+
+      const result = HeapSnapshotFormatter.formatDominators(mockDominators);
+      const expected = [
+        'nodeId,nodeName,selfSize,retainedSize',
+        `10,ClassA,${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(1000)}`,
+        `20,ClassB,${DevTools.I18n.ByteUtilities.formatBytesToKb(50)},${DevTools.I18n.ByteUtilities.formatBytesToKb(500)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+
+    it('formats empty dominator chain correctly', () => {
+      const mockDominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain =
+        [];
+      const result = HeapSnapshotFormatter.formatDominators(mockDominators);
+      const expected = 'nodeId,nodeName,selfSize,retainedSize';
+      assert.strictEqual(result, expected);
+    });
+  });
 });

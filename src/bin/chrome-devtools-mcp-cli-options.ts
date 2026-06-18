@@ -161,13 +161,20 @@ export const cliOptions = {
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
   },
-  experimentalMemory: {
+  memoryDebugging: {
     type: 'boolean',
-    describe: 'Whether to enable experimental memory tools.',
+    describe: 'Whether to enable memory debugging tools.',
+    alias: 'experimentalMemory',
   },
   experimentalStructuredContent: {
     type: 'boolean',
     describe: 'Whether to output structured formatted content.',
+  },
+  experimentalToonFormat: {
+    type: 'boolean',
+    describe:
+      'Whether to format structured data in text response using Token-Oriented Object Notation. Defaults to false which represents the embedded content as formatted JSON instead.',
+    hidden: true,
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
@@ -197,12 +204,24 @@ export const cliOptions = {
   categoryExperimentalWebmcp: {
     type: 'boolean',
     describe:
-      'Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`',
+      'Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCP,DevToolsWebMCPSupport`',
   },
   chromeArg: {
     type: 'array',
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+  },
+  blockedUrlPattern: {
+    type: 'array',
+    describe:
+      'Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+    conflicts: ['allowedUrlPattern'],
+  },
+  allowedUrlPattern: {
+    type: 'array',
+    describe:
+      'Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+    conflicts: ['blockedUrlPattern'],
   },
   ignoreDefaultChromeArg: {
     type: 'array',
@@ -264,6 +283,60 @@ export const cliOptions = {
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
+  screenshotFormat: {
+    type: 'string',
+    description:
+      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which helps reduce context size in AI conversations. Unset preserves the existing default ("png").',
+    choices: ['jpeg', 'png', 'webp'] as const,
+  },
+  screenshotQuality: {
+    type: 'number',
+    description:
+      'Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value < 0 || value > 100) {
+        throw new Error(
+          `Invalid screenshotQuality ${value}. Expected an integer between 0 and 100.`,
+        );
+      }
+      return value;
+    },
+  },
+  screenshotMaxWidth: {
+    type: 'number',
+    description:
+      'Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(
+          `Invalid screenshotMaxWidth ${value}. Expected a positive integer.`,
+        );
+      }
+      return value;
+    },
+  },
+  screenshotMaxHeight: {
+    type: 'number',
+    description:
+      'Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(
+          `Invalid screenshotMaxHeight ${value}. Expected a positive integer.`,
+        );
+      }
+      return value;
+    },
+  },
   slim: {
     type: 'boolean',
     describe:
@@ -293,7 +366,7 @@ export function parseArguments(
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
-    .check(args => {
+    .middleware(args => {
       // We can't set default in the options else
       // Yargs will complain
       if (
@@ -310,7 +383,6 @@ export function parseArguments(
         );
         args.usageStatistics = false;
       }
-      return true;
     })
     .example([
       [

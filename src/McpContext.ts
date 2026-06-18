@@ -10,8 +10,11 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
-import type {TargetUniverse} from './DevtoolsUtils.js';
-import {UniverseManager} from './DevtoolsUtils.js';
+import type {TargetUniverse} from './devtools/DevtoolsUtils.js';
+import {
+  overrideDevToolsGlobals,
+  UniverseManager,
+} from './devtools/DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
 import type {AggregatedInfoWithId} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
@@ -21,13 +24,13 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './PageCollector.js';
+import {ServiceWorkerConsoleCollector} from './ServiceWorkerCollector.js';
 import {
   Locator,
   PredefinedNetworkConditions,
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
-  type Debugger,
   type HTTPRequest,
   type Page,
   type ScreenRecorder,
@@ -41,6 +44,7 @@ import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
+import type {Logger} from './types.js';
 import type {
   EmulationSettings,
   GeolocationOptions,
@@ -60,6 +64,8 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
+  // Whether allowlist/blocklist is configured.
+  hasNetworkBlockOrAllowlist?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -67,7 +73,7 @@ const NAVIGATION_TIMEOUT = 10_000;
 
 export class McpContext implements Context {
   browser: Browser;
-  logger: Debugger;
+  logger: Logger;
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
@@ -82,6 +88,7 @@ export class McpContext implements Context {
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
+  #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
@@ -102,10 +109,16 @@ export class McpContext implements Context {
 
   private constructor(
     browser: Browser,
-    logger: Debugger,
+    logger: Logger,
     options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
+    overrideDevToolsGlobals({
+      loadResource: (url: string) => {
+        return this.loadResource(url);
+      },
+    });
+
     this.browser = browser;
     this.logger = logger;
     this.#locatorClass = locatorClass;
@@ -126,21 +139,26 @@ export class McpContext implements Context {
         },
       } as ListenerMap;
     });
+    this.#serviceWorkerConsoleCollector = new ServiceWorkerConsoleCollector(
+      this.browser,
+    );
     this.#devtoolsUniverseManager = new UniverseManager(this.browser);
   }
 
   async #init() {
     const pages = await this.createPagesSnapshot();
-    await this.createExtensionServiceWorkersSnapshot();
+    const workers = await this.createExtensionServiceWorkersSnapshot();
     await this.#networkCollector.init(pages);
     await this.#consoleCollector.init(pages);
     await this.#devtoolsUniverseManager.init(pages);
+    await this.#serviceWorkerConsoleCollector.init(workers);
   }
 
   dispose() {
     this.#networkCollector.dispose();
     this.#consoleCollector.dispose();
     this.#devtoolsUniverseManager.dispose();
+    this.#serviceWorkerConsoleCollector.dispose();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
@@ -153,7 +171,7 @@ export class McpContext implements Context {
 
   static async from(
     browser: Browser,
-    logger: Debugger,
+    logger: Logger,
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
@@ -236,7 +254,7 @@ export class McpContext implements Context {
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
     if (!cdpRequestId) {
-      this.logger('no network request');
+      this.logger?.('no network request');
       return;
     }
     const request = this.#networkCollector.find(page.pptrPage, request => {
@@ -244,7 +262,7 @@ export class McpContext implements Context {
       return request.id === cdpRequestId;
     });
     if (!request) {
-      this.logger('no network request for ' + cdpRequestId);
+      this.logger?.('no network request for ' + cdpRequestId);
       return;
     }
     return this.#networkCollector.getIdForResource(request);
@@ -345,7 +363,14 @@ export class McpContext implements Context {
     const mcpPage = this.#getMcpPage(page);
     const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
 
-    if (!options.networkConditions) {
+    // Skip network emulation if blocklist/allowlist is configured, as it conflicts with blocking rules in Puppeteer.
+    if (this.#options.hasNetworkBlockOrAllowlist) {
+      if (options.networkConditions !== undefined) {
+        throw new Error(
+          'Network throttling is not supported when network blocking (allowlist/blocklist) is configured.',
+        );
+      }
+    } else if (!options.networkConditions) {
       await page.emulateNetworkConditions(null);
       delete newSettings.networkConditions;
     } else if (options.networkConditions === 'Offline') {
@@ -581,6 +606,12 @@ export class McpContext implements Context {
     return this.#extensionServiceWorkers;
   }
 
+  getServiceWorkerConsoleData(
+    extensionId: string,
+  ): Array<ConsoleMessage | UncaughtError> {
+    return this.#serviceWorkerConsoleCollector.getData(extensionId);
+  }
+
   async createPagesSnapshot(): Promise<Page[]> {
     const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
 
@@ -591,7 +622,7 @@ export class McpContext implements Context {
         this.#mcpPages.set(page, mcpPage);
         // We emulate a focused page for all pages to support multi-agent workflows.
         void page.emulateFocusedPage(true).catch(error => {
-          this.logger('Error turning on focused page emulation', error);
+          this.logger?.('Error turning on focused page emulation', error);
         });
       }
       mcpPage.isolatedContextName = isolatedContextNames.get(page);
@@ -655,7 +686,7 @@ export class McpContext implements Context {
             page = await target.asPage();
             this.#extensionPages.set(target, page);
           } catch (e) {
-            this.logger('Failed to get page for extension target', e);
+            this.logger?.('Failed to get page for extension target', e);
           }
         }
       }
@@ -696,7 +727,7 @@ export class McpContext implements Context {
   }
 
   async detectOpenDevToolsWindows() {
-    this.logger('Detecting open DevTools windows');
+    this.logger?.('Detecting open DevTools windows');
     const {pages} = await this.#getAllPages();
 
     await Promise.all(
@@ -769,7 +800,7 @@ export class McpContext implements Context {
       await fs.writeFile(filePath, data);
       return {filename: filePath};
     } catch (err) {
-      this.logger(err);
+      this.logger?.(err);
       throw new Error('Could not save a file', {cause: err});
     }
   }
@@ -888,5 +919,67 @@ export class McpContext implements Context {
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
+  }
+
+  async closeHeapSnapshot(filePath: string): Promise<boolean> {
+    return this.#heapSnapshotManager.dispose(filePath);
+  }
+
+  hasHeapSnapshots(): boolean {
+    return this.#heapSnapshotManager.hasSnapshots();
+  }
+
+  async getHeapSnapshotRetainingPaths(
+    filePath: string,
+    nodeId: number,
+    maxDepth?: number,
+    maxNodes?: number,
+    maxSiblings?: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths> {
+    return await this.#heapSnapshotManager.getRetainingPaths(
+      filePath,
+      nodeId,
+      maxDepth,
+      maxNodes,
+      maxSiblings,
+    );
+  }
+
+  async getHeapSnapshotDominators(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain> {
+    return await this.#heapSnapshotManager.getDominatorsOf(filePath, nodeId);
+  }
+
+  async loadResource(path: string): Promise<string> {
+    const url = new URL(path);
+
+    switch (url.protocol) {
+      case 'https:':
+      case 'http:': {
+        // TODO: Verify allow/block list
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to load resource: ${url}`);
+        }
+        return response.text();
+      }
+
+      case 'file:': {
+        await this.validatePath(fileURLToPath(url));
+        return await fsPromises.readFile(url, 'utf-8');
+      }
+
+      default:
+        throw new Error(`Unsupported protocol for: ${url}`);
+    }
+  }
+
+  async getHeapSnapshotEdges(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.getEdges(filePath, nodeId);
   }
 }

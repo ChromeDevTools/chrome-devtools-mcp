@@ -13,6 +13,8 @@ import {executablePath} from 'puppeteer';
 
 import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
 
+import {serverHooks} from './server.js';
+
 describe('browser', () => {
   it('detects display does not crash', () => {
     detectDisplay();
@@ -99,5 +101,79 @@ describe('browser', () => {
     } finally {
       await browser.close();
     }
+  });
+
+  describe('Blocking', () => {
+    const server = serverHooks();
+
+    it('blocks URLs in blocklist', async () => {
+      server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
+      server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
+
+      const browser = await launch({
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+        blocklist: ['*://*:*/blocked.html'],
+      });
+      try {
+        const page = await browser.newPage();
+
+        // Access allowed URL
+        await page.goto(server.getRoute('/allowed.html'));
+        const content = await page.evaluate(() => document.body.textContent);
+        assert.strictEqual(content, 'Allowed');
+
+        // Fetch of blocked URL from the page
+        const fetchSucceeded = await page.evaluate(async url => {
+          try {
+            await fetch(url);
+            return true;
+          } catch {
+            return false;
+          }
+        }, server.getRoute('/blocked.html'));
+
+        assert.strictEqual(fetchSucceeded, false);
+      } finally {
+        await browser.close();
+      }
+    });
+
+    it('blocks URLs not in allowlist', async () => {
+      server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
+      server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
+
+      const browser = await launch({
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+        allowlist: ['*://*:*/allowed.html'],
+      });
+      try {
+        const page = await browser.newPage();
+
+        // Access allowed URL
+        await page.goto(server.getRoute('/allowed.html'));
+        const content = await page.evaluate(() => document.body.textContent);
+        assert.strictEqual(content, 'Allowed');
+
+        // Fetch of blocked URL from the page
+        const fetchSucceeded = await page.evaluate(async url => {
+          try {
+            await fetch(url);
+            return true;
+          } catch {
+            return false;
+          }
+        }, server.getRoute('/blocked.html'));
+
+        assert.strictEqual(fetchSucceeded, false);
+      } finally {
+        await browser.close();
+      }
+    });
   });
 });

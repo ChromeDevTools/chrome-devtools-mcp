@@ -21,11 +21,17 @@ export interface ToolGroup<T extends ToolDefinition> {
   tools: T[];
 }
 
+export type ToolGroups = Array<ToolGroup<ToolDefinition>>;
+
 declare global {
   interface Window {
     __dtmcp?: {
-      toolGroup?: ToolGroup<
-        ToolDefinition & {execute: (args: Record<string, unknown>) => unknown}
+      toolGroups?: Array<
+        ToolGroup<
+          ToolDefinition & {
+            execute: (args: Record<string, unknown>) => unknown;
+          }
+        >
       >;
       stashedElements?: Element[];
       executeTool?: (
@@ -90,8 +96,16 @@ export const executeThirdPartyDeveloperTool = definePageTool({
       }
     }
 
-    const toolGroup = request.page.getThirdPartyDeveloperTools();
-    const tool = toolGroup?.tools.find(t => t.name === toolName);
+    const toolGroups = request.page.getThirdPartyDeveloperTools();
+    let tool;
+    if (toolGroups) {
+      for (const group of toolGroups) {
+        tool = group.tools?.find(t => t.name === toolName);
+        if (tool) {
+          break;
+        }
+      }
+    }
     if (!tool) {
       throw new Error(`Tool ${toolName} not found`);
     }

@@ -31,9 +31,9 @@ import {
 } from './utils.js';
 
 const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
-logger(`Daemon sessionId: ${sessionId}`);
+logger?.(`Daemon sessionId: ${sessionId}`);
 if (isDaemonRunning(sessionId)) {
-  logger('Another daemon process is running.');
+  logger?.('Another daemon process is running.');
   process.exit(1);
 }
 const pidFilePath = getPidFilePath(sessionId);
@@ -113,7 +113,7 @@ try {
     }
   }
 }
-logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
+logger?.(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
 const socketPath = getSocketPath(sessionId);
 
@@ -225,13 +225,13 @@ async function startSocketServer() {
     server = createServer(socket => {
       const transport = new PipeTransport(socket, socket);
       transport.onmessage = async (message: string) => {
-        logger('onmessage', message);
+        logger?.('onmessage', message);
         const response = await handleRequest(JSON.parse(message));
         transport.send(JSON.stringify(response));
         socket.end();
       };
       socket.on('error', error => {
-        logger('Socket error:', error);
+        logger?.('Socket error:', error);
       });
     });
 
@@ -255,7 +255,7 @@ async function startSocketServer() {
     );
 
     server.on('error', error => {
-      logger('Server error:', error);
+      logger?.('Server error:', error);
       reject(error);
     });
   });
@@ -267,12 +267,12 @@ async function cleanup() {
   try {
     await mcpClient?.close();
   } catch (error) {
-    logger('Error closing MCP client:', error);
+    logger?.('Error closing MCP client:', error);
   }
   try {
     await mcpTransport?.close();
   } catch (error) {
-    logger('Error closing MCP transport:', error);
+    logger?.('Error closing MCP transport:', error);
   }
   if (server) {
     await new Promise<void>(resolve => {
@@ -286,7 +286,7 @@ async function cleanup() {
       // ignore errors
     }
   }
-  logger(`unlinking ${pidFilePath}`);
+  logger?.(`unlinking ${pidFilePath}`);
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);
   }
@@ -306,14 +306,14 @@ process.on('SIGHUP', () => {
 
 // Handle uncaught errors
 process.on('uncaughtException', error => {
-  logger('Uncaught exception:', error);
+  logger?.('Uncaught exception:', error);
 });
 process.on('unhandledRejection', error => {
-  logger('Unhandled rejection:', error);
+  logger?.('Unhandled rejection:', error);
 });
 
 // Start the server
 const started = startSocketServer().catch(error => {
-  logger('Failed to start daemon server:', error);
+  logger?.('Failed to start daemon server:', error);
   process.exit(1);
 });

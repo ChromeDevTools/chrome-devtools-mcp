@@ -175,6 +175,86 @@ id,name,count,selfSize,maxRetainedSize
 108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
 `;
 
+exports[`memory > get_heapsnapshot_dominators > with valid nodeId 1`] = `
+## Heap Snapshot Data
+### Dominator Chain
+nodeId,nodeName,selfSize,retainedSize
+25341,String,0.2 kB,1.6 kB
+7199,system / NativeContext,1.2 kB,84.4 kB
+1,,0.0 kB,802 kB
+`;
+
+exports[`memory > get_heapsnapshot_edges > with pagination 1`] = `
+## Heap Snapshot Data
+name,type,nodeId,nodeName
+constructor,property,25575,String
+anchor,property,29295,anchor
+Showing 1-2 of 56 (Page 1 of 28).
+Next page: 1
+`;
+
+exports[`memory > get_heapsnapshot_edges > with valid nodeId 1`] = `
+## Heap Snapshot Data
+name,type,nodeId,nodeName
+constructor,property,25575,String
+anchor,property,29295,anchor
+at,property,29297,at
+big,property,29299,big
+blink,property,29301,blink
+bold,property,29303,bold
+charAt,property,29305,charAt
+charCodeAt,property,29307,charCodeAt
+codePointAt,property,29309,codePointAt
+concat,property,29311,concat
+endsWith,property,29313,endsWith
+fontcolor,property,29315,fontcolor
+fontsize,property,29317,fontsize
+fixed,property,29319,fixed
+includes,property,29321,includes
+indexOf,property,29323,indexOf
+isWellFormed,property,29325,isWellFormed
+italics,property,29327,italics
+lastIndexOf,property,29329,lastIndexOf
+link,property,29331,link
+localeCompare,property,29333,localeCompare
+match,property,29335,match
+matchAll,property,29337,matchAll
+normalize,property,29339,normalize
+padEnd,property,29341,padEnd
+padStart,property,29343,padStart
+repeat,property,29345,repeat
+replace,property,29347,replace
+replaceAll,property,29349,replaceAll
+search,property,29351,search
+slice,property,29353,slice
+small,property,29355,small
+split,property,29357,split
+strike,property,29359,strike
+sub,property,29361,sub
+substr,property,29363,substr
+substring,property,29365,substring
+sup,property,29367,sup
+startsWith,property,29369,startsWith
+toString,property,29371,toString
+toWellFormed,property,29373,toWellFormed
+trim,property,29375,trim
+trimStart,property,29377,trimStart
+trimLeft,property,29377,trimStart
+trimEnd,property,29379,trimEnd
+trimRight,property,29379,trimEnd
+toLocaleLowerCase,property,29381,toLocaleLowerCase
+toLocaleUpperCase,property,29383,toLocaleUpperCase
+toLowerCase,property,29385,toLowerCase
+toUpperCase,property,29387,toUpperCase
+valueOf,property,29389,valueOf
+<symbol Symbol.iterator>,property,29391,[Symbol.iterator]
+__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString}
+properties,internal,29393,system / PropertyArray
+map,internal,25577,system / Map
+1,hidden,71,
+Showing 1-56 of 56 (Page 1 of 1).
+`;
+
 exports[`memory > get_heapsnapshot_retainers > with valid nodeId 1`] = `
 ## Heap Snapshot Data
 name,type,nodeId,nodeName
@@ -182,6 +262,32 @@ prototype,internal,29287,system / Map
 prototype,property,25575,String
 initial_string_prototype,internal,7199,system / NativeContext
 Showing 1-3 of 3 (Page 1 of 1).
+`;
+
+exports[`memory > get_heapsnapshot_retaining_paths > with valid nodeId 1`] = `
+## Heap Snapshot Data
+### Retaining Paths
+<- @45891 system / Context via context builtinToJSONs (distance: 4)
+  <- @34237 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Promise> (distance: 2)
+    <- @34235 system / PropertyCell via internal value (distance: 4)
+      <- @50423 (object properties) via internal 1912 (distance: 3)
+        <- @27635 Window (global*) / https://example.com via internal properties (distance: 2)
+  <- @34213 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Error> (distance: 2)
+  <- @34197 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::RegExp> (distance: 2)
+  <- @34185 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::String> (distance: 2)
+  <- @34145 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Array> (distance: 2)
+  <- @34069 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Function> (distance: 2)
+  <- @34047 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Object> (distance: 2)
+  <- @46063 stringify via internal context (distance: 4)
+    <- @34247 {parse, stringify} via property stringify (distance: 3)
+      <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::JSON> (distance: 2)
 `;
 
 exports[`memory > get_heapsnapshot_summary > with default options 1`] = `
