@@ -35,6 +35,7 @@
   "files": [
     "build/src",
     "LICENSE",
+    "skills",
     "!*.tsbuildinfo",
     "!*.js.map"
   ],
