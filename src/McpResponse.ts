@@ -130,7 +130,8 @@ async function getToolGroups(page: McpPage): Promise<ToolGroups> {
 
         if (
           typeof toolGroup.name !== 'string' ||
-          typeof toolGroup.description !== 'string' ||
+          (toolGroup.description &&
+            typeof toolGroup.description !== 'string') ||
           !Array.isArray(toolGroup.tools)
         ) {
           console.error('Invalid toolGroup:', toolGroup);
