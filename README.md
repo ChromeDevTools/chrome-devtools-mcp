@@ -929,3 +929,9 @@ Please consult [these instructions](./docs/debugging-android.md).
 ## Known limitations
 
 See [Troubleshooting](./docs/troubleshooting.md).
+
+## Integrating as a browser subagent
+
+If you are developing agentic tooling and want to provide an integrated browser subagent as part of your product, we recommend building on top of Chrome DevTools for agents.
+
+For a reference implementation, see the [Gemini CLI browser agent documentation](https://geminicli.com/docs/core/subagents/#browser-agent).
