@@ -139,6 +139,7 @@ describe('checkForUpdates', () => {
     );
     assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
     assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
+    assert.strictEqual(spawnStub.firstCall.args[2]?.windowsHide, true);
     assert.ok(unrefSpy.calledOnce);
   });
 
@@ -163,6 +164,7 @@ describe('checkForUpdates', () => {
     );
     assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
     assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
+    assert.strictEqual(spawnStub.firstCall.args[2]?.windowsHide, true);
     assert.ok(unrefSpy.calledOnce);
   });
 });
