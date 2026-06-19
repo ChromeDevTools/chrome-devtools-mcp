@@ -8,4 +8,6 @@ In general, it is the expectation that the AI agent or client using this MCP ser
 
 Several tools in this project have the ability to perform actions such as writing files to disk (e.g., via browser downloads or screenshots) or dynamically loading Chrome extensions. These are intentional, documented features and are not vulnerabilities.
 
+Network boundary controls like `--blocked-url-pattern` and `--allowed-url-pattern` have known limitations: specifically, service worker-initiated fetches bypass these restrictions and are not blocked. This is limitation of the underlying network interception and is not treated as a security vulnerability in the MCP server itself.
+
 We appreciate feedback and suggestions from developers on how this tool can make it easier for them to build a more secure user experience, but will treat these exclusively as feature requests, and not vulnerabilities in chrome-devtools-mcp itself.
