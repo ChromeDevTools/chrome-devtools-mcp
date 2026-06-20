@@ -7,7 +7,10 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import {
+  cliOptions,
+  parseArguments,
+} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 
 describe('cli args parsing', () => {
   const defaultArgs = {
@@ -391,6 +394,12 @@ describe('cli args parsing', () => {
     ]);
   });
 
+  it('rejects invalid blocked-url-pattern values', async () => {
+    assert.throws(() =>
+      cliOptions.blockedUrlPattern.coerce(['https://[invalid']),
+    );
+  });
+
   it('parses allowed-url-pattern flags as array', async () => {
     const defaultArgs = parseArguments('1.0.0', ['node', 'main.js']);
     assert.strictEqual(defaultArgs.allowedUrlPattern, undefined);
@@ -434,5 +443,11 @@ describe('cli args parsing', () => {
       'https://a.com/*',
       'https://b.com/*',
     ]);
+  });
+
+  it('rejects invalid allowed-url-pattern values', async () => {
+    assert.throws(() =>
+      cliOptions.allowedUrlPattern.coerce(['https://[invalid']),
+    );
   });
 });

@@ -216,12 +216,30 @@ export const cliOptions = {
     describe:
       'Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
     conflicts: ['allowedUrlPattern'],
+    coerce: (patterns: unknown[] | undefined) => {
+      if (!patterns) {
+        return;
+      }
+      for (const pattern of patterns) {
+        new URLPattern(String(pattern));
+      }
+      return patterns.map(String);
+    },
   },
   allowedUrlPattern: {
     type: 'array',
     describe:
       'Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
     conflicts: ['blockedUrlPattern'],
+    coerce: (patterns: unknown[] | undefined) => {
+      if (!patterns) {
+        return;
+      }
+      for (const pattern of patterns) {
+        new URLPattern(String(pattern));
+      }
+      return patterns.map(String);
+    },
   },
   ignoreDefaultChromeArg: {
     type: 'array',
