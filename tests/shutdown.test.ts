@@ -12,15 +12,34 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
+import {IS_WINDOWS} from '../src/daemon/utils.js';
+
 type Server = ChildProcessByStdio<Writable, Readable, Readable>;
 
 // Once shutdown is signalled, the server should be fully gone within this
 // budget. The actual fast path is well under 500ms; the budget is set to be
 // generous against CI noise without being so loose that it would hide a hang.
-const SHUTDOWN_BUDGET_MS = 3000;
+//
+// The Windows stdin-EOF path tears down the Chrome process tree via
+// `taskkill /T`, which is substantially slower (observed ~6.5s in CI, emitting
+// benign "could not be terminated" retries), so Windows gets a larger budget.
+// It must stay below the production force-exit backstop in
+// chrome-devtools-mcp-main.ts (an unref'd `setTimeout(process.exit(0), 10000)`),
+// otherwise a hung teardown rescued by that backstop (exiting at ~10s) would be
+// indistinguishable from a slow-but-correct one. 8000ms clears the real ~6.5s
+// teardown while still failing on a genuine hang.
+const SHUTDOWN_BUDGET_MS = IS_WINDOWS ? 8000 : 3000;
 // Outer test timeout. If exit doesn't happen within this, treat as a hang
 // (the bug we're guarding against) and SIGKILL the subprocess.
 const EXIT_TIMEOUT_MS = 15000;
+
+// Windows has no POSIX signals: Node maps child.kill('SIGTERM'|'SIGINT'|'SIGHUP')
+// to TerminateProcess, which hard-kills the server without running its signal
+// handlers — so the graceful path (closeBrowser → taskkill /T) never executes,
+// the timing assertions would be meaningless, and the Chrome process tree would
+// leak. The stdin-EOF case is the cross-platform graceful shutdown and stays as
+// the Windows coverage; the signal cases run only where signals are real.
+const signalIt = IS_WINDOWS ? it.skip : it;
 
 async function spawnServer(): Promise<Server> {
   const child = spawn(
@@ -145,7 +164,7 @@ describe('shutdown', () => {
     );
   });
 
-  it('exits within budget on SIGTERM after Chrome launch', async () => {
+  signalIt('exits within budget on SIGTERM after Chrome launch', async () => {
     const child = await spawnServer();
     await initializeAndLaunchBrowser(child);
     child.kill('SIGTERM');
@@ -156,7 +175,7 @@ describe('shutdown', () => {
     );
   });
 
-  it('exits within budget on SIGINT after Chrome launch', async () => {
+  signalIt('exits within budget on SIGINT after Chrome launch', async () => {
     const child = await spawnServer();
     await initializeAndLaunchBrowser(child);
     child.kill('SIGINT');
@@ -167,7 +186,7 @@ describe('shutdown', () => {
     );
   });
 
-  it('exits within budget on SIGHUP after Chrome launch', async () => {
+  signalIt('exits within budget on SIGHUP after Chrome launch', async () => {
     const child = await spawnServer();
     await initializeAndLaunchBrowser(child);
     child.kill('SIGHUP');
