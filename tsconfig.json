@@ -8,7 +8,7 @@
       "ESNext.Iterator",
       "ESNext.Collection"
     ],
-    "types": ["node", "filesystem"],
+    "types": ["node"],
     "moduleResolution": "bundler",
     "outDir": "./build",
     "rootDir": ".",
@@ -74,7 +74,5 @@
     "node_modules/chrome-devtools-frontend/mcp"
   ],
   "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"],
-  "files": [
-    "node_modules/chrome-devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
-  ]
+  "files": []
 }
