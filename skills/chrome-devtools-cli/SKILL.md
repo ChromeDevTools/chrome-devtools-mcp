@@ -100,7 +100,6 @@ chrome-devtools get_network_request --responseFilePath res.md # Save response bo
 chrome-devtools list_network_requests # List all network requests
 chrome-devtools list_network_requests --pageSize 50 --pageIdx 0 # List network requests with pagination
 chrome-devtools list_network_requests --resourceTypes Fetch # Filter requests by resource type
-chrome-devtools list_network_requests --includePreservedRequests true # Include preserved requests
 ```
 
 ## Debugging & Inspection

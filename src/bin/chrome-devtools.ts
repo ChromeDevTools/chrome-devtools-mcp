@@ -264,4 +264,48 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
   );
 }
 
+y.fail((msg, err, yargs_instance) => {
+  const cmdLine = process.argv.join(' ');
+  
+  if (cmdLine.includes('evaluate_script') && cmdLine.includes('--expression')) {
+    console.error(
+      '\n ERROR: Invalid flag "--expression" used with evaluate_script\n\n' +
+      'ISSUE: "evaluate_script" does not accept a "--expression" flag.\n' +
+      'The JavaScript code must be passed as a POSITIONAL ARGUMENT (the first argument after the command).\n\n' +
+      'INCORRECT: chrome-devtools evaluate_script --expression "() => document.title"\n' +
+      'CORRECT:   chrome-devtools evaluate_script "() => document.title"\n\n' +
+      'SHELL ESCAPING TIPS:\n' +
+      '- Use double quotes: "() => { return 123; }"\n' +
+      '- For complex code with quotes, use single quotes: \'(el) => el.getAttribute("data-id")\'\n' +
+      '- Or escape inner quotes: "() => el.getAttribute(\\"data-id\\")"\n\n' +
+      'EXAMPLES:\n' +
+      '  Simple:   chrome-devtools evaluate_script "() => document.title"\n' +
+      '  Complex:  chrome-devtools evaluate_script "() => { const x = []; return x; }"\n' +
+      '  With uid: chrome-devtools evaluate_script "(el) => el.innerText" --args uid123\n',
+    );
+    process.exit(1);
+  }
+
+  if (
+    cmdLine.includes('evaluate_script') &&
+    (msg.includes('Not enough non-option arguments') ||
+      msg.includes('Missing required argument'))
+  ) {
+    console.error(
+      '\n ERROR: Missing JavaScript code argument\n\n' +
+      'The evaluate_script command requires a JavaScript function as the first argument.\n\n' +
+      'USAGE: chrome-devtools evaluate_script <function> [--args uid1 uid2] [--filePath path] [--dialogAction action]\n\n' +
+      'EXAMPLES:\n' +
+      '  No args:    chrome-devtools evaluate_script "() => document.title"\n' +
+      '  With args:  chrome-devtools evaluate_script "(a) => a.innerText" --args 1_4\n' +
+      '  Arrow func: chrome-devtools evaluate_script "() => { return fetch(\\"url\\").then(r => r.json()); }"\n',
+    );
+    process.exit(1);
+  }
+
+  console.error('\n' + (msg || err?.message || 'Unknown error'));
+  console.error('\nUse --help for usage information');
+  process.exit(1);
+});
+
 await y.parse();
