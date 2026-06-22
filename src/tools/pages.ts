@@ -96,7 +96,7 @@ export const closePage = defineTool({
   },
 });
 
-export const newPage = defineTool(args => {
+export const newPage = defineTool(() => {
   return {
     name: 'new_page',
     description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
@@ -130,9 +130,14 @@ export const newPage = defineTool(args => {
         request.params.isolatedContext,
       );
 
-      await page.pptrPage.goto(request.params.url, {
-        timeout: request.params.timeout,
-      });
+      await page.waitForEventsAfterAction(
+        async () => {
+          await page.pptrPage.goto(request.params.url, {
+            timeout: request.params.timeout,
+          });
+        },
+        {timeout: request.params.timeout},
+      );
 
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();
@@ -140,7 +145,7 @@ export const newPage = defineTool(args => {
   };
 });
 
-export const navigatePage = definePageTool(args => {
+export const navigatePage = definePageTool(() => {
   return {
     name: 'navigate_page',
     description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
@@ -172,7 +177,6 @@ export const navigatePage = definePageTool(args => {
         .describe(
           'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
         ),
-
       ...timeoutSchema,
     },
     blockedByDialog: false,
@@ -214,63 +218,70 @@ export const navigatePage = definePageTool(args => {
         initScriptId = identifier;
       }
 
-      page.pptrPage.on('dialog', dialogHandler);
-
       try {
-        switch (request.params.type) {
-          case 'url':
-            if (!request.params.url) {
-              throw new Error('A URL is required for navigation of type=url.');
+        await page.waitForEventsAfterAction(
+          async () => {
+            switch (request.params.type) {
+              case 'url':
+                if (!request.params.url) {
+                  throw new Error(
+                    'A URL is required for navigation of type=url.',
+                  );
+                }
+                try {
+                  await page.pptrPage.goto(request.params.url, options);
+                  response.appendResponseLine(
+                    `Successfully navigated to ${request.params.url}.`,
+                  );
+                } catch (error) {
+                  response.appendResponseLine(
+                    `Unable to navigate in the selected page: ${error.message}.`,
+                  );
+                }
+                break;
+              case 'back':
+                try {
+                  await page.pptrPage.goBack(options);
+                  response.appendResponseLine(
+                    `Successfully navigated back to ${page.pptrPage.url()}.`,
+                  );
+                } catch (error) {
+                  response.appendResponseLine(
+                    `Unable to navigate back in the selected page: ${error.message}.`,
+                  );
+                }
+                break;
+              case 'forward':
+                try {
+                  await page.pptrPage.goForward(options);
+                  response.appendResponseLine(
+                    `Successfully navigated forward to ${page.pptrPage.url()}.`,
+                  );
+                } catch (error) {
+                  response.appendResponseLine(
+                    `Unable to navigate forward in the selected page: ${error.message}.`,
+                  );
+                }
+                break;
+              case 'reload':
+                try {
+                  await page.pptrPage.reload({
+                    ...options,
+                    ignoreCache: request.params.ignoreCache,
+                  });
+                  response.appendResponseLine(
+                    `Successfully reloaded the page.`,
+                  );
+                } catch (error) {
+                  response.appendResponseLine(
+                    `Unable to reload the selected page: ${error.message}.`,
+                  );
+                }
+                break;
             }
-            try {
-              await page.pptrPage.goto(request.params.url, options);
-              response.appendResponseLine(
-                `Successfully navigated to ${request.params.url}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'back':
-            try {
-              await page.pptrPage.goBack(options);
-              response.appendResponseLine(
-                `Successfully navigated back to ${page.pptrPage.url()}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate back in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'forward':
-            try {
-              await page.pptrPage.goForward(options);
-              response.appendResponseLine(
-                `Successfully navigated forward to ${page.pptrPage.url()}.`,
-              );
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to navigate forward in the selected page: ${error.message}.`,
-              );
-            }
-            break;
-          case 'reload':
-            try {
-              await page.pptrPage.reload({
-                ...options,
-                ignoreCache: request.params.ignoreCache,
-              });
-              response.appendResponseLine(`Successfully reloaded the page.`);
-            } catch (error) {
-              response.appendResponseLine(
-                `Unable to reload the selected page: ${error.message}.`,
-              );
-            }
-            break;
-        }
+          },
+          {timeout: request.params.timeout},
+        );
       } finally {
         page.pptrPage.off('dialog', dialogHandler);
         if (initScriptId) {
