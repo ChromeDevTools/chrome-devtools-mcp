@@ -232,11 +232,13 @@
   },
   {
     "name": "experimental_navigation_allowlist",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_navigation_allowlist_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_page_id_routing",
