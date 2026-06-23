@@ -9,3 +9,14 @@ In general, it is the expectation that the AI agent or client using this MCP ser
 Several tools in this project have the ability to perform actions such as writing files to disk (e.g., via browser downloads or screenshots) or dynamically loading Chrome extensions. These are intentional, documented features and are not vulnerabilities.
 
 We appreciate feedback and suggestions from developers on how this tool can make it easier for them to build a more secure user experience, but will treat these exclusively as feature requests, and not vulnerabilities in chrome-devtools-mcp itself.
+
+### MCP roots
+
+`chrome-devtools-mcp` supports [MCP roots](https://modelcontextprotocol.io/specification/2025-06-18/client/roots). If the client specifies them, the MCP server will check the roots when accessing files.
+Note that the MCP server always retains access to the OS-provided tmp directory. We treat security issues in the MCP roots implementation as low-severity issues because it is an optional configuration. To have full
+filesystem sandboxing, we recommend using OS sandbox mechanisms.
+
+### Network guardrails
+
+Optional `--allowed-url-pattern` and `--blocked-url-pattern` arguments configure the browser to reject access to the identified URLs. Note that this is not a complete network sandbox and it only applies to Chrome DevTools targets while `chrome-devtools-mcp` is attached to them.
+To have a full network sandbox, we recommend using a separate OS/VM sandbox mechanism.
