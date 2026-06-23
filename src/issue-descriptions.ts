@@ -25,14 +25,18 @@ export async function loadIssueDescriptions(): Promise<void> {
   const files = await fs.promises.readdir(DESCRIPTIONS_PATH);
   const descriptions: Record<string, string> = {};
 
-  for (const file of files) {
-    if (!file.endsWith('.md')) {
-      continue;
-    }
-    const content = await fs.promises.readFile(
-      path.join(DESCRIPTIONS_PATH, file),
-      'utf-8',
-    );
+  const readPromises = files
+    .filter(file => file.endsWith('.md'))
+    .map(async file => {
+      const content = await fs.promises.readFile(
+        path.join(DESCRIPTIONS_PATH, file),
+        'utf-8',
+      );
+      return {file, content};
+    });
+
+  const results = await Promise.all(readPromises);
+  for (const {file, content} of results) {
     descriptions[file] = content;
   }
 
