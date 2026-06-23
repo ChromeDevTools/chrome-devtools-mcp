@@ -35,6 +35,7 @@ export async function loadIssueDescriptions(): Promise<void> {
       return {file, content};
     });
 
+  // Execute all file read operations concurrently to improve performance
   const results = await Promise.all(readPromises);
   for (const {file, content} of results) {
     descriptions[file] = content;
