@@ -99,6 +99,30 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
+/**
+ * Control and bidirectional-formatting characters that must not survive into a
+ * tool response read by the model. Covers C0/C1 control characters (the common
+ * whitespace among them is normalized separately) and Unicode bidi overrides,
+ * any of which could reorder or obfuscate text in the model's context.
+ */
+const UNSAFE_PAGE_STRING_CHARS =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+/**
+ * Neutralizes a string that originates from page-controlled JavaScript before
+ * it is interpolated into a response that the model reads. Page content must
+ * not be able to inject fake sections via newlines or reorder/obfuscate text
+ * via control and bidirectional characters. Runs on the Node side, after the
+ * values have crossed the Puppeteer boundary, since in-page code is untrusted.
+ */
+function sanitizePageString(value: string): string {
+  return value
+    .replace(UNSAFE_PAGE_STRING_CHARS, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function getToolGroups(page: McpPage): Promise<ToolGroups> {
   // Check if there is a `devtoolstooldiscovery` event listener
   const windowHandle = await page.pptrPage.evaluateHandle(() => window);
@@ -190,7 +214,13 @@ async function getToolGroups(page: McpPage): Promise<ToolGroups> {
   });
 
   for (const group of toolGroups) {
+    group.name = sanitizePageString(group.name);
+    if (group.description) {
+      group.description = sanitizePageString(group.description);
+    }
     for (const tool of group.tools ?? []) {
+      tool.name = sanitizePageString(tool.name);
+      tool.description = sanitizePageString(tool.description);
       replaceHtmlElementsWithUids(tool.inputSchema);
     }
   }
