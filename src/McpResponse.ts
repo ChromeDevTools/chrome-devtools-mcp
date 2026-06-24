@@ -213,6 +213,7 @@ export class McpResponse implements Response {
   #attachedLighthouseResult?: LighthouseData;
   #textResponseLines: string[] = [];
   #images: ImageContentData[] = [];
+  #screencastFirstFrameTimestamp: number | undefined;
   #heapSnapshotOptions?: {
     include: boolean;
     aggregates?: Record<
@@ -436,6 +437,10 @@ export class McpResponse implements Response {
 
   appendResponseLine(value: string): void {
     this.#textResponseLines.push(value);
+  }
+
+  setScreencastFirstFrameTimestamp(timestamp: number): void {
+    this.#screencastFirstFrameTimestamp = timestamp;
   }
 
   attachWaitForResult(result: WaitForEventsResult): void {
@@ -811,6 +816,7 @@ export class McpResponse implements Response {
       thirdPartyDeveloperTools?: object[];
       webmcpTools?: object[];
       message?: string;
+      firstFrameTimestamp?: number;
       networkConditions?: string;
       navigationTimeout?: number;
       viewport?: object;
@@ -843,6 +849,11 @@ export class McpResponse implements Response {
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);
+    }
+
+    if (this.#screencastFirstFrameTimestamp !== undefined) {
+      structuredContent.firstFrameTimestamp =
+        this.#screencastFirstFrameTimestamp;
     }
 
     if (this.#attachedWaitForResult) {

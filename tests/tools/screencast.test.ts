@@ -12,8 +12,17 @@ import {describe, it, afterEach} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {CDPEvents} from '../../src/third_party/index.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {withMcpContext} from '../utils.js';
+
+interface ScreencastTestPage {
+  mainFrame(): {
+    client: {
+      emit(type: 'Page.screencastFrame', event: CDPEvents['Page.screencastFrame']): boolean;
+    };
+  };
+}
 
 function createMockRecorder() {
   return {
@@ -31,9 +40,25 @@ describe('screencast', () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();
         const selectedPage = context.getSelectedPptrPage();
+        const {client} = (selectedPage as unknown as ScreencastTestPage).mainFrame();
         const screencastStub = sinon
           .stub(selectedPage, 'screencast')
-          .resolves(mockRecorder as never);
+          .callsFake(async () => {
+            client.emit('Page.screencastFrame', {
+              data: '',
+              metadata: {
+                timestamp: 123.456,
+                offsetTop: 0,
+                pageScaleFactor: 1,
+                deviceWidth: 800,
+                deviceHeight: 600,
+                scrollOffsetX: 0,
+                scrollOffsetY: 0,
+              },
+              sessionId: 1,
+            });
+            return mockRecorder as never;
+          });
 
         await startScreencast().handler(
           {
@@ -54,6 +79,17 @@ describe('screencast', () => {
           response.responseLines
             .join('\n')
             .includes('Screencast recording started'),
+        );
+        assert.ok(
+          response.responseLines
+            .join('\n')
+            .includes('First frame timestamp: 123.456'),
+        );
+        const result = await response.handle('screencast_start', context);
+        assert.ok('firstFrameTimestamp' in result.structuredContent);
+        assert.strictEqual(
+          result.structuredContent.firstFrameTimestamp,
+          123.456,
         );
       });
     });

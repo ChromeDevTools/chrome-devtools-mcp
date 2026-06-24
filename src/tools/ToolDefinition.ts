@@ -101,6 +101,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  setScreencastFirstFrameTimestamp(timestamp: number): void;
   setHeapSnapshotAggregates(
     aggregates: Record<
       string,

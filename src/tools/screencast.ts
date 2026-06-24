@@ -9,7 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {zod} from '../third_party/index.js';
-import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
+import type {
+  CDPEvents,
+  ScreenRecorder,
+  VideoFormat,
+} from '../third_party/index.js';
 import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
@@ -21,6 +25,24 @@ async function generateTempFilePath(): Promise<string> {
 }
 
 const supportedExtensions: Array<`.${string}`> = ['.webm', '.mp4'];
+
+type ScreencastFrameHandler = (
+  event: CDPEvents['Page.screencastFrame'],
+) => void;
+
+interface ScreencastClient {
+  once(type: 'Page.screencastFrame', handler: ScreencastFrameHandler): void;
+  off(type: 'Page.screencastFrame', handler: ScreencastFrameHandler): void;
+}
+
+interface ScreencastPage {
+  mainFrame(): {client: ScreencastClient};
+  screencast(options: {
+    path: `${string}.webm`;
+    format: VideoFormat;
+    ffmpegPath?: string;
+  }): Promise<ScreenRecorder>;
+}
 
 export const startScreencast = definePageTool(args => ({
   name: 'screencast_start',
@@ -78,15 +100,25 @@ export const startScreencast = definePageTool(args => ({
     ) as `${string}.webm`;
 
     const page = request.page;
+    const pptrPage = page.pptrPage as unknown as ScreencastPage;
+    const client = pptrPage.mainFrame().client;
+    let firstFrameTimestamp: number | undefined;
+    const onFirstScreencastFrame = (
+      event: CDPEvents['Page.screencastFrame'],
+    ) => {
+      firstFrameTimestamp = event.metadata.timestamp;
+    };
+    client.once('Page.screencastFrame', onFirstScreencastFrame);
 
     let recorder: ScreenRecorder;
     try {
-      recorder = await page.pptrPage.screencast({
+      recorder = await pptrPage.screencast({
         path: resolvedPath,
         format: format,
         ffmpegPath: args?.experimentalFfmpegPath,
       });
     } catch (err) {
+      client.off('Page.screencastFrame', onFirstScreencastFrame);
       // If we generated a temporary directory for this recording, remove it so
       // a failed start (e.g. ffmpeg missing) does not leak an empty directory.
       if (requestedFilePath === undefined) {
@@ -108,12 +140,19 @@ export const startScreencast = definePageTool(args => ({
       }
       throw err;
     }
+    client.off('Page.screencastFrame', onFirstScreencastFrame);
 
     context.setScreenRecorder({recorder, filePath: resolvedPath});
 
     response.appendResponseLine(
       `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast.name} to stop recording.`,
     );
+    if (firstFrameTimestamp !== undefined) {
+      response.setScreencastFirstFrameTimestamp(firstFrameTimestamp);
+      response.appendResponseLine(
+        `First frame timestamp: ${firstFrameTimestamp}`,
+      );
+    }
   },
 }));
 
