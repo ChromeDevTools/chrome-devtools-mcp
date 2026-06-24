@@ -64,8 +64,10 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
-  // Whether allowlist/blocklist is configured.
-  hasNetworkBlockOrAllowlist?: boolean;
+  // The allow list of URL patterns to allow loading resources.
+  allowList?: string[];
+  // The block list of URL patterns to block loading resources.
+  blocklist?: string[];
 }
 
 const DEFAULT_TIMEOUT = 5_000;
@@ -347,6 +349,10 @@ export class McpContext implements Context {
     await this.emulate(currentSetting, page.pptrPage);
   }
 
+  get #hasNetworkBlockOrAllowlist(): boolean {
+    return !!(this.#options.allowList || this.#options.blocklist);
+  }
+
   async emulate(
     options: {
       networkConditions?: string;
@@ -364,7 +370,7 @@ export class McpContext implements Context {
     const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
 
     // Skip network emulation if blocklist/allowlist is configured, as it conflicts with blocking rules in Puppeteer.
-    if (this.#options.hasNetworkBlockOrAllowlist) {
+    if (this.#hasNetworkBlockOrAllowlist) {
       if (options.networkConditions !== undefined) {
         throw new Error(
           'Network throttling is not supported when network blocking (allowlist/blocklist) is configured.',
@@ -952,13 +958,41 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getDominatorsOf(filePath, nodeId);
   }
 
+  #isUrlBlocked(url: URL): void {
+    if (!this.#options.blocklist) {
+      return;
+    }
+    for (const block of this.#options.blocklist) {
+      const pattern = new URLPattern(block);
+      if (pattern.test(url)) {
+        throw new Error(`Blocked by blocklist: ${url}`);
+      }
+    }
+  }
+
+  #isUrlAllowed(url: URL): void {
+    if (!this.#options.allowList) {
+      return;
+    }
+    for (const allow of this.#options.allowList) {
+      const pattern = new URLPattern(allow);
+      if (pattern.test(url)) {
+        return;
+      }
+    }
+    throw new Error(`Not allowed by allowlist: ${url}`);
+  }
+
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
+
+    this.#isUrlBlocked(url);
 
     switch (url.protocol) {
       case 'https:':
       case 'http:': {
-        // TODO: Verify allow/block list
+        this.#isUrlAllowed(url);
+
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${url}`);
