@@ -25,7 +25,6 @@ export async function loadIssueDescriptions(): Promise<void> {
   const files = await fs.promises.readdir(DESCRIPTIONS_PATH);
   const descriptions: Record<string, string> = {};
 
-  // Execute all file read operations concurrently to improve performance
   const results = await Promise.all(
     files
       .filter(file => file.endsWith('.md'))
