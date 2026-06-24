@@ -345,8 +345,7 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable. Do not navigate the page inside this script; use `navigate_page` or `new_page` to change URLs because page navigations destroy the execution context.
 
 **Parameters:**
 

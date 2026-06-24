@@ -41,8 +41,14 @@ describe('script', () => {
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
       });
-    });
-    it('runs in selected page', async () => {
+    });    it('includes a navigation warning in the tool description', () => {
+      const tool = evaluateScript();
+      assert.ok(
+        tool.description.includes('navigate_page') ||
+          tool.description.includes('new_page'),
+        `Expected evaluate_script description to mention navigate_page or new_page.`,
+      );
+    });    it('runs in selected page', async () => {
       await withMcpContext(async (response, context) => {
         await evaluateScript().handler(
           {

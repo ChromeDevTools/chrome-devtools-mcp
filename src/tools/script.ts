@@ -17,8 +17,7 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable. Do not navigate the page inside this script; use the navigate_page or new_page tool to change URLs because page navigations destroy the execution context.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,

@@ -191,7 +191,7 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable. Do not navigate the page inside this script; use navigate_page or new_page to change URLs because page navigations destroy the execution context.',
     category: 'Debugging',
     args: {
       function: {
