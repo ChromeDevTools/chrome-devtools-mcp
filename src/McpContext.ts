@@ -958,7 +958,7 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getDominatorsOf(filePath, nodeId);
   }
 
-  #isUrlBlocked(url: URL): void {
+  #validateUrlNotBlocked(url: URL): void {
     if (!this.#options.blocklist) {
       return;
     }
@@ -970,7 +970,7 @@ export class McpContext implements Context {
     }
   }
 
-  #isUrlAllowed(url: URL): void {
+  #validateUrlAllowed(url: URL): void {
     if (!this.#options.allowList) {
       return;
     }
@@ -986,12 +986,12 @@ export class McpContext implements Context {
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
 
-    this.#isUrlBlocked(url);
+    this.#validateUrlNotBlocked(url);
 
     switch (url.protocol) {
       case 'https:':
       case 'http:': {
-        this.#isUrlAllowed(url);
+        this.#validateUrlAllowed(url);
 
         const response = await fetch(url);
         if (!response.ok) {
