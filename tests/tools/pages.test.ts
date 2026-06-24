@@ -99,7 +99,7 @@ describe('pages', () => {
         {},
         {
           categoryExtensions: true,
-        } as ParsedArguments,
+        },
       );
     });
 
@@ -152,7 +152,7 @@ describe('pages', () => {
           {},
           {
             categoryExtensions,
-          } as ParsedArguments,
+          },
         );
       });
     }
@@ -202,7 +202,7 @@ describe('pages', () => {
         {},
         {
           categoryExtensions: true,
-        } as ParsedArguments,
+        },
       );
     });
 

@@ -82,7 +82,7 @@ describe('thirdPartyDeveloperTools', () => {
           });
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -119,7 +119,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -155,7 +155,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -185,7 +185,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -247,7 +247,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.strictEqual(actualGroups[1].name, 'group-2');
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -301,7 +301,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.strictEqual(groupsLength, 1);
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
   });
@@ -368,7 +368,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -451,7 +451,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -494,7 +494,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -633,7 +633,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -680,7 +680,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -733,7 +733,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -792,7 +792,7 @@ describe('thirdPartyDeveloperTools', () => {
           stub.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -860,7 +860,7 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -920,7 +920,7 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
   });

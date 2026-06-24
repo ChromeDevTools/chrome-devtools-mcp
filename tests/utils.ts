@@ -122,11 +122,11 @@ export async function withMcpContext(
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
   } = {},
-  args: ParsedArguments = {} as ParsedArguments,
+  args: Partial<ParsedArguments> = {},
 ) {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
-    const response = new McpResponse(args);
+    const response = new McpResponse(args as ParsedArguments);
     if (context) {
       context.dispose();
     }
