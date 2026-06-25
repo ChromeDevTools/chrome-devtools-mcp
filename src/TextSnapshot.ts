@@ -306,12 +306,20 @@ export class TextSnapshot {
       descendantIds: Set<number>;
     }> = [];
 
-    const handlePromises = page.extraHandles.map(async handle => {
+    const extraNodes: (TextSnapshotNode | null)[] = [];
+    for (const handle of page.extraHandles) {
       const extraNode = await createExtraNode(handle);
+      extraNodes.push(extraNode);
+      if (extraNode) {
+        idToNode.set(extraNode.id, extraNode);
+      }
+    }
+
+    const handlePromises = page.extraHandles.map(async (handle, index) => {
+      const extraNode = extraNodes[index];
       if (!extraNode) {
         return null;
       }
-      idToNode.set(extraNode.id, extraNode);
       const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
       const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
       return {extraNode, attachTarget, descendantIds};
