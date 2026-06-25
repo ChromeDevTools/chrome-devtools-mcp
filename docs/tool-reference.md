@@ -161,7 +161,7 @@
 
 **Parameters:**
 
-- **filePath** (string) **(required)**: The local path of the file to upload
+- **filePath** (string or array) **(required)**: The local path of the file to upload, or an array of paths to upload several files at once to an input that accepts multiple files
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 

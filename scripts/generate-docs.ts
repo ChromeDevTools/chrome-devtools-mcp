@@ -272,6 +272,11 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
         result.items = getZodTypeInfo(def.type);
       }
       break;
+    case 'ZodUnion':
+      result.type = (def.options as ZodSchema[])
+        .map(option => getZodTypeInfo(option).type)
+        .join(' or ');
+      break;
     default:
       result.type = 'unknown';
   }

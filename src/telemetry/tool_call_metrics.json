@@ -543,11 +543,16 @@
     "args": [
       {
         "name": "file_path_length",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "include_snapshot",
         "argType": "boolean"
+      },
+      {
+        "name": "file_path_count",
+        "argType": "number"
       }
     ]
   },

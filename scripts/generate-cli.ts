@@ -78,6 +78,7 @@ interface JsonSchema {
   required?: string[];
   default?: unknown;
   enum?: unknown[];
+  anyOf?: JsonSchema[];
 }
 
 function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
@@ -89,14 +90,22 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
   return Object.entries(properties).map(([name, prop]) => {
     const isRequired = required.includes(name);
     const description = prop.description || '';
-    if (typeof prop.type !== 'string') {
+    // Accept `string | string[]` unions as scalar string args: the CLI cannot
+    // pass arrays, so it exposes the single-value form of the parameter.
+    const type =
+      typeof prop.type === 'string'
+        ? prop.type
+        : prop.anyOf?.some(member => member.type === 'string')
+          ? 'string'
+          : undefined;
+    if (type === undefined) {
       throw new Error(
         `Property ${name} has a complex type not supported by CLI.`,
       );
     }
     return {
       name,
-      type: prop.type,
+      type,
       description,
       required: isRequired,
       default: prop.default,
