@@ -107,6 +107,19 @@ describe('sanitizeParams', () => {
     assert.strictEqual(sanitized.str10001_length, 10000); // snaps to 10000
   });
 
+  it('counts `string | string[]` unions, normalizing scalars to one', () => {
+    const schema = {
+      paths: zod.union([zod.string(), zod.array(zod.string())]),
+    };
+
+    assert.deepStrictEqual(sanitizeParams({paths: ['a', 'b', 'c']}, schema), {
+      paths_count: 3,
+    });
+    assert.deepStrictEqual(sanitizeParams({paths: 'only'}, schema), {
+      paths_count: 1,
+    });
+  });
+
   it('throws error for unsupported types', () => {
     const schema = {
       myObj: zod.object({foo: zod.string()}),

@@ -1209,6 +1209,52 @@ describe('input', () => {
       await fs.unlink(testFilePath);
     });
 
+    it('uploads multiple files to a file input', async () => {
+      const firstFilePath = path.join(process.cwd(), 'first.txt');
+      const secondFilePath = path.join(process.cwd(), 'second.txt');
+      await fs.writeFile(firstFilePath, 'first file content');
+      await fs.writeFile(secondFilePath, 'second file content');
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<form>
+            <input
+              type="file"
+              id="file-input"
+              multiple
+            />
+          </form>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await uploadFile.handler(
+          {
+            params: {
+              uid: '1_2',
+              filePath: [firstFilePath, secondFilePath],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          `File uploaded from ${firstFilePath}, ${secondFilePath}.`,
+        );
+        const uploadedFileNames = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return Array.from(input.files ?? []).map(file => file.name);
+        });
+        assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
+      });
+
+      await fs.unlink(firstFilePath);
+      await fs.unlink(secondFilePath);
+    });
+
     it('uploads a file when clicking an element opens a file uploader', async () => {
       const testFilePath = path.join(process.cwd(), 'test.txt');
       await fs.writeFile(testFilePath, 'test file content');
