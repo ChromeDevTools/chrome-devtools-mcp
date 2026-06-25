@@ -57,7 +57,10 @@ export {
   Browser as BrowserEnum,
   type ChromeReleaseChannel as BrowsersChromeReleaseChannel,
 } from '@puppeteer/browsers';
-export {encode as toonEncode} from '@toon-format/toon';
+export async function getToonEncode(): Promise<(val: unknown) => string> {
+  const {encode} = await import('@toon-format/toon');
+  return encode;
+}
 
 import {
   snapshot as snapshotImpl,

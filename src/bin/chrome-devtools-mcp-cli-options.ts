@@ -173,7 +173,7 @@ export const cliOptions = {
   experimentalToonFormat: {
     type: 'boolean',
     describe:
-      'Whether to format structured data in text response using Token-Oriented Object Notation. Defaults to false which represents the embedded content as formatted JSON instead.',
+      'Whether to format structured data in text response using Token-Oriented Object Notation (requires @toon-format/toon). If running via npx, use: npx --package chrome-devtools-mcp@latest --package @toon-format/toon chrome-devtools-mcp --experimentalToonFormat',
     hidden: true,
   },
   experimentalIncludeAllPages: {

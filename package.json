@@ -84,6 +84,14 @@
     "urlpattern-polyfill": "^10.1.0",
     "yargs": "18.0.0"
   },
+  "peerDependencies": {
+    "@toon-format/toon": "^2.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@toon-format/toon": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"
   },

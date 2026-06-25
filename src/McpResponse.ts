@@ -17,7 +17,7 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, toonEncode, type Protocol} from './third_party/index.js';
+import {DevTools, getToonEncode, type Protocol} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -839,6 +839,20 @@ export class McpResponse implements Response {
       geolocation?: {latitude: number; longitude: number};
     } = {};
 
+    let toonEncode: ((val: unknown) => string) | undefined;
+    if (useToon) {
+      try {
+        toonEncode = await getToonEncode();
+      } catch {
+        throw new Error(
+          'The `@toon-format/toon` package is required to use the experimental TOON format. ' +
+            'Make sure the peer dependency is installed:\n' +
+            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon chrome-devtools-mcp --experimentalToonFormat\n' +
+            '- For npm: npm install @toon-format/toon (add -g if installed globally)',
+        );
+      }
+    }
+
     const response = [];
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
@@ -1057,7 +1071,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.snapshot = data.snapshot.toJSON();
         response.push('## Latest page snapshot');
         response.push(
-          useToon
+          useToon && toonEncode
             ? toonEncode(structuredContent.snapshot)
             : data.snapshot.toString(),
         );
@@ -1095,7 +1109,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         structuredContent.heapSnapshotData = formatter.toJSON();
         response.push(
-          useToon
+          useToon && toonEncode
             ? toonEncode(structuredContent.heapSnapshotData)
             : formatter.toString(),
         );
@@ -1244,7 +1258,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
             i.toJSON(),
           );
           response.push(
-            ...(useToon
+            ...(useToon && toonEncode
               ? [toonEncode(structuredContent.networkRequests)]
               : paginationData.items.map(i => i.toString())),
           );
@@ -1269,7 +1283,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
           item.toJSON(),
         );
         response.push(...paginationData.info);
-        if (useToon) {
+        if (useToon && toonEncode) {
           response.push(toonEncode(structuredContent.consoleMessages));
         } else {
           response.push(...paginationData.items.map(item => item.toString()));
