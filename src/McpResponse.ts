@@ -847,7 +847,7 @@ export class McpResponse implements Response {
         throw new Error(
           'The `@toon-format/toon` package is required to use the experimental TOON format. ' +
             'Make sure the peer dependency is installed:\n' +
-            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon chrome-devtools-mcp --experimentalToonFormat\n' +
+            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalToonFormat\n' +
             '- For npm: npm install @toon-format/toon (add -g if installed globally)',
         );
       }
