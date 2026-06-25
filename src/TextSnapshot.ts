@@ -306,7 +306,7 @@ export class TextSnapshot {
       descendantIds: Set<number>;
     }> = [];
 
-    const extraNodes: (TextSnapshotNode | null)[] = [];
+    const extraNodes: Array<TextSnapshotNode | null> = [];
     for (const handle of page.extraHandles) {
       const extraNode = await createExtraNode(handle);
       extraNodes.push(extraNode);
