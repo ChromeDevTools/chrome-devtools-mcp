@@ -11,9 +11,9 @@ _Note: If this is your very first time using the CLI, see [references/installati
 
 ## AI Workflow
 
-1. **Execute**: Run tools directly (e.g., `chrome-devtools list_pages`). The background server starts implicitly; **do not** run `start`/`status`/`stop` before each use.
-2. **Inspect**: Use `take_snapshot` to get an element `<uid>`.
-3. **Act**: Use `click`, `fill`, etc. State persists across commands.
+1. **Execute**: Run tools directly. If you don't know the target page's ID, run `chrome-devtools list_pages` to find it. The background server starts implicitly; **do not** run `start`/`status`/`stop` before each use.
+2. **Inspect**: Use `chrome-devtools take_snapshot <pageId>` to get an element `<uid>`.
+3. **Act**: Use `chrome-devtools click <pageId> <uid>`, `chrome-devtools fill <pageId> <uid> <value>`, etc. State persists across commands.
 
 Snapshot example:
 
@@ -34,23 +34,23 @@ Use `--help` on any command. Output defaults to Markdown, use `--output-format=j
 
 ```bash
 chrome-devtools take_snapshot --help # Help message for commands, works for any command.
-chrome-devtools take_snapshot # Take a text snapshot of the page to get UIDs for elements
-chrome-devtools click "id" # Clicks on the provided element
-chrome-devtools click "id" --dblClick true --includeSnapshot true # Double clicks and returns a snapshot
-chrome-devtools drag "src" "dst" # Drag an element onto another element
-chrome-devtools drag "src" "dst" --includeSnapshot true # Drag an element and return a snapshot
-chrome-devtools fill "id" "text" # Type text into an input or select an option
-chrome-devtools fill "id" "text" --includeSnapshot true # Fill an element and return a snapshot
-chrome-devtools handle_dialog accept # Handle a browser dialog
-chrome-devtools handle_dialog dismiss --promptText "hi" # Dismiss a dialog with prompt text
-chrome-devtools hover "id" # Hover over the provided element
-chrome-devtools hover "id" --includeSnapshot true # Hover over an element and return a snapshot
-chrome-devtools press_key "Enter" # Press a key or key combination
-chrome-devtools press_key "Control+A" --includeSnapshot true # Press a key and return a snapshot
-chrome-devtools type_text "hello" # Type text using keyboard into a focused input
-chrome-devtools type_text "hello" --submitKey "Enter" # Type text and press a submit key
-chrome-devtools upload_file "id" "file.txt" # Upload a file through a provided element
-chrome-devtools upload_file "id" "file.txt" --includeSnapshot true # Upload a file and return a snapshot
+chrome-devtools take_snapshot 1 # Take a text snapshot of the page to get UIDs for elements
+chrome-devtools click 1 "id" # Clicks on the provided element
+chrome-devtools click 1 "id" --dblClick true --includeSnapshot true # Double clicks and returns a snapshot
+chrome-devtools drag 1 "src" "dst" # Drag an element onto another element
+chrome-devtools drag 1 "src" "dst" --includeSnapshot true # Drag an element and return a snapshot
+chrome-devtools fill 1 "id" "text" # Type text into an input or select an option
+chrome-devtools fill 1 "id" "text" --includeSnapshot true # Fill an element and return a snapshot
+chrome-devtools handle_dialog 1 accept # Handle a browser dialog
+chrome-devtools handle_dialog 1 dismiss --promptText "hi" # Dismiss a dialog with prompt text
+chrome-devtools hover 1 "id" # Hover over the provided element
+chrome-devtools hover 1 "id" --includeSnapshot true # Hover over an element and return a snapshot
+chrome-devtools press_key 1 "Enter" # Press a key or key combination
+chrome-devtools press_key 1 "Control+A" --includeSnapshot true # Press a key and return a snapshot
+chrome-devtools type_text 1 "hello" # Type text using keyboard into a focused input
+chrome-devtools type_text 1 "hello" --submitKey "Enter" # Type text and press a submit key
+chrome-devtools upload_file 1 "id" "file.txt" # Upload a file through a provided element
+chrome-devtools upload_file 1 "id" "file.txt" --includeSnapshot true # Upload a file and return a snapshot
 ```
 
 ## Navigation
@@ -58,11 +58,11 @@ chrome-devtools upload_file "id" "file.txt" --includeSnapshot true # Upload a fi
 ```bash
 chrome-devtools close_page 1 # Closes the page by its index
 chrome-devtools list_pages # Get a list of pages open in the browser
-chrome-devtools navigate_page --url "https://example.com" # Navigates the currently selected page to a URL
-chrome-devtools navigate_page --type "reload" --ignoreCache true # Reload page ignoring cache
-chrome-devtools navigate_page --url "https://example.com" --timeout 5000 # Navigate with a timeout
-chrome-devtools navigate_page --handleBeforeUnload "accept" # Handle before unload dialog
-chrome-devtools navigate_page --type "back" --initScript "foo()" # Navigate back and run an init script
+chrome-devtools navigate_page 1 --url "https://example.com" # Navigates the currently selected page to a URL
+chrome-devtools navigate_page 1 --type "reload" --ignoreCache true # Reload page ignoring cache
+chrome-devtools navigate_page 1 --url "https://example.com" --timeout 5000 # Navigate with a timeout
+chrome-devtools navigate_page 1 --handleBeforeUnload "accept" # Handle before unload dialog
+chrome-devtools navigate_page 1 --type "back" --initScript "foo()" # Navigate back and run an init script
 chrome-devtools new_page "https://example.com" # Creates a new page
 chrome-devtools new_page "https://example.com" --background true --timeout 5000 # Create new page in background
 chrome-devtools new_page "https://example.com" --isolatedContext "ctx" # Create new page with isolated context
@@ -73,54 +73,54 @@ chrome-devtools select_page 1 --bringToFront true # Select a page and bring it t
 ## Emulation
 
 ```bash
-chrome-devtools emulate --networkConditions "Offline" # Emulate network conditions
-chrome-devtools emulate --cpuThrottlingRate 4 --geolocation "0x0" # Emulate CPU throttling and geolocation
-chrome-devtools emulate --colorScheme "dark" --viewport "1920x1080" # Emulate color scheme and viewport
-chrome-devtools emulate --userAgent "Mozilla/5.0..." # Emulate user agent
-chrome-devtools resize_page 1920 1080 # Resizes the selected page's window
+chrome-devtools emulate 1 --networkConditions "Offline" # Emulate network conditions
+chrome-devtools emulate 1 --cpuThrottlingRate 4 --geolocation "0x0" # Emulate CPU throttling and geolocation
+chrome-devtools emulate 1 --colorScheme "dark" --viewport "1920x1080" # Emulate color scheme and viewport
+chrome-devtools emulate 1 --userAgent "Mozilla/5.0..." # Emulate user agent
+chrome-devtools resize_page 1 1920 1080 # Resizes the selected page's window
 ```
 
 ## Performance
 
 ```bash
-chrome-devtools performance_analyze_insight "1" "LCPBreakdown" # Get more details on a specific Performance Insight
-chrome-devtools performance_start_trace true false # Starts a performance trace recording
-chrome-devtools performance_start_trace true true --filePath t.gz # Start trace and save to a file
-chrome-devtools performance_stop_trace # Stops the active performance trace
-chrome-devtools performance_stop_trace --filePath "t.json" # Stop trace and save to a file
-chrome-devtools take_memory_snapshot "./snap.heapsnapshot" # Capture a memory heapsnapshot
+chrome-devtools performance_analyze_insight 1 "1" "LCPBreakdown" # Get more details on a specific Performance Insight
+chrome-devtools performance_start_trace 1 --reload true --autoStop false # Starts a performance trace recording
+chrome-devtools performance_start_trace 1 --reload true --autoStop true --filePath t.gz # Start trace and save to a file
+chrome-devtools performance_stop_trace 1 # Stops the active performance trace
+chrome-devtools performance_stop_trace 1 --filePath "t.json" # Stop trace and save to a file
+chrome-devtools take_heapsnapshot 1 "./snap.heapsnapshot" # Capture a memory heapsnapshot
 ```
 
 ## Network
 
 ```bash
-chrome-devtools get_network_request # Get the currently selected network request
-chrome-devtools get_network_request --reqid 1 --requestFilePath req.md # Get request by id and save to file
-chrome-devtools get_network_request --responseFilePath res.md # Save response body to file
-chrome-devtools list_network_requests # List all network requests
-chrome-devtools list_network_requests --pageSize 50 --pageIdx 0 # List network requests with pagination
-chrome-devtools list_network_requests --resourceTypes Fetch # Filter requests by resource type
-chrome-devtools list_network_requests --includePreservedRequests true # Include preserved requests
+chrome-devtools get_network_request 1 # Get the currently selected network request
+chrome-devtools get_network_request 1 --reqid 1 --requestFilePath req.md # Get request by id and save to file
+chrome-devtools get_network_request 1 --responseFilePath res.md # Save response body to file
+chrome-devtools list_network_requests 1 # List all network requests
+chrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination
+chrome-devtools list_network_requests 1 --resourceTypes Fetch # Filter requests by resource type
+chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
 ```
 
 ## Debugging & Inspection
 
 ```bash
-chrome-devtools evaluate_script "() => document.title" # Evaluate a JavaScript function on the page
-chrome-devtools evaluate_script "(a) => a.innerText" --args 1_4 # Evaluate JS with UID arguments
-chrome-devtools get_console_message 1 # Gets a console message by its ID
-chrome-devtools lighthouse_audit --mode "navigation" # Run Lighthouse audit for navigation
-chrome-devtools lighthouse_audit --mode "snapshot" --device "mobile" # Run Lighthouse audit for a snapshot on mobile
-chrome-devtools lighthouse_audit --outputDirPath ./out # Run Lighthouse audit and save reports
-chrome-devtools list_console_messages # List all console messages
-chrome-devtools list_console_messages --pageSize 20 --pageIdx 1 # List console messages with pagination
-chrome-devtools list_console_messages --types error --types info # Filter console messages by type
-chrome-devtools list_console_messages --includePreservedMessages true # Include preserved messages
-chrome-devtools take_screenshot # Take a screenshot of the page viewport
-chrome-devtools take_screenshot --fullPage true --format "jpeg" --quality 80 # Take a full page screenshot as JPEG with quality
-chrome-devtools take_screenshot --uid "id" --filePath "s.png" # Take a screenshot of an element
-chrome-devtools take_snapshot # Take a text snapshot of the page from the a11y tree
-chrome-devtools take_snapshot --verbose true --filePath "s.txt" # Take a verbose snapshot and save to file
+chrome-devtools evaluate_script 1 "() => document.title" # Evaluate a JavaScript function on the page
+chrome-devtools evaluate_script 1 "(a) => a.innerText" --args 1_4 # Evaluate JS with UID arguments
+chrome-devtools get_console_message 1 1 # Gets a console message by its ID
+chrome-devtools lighthouse_audit 1 --mode "navigation" # Run Lighthouse audit for navigation
+chrome-devtools lighthouse_audit 1 --mode "snapshot" --device "mobile" # Run Lighthouse audit for a snapshot on mobile
+chrome-devtools lighthouse_audit 1 --outputDirPath ./out # Run Lighthouse audit and save reports
+chrome-devtools list_console_messages 1 # List all console messages
+chrome-devtools list_console_messages 1 --pageSize 20 --pageIdx 1 # List console messages with pagination
+chrome-devtools list_console_messages 1 --types error --types info # Filter console messages by type
+chrome-devtools list_console_messages 1 --includePreservedMessages true # Include preserved messages
+chrome-devtools take_screenshot 1 # Take a screenshot of the page viewport
+chrome-devtools take_screenshot 1 --fullPage true --format "jpeg" --quality 80 # Take a full page screenshot as JPEG with quality
+chrome-devtools take_screenshot 1 --uid "id" --filePath "s.png" # Take a screenshot of an element
+chrome-devtools take_snapshot 1 # Take a text snapshot of the page from the a11y tree
+chrome-devtools take_snapshot 1 --verbose true --filePath "s.txt" # Take a verbose snapshot and save to file
 ```
 
 ## Extensions
@@ -138,10 +138,10 @@ chrome-devtools trigger_extension_action "extension_id" # Triggers the default a
 Experimental tools are disabled by default. Enable them with the corresponding flag during `start`.
 
 ```bash
-chrome-devtools click_at 100 200 # Clicks at the provided coordinates (requires --experimentalVision=true)
-chrome-devtools screencast_start # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
-chrome-devtools screencast_stop # Stops the active screencast
-chrome-devtools list_webmcp_tools # List all WebMCP tools (requires --categoryExperimentalWebmcp=true)
+chrome-devtools click_at 1 100 200 # Clicks at the provided coordinates (requires --experimentalVision=true)
+chrome-devtools screencast_start 1 # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
+chrome-devtools screencast_stop 1 # Stops the active screencast
+chrome-devtools list_webmcp_tools 1 # List all WebMCP tools (requires --categoryExperimentalWebmcp=true)
 ```
 
 ## Service Management
