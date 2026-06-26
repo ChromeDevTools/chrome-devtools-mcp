@@ -85,10 +85,14 @@
     "yargs": "18.0.0"
   },
   "peerDependencies": {
-    "@toon-format/toon": "^2.2.0"
+    "@toon-format/toon": "^2.2.0",
+    "@blackwell-systems/gcf": ">=2.1.2"
   },
   "peerDependenciesMeta": {
     "@toon-format/toon": {
+      "optional": true
+    },
+    "@blackwell-systems/gcf": {
       "optional": true
     }
   },
