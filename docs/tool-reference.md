@@ -1,5 +1,5 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
-
+hallo
 # Chrome DevTools MCP Tool Reference
 
 - **[Input automation](#input-automation)** (10 tools)
