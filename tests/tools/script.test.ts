@@ -372,7 +372,7 @@ describe('script', () => {
                 params: {
                   function: String(() => 'test'),
                   serviceWorkerId: 'example_service_worker',
-                  pageId: '1',
+                  pageId: 1,
                 },
               },
               response,

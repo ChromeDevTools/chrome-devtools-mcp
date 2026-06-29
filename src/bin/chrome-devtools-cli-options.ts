@@ -19,1078 +19,1090 @@ export type Commands = Record<
   {
     description: string;
     category: string;
-    args: Record<string, ArgDef>;
+    args: Record<string, ArgDef>
   }
 >;
 export const commands: Commands = {
-  click: {
-    description: 'Clicks on the provided element',
-    category: 'Input automation',
-    args: {
-      uid: {
-        name: 'uid',
-        type: 'string',
-        description:
-          'The uid of an element on the page from the page content snapshot',
-        required: true,
+  "click": {
+    "description": "Clicks on the provided element",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      dblClick: {
-        name: 'dblClick',
-        type: 'boolean',
-        description: 'Set to true for double clicks. Default is false.',
-        required: false,
+      "uid": {
+        "name": "uid",
+        "type": "string",
+        "description": "The uid of an element on the page from the page content snapshot",
+        "required": true
       },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
+      "dblClick": {
+        "name": "dblClick",
+        "type": "boolean",
+        "description": "Set to true for double clicks. Default is false.",
+        "required": false
       },
-    },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  click_at: {
-    description:
-      'Clicks at the provided coordinates (requires flag: --experimentalVision=true)',
-    category: 'Input automation',
-    args: {
-      x: {
-        name: 'x',
-        type: 'number',
-        description: 'The x coordinate',
-        required: true,
+  "click_at": {
+    "description": "Clicks at the provided coordinates (requires flag: --experimentalVision=true)",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      y: {
-        name: 'y',
-        type: 'number',
-        description: 'The y coordinate',
-        required: true,
+      "x": {
+        "name": "x",
+        "type": "number",
+        "description": "The x coordinate",
+        "required": true
       },
-      dblClick: {
-        name: 'dblClick',
-        type: 'boolean',
-        description: 'Set to true for double clicks. Default is false.',
-        required: false,
+      "y": {
+        "name": "y",
+        "type": "number",
+        "description": "The y coordinate",
+        "required": true
       },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
+      "dblClick": {
+        "name": "dblClick",
+        "type": "boolean",
+        "description": "Set to true for double clicks. Default is false.",
+        "required": false
       },
-    },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  close_heapsnapshot: {
-    description:
-      'Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to the .heapsnapshot file to close.',
-        required: true,
-      },
-    },
+  "close_page": {
+    "description": "Closes the page by its index. The last open page cannot be closed.",
+    "category": "Navigation automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "The ID of the page to close. Call list_pages to list pages.",
+        "required": true
+      }
+    }
   },
-  close_page: {
-    description:
-      'Closes the page by its index. The last open page cannot be closed.',
-    category: 'Navigation automation',
-    args: {
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description:
-          'The ID of the page to close. Call list_pages to list pages.',
-        required: true,
+  "drag": {
+    "description": "Drag an element onto another element",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-    },
+      "from_uid": {
+        "name": "from_uid",
+        "type": "string",
+        "description": "The uid of the element to drag",
+        "required": true
+      },
+      "to_uid": {
+        "name": "to_uid",
+        "type": "string",
+        "description": "The uid of the element to drop into",
+        "required": true
+      },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  drag: {
-    description: 'Drag an element onto another element',
-    category: 'Input automation',
-    args: {
-      from_uid: {
-        name: 'from_uid',
-        type: 'string',
-        description: 'The uid of the element to drag',
-        required: true,
+  "emulate": {
+    "description": "Emulates various features on the selected page.",
+    "category": "Emulation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      to_uid: {
-        name: 'to_uid',
-        type: 'string',
-        description: 'The uid of the element to drop into',
-        required: true,
+      "networkConditions": {
+        "name": "networkConditions",
+        "type": "string",
+        "description": "Throttle network. Omit to disable throttling.",
+        "required": false,
+        "enum": [
+          "Offline",
+          "Slow 3G",
+          "Fast 3G",
+          "Slow 4G",
+          "Fast 4G"
+        ]
       },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
+      "cpuThrottlingRate": {
+        "name": "cpuThrottlingRate",
+        "type": "number",
+        "description": "Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling",
+        "required": false
       },
-    },
+      "geolocation": {
+        "name": "geolocation",
+        "type": "string",
+        "description": "Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.",
+        "required": false
+      },
+      "userAgent": {
+        "name": "userAgent",
+        "type": "string",
+        "description": "User agent to emulate. Set to empty string to clear the user agent override.",
+        "required": false
+      },
+      "colorScheme": {
+        "name": "colorScheme",
+        "type": "string",
+        "description": "Emulate the dark or the light mode. Set to \"auto\" to reset to the default.",
+        "required": false,
+        "enum": [
+          "dark",
+          "light",
+          "auto"
+        ]
+      },
+      "viewport": {
+        "name": "viewport",
+        "type": "string",
+        "description": "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.",
+        "required": false
+      },
+      "extraHttpHeaders": {
+        "name": "extraHttpHeaders",
+        "type": "string",
+        "description": "Extra HTTP headers as a JSON string object, e.g. {\"X-Custom\": \"value\", \"Authorization\": \"Bearer token\"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.",
+        "required": false
+      }
+    }
   },
-  emulate: {
-    description: 'Emulates various features on the selected page.',
-    category: 'Emulation',
-    args: {
-      networkConditions: {
-        name: 'networkConditions',
-        type: 'string',
-        description: 'Throttle network. Omit to disable throttling.',
-        required: false,
-        enum: ['Offline', 'Slow 3G', 'Fast 3G', 'Slow 4G', 'Fast 4G'],
+  "evaluate_script": {
+    "description": "Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      cpuThrottlingRate: {
-        name: 'cpuThrottlingRate',
-        type: 'number',
-        description:
-          'Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling',
-        required: false,
+      "function": {
+        "name": "function",
+        "type": "string",
+        "description": "A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch(\"example.com\")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n",
+        "required": true
       },
-      geolocation: {
-        name: 'geolocation',
-        type: 'string',
-        description:
-          'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
-        required: false,
+      "args": {
+        "name": "args",
+        "type": "array",
+        "description": "An optional list of arguments to pass to the function.",
+        "required": false
       },
-      userAgent: {
-        name: 'userAgent',
-        type: 'string',
-        description:
-          'User agent to emulate. Set to empty string to clear the user agent override.',
-        required: false,
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.",
+        "required": false
       },
-      colorScheme: {
-        name: 'colorScheme',
-        type: 'string',
-        description:
-          'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
-        required: false,
-        enum: ['dark', 'light', 'auto'],
-      },
-      viewport: {
-        name: 'viewport',
-        type: 'string',
-        description:
-          "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.",
-        required: false,
-      },
-      extraHttpHeaders: {
-        name: 'extraHttpHeaders',
-        type: 'string',
-        description:
-          'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
-        required: false,
-      },
-    },
+      "dialogAction": {
+        "name": "dialogAction",
+        "type": "string",
+        "description": "Handle dialogs while execution. \"accept\", \"dismiss\", or string for response of window.prompt. Defaults to accept.",
+        "required": false
+      }
+    }
   },
-  evaluate_script: {
-    description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.',
-    category: 'Debugging',
-    args: {
-      function: {
-        name: 'function',
-        type: 'string',
-        description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
-        required: true,
+  "execute_3p_developer_tool": {
+    "description": "Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)",
+    "category": "Third-party",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      args: {
-        name: 'args',
-        type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
-        required: false,
+      "toolName": {
+        "name": "toolName",
+        "type": "string",
+        "description": "The name of the tool to execute",
+        "required": true
       },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
-        required: false,
-      },
-      dialogAction: {
-        name: 'dialogAction',
-        type: 'string',
-        description:
-          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
-        required: false,
-      },
-    },
+      "params": {
+        "name": "params",
+        "type": "string",
+        "description": "The JSON-stringified parameters to pass to the tool",
+        "required": false
+      }
+    }
   },
-  execute_3p_developer_tool: {
-    description:
-      'Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)',
-    category: 'Third-party',
-    args: {
-      toolName: {
-        name: 'toolName',
-        type: 'string',
-        description: 'The name of the tool to execute',
-        required: true,
+  "execute_webmcp_tool": {
+    "description": "Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)",
+    "category": "WebMCP",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      params: {
-        name: 'params',
-        type: 'string',
-        description: 'The JSON-stringified parameters to pass to the tool',
-        required: false,
+      "toolName": {
+        "name": "toolName",
+        "type": "string",
+        "description": "The name of the WebMCP tool to execute",
+        "required": true
       },
-    },
+      "input": {
+        "name": "input",
+        "type": "string",
+        "description": "The JSON-stringified parameters to pass to the WebMCP tool",
+        "required": false
+      }
+    }
   },
-  execute_webmcp_tool: {
-    description:
-      'Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)',
-    category: 'WebMCP',
-    args: {
-      toolName: {
-        name: 'toolName',
-        type: 'string',
-        description: 'The name of the WebMCP tool to execute',
-        required: true,
+  "fill": {
+    "description": "Type text into an input, text area or select an option from a <select> element.",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      input: {
-        name: 'input',
-        type: 'string',
-        description:
-          'The JSON-stringified parameters to pass to the WebMCP tool',
-        required: false,
+      "uid": {
+        "name": "uid",
+        "type": "string",
+        "description": "The uid of an element on the page from the page content snapshot",
+        "required": true
       },
-    },
+      "value": {
+        "name": "value",
+        "type": "string",
+        "description": "The value to fill in. \"true\" or \"false\" for checkboxes and toggles, \"true\" for radio buttons.",
+        "required": true
+      },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  fill: {
-    description:
-      'Type text into an input, text area or select an option from a <select> element.',
-    category: 'Input automation',
-    args: {
-      uid: {
-        name: 'uid',
-        type: 'string',
-        description:
-          'The uid of an element on the page from the page content snapshot',
-        required: true,
+  "get_console_message": {
+    "description": "Gets a console message by its ID. You can get all messages by calling list_console_messages.",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      value: {
-        name: 'value',
-        type: 'string',
-        description:
-          'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
-        required: true,
-      },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
+      "msgid": {
+        "name": "msgid",
+        "type": "number",
+        "description": "The msgid of a console message on the page from the listed console messages",
+        "required": true
+      }
+    }
   },
-  get_console_message: {
-    description:
-      'Gets a console message by its ID. You can get all messages by calling list_console_messages.',
-    category: 'Debugging',
-    args: {
-      msgid: {
-        name: 'msgid',
-        type: 'number',
-        description:
-          'The msgid of a console message on the page from the listed console messages',
-        required: true,
+  "get_heapsnapshot_class_nodes": {
+    "description": "Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
       },
-    },
+      "id": {
+        "name": "id",
+        "type": "number",
+        "description": "The ID for the class, obtained from details.",
+        "required": true
+      },
+      "pageIdx": {
+        "name": "pageIdx",
+        "type": "number",
+        "description": "The page index for pagination.",
+        "required": false
+      },
+      "pageSize": {
+        "name": "pageSize",
+        "type": "number",
+        "description": "The page size for pagination.",
+        "required": false
+      }
+    }
   },
-  get_heapsnapshot_class_nodes: {
-    description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "get_heapsnapshot_details": {
+    "description": "Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
       },
-      id: {
-        name: 'id',
-        type: 'number',
-        description: 'The ID for the class, obtained from details.',
-        required: true,
+      "pageIdx": {
+        "name": "pageIdx",
+        "type": "number",
+        "description": "The page index for pagination of aggregates.",
+        "required": false
       },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
-        required: false,
-      },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
-        required: false,
-      },
-    },
+      "pageSize": {
+        "name": "pageSize",
+        "type": "number",
+        "description": "The page size for pagination of aggregates.",
+        "required": false
+      }
+    }
   },
-  get_heapsnapshot_details: {
-    description:
-      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "get_heapsnapshot_retainers": {
+    "description": "Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
       },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination of aggregates.',
-        required: false,
+      "nodeId": {
+        "name": "nodeId",
+        "type": "number",
+        "description": "The node ID to get retainers for.",
+        "required": true
       },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination of aggregates.',
-        required: false,
+      "pageIdx": {
+        "name": "pageIdx",
+        "type": "number",
+        "description": "The page index for pagination.",
+        "required": false
       },
-    },
+      "pageSize": {
+        "name": "pageSize",
+        "type": "number",
+        "description": "The page size for pagination.",
+        "required": false
+      }
+    }
   },
-  get_heapsnapshot_dominators: {
-    description:
-      'Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get the dominator chain for.',
-        required: true,
-      },
-    },
+  "get_heapsnapshot_summary": {
+    "description": "Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
+      }
+    }
   },
-  get_heapsnapshot_edges: {
-    description:
-      'Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "get_network_request": {
+    "description": "Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.",
+    "category": "Network",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get outgoing edges for.',
-        required: true,
+      "reqid": {
+        "name": "reqid",
+        "type": "number",
+        "description": "The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.",
+        "required": false
       },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
-        required: false,
+      "requestFilePath": {
+        "name": "requestFilePath",
+        "type": "string",
+        "description": "The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.",
+        "required": false
       },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
-        required: false,
-      },
-    },
+      "responseFilePath": {
+        "name": "responseFilePath",
+        "type": "string",
+        "description": "The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.",
+        "required": false
+      }
+    }
   },
-  get_heapsnapshot_retainers: {
-    description:
-      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "handle_dialog": {
+    "description": "If a browser dialog was opened, use this command to handle it",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get retainers for.',
-        required: true,
+      "action": {
+        "name": "action",
+        "type": "string",
+        "description": "Whether to dismiss or accept the dialog",
+        "required": true,
+        "enum": [
+          "accept",
+          "dismiss"
+        ]
       },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
-        required: false,
-      },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
-        required: false,
-      },
-    },
+      "promptText": {
+        "name": "promptText",
+        "type": "string",
+        "description": "Optional prompt text to enter into the dialog.",
+        "required": false
+      }
+    }
   },
-  get_heapsnapshot_retaining_paths: {
-    description:
-      'Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "hover": {
+    "description": "Hover over the provided element",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get retaining paths for.',
-        required: true,
+      "uid": {
+        "name": "uid",
+        "type": "string",
+        "description": "The uid of an element on the page from the page content snapshot",
+        "required": true
       },
-      maxDepth: {
-        name: 'maxDepth',
-        type: 'number',
-        description: 'The maximum depth to search for retaining paths.',
-        required: false,
-      },
-      maxNodes: {
-        name: 'maxNodes',
-        type: 'number',
-        description: 'The maximum number of nodes to return.',
-        required: false,
-      },
-      maxSiblings: {
-        name: 'maxSiblings',
-        type: 'number',
-        description: 'The maximum number of siblings to return.',
-        required: false,
-      },
-    },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  get_heapsnapshot_summary: {
-    description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-    },
+  "install_extension": {
+    "description": "Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)",
+    "category": "Extensions",
+    "args": {
+      "path": {
+        "name": "path",
+        "type": "string",
+        "description": "Absolute path to the unpacked extension folder.",
+        "required": true
+      }
+    }
   },
-  get_network_request: {
-    description:
-      'Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.',
-    category: 'Network',
-    args: {
-      reqid: {
-        name: 'reqid',
-        type: 'number',
-        description:
-          'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
-        required: false,
+  "lighthouse_audit": {
+    "description": "Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run performance_start_trace",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      requestFilePath: {
-        name: 'requestFilePath',
-        type: 'string',
-        description:
-          'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
-        required: false,
+      "mode": {
+        "name": "mode",
+        "type": "string",
+        "description": "\"navigation\" reloads & audits. \"snapshot\" analyzes current state.",
+        "required": false,
+        "default": "navigation",
+        "enum": [
+          "navigation",
+          "snapshot"
+        ]
       },
-      responseFilePath: {
-        name: 'responseFilePath',
-        type: 'string',
-        description:
-          'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
-        required: false,
+      "device": {
+        "name": "device",
+        "type": "string",
+        "description": "Device to emulate.",
+        "required": false,
+        "default": "desktop",
+        "enum": [
+          "desktop",
+          "mobile"
+        ]
       },
-    },
+      "outputDirPath": {
+        "name": "outputDirPath",
+        "type": "string",
+        "description": "Directory for reports. If omitted, uses temporary files.",
+        "required": false
+      }
+    }
   },
-  handle_dialog: {
-    description:
-      'If a browser dialog was opened, use this command to handle it',
-    category: 'Input automation',
-    args: {
-      action: {
-        name: 'action',
-        type: 'string',
-        description: 'Whether to dismiss or accept the dialog',
-        required: true,
-        enum: ['accept', 'dismiss'],
-      },
-      promptText: {
-        name: 'promptText',
-        type: 'string',
-        description: 'Optional prompt text to enter into the dialog.',
-        required: false,
-      },
-    },
+  "list_3p_developer_tools": {
+    "description": "Lists all third-party developer tools the page exposes for providing runtime information.\n  Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\n  Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the\n  following command to the script:\n  'window.__dtmcp.executeTool(toolName, params)'\n  This might be helpful when the third-party developer tools return non-serializable values or when composing\n  third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
+    "category": "Third-party",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      }
+    }
   },
-  hover: {
-    description: 'Hover over the provided element',
-    category: 'Input automation',
-    args: {
-      uid: {
-        name: 'uid',
-        type: 'string',
-        description:
-          'The uid of an element on the page from the page content snapshot',
-        required: true,
+  "list_console_messages": {
+    "description": "List all console messages for the currently selected page since the last navigation.",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
+      "pageSize": {
+        "name": "pageSize",
+        "type": "integer",
+        "description": "Maximum number of messages to return. When omitted, returns all messages.",
+        "required": false
       },
-    },
+      "pageIdx": {
+        "name": "pageIdx",
+        "type": "integer",
+        "description": "Page number to return (0-based). When omitted, returns the first page.",
+        "required": false
+      },
+      "types": {
+        "name": "types",
+        "type": "array",
+        "description": "Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.",
+        "required": false
+      },
+      "includePreservedMessages": {
+        "name": "includePreservedMessages",
+        "type": "boolean",
+        "description": "Set to true to return the preserved messages over the last 3 navigations.",
+        "required": false,
+        "default": false
+      }
+    }
   },
-  install_extension: {
-    description:
-      'Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)',
-    category: 'Extensions',
-    args: {
-      path: {
-        name: 'path',
-        type: 'string',
-        description: 'Absolute path to the unpacked extension folder.',
-        required: true,
-      },
-    },
+  "list_extensions": {
+    "description": "Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)",
+    "category": "Extensions",
+    "args": {}
   },
-  lighthouse_audit: {
-    description:
-      'Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run performance_start_trace',
-    category: 'Debugging',
-    args: {
-      mode: {
-        name: 'mode',
-        type: 'string',
-        description:
-          '"navigation" reloads & audits. "snapshot" analyzes current state.',
-        required: false,
-        default: 'navigation',
-        enum: ['navigation', 'snapshot'],
+  "list_network_requests": {
+    "description": "List all requests for the currently selected page since the last navigation.",
+    "category": "Network",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      device: {
-        name: 'device',
-        type: 'string',
-        description: 'Device to emulate.',
-        required: false,
-        default: 'desktop',
-        enum: ['desktop', 'mobile'],
+      "pageSize": {
+        "name": "pageSize",
+        "type": "integer",
+        "description": "Maximum number of requests to return. When omitted, returns all requests.",
+        "required": false
       },
-      outputDirPath: {
-        name: 'outputDirPath',
-        type: 'string',
-        description: 'Directory for reports. If omitted, uses temporary files.',
-        required: false,
+      "pageIdx": {
+        "name": "pageIdx",
+        "type": "integer",
+        "description": "Page number to return (0-based). When omitted, returns the first page.",
+        "required": false
       },
-    },
+      "resourceTypes": {
+        "name": "resourceTypes",
+        "type": "array",
+        "description": "Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.",
+        "required": false
+      },
+      "includePreservedRequests": {
+        "name": "includePreservedRequests",
+        "type": "boolean",
+        "description": "Set to true to return the preserved requests over the last 3 navigations.",
+        "required": false,
+        "default": false
+      }
+    }
   },
-  list_3p_developer_tools: {
-    description:
-      "Lists all third-party developer tools the page exposes for providing runtime information.\n  Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\n  Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the\n  following command to the script:\n  'window.__dtmcp.executeTool(toolName, params)'\n  This might be helpful when the third-party developer tools return non-serializable values or when composing\n  third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
-    category: 'Third-party',
-    args: {},
+  "list_pages": {
+    "description": "Get a list of pages open in the browser.",
+    "category": "Navigation automation",
+    "args": {}
   },
-  list_console_messages: {
-    description:
-      'List all console messages for the currently selected page since the last navigation.',
-    category: 'Debugging',
-    args: {
-      pageSize: {
-        name: 'pageSize',
-        type: 'integer',
-        description:
-          'Maximum number of messages to return. When omitted, returns all messages.',
-        required: false,
-      },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'integer',
-        description:
-          'Page number to return (0-based). When omitted, returns the first page.',
-        required: false,
-      },
-      types: {
-        name: 'types',
-        type: 'array',
-        description:
-          'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
-        required: false,
-      },
-      includePreservedMessages: {
-        name: 'includePreservedMessages',
-        type: 'boolean',
-        description:
-          'Set to true to return the preserved messages over the last 3 navigations.',
-        required: false,
-        default: false,
-      },
-      serviceWorkerId: {
-        name: 'serviceWorkerId',
-        type: 'string',
-        description:
-          'Filter messages to only return messages of the specified service worker.',
-        required: false,
-      },
-    },
+  "list_webmcp_tools": {
+    "description": "Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)",
+    "category": "WebMCP",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      }
+    }
   },
-  list_extensions: {
-    description:
-      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',
-    category: 'Extensions',
-    args: {},
+  "navigate_page": {
+    "description": "Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.",
+    "category": "Navigation automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      },
+      "type": {
+        "name": "type",
+        "type": "string",
+        "description": "Navigate the page by URL, back or forward in history, or reload.",
+        "required": false,
+        "enum": [
+          "url",
+          "back",
+          "forward",
+          "reload"
+        ]
+      },
+      "url": {
+        "name": "url",
+        "type": "string",
+        "description": "Target URL (only type=url)",
+        "required": false
+      },
+      "ignoreCache": {
+        "name": "ignoreCache",
+        "type": "boolean",
+        "description": "Whether to ignore cache on reload.",
+        "required": false
+      },
+      "handleBeforeUnload": {
+        "name": "handleBeforeUnload",
+        "type": "string",
+        "description": "Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.",
+        "required": false,
+        "enum": [
+          "accept",
+          "decline"
+        ]
+      },
+      "initScript": {
+        "name": "initScript",
+        "type": "string",
+        "description": "A JavaScript script to be executed on each new document before any other scripts for the next navigation.",
+        "required": false
+      },
+      "timeout": {
+        "name": "timeout",
+        "type": "integer",
+        "description": "Maximum wait time in milliseconds. If set to 0, the default timeout will be used.",
+        "required": false
+      }
+    }
   },
-  list_network_requests: {
-    description:
-      'List all requests for the currently selected page since the last navigation.',
-    category: 'Network',
-    args: {
-      pageSize: {
-        name: 'pageSize',
-        type: 'integer',
-        description:
-          'Maximum number of requests to return. When omitted, returns all requests.',
-        required: false,
+  "new_page": {
+    "description": "Open a new tab and load a URL. Use project URL if not specified otherwise.",
+    "category": "Navigation automation",
+    "args": {
+      "url": {
+        "name": "url",
+        "type": "string",
+        "description": "URL to load in a new page.",
+        "required": true
       },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'integer',
-        description:
-          'Page number to return (0-based). When omitted, returns the first page.',
-        required: false,
+      "background": {
+        "name": "background",
+        "type": "boolean",
+        "description": "Whether to open the page in the background without bringing it to the front. Default is false (foreground).",
+        "required": false
       },
-      resourceTypes: {
-        name: 'resourceTypes',
-        type: 'array',
-        description:
-          'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
-        required: false,
+      "isolatedContext": {
+        "name": "isolatedContext",
+        "type": "string",
+        "description": "If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.",
+        "required": false
       },
-      includePreservedRequests: {
-        name: 'includePreservedRequests',
-        type: 'boolean',
-        description:
-          'Set to true to return the preserved requests over the last 3 navigations.',
-        required: false,
-        default: false,
-      },
-    },
+      "timeout": {
+        "name": "timeout",
+        "type": "integer",
+        "description": "Maximum wait time in milliseconds. If set to 0, the default timeout will be used.",
+        "required": false
+      }
+    }
   },
-  list_pages: {
-    description: 'Get a list of pages open in the browser.',
-    category: 'Navigation automation',
-    args: {},
+  "performance_analyze_insight": {
+    "description": "Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.",
+    "category": "Performance",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      },
+      "insightSetId": {
+        "name": "insightSetId",
+        "type": "string",
+        "description": "The id for the specific insight set. Only use the ids given in the \"Available insight sets\" list.",
+        "required": true
+      },
+      "insightName": {
+        "name": "insightName",
+        "type": "string",
+        "description": "The name of the Insight you want more information on. For example: \"DocumentLatency\" or \"LCPBreakdown\"",
+        "required": true
+      }
+    }
   },
-  list_webmcp_tools: {
-    description:
-      'Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)',
-    category: 'WebMCP',
-    args: {},
+  "performance_start_trace": {
+    "description": "Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.",
+    "category": "Performance",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      },
+      "reload": {
+        "name": "reload",
+        "type": "boolean",
+        "description": "Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.",
+        "required": false,
+        "default": true
+      },
+      "autoStop": {
+        "name": "autoStop",
+        "type": "boolean",
+        "description": "Determines if the trace recording should be automatically stopped.",
+        "required": false,
+        "default": true
+      },
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).",
+        "required": false
+      }
+    }
   },
-  navigate_page: {
-    description:
-      'Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.',
-    category: 'Navigation automation',
-    args: {
-      type: {
-        name: 'type',
-        type: 'string',
-        description:
-          'Navigate the page by URL, back or forward in history, or reload.',
-        required: false,
-        enum: ['url', 'back', 'forward', 'reload'],
+  "performance_stop_trace": {
+    "description": "Stop the active performance trace recording on the selected webpage.",
+    "category": "Performance",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      url: {
-        name: 'url',
-        type: 'string',
-        description: 'Target URL (only type=url)',
-        required: false,
-      },
-      ignoreCache: {
-        name: 'ignoreCache',
-        type: 'boolean',
-        description: 'Whether to ignore cache on reload.',
-        required: false,
-      },
-      handleBeforeUnload: {
-        name: 'handleBeforeUnload',
-        type: 'string',
-        description:
-          'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
-        required: false,
-        enum: ['accept', 'decline'],
-      },
-      initScript: {
-        name: 'initScript',
-        type: 'string',
-        description:
-          'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
-        required: false,
-      },
-      timeout: {
-        name: 'timeout',
-        type: 'integer',
-        description:
-          'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
-        required: false,
-      },
-    },
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).",
+        "required": false
+      }
+    }
   },
-  new_page: {
-    description:
-      'Open a new tab and load a URL. Use project URL if not specified otherwise.',
-    category: 'Navigation automation',
-    args: {
-      url: {
-        name: 'url',
-        type: 'string',
-        description: 'URL to load in a new page.',
-        required: true,
+  "press_key": {
+    "description": "Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      background: {
-        name: 'background',
-        type: 'boolean',
-        description:
-          'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
-        required: false,
+      "key": {
+        "name": "key",
+        "type": "string",
+        "description": "A key or a combination (e.g., \"Enter\", \"Control+A\", \"Control++\", \"Control+Shift+R\"). Modifiers: Control, Shift, Alt, Meta",
+        "required": true
       },
-      isolatedContext: {
-        name: 'isolatedContext',
-        type: 'string',
-        description:
-          'If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.',
-        required: false,
-      },
-      timeout: {
-        name: 'timeout',
-        type: 'integer',
-        description:
-          'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
-        required: false,
-      },
-    },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  performance_analyze_insight: {
-    description:
-      'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
-    category: 'Performance',
-    args: {
-      insightSetId: {
-        name: 'insightSetId',
-        type: 'string',
-        description:
-          'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
-        required: true,
-      },
-      insightName: {
-        name: 'insightName',
-        type: 'string',
-        description:
-          'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
-        required: true,
-      },
-    },
+  "reload_extension": {
+    "description": "Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)",
+    "category": "Extensions",
+    "args": {
+      "id": {
+        "name": "id",
+        "type": "string",
+        "description": "ID of the extension to reload.",
+        "required": true
+      }
+    }
   },
-  performance_start_trace: {
-    description:
-      'Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.',
-    category: 'Performance',
-    args: {
-      reload: {
-        name: 'reload',
-        type: 'boolean',
-        description:
-          'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
-        required: false,
-        default: true,
+  "resize_page": {
+    "description": "Resizes the selected page's window so that the page has specified dimension",
+    "category": "Emulation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      autoStop: {
-        name: 'autoStop',
-        type: 'boolean',
-        description:
-          'Determines if the trace recording should be automatically stopped.',
-        required: false,
-        default: true,
+      "width": {
+        "name": "width",
+        "type": "number",
+        "description": "Page width",
+        "required": true
       },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
-        required: false,
-      },
-    },
+      "height": {
+        "name": "height",
+        "type": "number",
+        "description": "Page height",
+        "required": true
+      }
+    }
   },
-  performance_stop_trace: {
-    description:
-      'Stop the active performance trace recording on the selected webpage.',
-    category: 'Performance',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
-        required: false,
+  "screencast_start": {
+    "description": "Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-    },
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.",
+        "required": false
+      }
+    }
   },
-  press_key: {
-    description:
-      'Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).',
-    category: 'Input automation',
-    args: {
-      key: {
-        name: 'key',
-        type: 'string',
-        description:
-          'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
-        required: true,
-      },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
+  "screencast_stop": {
+    "description": "Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      }
+    }
   },
-  reload_extension: {
-    description:
-      'Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
-    category: 'Extensions',
-    args: {
-      id: {
-        name: 'id',
-        type: 'string',
-        description: 'ID of the extension to reload.',
-        required: true,
+  "select_page": {
+    "description": "Select a page as a context for future tool calls.",
+    "category": "Navigation automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "The ID of the page to select. Call list_pages to get available pages.",
+        "required": true
       },
-    },
+      "bringToFront": {
+        "name": "bringToFront",
+        "type": "boolean",
+        "description": "Whether to focus the page and bring it to the top.",
+        "required": false
+      }
+    }
   },
-  resize_page: {
-    description:
-      "Resizes the selected page's window so that the page has specified dimension",
-    category: 'Emulation',
-    args: {
-      width: {
-        name: 'width',
-        type: 'number',
-        description: 'Page width',
-        required: true,
+  "take_heapsnapshot": {
+    "description": "Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.",
+    "category": "Memory",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      height: {
-        name: 'height',
-        type: 'number',
-        description: 'Page height',
-        required: true,
-      },
-    },
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to save the heapsnapshot to.",
+        "required": true
+      }
+    }
   },
-  screencast_start: {
-    description:
-      'Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)',
-    category: 'Debugging',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.',
-        required: false,
+  "take_screenshot": {
+    "description": "Take a screenshot of the page or element.",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-    },
+      "format": {
+        "name": "format",
+        "type": "string",
+        "description": "Type of format to save the screenshot as. Default is \"png\"",
+        "required": false,
+        "default": "png",
+        "enum": [
+          "png",
+          "jpeg",
+          "webp"
+        ]
+      },
+      "quality": {
+        "name": "quality",
+        "type": "number",
+        "description": "Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.",
+        "required": false
+      },
+      "uid": {
+        "name": "uid",
+        "type": "string",
+        "description": "The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.",
+        "required": false
+      },
+      "fullPage": {
+        "name": "fullPage",
+        "type": "boolean",
+        "description": "If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.",
+        "required": false
+      },
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.",
+        "required": false
+      }
+    }
   },
-  screencast_stop: {
-    description:
-      'Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)',
-    category: 'Debugging',
-    args: {},
+  "take_snapshot": {
+    "description": "Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique\nidentifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected\nin the DevTools Elements panel (if any).",
+    "category": "Debugging",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
+      },
+      "verbose": {
+        "name": "verbose",
+        "type": "boolean",
+        "description": "Whether to include all possible information available in the full a11y tree. Default is false.",
+        "required": false
+      },
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.",
+        "required": false
+      }
+    }
   },
-  select_page: {
-    description: 'Select a page as a context for future tool calls.',
-    category: 'Navigation automation',
-    args: {
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description:
-          'The ID of the page to select. Call list_pages to get available pages.',
-        required: true,
-      },
-      bringToFront: {
-        name: 'bringToFront',
-        type: 'boolean',
-        description: 'Whether to focus the page and bring it to the top.',
-        required: false,
-      },
-    },
+  "trigger_extension_action": {
+    "description": "Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)",
+    "category": "Extensions",
+    "args": {
+      "id": {
+        "name": "id",
+        "type": "string",
+        "description": "ID of the extension to trigger the action for.",
+        "required": true
+      }
+    }
   },
-  take_heapsnapshot: {
-    description:
-      'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'A path to a .heapsnapshot file to save the heapsnapshot to.',
-        required: true,
+  "type_text": {
+    "description": "Type text using keyboard into a previously focused input",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-    },
+      "text": {
+        "name": "text",
+        "type": "string",
+        "description": "The text to type",
+        "required": true
+      },
+      "submitKey": {
+        "name": "submitKey",
+        "type": "string",
+        "description": "Optional key to press after typing. E.g., \"Enter\", \"Tab\", \"Escape\"",
+        "required": false
+      }
+    }
   },
-  take_screenshot: {
-    description: 'Take a screenshot of the page or element.',
-    category: 'Debugging',
-    args: {
-      format: {
-        name: 'format',
-        type: 'string',
-        description:
-          'Type of format to save the screenshot as. Default is "png"',
-        required: false,
-        default: 'png',
-        enum: ['png', 'jpeg', 'webp'],
-      },
-      quality: {
-        name: 'quality',
-        type: 'number',
-        description:
-          'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
-        required: false,
-      },
-      uid: {
-        name: 'uid',
-        type: 'string',
-        description:
-          'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
-        required: false,
-      },
-      fullPage: {
-        name: 'fullPage',
-        type: 'boolean',
-        description:
-          'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
-        required: false,
-      },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
-        required: false,
-      },
-    },
+  "uninstall_extension": {
+    "description": "Uninstalls a Chrome extension by its ID. (requires flag: --categoryExtensions=true)",
+    "category": "Extensions",
+    "args": {
+      "id": {
+        "name": "id",
+        "type": "string",
+        "description": "ID of the extension to uninstall.",
+        "required": true
+      }
+    }
   },
-  take_snapshot: {
-    description:
-      'Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique\nidentifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected\nin the DevTools Elements panel (if any).',
-    category: 'Debugging',
-    args: {
-      verbose: {
-        name: 'verbose',
-        type: 'boolean',
-        description:
-          'Whether to include all possible information available in the full a11y tree. Default is false.',
-        required: false,
+  "upload_file": {
+    "description": "Upload a file through a provided element.",
+    "category": "Input automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "Targets a specific page by ID.",
+        "required": true
       },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description:
-          'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
-        required: false,
+      "uid": {
+        "name": "uid",
+        "type": "string",
+        "description": "The uid of the file input element or an element that will open file chooser on the page from the page content snapshot",
+        "required": true
       },
-    },
-  },
-  trigger_extension_action: {
-    description:
-      'Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)',
-    category: 'Extensions',
-    args: {
-      id: {
-        name: 'id',
-        type: 'string',
-        description: 'ID of the extension to trigger the action for.',
-        required: true,
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "The local path of the file to upload",
+        "required": true
       },
-    },
-  },
-  type_text: {
-    description: 'Type text using keyboard into a previously focused input',
-    category: 'Input automation',
-    args: {
-      text: {
-        name: 'text',
-        type: 'string',
-        description: 'The text to type',
-        required: true,
-      },
-      submitKey: {
-        name: 'submitKey',
-        type: 'string',
-        description:
-          'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
-        required: false,
-      },
-    },
-  },
-  uninstall_extension: {
-    description:
-      'Uninstalls a Chrome extension by its ID. (requires flag: --categoryExtensions=true)',
-    category: 'Extensions',
-    args: {
-      id: {
-        name: 'id',
-        type: 'string',
-        description: 'ID of the extension to uninstall.',
-        required: true,
-      },
-    },
-  },
-  upload_file: {
-    description: 'Upload a file through a provided element.',
-    category: 'Input automation',
-    args: {
-      uid: {
-        name: 'uid',
-        type: 'string',
-        description:
-          'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
-        required: true,
-      },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'The local path of the file to upload',
-        required: true,
-      },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-    },
-  },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
+  }
 } as const;

@@ -24,7 +24,7 @@ so returned values have to be JSON-serializable.`,
       readOnlyHint: false,
     },
     schema: {
-      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
+      ...(cliArgs?.pageIdRouting ? pageIdSchema : {}),
       function: zod.string().describe(
         `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => {
@@ -59,6 +59,7 @@ Example with arguments: \`(el) => {
         .describe(
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         ),
+      ...(cliArgs?.pageIdRouting ? pageIdSchema : {}),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -108,9 +109,10 @@ Example with arguments: \`(el) => {
         return;
       }
 
-      const mcpPage = cliArgs?.experimentalPageIdRouting
-        ? context.getPageById(request.params.pageId)
-        : context.getSelectedMcpPage();
+      const mcpPage =
+        cliArgs?.pageIdRouting && request.params.pageId
+          ? context.getPageById(request.params.pageId)
+          : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
