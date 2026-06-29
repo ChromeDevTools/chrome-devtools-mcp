@@ -352,12 +352,12 @@ so returned values have to be JSON-serializable.
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
   Example without arguments: `() => {
-  return document.title
+return document.title
 }` or `async () => {
-  return await fetch("example.com")
+return await fetch("example.com")
 }`.
   Example with arguments: `(el) => {
-  return el.innerText;
+return el.innerText;
 }`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
@@ -628,7 +628,7 @@ in the DevTools Elements panel (if any).
 Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
 Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
 following command to the script:
-'window.\_\_dtmcp.executeTool(toolName, params)'
+'window.__dtmcp.executeTool(toolName, params)'
 This might be helpful when the third-party developer tools return non-serializable values or when composing
 third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)
 
