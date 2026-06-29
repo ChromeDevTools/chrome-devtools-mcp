@@ -55,7 +55,6 @@ import type {
   ExtensionServiceWorker,
 } from './types.js';
 import {
-  ensureExtension,
   getTempFilePath,
   resolveCanonicalPath,
 } from './utils/files.js';
@@ -256,6 +255,20 @@ export class McpContext implements Context {
         `Access denied: path ${filePath} (canonical: ${canonicalPath}) is not within any of the configured workspace roots.`,
       );
     }
+  }
+
+  async ensureExtension<Extension extends `.${string}`>(
+    filePath: string,
+    extension: Extension,
+  ): Promise<`${string}${Extension}`> {
+    const resolvedPath = path.resolve(filePath);
+    const currentExtension = path.extname(resolvedPath);
+    const outputPath: `${string}${Extension}` = `${resolvedPath.slice(
+      0,
+      resolvedPath.length - currentExtension.length,
+    )}${extension}`;
+    await this.validatePath(outputPath);
+    return outputPath;
   }
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
@@ -800,12 +813,11 @@ export class McpContext implements Context {
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}> {
-    await this.validatePath(clientProvidedFilePath);
+    const filePath = await this.ensureExtension(
+      clientProvidedFilePath,
+      extension,
+    );
     try {
-      const filePath = ensureExtension(
-        path.resolve(clientProvidedFilePath),
-        extension,
-      );
       await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, data);
       return {filename: filePath};

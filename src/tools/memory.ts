@@ -5,7 +5,6 @@
  */
 
 import {zod} from '../third_party/index.js';
-import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
@@ -24,16 +23,18 @@ export const takeHeapSnapshot = definePageTool({
   },
   blockedByDialog: true,
   verifyFilesSchema: ['filePath'],
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
     const page = request.page;
+    const snapshotPath = await context.ensureExtension(
+      request.params.filePath,
+      '.heapsnapshot',
+    );
 
     await page.pptrPage.captureHeapSnapshot({
-      path: ensureExtension(request.params.filePath, '.heapsnapshot'),
+      path: snapshotPath,
     });
 
-    response.appendResponseLine(
-      `Heap snapshot saved to ${request.params.filePath}`,
-    );
+    response.appendResponseLine(`Heap snapshot saved to ${snapshotPath}`);
   },
 });
 
