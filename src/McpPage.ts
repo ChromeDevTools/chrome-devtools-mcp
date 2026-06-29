@@ -115,6 +115,7 @@ import {
 export class McpPage implements ContextPage {
   readonly pptrPage: Page;
   readonly id: number;
+  readonly #emulateFocusedPage: boolean;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -144,6 +145,7 @@ export class McpPage implements ContextPage {
     page: Page,
     id: number,
     options: {
+      emulateFocusedPage: boolean;
       hasNetworkBlockOrAllowlist: boolean;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
@@ -151,6 +153,7 @@ export class McpPage implements ContextPage {
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
+    this.#emulateFocusedPage = options.emulateFocusedPage;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -183,6 +186,9 @@ export class McpPage implements ContextPage {
   }
 
   async #initFocusEmulationNoThrow(): Promise<void> {
+    if (!this.#emulateFocusedPage) {
+      return;
+    }
     // We emulate a focused page for all pages to support multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
       logger?.('Error turning on focused page emulation', error);
