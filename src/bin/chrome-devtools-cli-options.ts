@@ -81,47 +81,25 @@ export const commands: Commands = {
         "description": "Set to true for double clicks. Default is false.",
         "required": false
       },
-      includeSnapshot: {
-        name: 'includeSnapshot',
-        type: 'boolean',
-        description:
-          'Whether to include a snapshot in the response. Default is false.',
-        required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
-    },
+      "includeSnapshot": {
+        "name": "includeSnapshot",
+        "type": "boolean",
+        "description": "Whether to include a snapshot in the response. Default is false.",
+        "required": false
+      }
+    }
   },
-  close_heapsnapshot: {
-    description:
-      'Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to the .heapsnapshot file to close.',
-        required: true,
-      },
-    },
-  },
-  close_page: {
-    description:
-      'Closes the page by its index. The last open page cannot be closed.',
-    category: 'Navigation automation',
-    args: {
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description:
-          'The ID of the page to close. Call list_pages to list pages.',
-        required: true,
-      },
-    },
+  "close_page": {
+    "description": "Closes the page by its index. The last open page cannot be closed.",
+    "category": "Navigation automation",
+    "args": {
+      "pageId": {
+        "name": "pageId",
+        "type": "number",
+        "description": "The ID of the page to close. Call list_pages to list pages.",
+        "required": true
+      }
+    }
   },
   "drag": {
     "description": "Drag an element onto another element",
@@ -351,16 +329,15 @@ export const commands: Commands = {
       }
     }
   },
-  get_heapsnapshot_class_nodes: {
-    description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "get_heapsnapshot_class_nodes": {
+    "description": "Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
       },
       "id": {
         "name": "id",
@@ -382,16 +359,15 @@ export const commands: Commands = {
       }
     }
   },
-  get_heapsnapshot_details: {
-    description:
-      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "get_heapsnapshot_details": {
+    "description": "Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
       },
       "pageIdx": {
         "name": "pageIdx",
@@ -407,66 +383,15 @@ export const commands: Commands = {
       }
     }
   },
-  get_heapsnapshot_dominators: {
-    description:
-      'Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get the dominator chain for.',
-        required: true,
-      },
-    },
-  },
-  get_heapsnapshot_edges: {
-    description:
-      'Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get outgoing edges for.',
-        required: true,
-      },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
-        required: false,
-      },
-      pageSize: {
-        name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
-        required: false,
-      },
-    },
-  },
-  get_heapsnapshot_retainers: {
-    description:
-      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
+  "get_heapsnapshot_retainers": {
+    "description": "Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
       },
       "nodeId": {
         "name": "nodeId",
@@ -488,55 +413,17 @@ export const commands: Commands = {
       }
     }
   },
-  get_heapsnapshot_retaining_paths: {
-    description:
-      'Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-      nodeId: {
-        name: 'nodeId',
-        type: 'number',
-        description: 'The node ID to get retaining paths for.',
-        required: true,
-      },
-      maxDepth: {
-        name: 'maxDepth',
-        type: 'number',
-        description: 'The maximum depth to search for retaining paths.',
-        required: false,
-      },
-      maxNodes: {
-        name: 'maxNodes',
-        type: 'number',
-        description: 'The maximum number of nodes to return.',
-        required: false,
-      },
-      maxSiblings: {
-        name: 'maxSiblings',
-        type: 'number',
-        description: 'The maximum number of siblings to return.',
-        required: false,
-      },
-    },
-  },
-  get_heapsnapshot_summary: {
-    description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)',
-    category: 'Memory',
-    args: {
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'A path to a .heapsnapshot file to read.',
-        required: true,
-      },
-    },
+  "get_heapsnapshot_summary": {
+    "description": "Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --experimentalMemory=true)",
+    "category": "Memory",
+    "args": {
+      "filePath": {
+        "name": "filePath",
+        "type": "string",
+        "description": "A path to a .heapsnapshot file to read.",
+        "required": true
+      }
+    }
   },
   "get_network_request": {
     "description": "Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.",
@@ -712,34 +599,19 @@ export const commands: Commands = {
         "description": "Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.",
         "required": false
       },
-      includePreservedMessages: {
-        name: 'includePreservedMessages',
-        type: 'boolean',
-        description:
-          'Set to true to return the preserved messages over the last 3 navigations.',
-        required: false,
-        default: false,
-      },
-      serviceWorkerId: {
-        name: 'serviceWorkerId',
-        type: 'string',
-        description:
-          'Filter messages to only return messages of the specified service worker.',
-        required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
-    },
+      "includePreservedMessages": {
+        "name": "includePreservedMessages",
+        "type": "boolean",
+        "description": "Set to true to return the preserved messages over the last 3 navigations.",
+        "required": false,
+        "default": false
+      }
+    }
   },
-  list_extensions: {
-    description:
-      'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',
-    category: 'Extensions',
-    args: {},
+  "list_extensions": {
+    "description": "Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)",
+    "category": "Extensions",
+    "args": {}
   },
   "list_network_requests": {
     "description": "List all requests for the currently selected page since the last navigation.",
