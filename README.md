@@ -642,7 +642,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--emulateFocusedPages`/ `--emulate-focused-pages`**
-  Whether to emulate pages as focused and active. Disable to reduce visible browser focus stealing.
+  Whether to emulate pages as focused and active. Disable only when visible-browser focus behavior is problematic; keeping it enabled preserves existing behavior for multi-agent workflows where pages should behave as focused/active.
   - **Type:** boolean
   - **Default:** `true`
 

@@ -185,7 +185,7 @@ export const cliOptions = {
     type: 'boolean',
     default: true,
     describe:
-      'Whether to emulate pages as focused and active. Disable to reduce visible browser focus stealing.',
+      'Whether to emulate pages as focused and active. Disable only when visible-browser focus behavior is problematic; keeping it enabled preserves existing behavior for multi-agent workflows where pages should behave as focused/active.',
   },
   experimentalNavigationAllowlist: {
     type: 'boolean',
