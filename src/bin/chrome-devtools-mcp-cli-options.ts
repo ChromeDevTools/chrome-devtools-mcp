@@ -181,6 +181,12 @@ export const cliOptions = {
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
   },
+  emulateFocusedPages: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Whether to emulate pages as focused and active. Disable to reduce visible browser focus stealing.',
+  },
   experimentalNavigationAllowlist: {
     type: 'boolean',
     describe: 'Whether to enable navigation allowlist tool parameter.',

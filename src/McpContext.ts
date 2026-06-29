@@ -64,6 +64,8 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
+  // Whether pages should emulate being focused and active.
+  emulateFocusedPages: boolean;
   // The allow list of URL patterns to allow loading resources.
   allowList?: string[];
   // The block list of URL patterns to block loading resources.
@@ -318,7 +320,7 @@ export class McpContext implements Context {
         ctx = await this.browser.createBrowserContext();
         this.#isolatedContexts.set(isolatedContextName, ctx);
       }
-      page = await ctx.newPage();
+      page = await ctx.newPage({background});
     } else {
       page = await this.browser.newPage({background});
     }
@@ -626,10 +628,12 @@ export class McpContext implements Context {
       if (!mcpPage) {
         mcpPage = new McpPage(page, this.#nextPageId++);
         this.#mcpPages.set(page, mcpPage);
-        // We emulate a focused page for all pages to support multi-agent workflows.
-        void page.emulateFocusedPage(true).catch(error => {
-          this.logger?.('Error turning on focused page emulation', error);
-        });
+        if (this.#options.emulateFocusedPages) {
+          // We emulate a focused page for all pages to support multi-agent workflows.
+          void page.emulateFocusedPage(true).catch(error => {
+            this.logger?.('Error turning on focused page emulation', error);
+          });
+        }
       }
       mcpPage.isolatedContextName = isolatedContextNames.get(page);
     }

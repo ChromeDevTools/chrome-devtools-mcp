@@ -144,6 +144,7 @@ export async function createMcpServer(
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
+        emulateFocusedPages: serverArgs.emulateFocusedPages ?? true,
         allowList: allowlist,
         blocklist: blocklist,
       });
