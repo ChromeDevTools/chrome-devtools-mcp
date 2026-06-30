@@ -21,6 +21,8 @@ import {
   getHeapSnapshotRetainingPaths,
   getHeapSnapshotEdges,
   getHeapSnapshotDominators,
+  compareHeapSnapshotsSummary,
+  compareHeapSnapshotsClassNodes,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -359,6 +361,172 @@ describe('memory', () => {
 
         t.assert.snapshot(output);
       });
+    });
+  });
+
+  describe('compare_heapsnapshots_summary', () => {
+    it('compare heap-1 to heap-2', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-1.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+
+        await compareHeapSnapshotsSummary.handler(
+          {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareHeapSnapshotsSummary.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('compare heap-2 to heap-3', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-3.heapsnapshot',
+        );
+
+        await compareHeapSnapshotsSummary.handler(
+          {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareHeapSnapshotsSummary.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('compare_heapsnapshots_class_nodes', () => {
+    it('compare heap-1 to heap-2 with classIndex filter', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-1.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+
+        await compareHeapSnapshotsClassNodes.handler(
+          {
+            params: {
+              baseFilePath: filePathA,
+              currentFilePath: filePathB,
+              classIndex: 2, // NewObject
+            },
+          },
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareHeapSnapshotsClassNodes.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('compare heap-1 to heap-2 with invalid classIndex throws error', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-1.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+
+        await t.assert.rejects(
+          compareHeapSnapshotsClassNodes.handler(
+            {
+              params: {
+                baseFilePath: filePathA,
+                currentFilePath: filePathB,
+                classIndex: 99,
+              },
+            },
+            response,
+            context,
+          ),
+          /Invalid classIndex: 99. Total classes with changes: 10/,
+        );
+      });
+    });
+  });
+
+  // Verifies that the caching mechanism in HeapSnapshotManager correctly
+  // distinguishes comparisons when the same "current" snapshot is compared
+  // against different "base" snapshots. If the cache key (diffCacheKey) is
+  // not unique per base snapshot, the second comparison might incorrectly
+  // return cached results from the first comparison.
+  it('compares the same current snapshot against different bases', async () => {
+    await withMcpContext(async (_response, context) => {
+      const filePathA = join(
+        process.cwd(),
+        'tests/fixtures/heap-1.heapsnapshot',
+      );
+      const filePathB = join(
+        process.cwd(),
+        'tests/fixtures/heap-2.heapsnapshot',
+      );
+      const filePathC = join(
+        process.cwd(),
+        'tests/fixtures/heap-3.heapsnapshot',
+      );
+
+      const firstDiff = await context.getHeapSnapshotClassDiffs(
+        filePathA,
+        filePathC,
+      );
+      const secondDiff = await context.getHeapSnapshotClassDiffs(
+        filePathB,
+        filePathC,
+      );
+      const firstNewObjectDiff = firstDiff.find(
+        entry => entry.className === 'NewObject',
+      );
+      const secondNewObjectDiff = secondDiff.find(
+        entry => entry.className === 'NewObject',
+      );
+      assert.ok(firstNewObjectDiff);
+      assert.ok(secondNewObjectDiff);
+      assert.equal(firstNewObjectDiff.addedCount, 7);
+      assert.equal(secondNewObjectDiff.addedCount, 5);
     });
   });
 });

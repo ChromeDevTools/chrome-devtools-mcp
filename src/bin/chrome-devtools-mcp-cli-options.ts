@@ -173,7 +173,7 @@ export const cliOptions = {
   experimentalToonFormat: {
     type: 'boolean',
     describe:
-      'Whether to format structured data in text response using Token-Oriented Object Notation. Defaults to false which represents the embedded content as formatted JSON instead.',
+      'Whether to format structured data in text response using Token-Oriented Object Notation (requires @toon-format/toon). If running via npx, use: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalToonFormat',
     hidden: true,
   },
   experimentalIncludeAllPages: {
@@ -214,13 +214,13 @@ export const cliOptions = {
   blockedUrlPattern: {
     type: 'array',
     describe:
-      'Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['allowedUrlPattern'],
   },
   allowedUrlPattern: {
     type: 'array',
     describe:
-      'Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['blockedUrlPattern'],
   },
   ignoreDefaultChromeArg: {

@@ -17,7 +17,25 @@ import {
 export type AggregatedInfoWithId =
   WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
 
+export interface HeapSnapshotClassDiff {
+  className: string;
+  addedCount: number;
+  removedCount: number;
+  countDelta: number;
+  addedSize: number;
+  removedSize: number;
+  sizeDelta: number;
+}
+
+export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
+  addedIds: number[];
+  addedSelfSizes: number[];
+  deletedIds: number[];
+  deletedSelfSizes: number[];
+}
+
 export class HeapSnapshotManager {
+  #snapshotIdGenerator = createIdGenerator();
   #snapshots = new Map<
     string,
     {
@@ -39,7 +57,8 @@ export class HeapSnapshotManager {
       return cached.snapshot;
     }
 
-    const {snapshot, worker} = await this.#loadSnapshot(absolutePath);
+    const uid = this.#snapshotIdGenerator();
+    const {snapshot, worker} = await this.#loadSnapshot(absolutePath, uid);
     this.#snapshots.set(absolutePath, {
       snapshot,
       worker,
@@ -173,6 +192,55 @@ export class HeapSnapshotManager {
     return await provider.serializeItemsRange(0, Infinity);
   }
 
+  async getClassDiffs(
+    baseFilePath: string,
+    currentFilePath: string,
+  ): Promise<HeapSnapshotClassDiff[]> {
+    const rawDiffs = await this.#getSortedRawClassDiffs(
+      baseFilePath,
+      currentFilePath,
+    );
+    return rawDiffs.map(rawDiff => ({
+      className: rawDiff.name,
+      addedCount: rawDiff.addedCount,
+      removedCount: rawDiff.removedCount,
+      countDelta: rawDiff.countDelta,
+      addedSize: rawDiff.addedSize,
+      removedSize: rawDiff.removedSize,
+      sizeDelta: rawDiff.sizeDelta,
+    }));
+  }
+
+  async getDetailedClassDiff(
+    baseFilePath: string,
+    currentFilePath: string,
+    classIndex: number,
+  ): Promise<HeapSnapshotDetailedClassDiff> {
+    const classDiffs = await this.#getSortedRawClassDiffs(
+      baseFilePath,
+      currentFilePath,
+    );
+    const rawDiff = classDiffs[classIndex];
+    if (!rawDiff) {
+      throw new Error(
+        `Invalid classIndex: ${classIndex}. Total classes with changes: ${classDiffs.length}`,
+      );
+    }
+    return {
+      className: rawDiff.name,
+      addedCount: rawDiff.addedCount,
+      removedCount: rawDiff.removedCount,
+      countDelta: rawDiff.countDelta,
+      addedSize: rawDiff.addedSize,
+      removedSize: rawDiff.removedSize,
+      sizeDelta: rawDiff.sizeDelta,
+      addedIds: rawDiff.addedIds ?? [],
+      addedSelfSizes: rawDiff.addedSelfSizes ?? [],
+      deletedIds: rawDiff.deletedIds ?? [],
+      deletedSelfSizes: rawDiff.deletedSelfSizes ?? [],
+    };
+  }
+
   #getCachedSnapshot(filePath: string) {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
@@ -180,6 +248,35 @@ export class HeapSnapshotManager {
       throw new Error(`Snapshot not loaded for ${filePath}`);
     }
     return cached;
+  }
+
+  async #getSortedRawClassDiffs(
+    baseFilePath: string,
+    currentFilePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff[]> {
+    const baseSnapshot = await this.getSnapshot(baseFilePath);
+    const currentSnapshot = await this.getSnapshot(currentFilePath);
+
+    const interfaceDefinitions = await currentSnapshot.interfaceDefinitions();
+    const aggregatesForDiff =
+      await baseSnapshot.aggregatesForDiff(interfaceDefinitions);
+    const baseSnapshotId = baseSnapshot.uid;
+    if (baseSnapshotId === undefined) {
+      throw new Error('Base snapshot UID is undefined');
+    }
+    // DevTools calculateSnapshotDiff uses the first parameter (baseSnapshotId)
+    // as a cache key. We pass the unique UID of the base snapshot.
+    const rawDiffs = await currentSnapshot.calculateSnapshotDiff(
+      baseSnapshotId,
+      aggregatesForDiff,
+    );
+
+    // Return a filtered and sorted array here to ensure that
+    // compare_heapsnapshot_summary and compare_heapsnapshot_details agree
+    // on indices.
+    return Object.values(rawDiffs)
+      .filter(diff => diff.addedCount > 0 || diff.removedCount > 0)
+      .sort((a, b) => b.sizeDelta - a.sizeDelta);
   }
 
   async resolveClassKeyFromId(
@@ -190,7 +287,10 @@ export class HeapSnapshotManager {
     return cached.idToClassKey.get(id);
   }
 
-  async #loadSnapshot(absolutePath: string): Promise<{
+  async #loadSnapshot(
+    absolutePath: string,
+    uid: number,
+  ): Promise<{
     snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
     worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
   }> {
@@ -205,7 +305,7 @@ export class HeapSnapshotManager {
     const {promise: snapshotPromise, resolve: resolveSnapshot} =
       Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
 
-    const loaderProxy = workerProxy.createLoader(1, snapshotProxy => {
+    const loaderProxy = workerProxy.createLoader(uid, snapshotProxy => {
       resolveSnapshot(snapshotProxy);
     });
 

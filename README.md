@@ -121,9 +121,9 @@ To use the Chrome DevTools MCP server follow the instructions from <a href="http
     "chrome-devtools": {
       "command": "npx",
       "args": [
+        "-y",
         "chrome-devtools-mcp@latest",
-        "--browser-url=http://127.0.0.1:9222",
-        "-y"
+        "--browser-url=http://127.0.0.1:9222"
       ]
     }
   }
@@ -514,9 +514,11 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
-- **Memory** (9 tools)
+- **Memory** (11 tools)
   - [`take_heapsnapshot`](docs/tool-reference.md#take_heapsnapshot)
   - [`close_heapsnapshot`](docs/tool-reference.md#close_heapsnapshot)
+  - [`compare_heapsnapshots_class_nodes`](docs/tool-reference.md#compare_heapsnapshots_class_nodes)
+  - [`compare_heapsnapshots_summary`](docs/tool-reference.md#compare_heapsnapshots_summary)
   - [`get_heapsnapshot_class_nodes`](docs/tool-reference.md#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](docs/tool-reference.md#get_heapsnapshot_details)
   - [`get_heapsnapshot_dominators`](docs/tool-reference.md#get_heapsnapshot_dominators)
@@ -553,14 +555,17 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--browserUrl`/ `--browser-url`, `-u`**
   Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
   WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--wsHeaders`/ `--ws-headers`**
   Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--headless`**
   Whether to run in headless (no UI) mode.
@@ -570,87 +575,108 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--executablePath`/ `--executable-path`, `-e`**
   Path to custom Chrome executable.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--isolated`**
   If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--userDataDir`/ `--user-data-dir`**
   Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
   - **Type:** string
+  - **Default:** `false`
 
 - **`--channel`**
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
   - **Choices:** `canary`, `dev`, `beta`, `stable`
+  - **Default:** `false`
 
 - **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--viewport`**
   Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--acceptInsecureCerts`/ `--accept-insecure-certs`**
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalPageIdRouting`/ `--experimental-page-id-routing`**
   Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalDevtools`/ `--experimental-devtools`**
   Whether to enable automation over DevTools targets
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalVision`/ `--experimental-vision`**
   Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--memoryDebugging`/ `--memory-debugging`, `-experimentalMemory`**
   Whether to enable memory debugging tools.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalStructuredContent`/ `--experimental-structured-content`**
   Whether to output structured formatted content.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalIncludeAllPages`/ `--experimental-include-all-pages`**
   Whether to include all kinds of pages such as webviews or background pages as pages.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalScreencast`/ `--experimental-screencast`**
   Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--experimentalFfmpegPath`/ `--experimental-ffmpeg-path`**
   Path to ffmpeg executable for screencast recording.
   - **Type:** string
+  - **Default:** `false`
 
 - **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
   Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCP,DevToolsWebMCPSupport`
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--chromeArg`/ `--chrome-arg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
+  - **Default:** `false`
 
 - **`--blockedUrlPattern`/ `--blocked-url-pattern`**
-  Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
+  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
   - **Type:** array
+  - **Default:** `false`
 
 - **`--allowedUrlPattern`/ `--allowed-url-pattern`**
-  Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
+  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
   - **Type:** array
+  - **Default:** `false`
 
 - **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
   Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
+  - **Default:** `false`
 
 - **`--categoryEmulation`/ `--category-emulation`**
   Set to false to exclude tools related to emulation.
@@ -691,22 +717,27 @@ The Chrome DevTools MCP server supports the following configuration option:
   Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which helps reduce context size in AI conversations. Unset preserves the existing default ("png").
   - **Type:** string
   - **Choices:** `jpeg`, `png`, `webp`
+  - **Default:** `false`
 
 - **`--screenshotQuality`/ `--screenshot-quality`**
   Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.
   - **Type:** number
+  - **Default:** `false`
 
 - **`--screenshotMaxWidth`/ `--screenshot-max-width`**
   Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.
   - **Type:** number
+  - **Default:** `false`
 
 - **`--screenshotMaxHeight`/ `--screenshot-max-height`**
   Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.
   - **Type:** number
+  - **Default:** `false`
 
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
   - **Type:** boolean
+  - **Default:** `false`
 
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
   If true, redacts some of the network headers considered sensitive before returning to the client.
@@ -929,3 +960,9 @@ Please consult [these instructions](./docs/debugging-android.md).
 ## Known limitations
 
 See [Troubleshooting](./docs/troubleshooting.md).
+
+## Integrating as a browser subagent
+
+If you are developing agentic tooling and want to provide an integrated browser subagent as part of your product, we recommend building on top of Chrome DevTools for agents.
+
+For a reference implementation, see the [Gemini CLI browser agent documentation](https://geminicli.com/docs/core/subagents/#browser-agent).

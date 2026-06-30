@@ -48,17 +48,29 @@ export const startScreencast = definePageTool(args => ({
       return;
     }
 
-    const filePath = request.params.filePath ?? (await generateTempFilePath());
-    let enforcedExtension = '.mp4' as `.${string}`;
-    let format: VideoFormat = 'mp4';
+    const requestedFilePath = request.params.filePath;
+    const filePath = requestedFilePath ?? (await generateTempFilePath());
 
-    for (const supportedExtension of supportedExtensions) {
-      if (filePath.endsWith(supportedExtension)) {
-        enforcedExtension = supportedExtension;
-        format = supportedExtension.substring(1) as VideoFormat;
-        break;
-      }
+    // Match the extension case-insensitively so e.g. `.WEBM` is recognized as
+    // WebM. An explicitly requested but unsupported extension is rejected
+    // rather than being silently rewritten to `.mp4` (which would change both
+    // the format and the output path from what was requested). A missing
+    // extension falls back to `.mp4`. The matched extension is normalized to
+    // lower case.
+    const requestedExtension = path.extname(filePath);
+    const matchedExtension = supportedExtensions.find(
+      supportedExtension =>
+        supportedExtension === requestedExtension.toLowerCase(),
+    );
+    if (!matchedExtension && requestedExtension !== '') {
+      throw new Error(
+        `Unsupported screencast file extension "${requestedExtension}". ` +
+          `Supported formats: ${supportedExtensions.join(', ')} (case-insensitive).`,
+      );
     }
+    const enforcedExtension: `.${string}` = matchedExtension ?? '.mp4';
+    const format: VideoFormat = (matchedExtension?.substring(1) ??
+      'mp4') as VideoFormat;
 
     const resolvedPath = ensureExtension(
       path.resolve(filePath),
@@ -75,6 +87,18 @@ export const startScreencast = definePageTool(args => ({
         ffmpegPath: args?.experimentalFfmpegPath,
       });
     } catch (err) {
+      // If we generated a temporary directory for this recording, remove it so
+      // a failed start (e.g. ffmpeg missing) does not leak an empty directory.
+      if (requestedFilePath === undefined) {
+        try {
+          await fs.rm(path.dirname(resolvedPath), {
+            recursive: true,
+            force: true,
+          });
+        } catch {
+          // no-op
+        }
+      }
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('ENOENT') && message.includes('ffmpeg')) {
         throw new Error(

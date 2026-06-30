@@ -277,6 +277,13 @@ export default [
         return true;
       }
 
+      if (
+        source === '@toon-format/toon' ||
+        source.startsWith('@toon-format/toon/')
+      ) {
+        return true;
+      }
+
       const existingExternals = [
         './bidi.js',
         '../bidi/bidi.js',

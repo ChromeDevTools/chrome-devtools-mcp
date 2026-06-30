@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.4.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.3.0...chrome-devtools-mcp-v1.4.0) (2026-06-23)
+
+
+### 🎉 Features
+
+* publish the skills folder  ([#2229](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2229)) ([5367f7e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5367f7e97c1a4f506d8d1e3e8e773c72f1c0a03a))
+
+
+### 🛠️ Fixes
+
+* hide Windows update check consoles ([#2231](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2231)) ([6225ffb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6225ffbaf1ceb2d9d0f8b2f3b7380aa8a710b857))
+* **network:** keep redirect chain order consistent between text and JSON ([#2221](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2221)) ([5a9d6af](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/5a9d6af743109e3bb9703cf0c9a46f9cb2a97480))
+
+
+### 📄 Documentation
+
+* fix showing defaults in configuration ([#2234](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2234)) ([38dd346](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/38dd346805416c8bff2196e73c1410ca78d6f397))
+* **readme:** explicitly call out that CD4A can power your browser agent ([#2227](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2227)) ([705d0e1](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/705d0e11812b8c1c2506d0ac372a97671298df11))
+* update security.md ([#2248](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2248)) ([e559765](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e55976574030dd2cde45b58d57555f5d433f50e0))
+
+## [1.3.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.2.0...chrome-devtools-mcp-v1.3.0) (2026-06-18)
+
+
+### 🎉 Features
+
+* Add get_heapsnapshot_dominators MCP tool ([#2215](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2215)) ([08c234e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/08c234ea4b14b0ba0906deeca396873614a8c063))
+* Add retaining paths MCP tool ([#2187](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2187)) ([a97c642](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/a97c642d43d19fc5198038a7544ff41528ddc316))
+* Add the get_heapsnapshot_edges MCP tool ([#2180](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2180)) ([4f8eb7a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4f8eb7ad6beecc58f56ec383f9ff43549a5604d4))
+* include page title in list_pages output ([#2166](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2166)) ([b646feb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/b646feb4f33743a5ecdc6c5e3744e98f86374af3))
+* **screenshot:** add CLI options to cap screenshot size at the source ([#1823](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1823)) ([55c8a54](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/55c8a541d4f842056db6bc843e54117b07bf06c1))
+* Use HeapSnapshotProxy.nodeIndexById ([#2193](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2193)) ([6bd8c91](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/6bd8c91678035b5aa18ee40f72e1f630aa528837))
+
+
+### 🛠️ Fixes
+
+* handle missing third-party tool toolGroup description gracefully ([#2224](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2224)) ([8fe398e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8fe398eb5d6ee87edb51d4e37570d04b02679346))
+* handle screencast file extensions case-insensitively and clean up temp dir on failure ([#2207](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2207)) ([ba80096](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ba80096521da437a834953f697c4c98bcbd6e658))
+* limit windows test concurrency ([#2205](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2205)) ([e77101e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e77101e5dc53f9f9541eb91916eedb53495544cc))
+* Reset toolGroups before gathering toolGroups ([#2200](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2200)) ([ed02047](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ed02047ae90f25c4c15adb8fd7e224b963f43135))
+* return error message when screencast_stop is called with no active recording ([#2209](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2209)) ([9e32002](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9e32002a6947ff695e463a5fefa99a7f66f19403))
+
 ## [1.2.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.1.1...chrome-devtools-mcp-v1.2.0) (2026-06-08)
 
 

@@ -300,19 +300,109 @@ describe('McpContext', () => {
   });
 
   describe('loadResource', () => {
-    it('file protocol calls validatePath', async () => {
-      await withMcpContext(async (_response, context) => {
-        const validatePathSpy = sinon.spy(context, 'validatePath');
-        const testFilePath = path.join(os.tmpdir(), 'load-resource-test.txt');
+    describe('file protocol', () => {
+      it('calls validatePath', async () => {
+        await withMcpContext(async (_response, context) => {
+          const validatePathSpy = sinon.spy(context, 'validatePath');
+          const testFilePath = path.join(os.tmpdir(), 'load-resource-test.txt');
+          await fs.writeFile(testFilePath, 'test content');
+          try {
+            const url = pathToFileURL(testFilePath).href;
+            const content = await context.loadResource(url);
+            assert.strictEqual(content, 'test content');
+            sinon.assert.calledWith(validatePathSpy, testFilePath);
+          } finally {
+            await fs.rm(testFilePath, {force: true});
+          }
+        });
+      });
+
+      it('is not blocked by allowlist', async () => {
+        const testFilePath = path.join(
+          os.tmpdir(),
+          'load-resource-test-allow.txt',
+        );
         await fs.writeFile(testFilePath, 'test content');
         try {
-          const url = pathToFileURL(testFilePath).href;
-          const content = await context.loadResource(url);
-          assert.strictEqual(content, 'test content');
-          sinon.assert.calledWith(validatePathSpy, testFilePath);
+          await withMcpContext(
+            async (_response, context) => {
+              const url = pathToFileURL(testFilePath).href;
+              const content = await context.loadResource(url);
+              assert.strictEqual(content, 'test content');
+            },
+            {
+              allowedUrlPattern: ['https://example.com/allowed*'],
+            },
+          );
         } finally {
           await fs.rm(testFilePath, {force: true});
         }
+      });
+    });
+
+    describe('https protocol', () => {
+      it('respects blocklist by throwing if blocked', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            await assert.rejects(() =>
+              context.loadResource('https://example.com/blocked'),
+            );
+          },
+          {
+            blockedUrlPattern: ['https://example.com/blocked*'],
+          },
+        );
+      });
+
+      it('respects blocklist by not throwing if not blocked', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            sinon.stub(globalThis, 'fetch').resolves({
+              ok: true,
+              text: async () => 'mock data',
+            } as Response);
+
+            const content = await context.loadResource(
+              'https://example.com/allowed',
+            );
+            assert.strictEqual(content, 'mock data');
+          },
+          {
+            blockedUrlPattern: ['https://example.com/blocked*'],
+          },
+        );
+      });
+
+      it('respects allowlist by throwing if not allowed', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            await assert.rejects(() =>
+              context.loadResource('https://example.com/blocked'),
+            );
+          },
+          {
+            allowedUrlPattern: ['https://example.com/allowed*'],
+          },
+        );
+      });
+
+      it('respects allowlist by not throwing if allowed', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            sinon.stub(globalThis, 'fetch').resolves({
+              ok: true,
+              text: async () => 'mock data',
+            } as Response);
+
+            const content = await context.loadResource(
+              'https://example.com/allowed',
+            );
+            assert.strictEqual(content, 'mock data');
+          },
+          {
+            allowedUrlPattern: ['https://example.com/allowed*'],
+          },
+        );
       });
     });
   });

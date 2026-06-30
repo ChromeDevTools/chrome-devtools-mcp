@@ -185,9 +185,7 @@ function generateConfigOptionsMarkdown(): string {
     }
 
     // Add default if available
-    if (optionConfig.default !== undefined) {
-      markdown += `  - **Default:** \`${optionConfig.default}\`\n`;
-    }
+    markdown += `  - **Default:** \`${optionConfig.default ?? 'false'}\`\n`;
 
     markdown += '\n';
   }

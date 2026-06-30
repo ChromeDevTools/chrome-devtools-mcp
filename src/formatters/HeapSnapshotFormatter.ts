@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {AggregatedInfoWithId} from '../HeapSnapshotManager.js';
+import type {
+  AggregatedInfoWithId,
+  HeapSnapshotClassDiff,
+  HeapSnapshotDetailedClassDiff,
+} from '../HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import {stableIdSymbol} from '../utils/id.js';
 
@@ -157,4 +161,57 @@ export class HeapSnapshotFormatter {
   > {
     return Object.entries(aggregates).sort((a, b) => b[1].maxRet - a[1].maxRet);
   }
+
+  static formatDiffSummary(diffs: HeapSnapshotClassDiff[]): string {
+    const lines: string[] = [];
+    lines.push(
+      'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
+    );
+
+    let index = 0;
+    for (const diff of diffs) {
+      lines.push(
+        `${index},${diff.className},${diff.addedCount},${diff.removedCount},${diff.countDelta},${DevTools.I18n.ByteUtilities.formatBytesToKb(diff.addedSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(diff.removedSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(diff.sizeDelta)}`,
+      );
+      index++;
+    }
+
+    return lines.join('\n');
+  }
+
+  static formatDiffDetails(diff: HeapSnapshotDetailedClassDiff): string {
+    const lines: string[] = [];
+    lines.push(
+      `${diff.className}: # new: ${diff.addedCount}, # deleted: ${diff.removedCount}, # delta: ${formatSignedCount(diff.countDelta)}, alloc size: ${formatSignedSize(diff.addedSize)}, freed size: ${formatSignedSize(diff.removedSize)}, size delta: ${formatSignedSize(diff.sizeDelta)}`,
+    );
+
+    const addedIds = diff.addedIds;
+    const addedSelfSizes = diff.addedSelfSizes;
+    const deletedIds = diff.deletedIds;
+    const deletedSelfSizes = diff.deletedSelfSizes;
+
+    lines.push(`Objects:`);
+
+    for (let i = 0; i < addedIds.length; i++) {
+      lines.push(
+        `  + @${addedIds[i]} (self_size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(addedSelfSizes[i])})`,
+      );
+    }
+    for (let i = 0; i < deletedIds.length; i++) {
+      lines.push(
+        `  - @${deletedIds[i]} (self_size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(deletedSelfSizes[i])})`,
+      );
+    }
+
+    return lines.join('\n');
+  }
+}
+
+function formatSignedCount(n: number): string {
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+function formatSignedSize(bytes: number): string {
+  const formatted = DevTools.I18n.ByteUtilities.formatBytesToKb(bytes);
+  return bytes > 0 ? `+${formatted}` : formatted;
 }

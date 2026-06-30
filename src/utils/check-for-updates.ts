@@ -88,6 +88,7 @@ export async function checkForUpdates(message: string) {
       {
         detached: true,
         stdio: 'ignore',
+        windowsHide: true,
       },
     );
     child.unref();

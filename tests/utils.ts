@@ -122,11 +122,11 @@ export async function withMcpContext(
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
   } = {},
-  args: ParsedArguments = {} as ParsedArguments,
+  args: Partial<ParsedArguments> = {},
 ) {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
-    const response = new McpResponse(args);
+    const response = new McpResponse(args as ParsedArguments);
     if (context) {
       context.dispose();
     }
@@ -136,10 +136,8 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
-        hasNetworkBlockOrAllowlist: Boolean(
-          (options.blockedUrlPattern && options.blockedUrlPattern.length > 0) ||
-          (options.allowedUrlPattern && options.allowedUrlPattern.length > 0),
-        ),
+        allowList: options.allowedUrlPattern,
+        blocklist: options.blockedUrlPattern,
       },
       Locator,
     );
@@ -200,7 +198,10 @@ export function getMockRequest(
       );
     },
     redirectChain(): HTTPRequest[] {
-      return options.redirectChain ?? [];
+      // Puppeteer returns a fresh copy on every call (HTTPRequest returns
+      // `this._redirectChain.slice()`); mirror that so formatters can't share
+      // and accidentally mutate the same array across calls.
+      return [...(options.redirectChain ?? [])];
     },
     isNavigationRequest() {
       return options.navigationRequest ?? false;
