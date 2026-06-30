@@ -60,10 +60,35 @@ export async function ensureBrowserConnected(options: {
     return browser;
   }
 
+  // Detect Electron by checking /json/version — Electron doesn't support
+  // Target.getDevToolsTarget which handleDevToolsAsPage relies on.
+  let isElectron = false;
+  if (options.browserURL) {
+    try {
+      const res = await fetch(`${options.browserURL}/json/version`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      const info = (await res.json()) as {
+        Browser?: string;
+        'User-Agent'?: string;
+      };
+      const ua = info['User-Agent'] || '';
+      if (
+        /electron/i.test(ua) ||
+        (info.Browser && /electron/i.test(info.Browser))
+      ) {
+        isElectron = true;
+        logger?.('Detected Electron browser, disabling handleDevToolsAsPage');
+      }
+    } catch {
+      // Can't detect, assume Chrome
+    }
+  }
+
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
-    handleDevToolsAsPage: true,
+    handleDevToolsAsPage: !isElectron,
     blocklist: options.blocklist,
     allowlist: options.allowlist,
   };

@@ -1,0 +1,24 @@
+diff --git a/node_modules/puppeteer-core/lib/puppeteer/cdp/Browser.js b/node_modules/puppeteer-core/lib/puppeteer/cdp/Browser.js
+index 9e33ed9..fef916b 100644
+--- a/node_modules/puppeteer-core/lib/puppeteer/cdp/Browser.js
++++ b/node_modules/puppeteer-core/lib/puppeteer/cdp/Browser.js
+@@ -259,10 +259,15 @@ export class CdpBrowser extends BrowserBase {
+         return page;
+     }
+     async _hasDevToolsTarget(pageTargetId) {
+-        const response = await this.#connection.send('Target.getDevToolsTarget', {
+-            targetId: pageTargetId,
+-        });
+-        return response.targetId;
++        try {
++            const response = await this.#connection.send('Target.getDevToolsTarget', {
++                targetId: pageTargetId,
++            });
++            return response.targetId;
++        } catch {
++            // Electron doesn't support Target.getDevToolsTarget
++            return undefined;
++        }
+     }
+     async installExtension(path) {
+         const { id } = await this.#connection.send('Extensions.loadUnpacked', { path });
