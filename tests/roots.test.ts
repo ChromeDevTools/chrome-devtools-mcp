@@ -54,4 +54,86 @@ describe('McpContext Roots', () => {
       }
     });
   });
+
+  it('should enforce extensions and validate the output path', async () => {
+    await withMcpContext(async (_response, context) => {
+      const workspacePath = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'workspace-root-'),
+      );
+      try {
+        context.setRoots([
+          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
+        ]);
+
+        const testCases: Array<{
+          filePath: string;
+          extension: '.json' | '.txt' | '.png' | '.zip';
+          expected: string;
+        }> = [
+          {
+            filePath: 'result',
+            extension: '.json',
+            expected: 'result.json',
+          },
+          {
+            filePath: 'result.jpg',
+            extension: '.txt',
+            expected: 'result.txt',
+          },
+          {
+            filePath: 'nested/result.jpg',
+            extension: '.png',
+            expected: 'nested/result.png',
+          },
+          {
+            filePath: '.bashrc',
+            extension: '.txt',
+            expected: '.bashrc.txt',
+          },
+          {
+            filePath: 'file.tar.gz',
+            extension: '.zip',
+            expected: 'file.tar.zip',
+          },
+        ];
+
+        for (const testCase of testCases) {
+          const resolvedPath = await context.ensureExtension(
+            path.join(workspacePath, testCase.filePath),
+            testCase.extension,
+          );
+
+          assert.strictEqual(
+            resolvedPath,
+            path.join(workspacePath, testCase.expected),
+          );
+        }
+      } finally {
+        await fs.rm(workspacePath, {recursive: true, force: true});
+      }
+    });
+  });
+
+  it('should deny extension-enforced paths outside roots', async () => {
+    await withMcpContext(async (_response, context) => {
+      const workspacePath = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'workspace-root-'),
+      );
+      try {
+        context.setRoots([
+          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
+        ]);
+
+        await assert.rejects(
+          context.ensureExtension(
+            path.join(os.homedir(), 'outside-root-result'),
+            '.json',
+          ),
+          /Access denied/,
+        );
+      } finally {
+        await fs.rm(workspacePath, {recursive: true, force: true});
+      }
+    });
+  });
 });
