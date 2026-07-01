@@ -643,6 +643,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--emulateFocusedPages`/ `--emulate-focused-pages`**
+  Whether to emulate pages as focused and active. Disable only when visible-browser focus behavior is problematic; keeping it enabled preserves existing behavior for multi-agent workflows where pages should behave as focused/active.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--experimentalScreencast`/ `--experimental-screencast`**
   Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.
   - **Type:** boolean
