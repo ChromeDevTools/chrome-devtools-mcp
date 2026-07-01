@@ -240,14 +240,14 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable.',
     category: 'Debugging',
     args: {
       function: {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
         required: true,
       },
       args: {
@@ -653,7 +653,7 @@ export const commands: Commands = {
   },
   list_3p_developer_tools: {
     description:
-      "Lists all third-party developer tools the page exposes for providing runtime information.\n  Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\n  Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the\n  following command to the script:\n  'window.__dtmcp.executeTool(toolName, params)'\n  This might be helpful when the third-party developer tools return non-serializable values or when composing\n  third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
+      "Lists all third-party developer tools the page exposes for providing runtime information.\nThird-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\nAlternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the\nfollowing command to the script:\n`window.__dtmcp.executeTool(toolName, params)`\nThis might be helpful when the third-party developer tools return non-serializable values or when composing\nthird-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
     category: 'Third-party',
     args: {},
   },
