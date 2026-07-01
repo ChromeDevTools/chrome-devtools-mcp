@@ -313,6 +313,87 @@ describe('console', () => {
         });
       });
     });
+
+    it('includes source location in console messages', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          '<script>\nconsole.error("error with location");\n</script>',
+        );
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        // Should contain the location (line:column)
+        assert.match(textContent, /error with location.*\d+:\d+/);
+      });
+    });
+
+    it('includes source location with URL for external scripts', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent('<div>page</div>');
+        await page.addScriptTag({
+          content: 'console.error("from external")',
+        });
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /from external.*\d+:\d+/);
+      });
+    });
+
+    it('includes location in toJSON output', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          '<script>\nconsole.warn("warn with loc");\n</script>',
+        );
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const structured = formattedResponse.structuredContent as {
+          consoleMessages: Array<{location?: object}>;
+        };
+        const msg = structured?.consoleMessages?.[0];
+        assert.ok(msg?.location, 'location should be present in JSON output');
+        const loc = msg.location as {
+          lineNumber: number;
+          columnNumber: number;
+        };
+        assert.strictEqual(typeof loc.lineNumber, 'number');
+        assert.strictEqual(typeof loc.columnNumber, 'number');
+      });
+    });
+
+    it('includes source location in uncaught errors', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          '<script>\nthrow new Error("uncaught with location");\n</script>',
+        );
+        // Wait for the error to be collected
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle('test', context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /uncaught with location.*\d+:\d+/);
+      });
+    });
   });
 
   describe('get_console_message', () => {

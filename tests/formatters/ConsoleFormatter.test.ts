@@ -29,6 +29,7 @@ const createMockMessage = (
     type: () => data.type?.() ?? 'log',
     text: () => data.text?.() ?? '',
     args: () => data.args?.() ?? [],
+    location: () => ({}),
     ...data,
   } as unknown as ConsoleMessage;
 };
