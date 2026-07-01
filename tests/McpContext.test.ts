@@ -14,11 +14,69 @@ import {pathToFileURL} from 'node:url';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
+import {mapWithConcurrency} from '../src/McpContext.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
 import {getMockRequest, html, withMcpContext} from './utils.js';
+
+describe('mapWithConcurrency', () => {
+  it('runs the worker exactly once for each item below the limit', async () => {
+    const items = [1, 2, 3];
+    const processed = new Set<number>();
+
+    await mapWithConcurrency(items, 10, async item => {
+      assert.strictEqual(processed.has(item), false);
+      processed.add(item);
+    });
+
+    assert.deepStrictEqual(processed, new Set(items));
+  });
+
+  it('does not exceed the concurrency limit', async () => {
+    const items = Array.from({length: 50}, (_value, index) => index);
+    const limit = 3;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let processedCount = 0;
+
+    await mapWithConcurrency(items, limit, async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+        processedCount++;
+      } finally {
+        inFlight--;
+      }
+    });
+
+    assert.strictEqual(processedCount, items.length);
+    assert.ok(maxInFlight <= limit);
+  });
+
+  it('continues processing after a worker rejects', async () => {
+    const items = [1, 2, 3, 4, 5];
+    const started = new Set<number>();
+    const completed = new Set<number>();
+
+    await assert.rejects(
+      mapWithConcurrency(items, 2, async item => {
+        started.add(item);
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+        if (item === 3) {
+          throw new Error('failed item');
+        }
+        completed.add(item);
+      }),
+      /failed item/,
+    );
+
+    assert.deepStrictEqual(started, new Set(items));
+    assert.deepStrictEqual(completed, new Set([1, 2, 4, 5]));
+  });
+});
 
 describe('McpContext', () => {
   afterEach(() => {
