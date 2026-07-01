@@ -54,10 +54,7 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from './types.js';
-import {
-  getTempFilePath,
-  resolveCanonicalPath,
-} from './utils/files.js';
+import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
