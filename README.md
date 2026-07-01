@@ -966,3 +966,24 @@ See [Troubleshooting](./docs/troubleshooting.md).
 If you are developing agentic tooling and want to provide an integrated browser subagent as part of your product, we recommend building on top of Chrome DevTools for agents.
 
 For a reference implementation, see the [Gemini CLI browser agent documentation](https://geminicli.com/docs/core/subagents/#browser-agent).
+
+## Micropayments with x402
+
+This server supports optional [x402 micropayments](https://x402.org) via the `@gadgethumans/x402` package. x402 enables pay-per-use API access using HTTP 402/Payment Required semantics.
+
+To enable, install the optional dependency and wrap the server:
+
+```bash
+npm install @gadgethumans/x402
+```
+
+Then in your server setup:
+
+```ts
+import { wrapMCPServer } from '@gadgethumans/x402';
+
+const server = ...; // your MCP server instance
+wrapMCPServer(server);
+```
+
+That's it — `@gadgethumans/x402` intercepts incoming requests and handles x402 payment flow automatically. The server will return a `402 Payment Required` status when payment is needed, and the client SDK handles the wallet interaction.
