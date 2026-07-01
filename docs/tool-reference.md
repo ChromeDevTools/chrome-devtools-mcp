@@ -348,11 +348,11 @@
 ### `evaluate_script`
 
 **Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+so returned values have to be JSON-serializable. Use standard browser DOM APIs. Snapshot uids are not DOM attributes; to work with a snapshot element, pass its uid through args instead of using it in document.querySelector(). querySelector only accepts standard CSS selectors, not jQuery-style pseudo-classes such as :contains().
 
 **Parameters:**
 
-- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
+- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page. Use standard browser DOM APIs and selectors.
   Example without arguments: `() => {
 return document.title
 }` or `async () => {
@@ -362,7 +362,7 @@ return await fetch("example.com")
 return el.innerText;
 }`
 
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **args** (array) _(optional)_: An optional list of uids from the page content snapshot. Each uid is resolved to an element and passed as an argument to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
 

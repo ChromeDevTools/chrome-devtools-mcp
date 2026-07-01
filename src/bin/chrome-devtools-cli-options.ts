@@ -240,20 +240,21 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,\nso returned values have to be JSON-serializable. Use standard browser DOM APIs. Snapshot uids are not DOM attributes; to work with a snapshot element, pass its uid through args instead of using it in document.querySelector(). querySelector only accepts standard CSS selectors, not jQuery-style pseudo-classes such as :contains().',
     category: 'Debugging',
     args: {
       function: {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
+          'A JavaScript function declaration to be executed by the tool in the currently selected page. Use standard browser DOM APIs and selectors.\nExample without arguments: `() => {\n  return document.title\n}` or `async () => {\n  return await fetch("example.com")\n}`.\nExample with arguments: `(el) => {\n  return el.innerText;\n}`\n',
         required: true,
       },
       args: {
         name: 'args',
         type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
+        description:
+          'An optional list of uids from the page content snapshot. Each uid is resolved to an element and passed as an argument to the function.',
         required: false,
       },
       filePath: {

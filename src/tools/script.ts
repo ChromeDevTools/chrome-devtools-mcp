@@ -18,7 +18,7 @@ export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
     description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+so returned values have to be JSON-serializable. Use standard browser DOM APIs. Snapshot uids are not DOM attributes; to work with a snapshot element, pass its uid through args instead of using it in document.querySelector(). querySelector only accepts standard CSS selectors, not jQuery-style pseudo-classes such as :contains().`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
@@ -26,7 +26,7 @@ so returned values have to be JSON-serializable.`,
     schema: {
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       function: zod.string().describe(
-        `A JavaScript function declaration to be executed by the tool in the currently selected page.
+        `A JavaScript function declaration to be executed by the tool in the currently selected page. Use standard browser DOM APIs and selectors.
 Example without arguments: \`() => {
   return document.title
 }\` or \`async () => {
@@ -46,7 +46,9 @@ Example with arguments: \`(el) => {
             ),
         )
         .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
+        .describe(
+          `An optional list of uids from the page content snapshot. Each uid is resolved to an element and passed as an argument to the function.`,
+        ),
       filePath: zod
         .string()
         .optional()
