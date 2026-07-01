@@ -153,8 +153,8 @@ export class WaitForHelper {
     }
 
     const navigationFinished = this.waitForNavigationStarted()
-      .then(navigationStated => {
-        if (navigationStated) {
+      .then(navigationStarted => {
+        if (navigationStarted) {
           return this.#page.waitForNavigation({
             timeout: options?.timeout ?? this.#navigationTimeout,
             signal: this.#abortController.signal,

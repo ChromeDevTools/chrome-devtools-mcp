@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs/promises';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -788,7 +787,7 @@ export class McpContext implements Context {
     const filepath = await getTempFilePath(filename);
     await this.validatePath(filepath);
     try {
-      await fs.writeFile(filepath, data);
+      await fsPromises.writeFile(filepath, data);
     } catch (err) {
       throw new Error('Could not save a file', {cause: err});
     }
@@ -806,8 +805,8 @@ export class McpContext implements Context {
         path.resolve(clientProvidedFilePath),
         extension,
       );
-      await fs.mkdir(path.dirname(filePath), {recursive: true});
-      await fs.writeFile(filePath, data);
+      await fsPromises.mkdir(path.dirname(filePath), {recursive: true});
+      await fsPromises.writeFile(filePath, data);
       return {filename: filePath};
     } catch (err) {
       this.logger?.(err);
