@@ -85,9 +85,13 @@
     "yargs": "18.0.0"
   },
   "peerDependencies": {
+    "@gadgethumans/x402": "^1.0.0",
     "@toon-format/toon": "^2.2.0"
   },
   "peerDependenciesMeta": {
+    "@gadgethumans/x402": {
+      "optional": true
+    },
     "@toon-format/toon": {
       "optional": true
     }
