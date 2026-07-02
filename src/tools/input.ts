@@ -464,19 +464,24 @@ export const uploadFile = definePageTool({
       .describe(
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
-    filePath: zod.string().describe('The local path of the file to upload'),
+    filePath: zod
+      .union([zod.string(), zod.array(zod.string()).min(1)])
+      .describe(
+        'The local path of the file to upload, or an array of paths to upload several files at once to an input that accepts multiple files',
+      ),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
   verifyFilesSchema: ['filePath'],
   handler: async (request, response, _context) => {
     const {uid, filePath} = request.params;
+    const filePaths = Array.isArray(filePath) ? filePath : [filePath];
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
     try {
       try {
-        await handle.uploadFile(filePath);
+        await handle.uploadFile(...filePaths);
       } catch {
         // Some sites use a proxy element to trigger file upload instead of
         // a type=file element. In this case, we want to default to
@@ -486,7 +491,7 @@ export const uploadFile = definePageTool({
             request.page.pptrPage.waitForFileChooser({timeout: 3000}),
             handle.asLocator().click(),
           ]);
-          await fileChooser.accept([filePath]);
+          await fileChooser.accept(filePaths);
         } catch {
           throw new Error(
             `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
@@ -496,7 +501,9 @@ export const uploadFile = definePageTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
-      response.appendResponseLine(`File uploaded from ${filePath}.`);
+      response.appendResponseLine(
+        `File uploaded from ${filePaths.join(', ')}.`,
+      );
     } finally {
       void handle.dispose();
     }

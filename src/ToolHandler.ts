@@ -223,7 +223,10 @@ export class ToolHandler {
         if (this.tool.verifyFilesSchema) {
           for (const key of this.tool.verifyFilesSchema) {
             const filePath = params[key];
-            await context.validatePath(filePath as string);
+            const paths = Array.isArray(filePath) ? filePath : [filePath];
+            for (const path of paths) {
+              await context.validatePath(path as string);
+            }
           }
         }
         if (isPageScopedTool(this.tool)) {
