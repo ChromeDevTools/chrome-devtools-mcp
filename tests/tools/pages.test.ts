@@ -216,7 +216,7 @@ describe('pages', () => {
           });
         });
 
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test dialog');
         });
         const dialog = await dialogPromise;
@@ -226,6 +226,7 @@ describe('pages', () => {
         const result = await response.handle('list_pages', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
+        await evalPromise;
       });
     });
   });
@@ -388,7 +389,7 @@ describe('pages', () => {
           });
         });
 
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test dialog');
         });
         const dialog = await dialogPromise;
@@ -402,6 +403,7 @@ describe('pages', () => {
         const result = await response.handle('new_page', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
+        await evalPromise;
       });
     });
   });
@@ -604,7 +606,7 @@ describe('pages', () => {
           });
         });
 
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test dialog');
         });
         const dialog = await dialogPromise;
@@ -614,6 +616,7 @@ describe('pages', () => {
         const result = await response.handle('select_page', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
+        await evalPromise;
       });
     });
   });
@@ -1068,7 +1071,7 @@ describe('pages', () => {
           });
         });
 
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test dialog');
         });
         const dialog = await dialogPromise;
@@ -1085,6 +1088,7 @@ describe('pages', () => {
         const result = await response.handle('resize_page', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
+        await evalPromise;
       });
     });
   });
@@ -1098,7 +1102,7 @@ describe('pages', () => {
             resolve();
           });
         });
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test');
         });
         await dialogPromise;
@@ -1117,6 +1121,7 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully accepted the dialog',
         );
+        await evalPromise;
       });
     });
     it('can dismiss dialogs', async () => {
@@ -1127,7 +1132,7 @@ describe('pages', () => {
             resolve();
           });
         });
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test');
         });
         await dialogPromise;
@@ -1146,6 +1151,7 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully dismissed the dialog',
         );
+        await evalPromise;
       });
     });
     it('can dismiss already dismissed dialog dialogs', async () => {
@@ -1156,7 +1162,7 @@ describe('pages', () => {
             resolve(dialog);
           });
         });
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test');
         });
         const dialog = await dialogPromise;
@@ -1176,6 +1182,7 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully dismissed the dialog',
         );
+        await evalPromise;
       });
     });
     it('can handle a dialog on a non-selected page via pageId', async () => {
@@ -1188,7 +1195,7 @@ describe('pages', () => {
             resolve();
           });
         });
-        page1.pptrPage.evaluate(() => {
+        const evalPromise = page1.pptrPage.evaluate(() => {
           alert('test');
         });
         await dialogPromise;
@@ -1209,6 +1216,7 @@ describe('pages', () => {
           response.responseLines[0],
           'Successfully accepted the dialog',
         );
+        await evalPromise;
       });
     });
     it('tracks dialogs independently per page', async () => {
@@ -1223,7 +1231,7 @@ describe('pages', () => {
             resolve();
           });
         });
-        page1.pptrPage.evaluate(() => {
+        const eval1Promise = page1.pptrPage.evaluate(() => {
           alert('dialog1');
         });
         await dialog1Promise;
@@ -1234,7 +1242,7 @@ describe('pages', () => {
             resolve();
           });
         });
-        page2.pptrPage.evaluate(() => {
+        const eval2Promise = page2.pptrPage.evaluate(() => {
           alert('dialog2');
         });
         await dialog2Promise;
@@ -1259,6 +1267,8 @@ describe('pages', () => {
           context,
         );
         assert.strictEqual(page2.getDialog(), undefined);
+
+        await Promise.all([eval1Promise, eval2Promise]);
       });
     });
   });
