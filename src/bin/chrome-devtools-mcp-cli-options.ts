@@ -181,11 +181,6 @@ export const cliOptions = {
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
   },
-  experimentalNavigationAllowlist: {
-    type: 'boolean',
-    describe: 'Whether to enable navigation allowlist tool parameter.',
-    hidden: true,
-  },
   experimentalInteropTools: {
     type: 'boolean',
     describe: 'Whether to enable interoperability tools',
