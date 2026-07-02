@@ -333,8 +333,7 @@ export function defineTool<
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition:
-    | ToolDefinition<Schema>
-    | ((args?: Args) => ToolDefinition<Schema>),
+    ToolDefinition<Schema> | ((args?: Args) => ToolDefinition<Schema>),
 ) {
   if (typeof definition === 'function') {
     const factory = definition;
@@ -381,8 +380,7 @@ export function definePageTool<
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition:
-    | PageToolDefinition<Schema>
-    | ((args?: Args) => PageToolDefinition<Schema>),
+    PageToolDefinition<Schema> | ((args?: Args) => PageToolDefinition<Schema>),
 ): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
   if (typeof definition === 'function') {
     return (args?: Args): DefinedPageTool<Schema> => {

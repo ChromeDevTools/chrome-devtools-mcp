@@ -826,7 +826,8 @@
         "name": "class_index",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "compare_heapsnapshots_summary",
@@ -837,6 +838,24 @@
       },
       {
         "name": "current_file_path_length",
+        "argType": "number"
+      }
+    ],
+    "isDeprecated": true
+  },
+  {
+    "name": "compare_heapsnapshots",
+    "args": [
+      {
+        "name": "base_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "current_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "class_index",
         "argType": "number"
       }
     ]

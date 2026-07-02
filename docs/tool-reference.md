@@ -39,11 +39,10 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (11 tools)
+- **[Memory](#memory)** (10 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
-  - [`compare_heapsnapshots_class_nodes`](#compare_heapsnapshots_class_nodes)
-  - [`compare_heapsnapshots_summary`](#compare_heapsnapshots_summary)
+  - [`compare_heapsnapshots`](#compare_heapsnapshots)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
@@ -347,20 +346,13 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON,
-so returned values have to be JSON-serializable.
+**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => {
-  return document.title
-}` or `async () => {
-  return await fetch("example.com")
-}`.
-  Example with arguments: `(el) => {
-  return el.innerText;
-}`
+  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
+  Example with arguments: `(el) => el.innerText`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
@@ -471,26 +463,15 @@ in the DevTools Elements panel (if any).
 
 ---
 
-### `compare_heapsnapshots_class_nodes`
+### `compare_heapsnapshots`
 
-**Description:** Loads two memory heapsnapshots and returns the diff details (added/deleted instances) for a specific class. (requires flag: --memoryDebugging=true)
-
-**Parameters:**
-
-- **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
-- **classIndex** (number) **(required)**: 0-based index of the class in the summary list to filter results, showing individual objects.
-- **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
-
----
-
-### `compare_heapsnapshots_summary`
-
-**Description:** Loads two memory heapsnapshots and returns the summary diff between them (classes with changes). (requires flag: --memoryDebugging=true)
+**Description:** Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
 - **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
+- **classIndex** (number) _(optional)_: Optional 0-based index of the class in the summary list to filter results, showing individual objects.
 
 ---
 
@@ -653,7 +634,7 @@ in the DevTools Elements panel (if any).
 Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
 Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
 following command to the script:
-'window.\_\_dtmcp.executeTool(toolName, params)'
+`window.__dtmcp.executeTool(toolName, params)`
 This might be helpful when the third-party developer tools return non-serializable values or when composing
 third-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)
 
