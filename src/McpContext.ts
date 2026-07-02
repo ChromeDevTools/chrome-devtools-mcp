@@ -225,12 +225,20 @@ export class McpContext implements Context {
     }
 
     let allowed = false;
-    for (const root of roots) {
-      try {
+    const resolvedRoots = await Promise.allSettled(
+      roots.map(async root => {
         const rootPathUri = root.uri;
         const rootPath = path.resolve(fileURLToPath(rootPathUri));
-        const canonicalRoot = await fsPromises.realpath(rootPath);
+        return await fsPromises.realpath(rootPath);
+      }),
+    );
 
+    for (let i = 0; i < roots.length; i++) {
+      const root = roots[i];
+      const result = resolvedRoots[i];
+
+      if (result.status === 'fulfilled') {
+        const canonicalRoot = result.value;
         if (
           canonicalPath === canonicalRoot ||
           canonicalPath.startsWith(canonicalRoot + path.sep)
@@ -238,7 +246,8 @@ export class McpContext implements Context {
           allowed = true;
           break;
         }
-      } catch (rootErr) {
+      } else {
+        const rootErr = result.reason;
         const errMsg =
           rootErr instanceof Error ? rootErr.message : String(rootErr);
         console.warn(
