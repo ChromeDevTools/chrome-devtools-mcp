@@ -62,6 +62,7 @@ startCliOptions.isolated!.description =
 startCliOptions.categoryExtensions!.default = true;
 
 const y = yargs(hideBin(process.argv))
+  .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
   .usage('chrome-devtools <command> [...args] --flags')
