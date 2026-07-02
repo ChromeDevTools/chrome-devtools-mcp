@@ -39,6 +39,18 @@ async function start(args: string[], sessionId: string) {
 
 const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
 
+function getDefaultedStartArgs(
+  argv: Record<string, unknown>,
+): string[] {
+  if (argv.isolated === undefined && argv.userDataDir === undefined) {
+    argv.isolated = true;
+  }
+  if (argv.headless === undefined) {
+    argv.headless = true;
+  }
+  return serializeArgs(cliOptions, argv);
+}
+
 const startCliOptions = {
   ...cliOptions,
 } as Partial<typeof cliOptions>;
@@ -96,13 +108,7 @@ y.command(
       await stopDaemon(argv.sessionId);
     }
     // Defaults but we do not want to affect the yargs conflict resolution.
-    if (argv.isolated === undefined && argv.userDataDir === undefined) {
-      argv.isolated = true;
-    }
-    if (argv.headless === undefined) {
-      argv.headless = true;
-    }
-    const args = serializeArgs(cliOptions, argv);
+    const args = getDefaultedStartArgs(argv);
     await start(args, argv.sessionId);
     process.exit(0);
   },
@@ -226,7 +232,8 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
       const sessionId = argv.sessionId as string;
       try {
         if (!isDaemonRunning(sessionId)) {
-          await start([], sessionId);
+          const args = getDefaultedStartArgs({});
+          await start(args, sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
