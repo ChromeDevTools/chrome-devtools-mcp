@@ -334,6 +334,12 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
 </details>
 
 <details>
+  <summary>Grok Build CLI</summary>
+  Add the Chrome DevTools MCP server to your project's `.mcp.json` using the standard config from above.
+  See the <a href="https://docs.x.ai/build/features/skills-plugins-marketplaces">docs</a> for more options.
+</details>
+
+<details>
   <summary>JetBrains AI Assistant & Junie</summary>
 
 Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
