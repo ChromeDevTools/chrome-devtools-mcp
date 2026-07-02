@@ -306,15 +306,30 @@ export class TextSnapshot {
       descendantIds: Set<number>;
     }> = [];
 
+    const extraNodes: Array<TextSnapshotNode | null> = [];
     for (const handle of page.extraHandles) {
       const extraNode = await createExtraNode(handle);
-      if (!extraNode) {
-        continue;
+      extraNodes.push(extraNode);
+      if (extraNode) {
+        idToNode.set(extraNode.id, extraNode);
       }
-      idToNode.set(extraNode.id, extraNode);
+    }
+
+    const handlePromises = page.extraHandles.map(async (handle, index) => {
+      const extraNode = extraNodes[index];
+      if (!extraNode) {
+        return null;
+      }
       const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
       const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
-      reorgInfo.push({extraNode, attachTarget, descendantIds});
+      return {extraNode, attachTarget, descendantIds};
+    });
+
+    const results = await Promise.all(handlePromises);
+    for (const result of results) {
+      if (result) {
+        reorgInfo.push(result);
+      }
     }
 
     for (const {extraNode, attachTarget, descendantIds} of reorgInfo) {
