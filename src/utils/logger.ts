@@ -5,25 +5,23 @@
  */
 
 import fs from 'node:fs';
+import {debuglog} from 'node:util';
 
-import {debug} from '../third_party/index.js';
 import type {Logger} from '../types.js';
 
 const mcpDebugNamespace = 'mcp:log';
 
-const namespacesToEnable = [
-  mcpDebugNamespace,
-  ...(process.env['DEBUG'] ? [process.env['DEBUG']] : []),
-];
+const nodeDebugLogger = debuglog(mcpDebugNamespace);
+
+let fileLogger: ((...args: unknown[]) => void) | null = null;
 
 export function saveLogsToFile(fileName: string): fs.WriteStream {
-  // Enable overrides everything so we need to add them
-  debug.enable(namespacesToEnable.join(','));
-
   const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
-  debug.log = function (...chunks: any[]) {
+
+  fileLogger = (...chunks: unknown[]) => {
     logFile.write(`${chunks.join(' ')}\n`);
   };
+
   logFile.on('error', function (error) {
     console.error(`Error when opening/writing to log file: ${error.message}`);
     logFile.end();
@@ -45,4 +43,12 @@ export function flushLogs(
   });
 }
 
-export const logger: Logger = debug(mcpDebugNamespace) as Logger;
+let logger: Logger | undefined;
+
+if (fileLogger) {
+  logger = fileLogger;
+} else if (nodeDebugLogger.enabled) {
+  logger = nodeDebugLogger as unknown as Logger;
+}
+
+export {logger};
