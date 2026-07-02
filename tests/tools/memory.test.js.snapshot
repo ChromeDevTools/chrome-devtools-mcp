@@ -1,13 +1,4 @@
-exports[`memory > compare_heapsnapshots_class_nodes > compare heap-1 to heap-2 with classIndex filter 1`] = `
-## Heap Snapshot Data
-### Heap Snapshot Detailed Diff
-NewObject: # new: 2, # deleted: 0, # delta: +2, alloc size: +0.1 kB, freed size: 0.0 kB, size delta: +0.1 kB
-Objects:
-  + @35179 (self_size: 0.1 kB)
-  + @35181 (self_size: 0.1 kB)
-`;
-
-exports[`memory > compare_heapsnapshots_summary > compare heap-1 to heap-2 1`] = `
+exports[`memory > compare_heapsnapshots > compare heap-1 to heap-2 1`] = `
 ## Heap Snapshot Data
 ### Heap Snapshot Diff
 index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta
@@ -23,7 +14,16 @@ index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDel
 9,InitialObject,0,2,-2,0.0 kB,0.1 kB,-0.1 kB
 `;
 
-exports[`memory > compare_heapsnapshots_summary > compare heap-2 to heap-3 1`] = `
+exports[`memory > compare_heapsnapshots > compare heap-1 to heap-2 with classIndex filter 1`] = `
+## Heap Snapshot Data
+### Heap Snapshot Detailed Diff
+NewObject: # new: 2, # deleted: 0, # delta: +2, alloc size: +0.1 kB, freed size: 0.0 kB, size delta: +0.1 kB
+Objects:
+  + @35179 (self_size: 0.1 kB)
+  + @35181 (self_size: 0.1 kB)
+`;
+
+exports[`memory > compare_heapsnapshots > compare heap-2 to heap-3 1`] = `
 ## Heap Snapshot Data
 ### Heap Snapshot Diff
 index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta

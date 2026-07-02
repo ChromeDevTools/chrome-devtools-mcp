@@ -21,8 +21,7 @@ import {
   getHeapSnapshotRetainingPaths,
   getHeapSnapshotEdges,
   getHeapSnapshotDominators,
-  compareHeapSnapshotsSummary,
-  compareHeapSnapshotsClassNodes,
+  compareHeapSnapshots,
 } from '../../src/tools/memory.js';
 import {withMcpContext} from '../utils.js';
 
@@ -364,7 +363,7 @@ describe('memory', () => {
     });
   });
 
-  describe('compare_heapsnapshots_summary', () => {
+  describe('compare_heapsnapshots', () => {
     it('compare heap-1 to heap-2', async t => {
       await withMcpContext(async (response, context) => {
         const filePathA = join(
@@ -376,14 +375,14 @@ describe('memory', () => {
           'tests/fixtures/heap-2.heapsnapshot',
         );
 
-        await compareHeapSnapshotsSummary.handler(
+        await compareHeapSnapshots.handler(
           {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
           response,
           context,
         );
 
         const responseData = await response.handle(
-          compareHeapSnapshotsSummary.name,
+          compareHeapSnapshots.name,
           context,
         );
         const output = responseData.content
@@ -405,14 +404,14 @@ describe('memory', () => {
           'tests/fixtures/heap-3.heapsnapshot',
         );
 
-        await compareHeapSnapshotsSummary.handler(
+        await compareHeapSnapshots.handler(
           {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
           response,
           context,
         );
 
         const responseData = await response.handle(
-          compareHeapSnapshotsSummary.name,
+          compareHeapSnapshots.name,
           context,
         );
         const output = responseData.content
@@ -422,9 +421,7 @@ describe('memory', () => {
         t.assert.snapshot(output);
       });
     });
-  });
 
-  describe('compare_heapsnapshots_class_nodes', () => {
     it('compare heap-1 to heap-2 with classIndex filter', async t => {
       await withMcpContext(async (response, context) => {
         const filePathA = join(
@@ -436,7 +433,7 @@ describe('memory', () => {
           'tests/fixtures/heap-2.heapsnapshot',
         );
 
-        await compareHeapSnapshotsClassNodes.handler(
+        await compareHeapSnapshots.handler(
           {
             params: {
               baseFilePath: filePathA,
@@ -449,7 +446,7 @@ describe('memory', () => {
         );
 
         const responseData = await response.handle(
-          compareHeapSnapshotsClassNodes.name,
+          compareHeapSnapshots.name,
           context,
         );
         const output = responseData.content
@@ -460,7 +457,7 @@ describe('memory', () => {
       });
     });
 
-    it('compare heap-1 to heap-2 with invalid classIndex throws error', async t => {
+    it('compare heap-1 to heap-2 with invalid classIndex throws error', async () => {
       await withMcpContext(async (response, context) => {
         const filePathA = join(
           process.cwd(),
@@ -471,8 +468,8 @@ describe('memory', () => {
           'tests/fixtures/heap-2.heapsnapshot',
         );
 
-        await t.assert.rejects(
-          compareHeapSnapshotsClassNodes.handler(
+        await assert.rejects(
+          compareHeapSnapshots.handler(
             {
               params: {
                 baseFilePath: filePathA,

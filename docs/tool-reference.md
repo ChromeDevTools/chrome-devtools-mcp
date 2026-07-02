@@ -39,11 +39,10 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (11 tools)
+- **[Memory](#memory)** (10 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
-  - [`compare_heapsnapshots_class_nodes`](#compare_heapsnapshots_class_nodes)
-  - [`compare_heapsnapshots_summary`](#compare_heapsnapshots_summary)
+  - [`compare_heapsnapshots`](#compare_heapsnapshots)
   - [`get_heapsnapshot_class_nodes`](#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](#get_heapsnapshot_details)
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
@@ -464,26 +463,15 @@ in the DevTools Elements panel (if any).
 
 ---
 
-### `compare_heapsnapshots_class_nodes`
+### `compare_heapsnapshots`
 
-**Description:** Loads two memory heapsnapshots and returns the diff details (added/deleted instances) for a specific class. (requires flag: --memoryDebugging=true)
-
-**Parameters:**
-
-- **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
-- **classIndex** (number) **(required)**: 0-based index of the class in the summary list to filter results, showing individual objects.
-- **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
-
----
-
-### `compare_heapsnapshots_summary`
-
-**Description:** Loads two memory heapsnapshots and returns the summary diff between them (classes with changes). (requires flag: --memoryDebugging=true)
+**Description:** Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
 - **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
+- **classIndex** (number) _(optional)_: Optional 0-based index of the class in the summary list to filter results, showing individual objects.
 
 ---
 

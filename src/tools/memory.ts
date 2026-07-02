@@ -281,39 +281,10 @@ export const getHeapSnapshotDominators = defineTool({
   },
 });
 
-export const compareHeapSnapshotsSummary = defineTool({
-  name: 'compare_heapsnapshots_summary',
+export const compareHeapSnapshots = defineTool({
+  name: 'compare_heapsnapshots',
   description:
-    'Loads two memory heapsnapshots and returns the summary diff between them (classes with changes).',
-  annotations: {
-    category: ToolCategory.MEMORY,
-    readOnlyHint: true,
-    conditions: ['memoryDebugging'],
-  },
-  verifyFilesSchema: ['baseFilePath', 'currentFilePath'],
-  schema: {
-    baseFilePath: zod
-      .string()
-      .describe('A path to the base .heapsnapshot file (earlier snapshot).'),
-    currentFilePath: zod
-      .string()
-      .describe('A path to the current .heapsnapshot file (later snapshot).'),
-  },
-  blockedByDialog: false,
-  handler: async (request, response, context) => {
-    const diff = await context.getHeapSnapshotClassDiffs(
-      request.params.baseFilePath,
-      request.params.currentFilePath,
-    );
-
-    response.setHeapSnapshotClassDiffs(diff);
-  },
-});
-
-export const compareHeapSnapshotsClassNodes = defineTool({
-  name: 'compare_heapsnapshots_class_nodes',
-  description:
-    'Loads two memory heapsnapshots and returns the diff details (added/deleted instances) for a specific class.',
+    'Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff.',
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
@@ -329,17 +300,26 @@ export const compareHeapSnapshotsClassNodes = defineTool({
       .describe('A path to the current .heapsnapshot file (later snapshot).'),
     classIndex: zod
       .number()
+      .optional()
       .describe(
-        '0-based index of the class in the summary list to filter results, showing individual objects.',
+        'Optional 0-based index of the class in the summary list to filter results, showing individual objects.',
       ),
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
-    const classDiffResult = await context.getHeapSnapshotDetailedClassDiff(
-      request.params.baseFilePath,
-      request.params.currentFilePath,
-      request.params.classIndex,
-    );
-    response.setHeapSnapshotDetailedClassDiff(classDiffResult);
+    if (request.params.classIndex !== undefined) {
+      const classDiffResult = await context.getHeapSnapshotDetailedClassDiff(
+        request.params.baseFilePath,
+        request.params.currentFilePath,
+        request.params.classIndex,
+      );
+      response.setHeapSnapshotDetailedClassDiff(classDiffResult);
+    } else {
+      const diff = await context.getHeapSnapshotClassDiffs(
+        request.params.baseFilePath,
+        request.params.currentFilePath,
+      );
+      response.setHeapSnapshotClassDiffs(diff);
+    }
   },
 });
