@@ -335,7 +335,7 @@ class PageEventSubscriber {
         inspectorIssue,
       )[0];
       if (!issue) {
-        logger?.('No issue mapping for for the issue: ', inspectorIssue.code);
+        logger?.('No issue mapping for the issue: ', inspectorIssue.code);
         return;
       }
 
@@ -375,9 +375,6 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
   }
   override splitAfterNavigation(page: Page) {
     const navigations = this.storage.get(page) ?? [];
-    if (!navigations) {
-      return;
-    }
 
     const requests = navigations[0];
 
