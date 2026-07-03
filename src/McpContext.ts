@@ -16,7 +16,12 @@ import {
   UniverseManager,
 } from './devtools/DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
-import type {AggregatedInfoWithId} from './HeapSnapshotManager.js';
+import type {
+  AggregatedInfoWithId,
+  HeapSnapshotClassDiff,
+  HeapSnapshotDetailedClassDiff,
+  DuplicateStringGroup,
+} from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {
   NetworkCollector,
@@ -50,11 +55,7 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from './types.js';
-import {
-  ensureExtension,
-  getTempFilePath,
-  resolveCanonicalPath,
-} from './utils/files.js';
+import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
 interface McpContextOptions {
@@ -254,6 +255,20 @@ export class McpContext implements Context {
         `Access denied: path ${filePath} (canonical: ${canonicalPath}) is not within any of the configured workspace roots.`,
       );
     }
+  }
+
+  async ensureExtension<Extension extends `.${string}`>(
+    filePath: string,
+    extension: Extension,
+  ): Promise<`${string}${Extension}`> {
+    const resolvedPath = path.resolve(filePath);
+    const currentExtension = path.extname(resolvedPath);
+    const outputPath: `${string}${Extension}` = `${resolvedPath.slice(
+      0,
+      resolvedPath.length - currentExtension.length,
+    )}${extension}`;
+    await this.validatePath(outputPath);
+    return outputPath;
   }
 
   resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
@@ -800,12 +815,11 @@ export class McpContext implements Context {
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}> {
-    await this.validatePath(clientProvidedFilePath);
+    const filePath = await this.ensureExtension(
+      clientProvidedFilePath,
+      extension,
+    );
     try {
-      const filePath = ensureExtension(
-        path.resolve(clientProvidedFilePath),
-        extension,
-      );
       await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, data);
       return {filename: filePath};
@@ -903,6 +917,12 @@ export class McpContext implements Context {
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>> {
     return await this.#heapSnapshotManager.getAggregates(filePath);
+  }
+
+  async getHeapSnapshotDuplicateStrings(
+    filePath: string,
+  ): Promise<DuplicateStringGroup[]> {
+    return await this.#heapSnapshotManager.getDuplicateStrings(filePath);
   }
 
   async getHeapSnapshotStats(
@@ -1019,5 +1039,27 @@ export class McpContext implements Context {
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     return await this.#heapSnapshotManager.getEdges(filePath, nodeId);
+  }
+
+  async getHeapSnapshotClassDiffs(
+    baseFilePath: string,
+    currentFilePath: string,
+  ): Promise<HeapSnapshotClassDiff[]> {
+    return await this.#heapSnapshotManager.getClassDiffs(
+      baseFilePath,
+      currentFilePath,
+    );
+  }
+
+  async getHeapSnapshotDetailedClassDiff(
+    baseFilePath: string,
+    currentFilePath: string,
+    classIndex: number,
+  ): Promise<HeapSnapshotDetailedClassDiff> {
+    return await this.#heapSnapshotManager.getDetailedClassDiff(
+      baseFilePath,
+      currentFilePath,
+      classIndex,
+    );
   }
 }

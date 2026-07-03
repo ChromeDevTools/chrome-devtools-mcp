@@ -5,7 +5,12 @@
  */
 
 import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
-import type {AggregatedInfoWithId} from '../HeapSnapshotManager.js';
+import type {
+  AggregatedInfoWithId,
+  HeapSnapshotClassDiff,
+  HeapSnapshotDetailedClassDiff,
+  DuplicateStringGroup,
+} from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
@@ -116,11 +121,19 @@ export interface Response {
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
     options?: PaginationOptions,
   ): void;
+  setHeapSnapshotDuplicateStrings(
+    duplicateStrings: DuplicateStringGroup[],
+    options?: PaginationOptions,
+  ): void;
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
   ): void;
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+  ): void;
+  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
+  setHeapSnapshotDetailedClassDiff(
+    detailedClassDiff: HeapSnapshotDetailedClassDiff,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -179,6 +192,10 @@ export type SupportedExtensions =
  */
 export type Context = Readonly<{
   validatePath(filePath?: string): Promise<void>;
+  ensureExtension<Extension extends `.${string}`>(
+    filePath: string,
+    extension: Extension,
+  ): Promise<`${string}${Extension}`>;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
   isCruxEnabled(): boolean;
@@ -241,6 +258,9 @@ export type Context = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
   ): Promise<Record<string, AggregatedInfoWithId>>;
+  getHeapSnapshotDuplicateStrings(
+    filePath: string,
+  ): Promise<DuplicateStringGroup[]>;
   getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
@@ -271,6 +291,15 @@ export type Context = Readonly<{
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  getHeapSnapshotClassDiffs(
+    baseFilePath: string,
+    currentFilePath: string,
+  ): Promise<HeapSnapshotClassDiff[]>;
+  getHeapSnapshotDetailedClassDiff(
+    baseFilePath: string,
+    currentFilePath: string,
+    classIndex: number,
+  ): Promise<HeapSnapshotDetailedClassDiff>;
 }>;
 
 /**
@@ -316,8 +345,7 @@ export function defineTool<
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition:
-    | ToolDefinition<Schema>
-    | ((args?: Args) => ToolDefinition<Schema>),
+    ToolDefinition<Schema> | ((args?: Args) => ToolDefinition<Schema>),
 ) {
   if (typeof definition === 'function') {
     const factory = definition;
@@ -364,8 +392,7 @@ export function definePageTool<
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition:
-    | PageToolDefinition<Schema>
-    | ((args?: Args) => PageToolDefinition<Schema>),
+    PageToolDefinition<Schema> | ((args?: Args) => PageToolDefinition<Schema>),
 ): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
   if (typeof definition === 'function') {
     return (args?: Args): DefinedPageTool<Schema> => {

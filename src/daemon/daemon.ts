@@ -41,7 +41,7 @@ const pidDir = path.dirname(pidFilePath);
 const currentUserUid = os.userInfo().uid;
 
 try {
-  fs.mkdirSync(pidDir, {recursive: true});
+  fs.mkdirSync(pidDir, {recursive: true, mode: 0o700});
   if (os.platform() !== 'win32') {
     // POSIX specific checks
     try {

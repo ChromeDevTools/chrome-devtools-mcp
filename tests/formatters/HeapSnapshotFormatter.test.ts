@@ -130,6 +130,66 @@ describe('HeapSnapshotFormatter', () => {
     });
   });
 
+  describe('formatDiffSummary', () => {
+    it('includes classes with balanced added and removed objects', () => {
+      const summarized = [
+        {
+          className: 'Balanced',
+          addedCount: 1,
+          removedCount: 1,
+          countDelta: 0,
+          addedSize: 100,
+          removedSize: 100,
+          sizeDelta: 0,
+        },
+      ];
+      const result = HeapSnapshotFormatter.formatDiffSummary(summarized);
+      const expected = [
+        'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
+        `0,Balanced,1,1,0,${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(0)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+
+      const summarizedJson = JSON.stringify(summarized);
+      assert.ok(summarizedJson);
+      assert.equal(summarizedJson.includes('addedIndexes'), false);
+      assert.equal(summarizedJson.includes('deletedIndexes'), false);
+    });
+  });
+
+  describe('formatDiffDetails', () => {
+    it('formats detailed diffs correctly', () => {
+      const details = {
+        className: 'MyClass',
+        addedCount: 2,
+        removedCount: 1,
+        countDelta: 1,
+        addedSize: 120,
+        removedSize: 60,
+        sizeDelta: 60,
+        addedIds: [101, 102],
+        addedSelfSizes: [60, 60],
+        deletedIds: [201],
+        deletedSelfSizes: [60],
+      };
+
+      const formatted = HeapSnapshotFormatter.formatDiffDetails(details);
+      const formatted120 = DevTools.I18n.ByteUtilities.formatBytesToKb(120);
+      const formatted60 = DevTools.I18n.ByteUtilities.formatBytesToKb(60);
+
+      const expected = [
+        `MyClass: # new: 2, # deleted: 1, # delta: +1, alloc size: +${formatted120}, freed size: +${formatted60}, size delta: +${formatted60}`,
+        'Objects:',
+        `  + @101 (self_size: ${formatted60})`,
+        `  + @102 (self_size: ${formatted60})`,
+        `  - @201 (self_size: ${formatted60})`,
+      ].join('\n');
+
+      assert.strictEqual(formatted, expected);
+    });
+  });
+
   describe('sort', () => {
     it('sorts aggregates by retained size descending', () => {
       const unsortedAggregates: Record<

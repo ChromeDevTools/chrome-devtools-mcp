@@ -17,8 +17,7 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON,
-so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
@@ -27,14 +26,8 @@ so returned values have to be JSON-serializable.`,
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
       function: zod.string().describe(
         `A JavaScript function declaration to be executed by the tool in the currently selected page.
-Example without arguments: \`() => {
-  return document.title
-}\` or \`async () => {
-  return await fetch("example.com")
-}\`.
-Example with arguments: \`(el) => {
-  return el.innerText;
-}\`
+Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
+Example with arguments: \`(el) => el.innerText\`
 `,
       ),
       args: zod
