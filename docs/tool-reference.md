@@ -1,7 +1,6 @@
 <!-- AUTO GENERATED DO NOT EDIT - run 'npm run gen' to update-->
-
-# Chrome DevTools MCP Tool Reference
-
+spases 8
+# Chrome DevTools MCP Tool Referencet
 - **[Input automation](#input-automation)** (10 tools)
   - [`click`](#click)
   - [`drag`](#drag)
@@ -48,7 +47,7 @@
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
   - [`get_heapsnapshot_edges`](#get_heapsnapshot_edges)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
-  - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
+    [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
