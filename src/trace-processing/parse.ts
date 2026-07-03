@@ -80,13 +80,106 @@ ${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
 
 ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
+type CruxFieldMetricRating = 'good' | 'needs improvement' | 'poor';
+
+const CRUX_FIELD_METRIC_LINE =
+  /^ {2}- (?<metric>LCP|INP|CLS): (?<value>[0-9.]+)(?<unit> ms)? \(scope: (?<scope>url|origin)\)$/;
+
+function getCruxFieldMetricRating(
+  metric: string,
+  value: number,
+): CruxFieldMetricRating | null {
+  switch (metric) {
+    case 'LCP':
+      if (value <= 2500) {
+        return 'good';
+      }
+      if (value <= 4000) {
+        return 'needs improvement';
+      }
+      return 'poor';
+    case 'INP':
+      if (value <= 200) {
+        return 'good';
+      }
+      if (value <= 500) {
+        return 'needs improvement';
+      }
+      return 'poor';
+    case 'CLS':
+      if (value <= 0.1) {
+        return 'good';
+      }
+      if (value <= 0.25) {
+        return 'needs improvement';
+      }
+      return 'poor';
+    default:
+      return null;
+  }
+}
+
+function formatCruxFieldMetricLine(line: string): string {
+  const match = CRUX_FIELD_METRIC_LINE.exec(line);
+  const metric = match?.groups?.metric;
+  const valueText = match?.groups?.value;
+  const unit = match?.groups?.unit ?? '';
+  const scope = match?.groups?.scope;
+
+  if (!metric || !valueText || !scope) {
+    return line;
+  }
+
+  if (metric === 'CLS' ? unit !== '' : unit !== ' ms') {
+    return line;
+  }
+
+  const value = Number(valueText);
+  if (!Number.isFinite(value)) {
+    return line;
+  }
+
+  const rating = getCruxFieldMetricRating(metric, value);
+  if (!rating) {
+    return line;
+  }
+
+  return `  - ${metric}: ${valueText}${unit} (rating: ${rating}, scope: ${scope})`;
+}
+
+function formatCruxFieldMetricRatings(summaryText: string): string {
+  let inFieldMetrics = false;
+  const lines = summaryText.split('\n');
+
+  return lines
+    .map(line => {
+      if (line === 'Metrics (field / real users):') {
+        inFieldMetrics = true;
+        return line;
+      }
+
+      if (inFieldMetrics && !line.startsWith('  ')) {
+        inFieldMetrics = false;
+      }
+
+      if (!inFieldMetrics) {
+        return line;
+      }
+
+      return formatCruxFieldMetricLine(line);
+    })
+    .join('\n');
+}
+
 export function getTraceSummary(
   result: TraceResult,
   deviceScope?: DevTools.CrUXManager.DeviceScope | null,
 ): string {
   const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new DevTools.PerformanceTraceFormatter(focus, deviceScope);
-  const summaryText = formatter.formatTraceSummary();
+  const summaryText = formatCruxFieldMetricRatings(
+    formatter.formatTraceSummary(),
+  );
   return `## Summary of Performance trace findings:
 ${summaryText}
 

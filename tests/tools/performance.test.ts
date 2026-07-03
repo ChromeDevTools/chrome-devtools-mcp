@@ -427,8 +427,81 @@ describe('performance', () => {
           'Summary should include field data',
         );
         assert.ok(
-          fullOutput.includes('LCP: 1000 ms'),
-          'Summary should include desktop LCP value',
+          fullOutput.includes('LCP: 1000 ms (rating: good, scope: url)'),
+          'Summary should include desktop LCP value and rating',
+        );
+        assert.ok(
+          fullOutput.includes('INP: 140 ms (rating: good, scope: url)'),
+          'Summary should include desktop INP rating',
+        );
+        assert.ok(
+          fullOutput.includes('CLS: 0.06 (rating: good, scope: url)'),
+          'Summary should include desktop CLS rating',
+        );
+      });
+    });
+
+    it('includes CrUX ratings without labeling LCP breakdown subparts', async () => {
+      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+      // Use a unique URL to avoid cache issues
+      const jsonString = new TextDecoder().decode(rawData);
+      const modifiedJsonString = jsonString.replaceAll(
+        'https://web.dev/',
+        'https://ratings.web.dev/',
+      );
+      const modifiedData = new TextEncoder().encode(modifiedJsonString);
+
+      await withMcpContext(async (response, context) => {
+        context.setIsRunningPerformanceTrace(true);
+        const selectedPage = context.getSelectedPptrPage();
+        sinon.stub(selectedPage.tracing, 'stop').resolves(modifiedData);
+
+        const fetchStub = globalThis.fetch as sinon.SinonStub;
+        fetchStub.resetHistory();
+        fetchStub.callsFake(async (url, options) => {
+          const body = options?.body ? JSON.parse(options.body as string) : {};
+          const requestedUrl =
+            body.url || body.origin || 'https://ratings.web.dev/';
+          return new Response(
+            JSON.stringify(
+              cruxResponseFixture(requestedUrl, 4500, 300, '0.30'),
+            ),
+            {
+              status: 200,
+              headers: {'Content-Type': 'application/json'},
+            },
+          );
+        });
+
+        await stopTrace.handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        const result = await response.handle('performance_stop_trace', context);
+        const fullOutput = result.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        assert.ok(fetchStub.called, 'CrUX fetch should have been called');
+        assert.ok(
+          fullOutput.includes('LCP: 4500 ms (rating: poor, scope: url)'),
+          'Summary should include poor LCP rating',
+        );
+        assert.ok(
+          fullOutput.includes(
+            'INP: 300 ms (rating: needs improvement, scope: url)',
+          ),
+          'Summary should include needs improvement INP rating',
+        );
+        assert.ok(
+          fullOutput.includes('CLS: 0.30 (rating: poor, scope: url)'),
+          'Summary should include poor CLS rating',
+        );
+        assert.ok(
+          fullOutput.includes('TTFB: 1273 ms (scope: url)'),
+          'Summary should keep LCP breakdown subparts unlabelled',
         );
       });
     });
@@ -491,15 +564,20 @@ describe('performance', () => {
           'Summary should include field data',
         );
         assert.ok(
-          fullOutput.includes('LCP: 2000 ms'),
-          'Summary should include mobile LCP value',
+          fullOutput.includes('LCP: 2000 ms (rating: good, scope: url)'),
+          'Summary should include mobile LCP value and rating',
         );
       });
     });
   });
 });
 
-function cruxResponseFixture(url = 'https://web.dev/', lcp = 2595) {
+function cruxResponseFixture(
+  url = 'https://web.dev/',
+  lcp = 2595,
+  inp = 140,
+  cls = '0.06',
+) {
   // Ideally we could use `mockResponse` from 'chrome-devtools-frontend/front_end/models/crux-manager/CrUXManager.test.ts'
   // But test files are not published in the cdtf npm package.
   return {
@@ -534,7 +612,7 @@ function cruxResponseFixture(url = 'https://web.dev/', lcp = 2595) {
             {start: '0.10', end: '0.25', density: 0.0716},
             {start: '0.25', density: 0.0619},
           ],
-          percentiles: {p75: '0.06'},
+          percentiles: {p75: cls},
         },
         interaction_to_next_paint: {
           histogram: [
@@ -542,7 +620,7 @@ function cruxResponseFixture(url = 'https://web.dev/', lcp = 2595) {
             {start: 200, end: 500, density: 0.1081},
             {start: 500, density: 0.0505},
           ],
-          percentiles: {p75: 140},
+          percentiles: {p75: inp},
         },
         largest_contentful_paint_image_resource_load_duration: {
           percentiles: {p75: 451},
