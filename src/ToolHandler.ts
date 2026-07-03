@@ -259,10 +259,18 @@ export class ToolHandler {
       } catch (err) {
         response.setError(err);
       }
+      // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
+      let dataFormat: 'default' | 'toon' | 'gcf' = 'default';
+      if (this.serverArgs.experimentalDataFormat) {
+        dataFormat = this.serverArgs.experimentalDataFormat as 'default' | 'toon' | 'gcf';
+      } else if (this.serverArgs.experimentalToonFormat) {
+        dataFormat = 'toon';
+      }
+
       const {content, structuredContent} = await response.handle(
         this.tool.name,
         context,
-        this.serverArgs.experimentalToonFormat ?? false,
+        dataFormat,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;

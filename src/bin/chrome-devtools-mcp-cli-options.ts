@@ -173,7 +173,14 @@ export const cliOptions = {
   experimentalToonFormat: {
     type: 'boolean',
     describe:
-      'Whether to format structured data in text response using Token-Oriented Object Notation (requires @toon-format/toon). If running via npx, use: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalToonFormat',
+      'Deprecated: use --experimentalDataFormat=toon instead. Whether to format structured data using TOON (requires @toon-format/toon).',
+    hidden: true,
+  },
+  experimentalDataFormat: {
+    type: 'string',
+    describe:
+      'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
+    choices: ['default', 'toon', 'gcf'] as const,
     hidden: true,
   },
   experimentalIncludeAllPages: {
