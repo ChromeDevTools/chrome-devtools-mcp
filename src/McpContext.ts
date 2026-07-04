@@ -184,12 +184,9 @@ export class McpContext implements Context {
     return context;
   }
 
-  roots(): Root[] | undefined {
-    if (this.#roots === undefined) {
-      return undefined;
-    }
+  roots(): Root[] {
     return [
-      ...this.#roots,
+      ...(this.#roots ?? []),
       {
         uri: pathToFileURL(os.tmpdir()).href,
         name: 'temp',
@@ -205,10 +202,11 @@ export class McpContext implements Context {
     if (filePath === undefined) {
       return;
     }
+    // roots() always returns at least the temp directory, even if the
+    // connecting client never negotiated the optional `roots` capability.
+    // Path validation must not be skipped just because no workspace roots
+    // were configured.
     const roots = this.roots();
-    if (roots === undefined) {
-      return;
-    }
 
     let canonicalPath: string;
 
