@@ -252,7 +252,11 @@ describe('TextSnapshot', () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();
       await page.pptrPage.setContent(html`
-        <div id="hidden" style="display: none">Hidden content</div>
+        <div
+          id="hidden"
+          style="display: none"
+          >Hidden content</div
+        >
       `);
 
       const hiddenHandle = await page.pptrPage.$('#hidden');
