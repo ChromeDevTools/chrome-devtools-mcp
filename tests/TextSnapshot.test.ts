@@ -172,4 +172,112 @@ describe('TextSnapshot', () => {
       );
     });
   });
+
+  it('marks the DevTools selected element when it is in the a11y tree', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`<button id="btn">Click me</button>`);
+
+      const buttonHandle = await page.pptrPage.$('#btn');
+      if (!buttonHandle) {
+        throw new Error('button element not found');
+      }
+      const backendNodeId = await buttonHandle.backendNodeId();
+      if (!backendNodeId) {
+        throw new Error('Failed to get backendNodeId');
+      }
+
+      const snapshot = await TextSnapshot.create(page, {
+        devtoolsData: {cdpBackendNodeId: backendNodeId},
+      });
+
+      assert.strictEqual(snapshot.hasSelectedElement, true);
+      assert.ok(snapshot.selectedElementUid);
+      const selectedNode = snapshot.idToNode.get(snapshot.selectedElementUid!);
+      assert.strictEqual(selectedNode?.role, 'button');
+      assert.strictEqual(selectedNode?.name, 'Click me');
+    });
+  });
+
+  it('inserts the DevTools selected element when it is missing from the a11y tree', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`
+        <div id="parent">
+          <div
+            id="hidden"
+            style="display: none"
+          >
+            Hidden content
+          </div>
+        </div>
+      `);
+
+      const hiddenHandle = await page.pptrPage.$('#hidden');
+      if (!hiddenHandle) {
+        throw new Error('hidden element not found');
+      }
+      const backendNodeId = await hiddenHandle.backendNodeId();
+      if (!backendNodeId) {
+        throw new Error('Failed to get backendNodeId');
+      }
+
+      const snapshotBefore = await TextSnapshot.create(page, {
+        verbose: true,
+        devtoolsData: {},
+      });
+      assert.strictEqual(
+        TextSnapshot.findNodeUidByBackendNodeId(
+          snapshotBefore.idToNode,
+          backendNodeId,
+        ),
+        undefined,
+        'Hidden element should not be in the snapshot before selection',
+      );
+
+      const snapshot = await TextSnapshot.create(page, {
+        verbose: true,
+        devtoolsData: {cdpBackendNodeId: backendNodeId},
+      });
+
+      assert.strictEqual(snapshot.hasSelectedElement, true);
+      assert.ok(snapshot.selectedElementUid);
+      const selectedNode = snapshot.idToNode.get(snapshot.selectedElementUid!);
+      assert.strictEqual(selectedNode?.backendNodeId, backendNodeId);
+      assert.strictEqual(selectedNode?.role, 'div');
+    });
+  });
+
+  it('does not persist selected element handles across snapshots', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(html`
+        <div id="hidden" style="display: none">Hidden content</div>
+      `);
+
+      const hiddenHandle = await page.pptrPage.$('#hidden');
+      if (!hiddenHandle) {
+        throw new Error('hidden element not found');
+      }
+      const backendNodeId = await hiddenHandle.backendNodeId();
+      if (!backendNodeId) {
+        throw new Error('Failed to get backendNodeId');
+      }
+
+      await TextSnapshot.create(page, {
+        devtoolsData: {cdpBackendNodeId: backendNodeId},
+      });
+      assert.deepStrictEqual(page.extraHandles, []);
+
+      const snapshot = await TextSnapshot.create(page, {devtoolsData: {}});
+      assert.strictEqual(snapshot.hasSelectedElement, false);
+      assert.strictEqual(
+        TextSnapshot.findNodeUidByBackendNodeId(
+          snapshot.idToNode,
+          backendNodeId,
+        ),
+        undefined,
+      );
+    });
+  });
 });

@@ -133,9 +133,18 @@ export class TextSnapshot {
     const data = options.devtoolsData ?? (await page.getDevToolsData());
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = page.resolveCdpElementId(
-        data.cdpBackendNodeId,
-      );
+      snapshot.selectedElementUid =
+        await TextSnapshot.resolveSelectedElementUid(
+          page,
+          data.cdpBackendNodeId,
+          {
+            idToNode,
+            rootNodeWithId,
+            seenBackendNodeIds,
+            seenUniqueIds,
+            snapshotId,
+          },
+        );
     }
 
     // Clean up unique IDs that we did not see anymore.
@@ -321,5 +330,115 @@ export class TextSnapshot {
       const index = moveChildNodes(attachTarget, extraNode, descendantIds);
       attachTarget.children.splice(index, 0, extraNode);
     }
+  }
+
+  static findNodeUidByBackendNodeId(
+    idToNode: Map<string, TextSnapshotNode>,
+    backendNodeId: number,
+  ): string | undefined {
+    for (const node of idToNode.values()) {
+      if (node.backendNodeId === backendNodeId) {
+        return node.id;
+      }
+    }
+    return;
+  }
+
+  static getNextIdCounter(
+    idToNode: Map<string, TextSnapshotNode>,
+    snapshotId: number,
+  ): number {
+    const prefix = `${snapshotId}_`;
+    let max = -1;
+    for (const node of idToNode.values()) {
+      if (!node.id.startsWith(prefix)) {
+        continue;
+      }
+      const suffix = Number(node.id.slice(prefix.length));
+      if (!Number.isNaN(suffix)) {
+        max = Math.max(max, suffix);
+      }
+    }
+    return max + 1;
+  }
+
+  static async resolveElementHandleFromBackendNodeId(
+    page: McpPage,
+    backendNodeId: number,
+  ): Promise<ElementHandle<Element> | null> {
+    try {
+      interface CdpMainRealm {
+        adoptBackendNode(backendNodeId: number): Promise<ElementHandle>;
+      }
+      interface CdpFrame {
+        mainRealm(): CdpMainRealm;
+      }
+      const handle = await (page.pptrPage.mainFrame() as unknown as CdpFrame)
+        .mainRealm()
+        .adoptBackendNode(backendNodeId);
+      const element = handle.asElement();
+      if (!element) {
+        await handle.dispose();
+        return null;
+      }
+      return element as ElementHandle<Element>;
+    } catch (error) {
+      logger?.('Failed to resolve selected element handle', error);
+      return null;
+    }
+  }
+
+  static async resolveSelectedElementUid(
+    page: McpPage,
+    backendNodeId: number,
+    context: {
+      idToNode: Map<string, TextSnapshotNode>;
+      rootNodeWithId: TextSnapshotNode;
+      seenBackendNodeIds: Set<number>;
+      seenUniqueIds: Set<string>;
+      snapshotId: number;
+    },
+  ): Promise<string | undefined> {
+    let selectedUid = TextSnapshot.findNodeUidByBackendNodeId(
+      context.idToNode,
+      backendNodeId,
+    );
+    if (selectedUid) {
+      return selectedUid;
+    }
+
+    const selectedHandle =
+      await TextSnapshot.resolveElementHandleFromBackendNodeId(
+        page,
+        backendNodeId,
+      );
+    if (!selectedHandle) {
+      return;
+    }
+
+    const previousExtraHandles = page.extraHandles;
+    try {
+      await TextSnapshot.insertExtraNodes(
+        page,
+        context.idToNode,
+        context.seenUniqueIds,
+        context.snapshotId,
+        TextSnapshot.getNextIdCounter(context.idToNode, context.snapshotId),
+        context.rootNodeWithId,
+        context.seenBackendNodeIds,
+        [selectedHandle],
+      );
+    } finally {
+      page.extraHandles = previousExtraHandles;
+    }
+
+    selectedUid = TextSnapshot.findNodeUidByBackendNodeId(
+      context.idToNode,
+      backendNodeId,
+    );
+    if (!selectedUid) {
+      await selectedHandle.dispose();
+    }
+    return selectedUid;
   }
 }

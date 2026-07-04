@@ -1,9 +1,3 @@
-exports[`snapshotFormatter > does not include a note if the snapshot is already verbose 1`] = `
-uid=1_1 checkbox "checkbox" checked
-  uid=1_2 statictext "text"
-
-`;
-
 exports[`snapshotFormatter > formats with DevTools data included into a snapshot 1`] = `
 uid=1_1 checkbox "checkbox" checked [selected in the DevTools Elements panel]
   uid=1_2 statictext "text"
@@ -11,8 +5,17 @@ uid=1_1 checkbox "checkbox" checked [selected in the DevTools Elements panel]
 `;
 
 exports[`snapshotFormatter > formats with DevTools data not included into a snapshot 1`] = `
-Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
-Get a verbose snapshot to include all elements if you are interested in the selected element.
+Note: there is a selected element in the DevTools Elements panel but it could not be resolved in this snapshot.
+The element may be detached, inside a closed shadow root, or in another frame.
+
+uid=1_1 checkbox "checkbox" checked
+  uid=1_2 statictext "text"
+
+`;
+
+exports[`snapshotFormatter > includes a note when the selected element cannot be resolved 1`] = `
+Note: there is a selected element in the DevTools Elements panel but it could not be resolved in this snapshot.
+The element may be detached, inside a closed shadow root, or in another frame.
 
 uid=1_1 checkbox "checkbox" checked
   uid=1_2 statictext "text"

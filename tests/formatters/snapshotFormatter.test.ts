@@ -194,7 +194,7 @@ describe('snapshotFormatter', () => {
     t.assert.snapshot(formatted);
   });
 
-  it('does not include a note if the snapshot is already verbose', t => {
+  it('includes a note when the selected element cannot be resolved', t => {
     const node: TextSnapshotNode = {
       id: '1_1',
       role: 'checkbox',

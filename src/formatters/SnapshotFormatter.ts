@@ -20,12 +20,11 @@ export class SnapshotFormatter {
 
     // Top-level content of the snapshot.
     if (
-      !this.#snapshot.verbose &&
       this.#snapshot.hasSelectedElement &&
       !this.#snapshot.selectedElementUid
     ) {
-      chunks.push(`Note: there is a selected element in the DevTools Elements panel but it is not included into the current a11y tree snapshot.
-Get a verbose snapshot to include all elements if you are interested in the selected element.\n\n`);
+      chunks.push(`Note: there is a selected element in the DevTools Elements panel but it could not be resolved in this snapshot.
+The element may be detached, inside a closed shadow root, or in another frame.\n\n`);
     }
 
     chunks.push(this.#formatNode(root, 0));
