@@ -652,7 +652,9 @@ export class McpResponse implements Response {
             context,
             this.#page,
           ),
-          elementIdResolver: this.#page.resolveCdpElementId.bind(this.#page),
+          elementIdResolver: this.#page.textSnapshot?.resolveCdpElementId.bind(
+            this.#page.textSnapshot,
+          ),
         });
         if (!formatter.isValid()) {
           throw new Error(

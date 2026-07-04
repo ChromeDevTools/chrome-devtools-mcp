@@ -767,10 +767,6 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          const stub = sinon
-            .stub(page, 'resolveCdpElementId')
-            .returns('mock-uid');
-
           await executeThirdPartyDeveloperTool.handler(
             {
               params: {
@@ -785,10 +781,8 @@ describe('thirdPartyDeveloperTools', () => {
 
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({uid: 'mock-uid'}, null, 2),
+            JSON.stringify({uid: '1_1'}, null, 2),
           );
-
-          stub.restore();
         },
         undefined,
         {categoryExperimentalThirdParty: true},
@@ -826,14 +820,6 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          const stubSnapshot = sinon
-            .stub(TextSnapshot, 'create')
-            .resolves({} as TextSnapshot);
-
-          const stubResolve = sinon
-            .stub(page, 'resolveCdpElementId')
-            .returns('mock-uid');
-
           await executeThirdPartyDeveloperTool.handler(
             {
               params: {
@@ -846,17 +832,10 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          assert.ok(
-            stubSnapshot.calledOnce,
-            'Expected TextSnapshot.create to be called',
-          );
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({uid: 'mock-uid'}, null, 2),
+            JSON.stringify({uid: '1_1'}, null, 2),
           );
-
-          stubResolve.restore();
-          stubSnapshot.restore();
         },
         undefined,
         {categoryExperimentalThirdParty: true},
