@@ -60,7 +60,7 @@
     "@types/filesystem": "^0.0.36",
     "@types/node": "^26.0.0",
     "@types/semver": "^7.7.1",
-    "@types/sinon": "^21.0.0",
+    "@types/sinon": "^22.0.0",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
