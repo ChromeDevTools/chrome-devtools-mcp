@@ -1294,6 +1294,44 @@ describe('input', () => {
         await fs.unlink(testFilePath);
       });
     });
+
+    it('does not treat a non-file input as a file input', async () => {
+      const testFilePath = path.join(process.cwd(), 'test.txt');
+      await fs.writeFile(testFilePath, 'test file content');
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        // A text input is an HTMLInputElement but not a file input; routing it
+        // through uploadFile would send DOM.setFileInputFiles to a non-file
+        // node and crash the tab, so it must fall through to the chooser path.
+        await page.setContent(html`<input type="text" />`);
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          uploadFile.handler(
+            {
+              params: {
+                uid: '1_1',
+                filePath: testFilePath,
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          {
+            message:
+              'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
+          },
+        );
+
+        assert.strictEqual(response.responseLines.length, 0);
+
+        await fs.unlink(testFilePath);
+      });
+    });
   });
 
   describe('press_key', () => {
