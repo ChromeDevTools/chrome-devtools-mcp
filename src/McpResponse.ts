@@ -25,7 +25,12 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, getToonEncode, type Protocol} from './third_party/index.js';
+import {
+  DevTools,
+  getToonEncode,
+  getGcfEncode,
+  type Protocol,
+} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -49,6 +54,8 @@ import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
+
+export type DataFormat = 'default' | 'toon' | 'gcf';
 
 interface TraceInsightData {
   trace: TraceResult;
@@ -565,7 +572,7 @@ export class McpResponse implements Response {
   async handle(
     toolName: string,
     context: McpContext,
-    useToon = false,
+    dataFormat: DataFormat = 'default',
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
@@ -652,7 +659,9 @@ export class McpResponse implements Response {
             context,
             this.#page,
           ),
-          elementIdResolver: this.#page.resolveCdpElementId.bind(this.#page),
+          elementIdResolver: this.#page.textSnapshot?.resolveCdpElementId.bind(
+            this.#page.textSnapshot,
+          ),
         });
         if (!formatter.isValid()) {
           throw new Error(
@@ -811,7 +820,7 @@ export class McpResponse implements Response {
         webmcpTools,
         errorMessage: this.#error?.message,
       },
-      useToon,
+      dataFormat,
     );
   }
 
@@ -832,7 +841,7 @@ export class McpResponse implements Response {
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
-    useToon: boolean,
+    dataFormat: DataFormat = 'default',
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
@@ -883,16 +892,28 @@ export class McpResponse implements Response {
       geolocation?: {latitude: number; longitude: number};
     } = {};
 
-    let toonEncode: ((val: unknown) => string) | undefined;
-    if (useToon) {
+    // Resolve the compact encoder based on the chosen format
+    let compactEncode: ((val: unknown) => string) | undefined;
+    if (dataFormat === 'toon') {
       try {
-        toonEncode = await getToonEncode();
+        compactEncode = await getToonEncode();
       } catch {
         throw new Error(
-          'The `@toon-format/toon` package is required to use the experimental TOON format. ' +
+          'The `@toon-format/toon` package is required to use --experimentalDataFormat=toon. ' +
             'Make sure the peer dependency is installed:\n' +
-            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalToonFormat\n' +
+            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalDataFormat=toon\n' +
             '- For npm: npm install @toon-format/toon (add -g if installed globally)',
+        );
+      }
+    } else if (dataFormat === 'gcf') {
+      try {
+        compactEncode = await getGcfEncode();
+      } catch {
+        throw new Error(
+          'The `@blackwell-systems/gcf` package is required to use --experimentalDataFormat=gcf. ' +
+            'Make sure the peer dependency is installed:\n' +
+            '- For npx: npx --package chrome-devtools-mcp@latest --package @blackwell-systems/gcf@latest chrome-devtools-mcp --experimentalDataFormat=gcf\n' +
+            '- For npm: npm install @blackwell-systems/gcf (add -g if installed globally)',
         );
       }
     }
@@ -1115,8 +1136,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.snapshot = data.snapshot.toJSON();
         response.push('## Latest page snapshot');
         response.push(
-          useToon && toonEncode
-            ? toonEncode(structuredContent.snapshot)
+          compactEncode
+            ? compactEncode(structuredContent.snapshot)
             : data.snapshot.toString(),
         );
       }
@@ -1153,8 +1174,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         structuredContent.heapSnapshotData = formatter.toJSON();
         response.push(
-          useToon && toonEncode
-            ? toonEncode(structuredContent.heapSnapshotData)
+          compactEncode
+            ? compactEncode(structuredContent.heapSnapshotData)
             : formatter.toString(),
         );
       }
@@ -1218,8 +1239,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (classDiffs) {
         response.push('### Heap Snapshot Diff');
         response.push(
-          useToon && toonEncode
-            ? toonEncode(classDiffs)
+          compactEncode
+            ? compactEncode(classDiffs)
             : HeapSnapshotFormatter.formatDiffSummary(classDiffs),
         );
         structuredContent.heapSnapshotClassDiffs = classDiffs;
@@ -1228,8 +1249,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (detailedClassDiff) {
         response.push('### Heap Snapshot Detailed Diff');
         response.push(
-          useToon && toonEncode
-            ? toonEncode(detailedClassDiff)
+          compactEncode
+            ? compactEncode(detailedClassDiff)
             : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
         );
         structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
@@ -1340,8 +1361,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
             i.toJSON(),
           );
           response.push(
-            ...(useToon && toonEncode
-              ? [toonEncode(structuredContent.networkRequests)]
+            ...(compactEncode
+              ? [compactEncode(structuredContent.networkRequests)]
               : paginationData.items.map(i => i.toString())),
           );
         }
@@ -1365,8 +1386,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
           item.toJSON(),
         );
         response.push(...paginationData.info);
-        if (useToon && toonEncode) {
-          response.push(toonEncode(structuredContent.consoleMessages));
+        if (compactEncode) {
+          response.push(compactEncode(structuredContent.consoleMessages));
         } else {
           response.push(...paginationData.items.map(item => item.toString()));
         }

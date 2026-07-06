@@ -133,7 +133,7 @@ export class TextSnapshot {
     const data = options.devtoolsData ?? (await page.getDevToolsData());
     if (data?.cdpBackendNodeId) {
       snapshot.hasSelectedElement = true;
-      snapshot.selectedElementUid = page.resolveCdpElementId(
+      snapshot.selectedElementUid = snapshot.resolveCdpElementId(
         data.cdpBackendNodeId,
       );
     }
@@ -146,6 +146,25 @@ export class TextSnapshot {
     }
 
     return snapshot;
+  }
+
+  resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
+    if (!cdpBackendNodeId) {
+      logger?.('no cdpBackendNodeId');
+      return;
+    }
+    // TODO: index by backendNodeId instead.
+    const queue = [this.root];
+    while (queue.length) {
+      const current = queue.pop()!;
+      if (current.backendNodeId === cdpBackendNodeId) {
+        return current.id;
+      }
+      for (const child of current.children) {
+        queue.push(child);
+      }
+    }
+    return;
   }
 
   // ExtraHandles represent DOM nodes which might not be part of the accessibility tree, e.g. DOM nodes

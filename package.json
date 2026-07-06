@@ -55,6 +55,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
+    "@blackwell-systems/gcf": "^2.2.2",
     "@toon-format/toon": "^2.2.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
@@ -85,10 +86,14 @@
     "yargs": "18.0.0"
   },
   "peerDependencies": {
-    "@toon-format/toon": "^2.2.0"
+    "@toon-format/toon": "^2.2.0",
+    "@blackwell-systems/gcf": "^2.2.2"
   },
   "peerDependenciesMeta": {
     "@toon-format/toon": {
+      "optional": true
+    },
+    "@blackwell-systems/gcf": {
       "optional": true
     }
   },

@@ -347,5 +347,19 @@
   {
     "name": "screenshot_max_height_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "experimental_data_format_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_data_format",
+    "flagType": "enum",
+    "choices": [
+      "EXPERIMENTAL_DATA_FORMAT_UNSPECIFIED",
+      "EXPERIMENTAL_DATA_FORMAT_DEFAULT",
+      "EXPERIMENTAL_DATA_FORMAT_TOON",
+      "EXPERIMENTAL_DATA_FORMAT_GCF"
+    ]
   }
 ]
