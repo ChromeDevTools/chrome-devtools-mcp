@@ -260,6 +260,13 @@ export class McpContext implements Context {
     extension: Extension,
   ): Promise<`${string}${Extension}`> {
     const resolvedPath = path.resolve(filePath);
+    // path.extname only strips the final segment, so a multi-part extension
+    // like `.json.gz` would be doubled (trace.json.gz -> trace.json.json.gz).
+    // Keep the path as-is when it already carries the requested extension.
+    if (resolvedPath.toLowerCase().endsWith(extension.toLowerCase())) {
+      await this.validatePath(resolvedPath);
+      return resolvedPath as `${string}${Extension}`;
+    }
     const currentExtension = path.extname(resolvedPath);
     const outputPath: `${string}${Extension}` = `${resolvedPath.slice(
       0,
