@@ -135,6 +135,101 @@ export interface TargetUniverse {
 export async function createTargetUniverse(
   session: CDPSession,
 ): Promise<TargetUniverse> {
+  const registeredSettings =
+    DevTools.Common.SettingRegistration.getRegisteredSettings();
+  const hasOverridesEnabled = registeredSettings.some(
+    setting => setting.settingName === 'persistence-network-overrides-enabled',
+  );
+  if (!hasOverridesEnabled) {
+    console.log(
+      '[DevtoolsUtils] Registering persistence-network-overrides-enabled',
+    );
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.PERSISTENCE,
+      settingName: 'persistence-network-overrides-enabled',
+      settingType: DevTools.Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+    });
+  }
+
+  const hasRecordLog = registeredSettings.some(
+    setting => setting.settingName === 'network-log.record-log',
+  );
+  if (!hasRecordLog) {
+    console.log('[DevtoolsUtils] Registering network-log.record-log');
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.NETWORK,
+      settingName: 'network-log.record-log',
+      settingType: DevTools.Common.Settings.SettingType.BOOLEAN,
+      defaultValue: true,
+    });
+  }
+
+  const hasPreserveLog = registeredSettings.some(
+    setting => setting.settingName === 'network-log.preserve-log',
+  );
+  if (!hasPreserveLog) {
+    console.log('[DevtoolsUtils] Registering network-log.preserve-log');
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.NETWORK,
+      settingName: 'network-log.preserve-log',
+      settingType: DevTools.Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+    });
+  }
+
+  const hasDisableOverlay = registeredSettings.some(
+    setting => setting.settingName === 'disable-paused-state-overlay',
+  );
+  if (!hasDisableOverlay) {
+    console.log('[DevtoolsUtils] Registering disable-paused-state-overlay');
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.APPEARANCE,
+      settingName: 'disable-paused-state-overlay',
+      settingType: DevTools.Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+    });
+  }
+
+  const hasTouch = registeredSettings.some(
+    setting => setting.settingName === 'emulation.touch',
+  );
+  if (!hasTouch) {
+    console.log('[DevtoolsUtils] Registering emulation.touch');
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.EMULATION,
+      settingName: 'emulation.touch',
+      settingType: DevTools.Common.Settings.SettingType.ENUM,
+      defaultValue: 'non-touch',
+    });
+  }
+
+  const hasIdle = registeredSettings.some(
+    setting => setting.settingName === 'emulation.idle-detection',
+  );
+  if (!hasIdle) {
+    console.log('[DevtoolsUtils] Registering emulation.idle-detection');
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.EMULATION,
+      settingName: 'emulation.idle-detection',
+      settingType: DevTools.Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+    });
+  }
+
+  const hasCpu = registeredSettings.some(
+    setting => setting.settingName === 'emulation.cpu-pressure',
+  );
+  if (!hasCpu) {
+    console.log('[DevtoolsUtils] Registering emulation.cpu-pressure');
+    DevTools.Common.Settings.registerSettingExtension({
+      category: DevTools.Common.Settings.SettingCategory.EMULATION,
+      settingName: 'emulation.cpu-pressure',
+      settingType: DevTools.Common.Settings.SettingType.BOOLEAN,
+      defaultValue: false,
+    });
+  }
+
   const settingStorage = new DevTools.Common.Settings.SettingsStorage({});
   const universe = new DevTools.Foundation.Universe.Universe({
     settingsCreationOptions: {
@@ -145,6 +240,10 @@ export async function createTargetUniverse(
         DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
+    hostConfig: {},
+    inspectorFrontendHost:
+      DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
+    supportsEmulation: true,
   });
 
   const connection = new PuppeteerDevToolsConnection(session);
