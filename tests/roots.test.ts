@@ -67,7 +67,7 @@ describe('McpContext Roots', () => {
 
         const testCases: Array<{
           filePath: string;
-          extension: '.json' | '.txt' | '.png' | '.zip';
+          extension: '.json' | '.txt' | '.png' | '.zip' | '.json.gz';
           expected: string;
         }> = [
           {
@@ -94,6 +94,17 @@ describe('McpContext Roots', () => {
             filePath: 'file.tar.gz',
             extension: '.zip',
             expected: 'file.tar.zip',
+          },
+          {
+            // Multi-part extension already present: must not be doubled.
+            filePath: 'trace.json.gz',
+            extension: '.json.gz',
+            expected: 'trace.json.gz',
+          },
+          {
+            filePath: 'trace.gz',
+            extension: '.json.gz',
+            expected: 'trace.json.gz',
           },
         ];
 
