@@ -102,6 +102,22 @@ describe('McpContext', () => {
       },
     );
   });
+
+  it('keeps the existing selection when a page is missing from a snapshot', async () => {
+    await withMcpContext(async (_response, context) => {
+      const firstPage = context.getSelectedMcpPage();
+      const secondPage = await context.newPage();
+      context.selectPage(secondPage);
+
+      sinon.stub(context.browser, 'pages').resolves([firstPage.pptrPage]);
+
+      await context.createPagesSnapshot();
+
+      assert.strictEqual(context.getSelectedMcpPage(), secondPage);
+      assert.strictEqual(context.getSelectedPptrPage(), secondPage.pptrPage);
+    });
+  });
+
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot

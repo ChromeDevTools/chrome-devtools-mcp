@@ -646,7 +646,7 @@ export class McpContext implements Context {
 
     if (
       (!this.#selectedPage ||
-        this.#pages.indexOf(this.#selectedPage.pptrPage) === -1) &&
+        this.#selectedPage.pptrPage.isClosed()) &&
       this.#pages[0]
     ) {
       this.selectPage(this.#getMcpPage(this.#pages[0]));
