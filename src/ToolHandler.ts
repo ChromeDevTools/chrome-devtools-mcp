@@ -7,6 +7,7 @@
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
+import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
@@ -260,9 +261,9 @@ export class ToolHandler {
         response.setError(err);
       }
       // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
-      let dataFormat: 'default' | 'toon' | 'gcf' = 'default';
+      let dataFormat: DataFormat = 'default';
       if (this.serverArgs.experimentalDataFormat) {
-        dataFormat = this.serverArgs.experimentalDataFormat as 'default' | 'toon' | 'gcf';
+        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
       } else if (this.serverArgs.experimentalToonFormat) {
         dataFormat = 'toon';
       }

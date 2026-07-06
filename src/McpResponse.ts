@@ -25,9 +25,12 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, getToonEncode, getGcfEncode, type Protocol} from './third_party/index.js';
-
-export type DataFormat = 'default' | 'toon' | 'gcf';
+import {
+  DevTools,
+  getToonEncode,
+  getGcfEncode,
+  type Protocol,
+} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -51,6 +54,8 @@ import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
+
+export type DataFormat = 'default' | 'toon' | 'gcf';
 
 interface TraceInsightData {
   trace: TraceResult;
