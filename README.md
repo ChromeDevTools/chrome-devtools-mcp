@@ -340,7 +340,7 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
 grok mcp add chrome-devtools npx chrome-devtools-mcp@latest
 ```
 
-  See the <a href="https://docs.x.ai/build/features/skills-plugins-marketplaces">docs</a> for more options
+See the <a href="https://docs.x.ai/build/features/skills-plugins-marketplaces">docs</a> for more options
 </details>
 
 <details>
