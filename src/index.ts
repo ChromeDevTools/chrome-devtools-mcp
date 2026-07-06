@@ -86,6 +86,13 @@ export async function createMcpServer(
           void updateRoots();
         },
       );
+    } else if (!serverArgs.allowUnrestrictedPaths) {
+      console.warn(
+        '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
+          'capability. File-writing tools will be restricted to the OS temp directory. ' +
+          'To restore the previous unrestricted behavior, start the server with ' +
+          '--allow-unrestricted-paths.',
+      );
     }
   };
 
@@ -146,6 +153,7 @@ export async function createMcpServer(
         performanceCrux: serverArgs.performanceCrux,
         allowList: allowlist,
         blocklist: blocklist,
+        allowUnrestrictedPaths: serverArgs.allowUnrestrictedPaths,
       });
       await updateRoots();
     }

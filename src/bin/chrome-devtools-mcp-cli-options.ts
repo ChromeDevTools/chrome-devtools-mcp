@@ -361,6 +361,15 @@ export const cliOptions = {
       'If true, redacts some of the network headers considered sensitive before returning to the client.',
     default: false,
   },
+  allowUnrestrictedPaths: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'If set, disables the default path restriction that applies when the MCP client does not negotiate ' +
+      'the roots capability. By default, file-writing tools are restricted to the OS temp directory when ' +
+      'no roots are configured. Use this only when connecting a trusted local client that does not implement ' +
+      'MCP roots and requires access to paths outside the temp directory.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
