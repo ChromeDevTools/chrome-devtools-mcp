@@ -185,7 +185,7 @@ export type SupportedExtensions =
   | '.html'
   | '.txt'
   | '.csv'
-  | '.json.gz';
+  | '.gz';
 
 /**
  * Only add methods used by tools/*.
