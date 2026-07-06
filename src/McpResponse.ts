@@ -985,8 +985,20 @@ Call ${handleDialog.name} to handle it before continuing.`);
         {regularPages: [], extensionPages: []},
       );
 
+      const selectionFallback = context.getSelectedPageFallback();
       if (regularPages.length) {
         const parts = [`## Pages`];
+        if (selectionFallback) {
+          const selectedPage = regularPages.find(page =>
+            context.isPageSelected(page),
+          );
+          const selectedPageId = selectedPage
+            ? context.getPageId(selectedPage)
+            : undefined;
+          parts.push(
+            `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
+          );
+        }
         const structuredPages = [];
         for (const page of regularPages) {
           const isolatedContextName = context.getIsolatedContextName(page);

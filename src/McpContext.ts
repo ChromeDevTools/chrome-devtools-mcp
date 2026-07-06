@@ -88,6 +88,7 @@ export class McpContext implements Context {
 
   #mcpPages = new Map<Page, McpPage>();
   #selectedPage?: McpPage;
+  #selectedPageFallback?: {wasClosed: boolean};
   #networkCollector: NetworkCollector;
   #consoleCollector: ConsoleCollector;
   #devtoolsUniverseManager: UniverseManager;
@@ -562,6 +563,16 @@ export class McpContext implements Context {
     this.#updateSelectedPageTimeouts();
   }
 
+  /**
+   * Returns details about the last page snapshot automatically replacing the
+   * selection because the selected page disappeared from the page list, or
+   * `undefined` if the snapshot left the selection intact. Recomputed on every
+   * createPagesSnapshot() call.
+   */
+  getSelectedPageFallback(): {wasClosed: boolean} | undefined {
+    return this.#selectedPageFallback;
+  }
+
   #updateSelectedPageTimeouts() {
     const page = this.#getSelectedMcpPage();
     // For waiters 5sec timeout should be sufficient.
@@ -665,11 +676,19 @@ export class McpContext implements Context {
       );
     });
 
+    this.#selectedPageFallback = undefined;
     if (
       (!this.#selectedPage ||
         this.#pages.indexOf(this.#selectedPage.pptrPage) === -1) &&
       this.#pages[0]
     ) {
+      // Record the automatic change so the response can surface it. Skipped on
+      // first connect, when there was no prior selection to replace.
+      if (this.#selectedPage) {
+        this.#selectedPageFallback = {
+          wasClosed: this.#selectedPage.pptrPage.isClosed(),
+        };
+      }
       this.selectPage(this.#getMcpPage(this.#pages[0]));
     }
 
