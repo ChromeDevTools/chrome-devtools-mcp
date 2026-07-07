@@ -278,10 +278,23 @@ describe('McpContext', () => {
     });
   });
 
-  it('validatePath allows all paths if roots are undefined (legacy)', async () => {
+  it('validatePath allows all paths if roots are undefined and allowUnrestrictedPaths is set', async () => {
+    await withMcpContext(
+      async (_response, context) => {
+        context.setRoots(undefined);
+        await context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
+      },
+      {allowUnrestrictedPaths: true},
+    );
+  });
+
+  it('validatePath denies paths outside tmpdir if roots are undefined and allowUnrestrictedPaths is not set', async () => {
     await withMcpContext(async (_response, context) => {
-      context.setRoots(undefined);
-      await context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
+      // setRoots() never called — simulates a client that skips roots capability.
+      const outsidePath = path.resolve(os.homedir(), 'anywhere.txt');
+      await assert.rejects(context.validatePath(outsidePath), /Access denied/);
+      // Temp dir must still be reachable.
+      await context.validatePath(path.join(os.tmpdir(), 'test.txt'));
     });
   });
 

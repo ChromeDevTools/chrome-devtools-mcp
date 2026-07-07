@@ -361,5 +361,13 @@
       "EXPERIMENTAL_DATA_FORMAT_TOON",
       "EXPERIMENTAL_DATA_FORMAT_GCF"
     ]
+  },
+  {
+    "name": "allow_unrestricted_paths_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allow_unrestricted_paths",
+    "flagType": "boolean"
   }
 ]
