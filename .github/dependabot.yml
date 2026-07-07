@@ -7,6 +7,8 @@ updates:
       day: 'sunday'
       time: '02:00'
       timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
     groups:
       dependencies:
         dependency-type: production
@@ -41,6 +43,8 @@ updates:
       day: 'sunday'
       time: '04:00'
       timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
     groups:
       all:
         patterns:
