@@ -50,6 +50,15 @@ const {devDependencies = {}} = JSON.parse(
 // special case for puppeteer, from which we only bundle puppeteer-core
 devDependencies['puppeteer-core'] = devDependencies['puppeteer'];
 
+const packageLock = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'package-lock.json'), 'utf-8'),
+);
+
+function getResolvedVersion(packageName) {
+  const packageEntry = packageLock.packages?.[`node_modules/${packageName}`];
+  return packageEntry?.version || null;
+}
+
 const aggregatedStats = {
   bundlesProcessed: 0,
   totalBundles: 0,
@@ -103,14 +112,17 @@ function listBundledDeps() {
       if (aggregatedStats.bundlesProcessed === aggregatedStats.totalBundles) {
         const outputPath = path.join(thirdPartyDir, 'bundled-packages.json');
 
-        const bundledDevDeps = Object.fromEntries(
-          Object.entries(devDependencies).filter(
-            ([name]) =>
-              aggregatedStats.bundledPackages.has(name) ||
-              name === 'chrome-devtools-frontend' ||
-              name === 'lighthouse',
-          ),
-        );
+        const bundledDevDeps = {};
+        for (const [name, versionRange] of Object.entries(devDependencies)) {
+          if (
+            aggregatedStats.bundledPackages.has(name) ||
+            name === 'chrome-devtools-frontend' ||
+            name === 'lighthouse'
+          ) {
+            const resolvedVersion = getResolvedVersion(name);
+            bundledDevDeps[name] = resolvedVersion || versionRange;
+          }
+        }
 
         fs.writeFileSync(outputPath, JSON.stringify(bundledDevDeps, null, 2));
       }
