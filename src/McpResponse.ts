@@ -986,19 +986,19 @@ Call ${handleDialog.name} to handle it before continuing.`);
       );
 
       const selectionFallback = context.getSelectedPageFallback();
+      if (selectionFallback) {
+        let selectedPageId: number | undefined;
+        try {
+          selectedPageId = context.getSelectedMcpPage().id;
+        } catch {
+          selectedPageId = undefined;
+        }
+        response.push(
+          `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
+        );
+      }
       if (regularPages.length) {
         const parts = [`## Pages`];
-        if (selectionFallback) {
-          const selectedPage = regularPages.find(page =>
-            context.isPageSelected(page),
-          );
-          const selectedPageId = selectedPage
-            ? context.getPageId(selectedPage)
-            : undefined;
-          parts.push(
-            `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
-          );
-        }
         const structuredPages = [];
         for (const page of regularPages) {
           const isolatedContextName = context.getIsolatedContextName(page);
