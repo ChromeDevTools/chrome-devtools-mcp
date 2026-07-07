@@ -86,7 +86,7 @@ export const startScreencast = definePageTool(args => ({
 
     const page = request.page;
 
-    const fps = request.params.fps ?? args?.experimentalScreencastFps;
+    const fps = request.params.fps ?? args?.experimentalScreencastFps ?? 12;
 
     let recorder: ScreenRecorder;
     try {

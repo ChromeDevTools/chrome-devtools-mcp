@@ -203,6 +203,7 @@ export const cliOptions = {
   },
   experimentalScreencastFps: {
     type: 'number',
+    default: 12,
     describe: 'Target frame rate for screencast recording.',
     implies: 'experimentalScreencast',
   },
