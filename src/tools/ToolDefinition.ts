@@ -17,6 +17,7 @@ import type {
   Dialog,
   ElementHandle,
   Extension,
+  HTTPRequest,
   Page,
   ScreenRecorder,
   Viewport,
@@ -241,6 +242,10 @@ export type Context = Readonly<{
     page: ContextPage,
     cdpRequestId: string,
   ): number | undefined;
+  /**
+   * Returns a captured network request by its reqid. Throws if not found.
+   */
+  getNetworkRequestById(page: ContextPage, reqid: number): HTTPRequest;
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,

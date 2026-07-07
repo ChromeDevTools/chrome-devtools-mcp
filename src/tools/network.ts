@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {toCurl, toFetch} from '../formatters/CurlFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {ResourceType} from '../third_party/index.js';
 
@@ -140,5 +141,67 @@ export const getNetworkRequest = definePageTool({
         );
       }
     }
+  },
+});
+
+export const toSnippet = definePageTool({
+  name: 'to_snippet',
+  description: `Generate a runnable curl or fetch code snippet that reproduces a captured network request. Sensitive headers (authorization, cookie, ...) are redacted by default; set includeSensitiveHeaders to true to reproduce authenticated requests.`,
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: true,
+  },
+  schema: {
+    reqid: zod
+      .number()
+      .optional()
+      .describe(
+        'The reqid of the network request (see list_network_requests). If omitted, uses the request currently selected in the DevTools Network panel.',
+      ),
+    format: zod
+      .enum(['curl', 'fetch'])
+      .default('curl')
+      .optional()
+      .describe('Output format. Defaults to curl.'),
+    includeSensitiveHeaders: zod
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'Include sensitive headers (authorization, cookie, ...) verbatim so the snippet works for authenticated endpoints. Defaults to false (redacted).',
+      ),
+  },
+  blockedByDialog: true,
+  verifyFilesSchema: [],
+  handler: async (request, response, context) => {
+    let reqid = request.params.reqid;
+    if (reqid === undefined) {
+      const data = await request.page.getDevToolsData();
+      response.attachDevToolsData(data);
+      reqid = data?.cdpRequestId
+        ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
+        : undefined;
+    }
+    if (reqid === undefined) {
+      response.appendResponseLine(
+        'Nothing is currently selected in the DevTools Network panel. Provide a reqid.',
+      );
+      return;
+    }
+
+    const httpRequest = context.getNetworkRequestById(request.page, reqid);
+    const format = request.params.format ?? 'curl';
+    const options = {
+      includeSensitiveHeaders: request.params.includeSensitiveHeaders ?? false,
+    };
+    const snippet =
+      format === 'fetch'
+        ? await toFetch(httpRequest, options)
+        : await toCurl(httpRequest, options);
+
+    response.appendResponseLine(`Snippet (${format}) for reqid=${reqid}:`);
+    response.appendResponseLine(format === 'fetch' ? '```js' : '```sh');
+    response.appendResponseLine(snippet);
+    response.appendResponseLine('```');
   },
 });

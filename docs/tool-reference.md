@@ -27,9 +27,10 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (3 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
+  - [`to_snippet`](#to_snippet)
 - **[Debugging](#debugging)** (8 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -340,6 +341,18 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+
+---
+
+### `to_snippet`
+
+**Description:** Generate a runnable curl or fetch code snippet that reproduces a captured network request. Sensitive headers (authorization, cookie, ...) are redacted by default; set includeSensitiveHeaders to true to reproduce authenticated requests.
+
+**Parameters:**
+
+- **format** (enum: "curl", "fetch") _(optional)_: Output format. Defaults to curl.
+- **includeSensitiveHeaders** (boolean) _(optional)_: Include sensitive headers (authorization, cookie, ...) verbatim so the snippet works for authenticated endpoints. Defaults to false (redacted).
+- **reqid** (number) _(optional)_: The reqid of the network request (see [`list_network_requests`](#list_network_requests)). If omitted, uses the request currently selected in the DevTools Network panel.
 
 ---
 

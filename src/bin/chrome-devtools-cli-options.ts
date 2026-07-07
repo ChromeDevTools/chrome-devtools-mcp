@@ -1075,6 +1075,36 @@ export const commands: Commands = {
       },
     },
   },
+  to_snippet: {
+    description:
+      'Generate a runnable curl or fetch code snippet that reproduces a captured network request. Sensitive headers (authorization, cookie, ...) are redacted by default; set includeSensitiveHeaders to true to reproduce authenticated requests.',
+    category: 'Network',
+    args: {
+      reqid: {
+        name: 'reqid',
+        type: 'number',
+        description:
+          'The reqid of the network request (see list_network_requests). If omitted, uses the request currently selected in the DevTools Network panel.',
+        required: false,
+      },
+      format: {
+        name: 'format',
+        type: 'string',
+        description: 'Output format. Defaults to curl.',
+        required: false,
+        default: 'curl',
+        enum: ['curl', 'fetch'],
+      },
+      includeSensitiveHeaders: {
+        name: 'includeSensitiveHeaders',
+        type: 'boolean',
+        description:
+          'Include sensitive headers (authorization, cookie, ...) verbatim so the snippet works for authenticated endpoints. Defaults to false (redacted).',
+        required: false,
+        default: false,
+      },
+    },
+  },
   trigger_extension_action: {
     description:
       'Triggers the default action of an extension by its ID. (requires flag: --categoryExtensions=true)',
