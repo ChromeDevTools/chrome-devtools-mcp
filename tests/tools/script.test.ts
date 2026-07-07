@@ -357,7 +357,7 @@ describe('script', () => {
           assertNoServiceWorkerReported(targets, extensionId);
         },
         {},
-        {categoryExtensions: true} as ParsedArguments,
+        {categoryExtensions: true},
       );
     });
 
@@ -384,7 +384,7 @@ describe('script', () => {
           );
         },
         {},
-        {categoryExtensions: true} as ParsedArguments,
+        {categoryExtensions: true},
       );
     });
 
@@ -412,7 +412,7 @@ describe('script', () => {
           );
         },
         {},
-        {categoryExtensions: true} as ParsedArguments,
+        {categoryExtensions: true},
       );
     });
   });

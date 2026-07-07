@@ -9,7 +9,6 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -82,7 +81,7 @@ describe('thirdPartyDeveloperTools', () => {
           });
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -119,7 +118,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -155,7 +154,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -185,7 +184,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -247,7 +246,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.strictEqual(actualGroups[1].name, 'group-2');
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -301,7 +300,7 @@ describe('thirdPartyDeveloperTools', () => {
           assert.strictEqual(groupsLength, 1);
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
   });
@@ -368,7 +367,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -451,7 +450,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -494,7 +493,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -633,7 +632,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -680,7 +679,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -733,7 +732,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -768,10 +767,6 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          const stub = sinon
-            .stub(page, 'resolveCdpElementId')
-            .returns('mock-uid');
-
           await executeThirdPartyDeveloperTool.handler(
             {
               params: {
@@ -786,13 +781,11 @@ describe('thirdPartyDeveloperTools', () => {
 
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({uid: 'mock-uid'}, null, 2),
+            JSON.stringify({uid: '1_1'}, null, 2),
           );
-
-          stub.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -827,14 +820,6 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          const stubSnapshot = sinon
-            .stub(TextSnapshot, 'create')
-            .resolves({} as TextSnapshot);
-
-          const stubResolve = sinon
-            .stub(page, 'resolveCdpElementId')
-            .returns('mock-uid');
-
           await executeThirdPartyDeveloperTool.handler(
             {
               params: {
@@ -847,20 +832,13 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          assert.ok(
-            stubSnapshot.calledOnce,
-            'Expected TextSnapshot.create to be called',
-          );
           assert.strictEqual(
             response.responseLines[0],
-            JSON.stringify({uid: 'mock-uid'}, null, 2),
+            JSON.stringify({uid: '1_1'}, null, 2),
           );
-
-          stubResolve.restore();
-          stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
 
@@ -920,7 +898,7 @@ describe('thirdPartyDeveloperTools', () => {
           stubSnapshot.restore();
         },
         undefined,
-        {categoryExperimentalThirdParty: true} as ParsedArguments,
+        {categoryExperimentalThirdParty: true},
       );
     });
   });

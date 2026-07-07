@@ -143,7 +143,7 @@ describe('extension', () => {
       {},
       {
         categoryExtensions: true,
-      } as ParsedArguments,
+      },
     );
   });
   it('triggers an extension action', async () => {
@@ -176,7 +176,7 @@ describe('extension', () => {
       {},
       {
         categoryExtensions: true,
-      } as ParsedArguments,
+      },
     );
   });
 
@@ -218,7 +218,7 @@ describe('extension', () => {
       {},
       {
         categoryExtensions: true,
-      } as ParsedArguments,
+      },
     );
   });
 });

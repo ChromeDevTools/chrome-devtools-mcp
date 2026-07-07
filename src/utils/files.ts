@@ -15,14 +15,6 @@ export async function getTempFilePath(filename: string) {
   return filepath;
 }
 
-export function ensureExtension(
-  filepath: string,
-  extension: `.${string}`,
-): string {
-  const ext = path.extname(filepath);
-  return filepath.slice(0, filepath.length - ext.length) + extension;
-}
-
 export async function resolveCanonicalPath(filePath: string): Promise<string> {
   const absolutePath = path.resolve(filePath);
   try {

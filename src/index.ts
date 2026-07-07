@@ -144,10 +144,8 @@ export async function createMcpServer(
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages: serverArgs.experimentalIncludeAllPages,
         performanceCrux: serverArgs.performanceCrux,
-        hasNetworkBlockOrAllowlist: Boolean(
-          (blocklist && blocklist.length > 0) ||
-          (allowlist && allowlist.length > 0),
-        ),
+        allowList: allowlist,
+        blocklist: blocklist,
       });
       await updateRoots();
     }

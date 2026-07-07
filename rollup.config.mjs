@@ -277,6 +277,20 @@ export default [
         return true;
       }
 
+      if (
+        source === '@toon-format/toon' ||
+        source.startsWith('@toon-format/toon/')
+      ) {
+        return true;
+      }
+
+      if (
+        source === '@blackwell-systems/gcf' ||
+        source.startsWith('@blackwell-systems/gcf/')
+      ) {
+        return true;
+      }
+
       const existingExternals = [
         './bidi.js',
         '../bidi/bidi.js',

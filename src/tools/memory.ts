@@ -5,7 +5,6 @@
  */
 
 import {zod} from '../third_party/index.js';
-import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
@@ -24,16 +23,18 @@ export const takeHeapSnapshot = definePageTool({
   },
   blockedByDialog: true,
   verifyFilesSchema: ['filePath'],
-  handler: async (request, response) => {
+  handler: async (request, response, context) => {
     const page = request.page;
+    const snapshotPath = await context.ensureExtension(
+      request.params.filePath,
+      '.heapsnapshot',
+    );
 
     await page.pptrPage.captureHeapSnapshot({
-      path: ensureExtension(request.params.filePath, '.heapsnapshot'),
+      path: snapshotPath,
     });
 
-    response.appendResponseLine(
-      `Heap snapshot saved to ${request.params.filePath}`,
-    );
+    response.appendResponseLine(`Heap snapshot saved to ${snapshotPath}`);
   },
 });
 
@@ -278,5 +279,76 @@ export const getHeapSnapshotDominators = defineTool({
     );
 
     response.setHeapSnapshotDominators(dominators);
+  },
+});
+
+export const compareHeapSnapshots = defineTool({
+  name: 'compare_heapsnapshots',
+  description:
+    'Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  verifyFilesSchema: ['baseFilePath', 'currentFilePath'],
+  schema: {
+    baseFilePath: zod
+      .string()
+      .describe('A path to the base .heapsnapshot file (earlier snapshot).'),
+    currentFilePath: zod
+      .string()
+      .describe('A path to the current .heapsnapshot file (later snapshot).'),
+    classIndex: zod
+      .number()
+      .optional()
+      .describe(
+        'Optional 0-based index of the class in the summary list to filter results, showing individual objects.',
+      ),
+  },
+  blockedByDialog: false,
+  handler: async (request, response, context) => {
+    if (request.params.classIndex !== undefined) {
+      const classDiffResult = await context.getHeapSnapshotDetailedClassDiff(
+        request.params.baseFilePath,
+        request.params.currentFilePath,
+        request.params.classIndex,
+      );
+      response.setHeapSnapshotDetailedClassDiff(classDiffResult);
+    } else {
+      const diff = await context.getHeapSnapshotClassDiffs(
+        request.params.baseFilePath,
+        request.params.currentFilePath,
+      );
+      response.setHeapSnapshotClassDiffs(diff);
+    }
+  },
+});
+
+export const getHeapSnapshotDuplicateStrings = defineTool({
+  name: 'get_heapsnapshot_duplicate_strings',
+  description:
+    'Loads a memory heapsnapshot and returns duplicate strings grouped by their value.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  blockedByDialog: false,
+  verifyFilesSchema: ['filePath'],
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    pageIdx: zod.number().optional().describe('The page index for pagination.'),
+    pageSize: zod.number().optional().describe('The page size for pagination.'),
+  },
+  handler: async (request, response, context) => {
+    const duplicateStrings = await context.getHeapSnapshotDuplicateStrings(
+      request.params.filePath,
+    );
+
+    response.setHeapSnapshotDuplicateStrings(duplicateStrings, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
   },
 });

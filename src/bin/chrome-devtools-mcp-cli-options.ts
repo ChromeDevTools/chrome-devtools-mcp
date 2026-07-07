@@ -173,7 +173,14 @@ export const cliOptions = {
   experimentalToonFormat: {
     type: 'boolean',
     describe:
-      'Whether to format structured data in text response using Token-Oriented Object Notation. Defaults to false which represents the embedded content as formatted JSON instead.',
+      'Deprecated: use --experimentalDataFormat=toon instead. Whether to format structured data using TOON (requires @toon-format/toon).',
+    hidden: true,
+  },
+  experimentalDataFormat: {
+    type: 'string',
+    describe:
+      'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
+    choices: ['default', 'toon', 'gcf'] as const,
     hidden: true,
   },
   experimentalIncludeAllPages: {
@@ -220,13 +227,13 @@ export const cliOptions = {
   blockedUrlPattern: {
     type: 'array',
     describe:
-      'Restricts network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['allowedUrlPattern'],
   },
   allowedUrlPattern: {
     type: 'array',
     describe:
-      'Restricts network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.',
+      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['blockedUrlPattern'],
   },
   ignoreDefaultChromeArg: {

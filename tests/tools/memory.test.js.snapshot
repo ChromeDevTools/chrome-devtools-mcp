@@ -1,3 +1,40 @@
+exports[`memory > compare_heapsnapshots > compare heap-1 to heap-2 1`] = `
+## Heap Snapshot Data
+### Heap Snapshot Diff
+index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta
+0,(object shape),11,1,10,0.4 kB,0.0 kB,0.4 kB
+1,(compiled code),7,1,6,0.3 kB,0.0 kB,0.2 kB
+2,NewObject,2,0,2,0.1 kB,0.0 kB,0.1 kB
+3,(concatenated string),45,43,2,0.9 kB,0.9 kB,0.0 kB
+4,Array,2,0,2,0.0 kB,0.0 kB,0.0 kB
+5,{constructor},1,0,1,0.0 kB,0.0 kB,0.0 kB
+6,(string),4,4,0,0.1 kB,0.1 kB,0.0 kB
+7,(number),0,2,-2,0.0 kB,0.0 kB,-0.0 kB
+8,Object,0,2,-2,0.0 kB,0.0 kB,-0.0 kB
+9,InitialObject,0,2,-2,0.0 kB,0.1 kB,-0.1 kB
+`;
+
+exports[`memory > compare_heapsnapshots > compare heap-1 to heap-2 with classIndex filter 1`] = `
+## Heap Snapshot Data
+### Heap Snapshot Detailed Diff
+NewObject: # new: 2, # deleted: 0, # delta: +2, alloc size: +0.1 kB, freed size: 0.0 kB, size delta: +0.1 kB
+Objects:
+  + @35179 (self_size: 0.1 kB)
+  + @35181 (self_size: 0.1 kB)
+`;
+
+exports[`memory > compare_heapsnapshots > compare heap-2 to heap-3 1`] = `
+## Heap Snapshot Data
+### Heap Snapshot Diff
+index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta
+0,(concatenated string),105,0,105,2.1 kB,0.0 kB,2.1 kB
+1,(object shape),7,1,6,0.3 kB,0.1 kB,0.3 kB
+2,(string),10,0,10,0.2 kB,0.0 kB,0.2 kB
+3,NewObject,5,0,5,0.1 kB,0.0 kB,0.1 kB
+4,Array,5,0,5,0.1 kB,0.0 kB,0.1 kB
+5,system / PropertyArray,1,0,1,0.0 kB,0.0 kB,0.0 kB
+`;
+
 exports[`memory > get_heapsnapshot_class_nodes > with default options 1`] = `
 ## Heap Snapshot Data
 nodeId,nodeName,type,distance,selfSize,retainedSize
@@ -182,6 +219,26 @@ nodeId,nodeName,selfSize,retainedSize
 25341,String,0.2 kB,1.6 kB
 7199,system / NativeContext,1.2 kB,84.4 kB
 1,,0.0 kB,802 kB
+`;
+
+exports[`memory > get_heapsnapshot_duplicate_strings > with default options 1`] = `
+## Heap Snapshot Data
+### Duplicate Strings
+Showing 1-13 of 13 (Page 1 of 1).
+value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds
+"get disposed",8,0.2 kB,0.2 kB,false,@30685 @30731 @33713 @33781 @42891 @42947 @45203 @45233
+"WebAssembly.Suspending",4,0.1 kB,0.1 kB,false,@44967 @45473 @46069 @46195
+"extensions::SafeBuiltins",2,0.1 kB,0.1 kB,false,@25155 @26209
+"WebAssembly",2,0.0 kB,0.0 kB,false,@7495 @15037
+"EventTarget",3,0.0 kB,0.0 kB,false,@13309 @25089 @26185
+"v8/LoadTimes",2,0.0 kB,0.0 kB,false,@25159 @26365
+"Document",3,0.0 kB,0.0 kB,false,@12341 @25969 @26603
+"WebAssembly.Exception",2,0.0 kB,0.0 kB,false,@1855 @7473
+"WebAssembly.Module",2,0.0 kB,0.0 kB,false,@1857 @7429
+"HTMLBodyElement",2,0.0 kB,0.0 kB,false,@13679 @44753
+"MutationObserver",2,0.0 kB,0.0 kB,false,@14347 @32179
+"HTMLElement",2,0.0 kB,0.0 kB,false,@11557 @43899
+" ",2,0.0 kB,0.0 kB,false,@725 @789
 `;
 
 exports[`memory > get_heapsnapshot_edges > with pagination 1`] = `

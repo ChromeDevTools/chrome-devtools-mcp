@@ -62,6 +62,7 @@ startCliOptions.isolated!.description =
 startCliOptions.categoryExtensions!.default = true;
 
 const y = yargs(hideBin(process.argv))
+  .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
   .usage('chrome-devtools <command> [...args] --flags')
@@ -78,7 +79,43 @@ const y = yargs(hideBin(process.argv))
   .version(VERSION)
   .strict()
   .help(true)
-  .wrap(120);
+  .wrap(120)
+  .fail((msg, err) => {
+    if (msg) {
+      console.error('Error:', msg);
+      if (
+        msg.includes('Not enough non-option arguments') ||
+        msg.includes('Unknown argument') ||
+        msg.includes('Unknown arguments')
+      ) {
+        console.error('\n=========================================');
+        console.error('💡 TIP FOR AI AGENT / DEVELOPER:');
+        console.error('In the `chrome-devtools` CLI:');
+        console.error(
+          '1. Required parameters MUST be passed as positional arguments (without flags).',
+        );
+        console.error(
+          '   - INCORRECT: chrome-devtools evaluate_script --expression "() => document.title"',
+        );
+        console.error(
+          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title"',
+        );
+        console.error(
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --pageId 1).',
+        );
+        console.error(
+          '3. Make sure to escape quotes properly for your shell environment.',
+        );
+        console.error(
+          'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',
+        );
+        console.error('=========================================');
+      }
+    } else if (err) {
+      console.error(err);
+    }
+    process.exit(1);
+  });
 
 y.command(
   'start',

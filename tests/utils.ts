@@ -122,11 +122,11 @@ export async function withMcpContext(
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
   } = {},
-  args: ParsedArguments = {} as ParsedArguments,
+  args: Partial<ParsedArguments> = {},
 ) {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
-    const response = new McpResponse(args);
+    const response = new McpResponse(args as ParsedArguments);
     if (context) {
       context.dispose();
     }
@@ -136,10 +136,8 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
-        hasNetworkBlockOrAllowlist: Boolean(
-          (options.blockedUrlPattern && options.blockedUrlPattern.length > 0) ||
-          (options.allowedUrlPattern && options.allowedUrlPattern.length > 0),
-        ),
+        allowList: options.allowedUrlPattern,
+        blocklist: options.blockedUrlPattern,
       },
       Locator,
     );
