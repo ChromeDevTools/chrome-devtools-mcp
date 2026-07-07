@@ -186,17 +186,20 @@ describe('McpContext', () => {
       sinon.stub(context, 'getNetworkRequestById').returns(mockRequest);
       sinon.stub(context, 'getNetworkRequestStableId').returns(789);
 
+      // Use os.tmpdir() so validatePath passes on all platforms (macOS tmpdir
+      // is /var/folders/..., not /tmp, so hardcoded /tmp paths are rejected).
+      const reqFilePath = path.join(os.tmpdir(), 'req.txt');
+      const resFilePath = path.join(os.tmpdir(), 'res.txt');
+
       // We stub NetworkFormatter.from to avoid actual file system writes and verify arguments
       const fromStub = sinon
         .stub(NetworkFormatter, 'from')
         .callsFake(async (_req, opts) => {
-          // Verify we received the file paths
-          assert.strictEqual(opts?.requestFilePath, '/tmp/req.txt');
-          assert.strictEqual(opts?.responseFilePath, '/tmp/res.txt');
-          // Return a dummy formatter that behaves as if it saved files
-          // We need to create a real instance or mock one.
-          // Since constructor is private, we can't easily new it up.
-          // But we can return a mock object.
+          // Verify we received the platform-correct file paths
+          assert.strictEqual(opts?.requestFilePath, reqFilePath);
+          assert.strictEqual(opts?.responseFilePath, resFilePath);
+          // Return fixed strings in toJSONDetailed so the snapshot is stable
+          // across platforms (os.tmpdir() differs on macOS vs Linux/Windows).
           return {
             toStringDetailed: () => 'Detailed string',
             toJSONDetailed: () => ({
@@ -207,8 +210,8 @@ describe('McpContext', () => {
         });
 
       response.attachNetworkRequest(789, {
-        requestFilePath: '/tmp/req.txt',
-        responseFilePath: '/tmp/res.txt',
+        requestFilePath: reqFilePath,
+        responseFilePath: resFilePath,
       });
       const result = await response.handle('test', context);
 
