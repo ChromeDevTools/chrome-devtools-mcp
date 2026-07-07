@@ -199,6 +199,26 @@ describe('screencast', () => {
       });
     });
 
+    it('passes fps from params to puppeteer', async () => {
+      await withMcpContext(async (response, context) => {
+        const mockRecorder = createMockRecorder();
+        const selectedPage = context.getSelectedPptrPage();
+        const screencastStub = sinon
+          .stub(selectedPage, 'screencast')
+          .resolves(mockRecorder as never);
+
+        await startScreencast().handler(
+          {params: {fps: 12}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnce(screencastStub);
+        const callArgs = screencastStub.firstCall.args[0];
+        assert.strictEqual(callArgs?.fps, 12);
+      });
+    });
+
     it('passes ffmpegPath from args to puppeteer', async () => {
       await withMcpContext(async (response, context) => {
         const mockRecorder = createMockRecorder();

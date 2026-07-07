@@ -201,6 +201,11 @@ export const cliOptions = {
     describe: 'Path to ffmpeg executable for screencast recording.',
     implies: 'experimentalScreencast',
   },
+  experimentalScreencastFps: {
+    type: 'number',
+    describe: 'Target frame rate for screencast recording.',
+    implies: 'experimentalScreencast',
+  },
   categoryExperimentalWebmcp: {
     type: 'boolean',
     describe:

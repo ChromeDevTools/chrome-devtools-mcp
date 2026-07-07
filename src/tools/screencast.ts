@@ -37,6 +37,13 @@ export const startScreencast = definePageTool(args => ({
       .describe(
         `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
       ),
+    fps: zod
+      .number()
+      .int()
+      .min(1)
+      .max(60)
+      .optional()
+      .describe('Target frame rate for screencast recording.'),
   },
   blockedByDialog: false,
   verifyFilesSchema: ['filePath'],
@@ -79,12 +86,15 @@ export const startScreencast = definePageTool(args => ({
 
     const page = request.page;
 
+    const fps = request.params.fps ?? args?.experimentalScreencastFps;
+
     let recorder: ScreenRecorder;
     try {
       recorder = await page.pptrPage.screencast({
         path: resolvedPath,
         format: format,
         ffmpegPath: args?.experimentalFfmpegPath,
+        ...(fps !== undefined ? {fps} : {}),
       });
     } catch (err) {
       // If we generated a temporary directory for this recording, remove it so
