@@ -51,10 +51,7 @@ export const startTrace = definePageTool({
   verifyFilesSchema: ['filePath'],
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
-      response.appendResponseLine(
-        'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
-      );
-      return;
+      await stopActiveTraceWithoutParsing(request.page, response, context);
     }
     context.setIsRunningPerformanceTrace(true);
 
@@ -114,6 +111,21 @@ export const startTrace = definePageTool({
     }
   },
 });
+
+async function stopActiveTraceWithoutParsing(
+  page: ContextPage,
+  response: Response,
+  context: Context,
+): Promise<void> {
+  try {
+    await page.pptrPage.tracing.stop();
+    response.appendResponseLine(
+      'Stopped the previous performance trace before starting a new one.',
+    );
+  } finally {
+    context.setIsRunningPerformanceTrace(false);
+  }
+}
 
 export const stopTrace = definePageTool({
   name: 'performance_stop_trace',

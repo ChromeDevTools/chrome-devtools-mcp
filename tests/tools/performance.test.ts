@@ -144,24 +144,32 @@ describe('performance', () => {
       });
     });
 
-    it('errors if a recording is already active', async () => {
+    it('stops an active trace before starting a new recording', async () => {
+      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+
       await withMcpContext(async (response, context) => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedPptrPage();
+        const stopTracingStub = sinon
+          .stub(selectedPage.tracing, 'stop')
+          .resolves(rawData);
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {
-            params: {reload: true, autoStop: false},
+            params: {reload: false, autoStop: false},
             page: context.getSelectedMcpPage(),
           },
           response,
           context,
         );
-        sinon.assert.notCalled(startTracingStub);
+        sinon.assert.calledOnce(stopTracingStub);
+        sinon.assert.calledOnce(startTracingStub);
+        assert.strictEqual(context.recordedTraces().length, 0);
+        assert.ok(context.isRunningPerformanceTrace());
         assert.ok(
           response.responseLines
             .join('\n')
-            .match(/a performance trace is already running/),
+            .match(/Stopped the previous performance trace/),
         );
       });
     });
