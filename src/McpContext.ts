@@ -17,7 +17,7 @@ import {
 } from './devtools/DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
 import type {
-  AggregatedInfoWithId,
+  HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
@@ -953,7 +953,7 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
-  ): Promise<Record<string, AggregatedInfoWithId>> {
+  ): Promise<HeapSnapshotAggregateData> {
     return await this.#heapSnapshotManager.getAggregates(filePath, filterName);
   }
 

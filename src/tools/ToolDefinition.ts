@@ -6,7 +6,7 @@
 
 import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
 import type {
-  AggregatedInfoWithId,
+  HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
@@ -107,10 +107,7 @@ export interface DevToolsData {
 export interface Response {
   appendResponseLine(value: string): void;
   setHeapSnapshotAggregates(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
+    aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,
   ): void;
   setHeapSnapshotStats(
@@ -258,7 +255,7 @@ export type Context = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
-  ): Promise<Record<string, AggregatedInfoWithId>>;
+  ): Promise<HeapSnapshotAggregateData>;
   getHeapSnapshotDuplicateStrings(
     filePath: string,
   ): Promise<DuplicateStringGroup[]>;

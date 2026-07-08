@@ -63,6 +63,8 @@ Showing 1-6 of 6 (Page 1 of 1).
 
 exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
+Objects: 11940
+Total shallow size: 802 kB
 Showing 1-157 of 157 (Page 1 of 1).
 id,name,count,selfSize,maxRetainedSize
 2,(system),3205,199 kB,655 kB
@@ -226,6 +228,8 @@ id,name,count,selfSize,maxRetainedSize
 
 exports[`memory > get_heapsnapshot_details > with objectsRetainedByContexts filterName 1`] = `
 ## Heap Snapshot Data
+Objects: 148
+Total shallow size: 3.5 kB
 Showing 1-4 of 4 (Page 1 of 1).
 id,name,count,selfSize,maxRetainedSize
 1,system / Context,116,2.5 kB,3.5 kB

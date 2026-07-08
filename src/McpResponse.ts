@@ -17,6 +17,7 @@ import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {
+  HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
@@ -230,10 +231,7 @@ export class McpResponse implements Response {
   #images: ImageContentData[] = [];
   #heapSnapshotOptions?: {
     include: boolean;
-    aggregates?: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >;
+    aggregateData?: HeapSnapshotAggregateData;
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
@@ -461,16 +459,13 @@ export class McpResponse implements Response {
   }
 
   setHeapSnapshotAggregates(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
+    aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
-      aggregates,
+      aggregateData,
       pagination: options,
     };
   }
@@ -877,6 +872,10 @@ export class McpResponse implements Response {
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
+        aggregateStats?: {
+          objectCount: number;
+          totalSelfSize: number;
+        };
       };
       heapSnapshotData?: object[];
       heapSnapshotNodes?: readonly object[];
@@ -1169,15 +1168,28 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
       }
-      const aggregates = this.#heapSnapshotOptions.aggregates;
-      if (aggregates) {
-        const sortedEntries = HeapSnapshotFormatter.sort(aggregates);
+      const aggregateData = this.#heapSnapshotOptions.aggregateData;
+      if (aggregateData) {
+        const sortedEntries = HeapSnapshotFormatter.sort(
+          aggregateData.aggregates,
+        );
 
         const paginationData = this.#dataWithPagination(
           sortedEntries,
           this.#heapSnapshotOptions.pagination,
         );
 
+        response.push(`Objects: ${aggregateData.objectCount}`);
+        response.push(
+          `Total shallow size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(
+            aggregateData.totalSelfSize,
+          )}`,
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.aggregateStats = {
+          objectCount: aggregateData.objectCount,
+          totalSelfSize: aggregateData.totalSelfSize,
+        };
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
 

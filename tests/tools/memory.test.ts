@@ -168,11 +168,11 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        const aggregates = await context.getHeapSnapshotAggregates(
+        const aggregateData = await context.getHeapSnapshotAggregates(
           filePath,
           'objectsRetainedByContexts',
         );
-        const aggregate = Object.values(aggregates).find(
+        const aggregate = Object.values(aggregateData.aggregates).find(
           a => a.name === 'Function',
         );
         assert.ok(aggregate);

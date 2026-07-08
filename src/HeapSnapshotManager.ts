@@ -17,6 +17,12 @@ import {
 export type AggregatedInfoWithId =
   WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
 
+export interface HeapSnapshotAggregateData {
+  aggregates: Record<string, AggregatedInfoWithId>;
+  objectCount: number;
+  totalSelfSize: number;
+}
+
 export interface HeapSnapshotClassDiff {
   className: string;
   addedCount: number;
@@ -74,7 +80,7 @@ export class HeapSnapshotManager {
   async getAggregates(
     filePath: string,
     filterName?: string,
-  ): Promise<Record<string, AggregatedInfoWithId>> {
+  ): Promise<HeapSnapshotAggregateData> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
@@ -83,16 +89,21 @@ export class HeapSnapshotManager {
     }
     const aggregates: Record<string, AggregatedInfoWithId> =
       await snapshot.aggregatesWithFilter(filter);
+    let objectCount = 0;
+    let totalSelfSize = 0;
 
-    for (const key of Object.keys(aggregates)) {
+    for (const [key, aggregate] of Object.entries(aggregates)) {
       const id = await this.getOrCreateIdForClassKey(filePath, key);
-      const aggregate = aggregates[key];
-      if (aggregate) {
-        aggregate[stableIdSymbol] = id;
-      }
+      aggregate[stableIdSymbol] = id;
+      objectCount += aggregate.count;
+      totalSelfSize += aggregate.self;
     }
 
-    return aggregates;
+    return {
+      aggregates,
+      objectCount,
+      totalSelfSize,
+    };
   }
 
   async getStats(
