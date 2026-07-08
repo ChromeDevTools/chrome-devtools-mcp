@@ -22,6 +22,8 @@ import {
 } from './utils.js';
 
 const FILE_TIMEOUT = 10_000;
+const READY_CHECK_INTERVAL = 100;
+const READY_CHECK_COMMAND_TIMEOUT = 1_000;
 
 /**
  * Waits for a file to be created and populated (removed = false) or removed (removed = true).
@@ -67,9 +69,47 @@ function waitForFile(filePath: string, removed = false) {
   });
 }
 
+function delay(ms: number) {
+  return new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForDaemonReady(sessionId: string) {
+  const deadline = Date.now() + FILE_TIMEOUT;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await sendCommand(
+        {method: 'status'},
+        sessionId,
+        READY_CHECK_COMMAND_TIMEOUT,
+      );
+      if (response.success) {
+        return;
+      }
+      lastError = new Error(String(response.error));
+    } catch (error) {
+      lastError = error;
+    }
+
+    const timeLeft = deadline - Date.now();
+    if (timeLeft > 0) {
+      await delay(Math.min(READY_CHECK_INTERVAL, timeLeft));
+    }
+  }
+
+  throw new Error(
+    `Timeout: daemon not ready within ${FILE_TIMEOUT}ms`,
+    lastError === undefined ? undefined : {cause: lastError},
+  );
+}
+
 export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   if (isDaemonRunning(sessionId)) {
     logger?.('Daemon is already running');
+    await waitForDaemonReady(sessionId);
     return;
   }
 
@@ -90,6 +130,7 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   child.unref();
 
   await waitForFile(pidFilePath);
+  await waitForDaemonReady(sessionId);
 }
 
 const SEND_COMMAND_TIMEOUT = 60_000; // ms
@@ -100,6 +141,7 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
+  timeout = SEND_COMMAND_TIMEOUT,
 ): Promise<DaemonResponse> {
   const socketPath = getSocketPath(sessionId);
 
@@ -111,7 +153,7 @@ export async function sendCommand(
     const timer = setTimeout(() => {
       socket.destroy();
       reject(new Error('Timeout waiting for daemon response'));
-    }, SEND_COMMAND_TIMEOUT);
+    }, timeout);
 
     const transport = new PipeTransport(socket, socket);
     transport.onmessage = async (message: string) => {
