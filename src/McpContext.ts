@@ -58,6 +58,53 @@ import type {
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {getNetworkMultiplierFromString} from './WaitForHelper.js';
 
+// Bounds concurrent DevTools detection CDP round-trips for large profiles.
+const DEVTOOLS_DETECTION_CONCURRENCY = 10;
+
+export async function mapWithConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (limit < 1) {
+    throw new Error('Concurrency limit must be at least 1.');
+  }
+
+  let nextIndex = 0;
+  let firstError: {error: unknown} | undefined;
+
+  async function runWorker(): Promise<void> {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+
+      if (index >= items.length) {
+        return;
+      }
+
+      try {
+        await worker(items[index]);
+      } catch (error) {
+        if (firstError === undefined) {
+          firstError = {error};
+        }
+      }
+    }
+  }
+
+  const workers: Array<Promise<void>> = [];
+  const workerCount = Math.min(limit, items.length);
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(runWorker());
+  }
+
+  await Promise.all(workers);
+
+  if (firstError !== undefined) {
+    throw firstError.error;
+  }
+}
+
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
@@ -789,8 +836,10 @@ export class McpContext implements Context {
     this.logger?.('Detecting open DevTools windows');
     const {pages} = await this.#getAllPages();
 
-    await Promise.all(
-      pages.map(async page => {
+    await mapWithConcurrency(
+      pages,
+      DEVTOOLS_DETECTION_CONCURRENCY,
+      async page => {
         const mcpPage = this.#mcpPages.get(page);
         if (!mcpPage) {
           return;
@@ -808,7 +857,7 @@ export class McpContext implements Context {
         } catch {
           mcpPage.devToolsPage = undefined;
         }
-      }),
+      },
     );
   }
 
