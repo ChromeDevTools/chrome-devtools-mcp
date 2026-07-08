@@ -87,6 +87,7 @@ export const startScreencast = definePageTool(args => ({
         path: resolvedPath,
         format: format,
         ffmpegPath: args?.experimentalFfmpegPath,
+        fps: args?.experimentalScreencastFps,
       });
     } catch (err) {
       // If we generated a temporary directory for this recording, remove it so
