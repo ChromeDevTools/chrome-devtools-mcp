@@ -1006,6 +1006,18 @@ Call ${handleDialog.name} to handle it before continuing.`);
         {regularPages: [], extensionPages: []},
       );
 
+      const selectionFallback = context.getSelectedPageFallback();
+      if (selectionFallback) {
+        let selectedPageId: number | undefined;
+        try {
+          selectedPageId = context.getSelectedMcpPage().id;
+        } catch {
+          selectedPageId = undefined;
+        }
+        response.push(
+          `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
+        );
+      }
       if (regularPages.length) {
         const parts = [`## Pages`];
         const structuredPages = [];

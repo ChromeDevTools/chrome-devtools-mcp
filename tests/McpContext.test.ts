@@ -135,6 +135,68 @@ describe('McpContext', () => {
     });
   });
 
+  it('reports the fallback when the selected page is closed', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      assert.ok(context.isPageSelected(page.pptrPage));
+
+      await page.pptrPage.close();
+      await context.createPagesSnapshot();
+
+      const [firstPage] = context.getPages();
+      assert.ok(firstPage);
+      assert.ok(context.isPageSelected(firstPage));
+
+      const fallback = context.getSelectedPageFallback();
+      assert.ok(fallback, 'fallback should be reported');
+      assert.strictEqual(fallback.wasClosed, true);
+    });
+  });
+
+  it('clears the fallback on the next snapshot with a valid selection', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      await page.pptrPage.close();
+      await context.createPagesSnapshot();
+      assert.ok(context.getSelectedPageFallback());
+
+      // A later snapshot keeps a valid selection (e.g. the one taken before the
+      // next response, or after an explicit select), so the note is not repeated.
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('does not report a fallback for a regular selection', async () => {
+    await withMcpContext(async (_response, context) => {
+      await context.newPage();
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('reports the fallback when the selected page is missing from the list', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      assert.ok(context.isPageSelected(page.pptrPage));
+
+      // A live page that is temporarily missing from the pages list.
+      const pages = await context.browser.pages();
+      const stub = sinon
+        .stub(context.browser, 'pages')
+        .resolves(pages.filter(otherPage => otherPage !== page.pptrPage));
+      try {
+        await context.createPagesSnapshot();
+      } finally {
+        stub.restore();
+      }
+
+      const fallback = context.getSelectedPageFallback();
+      assert.ok(fallback, 'fallback should be reported');
+      assert.strictEqual(fallback.wasClosed, false);
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
