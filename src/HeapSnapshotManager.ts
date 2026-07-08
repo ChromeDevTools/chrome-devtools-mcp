@@ -44,10 +44,9 @@ export class HeapSnapshotManager {
     {
       snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
       worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
-      // TODO: use a multimap
-      idToClassKey: Map<number, string>;
+      // 1-indexed array where index is the class ID.
+      idToClassKey: string[];
       classKeyToId: Map<string, number>;
-      idGenerator: () => number;
     }
   >();
 
@@ -65,9 +64,8 @@ export class HeapSnapshotManager {
     this.#snapshots.set(absolutePath, {
       snapshot,
       worker,
-      idToClassKey: new Map<number, string>(),
+      idToClassKey: [''],
       classKeyToId: new Map<string, number>(),
-      idGenerator: createIdGenerator(),
     });
 
     return snapshot;
@@ -114,9 +112,9 @@ export class HeapSnapshotManager {
     const cached = this.#getCachedSnapshot(filePath);
     let id = cached.classKeyToId.get(classKey);
     if (!id) {
-      id = cached.idGenerator();
+      id = cached.idToClassKey.length;
       cached.classKeyToId.set(classKey, id);
-      cached.idToClassKey.set(id, classKey);
+      cached.idToClassKey.push(classKey);
     }
     return id;
   }
@@ -287,7 +285,7 @@ export class HeapSnapshotManager {
     id: number,
   ): Promise<string | undefined> {
     const cached = this.#getCachedSnapshot(filePath);
-    return cached.idToClassKey.get(id);
+    return cached.idToClassKey[id];
   }
 
   async #loadSnapshot(
