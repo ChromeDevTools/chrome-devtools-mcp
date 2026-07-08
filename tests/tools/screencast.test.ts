@@ -6,8 +6,8 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
 import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
