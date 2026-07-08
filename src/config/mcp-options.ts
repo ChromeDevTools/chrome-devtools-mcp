@@ -206,6 +206,23 @@ export const mcpOptions = {
     describe: 'Path to ffmpeg executable for screencast recording.',
     implies: 'experimentalScreencast',
   },
+  experimentalScreencastFps: {
+    type: 'number',
+    describe:
+      'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
+    implies: 'experimentalScreencast',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(
+          `Invalid experimentalScreencastFps ${value}. Expected a positive integer.`,
+        );
+      }
+      return value;
+    },
+  },
   categoryExperimentalWebmcp: {
     type: 'boolean',
     describe:

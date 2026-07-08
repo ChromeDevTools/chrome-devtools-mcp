@@ -397,5 +397,9 @@
   {
     "name": "javascript_evaluation",
     "flagType": "boolean"
+  },
+  {
+    "name": "experimental_screencast_fps_present",
+    "flagType": "boolean"
   }
 ]
