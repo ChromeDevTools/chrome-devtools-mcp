@@ -175,12 +175,13 @@ describe('McpContext', () => {
     });
   });
 
-  it('reports the fallback when the selected page is missing from the list', async () => {
+  it('keeps a still-open selected page that is missing from the list', async () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       assert.ok(context.isPageSelected(page.pptrPage));
 
-      // A live page that is temporarily missing from the pages list.
+      // A live page that is temporarily missing from the pages list must keep
+      // its selection — only a genuinely closed page is replaced.
       const pages = await context.browser.pages();
       const stub = sinon
         .stub(context.browser, 'pages')
@@ -191,9 +192,11 @@ describe('McpContext', () => {
         stub.restore();
       }
 
-      const fallback = context.getSelectedPageFallback();
-      assert.ok(fallback, 'fallback should be reported');
-      assert.strictEqual(fallback.wasClosed, false);
+      assert.ok(
+        context.isPageSelected(page.pptrPage),
+        'a still-open page should keep its selection',
+      );
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
     });
   });
 

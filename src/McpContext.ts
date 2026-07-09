@@ -695,10 +695,13 @@ export class McpContext implements Context {
       );
     });
 
+    // Only fall back when the selected page is actually gone. Gating on
+    // `isClosed()` instead of `#pages` membership avoids silently swapping a
+    // live page that is momentarily missing from the snapshot, e.g., a
+    // `devtools://` page, which is selectable but filtered out of `#pages` above.
     this.#selectedPageFallback = undefined;
     if (
-      (!this.#selectedPage ||
-        this.#pages.indexOf(this.#selectedPage.pptrPage) === -1) &&
+      (!this.#selectedPage || this.#selectedPage.pptrPage.isClosed()) &&
       this.#pages[0]
     ) {
       // Record the automatic change so the response can surface it. Skipped on
