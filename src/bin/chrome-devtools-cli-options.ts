@@ -812,7 +812,7 @@ export const commands: Commands = {
         description:
           'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
         required: false,
-        enum: ['accept', 'decline'],
+        enum: ['accept', 'dismiss'],
       },
       initScript: {
         name: 'initScript',
