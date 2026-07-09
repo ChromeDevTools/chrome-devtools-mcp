@@ -87,7 +87,6 @@ export class McpContext implements Context {
   // Auto-generated name counter for when no name is provided.
   #nextIsolatedContextId = 1;
 
-  #pages: Page[] = [];
   #extensionServiceWorkers: ExtensionServiceWorker[] = [];
 
   #mcpPages = new Map<Page, McpPage>();
@@ -374,7 +373,7 @@ export class McpContext implements Context {
     return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
-    if (this.#pages.length === 1) {
+    if (this.getPages().length === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageById(pageId);
@@ -560,15 +559,13 @@ export class McpContext implements Context {
   }
 
   getPageById(pageId: number): McpPage {
-    const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
+    const page = Array.from(this.#mcpPages.values()).find(
+      mcpPage => mcpPage.id === pageId,
+    );
     if (!page) {
       throw new Error('No page found');
     }
     return page;
-  }
-
-  getPageId(page: Page): number | undefined {
-    return this.#mcpPages.get(page)?.id;
   }
 
   #getMcpPage(page: Page): McpPage {
@@ -687,7 +684,8 @@ export class McpContext implements Context {
   }
 
   async createPagesSnapshot(): Promise<Page[]> {
-    const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
+    const {pages: allPages, isolatedContextNames} =
+      await this.#fetchBrowserPages();
 
     for (const page of allPages) {
       const mcpPage = this.#createMcpPage(page);
@@ -703,21 +701,16 @@ export class McpContext implements Context {
       }
     }
 
-    this.#pages = allPages.filter(page => {
-      return (
-        this.#options.experimentalDevToolsDebugging ||
-        !page.url().startsWith('devtools://')
-      );
-    });
+    const pages = this.getPages();
 
     // Only fall back when the selected page is actually gone. Gating on
-    // `isClosed()` instead of `#pages` membership avoids silently swapping a
+    // `isClosed()` instead of `pages` membership avoids silently swapping a
     // live page that is momentarily missing from the snapshot, e.g., a
-    // `devtools://` page, which is selectable but filtered out of `#pages` above.
+    // `devtools://` page, which is selectable but filtered out of `pages` above.
     this.#selectedPageFallback = undefined;
     if (
       (!this.#selectedPage || this.#selectedPage.pptrPage.isClosed()) &&
-      this.#pages[0]
+      pages[0]
     ) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
@@ -726,15 +719,15 @@ export class McpContext implements Context {
           wasClosed: this.#selectedPage.pptrPage.isClosed(),
         };
       }
-      this.selectPage(this.#getMcpPage(this.#pages[0]));
+      this.selectPage(pages[0]);
     }
 
     await this.detectOpenDevToolsWindows();
 
-    return this.#pages;
+    return pages.map(p => p.pptrPage);
   }
 
-  async #getAllPages(): Promise<{
+  async #fetchBrowserPages(): Promise<{
     pages: Page[];
     isolatedContextNames: Map<Page, string>;
   }> {
@@ -805,15 +798,10 @@ export class McpContext implements Context {
 
   async detectOpenDevToolsWindows() {
     this.logger?.('Detecting open DevTools windows');
-    const {pages} = await this.#getAllPages();
 
     await Promise.all(
-      pages.map(async page => {
-        const mcpPage = this.#mcpPages.get(page);
-        if (!mcpPage) {
-          return;
-        }
-
+      Array.from(this.#mcpPages.values()).map(async mcpPage => {
+        const page = mcpPage.pptrPage;
         // Prior to Chrome 144.0.7559.59, the command fails,
         // Some Electron apps still use older version
         // Fall back to not exposing DevTools at all.
@@ -840,8 +828,13 @@ export class McpContext implements Context {
     return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
   }
 
-  getPages(): Page[] {
-    return this.#pages;
+  getPages(): McpPage[] {
+    return Array.from(this.#mcpPages.values()).filter(mcpPage => {
+      return (
+        this.#options.experimentalDevToolsDebugging ||
+        !mcpPage.pptrPage.url().startsWith('devtools://')
+      );
+    });
   }
 
   getIsolatedContextName(page: Page): string | undefined {
@@ -923,7 +916,7 @@ export class McpContext implements Context {
    * We need to ignore favicon request as they make our test flaky
    */
   async setUpNetworkCollectorForTesting() {
-    for (const mcpPage of this.#mcpPages.values()) {
+    for (const mcpPage of this.getPages()) {
       mcpPage.networkCollector.dispose();
       mcpPage.networkCollector = new NetworkCollector(
         mcpPage.pptrPage,

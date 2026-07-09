@@ -994,11 +994,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
       const allPages = context.getPages();
 
       const {regularPages, extensionPages} = allPages.reduce(
-        (acc: {regularPages: Page[]; extensionPages: Page[]}, page: Page) => {
-          if (page.url().startsWith('chrome-extension://')) {
-            acc.extensionPages.push(page);
+        (
+          acc: {regularPages: McpPage[]; extensionPages: McpPage[]},
+          mcpPage: McpPage,
+        ) => {
+          if (mcpPage.pptrPage.url().startsWith('chrome-extension://')) {
+            acc.extensionPages.push(mcpPage);
           } else {
-            acc.regularPages.push(page);
+            acc.regularPages.push(mcpPage);
           }
           return acc;
         },
@@ -1020,19 +1023,19 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (regularPages.length) {
         const parts = [`## Pages`];
         const structuredPages = [];
-        for (const page of regularPages) {
-          const isolatedContextName = context.getIsolatedContextName(page);
+        for (const mcpPage of regularPages) {
+          const isolatedContextName = mcpPage.isolatedContextName;
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await fetchPageTitle(page);
+          const title = await fetchPageTitle(mcpPage.pptrPage);
           const pageLabel = title
-            ? `${truncateTitle(title)} (${page.url()})`
-            : page.url();
+            ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
+            : mcpPage.pptrPage.url();
           parts.push(
-            `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+            `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage.pptrPage) ? ' [selected]' : ''}${contextLabel}`,
           );
-          structuredPages.push(createStructuredPage(page, context, title));
+          structuredPages.push(createStructuredPage(mcpPage, context, title));
         }
         response.push(...parts);
         structuredContent.pages = structuredPages;
@@ -1042,20 +1045,20 @@ Call ${handleDialog.name} to handle it before continuing.`);
         if (extensionPages.length) {
           response.push(`## Extension Pages`);
           const structuredExtensionPages = [];
-          for (const page of extensionPages) {
-            const isolatedContextName = context.getIsolatedContextName(page);
+          for (const mcpPage of extensionPages) {
+            const isolatedContextName = mcpPage.isolatedContextName;
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await fetchPageTitle(page);
+            const title = await fetchPageTitle(mcpPage.pptrPage);
             const pageLabel = title
-              ? `${truncateTitle(title)} (${page.url()})`
-              : page.url();
+              ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
+              : mcpPage.pptrPage.url();
             response.push(
-              `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+              `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage.pptrPage) ? ' [selected]' : ''}${contextLabel}`,
             );
             structuredExtensionPages.push(
-              createStructuredPage(page, context, title),
+              createStructuredPage(mcpPage, context, title),
             );
           }
           structuredContent.extensionPages = structuredExtensionPages;
@@ -1496,11 +1499,11 @@ async function fetchPageTitle(page: Page): Promise<string> {
 }
 
 function createStructuredPage(
-  page: Page,
+  mcpPage: McpPage,
   context: McpContext,
   rawTitle: string,
 ) {
-  const isolatedContextName = context.getIsolatedContextName(page);
+  const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
   const entry: {
     id: number | undefined;
@@ -1509,10 +1512,10 @@ function createStructuredPage(
     selected: boolean;
     isolatedContext?: string;
   } = {
-    id: context.getPageId(page),
-    url: page.url(),
+    id: mcpPage.id,
+    url: mcpPage.pptrPage.url(),
     title,
-    selected: context.isPageSelected(page),
+    selected: context.isPageSelected(mcpPage.pptrPage),
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;

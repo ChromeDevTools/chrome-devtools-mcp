@@ -1168,16 +1168,14 @@ describe('third-party developer tools', () => {
 
   it('includes third-party developer tools in select_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const pageId =
-        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      const pageId = context.getSelectedMcpPage().id;
       await selectPage.handler({params: {pageId}}, response, context);
     }, 'select_page');
   });
 
   it('includes third-party developer tools in close_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const pageId =
-        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      const pageId = context.getSelectedMcpPage().id;
       await closePage.handler({params: {pageId}}, response, context);
     }, 'close_page');
   });
@@ -1523,8 +1521,7 @@ describe('webmcp', () => {
       t,
       {categoryExperimentalWebmcp: true},
       async (response, context) => {
-        const pageId =
-          context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+        const pageId = context.getSelectedMcpPage().id;
         await selectPage.handler({params: {pageId}}, response, context);
       },
       'select_page',

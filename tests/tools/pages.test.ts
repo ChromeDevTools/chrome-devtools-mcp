@@ -372,7 +372,7 @@ describe('pages', () => {
           context,
         );
         const page = context.getSelectedPptrPage();
-        const pageId = context.getPageId(page)!;
+        const pageId = context.getSelectedMcpPage().id;
         assert.ok(!page.isClosed());
         await closePage.handler({params: {pageId}}, response, context);
         assert.ok(page.isClosed());
@@ -560,7 +560,7 @@ describe('pages', () => {
           context,
         );
         const pageA = context.getSelectedPptrPage();
-        const pageAId = context.getPageId(pageA)!;
+        const pageAId = context.getSelectedMcpPage().id;
 
         await newPage().handler(
           {params: {url: 'about:blank', isolatedContext: 'ctx-b'}},

@@ -145,7 +145,7 @@ describe('McpContext', () => {
 
       const [firstPage] = context.getPages();
       assert.ok(firstPage);
-      assert.ok(context.isPageSelected(firstPage));
+      assert.ok(context.isPageSelected(firstPage.pptrPage));
 
       const fallback = context.getSelectedPageFallback();
       assert.ok(fallback, 'fallback should be reported');
