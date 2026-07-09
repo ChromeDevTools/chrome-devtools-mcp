@@ -687,6 +687,13 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 
+  async getHeapSnapshotObjectDetails(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    return await this.#heapSnapshotManager.getObjectInfo(filePath, nodeId);
+  }
+
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
     return this.#heapSnapshotManager.dispose(filePath);
   }

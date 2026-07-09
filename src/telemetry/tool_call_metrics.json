@@ -884,5 +884,18 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "get_heapsnapshot_object_details",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "node_id",
+        "argType": "number"
+      }
+    ]
   }
 ]

@@ -89,6 +89,7 @@ export class McpResponse implements Response {
     classDiffs?: HeapSnapshotClassDiff[];
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
+    objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -398,6 +399,16 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+    };
+  }
+
+  setHeapSnapshotObjectDetails(
+    objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      objectInfo,
     };
   }
 
@@ -742,6 +753,7 @@ export class McpResponse implements Response {
       heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
+      heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1163,6 +1175,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(formatted);
 
         structuredContent.heapSnapshotDuplicateStrings = paginationData.items;
+      }
+      const objectInfo = this.#heapSnapshotOptions.objectInfo;
+      if (objectInfo) {
+        response.push('### Object Details');
+        response.push(
+          compactEncode
+            ? compactEncode(objectInfo)
+            : HeapSnapshotFormatter.formatObjectInfo(objectInfo),
+        );
+        structuredContent.heapSnapshotObjectDetails = objectInfo;
       }
     }
 

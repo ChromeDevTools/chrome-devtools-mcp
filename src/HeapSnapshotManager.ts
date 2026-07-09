@@ -167,6 +167,18 @@ export class HeapSnapshotManager {
     return await provider.serializeItemsRange(0, Infinity);
   }
 
+  async getObjectInfo(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    return await snapshot.getObjectInfo(nodeIndex);
+  }
+
   async getRetainingPaths(
     filePath: string,
     nodeId: number,

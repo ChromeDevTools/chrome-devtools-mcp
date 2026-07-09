@@ -221,6 +221,37 @@ export class HeapSnapshotFormatter {
 
     return lines.join('\n');
   }
+
+  static formatObjectInfo(
+    info: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+  ): string {
+    const lines = [
+      `id: @${info.id}`,
+      `name: ${info.name}`,
+      `type: ${info.type}`,
+      `detachedness: ${formatDOMLinkState(info.detachedness)}`,
+      `selfSize: ${DevTools.I18n.ByteUtilities.formatBytesToKb(info.selfSize)}`,
+      `retainedSize: ${DevTools.I18n.ByteUtilities.formatBytesToKb(info.retainedSize)}`,
+      `distance: ${info.distance}`,
+      `edgeCount: ${info.edgeCount}`,
+      `retainerCount: ${info.retainerCount}`,
+    ];
+    return lines.join('\n');
+  }
+}
+
+function formatDOMLinkState(
+  state: DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState,
+): string {
+  switch (state) {
+    case DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.ATTACHED:
+      return 'attached';
+    case DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.DETACHED:
+      return 'detached';
+    case DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.UNKNOWN:
+    default:
+      return 'unknown';
+  }
 }
 
 function formatSignedCount(n: number): string {

@@ -332,6 +332,20 @@ map,internal,25577,system / Map
 Showing 1-56 of 56 (Page 1 of 1).
 `;
 
+exports[`memory > get_heapsnapshot_object_details > with valid nodeId 1`] = `
+## Heap Snapshot Data
+### Object Details
+id: @25341
+name: String
+type: object
+detachedness: unknown
+selfSize: 0.2 kB
+retainedSize: 1.6 kB
+distance: 2
+edgeCount: 56
+retainerCount: 3
+`;
+
 exports[`memory > get_heapsnapshot_retainers > with valid nodeId 1`] = `
 ## Heap Snapshot Data
 name,type,nodeId,nodeName
