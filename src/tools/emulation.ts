@@ -103,7 +103,7 @@ export const emulate = definePageTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const page = request.page;
-    await context.emulate(request.params, page.pptrPage);
+    await context.emulate(request.params, page);
     response.appendResponseLine('Emulation configured successfully');
   },
 });

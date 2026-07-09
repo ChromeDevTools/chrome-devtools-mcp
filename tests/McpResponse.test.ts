@@ -81,7 +81,7 @@ describe('McpResponse', () => {
 
   it('does not include anything in response if snapshot is null', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       page.accessibility.snapshot = async () => null;
       const {content, structuredContent} = await response.handle(
         'test',
@@ -96,7 +96,7 @@ describe('McpResponse', () => {
 
   it('returns correctly formatted snapshot for a simple tree', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(
         html`<button>Click me</button>
           <input
@@ -119,7 +119,7 @@ describe('McpResponse', () => {
 
   it('returns values for textboxes', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(
         html`<label
           >username<input
@@ -143,7 +143,7 @@ describe('McpResponse', () => {
 
   it('returns verbose snapshot and structured content', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(html`<aside>test</aside>`);
       response.includeSnapshot({
         verbose: true,
@@ -162,7 +162,7 @@ describe('McpResponse', () => {
     const filePath = join(tmpdir(), 'test-snapshot.txt');
     try {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(html`<aside>test</aside>`);
         response.includeSnapshot({
           verbose: true,
@@ -191,7 +191,7 @@ describe('McpResponse', () => {
 
   it('preserves mapping ids across multiple snapshots', async () => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(html`
         <div>
           <button id="btn1">Button 1</button>
@@ -266,7 +266,7 @@ describe('McpResponse', () => {
             </div>
           `,
         );
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/page.html'));
 
         response.includeSnapshot();
@@ -556,7 +556,7 @@ describe('McpResponse', () => {
   it('adds console messages when the setting is true', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeConsoleData(true);
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       const consoleMessagePromise = new Promise<void>(resolve => {
         page.on('console', () => {
           resolve();

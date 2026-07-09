@@ -390,7 +390,7 @@ export class McpContext implements Context {
 
   async restoreEmulation(page: McpPage) {
     const currentSetting = page.emulationSettings;
-    await this.emulate(currentSetting, page.pptrPage);
+    await this.emulate(currentSetting, page);
   }
 
   get #hasNetworkBlockOrAllowlist(): boolean {
@@ -407,10 +407,10 @@ export class McpContext implements Context {
       viewport?: Viewport;
       extraHttpHeaders?: Record<string, string> | undefined;
     },
-    targetPage?: Page,
+    targetMcpPage?: McpPage,
   ): Promise<void> {
-    const page = targetPage ?? this.getSelectedPptrPage();
-    const mcpPage = this.#getMcpPage(page);
+    const mcpPage = targetMcpPage ?? this.getSelectedMcpPage();
+    const page = mcpPage.pptrPage;
     const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
 
     // Skip network emulation if blocklist/allowlist is configured, as it conflicts with blocking rules in Puppeteer.
@@ -540,7 +540,7 @@ export class McpContext implements Context {
     return this.#options.performanceCrux;
   }
 
-  getSelectedPptrPage(): Page {
+  getSelectedMcpPage(): McpPage {
     const page = this.#selectedPage;
     if (!page) {
       throw new Error('No page selected');
@@ -550,12 +550,7 @@ export class McpContext implements Context {
         `The selected page has been closed. Call ${listPages().name} to see open pages.`,
       );
     }
-    return page.pptrPage;
-  }
-
-  getSelectedMcpPage(): McpPage {
-    const page = this.getSelectedPptrPage();
-    return this.#getMcpPage(page);
+    return page;
   }
 
   getPageById(pageId: number): McpPage {
@@ -568,20 +563,8 @@ export class McpContext implements Context {
     return page;
   }
 
-  #getMcpPage(page: Page): McpPage {
-    const mcpPage = this.#mcpPages.get(page);
-    if (!mcpPage) {
-      throw new Error('No McpPage found for the given page.');
-    }
-    return mcpPage;
-  }
-
-  #getSelectedMcpPage(): McpPage {
-    return this.#getMcpPage(this.getSelectedPptrPage());
-  }
-
-  isPageSelected(page: Page): boolean {
-    return this.#selectedPage?.pptrPage === page;
+  isPageSelected(page: McpPage): boolean {
+    return this.#selectedPage === page;
   }
 
   selectPage(newPage: McpPage): void {
@@ -600,7 +583,7 @@ export class McpContext implements Context {
   }
 
   #updateSelectedPageTimeouts() {
-    const page = this.#getSelectedMcpPage();
+    const page = this.getSelectedMcpPage();
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = page.cpuThrottlingRate;
@@ -891,9 +874,11 @@ export class McpContext implements Context {
   waitForTextOnPage(
     text: string[],
     timeout?: number,
-    targetPage?: Page,
+    mcpPage?: McpPage,
   ): Promise<Element> {
-    const page = targetPage ?? this.getSelectedPptrPage();
+    const page = mcpPage
+      ? mcpPage.pptrPage
+      : this.getSelectedMcpPage().pptrPage;
     const frames = page.frames();
 
     let locator = this.#locatorClass.race(
@@ -949,7 +934,7 @@ export class McpContext implements Context {
     if (!extension) {
       throw new Error(`Extension with ID ${id} not found.`);
     }
-    const page = this.getSelectedPptrPage();
+    const page = this.getSelectedMcpPage().pptrPage;
     await extension.triggerAction(page);
   }
 

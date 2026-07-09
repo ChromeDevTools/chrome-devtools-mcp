@@ -284,7 +284,7 @@ describe('console', () => {
 
       it('when dialog is open', async t => {
         await withMcpContext(async (response, context) => {
-          const page = context.getSelectedPptrPage();
+          const page = context.getSelectedMcpPage().pptrPage;
           await page.setContent(
             '<script>console.log("Pre-dialog message")</script>',
           );
@@ -627,7 +627,7 @@ describe('console', () => {
 
     it('when dialog is open', async t => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(
           '<script>console.error("This is an error")</script>',
         );

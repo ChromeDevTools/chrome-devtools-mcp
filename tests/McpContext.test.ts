@@ -138,14 +138,14 @@ describe('McpContext', () => {
   it('reports the fallback when the selected page is closed', async () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
-      assert.ok(context.isPageSelected(page.pptrPage));
+      assert.ok(context.isPageSelected(page));
 
       await page.pptrPage.close();
       await context.createPagesSnapshot();
 
       const [firstPage] = context.getPages();
       assert.ok(firstPage);
-      assert.ok(context.isPageSelected(firstPage.pptrPage));
+      assert.ok(context.isPageSelected(firstPage));
 
       const fallback = context.getSelectedPageFallback();
       assert.ok(fallback, 'fallback should be reported');
@@ -178,7 +178,7 @@ describe('McpContext', () => {
   it('keeps a still-open selected page that is missing from the list', async () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
-      assert.ok(context.isPageSelected(page.pptrPage));
+      assert.ok(context.isPageSelected(page));
 
       // A live page that is temporarily missing from the pages list must keep
       // its selection — only a genuinely closed page is replaced.
@@ -193,7 +193,7 @@ describe('McpContext', () => {
       }
 
       assert.ok(
-        context.isPageSelected(page.pptrPage),
+        context.isPageSelected(page),
         'a still-open page should keep its selection',
       );
       assert.strictEqual(context.getSelectedPageFallback(), undefined);

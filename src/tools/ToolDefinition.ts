@@ -215,7 +215,7 @@ export type Context = Readonly<{
       colorScheme?: 'dark' | 'light' | 'auto';
       viewport?: Viewport;
     },
-    targetPage?: Page,
+    mcpPage?: ContextPage,
   ): Promise<void>;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
@@ -229,7 +229,7 @@ export type Context = Readonly<{
   waitForTextOnPage(
     text: string[],
     timeout?: number,
-    page?: Page,
+    mcpPage?: ContextPage,
   ): Promise<Element>;
   /**
    * Returns a reqid for a cdpRequestId.

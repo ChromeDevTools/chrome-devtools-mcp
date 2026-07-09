@@ -1033,7 +1033,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
             ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
             : mcpPage.pptrPage.url();
           parts.push(
-            `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage.pptrPage) ? ' [selected]' : ''}${contextLabel}`,
+            `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
           );
           structuredPages.push(createStructuredPage(mcpPage, context, title));
         }
@@ -1055,7 +1055,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
               ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
               : mcpPage.pptrPage.url();
             response.push(
-              `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage.pptrPage) ? ' [selected]' : ''}${contextLabel}`,
+              `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
             );
             structuredExtensionPages.push(
               createStructuredPage(mcpPage, context, title),
@@ -1515,7 +1515,7 @@ function createStructuredPage(
     id: mcpPage.id,
     url: mcpPage.pptrPage.url(),
     title,
-    selected: context.isPageSelected(mcpPage.pptrPage),
+    selected: context.isPageSelected(mcpPage),
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
