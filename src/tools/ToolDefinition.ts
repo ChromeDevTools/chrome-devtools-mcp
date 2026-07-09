@@ -320,8 +320,7 @@ export type ContextPage = Readonly<{
     options?: {
       timeout?: number;
       handleDialog?:
-        | DialogAction
-        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult>;
   getThirdPartyDeveloperTools(): ToolGroups;

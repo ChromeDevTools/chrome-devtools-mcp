@@ -156,8 +156,7 @@ export class McpPage implements ContextPage {
     options?: {
       timeout?: number;
       handleDialog?:
-        | DialogAction
-        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult> {
     const helper = this.createWaitForHelper(

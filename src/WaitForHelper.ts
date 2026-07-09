@@ -135,8 +135,7 @@ export class WaitForHelper {
     options?: {
       timeout?: number;
       handleDialog?:
-        | DialogAction
-        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult> {
     if (this.#abortController.signal.aborted) {
