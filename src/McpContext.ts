@@ -512,9 +512,11 @@ export class McpContext implements Context {
   }
 
   getPageById(pageId: number): McpPage {
-    const page = Array.from(this.#mcpPages.values()).find(
-      mcpPage => mcpPage.id === pageId,
-    );
+    // Resolve only among listed pages (`getPages()`), so an id that
+    // `list_pages` never showed cannot be targeted (e.g. a `devtools://`
+    // frontend, which the listing excludes unless `experimentalDevToolsDebugging`
+    // is set).
+    const page = this.getPages().find(mcpPage => mcpPage.id === pageId);
     if (!page) {
       throw new Error('No page found');
     }
@@ -646,8 +648,7 @@ export class McpContext implements Context {
 
     // Only fall back when the selected page is actually gone. Gating on
     // `isClosed()` instead of `pages` membership avoids silently swapping a
-    // live page that is momentarily missing from the snapshot, e.g., a
-    // `devtools://` page, which is selectable but filtered out of `pages` above.
+    // live page that is momentarily missing from the snapshot.
     this.#selectedPageFallback = undefined;
     if (
       (!this.#selectedPage || this.#selectedPage.pptrPage.isClosed()) &&

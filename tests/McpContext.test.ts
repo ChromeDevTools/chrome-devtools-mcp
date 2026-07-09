@@ -102,6 +102,41 @@ describe('McpContext', () => {
       },
     );
   });
+
+  it('does not resolve a page id that is filtered out of the list', async () => {
+    await withMcpContext(
+      async (_response, context) => {
+        const page = await context.newPage();
+        // A second snapshot guarantees the devtools page opened by the first
+        // is enrolled.
+        await context.createPagesSnapshot();
+        await context.createPagesSnapshot();
+        assert.ok(page.devToolsPage, 'devtools page should be open');
+
+        // The devtools page is tracked but excluded from the listing.
+        const listed = context.getPages();
+        assert.ok(
+          listed.every(
+            mcpPage => !mcpPage.pptrPage.url().startsWith('devtools://'),
+          ),
+          'listing should exclude devtools pages',
+        );
+
+        // So no id outside the listing resolves - the unlisted devtools page
+        // (and any other filtered page) can't be targeted by id.
+        const listedIds = new Set(listed.map(mcpPage => mcpPage.id));
+        for (let id = 1; id < 30; id++) {
+          if (listedIds.has(id)) {
+            continue;
+          }
+          assert.throws(() => context.getPageById(id), /No page found/);
+        }
+      },
+      {
+        autoOpenDevTools: true,
+      },
+    );
+  });
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot
