@@ -5,6 +5,11 @@
  */
 
 import {logger} from './logger.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  type ListenerMap,
+} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import type {
   Dialog,
@@ -61,6 +66,9 @@ export class McpPage implements ContextPage {
 
   thirdPartyDeveloperTools: ToolGroups = [];
 
+  networkCollector: NetworkCollector;
+  consoleCollector: ConsoleCollector;
+
   constructor(page: Page, id: number) {
     this.pptrPage = page;
     this.id = id;
@@ -68,6 +76,28 @@ export class McpPage implements ContextPage {
       this.#dialog = dialog;
     };
     page.on('dialog', this.#dialogHandler);
+
+    this.networkCollector = new NetworkCollector(page);
+    this.consoleCollector = new ConsoleCollector(page, collect => {
+      return {
+        console: event => {
+          collect(event);
+        },
+        uncaughtError: event => {
+          collect(event);
+        },
+        devtoolsAggregatedIssue: event => {
+          collect(event);
+        },
+      } as ListenerMap;
+    });
+  }
+
+  async init(): Promise<void> {
+    await Promise.all([
+      this.networkCollector.init(),
+      this.consoleCollector.init(),
+    ]);
   }
 
   get dialog(): Dialog | undefined {
@@ -143,6 +173,8 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.pptrPage.off('dialog', this.#dialogHandler);
+    this.networkCollector.dispose();
+    this.consoleCollector.dispose();
   }
 
   async executeThirdPartyDeveloperTool(

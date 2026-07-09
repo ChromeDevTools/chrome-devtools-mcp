@@ -209,7 +209,6 @@ describe('McpContext', () => {
 
       response.setIncludeNetworkRequests(true);
       const result = await response.handle('test', context);
-
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
