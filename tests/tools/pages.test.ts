@@ -285,8 +285,8 @@ describe('pages', () => {
           response,
           context,
         );
-        const page = context.getSelectedMcpPage().pptrPage;
-        assert.strictEqual(context.getIsolatedContextName(page), 'session-a');
+        const mcpPage = context.getSelectedMcpPage();
+        assert.strictEqual(mcpPage.isolatedContextName, 'session-a');
         assert.ok(response.includePages);
       });
     });
@@ -298,16 +298,18 @@ describe('pages', () => {
           response,
           context,
         );
-        const page1 = context.getSelectedMcpPage().pptrPage;
+        const mcpPage1 = context.getSelectedMcpPage();
+        const page1 = mcpPage1.pptrPage;
         await newPage().handler(
           {params: {url: 'about:blank', isolatedContext: 'session-a'}},
           response,
           context,
         );
-        const page2 = context.getSelectedMcpPage().pptrPage;
+        const mcpPage2 = context.getSelectedMcpPage();
+        const page2 = mcpPage2.pptrPage;
         assert.notStrictEqual(page1, page2);
-        assert.strictEqual(context.getIsolatedContextName(page1), 'session-a');
-        assert.strictEqual(context.getIsolatedContextName(page2), 'session-a');
+        assert.strictEqual(mcpPage1.isolatedContextName, 'session-a');
+        assert.strictEqual(mcpPage2.isolatedContextName, 'session-a');
         assert.strictEqual(page1.browserContext(), page2.browserContext());
       });
     });
@@ -319,15 +321,17 @@ describe('pages', () => {
           response,
           context,
         );
-        const pageA = context.getSelectedMcpPage().pptrPage;
+        const mcpPageA = context.getSelectedMcpPage();
+        const pageA = mcpPageA.pptrPage;
         await newPage().handler(
           {params: {url: 'about:blank', isolatedContext: 'session-b'}},
           response,
           context,
         );
-        const pageB = context.getSelectedMcpPage().pptrPage;
-        assert.strictEqual(context.getIsolatedContextName(pageA), 'session-a');
-        assert.strictEqual(context.getIsolatedContextName(pageB), 'session-b');
+        const mcpPageB = context.getSelectedMcpPage();
+        const pageB = mcpPageB.pptrPage;
+        assert.strictEqual(mcpPageA.isolatedContextName, 'session-a');
+        assert.strictEqual(mcpPageB.isolatedContextName, 'session-b');
         assert.notStrictEqual(pageA.browserContext(), pageB.browserContext());
       });
     });
@@ -350,15 +354,15 @@ describe('pages', () => {
 
     it('does not set isolatedContext for pages in the default context', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        assert.strictEqual(context.getIsolatedContextName(page), undefined);
+        const mcpPage = context.getSelectedMcpPage();
+        assert.strictEqual(mcpPage.isolatedContextName, undefined);
         await newPage().handler(
           {params: {url: 'about:blank'}},
           response,
           context,
         );
         assert.strictEqual(
-          context.getIsolatedContextName(context.getSelectedMcpPage().pptrPage),
+          context.getSelectedMcpPage().isolatedContextName,
           undefined,
         );
       });

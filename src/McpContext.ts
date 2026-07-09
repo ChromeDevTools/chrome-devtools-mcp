@@ -820,10 +820,6 @@ export class McpContext implements Context {
     });
   }
 
-  getIsolatedContextName(page: Page): string | undefined {
-    return this.#mcpPages.get(page)?.isolatedContextName;
-  }
-
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
