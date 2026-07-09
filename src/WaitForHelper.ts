@@ -8,6 +8,8 @@ import {logger} from './logger.js';
 import type {Page, Protocol, CdpPage, Dialog} from './third_party/index.js';
 import type {PredefinedNetworkConditions} from './third_party/index.js';
 
+export type DialogAction = 'accept' | 'dismiss' | string;
+
 export class WaitForHelper {
   #abortController = new AbortController();
   #page: CdpPage;
@@ -130,20 +132,37 @@ export class WaitForHelper {
 
   async waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
+    options?: {
+      timeout?: number;
+      handleDialog?:
+        | DialogAction
+        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+    },
   ): Promise<WaitForEventsResult> {
     if (this.#abortController.signal.aborted) {
       throw new Error("Can't re-use a WaitForHelper");
     }
     if (options?.handleDialog) {
-      const dialogHandler = (dialog: Pick<Dialog, 'accept' | 'dismiss'>) => {
-        this.#dialogOpened = true;
-        if (options.handleDialog === 'dismiss') {
-          void dialog.dismiss();
-        } else if (options.handleDialog === 'accept') {
-          void dialog.accept();
+      const dialogHandler = (
+        dialog: Pick<Dialog, 'accept' | 'dismiss' | 'type'>,
+      ) => {
+        let actionToTake: DialogAction | undefined;
+
+        if (typeof options.handleDialog === 'object') {
+          actionToTake = options.handleDialog[dialog.type()];
         } else {
-          void dialog.accept(options.handleDialog);
+          actionToTake = options.handleDialog;
+        }
+
+        if (actionToTake) {
+          this.#dialogOpened = true;
+          if (actionToTake === 'dismiss') {
+            void dialog.dismiss();
+          } else if (actionToTake === 'accept') {
+            void dialog.accept();
+          } else {
+            void dialog.accept(actionToTake);
+          }
         }
       };
       this.#page.on('dialog', dialogHandler);

@@ -268,7 +268,7 @@ export const navigatePage = definePageTool(() => {
           },
           {
             timeout: request.params.timeout,
-            handleDialog: action,
+            handleDialog: {beforeunload: action},
           },
         );
         if (result.dialogHandled) {

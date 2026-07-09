@@ -14,9 +14,10 @@ import {TextSnapshot} from './TextSnapshot.js';
 import type {
   Dialog,
   ElementHandle,
-  Page,
   Viewport,
   WebMCPTool,
+  Protocol,
+  Page,
 } from './third_party/index.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -34,6 +35,7 @@ import {
   getNetworkMultiplierFromString,
   WaitForHelper,
   type WaitForEventsResult,
+  type DialogAction,
 } from './WaitForHelper.js';
 
 /**
@@ -151,7 +153,12 @@ export class McpPage implements ContextPage {
 
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
+    options?: {
+      timeout?: number;
+      handleDialog?:
+        | DialogAction
+        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+    },
   ): Promise<WaitForEventsResult> {
     const helper = this.createWaitForHelper(
       this.cpuThrottlingRate,

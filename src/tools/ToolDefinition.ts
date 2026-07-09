@@ -17,10 +17,11 @@ import type {
   Dialog,
   ElementHandle,
   Extension,
-  Page,
   ScreenRecorder,
   Viewport,
   DevTools,
+  Protocol,
+  Page,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import type {
@@ -29,7 +30,7 @@ import type {
   ExtensionServiceWorker,
 } from '../types.js';
 import type {PaginationOptions} from '../utils/types.js';
-import type {WaitForEventsResult} from '../WaitForHelper.js';
+import type {WaitForEventsResult, DialogAction} from '../WaitForHelper.js';
 
 import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
@@ -316,7 +317,12 @@ export type ContextPage = Readonly<{
   throwIfDialogOpen(): void;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
+    options?: {
+      timeout?: number;
+      handleDialog?:
+        | DialogAction
+        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+    },
   ): Promise<WaitForEventsResult>;
   getThirdPartyDeveloperTools(): ToolGroups;
 
