@@ -218,6 +218,8 @@ export const navigatePage = definePageTool(() => {
         initScriptId = identifier;
       }
 
+      page.pptrPage.on('dialog', dialogHandler);
+
       try {
         await page.waitForEventsAfterAction(
           async () => {
