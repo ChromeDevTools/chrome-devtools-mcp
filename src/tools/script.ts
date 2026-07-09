@@ -97,6 +97,9 @@ Example with arguments: \`(el) => el.innerText\`
             },
             {handleDialog: dialogAction ?? 'accept'},
           );
+        if (result.dialogHandled) {
+          context.getSelectedMcpPage().clearDialog();
+        }
         response.attachWaitForResult(result);
         return;
       }

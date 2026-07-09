@@ -5,7 +5,7 @@
  */
 
 import {logger} from '../logger.js';
-import type {CdpPage, Dialog} from '../third_party/index.js';
+import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -166,7 +166,7 @@ export const navigatePage = definePageTool(() => {
         .optional()
         .describe('Whether to ignore cache on reload.'),
       handleBeforeUnload: zod
-        .enum(['accept', 'decline'])
+        .enum(['accept', 'dismiss'])
         .optional()
         .describe(
           'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
@@ -195,21 +195,6 @@ export const navigatePage = definePageTool(() => {
         request.params.type = 'url';
       }
 
-      const handleBeforeUnload = request.params.handleBeforeUnload ?? 'accept';
-      const dialogHandler = (dialog: Dialog) => {
-        if (dialog.type() === 'beforeunload') {
-          if (handleBeforeUnload === 'accept') {
-            response.appendResponseLine(`Accepted a beforeunload dialog.`);
-            void dialog.accept();
-          } else {
-            response.appendResponseLine(`Declined a beforeunload dialog.`);
-            void dialog.dismiss();
-          }
-          // We are not going to report the dialog like regular dialogs.
-          page.clearDialog();
-        }
-      };
-
       let initScriptId: string | undefined;
       if (request.params.initScript) {
         const {identifier} = await page.pptrPage.evaluateOnNewDocument(
@@ -218,10 +203,9 @@ export const navigatePage = definePageTool(() => {
         initScriptId = identifier;
       }
 
-      page.pptrPage.on('dialog', dialogHandler);
-
       try {
-        await page.waitForEventsAfterAction(
+        const action = request.params.handleBeforeUnload ?? 'accept';
+        const result = await page.waitForEventsAfterAction(
           async () => {
             switch (request.params.type) {
               case 'url':
@@ -282,10 +266,18 @@ export const navigatePage = definePageTool(() => {
                 break;
             }
           },
-          {timeout: request.params.timeout},
+          {
+            timeout: request.params.timeout,
+            handleDialog: action,
+          },
         );
+        if (result.dialogHandled) {
+          response.appendResponseLine(
+            `${action === 'dismiss' ? 'Dismissed' : 'Accepted'} a beforeunload dialog.`,
+          );
+          page.clearDialog();
+        }
       } finally {
-        page.pptrPage.off('dialog', dialogHandler);
         if (initScriptId) {
           await page.pptrPage
             .removeScriptToEvaluateOnNewDocument(initScriptId)

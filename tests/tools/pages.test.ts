@@ -773,7 +773,7 @@ describe('pages', () => {
         assert.ok(response.includePages);
         assert.strictEqual(
           response.responseLines.join('\n'),
-          'Accepted a beforeunload dialog.\nSuccessfully reloaded the page.',
+          'Successfully reloaded the page.\nAccepted a beforeunload dialog.',
         );
       });
     });
@@ -794,7 +794,7 @@ describe('pages', () => {
           {
             params: {
               type: 'reload',
-              handleBeforeUnload: 'decline',
+              handleBeforeUnload: 'dismiss',
               timeout: 500,
             },
             page: context.getSelectedMcpPage(),
@@ -807,7 +807,7 @@ describe('pages', () => {
         assert.ok(response.includePages);
         assert.strictEqual(
           response.responseLines.join('\n'),
-          'Declined a beforeunload dialog.\nUnable to reload the selected page: Navigation timeout of 500 ms exceeded.',
+          'Unable to reload the selected page: Navigation timeout of 500 ms exceeded.\nDismissed a beforeunload dialog.',
         );
       });
     });

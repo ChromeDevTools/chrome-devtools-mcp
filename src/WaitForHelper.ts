@@ -197,6 +197,7 @@ export class WaitForHelper {
       ...(urlAfterAction !== this.#initialUrl
         ? {navigatedToUrl: urlAfterAction}
         : {}),
+      dialogHandled: this.#dialogOpened,
     };
   }
 }
@@ -207,6 +208,10 @@ export interface WaitForEventsResult {
    * occurred.
    */
   navigatedToUrl?: string;
+  /**
+   * Whether a dialog was automatically handled during the action.
+   */
+  dialogHandled?: boolean;
 }
 
 export function getNetworkMultiplierFromString(

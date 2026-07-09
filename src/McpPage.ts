@@ -93,12 +93,8 @@ export class McpPage implements ContextPage {
     });
   }
 
-  get dialog(): Dialog | undefined {
-    return this.#dialog;
-  }
-
   getDialog(): Dialog | undefined {
-    return this.dialog;
+    return this.#dialog;
   }
 
   clearDialog(): void {
