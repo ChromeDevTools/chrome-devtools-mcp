@@ -419,3 +419,27 @@ export const getTabId = definePageTool({
     response.setTabId(tabId);
   },
 });
+
+export const openDevtools = definePageTool({
+  name: 'open_devtools',
+  description: `Open a DevTools window for the selected page.`,
+  annotations: {
+    category: ToolCategory.DEBUGGING,
+    readOnlyHint: true,
+  },
+  schema: {},
+  blockedByDialog: false,
+  verifyFilesSchema: [],
+  handler: async (request, response) => {
+    const page = request.page;
+    try {
+      await page.pptrPage.openDevTools();
+      response.appendResponseLine('DevTools window opened successfully.');
+    } catch (e) {
+      response.appendResponseLine(
+        `Failed to open DevTools: ${(e as Error).message}`,
+      );
+    }
+    response.setIncludePages(true);
+  },
+});
