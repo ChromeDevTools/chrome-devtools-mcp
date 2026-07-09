@@ -93,13 +93,6 @@ export class McpPage implements ContextPage {
     });
   }
 
-  async init(): Promise<void> {
-    await Promise.all([
-      this.networkCollector.init(),
-      this.consoleCollector.init(),
-    ]);
-  }
-
   get dialog(): Dialog | undefined {
     return this.#dialog;
   }

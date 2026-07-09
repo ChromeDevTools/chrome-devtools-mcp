@@ -168,7 +168,7 @@ export class McpContext implements Context {
       if (!page) {
         return;
       }
-      await this.#createMcpPage(page);
+      this.#createMcpPage(page);
     } catch (err) {
       this.logger?.('Error handling targetcreated', err);
     }
@@ -368,9 +368,10 @@ export class McpContext implements Context {
     } else {
       page = await this.browser.newPage({background});
     }
+    const mcpPage = this.#createMcpPage(page);
     await this.createPagesSnapshot();
-    this.selectPage(this.#getMcpPage(page));
-    return this.#getMcpPage(page);
+    this.selectPage(mcpPage);
+    return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
     if (this.#pages.length === 1) {
@@ -672,12 +673,11 @@ export class McpContext implements Context {
     return this.#serviceWorkerConsoleCollector.getData(extensionId);
   }
 
-  async #createMcpPage(page: Page): Promise<McpPage> {
+  #createMcpPage(page: Page): McpPage {
     let mcpPage = this.#mcpPages.get(page);
     if (!mcpPage) {
       mcpPage = new McpPage(page, this.#nextPageId++);
       this.#mcpPages.set(page, mcpPage);
-      await mcpPage.init();
       // We emulate a focused page for all pages to support multi-agent workflows.
       void page.emulateFocusedPage(true).catch(error => {
         this.logger?.('Error turning on focused page emulation', error);
@@ -690,7 +690,7 @@ export class McpContext implements Context {
     const {pages: allPages, isolatedContextNames} = await this.#getAllPages();
 
     for (const page of allPages) {
-      const mcpPage = await this.#createMcpPage(page);
+      const mcpPage = this.#createMcpPage(page);
       mcpPage.isolatedContextName = isolatedContextNames.get(page);
     }
 
@@ -935,7 +935,6 @@ export class McpContext implements Context {
           } as ListenerMap;
         },
       );
-      await mcpPage.networkCollector.init();
     }
   }
 

@@ -32,7 +32,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+
     page.emit('request', request);
 
     assert.equal(collector.getData()[0], request);
@@ -50,7 +50,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+
     page.emit('request', request);
 
     assert.equal(collector.getData()[0], request);
@@ -70,7 +70,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+
     page.emit('request', request);
     page.emit('framenavigated', {} as Frame);
 
@@ -89,7 +89,7 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
+
     page.emit('request', request);
 
     assert.equal(collector.getData()[0], request);
@@ -114,7 +114,6 @@ describe('PageCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
 
     page.emit('request', request1);
     page.emit('request', request2);
@@ -138,7 +137,7 @@ describe('NetworkCollector', () => {
     });
     const request2 = getMockRequest();
     const collector = new NetworkCollector(page);
-    await collector.init();
+
     page.emit('request', request);
     page.emit('request', navRequest);
 
@@ -171,7 +170,7 @@ describe('NetworkCollector', () => {
     const request = getMockRequest();
 
     const collector = new NetworkCollector(page);
-    await collector.init();
+
     page.emit('request', navRequest);
     assert.equal(collector.getData()[0], navRequest);
 
@@ -207,7 +206,7 @@ describe('NetworkCollector', () => {
     const request = getMockRequest();
 
     const collector = new NetworkCollector(page);
-    await collector.init();
+
     page.emit('request', navRequest);
     assert.equal(collector.getData(true).length, 1);
 
@@ -229,7 +228,6 @@ describe('NetworkCollector', () => {
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
     const collector = new NetworkCollector(page);
-    await collector.init();
 
     // Simulate 5 navigations (maxNavigationSaved is 3)
     for (let i = 0; i < 5; i++) {
@@ -278,7 +276,6 @@ describe('ConsoleCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
 
     const issue2 = {
       code: 'ElementAccessibilityIssue' as const,
@@ -309,7 +306,6 @@ describe('ConsoleCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
 
     const performanceIssue = {
       code: 'PerformanceIssue',
@@ -337,7 +333,6 @@ describe('ConsoleCollector', () => {
         },
       } as ListenerMap;
     });
-    await collector.init();
 
     page.emit('issue', issue);
     page.emit('issue', issue);
@@ -355,12 +350,11 @@ describe('ConsoleCollector', () => {
     // @ts-expect-error internal API.
     const cdpSession = page._client();
     const onUncaughtErrorListener = sinon.spy();
-    const collector = new ConsoleCollector(page, () => {
+    new ConsoleCollector(page, () => {
       return {
         uncaughtError: onUncaughtErrorListener,
       } as ListenerMap;
     });
-    await collector.init();
 
     cdpSession.emit('Runtime.exceptionThrown', {
       exceptionDetails: {

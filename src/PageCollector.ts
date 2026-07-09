@@ -47,9 +47,6 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
 
 export class PageCollector<T> {
   protected pptrPage: Page;
-  #listenersInitializer: (
-    collector: (item: T) => void,
-  ) => ListenerMap<PageEvents>;
   #listeners?: ListenerMap<PageEvents>;
   protected maxNavigationSaved = 3;
 
@@ -65,19 +62,16 @@ export class PageCollector<T> {
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
   ) {
     this.pptrPage = page;
-    this.#listenersInitializer = listeners;
-  }
 
-  async init() {
     const idGenerator = createIdGenerator();
 
-    const listeners = this.#listenersInitializer(value => {
+    const listenerMap = listeners(value => {
       const withId = value as WithSymbolId<T>;
       withId[stableIdSymbol] = idGenerator();
       this.storage[0].push(withId);
     });
 
-    listeners['framenavigated'] = (frame: Frame) => {
+    listenerMap['framenavigated'] = (frame: Frame) => {
       // Only split the storage on main frame navigation
       if (frame !== this.pptrPage.mainFrame()) {
         return;
@@ -85,11 +79,11 @@ export class PageCollector<T> {
       this.splitAfterNavigation();
     };
 
-    for (const [name, listener] of Object.entries(listeners)) {
+    for (const [name, listener] of Object.entries(listenerMap)) {
       this.pptrPage.on(name, listener as Handler<unknown>);
     }
 
-    this.#listeners = listeners;
+    this.#listeners = listenerMap;
   }
 
   dispose() {
@@ -152,10 +146,17 @@ export class ConsoleCollector extends PageCollector<
 > {
   #subscriber?: PageEventSubscriber;
 
-  override async init(): Promise<void> {
-    await super.init();
+  constructor(
+    page: Page,
+    listeners: (
+      collector: (
+        item: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
+      ) => void,
+    ) => ListenerMap<PageEvents>,
+  ) {
+    super(page, listeners);
     this.#subscriber = new PageEventSubscriber(this.pptrPage);
-    void this.#subscriber.subscribe();
+    this.#subscriber.subscribe();
   }
 
   override dispose(): void {
@@ -196,7 +197,7 @@ class PageEventSubscriber {
     );
   }
 
-  async subscribe() {
+  subscribe() {
     this.#resetIssueAggregator();
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
