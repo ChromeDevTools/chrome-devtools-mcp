@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  createTargetUniverse,
+  type TargetUniverse,
+} from './devtools/DevtoolsUtils.js';
 import {logger} from './logger.js';
 import {
   ConsoleCollector,
@@ -65,6 +69,7 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   devToolsPage?: Page;
+  #devtoolsUniverse?: TargetUniverse;
 
   // Dialog
   #dialog?: Dialog;
@@ -97,6 +102,26 @@ export class McpPage implements ContextPage {
         },
       } as ListenerMap;
     });
+  }
+
+  async init(): Promise<void> {
+    if (this.#devtoolsUniverse) {
+      return;
+    }
+    try {
+      this.#devtoolsUniverse = await createTargetUniverse(this.pptrPage);
+    } catch (e) {
+      logger?.('Failed to initialize DevTools universe', e);
+    }
+
+    // We emulate a focused page for all pages to support multi-agent workflows.
+    void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      logger?.('Error turning on focused page emulation', error);
+    });
+  }
+
+  get devtoolsUniverse(): TargetUniverse | undefined {
+    return this.#devtoolsUniverse;
   }
 
   getDialog(): Dialog | undefined {

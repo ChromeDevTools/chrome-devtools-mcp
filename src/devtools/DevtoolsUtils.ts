@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Mutex} from '../Mutex.js';
 import {DevTools} from '../third_party/index.js';
 import type {
-  Browser,
   CDPSession,
   ConsoleMessage,
   Page,
   Protocol,
-  Target as PuppeteerTarget,
 } from '../third_party/index.js';
 
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
@@ -135,83 +132,10 @@ export interface TargetUniverse {
   /** The secondary session created for this page */
   session: CDPSession;
 }
-export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
 
-export class UniverseManager {
-  readonly #browser: Browser;
-  readonly #createUniverseFor: TargetUniverseFactoryFn;
-  readonly #universes = new WeakMap<Page, TargetUniverse>();
-
-  /** Guard access to #universes so we don't create unnecessary universes */
-  readonly #mutex = new Mutex();
-
-  constructor(
-    browser: Browser,
-    factory: TargetUniverseFactoryFn = DEFAULT_FACTORY,
-  ) {
-    this.#browser = browser;
-    this.#createUniverseFor = factory;
-  }
-
-  async init(pages: Page[]) {
-    try {
-      await this.#mutex.acquire();
-      const promises = [];
-      for (const page of pages) {
-        promises.push(
-          this.#createUniverseFor(page).then(targetUniverse =>
-            this.#universes.set(page, targetUniverse),
-          ),
-        );
-      }
-
-      this.#browser.on('targetcreated', this.#onTargetCreated);
-      this.#browser.on('targetdestroyed', this.#onTargetDestroyed);
-
-      await Promise.all(promises);
-    } finally {
-      this.#mutex.release();
-    }
-  }
-
-  get(page: Page): TargetUniverse | null {
-    return this.#universes.get(page) ?? null;
-  }
-
-  dispose() {
-    this.#browser.off('targetcreated', this.#onTargetCreated);
-    this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
-  }
-
-  #onTargetCreated = async (target: PuppeteerTarget) => {
-    const page = await target.page();
-    try {
-      await this.#mutex.acquire();
-      if (!page || this.#universes.has(page)) {
-        return;
-      }
-
-      this.#universes.set(page, await this.#createUniverseFor(page));
-    } finally {
-      this.#mutex.release();
-    }
-  };
-
-  #onTargetDestroyed = async (target: PuppeteerTarget) => {
-    const page = await target.page();
-    try {
-      await this.#mutex.acquire();
-      if (!page || !this.#universes.has(page)) {
-        return;
-      }
-      this.#universes.delete(page);
-    } finally {
-      this.#mutex.release();
-    }
-  };
-}
-
-const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
+export async function createTargetUniverse(
+  page: Page,
+): Promise<TargetUniverse> {
   const settingStorage = new DevTools.Common.Settings.SettingsStorage({});
   const universe = new DevTools.Foundation.Universe.Universe({
     settingsCreationOptions: {
@@ -245,7 +169,7 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
     connection,
   );
   return {target, universe, session};
-};
+}
 
 // We don't want to pause any DevTools universe session ever on the MCP side.
 //

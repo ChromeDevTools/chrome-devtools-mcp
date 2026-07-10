@@ -11,10 +11,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import type {TargetUniverse} from './devtools/DevtoolsUtils.js';
-import {
-  overrideDevToolsGlobals,
-  UniverseManager,
-} from './devtools/DevtoolsUtils.js';
+import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
 import type {
   HeapSnapshotAggregateData,
@@ -92,7 +89,7 @@ export class McpContext implements Context {
   #mcpPages = new Map<Page, McpPage>();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
-  #devtoolsUniverseManager: UniverseManager;
+
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
@@ -134,13 +131,12 @@ export class McpContext implements Context {
     this.#serviceWorkerConsoleCollector = new ServiceWorkerConsoleCollector(
       this.browser,
     );
-    this.#devtoolsUniverseManager = new UniverseManager(this.browser);
   }
 
   async #init() {
-    const pages = await this.createPagesSnapshot();
+    await this.createPagesSnapshot();
     const workers = await this.createExtensionServiceWorkersSnapshot();
-    await this.#devtoolsUniverseManager.init(pages);
+
     await this.#serviceWorkerConsoleCollector.init(workers);
     this.browser.on('targetcreated', this.#onTargetCreated);
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
@@ -149,7 +145,7 @@ export class McpContext implements Context {
   dispose() {
     this.browser.off('targetcreated', this.#onTargetCreated);
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
-    this.#devtoolsUniverseManager.dispose();
+
     this.#serviceWorkerConsoleCollector.dispose();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
@@ -304,8 +300,9 @@ export class McpContext implements Context {
     await this.validatePath(outputPath);
     return outputPath;
   }
+
   getDevToolsUniverse(page: McpPage): TargetUniverse | null {
-    return this.#devtoolsUniverseManager.get(page.pptrPage);
+    return page.devtoolsUniverse ?? null;
   }
 
   getConsoleMessageStableId(
@@ -616,10 +613,7 @@ export class McpContext implements Context {
     if (!mcpPage) {
       mcpPage = new McpPage(page, this.#nextPageId++);
       this.#mcpPages.set(page, mcpPage);
-      // We emulate a focused page for all pages to support multi-agent workflows.
-      void page.emulateFocusedPage(true).catch(error => {
-        this.logger?.('Error turning on focused page emulation', error);
-      });
+      void mcpPage.init();
     }
     return mcpPage;
   }
