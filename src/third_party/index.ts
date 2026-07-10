@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import 'urlpattern-polyfill';
 import 'core-js/modules/es.promise.with-resolvers.js';
 import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
@@ -60,6 +59,10 @@ export {
 export async function getToonEncode(): Promise<(val: unknown) => string> {
   const {encode} = await import('@toon-format/toon');
   return encode;
+}
+export async function getGcfEncode(): Promise<(val: unknown) => string> {
+  const {encodeGeneric} = await import('@blackwell-systems/gcf');
+  return encodeGeneric;
 }
 
 import {

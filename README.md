@@ -334,6 +334,16 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
 </details>
 
 <details>
+  <summary>Grok Build CLI</summary>
+
+```bash
+grok mcp add chrome-devtools npx chrome-devtools-mcp@latest
+```
+
+See the <a href="https://docs.x.ai/build/features/skills-plugins-marketplaces">docs</a> for more options
+</details>
+
+<details>
   <summary>JetBrains AI Assistant & Junie</summary>
 
 Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
@@ -746,6 +756,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
   If true, redacts some of the network headers considered sensitive before returning to the client.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--allowUnrestrictedPaths`/ `--allow-unrestricted-paths`**
+  If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, file-writing tools are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
   - **Type:** boolean
   - **Default:** `false`
 

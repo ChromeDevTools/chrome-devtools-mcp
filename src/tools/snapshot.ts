@@ -66,7 +66,7 @@ export const waitFor = definePageTool({
     await context.waitForTextOnPage(
       request.params.text,
       request.params.timeout,
-      page.pptrPage,
+      page,
     );
 
     response.appendResponseLine(

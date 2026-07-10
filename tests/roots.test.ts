@@ -23,6 +23,23 @@ describe('McpContext Roots', () => {
     });
   });
 
+  it('should deny paths outside the temp directory when the client never negotiates roots', async () => {
+    await withMcpContext(async (_response, context) => {
+      // setRoots() is intentionally never called here, matching a client
+      // that omits the optional MCP `roots` capability during initialize.
+      const outsidePath = path.resolve(
+        os.homedir(),
+        'a_very_unlikely_path_name_never_negotiated_roots',
+      );
+      await assert.rejects(context.validatePath(outsidePath), /Access denied/);
+
+      const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
+      // The temp directory must remain reachable even with no negotiated
+      // roots, matching the existing "empty roots" behavior above.
+      await context.validatePath(tmpPath);
+    });
+  });
+
   it('should allow access to os.tmpdir() when other roots are set', async () => {
     await withMcpContext(async (_response, context) => {
       const otherRoot = path.resolve(

@@ -17,6 +17,12 @@ import {
 export type AggregatedInfoWithId =
   WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
 
+export interface HeapSnapshotAggregateData {
+  aggregates: Record<string, AggregatedInfoWithId>;
+  objectCount: number;
+  totalSelfSize: number;
+}
+
 export interface HeapSnapshotClassDiff {
   className: string;
   addedCount: number;
@@ -44,10 +50,9 @@ export class HeapSnapshotManager {
     {
       snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
       worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
-      // TODO: use a multimap
-      idToClassKey: Map<number, string>;
+      // 1-indexed array where index is the class ID.
+      idToClassKey: string[];
       classKeyToId: Map<string, number>;
-      idGenerator: () => number;
     }
   >();
 
@@ -65,9 +70,8 @@ export class HeapSnapshotManager {
     this.#snapshots.set(absolutePath, {
       snapshot,
       worker,
-      idToClassKey: new Map<number, string>(),
+      idToClassKey: [''],
       classKeyToId: new Map<string, number>(),
-      idGenerator: createIdGenerator(),
     });
 
     return snapshot;
@@ -75,22 +79,31 @@ export class HeapSnapshotManager {
 
   async getAggregates(
     filePath: string,
-  ): Promise<Record<string, AggregatedInfoWithId>> {
+    filterName?: string,
+  ): Promise<HeapSnapshotAggregateData> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    if (filterName) {
+      filter.filterName = filterName;
+    }
     const aggregates: Record<string, AggregatedInfoWithId> =
       await snapshot.aggregatesWithFilter(filter);
+    let objectCount = 0;
+    let totalSelfSize = 0;
 
-    for (const key of Object.keys(aggregates)) {
+    for (const [key, aggregate] of Object.entries(aggregates)) {
       const id = await this.getOrCreateIdForClassKey(filePath, key);
-      const aggregate = aggregates[key];
-      if (aggregate) {
-        aggregate[stableIdSymbol] = id;
-      }
+      aggregate[stableIdSymbol] = id;
+      objectCount += aggregate.count;
+      totalSelfSize += aggregate.self;
     }
 
-    return aggregates;
+    return {
+      aggregates,
+      objectCount,
+      totalSelfSize,
+    };
   }
 
   async getStats(
@@ -114,9 +127,9 @@ export class HeapSnapshotManager {
     const cached = this.#getCachedSnapshot(filePath);
     let id = cached.classKeyToId.get(classKey);
     if (!id) {
-      id = cached.idGenerator();
+      id = cached.idToClassKey.length;
       cached.classKeyToId.set(classKey, id);
-      cached.idToClassKey.set(id, classKey);
+      cached.idToClassKey.push(classKey);
     }
     return id;
   }
@@ -124,10 +137,14 @@ export class HeapSnapshotManager {
   async getNodesById(
     filePath: string,
     id: number,
+    filterName?: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    if (filterName) {
+      filter.filterName = filterName;
+    }
     const className = await this.resolveClassKeyFromId(filePath, id);
     if (!className) {
       throw new Error(`Class with ID ${id} not found in heap snapshot`);
@@ -287,7 +304,7 @@ export class HeapSnapshotManager {
     id: number,
   ): Promise<string | undefined> {
     const cached = this.#getCachedSnapshot(filePath);
-    return cached.idToClassKey.get(id);
+    return cached.idToClassKey[id];
   }
 
   async #loadSnapshot(

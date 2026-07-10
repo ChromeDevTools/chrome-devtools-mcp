@@ -122,6 +122,7 @@ export async function withMcpContext(
     args?: string[];
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
+    allowUnrestrictedPaths?: boolean;
   } = {},
   args: Partial<ParsedArguments> = {},
 ) {
@@ -140,6 +141,7 @@ export async function withMcpContext(
         emulateFocusedPages: options.emulateFocusedPages ?? true,
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
+        allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
       },
       Locator,
     );

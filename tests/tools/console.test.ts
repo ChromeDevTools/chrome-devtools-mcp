@@ -284,7 +284,7 @@ describe('console', () => {
 
       it('when dialog is open', async t => {
         await withMcpContext(async (response, context) => {
-          const page = context.getSelectedPptrPage();
+          const page = context.getSelectedMcpPage().pptrPage;
           await page.setContent(
             '<script>console.log("Pre-dialog message")</script>',
           );
@@ -403,7 +403,7 @@ describe('console', () => {
           `);
           page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
-          const messages = context.getConsoleData(page);
+          const messages = page.getConsoleData();
           let issueMsg;
           for (const message of messages) {
             if (message instanceof DevTools.AggregatedIssue) {
@@ -627,7 +627,7 @@ describe('console', () => {
 
     it('when dialog is open', async t => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(
           '<script>console.error("This is an error")</script>',
         );

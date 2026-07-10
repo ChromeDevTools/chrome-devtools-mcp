@@ -7,7 +7,6 @@
 import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
 import {logger} from './logger.js';
 import type {
-  Target,
   CDPSession,
   ConsoleMessage,
   Protocol,
@@ -15,7 +14,6 @@ import type {
 } from './third_party/index.js';
 import {DevTools} from './third_party/index.js';
 import {
-  type Browser,
   type Frame,
   type Handler,
   type HTTPRequest,
@@ -48,11 +46,8 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
 };
 
 export class PageCollector<T> {
-  #browser: Browser;
-  #listenersInitializer: (
-    collector: (item: T) => void,
-  ) => ListenerMap<PageEvents>;
-  #listeners = new WeakMap<Page, ListenerMap>();
+  protected pptrPage: Page;
+  #listeners?: ListenerMap<PageEvents>;
   protected maxNavigationSaved = 3;
 
   /**
@@ -60,123 +55,60 @@ export class PageCollector<T> {
    * of all collected resources.
    * The newer navigations come first.
    */
-  protected storage = new WeakMap<Page, Array<Array<WithSymbolId<T>>>>();
+  protected storage: Array<Array<WithSymbolId<T>>> = [[]];
 
   constructor(
-    browser: Browser,
+    page: Page,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
   ) {
-    this.#browser = browser;
-    this.#listenersInitializer = listeners;
-  }
+    this.pptrPage = page;
 
-  async init(pages: Page[]) {
-    for (const page of pages) {
-      this.addPage(page);
+    const idGenerator = createIdGenerator();
+
+    const listenerMap = listeners(value => {
+      const withId = value as WithSymbolId<T>;
+      withId[stableIdSymbol] = idGenerator();
+      this.storage[0].push(withId);
+    });
+
+    listenerMap['framenavigated'] = (frame: Frame) => {
+      // Only split the storage on main frame navigation
+      if (frame !== this.pptrPage.mainFrame()) {
+        return;
+      }
+      this.splitAfterNavigation();
+    };
+
+    for (const [name, listener] of Object.entries(listenerMap)) {
+      this.pptrPage.on(name, listener as Handler<unknown>);
     }
 
-    this.#browser.on('targetcreated', this.#onTargetCreated);
-    this.#browser.on('targetdestroyed', this.#onTargetDestroyed);
+    this.#listeners = listenerMap;
   }
 
   dispose() {
-    this.#browser.off('targetcreated', this.#onTargetCreated);
-    this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
+    if (this.#listeners) {
+      for (const [name, listener] of Object.entries(this.#listeners)) {
+        this.pptrPage.off(name, listener as Handler<unknown>);
+      }
+    }
   }
 
-  #onTargetCreated = async (target: Target) => {
-    try {
-      const page = await target.page();
-      if (!page) {
-        return;
-      }
-      this.addPage(page);
-    } catch (err) {
-      logger?.('Error getting a page for a target onTargetCreated', err);
-    }
-  };
-
-  #onTargetDestroyed = async (target: Target) => {
-    try {
-      const page = await target.page();
-      if (!page) {
-        return;
-      }
-      this.cleanupPageDestroyed(page);
-    } catch (err) {
-      logger?.('Error getting a page for a target onTargetDestroyed', err);
-    }
-  };
-
-  public addPage(page: Page) {
-    this.#initializePage(page);
-  }
-
-  #initializePage(page: Page) {
-    if (this.storage.has(page)) {
-      return;
-    }
-    const idGenerator = createIdGenerator();
-    const storedLists: Array<Array<WithSymbolId<T>>> = [[]];
-    this.storage.set(page, storedLists);
-
-    const listeners = this.#listenersInitializer(value => {
-      const withId = value as WithSymbolId<T>;
-      withId[stableIdSymbol] = idGenerator();
-
-      const navigations = this.storage.get(page) ?? [[]];
-      navigations[0].push(withId);
-    });
-
-    listeners['framenavigated'] = (frame: Frame) => {
-      // Only split the storage on main frame navigation
-      if (frame !== page.mainFrame()) {
-        return;
-      }
-      this.splitAfterNavigation(page);
-    };
-
-    for (const [name, listener] of Object.entries(listeners)) {
-      page.on(name, listener as Handler<unknown>);
-    }
-
-    this.#listeners.set(page, listeners);
-  }
-
-  protected splitAfterNavigation(page: Page) {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      return;
-    }
+  protected splitAfterNavigation() {
     // Add the latest navigation first
-    navigations.unshift([]);
-    navigations.splice(this.maxNavigationSaved);
+    this.storage.unshift([]);
+    this.storage.splice(this.maxNavigationSaved);
   }
 
-  protected cleanupPageDestroyed(page: Page) {
-    const listeners = this.#listeners.get(page);
-    if (listeners) {
-      for (const [name, listener] of Object.entries(listeners)) {
-        page.off(name, listener as Handler<unknown>);
-      }
-    }
-    this.storage.delete(page);
-  }
-
-  getData(page: Page, includePreservedData?: boolean): T[] {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      return [];
-    }
-
+  getData(includePreservedData?: boolean): T[] {
     if (!includePreservedData) {
-      return navigations[0];
+      return this.storage[0];
     }
 
     const data: T[] = [];
     for (let index = this.maxNavigationSaved; index >= 0; index--) {
-      if (navigations[index]) {
-        data.push(...navigations[index]);
+      if (this.storage[index]) {
+        data.push(...this.storage[index]);
       }
     }
     return data;
@@ -186,13 +118,8 @@ export class PageCollector<T> {
     return resource[stableIdSymbol] ?? -1;
   }
 
-  getById(page: Page, stableId: number): T {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      throw new Error('No requests found for selected page');
-    }
-
-    const item = this.find(page, item => item[stableIdSymbol] === stableId);
+  getById(stableId: number): T {
+    const item = this.find(item => item[stableIdSymbol] === stableId);
 
     if (!item) {
       throw new Error('Request not found for selected page');
@@ -202,15 +129,9 @@ export class PageCollector<T> {
   }
 
   find(
-    page: Page,
     filter: (item: WithSymbolId<T>) => boolean,
   ): WithSymbolId<T> | undefined {
-    const navigations = this.storage.get(page);
-    if (!navigations) {
-      return;
-    }
-
-    for (const navigation of navigations) {
+    for (const navigation of this.storage) {
       const item = navigation.find(filter);
       if (item) {
         return item;
@@ -223,21 +144,24 @@ export class PageCollector<T> {
 export class ConsoleCollector extends PageCollector<
   ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
 > {
-  #subscribedPages = new WeakMap<Page, PageEventSubscriber>();
+  #subscriber?: PageEventSubscriber;
 
-  override addPage(page: Page): void {
-    super.addPage(page);
-    if (!this.#subscribedPages.has(page)) {
-      const subscriber = new PageEventSubscriber(page);
-      this.#subscribedPages.set(page, subscriber);
-      void subscriber.subscribe();
-    }
+  constructor(
+    page: Page,
+    listeners: (
+      collector: (
+        item: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
+      ) => void,
+    ) => ListenerMap<PageEvents>,
+  ) {
+    super(page, listeners);
+    this.#subscriber = new PageEventSubscriber(this.pptrPage);
+    this.#subscriber.subscribe();
   }
 
-  protected override cleanupPageDestroyed(page: Page): void {
-    super.cleanupPageDestroyed(page);
-    this.#subscribedPages.get(page)?.unsubscribe();
-    this.#subscribedPages.delete(page);
+  override dispose(): void {
+    super.dispose();
+    this.#subscriber?.unsubscribe();
   }
 }
 
@@ -273,7 +197,7 @@ class PageEventSubscriber {
     );
   }
 
-  async subscribe() {
+  subscribe() {
     this.#resetIssueAggregator();
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
@@ -360,7 +284,7 @@ class PageEventSubscriber {
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
   constructor(
-    browser: Browser,
+    page: Page,
     listeners: (
       collector: (item: HTTPRequest) => void,
     ) => ListenerMap<PageEvents> = collect => {
@@ -371,18 +295,13 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
       } as ListenerMap;
     },
   ) {
-    super(browser, listeners);
+    super(page, listeners);
   }
-  override splitAfterNavigation(page: Page) {
-    const navigations = this.storage.get(page) ?? [];
-    if (!navigations) {
-      return;
-    }
-
-    const requests = navigations[0];
+  override splitAfterNavigation() {
+    const requests = this.storage[0];
 
     const lastRequestIdx = requests.findLastIndex(request => {
-      return request.frame() === page.mainFrame()
+      return request.frame() === this.pptrPage.mainFrame()
         ? request.isNavigationRequest()
         : false;
     });
@@ -392,10 +311,10 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     // Keep the reference
     if (lastRequestIdx !== -1) {
       const fromCurrentNavigation = requests.splice(lastRequestIdx);
-      navigations.unshift(fromCurrentNavigation);
+      this.storage.unshift(fromCurrentNavigation);
     } else {
-      navigations.unshift([]);
+      this.storage.unshift([]);
     }
-    navigations.splice(this.maxNavigationSaved);
+    this.storage.splice(this.maxNavigationSaved);
   }
 }

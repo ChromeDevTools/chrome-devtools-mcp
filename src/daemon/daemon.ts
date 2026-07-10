@@ -185,6 +185,7 @@ async function handleRequest(msg: DaemonMessage) {
         message: 'stopping',
       };
     } else if (msg.method === 'status') {
+      await started;
       return {
         success: true,
         result: JSON.stringify({

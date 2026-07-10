@@ -4,14 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  createTargetUniverse,
+  type TargetUniverse,
+} from './devtools/DevtoolsUtils.js';
 import {logger} from './logger.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import type {
   Dialog,
   ElementHandle,
-  Page,
   Viewport,
   WebMCPTool,
+  Protocol,
+  Page,
+  ConsoleMessage,
+  HTTPRequest,
+  DevTools,
 } from './third_party/index.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -29,6 +43,7 @@ import {
   getNetworkMultiplierFromString,
   WaitForHelper,
   type WaitForEventsResult,
+  type DialogAction,
 } from './WaitForHelper.js';
 
 /**
@@ -42,6 +57,7 @@ import {
 export class McpPage implements ContextPage {
   readonly pptrPage: Page;
   readonly id: number;
+  readonly #emulateFocusedPage: boolean;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -54,6 +70,7 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   devToolsPage?: Page;
+  #devtoolsUniverse?: TargetUniverse;
 
   // Dialog
   #dialog?: Dialog;
@@ -61,21 +78,62 @@ export class McpPage implements ContextPage {
 
   thirdPartyDeveloperTools: ToolGroups = [];
 
-  constructor(page: Page, id: number) {
+  networkCollector: NetworkCollector;
+  consoleCollector: ConsoleCollector;
+
+  constructor(
+    page: Page,
+    id: number,
+    options: {emulateFocusedPage?: boolean} = {},
+  ) {
     this.pptrPage = page;
     this.id = id;
+    this.#emulateFocusedPage = options.emulateFocusedPage ?? true;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
     page.on('dialog', this.#dialogHandler);
+
+    this.networkCollector = new NetworkCollector(page);
+    this.consoleCollector = new ConsoleCollector(page, collect => {
+      return {
+        console: event => {
+          collect(event);
+        },
+        uncaughtError: event => {
+          collect(event);
+        },
+        devtoolsAggregatedIssue: event => {
+          collect(event);
+        },
+      } as ListenerMap;
+    });
   }
 
-  get dialog(): Dialog | undefined {
-    return this.#dialog;
+  async init(): Promise<void> {
+    if (this.#devtoolsUniverse) {
+      return;
+    }
+    try {
+      this.#devtoolsUniverse = await createTargetUniverse(this.pptrPage);
+    } catch (e) {
+      logger?.('Failed to initialize DevTools universe', e);
+    }
+
+    if (this.#emulateFocusedPage) {
+      // We emulate a focused page for all pages to support multi-agent workflows.
+      void this.pptrPage.emulateFocusedPage(true).catch(error => {
+        logger?.('Error turning on focused page emulation', error);
+      });
+    }
+  }
+
+  get devtoolsUniverse(): TargetUniverse | undefined {
+    return this.#devtoolsUniverse;
   }
 
   getDialog(): Dialog | undefined {
-    return this.dialog;
+    return this.#dialog;
   }
 
   clearDialog(): void {
@@ -96,6 +154,42 @@ export class McpPage implements ContextPage {
 
   getWebMcpTools(): WebMCPTool[] {
     return this.pptrPage.webmcp.tools();
+  }
+
+  resolveCdpRequestId(cdpRequestId: string): number | undefined {
+    if (!cdpRequestId) {
+      logger?.('no network request');
+      return;
+    }
+    const request = this.networkCollector.find(request => {
+      // @ts-expect-error id is internal.
+      return request.id === cdpRequestId;
+    });
+    if (!request) {
+      logger?.('no network request for ' + cdpRequestId);
+      return;
+    }
+    return this.networkCollector.getIdForResource(request);
+  }
+
+  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
+    return this.networkCollector.getData(includePreservedRequests);
+  }
+
+  getConsoleData(
+    includePreservedMessages?: boolean,
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.consoleCollector.getData(includePreservedMessages);
+  }
+
+  getConsoleMessageById(
+    id: number,
+  ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
+    return this.consoleCollector.getById(id);
+  }
+
+  getNetworkRequestById(reqid: number): HTTPRequest {
+    return this.networkCollector.getById(reqid);
   }
 
   get networkConditions(): string | null {
@@ -132,7 +226,11 @@ export class McpPage implements ContextPage {
 
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
+    options?: {
+      timeout?: number;
+      handleDialog?:
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+    },
   ): Promise<WaitForEventsResult> {
     const helper = this.createWaitForHelper(
       this.cpuThrottlingRate,
@@ -143,6 +241,8 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.pptrPage.off('dialog', this.#dialogHandler);
+    this.networkCollector.dispose();
+    this.consoleCollector.dispose();
   }
 
   async executeThirdPartyDeveloperTool(
@@ -296,7 +396,8 @@ export class McpPage implements ContextPage {
           );
           return `stashed-${index}`;
         }
-        const cdpElementId = this.resolveCdpElementId(backendNodeId);
+        const cdpElementId =
+          this.textSnapshot?.resolveCdpElementId(backendNodeId);
         if (!cdpElementId) {
           logger?.(
             `Could not get cdpElementId for backend node ${backendNodeId}`,
@@ -367,30 +468,6 @@ export class McpPage implements ContextPage {
 
   getAXNodeByUid(uid: string) {
     return this.textSnapshot?.idToNode.get(uid);
-  }
-
-  resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
-    if (!cdpBackendNodeId) {
-      logger?.('no cdpBackendNodeId');
-      return;
-    }
-    const snapshot = this.textSnapshot;
-    if (!snapshot) {
-      logger?.('no text snapshot');
-      return;
-    }
-    // TODO: index by backendNodeId instead.
-    const queue = [snapshot.root];
-    while (queue.length) {
-      const current = queue.pop()!;
-      if (current.backendNodeId === cdpBackendNodeId) {
-        return current.id;
-      }
-      for (const child of current.children) {
-        queue.push(child);
-      }
-    }
-    return;
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

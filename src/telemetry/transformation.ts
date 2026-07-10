@@ -53,6 +53,30 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
   throw new Error(`Unsupported zod type for tool parameter: ${typeName}`);
 }
 
+/**
+ * Resolves the values of an enum parameter, unwrapping any optional/default/
+ * nullable/effects wrappers (in any order), mirroring {@link getZodType}.
+ */
+export function getEnumValues(zodType: zod.ZodTypeAny): unknown[] {
+  const def = zodType._def;
+  const typeName = def.typeName;
+
+  if (
+    typeName === 'ZodOptional' ||
+    typeName === 'ZodDefault' ||
+    typeName === 'ZodNullable'
+  ) {
+    return getEnumValues(def.innerType);
+  }
+  if (typeName === 'ZodEffects') {
+    return getEnumValues(def.schema);
+  }
+  if (typeName === 'ZodEnum') {
+    return def.values;
+  }
+  throw new Error(`Cannot resolve enum values for zod type: ${typeName}`);
+}
+
 export function stripUnderscoreBeforeNumber(name: string): string {
   return name.replace(/_([0-9])/g, '$1');
 }

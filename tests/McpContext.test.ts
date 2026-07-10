@@ -139,6 +139,26 @@ describe('McpContext', () => {
         const page = await context.newPage();
         await context.createPagesSnapshot();
         assert.ok(page.devToolsPage);
+
+        // A devtools page is tracked but excluded from the listing, so its id
+        // must not resolve through `getPageById()` (which backs `select_page`
+        // and every other pageId tool). A second snapshot guarantees the
+        // devtools page is enrolled.
+        await context.createPagesSnapshot();
+        const listed = context.getPages();
+        assert.ok(
+          listed.every(
+            mcpPage => !mcpPage.pptrPage.url().startsWith('devtools://'),
+          ),
+          'listing should exclude devtools pages',
+        );
+        const listedIds = new Set(listed.map(mcpPage => mcpPage.id));
+        for (let id = 1; id < 30; id++) {
+          if (listedIds.has(id)) {
+            continue;
+          }
+          assert.throws(() => context.getPageById(id), /No page found/);
+        }
       },
       {
         autoOpenDevTools: true,
@@ -178,6 +198,71 @@ describe('McpContext', () => {
     });
   });
 
+  it('reports the fallback when the selected page is closed', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      assert.ok(context.isPageSelected(page));
+
+      await page.pptrPage.close();
+      await context.createPagesSnapshot();
+
+      const [firstPage] = context.getPages();
+      assert.ok(firstPage);
+      assert.ok(context.isPageSelected(firstPage));
+
+      const fallback = context.getSelectedPageFallback();
+      assert.ok(fallback, 'fallback should be reported');
+      assert.strictEqual(fallback.wasClosed, true);
+    });
+  });
+
+  it('clears the fallback on the next snapshot with a valid selection', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      await page.pptrPage.close();
+      await context.createPagesSnapshot();
+      assert.ok(context.getSelectedPageFallback());
+
+      // A later snapshot keeps a valid selection (e.g. the one taken before the
+      // next response, or after an explicit select), so the note is not repeated.
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('does not report a fallback for a regular selection', async () => {
+    await withMcpContext(async (_response, context) => {
+      await context.newPage();
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('keeps a still-open selected page that is missing from the list', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      assert.ok(context.isPageSelected(page));
+
+      // A live page that is temporarily missing from the pages list must keep
+      // its selection — only a genuinely closed page is replaced.
+      const pages = await context.browser.pages();
+      const stub = sinon
+        .stub(context.browser, 'pages')
+        .resolves(pages.filter(otherPage => otherPage !== page.pptrPage));
+      try {
+        await context.createPagesSnapshot();
+      } finally {
+        stub.restore();
+      }
+
+      assert.ok(
+        context.isPageSelected(page),
+        'a still-open page should keep its selection',
+      );
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
@@ -185,12 +270,13 @@ describe('McpContext', () => {
         stableId: 123,
       });
 
-      sinon.stub(context, 'getNetworkRequests').returns([mockRequest]);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequests')
+        .returns([mockRequest]);
       sinon.stub(context, 'getNetworkRequestStableId').returns(123);
 
       response.setIncludeNetworkRequests(true);
       const result = await response.handle('test', context);
-
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
@@ -202,7 +288,9 @@ describe('McpContext', () => {
         stableId: 456,
       });
 
-      sinon.stub(context, 'getNetworkRequestById').returns(mockRequest);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
+        .returns(mockRequest);
       sinon.stub(context, 'getNetworkRequestStableId').returns(456);
 
       response.attachNetworkRequest(456);
@@ -226,20 +314,25 @@ describe('McpContext', () => {
         } as unknown as HTTPResponse,
       });
 
-      sinon.stub(context, 'getNetworkRequestById').returns(mockRequest);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
+        .returns(mockRequest);
       sinon.stub(context, 'getNetworkRequestStableId').returns(789);
+
+      // Use os.tmpdir() so validatePath passes on all platforms (macOS tmpdir
+      // is /var/folders/..., not /tmp, so hardcoded /tmp paths are rejected).
+      const reqFilePath = path.join(os.tmpdir(), 'req.txt');
+      const resFilePath = path.join(os.tmpdir(), 'res.txt');
 
       // We stub NetworkFormatter.from to avoid actual file system writes and verify arguments
       const fromStub = sinon
         .stub(NetworkFormatter, 'from')
         .callsFake(async (_req, opts) => {
-          // Verify we received the file paths
-          assert.strictEqual(opts?.requestFilePath, '/tmp/req.txt');
-          assert.strictEqual(opts?.responseFilePath, '/tmp/res.txt');
-          // Return a dummy formatter that behaves as if it saved files
-          // We need to create a real instance or mock one.
-          // Since constructor is private, we can't easily new it up.
-          // But we can return a mock object.
+          // Verify we received the platform-correct file paths
+          assert.strictEqual(opts?.requestFilePath, reqFilePath);
+          assert.strictEqual(opts?.responseFilePath, resFilePath);
+          // Return fixed strings in toJSONDetailed so the snapshot is stable
+          // across platforms (os.tmpdir() differs on macOS vs Linux/Windows).
           return {
             toStringDetailed: () => 'Detailed string',
             toJSONDetailed: () => ({
@@ -250,8 +343,8 @@ describe('McpContext', () => {
         });
 
       response.attachNetworkRequest(789, {
-        requestFilePath: '/tmp/req.txt',
-        responseFilePath: '/tmp/res.txt',
+        requestFilePath: reqFilePath,
+        responseFilePath: resFilePath,
       });
       const result = await response.handle('test', context);
 
@@ -321,10 +414,23 @@ describe('McpContext', () => {
     });
   });
 
-  it('validatePath allows all paths if roots are undefined (legacy)', async () => {
+  it('validatePath allows all paths if roots are undefined and allowUnrestrictedPaths is set', async () => {
+    await withMcpContext(
+      async (_response, context) => {
+        context.setRoots(undefined);
+        await context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
+      },
+      {allowUnrestrictedPaths: true},
+    );
+  });
+
+  it('validatePath denies paths outside tmpdir if roots are undefined and allowUnrestrictedPaths is not set', async () => {
     await withMcpContext(async (_response, context) => {
-      context.setRoots(undefined);
-      await context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
+      // setRoots() never called — simulates a client that skips roots capability.
+      const outsidePath = path.resolve(os.homedir(), 'anywhere.txt');
+      await assert.rejects(context.validatePath(outsidePath), /Access denied/);
+      // Temp dir must still be reachable.
+      await context.validatePath(path.join(os.tmpdir(), 'test.txt'));
     });
   });
 

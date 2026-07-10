@@ -9,6 +9,13 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
 
+const HEAP_SNAPSHOT_FILTERS: readonly [string, ...string[]] = [
+  'objectsRetainedByDetachedDomNodes',
+  'objectsRetainedByConsole',
+  'objectsRetainedByEventHandlers',
+  'objectsRetainedByContexts',
+];
+
 export const takeHeapSnapshot = definePageTool({
   name: 'take_heapsnapshot',
   description: `Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
@@ -73,6 +80,10 @@ export const getHeapSnapshotDetails = defineTool({
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filterName: zod
+      .enum(HEAP_SNAPSHOT_FILTERS)
+      .optional()
+      .describe('An optional filter to apply to the aggregates.'),
     pageIdx: zod
       .number()
       .optional()
@@ -87,6 +98,7 @@ export const getHeapSnapshotDetails = defineTool({
   handler: async (request, response, context) => {
     const aggregates = await context.getHeapSnapshotAggregates(
       request.params.filePath,
+      request.params.filterName,
     );
 
     response.setHeapSnapshotAggregates(aggregates, {
@@ -108,6 +120,10 @@ export const getHeapSnapshotClassNodes = defineTool({
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
     id: zod.number().describe('The ID for the class, obtained from details.'),
+    filterName: zod
+      .enum(HEAP_SNAPSHOT_FILTERS)
+      .optional()
+      .describe('An optional filter to apply to the nodes.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
@@ -117,6 +133,7 @@ export const getHeapSnapshotClassNodes = defineTool({
     const nodes = await context.getHeapSnapshotNodesById(
       request.params.filePath,
       request.params.id,
+      request.params.filterName,
     );
 
     response.setHeapSnapshotNodes(nodes, {

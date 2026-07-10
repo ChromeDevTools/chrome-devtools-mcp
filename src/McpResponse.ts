@@ -17,6 +17,7 @@ import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {
+  HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
@@ -25,7 +26,12 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, getToonEncode, type Protocol} from './third_party/index.js';
+import {
+  DevTools,
+  getToonEncode,
+  getGcfEncode,
+  type Protocol,
+} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
@@ -49,6 +55,8 @@ import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
+
+export type DataFormat = 'default' | 'toon' | 'gcf';
 
 interface TraceInsightData {
   trace: TraceResult;
@@ -223,10 +231,7 @@ export class McpResponse implements Response {
   #images: ImageContentData[] = [];
   #heapSnapshotOptions?: {
     include: boolean;
-    aggregates?: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >;
+    aggregateData?: HeapSnapshotAggregateData;
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
@@ -454,16 +459,13 @@ export class McpResponse implements Response {
   }
 
   setHeapSnapshotAggregates(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
+    aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
-      aggregates,
+      aggregateData,
       pagination: options,
     };
   }
@@ -565,7 +567,7 @@ export class McpResponse implements Response {
   async handle(
     toolName: string,
     context: McpContext,
-    useToon = false,
+    dataFormat: DataFormat = 'default',
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
@@ -608,8 +610,7 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error(`Response must have an McpPage`);
       }
-      const request = context.getNetworkRequestById(
-        this.#page,
+      const request = this.#page.getNetworkRequestById(
         this.#attachedNetworkRequestId,
       );
       const formatter = await NetworkFormatter.from(request, {
@@ -632,8 +633,7 @@ export class McpResponse implements Response {
         throw new Error(`Response must have an McpPage`);
       }
 
-      const message = context.getConsoleMessageById(
-        this.#page,
+      const message = this.#page.getConsoleMessageById(
         this.#attachedConsoleMessageId,
       );
       const consoleMessageStableId = this.#attachedConsoleMessageId;
@@ -648,11 +648,10 @@ export class McpResponse implements Response {
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
-          requestIdResolver: context.resolveCdpRequestId.bind(
-            context,
-            this.#page,
+          requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
+          elementIdResolver: this.#page.textSnapshot?.resolveCdpElementId.bind(
+            this.#page.textSnapshot,
           ),
-          elementIdResolver: this.#page.resolveCdpElementId.bind(this.#page),
         });
         if (!formatter.isValid()) {
           throw new Error(
@@ -703,8 +702,7 @@ export class McpResponse implements Response {
         if (!page) {
           throw new Error(`Response must have an McpPage`);
         }
-        messages = context.getConsoleData(
-          page,
+        messages = page.getConsoleData(
           this.#consoleDataOptions.includePreservedMessages,
         );
       }
@@ -760,8 +758,7 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error(`Response must have an McpPage`);
       }
-      let requests = context.getNetworkRequests(
-        this.#page,
+      let requests = this.#page.getNetworkRequests(
         this.#networkRequestsOptions?.includePreservedRequests,
       );
 
@@ -811,7 +808,7 @@ export class McpResponse implements Response {
         webmcpTools,
         errorMessage: this.#error?.message,
       },
-      useToon,
+      dataFormat,
     );
   }
 
@@ -832,7 +829,7 @@ export class McpResponse implements Response {
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
-    useToon: boolean,
+    dataFormat: DataFormat = 'default',
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
@@ -868,6 +865,10 @@ export class McpResponse implements Response {
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
+        aggregateStats?: {
+          objectCount: number;
+          totalSelfSize: number;
+        };
       };
       heapSnapshotData?: object[];
       heapSnapshotNodes?: readonly object[];
@@ -883,16 +884,28 @@ export class McpResponse implements Response {
       geolocation?: {latitude: number; longitude: number};
     } = {};
 
-    let toonEncode: ((val: unknown) => string) | undefined;
-    if (useToon) {
+    // Resolve the compact encoder based on the chosen format
+    let compactEncode: ((val: unknown) => string) | undefined;
+    if (dataFormat === 'toon') {
       try {
-        toonEncode = await getToonEncode();
+        compactEncode = await getToonEncode();
       } catch {
         throw new Error(
-          'The `@toon-format/toon` package is required to use the experimental TOON format. ' +
+          'The `@toon-format/toon` package is required to use --experimentalDataFormat=toon. ' +
             'Make sure the peer dependency is installed:\n' +
-            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalToonFormat\n' +
+            '- For npx: npx --package chrome-devtools-mcp@latest --package @toon-format/toon@latest chrome-devtools-mcp --experimentalDataFormat=toon\n' +
             '- For npm: npm install @toon-format/toon (add -g if installed globally)',
+        );
+      }
+    } else if (dataFormat === 'gcf') {
+      try {
+        compactEncode = await getGcfEncode();
+      } catch {
+        throw new Error(
+          'The `@blackwell-systems/gcf` package is required to use --experimentalDataFormat=gcf. ' +
+            'Make sure the peer dependency is installed:\n' +
+            '- For npx: npx --package chrome-devtools-mcp@latest --package @blackwell-systems/gcf@latest chrome-devtools-mcp --experimentalDataFormat=gcf\n' +
+            '- For npm: npm install @blackwell-systems/gcf (add -g if installed globally)',
         );
       }
     }
@@ -974,33 +987,48 @@ Call ${handleDialog.name} to handle it before continuing.`);
       const allPages = context.getPages();
 
       const {regularPages, extensionPages} = allPages.reduce(
-        (acc: {regularPages: Page[]; extensionPages: Page[]}, page: Page) => {
-          if (page.url().startsWith('chrome-extension://')) {
-            acc.extensionPages.push(page);
+        (
+          acc: {regularPages: McpPage[]; extensionPages: McpPage[]},
+          mcpPage: McpPage,
+        ) => {
+          if (mcpPage.pptrPage.url().startsWith('chrome-extension://')) {
+            acc.extensionPages.push(mcpPage);
           } else {
-            acc.regularPages.push(page);
+            acc.regularPages.push(mcpPage);
           }
           return acc;
         },
         {regularPages: [], extensionPages: []},
       );
 
+      const selectionFallback = context.getSelectedPageFallback();
+      if (selectionFallback) {
+        let selectedPageId: number | undefined;
+        try {
+          selectedPageId = context.getSelectedMcpPage().id;
+        } catch {
+          selectedPageId = undefined;
+        }
+        response.push(
+          `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
+        );
+      }
       if (regularPages.length) {
         const parts = [`## Pages`];
         const structuredPages = [];
-        for (const page of regularPages) {
-          const isolatedContextName = context.getIsolatedContextName(page);
+        for (const mcpPage of regularPages) {
+          const isolatedContextName = mcpPage.isolatedContextName;
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await fetchPageTitle(page);
+          const title = await fetchPageTitle(mcpPage.pptrPage);
           const pageLabel = title
-            ? `${truncateTitle(title)} (${page.url()})`
-            : page.url();
+            ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
+            : mcpPage.pptrPage.url();
           parts.push(
-            `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+            `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
           );
-          structuredPages.push(createStructuredPage(page, context, title));
+          structuredPages.push(createStructuredPage(mcpPage, context, title));
         }
         response.push(...parts);
         structuredContent.pages = structuredPages;
@@ -1010,20 +1038,20 @@ Call ${handleDialog.name} to handle it before continuing.`);
         if (extensionPages.length) {
           response.push(`## Extension Pages`);
           const structuredExtensionPages = [];
-          for (const page of extensionPages) {
-            const isolatedContextName = context.getIsolatedContextName(page);
+          for (const mcpPage of extensionPages) {
+            const isolatedContextName = mcpPage.isolatedContextName;
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await fetchPageTitle(page);
+            const title = await fetchPageTitle(mcpPage.pptrPage);
             const pageLabel = title
-              ? `${truncateTitle(title)} (${page.url()})`
-              : page.url();
+              ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
+              : mcpPage.pptrPage.url();
             response.push(
-              `${context.getPageId(page)}: ${pageLabel}${context.isPageSelected(page) ? ' [selected]' : ''}${contextLabel}`,
+              `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
             );
             structuredExtensionPages.push(
-              createStructuredPage(page, context, title),
+              createStructuredPage(mcpPage, context, title),
             );
           }
           structuredContent.extensionPages = structuredExtensionPages;
@@ -1115,8 +1143,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.snapshot = data.snapshot.toJSON();
         response.push('## Latest page snapshot');
         response.push(
-          useToon && toonEncode
-            ? toonEncode(structuredContent.snapshot)
+          compactEncode
+            ? compactEncode(structuredContent.snapshot)
             : data.snapshot.toString(),
         );
       }
@@ -1136,15 +1164,28 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
       }
-      const aggregates = this.#heapSnapshotOptions.aggregates;
-      if (aggregates) {
-        const sortedEntries = HeapSnapshotFormatter.sort(aggregates);
+      const aggregateData = this.#heapSnapshotOptions.aggregateData;
+      if (aggregateData) {
+        const sortedEntries = HeapSnapshotFormatter.sort(
+          aggregateData.aggregates,
+        );
 
         const paginationData = this.#dataWithPagination(
           sortedEntries,
           this.#heapSnapshotOptions.pagination,
         );
 
+        response.push(`Objects: ${aggregateData.objectCount}`);
+        response.push(
+          `Total shallow size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(
+            aggregateData.totalSelfSize,
+          )}`,
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.aggregateStats = {
+          objectCount: aggregateData.objectCount,
+          totalSelfSize: aggregateData.totalSelfSize,
+        };
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
 
@@ -1153,8 +1194,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         structuredContent.heapSnapshotData = formatter.toJSON();
         response.push(
-          useToon && toonEncode
-            ? toonEncode(structuredContent.heapSnapshotData)
+          compactEncode
+            ? compactEncode(structuredContent.heapSnapshotData)
             : formatter.toString(),
         );
       }
@@ -1218,8 +1259,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (classDiffs) {
         response.push('### Heap Snapshot Diff');
         response.push(
-          useToon && toonEncode
-            ? toonEncode(classDiffs)
+          compactEncode
+            ? compactEncode(classDiffs)
             : HeapSnapshotFormatter.formatDiffSummary(classDiffs),
         );
         structuredContent.heapSnapshotClassDiffs = classDiffs;
@@ -1228,8 +1269,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
       if (detailedClassDiff) {
         response.push('### Heap Snapshot Detailed Diff');
         response.push(
-          useToon && toonEncode
-            ? toonEncode(detailedClassDiff)
+          compactEncode
+            ? compactEncode(detailedClassDiff)
             : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
         );
         structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
@@ -1340,8 +1381,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
             i.toJSON(),
           );
           response.push(
-            ...(useToon && toonEncode
-              ? [toonEncode(structuredContent.networkRequests)]
+            ...(compactEncode
+              ? [compactEncode(structuredContent.networkRequests)]
               : paginationData.items.map(i => i.toString())),
           );
         }
@@ -1365,8 +1406,8 @@ Call ${handleDialog.name} to handle it before continuing.`);
           item.toJSON(),
         );
         response.push(...paginationData.info);
-        if (useToon && toonEncode) {
-          response.push(toonEncode(structuredContent.consoleMessages));
+        if (compactEncode) {
+          response.push(compactEncode(structuredContent.consoleMessages));
         } else {
           response.push(...paginationData.items.map(item => item.toString()));
         }
@@ -1451,11 +1492,11 @@ async function fetchPageTitle(page: Page): Promise<string> {
 }
 
 function createStructuredPage(
-  page: Page,
+  mcpPage: McpPage,
   context: McpContext,
   rawTitle: string,
 ) {
-  const isolatedContextName = context.getIsolatedContextName(page);
+  const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
   const entry: {
     id: number | undefined;
@@ -1464,10 +1505,10 @@ function createStructuredPage(
     selected: boolean;
     isolatedContext?: string;
   } = {
-    id: context.getPageId(page),
-    url: page.url(),
+    id: mcpPage.id,
+    url: mcpPage.pptrPage.url(),
     title,
-    selected: context.isPageSelected(page),
+    selected: context.isPageSelected(mcpPage),
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;

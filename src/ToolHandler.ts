@@ -7,6 +7,7 @@
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
+import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
@@ -259,10 +260,18 @@ export class ToolHandler {
       } catch (err) {
         response.setError(err);
       }
+      // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
+      let dataFormat: DataFormat = 'default';
+      if (this.serverArgs.experimentalDataFormat) {
+        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
+      } else if (this.serverArgs.experimentalToonFormat) {
+        dataFormat = 'toon';
+      }
+
       const {content, structuredContent} = await response.handle(
         this.tool.name,
         context,
-        this.serverArgs.experimentalToonFormat ?? false,
+        dataFormat,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;

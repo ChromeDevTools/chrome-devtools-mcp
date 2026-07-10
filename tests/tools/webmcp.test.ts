@@ -34,8 +34,7 @@ describe('webmcp', () => {
 
     it('list webmcp tools in select_page response', async () => {
       await withMcpContext(async (response, context) => {
-        const pageId =
-          context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+        const pageId = context.getSelectedMcpPage().id ?? 1;
         await selectPage.handler({params: {pageId}}, response, context);
         assert.ok(response.listWebMcpTools);
       });

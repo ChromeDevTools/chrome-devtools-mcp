@@ -9,11 +9,44 @@ import {describe, it} from 'node:test';
 
 import {
   bucketizeLatency,
+  getEnumValues,
   sanitizeParams,
   stripUnderscoreBeforeNumber,
   transformArgName,
 } from '../../src/telemetry/transformation.js';
 import {zod} from '../../src/third_party/index.js';
+
+describe('getEnumValues', () => {
+  it('resolves values for a bare enum', () => {
+    assert.deepStrictEqual(getEnumValues(zod.enum(['a', 'b'])), ['a', 'b']);
+  });
+
+  it('resolves values through optional/default wrappers in any order', () => {
+    assert.deepStrictEqual(getEnumValues(zod.enum(['a', 'b']).optional()), [
+      'a',
+      'b',
+    ]);
+    assert.deepStrictEqual(getEnumValues(zod.enum(['a', 'b']).default('a')), [
+      'a',
+      'b',
+    ]);
+    assert.deepStrictEqual(
+      getEnumValues(zod.enum(['a', 'b']).default('a').optional()),
+      ['a', 'b'],
+    );
+    assert.deepStrictEqual(
+      getEnumValues(zod.enum(['a', 'b']).optional().default('a')),
+      ['a', 'b'],
+    );
+  });
+
+  it('throws for a non-enum type', () => {
+    assert.throws(
+      () => getEnumValues(zod.string()),
+      /Cannot resolve enum values/,
+    );
+  });
+});
 
 describe('bucketizeLatency', () => {
   it('should bucketize values correctly', () => {

@@ -5,75 +5,16 @@
  */
 
 import {logger} from '../logger.js';
-import type {CdpPage, Dialog, HTTPRequest} from '../third_party/index.js';
+import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
 import {
   CLOSE_PAGE_ERROR,
   definePageTool,
   defineTool,
   timeoutSchema,
 } from './ToolDefinition.js';
-
-async function navigateWithInterception(
-  page: ContextPage,
-  action: () => Promise<unknown>,
-  allowListString?: string,
-  timeout?: number,
-): Promise<void> {
-  const allowList = allowListString
-    ? allowListString.split(',').map((p: string) => new URLPattern(p.trim()))
-    : undefined;
-
-  const requestHandler = (interceptedRequest: HTTPRequest) => {
-    if (!interceptedRequest.isNavigationRequest()) {
-      void interceptedRequest.continue();
-      return;
-    }
-    const requestUrl = interceptedRequest.url();
-    const isAllowed = allowList!.some((pattern: URLPattern) =>
-      pattern.test(requestUrl),
-    );
-
-    if (isAllowed) {
-      void interceptedRequest.continue();
-    } else {
-      logger?.(`Blocking request to: ${requestUrl}`);
-      void interceptedRequest.abort('blockedbyclient');
-    }
-  };
-
-  const cleanupInterception = async () => {
-    if (allowList) {
-      page.pptrPage.off('request', requestHandler);
-      await page.pptrPage.setRequestInterception(false).catch(error => {
-        logger?.(`Failed to disable request interception`, error);
-      });
-    }
-  };
-
-  if (allowList) {
-    await page.pptrPage.setRequestInterception(true);
-    page.pptrPage.on('request', requestHandler);
-  }
-
-  try {
-    await page.waitForEventsAfterAction(
-      async () => {
-        try {
-          await action();
-        } finally {
-          await cleanupInterception();
-        }
-      },
-      {timeout},
-    );
-  } finally {
-    await cleanupInterception();
-  }
-}
 
 export const listPages = defineTool(args => {
   return {
@@ -155,7 +96,7 @@ export const closePage = defineTool({
   },
 });
 
-export const newPage = defineTool(args => {
+export const newPage = defineTool(() => {
   return {
     name: 'new_page',
     description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
@@ -179,16 +120,6 @@ export const newPage = defineTool(args => {
             'Pages in the same browser context share cookies and storage. ' +
             'Pages in different browser contexts are fully isolated.',
         ),
-      ...(args?.experimentalNavigationAllowlist
-        ? {
-            allowList: zod
-              .string()
-              .optional()
-              .describe(
-                'Optional comma-separated list of URL patterns to allow. If provided, all other navigations will be blocked.',
-              ),
-          }
-        : {}),
       ...timeoutSchema,
     },
     blockedByDialog: false,
@@ -199,14 +130,13 @@ export const newPage = defineTool(args => {
         request.params.isolatedContext,
       );
 
-      await navigateWithInterception(
-        page,
-        () =>
-          page.pptrPage.goto(request.params.url, {
+      await page.waitForEventsAfterAction(
+        async () => {
+          await page.pptrPage.goto(request.params.url, {
             timeout: request.params.timeout,
-          }),
-        request.params.allowList,
-        request.params.timeout,
+          });
+        },
+        {timeout: request.params.timeout},
       );
 
       response.setIncludePages(true);
@@ -215,7 +145,7 @@ export const newPage = defineTool(args => {
   };
 });
 
-export const navigatePage = definePageTool(args => {
+export const navigatePage = definePageTool(() => {
   return {
     name: 'navigate_page',
     description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
@@ -236,7 +166,7 @@ export const navigatePage = definePageTool(args => {
         .optional()
         .describe('Whether to ignore cache on reload.'),
       handleBeforeUnload: zod
-        .enum(['accept', 'decline'])
+        .enum(['accept', 'dismiss'])
         .optional()
         .describe(
           'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
@@ -247,16 +177,6 @@ export const navigatePage = definePageTool(args => {
         .describe(
           'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
         ),
-      ...(args?.experimentalNavigationAllowlist
-        ? {
-            allowList: zod
-              .string()
-              .optional()
-              .describe(
-                'Optional comma-separated list of URL patterns to allow. If provided, all other navigations will be blocked.',
-              ),
-          }
-        : {}),
       ...timeoutSchema,
     },
     blockedByDialog: false,
@@ -275,21 +195,6 @@ export const navigatePage = definePageTool(args => {
         request.params.type = 'url';
       }
 
-      const handleBeforeUnload = request.params.handleBeforeUnload ?? 'accept';
-      const dialogHandler = (dialog: Dialog) => {
-        if (dialog.type() === 'beforeunload') {
-          if (handleBeforeUnload === 'accept') {
-            response.appendResponseLine(`Accepted a beforeunload dialog.`);
-            void dialog.accept();
-          } else {
-            response.appendResponseLine(`Declined a beforeunload dialog.`);
-            void dialog.dismiss();
-          }
-          // We are not going to report the dialog like regular dialogs.
-          page.clearDialog();
-        }
-      };
-
       let initScriptId: string | undefined;
       if (request.params.initScript) {
         const {identifier} = await page.pptrPage.evaluateOnNewDocument(
@@ -298,11 +203,9 @@ export const navigatePage = definePageTool(args => {
         initScriptId = identifier;
       }
 
-      page.pptrPage.on('dialog', dialogHandler);
-
       try {
-        await navigateWithInterception(
-          page,
+        const action = request.params.handleBeforeUnload ?? 'accept';
+        const result = await page.waitForEventsAfterAction(
           async () => {
             switch (request.params.type) {
               case 'url':
@@ -363,11 +266,18 @@ export const navigatePage = definePageTool(args => {
                 break;
             }
           },
-          request.params.allowList,
-          request.params.timeout,
+          {
+            timeout: request.params.timeout,
+            handleDialog: {beforeunload: action},
+          },
         );
+        if (result.dialogHandled) {
+          response.appendResponseLine(
+            `${action === 'dismiss' ? 'Dismissed' : 'Accepted'} a beforeunload dialog.`,
+          );
+          page.clearDialog();
+        }
       } finally {
-        page.pptrPage.off('dialog', dialogHandler);
         if (initScriptId) {
           await page.pptrPage
             .removeScriptToEvaluateOnNewDocument(initScriptId)

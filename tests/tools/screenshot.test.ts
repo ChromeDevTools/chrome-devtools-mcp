@@ -37,7 +37,7 @@ describe('screenshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await screenshotTool.handler(
           {params: {format: 'png'}, page: context.getSelectedMcpPage()},
@@ -56,7 +56,7 @@ describe('screenshot', () => {
     it('ignores quality', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await screenshotTool.handler(
           {
@@ -110,7 +110,7 @@ describe('screenshot', () => {
     it('with full page', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.viewportOverflow;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await screenshotTool.handler(
           {
@@ -132,7 +132,7 @@ describe('screenshot', () => {
 
     it('with full page resulting in a large screenshot', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(
           html`${`<div style="color:blue;">test</div>`.repeat(6500)}
@@ -171,7 +171,7 @@ describe('screenshot', () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.button;
 
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
@@ -202,7 +202,7 @@ describe('screenshot', () => {
         const filePath = join(tmpdir(), 'test-screenshot.png');
         try {
           const fixture = screenshots.basic;
-          const page = context.getSelectedPptrPage();
+          const page = context.getSelectedMcpPage().pptrPage;
           await page.setContent(fixture.html);
           await screenshotTool.handler(
             {
@@ -245,7 +245,7 @@ describe('screenshot', () => {
         try {
           await withMcpContext(async (response, context) => {
             const fixture = screenshots.basic;
-            const page = context.getSelectedPptrPage();
+            const page = context.getSelectedMcpPage().pptrPage;
             await page.setContent(fixture.html);
             await assert.rejects(
               screenshotTool.handler(
@@ -272,7 +272,7 @@ describe('screenshot', () => {
         try {
           await withMcpContext(async (response, context) => {
             const fixture = screenshots.basic;
-            const page = context.getSelectedPptrPage();
+            const page = context.getSelectedMcpPage().pptrPage;
             await page.setContent(fixture.html);
             await assert.rejects(
               screenshotTool.handler(
@@ -298,7 +298,7 @@ describe('screenshot', () => {
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         // No explicit format passed: zod should apply the CLI-driven default.
         await tool.handler(
@@ -325,7 +325,7 @@ describe('screenshot', () => {
         screenshotMaxWidth: 100,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(
           html`<div style="width:100vw;height:100vh;background:red"></div>`,
@@ -351,7 +351,7 @@ describe('screenshot', () => {
         screenshotMaxHeight: 60,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(
           html`<div style="width:100vw;height:100vh"></div>`,
@@ -376,7 +376,7 @@ describe('screenshot', () => {
         screenshotMaxHeight: 4000,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(html`<div></div>`);
 
@@ -397,7 +397,7 @@ describe('screenshot', () => {
         screenshotMaxWidth: 200,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(
           html`<style>
@@ -435,7 +435,7 @@ describe('screenshot', () => {
         const invalidChar = process.platform === 'win32' ? '>' : '\0';
         const filePath = `malformed${invalidChar}path.png`;
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await assert.rejects(
           screenshotTool.handler(
