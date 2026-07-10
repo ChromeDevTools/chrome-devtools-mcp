@@ -137,6 +137,28 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
+  static formatNativeContextSizes(
+    sizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+  ): string {
+    const lines: string[] = [];
+    lines.push('nodeId,nodeName,selfSize,retainedSize,attributedSize');
+    const sortedContexts = [...sizes.nativeContexts].sort(
+      (a, b) => b.attributedSize - a.attributedSize,
+    );
+    for (const nc of sortedContexts) {
+      lines.push(
+        `${nc.nodeId},${nc.nodeName},${DevTools.I18n.ByteUtilities.formatBytesToKb(nc.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(nc.retainedSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(nc.attributedSize)}`,
+      );
+    }
+    lines.push(
+      `Shared Size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(sizes.sharedSize)}`,
+    );
+    lines.push(
+      `Unattributed Size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(sizes.noAttributionSize)}`,
+    );
+    return lines.join('\n');
+  }
+
   #getSortedAggregates(): AggregatedInfoWithId[] {
     return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
   }

@@ -389,4 +389,12 @@ Static Data: {
   "totalSize": 1121496,
   "maxJSObjectId": 54005
 }
+### Native Contexts
+nodeId,nodeName,selfSize,retainedSize,attributedSize
+7249,system / NativeContext / https://example.com,1.2 kB,350 kB,350 kB
+7195,system / NativeContext / https://example.com,1.2 kB,60.1 kB,215 kB
+7307,system / NativeContext,1.2 kB,84.4 kB,84.6 kB
+7199,system / NativeContext,1.2 kB,84.4 kB,84.4 kB
+Shared Size: 22.9 kB
+Unattributed Size: 44.8 kB
 `;

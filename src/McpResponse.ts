@@ -83,6 +83,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
+    nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
@@ -330,12 +331,14 @@ export class McpResponse implements Response {
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+    nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       stats,
       staticData,
+      nativeContextSizes,
     };
   }
 
@@ -730,6 +733,7 @@ export class McpResponse implements Response {
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
+        nativeContextSizes?: object;
         aggregateStats?: {
           objectCount: number;
           totalSelfSize: number;
@@ -1034,6 +1038,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(`Static Data: ${JSON.stringify(staticData, null, 2)}`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
+      }
+      const nativeContextSizes = this.#heapSnapshotOptions.nativeContextSizes;
+      if (nativeContextSizes) {
+        response.push('### Native Contexts');
+        response.push(
+          HeapSnapshotFormatter.formatNativeContextSizes(nativeContextSizes),
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
       }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {

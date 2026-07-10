@@ -668,6 +668,12 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
+  async getHeapSnapshotNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    return await this.#heapSnapshotManager.getNativeContextSizes(filePath);
+  }
+
   async getHeapSnapshotNodesById(
     filePath: string,
     id: number,

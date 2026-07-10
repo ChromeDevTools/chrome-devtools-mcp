@@ -48,7 +48,7 @@ export const takeHeapSnapshot = definePageTool({
 export const getHeapSnapshotSummary = defineTool({
   name: 'get_heapsnapshot_summary',
   description:
-    'Loads a memory heapsnapshot and returns snapshot summary stats.',
+    'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes.',
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
@@ -64,8 +64,11 @@ export const getHeapSnapshotSummary = defineTool({
     const staticData = await context.getHeapSnapshotStaticData(
       request.params.filePath,
     );
+    const nativeContextSizes = await context.getHeapSnapshotNativeContextSizes(
+      request.params.filePath,
+    );
 
-    response.setHeapSnapshotStats(stats, staticData);
+    response.setHeapSnapshotStats(stats, staticData, nativeContextSizes);
   },
 });
 

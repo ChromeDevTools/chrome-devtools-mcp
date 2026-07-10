@@ -568,7 +568,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)
+**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 

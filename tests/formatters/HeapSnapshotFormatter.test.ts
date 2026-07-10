@@ -293,4 +293,43 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(result, expected);
     });
   });
+
+  describe('formatNativeContextSizes', () => {
+    it('formats native context sizes as CSV with summary lines', () => {
+      const mockSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes =
+        {
+          nativeContexts: [
+            {
+              nodeId: 10,
+              nodeIndex: 1,
+              nodeName: 'system / NativeContext',
+              attributedSize: 500,
+              retainedSize: 1000,
+              selfSize: 100,
+            },
+            {
+              nodeId: 20,
+              nodeIndex: 2,
+              nodeName: 'system / NativeContext / https://example.com',
+              attributedSize: 2000,
+              retainedSize: 5000,
+              selfSize: 200,
+            },
+          ],
+          sharedSize: 300,
+          noAttributionSize: 400,
+        };
+
+      const result = HeapSnapshotFormatter.formatNativeContextSizes(mockSizes);
+      const expected = [
+        'nodeId,nodeName,selfSize,retainedSize,attributedSize',
+        `20,system / NativeContext / https://example.com,${DevTools.I18n.ByteUtilities.formatBytesToKb(200)},${DevTools.I18n.ByteUtilities.formatBytesToKb(5000)},${DevTools.I18n.ByteUtilities.formatBytesToKb(2000)}`,
+        `10,system / NativeContext,${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(1000)},${DevTools.I18n.ByteUtilities.formatBytesToKb(500)}`,
+        `Shared Size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(300)}`,
+        `Unattributed Size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(400)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+  });
 });

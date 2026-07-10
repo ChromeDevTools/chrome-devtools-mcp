@@ -120,6 +120,13 @@ export class HeapSnapshotManager {
     return snapshot.staticData;
   }
 
+  async getNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getNativeContextSizes();
+  }
+
   async getOrCreateIdForClassKey(
     filePath: string,
     classKey: string,
