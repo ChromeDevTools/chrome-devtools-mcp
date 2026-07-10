@@ -11,14 +11,17 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import logger from 'debug';
+import {Locator} from 'puppeteer';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
+import {McpContext} from '../src/McpContext.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {getMockRequest, html, withMcpContext} from './utils.js';
+import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -219,6 +222,66 @@ describe('McpContext', () => {
         'a still-open page should keep its selection',
       );
       assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('continues page ids across contexts so stale ids do not resolve', async () => {
+    await withBrowser(async browser => {
+      const options = {
+        experimentalDevToolsDebugging: false,
+        performanceCrux: false,
+      };
+      const first = await McpContext.from(
+        browser,
+        logger('test'),
+        options,
+        Locator,
+      );
+      const idBeforeReconnect = (await first.newPage()).id;
+      first.dispose();
+
+      // A new context (as created after a browser reconnect) continues the
+      // shared id counter, so an id handed out before no longer resolves and
+      // the next page keeps counting up rather than colliding with it.
+      const second = await McpContext.from(
+        browser,
+        logger('test'),
+        options,
+        Locator,
+      );
+      try {
+        assert.throws(
+          () => second.getPageById(idBeforeReconnect),
+          /No page found/,
+        );
+        assert.ok(
+          (await second.newPage()).id > idBeforeReconnect,
+          'ids continue past the pre-reconnect ids',
+        );
+      } finally {
+        second.dispose();
+      }
+    });
+  });
+
+  it('reports the reconnect notice once', async () => {
+    await withBrowser(async browser => {
+      const context = await McpContext.from(
+        browser,
+        logger('test'),
+        {
+          experimentalDevToolsDebugging: false,
+          performanceCrux: false,
+          reconnected: true,
+        },
+        Locator,
+      );
+      try {
+        assert.ok(context.consumeReconnectNotice(), 'notice available once');
+        assert.ok(!context.consumeReconnectNotice(), 'notice does not repeat');
+      } finally {
+        context.dispose();
+      }
     });
   });
 

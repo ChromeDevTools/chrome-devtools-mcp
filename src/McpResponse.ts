@@ -41,7 +41,7 @@ import type {
   JSONSchema7Definition,
   Extension,
 } from './third_party/index.js';
-import {handleDialog} from './tools/pages.js';
+import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
@@ -266,6 +266,7 @@ export class McpResponse implements Response {
   #redactNetworkHeaders = true;
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
+  #reconnectNotice = false;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -281,6 +282,14 @@ export class McpResponse implements Response {
 
   setRedactNetworkHeaders(value: boolean): void {
     this.#redactNetworkHeaders = value;
+  }
+
+  /**
+   * Surfaces a one-time note that the browser reconnected and page ids changed.
+   * Set by the tool handler when the context reports a pending reconnect notice.
+   */
+  setReconnectNotice(): void {
+    this.#reconnectNotice = true;
   }
 
   attachDevToolsData(data: DevToolsData): void {
@@ -855,6 +864,7 @@ export class McpResponse implements Response {
       thirdPartyDeveloperTools?: object[];
       webmcpTools?: object[];
       message?: string;
+      reconnected?: boolean;
       networkConditions?: string;
       navigationTimeout?: number;
       viewport?: object;
@@ -917,6 +927,12 @@ export class McpResponse implements Response {
     }
 
     const response = [];
+    if (this.#reconnectNotice) {
+      structuredContent.reconnected = true;
+      response.push(
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages().name} to see open pages.`,
+      );
+    }
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);
