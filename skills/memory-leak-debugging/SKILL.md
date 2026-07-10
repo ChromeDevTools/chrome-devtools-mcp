@@ -12,7 +12,7 @@ This skill provides expert guidance and workflows for finding, diagnosing, and f
 - **Prefer MCP memory tools:** Do NOT attempt to read raw `.heapsnapshot` files directly, as they are extremely large and will consume too many tokens. Use the Chrome DevTools MCP heap snapshot tools to summarize, compare, and inspect snapshots.
 - **Isolate the Leak:** Determine if the leak is in the browser (client-side) or Node.js (server-side).
 - **Common Culprits:** Look for detached DOM nodes, unhandled closures, global variables, event listeners not being removed, and caches growing unbounded. _Note: Detached DOM nodes are sometimes intentional caches; always ask the user before nulling them._
-- **Close Loaded Snapshots:** Heap snapshots can be large. Use `close_heapsnapshot` after inspecting a file to release memory held by the MCP server.
+- **Close Loaded Snapshots:** Heap snapshots can be large. After completing an investigation, use `close_heapsnapshot` for each loaded snapshot to release memory held by the MCP server.
 
 ## Workflows
 
