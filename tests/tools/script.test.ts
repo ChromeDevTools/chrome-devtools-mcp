@@ -8,6 +8,8 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {installExtension} from '../../src/tools/extensions.js';
@@ -193,6 +195,40 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 'Works');
+      });
+    });
+
+    it('can skip waiting for a stable DOM', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        const waitForEventsAfterAction = sinon
+          .stub(page, 'waitForEventsAfterAction')
+          .callsFake(async action => {
+            await action();
+            return {};
+          });
+
+        try {
+          await evaluateScript().handler(
+            {
+              params: {
+                function: String(() => document.title),
+                waitForStableDom: false,
+              },
+            },
+            response,
+            context,
+          );
+        } finally {
+          waitForEventsAfterAction.restore();
+        }
+
+        assert.strictEqual(
+          waitForEventsAfterAction.firstCall.args[1]?.waitForStableDom,
+          false,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), '');
       });
     });
 

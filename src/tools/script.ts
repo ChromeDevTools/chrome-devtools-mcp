@@ -52,6 +52,12 @@ Example with arguments: \`(el) => el.innerText\`
         .describe(
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         ),
+      waitForStableDom: zod
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to wait for the DOM to become stable after the script runs. Set to false for read-only scripts on pages with continuous DOM mutations. Defaults to true.',
+        ),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -73,6 +79,7 @@ Example with arguments: \`(el) => el.innerText\`
         pageId,
         dialogAction,
         filePath,
+        waitForStableDom,
       } = request.params;
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
@@ -95,7 +102,10 @@ Example with arguments: \`(el) => el.innerText\`
                 context,
               });
             },
-            {handleDialog: dialogAction ?? 'accept'},
+            {
+              handleDialog: dialogAction ?? 'accept',
+              waitForStableDom,
+            },
           );
         if (result.dialogHandled) {
           context.getSelectedMcpPage().clearDialog();
@@ -127,7 +137,10 @@ Example with arguments: \`(el) => el.innerText\`
               context,
             });
           },
-          {handleDialog: dialogAction ?? 'accept'},
+          {
+            handleDialog: dialogAction ?? 'accept',
+            waitForStableDom,
+          },
         );
         response.attachWaitForResult(result);
       } finally {
