@@ -358,6 +358,7 @@
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
+- **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
 ---
 
