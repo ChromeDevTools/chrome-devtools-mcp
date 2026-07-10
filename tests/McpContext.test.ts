@@ -96,24 +96,12 @@ describe('McpContext', () => {
         const page = await context.newPage();
         await context.createPagesSnapshot();
         assert.ok(page.devToolsPage);
-      },
-      {
-        autoOpenDevTools: true,
-      },
-    );
-  });
 
-  it('does not resolve a page id that is filtered out of the list', async () => {
-    await withMcpContext(
-      async (_response, context) => {
-        const page = await context.newPage();
-        // A second snapshot guarantees the devtools page opened by the first
-        // is enrolled.
+        // A devtools page is tracked but excluded from the listing, so its id
+        // must not resolve through `getPageById()` (which backs `select_page`
+        // and every other pageId tool). A second snapshot guarantees the
+        // devtools page is enrolled.
         await context.createPagesSnapshot();
-        await context.createPagesSnapshot();
-        assert.ok(page.devToolsPage, 'devtools page should be open');
-
-        // The devtools page is tracked but excluded from the listing.
         const listed = context.getPages();
         assert.ok(
           listed.every(
@@ -121,9 +109,6 @@ describe('McpContext', () => {
           ),
           'listing should exclude devtools pages',
         );
-
-        // So no id outside the listing resolves - the unlisted devtools page
-        // (and any other filtered page) can't be targeted by id.
         const listedIds = new Set(listed.map(mcpPage => mcpPage.id));
         for (let id = 1; id < 30; id++) {
           if (listedIds.has(id)) {
