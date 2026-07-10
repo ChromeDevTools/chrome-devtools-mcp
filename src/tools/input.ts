@@ -261,7 +261,7 @@ async function fillFormElement(
 ) {
   const handle = await page.getElementByUid(uid);
   try {
-    const aXNode = context.getAXNodeByUid(uid);
+    const aXNode = page.getAXNodeByUid(uid);
     // We assume that combobox needs to be handled as select if it has
     // role='combobox' and option children.
     if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
@@ -469,7 +469,7 @@ export const uploadFile = definePageTool({
   },
   blockedByDialog: true,
   verifyFilesSchema: ['filePath'],
-  handler: async (request, response, _context) => {
+  handler: async (request, response) => {
     const {uid, filePath} = request.params;
     const handle = (await request.page.getElementByUid(
       uid,

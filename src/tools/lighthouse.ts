@@ -103,7 +103,7 @@ export const lighthouseAudit = definePageTool({
         throw new Error('Lighthouse audit failed.');
       }
     } finally {
-      await context.restoreEmulation(page);
+      await page.restoreEmulation();
     }
 
     const lhr = result.lhr;

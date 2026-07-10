@@ -615,7 +615,8 @@ export class McpResponse implements Response {
       );
       const formatter = await NetworkFormatter.from(request, {
         requestId: this.#attachedNetworkRequestId,
-        requestIdResolver: req => context.getNetworkRequestStableId(req),
+        requestIdResolver: req =>
+          context.getSelectedMcpPage().getNetworkRequestStableId(req),
         fetchData: true,
         requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
         responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
@@ -724,8 +725,9 @@ export class McpResponse implements Response {
         await Promise.all(
           messages.map(
             async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
-              const consoleMessageStableId =
-                context.getConsoleMessageStableId(item);
+              const consoleMessageStableId = context
+                .getSelectedMcpPage()
+                .getConsoleMessageStableId(item);
               if ('args' in item || item instanceof UncaughtError) {
                 const consoleMessage = item as ConsoleMessage | UncaughtError;
                 const devTools = page
@@ -777,9 +779,13 @@ export class McpResponse implements Response {
         networkRequests = await Promise.all(
           requests.map(request =>
             NetworkFormatter.from(request, {
-              requestId: context.getNetworkRequestStableId(request),
+              requestId: context
+                .getSelectedMcpPage()
+                .getNetworkRequestStableId(request),
               selectedInDevToolsUI:
-                context.getNetworkRequestStableId(request) ===
+                context
+                  .getSelectedMcpPage()
+                  .getNetworkRequestStableId(request) ===
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
               saveFile: (data, filename, extension) =>

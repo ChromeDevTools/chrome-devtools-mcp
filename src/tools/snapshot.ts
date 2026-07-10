@@ -61,13 +61,9 @@ export const waitFor = definePageTool({
   },
   blockedByDialog: true,
   verifyFilesSchema: [],
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
-    await context.waitForTextOnPage(
-      request.params.text,
-      request.params.timeout,
-      page,
-    );
+    await page.waitForTextOnPage(request.params.text, request.params.timeout);
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,
