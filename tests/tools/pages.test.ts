@@ -171,7 +171,7 @@ describe('pages', () => {
             `chrome-extension://${extensionId}/sidepanel.html`,
           );
 
-          await context.waitForTextOnPage(['Side Panel']);
+          await context.getSelectedMcpPage().waitForTextOnPage(['Side Panel']);
 
           // Wait for service worker used in the snapshot.
           await context.browser.waitForTarget(

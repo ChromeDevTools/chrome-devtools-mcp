@@ -58,7 +58,7 @@ third-party developer tools with additional functionality.`,
   schema: {},
   blockedByDialog: false,
   verifyFilesSchema: [],
-  handler: async (_request, response, _context) => {
+  handler: async (_request, response) => {
     response.setListThirdPartyDeveloperTools();
   },
 });

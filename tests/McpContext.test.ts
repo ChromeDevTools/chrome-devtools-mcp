@@ -56,7 +56,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.pptrPage.getDefaultTimeout();
-      await context.emulate({cpuThrottlingRate: 2});
+      await context.getSelectedMcpPage().emulate({cpuThrottlingRate: 2});
       const timeoutAfter = page.pptrPage.getDefaultTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -66,7 +66,9 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
       const timeoutBefore = page.pptrPage.getDefaultNavigationTimeout();
-      await context.emulate({networkConditions: 'Slow 3G'});
+      await context
+        .getSelectedMcpPage()
+        .emulate({networkConditions: 'Slow 3G'});
       const timeoutAfter = page.pptrPage.getDefaultNavigationTimeout();
       assert(timeoutBefore < timeoutAfter, 'Timeout was less then expected');
     });
@@ -76,7 +78,7 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       const page = await context.newPage();
 
-      await context.emulate({
+      await context.getSelectedMcpPage().emulate({
         cpuThrottlingRate: 2,
         networkConditions: 'Slow 3G',
       });
@@ -133,7 +135,7 @@ describe('McpContext', () => {
 
       // Capture a uid from page1's snapshot (snapshotId=1, button is node 1)
       const page1Uid = '1_1';
-      const page1Node = context.getAXNodeByUid(page1Uid);
+      const page1Node = page1.getAXNodeByUid(page1Uid);
       assert.ok(page1Node, 'uid should resolve from page1 snapshot');
 
       // Page 2: new page, set content, snapshot
@@ -145,7 +147,7 @@ describe('McpContext', () => {
       });
 
       // Page 2 is now selected. Page 1's uid should still resolve.
-      const node = context.getAXNodeByUid(page1Uid);
+      const node = page1.getAXNodeByUid(page1Uid);
       assert.ok(node, 'page1 uid should still resolve after page2 snapshot');
       assert.strictEqual(node?.name, 'Page1 Button');
 
@@ -230,7 +232,9 @@ describe('McpContext', () => {
       sinon
         .stub(context.getSelectedMcpPage(), 'getNetworkRequests')
         .returns([mockRequest]);
-      sinon.stub(context, 'getNetworkRequestStableId').returns(123);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestStableId')
+        .returns(123);
 
       response.setIncludeNetworkRequests(true);
       const result = await response.handle('test', context);
@@ -248,7 +252,9 @@ describe('McpContext', () => {
       sinon
         .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
         .returns(mockRequest);
-      sinon.stub(context, 'getNetworkRequestStableId').returns(456);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestStableId')
+        .returns(456);
 
       response.attachNetworkRequest(456);
       const result = await response.handle('test', context);
@@ -274,7 +280,9 @@ describe('McpContext', () => {
       sinon
         .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
         .returns(mockRequest);
-      sinon.stub(context, 'getNetworkRequestStableId').returns(789);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestStableId')
+        .returns(789);
 
       // Use os.tmpdir() so validatePath passes on all platforms (macOS tmpdir
       // is /var/folders/..., not /tmp, so hardcoded /tmp paths are rejected).

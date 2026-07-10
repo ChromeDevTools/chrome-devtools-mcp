@@ -20,22 +20,15 @@ import type {
   DuplicateStringGroup,
 } from './HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import {
-  NetworkCollector,
-  type ListenerMap,
-  type UncaughtError,
-} from './PageCollector.js';
+import {type UncaughtError} from './PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './ServiceWorkerCollector.js';
 import {
   Locator,
-  PredefinedNetworkConditions,
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
-  type HTTPRequest,
   type Page,
   type ScreenRecorder,
-  type Viewport,
   type Target,
   type Extension,
   type Root,
@@ -46,15 +39,8 @@ import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {Logger} from './types.js';
-import type {
-  EmulationSettings,
-  GeolocationOptions,
-  ExtensionServiceWorker,
-} from './types.js';
+import type {ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
-import {type WithSymbolId, stableIdSymbol} from './utils/id.js';
-import {getNetworkMultiplierFromString} from './WaitForHelper.js';
-
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
@@ -71,9 +57,6 @@ interface McpContextOptions {
   // OS temp directory. When true, the previous permissive behavior is restored.
   allowUnrestrictedPaths?: boolean;
 }
-
-const DEFAULT_TIMEOUT = 5_000;
-const NAVIGATION_TIMEOUT = 10_000;
 
 export class McpContext implements Context {
   browser: Browser;
@@ -305,12 +288,6 @@ export class McpContext implements Context {
     return page.devtoolsUniverse ?? null;
   }
 
-  getConsoleMessageStableId(
-    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
-  ): number {
-    return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
-  }
-
   async newPage(
     background?: boolean,
     isolatedContextName?: string,
@@ -343,134 +320,8 @@ export class McpContext implements Context {
     await page.pptrPage.close({runBeforeUnload: false});
   }
 
-  async restoreEmulation(page: McpPage) {
-    const currentSetting = page.emulationSettings;
-    await this.emulate(currentSetting, page);
-  }
-
   get #hasNetworkBlockOrAllowlist(): boolean {
     return !!(this.#options.allowList || this.#options.blocklist);
-  }
-
-  async emulate(
-    options: {
-      networkConditions?: string;
-      cpuThrottlingRate?: number;
-      geolocation?: GeolocationOptions;
-      userAgent?: string;
-      colorScheme?: 'dark' | 'light' | 'auto';
-      viewport?: Viewport;
-      extraHttpHeaders?: Record<string, string> | undefined;
-    },
-    targetMcpPage?: McpPage,
-  ): Promise<void> {
-    const mcpPage = targetMcpPage ?? this.getSelectedMcpPage();
-    const page = mcpPage.pptrPage;
-    const newSettings: EmulationSettings = {...mcpPage.emulationSettings};
-
-    // Skip network emulation if blocklist/allowlist is configured, as it conflicts with blocking rules in Puppeteer.
-    if (this.#hasNetworkBlockOrAllowlist) {
-      if (options.networkConditions !== undefined) {
-        throw new Error(
-          'Network throttling is not supported when network blocking (allowlist/blocklist) is configured.',
-        );
-      }
-    } else if (!options.networkConditions) {
-      await page.emulateNetworkConditions(null);
-      delete newSettings.networkConditions;
-    } else if (options.networkConditions === 'Offline') {
-      await page.emulateNetworkConditions({
-        offline: true,
-        download: 0,
-        upload: 0,
-        latency: 0,
-      });
-      newSettings.networkConditions = 'Offline';
-    } else if (options.networkConditions in PredefinedNetworkConditions) {
-      const networkCondition =
-        PredefinedNetworkConditions[
-          options.networkConditions as keyof typeof PredefinedNetworkConditions
-        ];
-      await page.emulateNetworkConditions(networkCondition);
-      newSettings.networkConditions = options.networkConditions;
-    }
-
-    const secondarySession = this.getDevToolsUniverse(mcpPage)?.session;
-    if (!options.cpuThrottlingRate) {
-      await page.emulateCPUThrottling(1);
-      if (secondarySession) {
-        await secondarySession.send('Emulation.setCPUThrottlingRate', {
-          rate: 1,
-        });
-      }
-      delete newSettings.cpuThrottlingRate;
-    } else {
-      await page.emulateCPUThrottling(options.cpuThrottlingRate);
-      if (secondarySession) {
-        await secondarySession.send('Emulation.setCPUThrottlingRate', {
-          rate: options.cpuThrottlingRate,
-        });
-      }
-      newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
-    }
-
-    if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
-      delete newSettings.geolocation;
-    } else {
-      await page.setGeolocation(options.geolocation);
-      newSettings.geolocation = options.geolocation;
-    }
-
-    if (!options.userAgent) {
-      await page.setUserAgent({userAgent: undefined});
-      delete newSettings.userAgent;
-    } else {
-      await page.setUserAgent({userAgent: options.userAgent});
-      newSettings.userAgent = options.userAgent;
-    }
-
-    if (!options.colorScheme || options.colorScheme === 'auto') {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: ''},
-      ]);
-      delete newSettings.colorScheme;
-    } else {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: options.colorScheme},
-      ]);
-      newSettings.colorScheme = options.colorScheme;
-    }
-
-    if (!options.viewport) {
-      delete newSettings.viewport;
-    } else {
-      const defaults = {
-        deviceScaleFactor: 1,
-        isMobile: false,
-        hasTouch: false,
-        isLandscape: false,
-      };
-      newSettings.viewport = {...defaults, ...options.viewport};
-    }
-
-    if (options.extraHttpHeaders !== undefined) {
-      await page.setExtraHTTPHeaders(options.extraHttpHeaders);
-      newSettings.extraHttpHeaders = options.extraHttpHeaders;
-      if (Object.keys(options.extraHttpHeaders).length === 0) {
-        delete newSettings.extraHttpHeaders;
-      }
-    }
-
-    mcpPage.emulationSettings = Object.keys(newSettings).length
-      ? newSettings
-      : {};
-
-    this.#updateSelectedPageTimeouts();
-
-    // This should happen after updating the page timeouts.
-    // Setting the viewport can trigger a reload which we don't want to timeout.
-    await page.setViewport(newSettings.viewport ?? null);
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
@@ -526,7 +377,7 @@ export class McpContext implements Context {
 
   selectPage(newPage: McpPage): void {
     this.#selectedPage = newPage;
-    this.#updateSelectedPageTimeouts();
+    newPage.updateTimeouts();
   }
 
   /**
@@ -537,36 +388,6 @@ export class McpContext implements Context {
    */
   getSelectedPageFallback(): {wasClosed: boolean} | undefined {
     return this.#selectedPageFallback;
-  }
-
-  #updateSelectedPageTimeouts() {
-    const page = this.getSelectedMcpPage();
-    // For waiters 5sec timeout should be sufficient.
-    // Increased in case we throttle the CPU
-    const cpuMultiplier = page.cpuThrottlingRate;
-    page.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
-    // 10sec should be enough for the load event to be emitted during
-    // navigations.
-    // Increased in case we throttle the network requests or the CPU
-    const networkMultiplier = getNetworkMultiplierFromString(
-      page.networkConditions,
-    );
-    page.pptrPage.setDefaultNavigationTimeout(
-      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
-    );
-  }
-
-  // Linear scan over per-page snapshots. The page count is small (typically
-  // 2-10) so a reverse index isn't worthwhile given the uid-reuse lifecycle
-  // complexity it would introduce.
-  getAXNodeByUid(uid: string) {
-    for (const mcpPage of this.#mcpPages.values()) {
-      const node = mcpPage.textSnapshot?.idToNode.get(uid);
-      if (node) {
-        return node;
-      }
-    }
-    return undefined;
   }
 
   /**
@@ -613,7 +434,10 @@ export class McpContext implements Context {
   #createMcpPage(page: Page): McpPage {
     let mcpPage = this.#mcpPages.get(page);
     if (!mcpPage) {
-      mcpPage = new McpPage(page, this.#nextPageId++);
+      mcpPage = new McpPage(page, this.#nextPageId++, {
+        locatorClass: this.#locatorClass,
+        hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
+      });
       this.#mcpPages.set(page, mcpPage);
       void mcpPage.init();
     }
@@ -814,58 +638,6 @@ export class McpContext implements Context {
 
   recordedTraces(): TraceResult[] {
     return this.#traceResults;
-  }
-
-  getNetworkRequestStableId(request: HTTPRequest): number {
-    return (request as WithSymbolId<typeof request>)[stableIdSymbol] ?? -1;
-  }
-
-  waitForTextOnPage(
-    text: string[],
-    timeout?: number,
-    mcpPage?: McpPage,
-  ): Promise<Element> {
-    const page = mcpPage
-      ? mcpPage.pptrPage
-      : this.getSelectedMcpPage().pptrPage;
-    const frames = page.frames();
-
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => [
-          frame.locator(`aria/${value}`),
-          frame.locator(`text/${value}`),
-        ]),
-      ),
-    );
-
-    if (timeout) {
-      locator = locator.setTimeout(timeout);
-    }
-
-    return locator.wait();
-  }
-
-  /**
-   * We need to ignore favicon request as they make our test flaky
-   */
-  async setUpNetworkCollectorForTesting() {
-    for (const mcpPage of this.getPages()) {
-      mcpPage.networkCollector.dispose();
-      mcpPage.networkCollector = new NetworkCollector(
-        mcpPage.pptrPage,
-        collect => {
-          return {
-            request: req => {
-              if (req.url().includes('favicon.ico')) {
-                return;
-              }
-              collect(req);
-            },
-          } as ListenerMap;
-        },
-      );
-    }
   }
 
   async installExtension(extensionPath: string): Promise<string> {

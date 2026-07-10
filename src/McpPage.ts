@@ -16,19 +16,23 @@ import {
   type UncaughtError,
 } from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import type {
-  Dialog,
-  ElementHandle,
-  Viewport,
-  WebMCPTool,
-  Protocol,
-  Page,
-  ConsoleMessage,
-  HTTPRequest,
-  DevTools,
+import type {Locator} from './third_party/index.js';
+import {
+  PredefinedNetworkConditions,
+  type Dialog,
+  type ElementHandle,
+  type Viewport,
+  type WebMCPTool,
+  type Protocol,
+  type Page,
+  type ConsoleMessage,
+  type HTTPRequest,
+  type DevTools,
 } from './third_party/index.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
+const DEFAULT_TIMEOUT = 5_000;
+const NAVIGATION_TIMEOUT = 10_000;
 import type {
   ContextPage,
   DevToolsData,
@@ -39,6 +43,7 @@ import type {
   GeolocationOptions,
   TextSnapshotNode,
 } from './types.js';
+import {type WithSymbolId, stableIdSymbol} from './utils/id.js';
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
@@ -80,7 +85,19 @@ export class McpPage implements ContextPage {
   networkCollector: NetworkCollector;
   consoleCollector: ConsoleCollector;
 
-  constructor(page: Page, id: number) {
+  #hasNetworkBlockOrAllowlist: boolean;
+  #locatorClass: typeof Locator;
+
+  constructor(
+    page: Page,
+    id: number,
+    options: {
+      hasNetworkBlockOrAllowlist: boolean;
+      locatorClass: typeof Locator;
+    },
+  ) {
+    this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
+    this.#locatorClass = options.locatorClass;
     this.pptrPage = page;
     this.id = id;
     this.#dialogHandler = (dialog: Dialog): void => {
@@ -493,5 +510,187 @@ export class McpPage implements ContextPage {
       logger?.('error getting devtools data', err);
     }
     return {};
+  }
+
+  getConsoleMessageStableId(
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
+  ): number {
+    return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
+  }
+
+  getNetworkRequestStableId(request: HTTPRequest): number {
+    return (request as WithSymbolId<typeof request>)[stableIdSymbol] ?? -1;
+  }
+
+  async restoreEmulation() {
+    const currentSetting = this.emulationSettings;
+    await this.emulate(currentSetting);
+  }
+
+  async emulate(options: {
+    networkConditions?: string;
+    cpuThrottlingRate?: number;
+    geolocation?: GeolocationOptions;
+    userAgent?: string;
+    colorScheme?: 'dark' | 'light' | 'auto';
+    viewport?: Viewport;
+    extraHttpHeaders?: Record<string, string> | undefined;
+  }): Promise<void> {
+    const page = this.pptrPage;
+    const newSettings: EmulationSettings = {...this.emulationSettings};
+
+    // Skip network emulation if blocklist/allowlist is configured, as it conflicts with blocking rules in Puppeteer.
+    if (this.#hasNetworkBlockOrAllowlist) {
+      if (options.networkConditions !== undefined) {
+        throw new Error(
+          'Network throttling is not supported when network blocking (allowlist/blocklist) is configured.',
+        );
+      }
+    } else if (!options.networkConditions) {
+      await page.emulateNetworkConditions(null);
+      delete newSettings.networkConditions;
+    } else if (options.networkConditions === 'Offline') {
+      await page.emulateNetworkConditions({
+        offline: true,
+        download: 0,
+        upload: 0,
+        latency: 0,
+      });
+      newSettings.networkConditions = 'Offline';
+    } else if (options.networkConditions in PredefinedNetworkConditions) {
+      const networkCondition =
+        PredefinedNetworkConditions[
+          options.networkConditions as keyof typeof PredefinedNetworkConditions
+        ];
+      await page.emulateNetworkConditions(networkCondition);
+      newSettings.networkConditions = options.networkConditions;
+    }
+
+    const secondarySession = this.devtoolsUniverse?.session;
+    if (!options.cpuThrottlingRate) {
+      await page.emulateCPUThrottling(1);
+      if (secondarySession) {
+        await secondarySession.send('Emulation.setCPUThrottlingRate', {
+          rate: 1,
+        });
+      }
+      delete newSettings.cpuThrottlingRate;
+    } else {
+      await page.emulateCPUThrottling(options.cpuThrottlingRate);
+      if (secondarySession) {
+        await secondarySession.send('Emulation.setCPUThrottlingRate', {
+          rate: options.cpuThrottlingRate,
+        });
+      }
+      newSettings.cpuThrottlingRate = options.cpuThrottlingRate;
+    }
+
+    if (!options.geolocation) {
+      await page.setGeolocation({latitude: 0, longitude: 0});
+      delete newSettings.geolocation;
+    } else {
+      await page.setGeolocation(options.geolocation);
+      newSettings.geolocation = options.geolocation;
+    }
+
+    if (!options.userAgent) {
+      await page.setUserAgent({userAgent: undefined});
+      delete newSettings.userAgent;
+    } else {
+      await page.setUserAgent({userAgent: options.userAgent});
+      newSettings.userAgent = options.userAgent;
+    }
+
+    if (!options.colorScheme || options.colorScheme === 'auto') {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: ''},
+      ]);
+      delete newSettings.colorScheme;
+    } else {
+      await page.emulateMediaFeatures([
+        {name: 'prefers-color-scheme', value: options.colorScheme},
+      ]);
+      newSettings.colorScheme = options.colorScheme;
+    }
+
+    if (!options.viewport) {
+      delete newSettings.viewport;
+    } else {
+      const defaults = {
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      };
+      newSettings.viewport = {...defaults, ...options.viewport};
+    }
+
+    if (options.extraHttpHeaders !== undefined) {
+      await page.setExtraHTTPHeaders(options.extraHttpHeaders);
+      newSettings.extraHttpHeaders = options.extraHttpHeaders;
+      if (Object.keys(options.extraHttpHeaders).length === 0) {
+        delete newSettings.extraHttpHeaders;
+      }
+    }
+
+    this.emulationSettings = Object.keys(newSettings).length ? newSettings : {};
+
+    this.updateTimeouts();
+
+    // This should happen after updating the page timeouts.
+    // Setting the viewport can trigger a reload which we don't want to timeout.
+    await page.setViewport(newSettings.viewport ?? null);
+  }
+
+  updateTimeouts() {
+    // For waiters 5sec timeout should be sufficient.
+    // Increased in case we throttle the CPU
+    const cpuMultiplier = this.cpuThrottlingRate;
+    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    // 10sec should be enough for the load event to be emitted during
+    // navigations.
+    // Increased in case we throttle the network requests or the CPU
+    const networkMultiplier = getNetworkMultiplierFromString(
+      this.networkConditions,
+    );
+    this.pptrPage.setDefaultNavigationTimeout(
+      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
+    );
+  }
+
+  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
+    const frames = this.pptrPage.frames();
+
+    let locator = this.#locatorClass.race(
+      frames.flatMap(frame =>
+        text.flatMap(value => [
+          frame.locator(`aria/${value}`),
+          frame.locator(`text/${value}`),
+        ]),
+      ),
+    );
+
+    if (timeout) {
+      locator = locator.setTimeout(timeout);
+    }
+
+    return locator.wait();
+  }
+
+  /**
+   * We need to ignore favicon request as they make our test flaky
+   */
+  async setUpNetworkCollectorForTesting() {
+    this.networkCollector.dispose();
+    this.networkCollector = new NetworkCollector(this.pptrPage, collect => {
+      return {
+        request: req => {
+          if (req.url().includes('favicon.ico')) {
+            return;
+          }
+          collect(req);
+        },
+      } as ListenerMap;
+    });
   }
 }

@@ -206,18 +206,6 @@ export type Context = Readonly<{
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;
-  restoreEmulation(page: ContextPage): Promise<void>;
-  emulate(
-    options: {
-      networkConditions?: string;
-      cpuThrottlingRate?: number;
-      geolocation?: GeolocationOptions;
-      userAgent?: string;
-      colorScheme?: 'dark' | 'light' | 'auto';
-      viewport?: Viewport;
-    },
-    mcpPage?: ContextPage,
-  ): Promise<void>;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
@@ -227,11 +215,6 @@ export type Context = Readonly<{
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}>;
-  waitForTextOnPage(
-    text: string[],
-    timeout?: number,
-    mcpPage?: ContextPage,
-  ): Promise<Element>;
 
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
@@ -330,6 +313,16 @@ export type ContextPage = Readonly<{
     response: Response,
   ): Promise<void>;
   getDevToolsData(): Promise<DevToolsData>;
+  restoreEmulation(): Promise<void>;
+  emulate(options: {
+    networkConditions?: string;
+    cpuThrottlingRate?: number;
+    geolocation?: GeolocationOptions;
+    userAgent?: string;
+    colorScheme?: 'dark' | 'light' | 'auto';
+    viewport?: Viewport;
+  }): Promise<void>;
+  waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

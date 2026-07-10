@@ -449,7 +449,7 @@ describe('performance', () => {
         sinon.stub(selectedPage.tracing, 'stop').resolves(modifiedData);
 
         // Emulate mobile
-        await context.emulate({
+        await context.getSelectedMcpPage().emulate({
           viewport: {
             width: 375,
             height: 667,

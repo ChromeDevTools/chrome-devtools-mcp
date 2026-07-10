@@ -241,7 +241,7 @@ describe('emulation', () => {
 
     it('disables cpu throttling', async () => {
       await withMcpContext(async (response, context) => {
-        await context.emulate({
+        await context.getSelectedMcpPage().emulate({
           cpuThrottlingRate: 4,
         });
         await emulate.handler(

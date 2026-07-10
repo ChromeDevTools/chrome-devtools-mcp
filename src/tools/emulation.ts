@@ -101,9 +101,9 @@ export const emulate = definePageTool({
   },
   blockedByDialog: true,
   verifyFilesSchema: [],
-  handler: async (request, response, context) => {
+  handler: async (request, response) => {
     const page = request.page;
-    await context.emulate(request.params, page);
+    await page.emulate(request.params);
     response.appendResponseLine('Emulation configured successfully');
   },
 });

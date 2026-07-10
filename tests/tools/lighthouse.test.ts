@@ -58,7 +58,7 @@ describe('lighthouse', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/test-mobile'));
-        await context.emulate({
+        await context.getSelectedMcpPage().emulate({
           viewport: {
             width: 400,
             height: 400,

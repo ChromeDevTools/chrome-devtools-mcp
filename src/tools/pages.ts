@@ -307,7 +307,7 @@ export const resizePage = definePageTool({
   },
   blockedByDialog: false,
   verifyFilesSchema: [],
-  handler: async (request, response, _context) => {
+  handler: async (request, response) => {
     const page = request.page;
 
     try {
@@ -353,7 +353,7 @@ export const handleDialog = definePageTool({
   },
   blockedByDialog: false,
   verifyFilesSchema: [],
-  handler: async (request, response, _context) => {
+  handler: async (request, response) => {
     const page = request.page;
     const dialog = page.getDialog();
     if (!dialog) {
