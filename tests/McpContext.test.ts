@@ -207,7 +207,9 @@ describe('McpContext', () => {
         stableId: 123,
       });
 
-      sinon.stub(context, 'getNetworkRequests').returns([mockRequest]);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequests')
+        .returns([mockRequest]);
       sinon.stub(context, 'getNetworkRequestStableId').returns(123);
 
       response.setIncludeNetworkRequests(true);
@@ -223,7 +225,9 @@ describe('McpContext', () => {
         stableId: 456,
       });
 
-      sinon.stub(context, 'getNetworkRequestById').returns(mockRequest);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
+        .returns(mockRequest);
       sinon.stub(context, 'getNetworkRequestStableId').returns(456);
 
       response.attachNetworkRequest(456);
@@ -247,7 +251,9 @@ describe('McpContext', () => {
         } as unknown as HTTPResponse,
       });
 
-      sinon.stub(context, 'getNetworkRequestById').returns(mockRequest);
+      sinon
+        .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
+        .returns(mockRequest);
       sinon.stub(context, 'getNetworkRequestStableId').returns(789);
 
       // Use os.tmpdir() so validatePath passes on all platforms (macOS tmpdir

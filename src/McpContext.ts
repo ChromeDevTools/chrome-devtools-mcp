@@ -304,37 +304,6 @@ export class McpContext implements Context {
     await this.validatePath(outputPath);
     return outputPath;
   }
-
-  resolveCdpRequestId(page: McpPage, cdpRequestId: string): number | undefined {
-    if (!cdpRequestId) {
-      this.logger?.('no network request');
-      return;
-    }
-    const request = page.networkCollector.find(request => {
-      // @ts-expect-error id is internal.
-      return request.id === cdpRequestId;
-    });
-    if (!request) {
-      this.logger?.('no network request for ' + cdpRequestId);
-      return;
-    }
-    return page.networkCollector.getIdForResource(request);
-  }
-
-  getNetworkRequests(
-    page: McpPage,
-    includePreservedRequests?: boolean,
-  ): HTTPRequest[] {
-    return page.networkCollector.getData(includePreservedRequests);
-  }
-
-  getConsoleData(
-    page: McpPage,
-    includePreservedMessages?: boolean,
-  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
-    return page.consoleCollector.getData(includePreservedMessages);
-  }
-
   getDevToolsUniverse(page: McpPage): TargetUniverse | null {
     return this.#devtoolsUniverseManager.get(page.pptrPage);
   }
@@ -343,13 +312,6 @@ export class McpContext implements Context {
     message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
   ): number {
     return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
-  }
-
-  getConsoleMessageById(
-    page: McpPage,
-    id: number,
-  ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
-    return page.consoleCollector.getById(id);
   }
 
   async newPage(
@@ -382,10 +344,6 @@ export class McpContext implements Context {
       this.#mcpPages.delete(page.pptrPage);
     }
     await page.pptrPage.close({runBeforeUnload: false});
-  }
-
-  getNetworkRequestById(page: McpPage, reqid: number): HTTPRequest {
-    return page.networkCollector.getById(reqid);
   }
 
   async restoreEmulation(page: McpPage) {

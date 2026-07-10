@@ -610,8 +610,7 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error(`Response must have an McpPage`);
       }
-      const request = context.getNetworkRequestById(
-        this.#page,
+      const request = this.#page.getNetworkRequestById(
         this.#attachedNetworkRequestId,
       );
       const formatter = await NetworkFormatter.from(request, {
@@ -634,8 +633,7 @@ export class McpResponse implements Response {
         throw new Error(`Response must have an McpPage`);
       }
 
-      const message = context.getConsoleMessageById(
-        this.#page,
+      const message = this.#page.getConsoleMessageById(
         this.#attachedConsoleMessageId,
       );
       const consoleMessageStableId = this.#attachedConsoleMessageId;
@@ -650,10 +648,7 @@ export class McpResponse implements Response {
       } else if (message instanceof DevTools.AggregatedIssue) {
         const formatter = new IssueFormatter(message, {
           id: consoleMessageStableId,
-          requestIdResolver: context.resolveCdpRequestId.bind(
-            context,
-            this.#page,
-          ),
+          requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
           elementIdResolver: this.#page.textSnapshot?.resolveCdpElementId.bind(
             this.#page.textSnapshot,
           ),
@@ -707,8 +702,7 @@ export class McpResponse implements Response {
         if (!page) {
           throw new Error(`Response must have an McpPage`);
         }
-        messages = context.getConsoleData(
-          page,
+        messages = page.getConsoleData(
           this.#consoleDataOptions.includePreservedMessages,
         );
       }
@@ -764,8 +758,7 @@ export class McpResponse implements Response {
       if (!this.#page) {
         throw new Error(`Response must have an McpPage`);
       }
-      let requests = context.getNetworkRequests(
-        this.#page,
+      let requests = this.#page.getNetworkRequests(
         this.#networkRequestsOptions?.includePreservedRequests,
       );
 

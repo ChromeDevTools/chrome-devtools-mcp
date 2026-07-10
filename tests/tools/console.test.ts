@@ -403,7 +403,7 @@ describe('console', () => {
           `);
           page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
-          const messages = context.getConsoleData(page);
+          const messages = page.getConsoleData();
           let issueMsg;
           for (const message of messages) {
             if (message instanceof DevTools.AggregatedIssue) {

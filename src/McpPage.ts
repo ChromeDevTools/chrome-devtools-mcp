@@ -9,6 +9,7 @@ import {
   ConsoleCollector,
   NetworkCollector,
   type ListenerMap,
+  type UncaughtError,
 } from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import type {
@@ -18,6 +19,9 @@ import type {
   WebMCPTool,
   Protocol,
   Page,
+  ConsoleMessage,
+  HTTPRequest,
+  DevTools,
 } from './third_party/index.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -117,6 +121,42 @@ export class McpPage implements ContextPage {
 
   getWebMcpTools(): WebMCPTool[] {
     return this.pptrPage.webmcp.tools();
+  }
+
+  resolveCdpRequestId(cdpRequestId: string): number | undefined {
+    if (!cdpRequestId) {
+      logger?.('no network request');
+      return;
+    }
+    const request = this.networkCollector.find(request => {
+      // @ts-expect-error id is internal.
+      return request.id === cdpRequestId;
+    });
+    if (!request) {
+      logger?.('no network request for ' + cdpRequestId);
+      return;
+    }
+    return this.networkCollector.getIdForResource(request);
+  }
+
+  getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
+    return this.networkCollector.getData(includePreservedRequests);
+  }
+
+  getConsoleData(
+    includePreservedMessages?: boolean,
+  ): Array<ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError> {
+    return this.consoleCollector.getData(includePreservedMessages);
+  }
+
+  getConsoleMessageById(
+    id: number,
+  ): ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError {
+    return this.consoleCollector.getById(id);
+  }
+
+  getNetworkRequestById(reqid: number): HTTPRequest {
+    return this.networkCollector.getById(reqid);
   }
 
   get networkConditions(): string | null {

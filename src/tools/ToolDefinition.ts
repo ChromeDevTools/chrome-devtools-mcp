@@ -232,13 +232,7 @@ export type Context = Readonly<{
     timeout?: number,
     mcpPage?: ContextPage,
   ): Promise<Element>;
-  /**
-   * Returns a reqid for a cdpRequestId.
-   */
-  resolveCdpRequestId(
-    page: ContextPage,
-    cdpRequestId: string,
-  ): number | undefined;
+
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,
@@ -311,6 +305,11 @@ export type ContextPage = Readonly<{
   readonly networkConditions: string | null;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+
+  /**
+   * Returns a reqid for a cdpRequestId.
+   */
+  resolveCdpRequestId(cdpRequestId: string): number | undefined;
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;
