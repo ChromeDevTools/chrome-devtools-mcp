@@ -1359,5 +1359,55 @@ describe('input', () => {
         ]);
       });
     });
+
+    it('releases held modifiers when the main key press fails', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<script>
+            logs = [];
+            document.addEventListener('keydown', e => logs.push('d' + e.key));
+            document.addEventListener('keyup', e => logs.push('u' + e.key));
+          </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        // Simulate the main key press failing mid-sequence (e.g. a CDP
+        // hiccup) after the modifiers have already been pressed down.
+        const originalPress = page.keyboard.press.bind(page.keyboard);
+        page.keyboard.press = () => {
+          throw new Error('injected press failure');
+        };
+
+        try {
+          await assert.rejects(
+            pressKey.handler(
+              {
+                params: {
+                  key: 'Control+Shift+C',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            ),
+          );
+        } finally {
+          page.keyboard.press = originalPress;
+        }
+
+        // The modifiers were pressed down; both must be released even though
+        // the main key press threw, otherwise the browser is left with the
+        // modifiers logically stuck down.
+        assert.deepStrictEqual(await page.evaluate('logs'), [
+          'dControl',
+          'dShift',
+          'uShift',
+          'uControl',
+        ]);
+      });
+    });
   });
 });
