@@ -232,9 +232,6 @@ describe('McpContext', () => {
       sinon
         .stub(context.getSelectedMcpPage(), 'getNetworkRequests')
         .returns([mockRequest]);
-      sinon
-        .stub(context.getSelectedMcpPage(), 'getNetworkRequestStableId')
-        .returns(123);
 
       response.setIncludeNetworkRequests(true);
       const result = await response.handle('test', context);
@@ -252,9 +249,6 @@ describe('McpContext', () => {
       sinon
         .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
         .returns(mockRequest);
-      sinon
-        .stub(context.getSelectedMcpPage(), 'getNetworkRequestStableId')
-        .returns(456);
 
       response.attachNetworkRequest(456);
       const result = await response.handle('test', context);
@@ -280,9 +274,6 @@ describe('McpContext', () => {
       sinon
         .stub(context.getSelectedMcpPage(), 'getNetworkRequestById')
         .returns(mockRequest);
-      sinon
-        .stub(context.getSelectedMcpPage(), 'getNetworkRequestStableId')
-        .returns(789);
 
       // Use os.tmpdir() so validatePath passes on all platforms (macOS tmpdir
       // is /var/folders/..., not /tmp, so hardcoded /tmp paths are rejected).

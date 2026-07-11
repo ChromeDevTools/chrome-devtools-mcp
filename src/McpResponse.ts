@@ -40,6 +40,7 @@ import type {
   TextContent,
   JSONSchema7Definition,
   Extension,
+  HTTPRequest,
 } from './third_party/index.js';
 import {handleDialog} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -52,6 +53,8 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import type {WithSymbolId} from './utils/id.js';
+import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import type {PaginationOptions} from './utils/types.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
@@ -615,8 +618,7 @@ export class McpResponse implements Response {
       );
       const formatter = await NetworkFormatter.from(request, {
         requestId: this.#attachedNetworkRequestId,
-        requestIdResolver: req =>
-          context.getSelectedMcpPage().getNetworkRequestStableId(req),
+        requestIdResolver: req => this.getNetworkRequestStableId(req),
         fetchData: true,
         requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
         responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
@@ -640,7 +642,7 @@ export class McpResponse implements Response {
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message || message instanceof UncaughtError) {
         const consoleMessage = message as ConsoleMessage | UncaughtError;
-        const devTools = context.getDevToolsUniverse(this.#page);
+        const devTools = this.#page.devtoolsUniverse;
         detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
           id: consoleMessageStableId,
           fetchDetailedData: true,
@@ -725,18 +727,14 @@ export class McpResponse implements Response {
         await Promise.all(
           messages.map(
             async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
-              const consoleMessageStableId = context
-                .getSelectedMcpPage()
-                .getConsoleMessageStableId(item);
+              const consoleMessageStableId =
+                this.getConsoleMessageStableId(item);
               if ('args' in item || item instanceof UncaughtError) {
                 const consoleMessage = item as ConsoleMessage | UncaughtError;
-                const devTools = page
-                  ? context.getDevToolsUniverse(page)
-                  : null;
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,
                   fetchDetailedData: false,
-                  devTools: devTools ?? undefined,
+                  devTools: page ? page.devtoolsUniverse : undefined,
                 });
               }
               if (item instanceof DevTools.AggregatedIssue) {
@@ -779,13 +777,9 @@ export class McpResponse implements Response {
         networkRequests = await Promise.all(
           requests.map(request =>
             NetworkFormatter.from(request, {
-              requestId: context
-                .getSelectedMcpPage()
-                .getNetworkRequestStableId(request),
+              requestId: this.getNetworkRequestStableId(request),
               selectedInDevToolsUI:
-                context
-                  .getSelectedMcpPage()
-                  .getNetworkRequestStableId(request) ===
+                this.getNetworkRequestStableId(request) ===
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
               saveFile: (data, filename, extension) =>
@@ -816,6 +810,16 @@ export class McpResponse implements Response {
       },
       dataFormat,
     );
+  }
+
+  getConsoleMessageStableId(
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
+  ): number {
+    return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
+  }
+
+  getNetworkRequestStableId(request: HTTPRequest): number {
+    return (request as WithSymbolId<typeof request>)[stableIdSymbol] ?? -1;
   }
 
   async format(

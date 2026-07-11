@@ -412,9 +412,7 @@ describe('console', () => {
             }
           }
           assert.ok(issueMsg);
-          const id = context
-            .getSelectedMcpPage()
-            .getConsoleMessageStableId(issueMsg);
+          const id = response.getConsoleMessageStableId(issueMsg);
           assert.ok(id);
           await listConsoleMessages().handler(
             {params: {types: ['issue']}, page: context.getSelectedMcpPage()},

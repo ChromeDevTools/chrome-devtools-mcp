@@ -10,7 +10,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
-import type {TargetUniverse} from './devtools/DevtoolsUtils.js';
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
 import {HeapSnapshotManager} from './HeapSnapshotManager.js';
 import type {
@@ -282,10 +281,6 @@ export class McpContext implements Context {
     )}${extension}`;
     await this.validatePath(outputPath);
     return outputPath;
-  }
-
-  getDevToolsUniverse(page: McpPage): TargetUniverse | null {
-    return page.devtoolsUniverse ?? null;
   }
 
   async newPage(

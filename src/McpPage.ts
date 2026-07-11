@@ -43,7 +43,6 @@ import type {
   GeolocationOptions,
   TextSnapshotNode,
 } from './types.js';
-import {type WithSymbolId, stableIdSymbol} from './utils/id.js';
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
@@ -510,16 +509,6 @@ export class McpPage implements ContextPage {
       logger?.('error getting devtools data', err);
     }
     return {};
-  }
-
-  getConsoleMessageStableId(
-    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
-  ): number {
-    return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
-  }
-
-  getNetworkRequestStableId(request: HTTPRequest): number {
-    return (request as WithSymbolId<typeof request>)[stableIdSymbol] ?? -1;
   }
 
   async restoreEmulation() {
