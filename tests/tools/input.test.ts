@@ -9,6 +9,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -1362,7 +1364,7 @@ describe('input', () => {
 
     it('releases held modifiers when the main key press fails', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(
           html`<script>
             logs = [];
@@ -1376,10 +1378,9 @@ describe('input', () => {
 
         // Simulate the main key press failing mid-sequence (e.g. a CDP
         // hiccup) after the modifiers have already been pressed down.
-        const originalPress = page.keyboard.press.bind(page.keyboard);
-        page.keyboard.press = () => {
-          throw new Error('injected press failure');
-        };
+        sinon
+          .stub(page.keyboard, 'press')
+          .throws(new Error('injected press failure'));
 
         try {
           await assert.rejects(
@@ -1395,7 +1396,7 @@ describe('input', () => {
             ),
           );
         } finally {
-          page.keyboard.press = originalPress;
+          sinon.restore();
         }
 
         // The modifiers were pressed down; both must be released even though
