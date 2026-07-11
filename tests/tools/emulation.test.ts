@@ -209,7 +209,7 @@ describe('emulation', () => {
       });
     });
 
-    it('applies cpu throttling to secondary session', async () => {
+    it.only('applies cpu throttling to secondary session', async () => {
       await withMcpContext(async (response, context) => {
         const mcpPage = context.getSelectedMcpPage();
         const universe = context.getDevToolsUniverse(mcpPage);

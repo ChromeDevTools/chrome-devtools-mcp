@@ -146,7 +146,7 @@ export class McpContext implements Context {
       if (!page) {
         return;
       }
-      this.#createMcpPage(page);
+      void this.#createMcpPage(page);
     } catch (err) {
       this.logger?.('Error handling targetcreated', err);
     }
@@ -303,13 +303,13 @@ export class McpContext implements Context {
     } else {
       page = await this.browser.newPage({background});
     }
-    const mcpPage = this.#createMcpPage(page);
+    const mcpPage = await this.#createMcpPage(page);
     await this.createPagesSnapshot();
     this.selectPage(mcpPage);
     return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
-    if (this.getPages().length === 1) {
+    if (this.#mcpPages.size === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageById(pageId);
@@ -346,6 +346,10 @@ export class McpContext implements Context {
     return this.#options.performanceCrux;
   }
 
+  getPages(): McpPage[] {
+    return Array.from(this.#mcpPages.values());
+  }
+
   getSelectedMcpPage(): McpPage {
     const page = this.#selectedPage;
     if (!page) {
@@ -360,11 +364,7 @@ export class McpContext implements Context {
   }
 
   getPageById(pageId: number): McpPage {
-    // Resolve only among listed pages (`getPages()`), so an id that
-    // `list_pages` never showed cannot be targeted (e.g. a `devtools://`
-    // frontend, which the listing excludes unless `experimentalDevToolsDebugging`
-    // is set).
-    const page = this.getPages().find(mcpPage => mcpPage.id === pageId);
+    const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
     if (!page) {
       throw new Error('No page found');
     }
@@ -431,27 +431,46 @@ export class McpContext implements Context {
     return this.#serviceWorkerConsoleCollector.getData(extensionId);
   }
 
-  #createMcpPage(page: Page): McpPage {
+  #getBrowserContextToNameMap(): Map<BrowserContext, string> {
+    // Build a reverse lookup from BrowserContext instance → name.
+    const contextToName = new Map<BrowserContext, string>();
+    for (const [name, ctx] of this.#isolatedContexts) {
+      contextToName.set(ctx, name);
+    }
+    const defaultCtx = this.browser.defaultBrowserContext();
+    // Auto-discover BrowserContexts not in our mapping (e.g., externally
+    // created incognito contexts) and assign generated names.
+    const knownContexts = new Set(this.#isolatedContexts.values());
+    for (const ctx of this.browser.browserContexts()) {
+      if (ctx !== defaultCtx && !ctx.closed && !knownContexts.has(ctx)) {
+        const name = `isolated-context-${this.#nextIsolatedContextId++}`;
+        this.#isolatedContexts.set(name, ctx);
+        contextToName.set(ctx, name);
+      }
+    }
+    return contextToName;
+  }
+
+  async #createMcpPage(page: Page): Promise<McpPage> {
     let mcpPage = this.#mcpPages.get(page);
     if (!mcpPage) {
       mcpPage = new McpPage(page, this.#nextPageId++, {
         locatorClass: this.#locatorClass,
         hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
+        isolatedContextName: this.#getBrowserContextToNameMap().get(
+          page.browserContext(),
+        ),
       });
       this.#mcpPages.set(page, mcpPage);
-      void mcpPage.init();
+      await mcpPage.init();
     }
     return mcpPage;
   }
 
   async createPagesSnapshot(): Promise<Page[]> {
-    const {pages: allPages, isolatedContextNames} =
-      await this.#fetchBrowserPages();
+    const allPages = await this.#fetchBrowserPages();
 
-    for (const page of allPages) {
-      const mcpPage = this.#createMcpPage(page);
-      mcpPage.isolatedContextName = isolatedContextNames.get(page);
-    }
+    await Promise.allSettled(allPages.map(page => this.#createMcpPage(page)));
 
     // Prune orphaned #mcpPages entries (pages that no longer exist).
     const currentPages = new Set(allPages);
@@ -462,7 +481,7 @@ export class McpContext implements Context {
       }
     }
 
-    const pages = this.getPages();
+    const pages = Array.from(this.#mcpPages.values());
 
     // Only fall back when the selected page is actually gone. Gating on
     // `isClosed()` instead of `pages` membership avoids silently swapping a
@@ -482,19 +501,18 @@ export class McpContext implements Context {
       this.selectPage(pages[0]);
     }
 
-    await this.detectOpenDevToolsWindows();
-
     return pages.map(p => p.pptrPage);
   }
 
-  async #fetchBrowserPages(): Promise<{
-    pages: Page[];
-    isolatedContextNames: Map<Page, string>;
-  }> {
-    const defaultCtx = this.browser.defaultBrowserContext();
-    const allPages = await this.browser.pages(
-      this.#options.experimentalIncludeAllPages,
-    );
+  async #fetchBrowserPages(): Promise<Page[]> {
+    const allPages = (
+      await this.browser.pages(this.#options.experimentalIncludeAllPages)
+    ).filter(page => {
+      return (
+        this.#options.experimentalDevToolsDebugging ||
+        !page.url().startsWith('devtools://')
+      );
+    });
 
     const allTargets = this.browser.targets();
     const extensionTargets = allTargets.filter(target => {
@@ -504,78 +522,24 @@ export class McpContext implements Context {
       );
     });
 
-    for (const target of extensionTargets) {
-      // Right now target.page() returns null for popup and side panel pages.
-      let page = await target.page();
-      if (!page) {
-        // We need to cache pages instances for targets because target.asPage()
-        // returns a new page instance every time.
-        page = this.#extensionPages.get(target) ?? null;
-        if (!page) {
-          try {
-            page = await target.asPage();
-            this.#extensionPages.set(target, page);
-          } catch (e) {
-            this.logger?.('Failed to get page for extension target', e);
-          }
-        }
-      }
-
-      if (page && !allPages.includes(page)) {
-        allPages.push(page);
-      }
-    }
-
-    // Build a reverse lookup from BrowserContext instance → name.
-    const contextToName = new Map<BrowserContext, string>();
-    for (const [name, ctx] of this.#isolatedContexts) {
-      contextToName.set(ctx, name);
-    }
-
-    // Auto-discover BrowserContexts not in our mapping (e.g., externally
-    // created incognito contexts) and assign generated names.
-    const knownContexts = new Set(this.#isolatedContexts.values());
-    for (const ctx of this.browser.browserContexts()) {
-      if (ctx !== defaultCtx && !ctx.closed && !knownContexts.has(ctx)) {
-        const name = `isolated-context-${this.#nextIsolatedContextId++}`;
-        this.#isolatedContexts.set(name, ctx);
-        contextToName.set(ctx, name);
-      }
-    }
-
-    // Map each page to its isolated context name (if any).
-    const isolatedContextNames = new Map<Page, string>();
-    for (const page of allPages) {
-      const ctx = page.browserContext();
-      const name = contextToName.get(ctx);
-      if (name) {
-        isolatedContextNames.set(page, name);
-      }
-    }
-
-    return {pages: allPages, isolatedContextNames};
-  }
-
-  async detectOpenDevToolsWindows() {
-    this.logger?.('Detecting open DevTools windows');
-
-    await Promise.all(
-      Array.from(this.#mcpPages.values()).map(async mcpPage => {
-        const page = mcpPage.pptrPage;
-        // Prior to Chrome 144.0.7559.59, the command fails,
-        // Some Electron apps still use older version
-        // Fall back to not exposing DevTools at all.
+    await Promise.allSettled(
+      extensionTargets.map(async target => {
         try {
-          if (await page.hasDevTools()) {
-            mcpPage.devToolsPage = await page.openDevTools();
-          } else {
-            mcpPage.devToolsPage = undefined;
+          let page = await target.page();
+          if (!page) {
+            page = await target.asPage();
           }
-        } catch {
-          mcpPage.devToolsPage = undefined;
+          this.#extensionPages.set(target, page);
+          if (page && !allPages.includes(page)) {
+            allPages.push(page);
+          }
+        } catch (e) {
+          this.logger?.('Failed to get page for extension target', e);
         }
       }),
     );
+
+    return allPages;
   }
 
   getExtensionServiceWorkers(): ExtensionServiceWorker[] {
@@ -586,15 +550,6 @@ export class McpContext implements Context {
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined {
     return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
-  }
-
-  getPages(): McpPage[] {
-    return Array.from(this.#mcpPages.values()).filter(mcpPage => {
-      return (
-        this.#options.experimentalDevToolsDebugging ||
-        !mcpPage.pptrPage.url().startsWith('devtools://')
-      );
-    });
   }
 
   async saveTemporaryFile(

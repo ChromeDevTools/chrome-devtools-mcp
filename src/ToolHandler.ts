@@ -214,7 +214,6 @@ export class ToolHandler {
       );
       const context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
-      await context.detectOpenDevToolsWindows();
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);

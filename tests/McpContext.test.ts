@@ -97,7 +97,7 @@ describe('McpContext', () => {
       async (_response, context) => {
         const page = await context.newPage();
         await context.createPagesSnapshot();
-        assert.ok(page.devToolsPage);
+        assert.ok(await page.getDevToolsPage());
 
         // A devtools page is tracked but excluded from the listing, so its id
         // must not resolve through `getPageById()` (which backs `select_page`
