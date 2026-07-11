@@ -9,6 +9,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -1295,39 +1297,66 @@ describe('input', () => {
       });
     });
 
-    it('does not treat a non-file input as a file input', async () => {
+    it('does not probe a chooser-opening element with uploadFile', async () => {
       const testFilePath = path.join(process.cwd(), 'test.txt');
       await fs.writeFile(testFilePath, 'test file content');
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedPptrPage();
-        // A text input is an HTMLInputElement but not a file input; routing it
-        // through uploadFile would send DOM.setFileInputFiles to a non-file
-        // node and crash the tab, so it must fall through to the chooser path.
-        await page.setContent(html`<input type="text" />`);
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
         );
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
 
-        await assert.rejects(
-          uploadFile.handler(
+        // Real headful Chrome doesn't throw when uploadFile is called on a
+        // chooser-opening element — it kills the renderer, and the file is
+        // never set. The in-process test browser instead throws, which lets
+        // the old code recover via the chooser and masks the bug. Stub
+        // uploadFile to a silent no-op so the button behaves like it does in
+        // production: if the tool probes it with uploadFile, the file is lost.
+        const buttonHandle = await mcpPage.getElementByUid('1_1');
+        const uploadFileStub = sinon
+          .stub(buttonHandle, 'uploadFile')
+          .resolves();
+        sinon.stub(mcpPage, 'getElementByUid').resolves(buttonHandle);
+
+        try {
+          await uploadFile.handler(
             {
               params: {
                 uid: '1_1',
                 filePath: testFilePath,
               },
-              page: context.getSelectedMcpPage(),
+              page: mcpPage,
             },
             response,
             context,
-          ),
-          {
-            message:
-              'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
-          },
-        );
+          );
 
-        assert.strictEqual(response.responseLines.length, 0);
+          // The element isn't a file input, so it must never be probed with
+          // uploadFile — it has to go straight to the chooser...
+          assert.strictEqual(uploadFileStub.called, false);
+          // ...and the chooser path must actually deliver the file.
+          const uploadedFileName = await page.$eval('#file-input', el => {
+            return (el as HTMLInputElement).files?.[0]?.name;
+          });
+          assert.strictEqual(uploadedFileName, 'test.txt');
+        } finally {
+          sinon.restore();
+        }
 
         await fs.unlink(testFilePath);
       });
