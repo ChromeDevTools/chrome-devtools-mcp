@@ -249,6 +249,13 @@ export const commands: Commands = {
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         required: false,
       },
+      waitForStableDom: {
+        name: 'waitForStableDom',
+        type: 'boolean',
+        description:
+          'Whether to wait for the DOM to become stable after the script runs. Set to false for read-only scripts on pages with continuous DOM mutations. Defaults to true.',
+        required: false,
+      },
     },
   },
   execute_3p_developer_tool: {
