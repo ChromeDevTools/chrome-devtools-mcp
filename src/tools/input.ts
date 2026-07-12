@@ -7,7 +7,7 @@
 import {logger} from '../logger.js';
 import type {McpContext} from '../McpContext.js';
 import {zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import type {ElementHandle, Keyboard, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import type {WaitForEventsResult} from '../WaitForHelper.js';
@@ -32,6 +32,44 @@ const submitKeySchema = zod
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
   );
+
+/**
+ * Presses `key` while `modifiers` are held, and guarantees that every key it
+ * pressed down is released again — even if a key event rejects mid-sequence.
+ *
+ * Puppeteer's `Keyboard.press()` is a bare `down()` followed by `up()` with no
+ * guard of its own, so a rejection between the two leaves the key logically
+ * held down in the browser. `Keyboard.down()` also sets the client-side
+ * modifier bit *before* it sends the CDP command, and only `up()` clears that
+ * bit, so a key whose `down()` rejected still needs a matching `up()`.
+ */
+async function pressKeyReleasingHeldKeys(
+  keyboard: Keyboard,
+  key: KeyInput,
+  modifiers: KeyInput[] = [],
+) {
+  const held: KeyInput[] = [];
+  try {
+    for (const modifier of modifiers) {
+      held.push(modifier);
+      await keyboard.down(modifier);
+    }
+    held.push(key);
+    await keyboard.down(key);
+    await keyboard.up(key);
+    held.pop();
+  } finally {
+    for (const heldKey of held.toReversed()) {
+      try {
+        await keyboard.up(heldKey);
+      } catch (error) {
+        // A failed release must not abort the remaining releases, nor replace
+        // the original error with its own.
+        logger?.('failed to release key', heldKey, error);
+      }
+    }
+  }
+}
 
 function handleActionError(error: unknown, uid: string) {
   logger?.('failed to act using a locator', error);
@@ -356,7 +394,8 @@ export const typeText = definePageTool({
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
-        await page.pptrPage.keyboard.press(
+        await pressKeyReleasingHeldKeys(
+          page.pptrPage.keyboard,
           request.params.submitKey as KeyInput,
         );
       }
@@ -389,9 +428,24 @@ export const drag = definePageTool({
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
       const result = await request.page.waitForEventsAfterAction(async () => {
-        await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await toHandle.drop(fromHandle);
+        let dropped = false;
+        try {
+          await fromHandle.drag(toHandle);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          await toHandle.drop(fromHandle);
+          dropped = true;
+        } finally {
+          if (!dropped) {
+            // `drag()` presses the mouse button down and only `drop()` releases
+            // it, so a failed drop leaves the button held down for the rest of
+            // the session, breaking every later click.
+            try {
+              await request.page.pptrPage.mouse.up();
+            } catch (error) {
+              logger?.('failed to release the mouse button', error);
+            }
+          }
+        }
       });
       response.appendResponseLine(`Successfully dragged an element`);
       response.attachWaitForResult(result);
@@ -526,21 +580,7 @@ export const pressKey = definePageTool({
     const [key, ...modifiers] = tokens;
 
     const result = await page.waitForEventsAfterAction(async () => {
-      const heldModifiers: KeyInput[] = [];
-      try {
-        for (const modifier of modifiers) {
-          await page.pptrPage.keyboard.down(modifier);
-          heldModifiers.push(modifier);
-        }
-        await page.pptrPage.keyboard.press(key);
-      } finally {
-        // Release every modifier that was successfully pressed, even if a
-        // later key event throws. Otherwise a failed press leaves modifiers
-        // logically held down in the browser (see #2309).
-        for (const modifier of heldModifiers.toReversed()) {
-          await page.pptrPage.keyboard.up(modifier);
-        }
-      }
+      await pressKeyReleasingHeldKeys(page.pptrPage.keyboard, key, modifiers);
     });
 
     response.appendResponseLine(
