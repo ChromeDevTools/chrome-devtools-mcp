@@ -117,6 +117,7 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
+    emulateFocusedPages?: boolean;
     executablePath?: string;
     args?: string[];
     blockedUrlPattern?: string[];
@@ -137,6 +138,7 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        emulateFocusedPages: options.emulateFocusedPages ?? true,
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
         allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,

@@ -14,11 +14,16 @@ import {pathToFileURL} from 'node:url';
 import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
+import {McpContext} from '../src/McpContext.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
+import {
+  Locator,
+  type CreatePageOptions,
+  type HTTPResponse,
+} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {getMockRequest, html, withMcpContext} from './utils.js';
+import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -49,6 +54,44 @@ describe('McpContext', () => {
       context.storeTraceRecording(fakeTrace1);
       context.storeTraceRecording(fakeTrace2);
       assert.deepEqual(context.recordedTraces(), [fakeTrace2]);
+    });
+  });
+
+  it('does not emulate focused pages when disabled', async () => {
+    await withBrowser(async (browser, page) => {
+      const focusSpy = sinon.spy(page, 'emulateFocusedPage');
+      const context = await McpContext.from(
+        browser,
+        undefined,
+        {
+          experimentalDevToolsDebugging: false,
+          performanceCrux: true,
+          emulateFocusedPages: false,
+        },
+        Locator,
+      );
+
+      try {
+        sinon.assert.notCalled(focusSpy);
+      } finally {
+        context.dispose();
+      }
+    });
+  });
+
+  it('passes background to isolated context page creation', async () => {
+    await withMcpContext(async (_response, context) => {
+      const browser = context.browser;
+      const newPageStub = sinon
+        .stub()
+        .callsFake((options?: CreatePageOptions) => browser.newPage(options));
+      sinon.stub(browser, 'createBrowserContext').resolves({
+        newPage: newPageStub,
+      } as unknown as Awaited<ReturnType<typeof browser.createBrowserContext>>);
+
+      await context.newPage(true, 'session-a');
+
+      sinon.assert.calledOnceWithExactly(newPageStub, {background: true});
     });
   });
 

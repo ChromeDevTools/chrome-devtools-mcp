@@ -62,6 +62,7 @@ import {
 export class McpPage implements ContextPage {
   readonly pptrPage: Page;
   readonly id: number;
+  readonly #emulateFocusedPage: boolean;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -94,12 +95,14 @@ export class McpPage implements ContextPage {
     options: {
       hasNetworkBlockOrAllowlist: boolean;
       locatorClass: typeof Locator;
+      emulateFocusedPage: boolean;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.pptrPage = page;
     this.id = id;
+    this.#emulateFocusedPage = options.emulateFocusedPage;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
@@ -131,10 +134,12 @@ export class McpPage implements ContextPage {
       logger?.('Failed to initialize DevTools universe', e);
     }
 
-    // We emulate a focused page for all pages to support multi-agent workflows.
-    void this.pptrPage.emulateFocusedPage(true).catch(error => {
-      logger?.('Error turning on focused page emulation', error);
-    });
+    if (this.#emulateFocusedPage) {
+      // We emulate a focused page for all pages to support multi-agent workflows.
+      void this.pptrPage.emulateFocusedPage(true).catch(error => {
+        logger?.('Error turning on focused page emulation', error);
+      });
+    }
   }
 
   get devtoolsUniverse(): TargetUniverse | undefined {
