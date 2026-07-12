@@ -526,12 +526,20 @@ export const pressKey = definePageTool({
     const [key, ...modifiers] = tokens;
 
     const result = await page.waitForEventsAfterAction(async () => {
-      for (const modifier of modifiers) {
-        await page.pptrPage.keyboard.down(modifier);
-      }
-      await page.pptrPage.keyboard.press(key);
-      for (const modifier of modifiers.toReversed()) {
-        await page.pptrPage.keyboard.up(modifier);
+      const heldModifiers: KeyInput[] = [];
+      try {
+        for (const modifier of modifiers) {
+          await page.pptrPage.keyboard.down(modifier);
+          heldModifiers.push(modifier);
+        }
+        await page.pptrPage.keyboard.press(key);
+      } finally {
+        // Release every modifier that was successfully pressed, even if a
+        // later key event throws. Otherwise a failed press leaves modifiers
+        // logically held down in the browser (see #2309).
+        for (const modifier of heldModifiers.toReversed()) {
+          await page.pptrPage.keyboard.up(modifier);
+        }
       }
     });
 

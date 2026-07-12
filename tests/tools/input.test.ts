@@ -9,6 +9,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -1354,6 +1356,55 @@ describe('input', () => {
           'dShift',
           'dC',
           'uC',
+          'uShift',
+          'uControl',
+        ]);
+      });
+    });
+
+    it('releases held modifiers when the main key press fails', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<script>
+            logs = [];
+            document.addEventListener('keydown', e => logs.push('d' + e.key));
+            document.addEventListener('keyup', e => logs.push('u' + e.key));
+          </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        // Simulate the main key press failing mid-sequence (e.g. a CDP
+        // hiccup) after the modifiers have already been pressed down.
+        sinon
+          .stub(page.keyboard, 'press')
+          .throws(new Error('injected press failure'));
+
+        try {
+          await assert.rejects(
+            pressKey.handler(
+              {
+                params: {
+                  key: 'Control+Shift+C',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            ),
+          );
+        } finally {
+          sinon.restore();
+        }
+
+        // The modifiers were pressed down; both must be released even though
+        // the main key press threw, otherwise the browser is left with the
+        // modifiers logically stuck down.
+        assert.deepStrictEqual(await page.evaluate('logs'), [
+          'dControl',
+          'dShift',
           'uShift',
           'uControl',
         ]);
