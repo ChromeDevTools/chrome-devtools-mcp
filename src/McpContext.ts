@@ -55,7 +55,16 @@ interface McpContextOptions {
   // capability. When false (default), file-writing tools are restricted to the
   // OS temp directory. When true, the previous permissive behavior is restored.
   allowUnrestrictedPaths?: boolean;
+  // Whether this context replaces a previous one after a browser reconnect.
+  // Surfaces a one-time note in the next response.
+  reconnected?: boolean;
 }
+
+// Page ids are handed out from a process-wide counter so they stay unique
+// across all contexts, in particular across browser reconnects. An id issued
+// before a reconnect then fails to resolve instead of hitting an unrelated
+// page of the reconnected browser.
+let nextPageId = 1;
 
 export class McpContext implements Context {
   browser: Browser;
@@ -78,7 +87,7 @@ export class McpContext implements Context {
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
     null;
 
-  #nextPageId = 1;
+  #reconnectNotice = false;
   #extensionPages = new WeakMap<Target, Page>();
 
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
@@ -109,6 +118,7 @@ export class McpContext implements Context {
     this.#locatorClass = locatorClass;
     this.#options = options;
     this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
+    this.#reconnectNotice = options.reconnected ?? false;
 
     this.#serviceWorkerConsoleCollector = new ServiceWorkerConsoleCollector(
       this.browser,
@@ -183,6 +193,10 @@ export class McpContext implements Context {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
+  }
+
+  static resetPageIdsForTesting(): void {
+    nextPageId = 1;
   }
 
   roots(): Root[] {
@@ -358,6 +372,17 @@ export class McpContext implements Context {
     return page;
   }
 
+  /**
+   * Returns true once if this context was created by reconnecting after the
+   * previous browser connection was lost, so the next response can surface a
+   * note. Cleared on first call.
+   */
+  consumeReconnectNotice(): boolean {
+    const notice = this.#reconnectNotice;
+    this.#reconnectNotice = false;
+    return notice;
+  }
+
   getPageById(pageId: number): McpPage {
     const page = this.#mcpPages.values().find(mcpPage => mcpPage.id === pageId);
     if (!page) {
@@ -449,7 +474,7 @@ export class McpContext implements Context {
   async #createMcpPage(page: Page): Promise<McpPage> {
     let mcpPage = this.#mcpPages.get(page);
     if (!mcpPage) {
-      mcpPage = new McpPage(page, this.#nextPageId++, {
+      mcpPage = new McpPage(page, nextPageId++, {
         locatorClass: this.#locatorClass,
         hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
         isolatedContextName: this.#getBrowserContextToNameMap().get(

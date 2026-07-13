@@ -127,6 +127,7 @@ export async function withMcpContext(
 ) {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
+    McpContext.resetPageIdsForTesting();
     const response = new McpResponse(args as ParsedArguments);
     if (context) {
       context.dispose();

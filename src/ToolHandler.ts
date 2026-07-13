@@ -219,6 +219,9 @@ export class ToolHandler {
         : new McpResponse(this.serverArgs);
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+      if (context.consumeReconnectNotice()) {
+        response.setReconnectNotice();
+      }
       try {
         if (this.tool.verifyFilesSchema) {
           for (const key of this.tool.verifyFilesSchema) {

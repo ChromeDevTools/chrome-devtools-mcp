@@ -63,6 +63,32 @@ describe('McpResponse', () => {
     });
   });
 
+  it('includes a reconnect notice only when set', async () => {
+    await withMcpContext(async (response, context) => {
+      const before = await response.handle('test', context);
+      assert.ok(
+        !JSON.stringify(before.content).includes('Page ids have changed'),
+        'no reconnect notice by default',
+      );
+      assert.ok(
+        !(before.structuredContent as {reconnected?: boolean}).reconnected,
+        'structuredContent is not flagged reconnected by default',
+      );
+
+      response.setReconnectNotice();
+      const after = await response.handle('test', context);
+      assert.ok(
+        JSON.stringify(after.content).includes('Page ids have changed'),
+        'reconnect notice is included once set',
+      );
+      assert.strictEqual(
+        (after.structuredContent as {reconnected?: boolean}).reconnected,
+        true,
+        'structuredContent is flagged reconnected once set',
+      );
+    });
+  });
+
   it('allows response text lines to be added', async t => {
     await withMcpContext(async (response, context) => {
       response.appendResponseLine('Testing 1');
