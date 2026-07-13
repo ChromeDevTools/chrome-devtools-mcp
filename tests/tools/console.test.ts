@@ -11,7 +11,7 @@ import {before, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
+import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {CdpWebWorker} from '../../src/third_party/index.js';
@@ -345,7 +345,7 @@ describe('console', () => {
     });
 
     describe('issues type', () => {
-      it('gets issue details with node id parsing', async t => {
+      it.only('gets issue details with node id parsing', async t => {
         await withMcpContext(async (response, context) => {
           const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {

@@ -35,3 +35,8 @@ export interface EmulationSettings {
 }
 
 export type Logger = ((...args: unknown[]) => void) | undefined;
+
+export interface PaginationOptions {
+  pageSize?: number;
+  pageIdx?: number;
+}

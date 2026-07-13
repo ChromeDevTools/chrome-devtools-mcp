@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
+import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
 import {

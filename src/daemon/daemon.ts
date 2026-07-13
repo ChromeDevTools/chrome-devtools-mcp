@@ -12,12 +12,12 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import {logger} from '../logger.js';
 import {
   Client,
   PipeTransport,
   StdioClientTransport,
 } from '../third_party/index.js';
+import {logger} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage} from './types.js';

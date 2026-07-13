@@ -8,7 +8,6 @@ import {
   createTargetUniverse,
   type TargetUniverse,
 } from './devtools/DevtoolsUtils.js';
-import {logger} from './logger.js';
 import {
   ConsoleCollector,
   NetworkCollector,
@@ -43,6 +42,7 @@ import type {
   GeolocationOptions,
   TextSnapshotNode,
 } from './types.js';
+import {logger} from './utils/logger.js';
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
