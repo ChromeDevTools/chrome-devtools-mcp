@@ -154,6 +154,8 @@ export async function createMcpServer(
         allowList: allowlist,
         blocklist: blocklist,
         allowUnrestrictedPaths: serverArgs.allowUnrestrictedPaths,
+        // Surfaces a one-time note in the next response after a reconnect.
+        reconnected: context !== undefined,
       });
       await updateRoots();
     }

@@ -214,12 +214,14 @@ export class ToolHandler {
       );
       const context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
-      await context.detectOpenDevToolsWindows();
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+      if (context.consumeReconnectNotice()) {
+        response.setReconnectNotice();
+      }
       try {
         if (this.tool.verifyFilesSchema) {
           for (const key of this.tool.verifyFilesSchema) {

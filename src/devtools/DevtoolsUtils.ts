@@ -8,7 +8,6 @@ import {DevTools} from '../third_party/index.js';
 import type {
   CDPSession,
   ConsoleMessage,
-  Page,
   Protocol,
 } from '../third_party/index.js';
 
@@ -134,7 +133,7 @@ export interface TargetUniverse {
 }
 
 export async function createTargetUniverse(
-  page: Page,
+  session: CDPSession,
 ): Promise<TargetUniverse> {
   const settingStorage = new DevTools.Common.Settings.SettingsStorage({});
   const universe = new DevTools.Foundation.Universe.Universe({
@@ -148,7 +147,6 @@ export async function createTargetUniverse(
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
   });
 
-  const session = await page.createCDPSession();
   const connection = new PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);

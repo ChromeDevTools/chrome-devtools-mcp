@@ -23,7 +23,9 @@ describe('createTargetUniverse', () => {
 
   it('works with a real browser', async () => {
     await withBrowser(async (browser, page) => {
-      const targetUniverse = await createTargetUniverse(page);
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+      );
 
       assert.notStrictEqual(targetUniverse, null);
     });
@@ -31,7 +33,9 @@ describe('createTargetUniverse', () => {
 
   it('ignores pauses', async () => {
     await withBrowser(async (browser, page) => {
-      const targetUniverse = await createTargetUniverse(page);
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+      );
       assert.ok(targetUniverse);
       const model = targetUniverse.target.model(DevTools.DebuggerModel);
       assert.ok(model);
@@ -50,7 +54,9 @@ describe('createTargetUniverse', () => {
     server.addHtmlRoute('/test', html`<div>Test</div>`);
 
     await withBrowser(async (browser, page) => {
-      const targetUniverse = await createTargetUniverse(page);
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+      );
       assert.ok(targetUniverse);
 
       const networkManager = targetUniverse.target.model(

@@ -47,7 +47,6 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getSelectedMcpPage.returns(mockPage);
-    mockContext.detectOpenDevToolsWindows.resolves();
 
     const toolMutex = new Mutex();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
@@ -86,7 +85,6 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.detectOpenDevToolsWindows.resolves();
 
     const toolMutex = new Mutex();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
@@ -129,7 +127,6 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.detectOpenDevToolsWindows.resolves();
 
     const toolMutex = new Mutex();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
