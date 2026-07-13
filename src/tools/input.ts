@@ -39,9 +39,13 @@ const submitKeySchema = zod
  *
  * Puppeteer's `Keyboard.press()` is a bare `down()` followed by `up()` with no
  * guard of its own, so a rejection between the two leaves the key logically
- * held down in the browser. `Keyboard.down()` also sets the client-side
- * modifier bit *before* it sends the CDP command, and only `up()` clears that
- * bit, so a key whose `down()` rejected still needs a matching `up()`.
+ * held down in the browser.
+ *
+ * Keys whose `down()` rejected are released too: `Keyboard.down()` latches the
+ * key on the client (`_modifiers |= bit`) *before* it sends the CDP command and
+ * only `up()` clears it, and `_modifiers` is stamped onto every subsequent
+ * keyboard, mouse and touch event. A stray key up is harmless; a latched
+ * modifier poisoning every later click is not.
  */
 async function pressKeyReleasingHeldKeys(
   keyboard: Keyboard,
@@ -55,8 +59,7 @@ async function pressKeyReleasingHeldKeys(
       await keyboard.down(modifier);
     }
     held.push(key);
-    await keyboard.down(key);
-    await keyboard.up(key);
+    await keyboard.press(key);
     held.pop();
   } finally {
     for (const heldKey of held.toReversed()) {
@@ -438,7 +441,11 @@ export const drag = definePageTool({
           if (!dropped) {
             // `drag()` presses the mouse button down and only `drop()` releases
             // it, so a failed drop leaves the button held down for the rest of
-            // the session, breaking every later click.
+            // the session, breaking every later click. `drag()` can also throw
+            // after pressing the button (it resets its own dragging flag
+            // without releasing), and there is no way to ask whether the button
+            // is currently down — so release unconditionally. A stray mouse up
+            // is harmless; a stuck button is not.
             try {
               await request.page.pptrPage.mouse.up();
             } catch (error) {
