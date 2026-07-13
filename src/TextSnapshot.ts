@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from './logger.js';
 import type {McpPage} from './McpPage.js';
 import type {
   Protocol,
@@ -13,6 +12,7 @@ import type {
 } from './third_party/index.js';
 import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
+import {logger} from './utils/logger.js';
 
 export class TextSnapshot {
   static nextSnapshotId = 1;

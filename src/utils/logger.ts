@@ -6,8 +6,8 @@
 
 import fs from 'node:fs';
 
-import {debug} from './third_party/index.js';
-import type {Logger} from './types.js';
+import {debug} from '../third_party/index.js';
+import type {Logger} from '../types.js';
 
 const mcpDebugNamespace = 'mcp:log';
 

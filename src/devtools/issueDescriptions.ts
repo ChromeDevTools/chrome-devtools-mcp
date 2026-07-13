@@ -9,7 +9,7 @@ import * as path from 'node:path';
 
 const DESCRIPTIONS_PATH = path.join(
   import.meta.dirname,
-  'third_party/issue-descriptions',
+  '../third_party/issue-descriptions',
 );
 
 let issueDescriptions: Record<string, string> = {};

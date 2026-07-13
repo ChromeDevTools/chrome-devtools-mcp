@@ -9,7 +9,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {logger} from './logger.js';
 import type {
   Browser,
   ChromeReleaseChannel,
@@ -17,6 +16,7 @@ import type {
   Target,
 } from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
+import {logger} from './utils/logger.js';
 
 let browser: Browser | undefined;
 let browserMode: 'launched' | 'connected' | undefined;
