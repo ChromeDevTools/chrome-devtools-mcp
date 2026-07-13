@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from './logger.js';
 import type {Page, Protocol, CdpPage, Dialog} from './third_party/index.js';
 import type {PredefinedNetworkConditions} from './third_party/index.js';
+import {logger} from './utils/logger.js';
 
 export type DialogAction = 'accept' | 'dismiss' | string;
 

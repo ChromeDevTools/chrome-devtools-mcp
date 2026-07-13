@@ -40,8 +40,9 @@ import type {
   TextContent,
   JSONSchema7Definition,
   Extension,
+  HTTPRequest,
 } from './third_party/index.js';
-import {handleDialog} from './tools/pages.js';
+import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
@@ -52,8 +53,10 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import type {PaginationOptions} from './types.js';
+import type {WithSymbolId} from './utils/id.js';
+import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
-import type {PaginationOptions} from './utils/types.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
 
 export type DataFormat = 'default' | 'toon' | 'gcf';
@@ -266,6 +269,7 @@ export class McpResponse implements Response {
   #redactNetworkHeaders = true;
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
+  #reconnectNotice = false;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -281,6 +285,14 @@ export class McpResponse implements Response {
 
   setRedactNetworkHeaders(value: boolean): void {
     this.#redactNetworkHeaders = value;
+  }
+
+  /**
+   * Surfaces a one-time note that the browser reconnected and page ids changed.
+   * Set by the tool handler when the context reports a pending reconnect notice.
+   */
+  setReconnectNotice(): void {
+    this.#reconnectNotice = true;
   }
 
   attachDevToolsData(data: DevToolsData): void {
@@ -615,8 +627,7 @@ export class McpResponse implements Response {
       );
       const formatter = await NetworkFormatter.from(request, {
         requestId: this.#attachedNetworkRequestId,
-        requestIdResolver: req =>
-          context.getSelectedMcpPage().getNetworkRequestStableId(req),
+        requestIdResolver: req => this.getNetworkRequestStableId(req),
         fetchData: true,
         requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
         responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
@@ -640,7 +651,7 @@ export class McpResponse implements Response {
       const consoleMessageStableId = this.#attachedConsoleMessageId;
       if ('args' in message || message instanceof UncaughtError) {
         const consoleMessage = message as ConsoleMessage | UncaughtError;
-        const devTools = context.getDevToolsUniverse(this.#page);
+        const devTools = this.#page.devtoolsUniverse;
         detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
           id: consoleMessageStableId,
           fetchDetailedData: true,
@@ -725,18 +736,14 @@ export class McpResponse implements Response {
         await Promise.all(
           messages.map(
             async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
-              const consoleMessageStableId = context
-                .getSelectedMcpPage()
-                .getConsoleMessageStableId(item);
+              const consoleMessageStableId =
+                this.getConsoleMessageStableId(item);
               if ('args' in item || item instanceof UncaughtError) {
                 const consoleMessage = item as ConsoleMessage | UncaughtError;
-                const devTools = page
-                  ? context.getDevToolsUniverse(page)
-                  : null;
                 return await ConsoleFormatter.from(consoleMessage, {
                   id: consoleMessageStableId,
                   fetchDetailedData: false,
-                  devTools: devTools ?? undefined,
+                  devTools: page ? page.devtoolsUniverse : undefined,
                 });
               }
               if (item instanceof DevTools.AggregatedIssue) {
@@ -779,13 +786,9 @@ export class McpResponse implements Response {
         networkRequests = await Promise.all(
           requests.map(request =>
             NetworkFormatter.from(request, {
-              requestId: context
-                .getSelectedMcpPage()
-                .getNetworkRequestStableId(request),
+              requestId: this.getNetworkRequestStableId(request),
               selectedInDevToolsUI:
-                context
-                  .getSelectedMcpPage()
-                  .getNetworkRequestStableId(request) ===
+                this.getNetworkRequestStableId(request) ===
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
               fetchData: false,
               saveFile: (data, filename, extension) =>
@@ -816,6 +819,16 @@ export class McpResponse implements Response {
       },
       dataFormat,
     );
+  }
+
+  getConsoleMessageStableId(
+    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
+  ): number {
+    return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
+  }
+
+  getNetworkRequestStableId(request: HTTPRequest): number {
+    return (request as WithSymbolId<typeof request>)[stableIdSymbol] ?? -1;
   }
 
   async format(
@@ -855,6 +868,7 @@ export class McpResponse implements Response {
       thirdPartyDeveloperTools?: object[];
       webmcpTools?: object[];
       message?: string;
+      reconnected?: boolean;
       networkConditions?: string;
       navigationTimeout?: number;
       viewport?: object;
@@ -917,6 +931,12 @@ export class McpResponse implements Response {
     }
 
     const response = [];
+    if (this.#reconnectNotice) {
+      structuredContent.reconnected = true;
+      response.push(
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages().name} to see open pages.`,
+      );
+    }
     if (this.#textResponseLines.length) {
       structuredContent.message = this.#textResponseLines.join('\n');
       response.push(...this.#textResponseLines);

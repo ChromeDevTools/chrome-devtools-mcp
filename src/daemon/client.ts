@@ -8,10 +8,10 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 
-import {logger} from '../logger.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
+import {logger} from '../utils/logger.js';
 
 import type {DaemonMessage, DaemonResponse} from './types.js';
 import {

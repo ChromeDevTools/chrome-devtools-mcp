@@ -29,7 +29,7 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
 } from '../types.js';
-import type {PaginationOptions} from '../utils/types.js';
+import type {PaginationOptions} from '../types.js';
 import type {WaitForEventsResult, DialogAction} from '../WaitForHelper.js';
 
 import type {ToolCategory} from './categories.js';

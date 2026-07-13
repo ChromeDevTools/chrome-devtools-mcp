@@ -8,7 +8,6 @@ import {
   createTargetUniverse,
   type TargetUniverse,
 } from './devtools/DevtoolsUtils.js';
-import {logger} from './logger.js';
 import {
   ConsoleCollector,
   NetworkCollector,
@@ -43,7 +42,7 @@ import type {
   GeolocationOptions,
   TextSnapshotNode,
 } from './types.js';
-import {type WithSymbolId, stableIdSymbol} from './utils/id.js';
+import {logger} from './utils/logger.js';
 import {
   getNetworkMultiplierFromString,
   WaitForHelper,
@@ -73,7 +72,6 @@ export class McpPage implements ContextPage {
 
   // Metadata
   isolatedContextName?: string;
-  devToolsPage?: Page;
   #devtoolsUniverse?: TargetUniverse;
 
   // Dialog
@@ -94,12 +92,14 @@ export class McpPage implements ContextPage {
     options: {
       hasNetworkBlockOrAllowlist: boolean;
       locatorClass: typeof Locator;
+      isolatedContextName?: string;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.pptrPage = page;
     this.id = id;
+    this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
@@ -122,19 +122,29 @@ export class McpPage implements ContextPage {
   }
 
   async init(): Promise<void> {
-    if (this.#devtoolsUniverse) {
-      return;
-    }
-    try {
-      this.#devtoolsUniverse = await createTargetUniverse(this.pptrPage);
-    } catch (e) {
-      logger?.('Failed to initialize DevTools universe', e);
-    }
+    await Promise.allSettled([
+      this.#initDevToolsUniverseNoThrow(),
+      this.#initFocusEmulationNoThrow(),
+    ]);
+  }
 
+  async #initFocusEmulationNoThrow(): Promise<void> {
     // We emulate a focused page for all pages to support multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
       logger?.('Error turning on focused page emulation', error);
     });
+  }
+
+  async #initDevToolsUniverseNoThrow(): Promise<void> {
+    if (this.#devtoolsUniverse) {
+      return undefined;
+    }
+    try {
+      const session = await this.pptrPage.createCDPSession();
+      this.#devtoolsUniverse = await createTargetUniverse(session);
+    } catch (e) {
+      logger?.('Failed to initialize DevTools universe', e);
+    }
   }
 
   get devtoolsUniverse(): TargetUniverse | undefined {
@@ -183,6 +193,20 @@ export class McpPage implements ContextPage {
 
   getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
     return this.networkCollector.getData(includePreservedRequests);
+  }
+
+  async getDevToolsPage(): Promise<Page | undefined> {
+    try {
+      if (await this.pptrPage.hasDevTools()) {
+        return await this.pptrPage.openDevTools();
+      }
+      return undefined;
+    } catch {
+      // Prior to Chrome 144.0.7559.59, the command fails,
+      // Some Electron apps still use older version
+      // Fall back to not exposing DevTools at all.
+      return undefined;
+    }
   }
 
   getConsoleData(
@@ -483,7 +507,7 @@ export class McpPage implements ContextPage {
   async getDevToolsData(): Promise<DevToolsData> {
     try {
       logger?.('Getting DevTools UI data');
-      const devtoolsPage = this.devToolsPage;
+      const devtoolsPage = await this.getDevToolsPage();
       if (!devtoolsPage) {
         logger?.('No DevTools page detected');
         return {};
@@ -511,16 +535,6 @@ export class McpPage implements ContextPage {
       logger?.('error getting devtools data', err);
     }
     return {};
-  }
-
-  getConsoleMessageStableId(
-    message: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
-  ): number {
-    return (message as WithSymbolId<typeof message>)[stableIdSymbol] ?? -1;
-  }
-
-  getNetworkRequestStableId(request: HTTPRequest): number {
-    return (request as WithSymbolId<typeof request>)[stableIdSymbol] ?? -1;
   }
 
   async restoreEmulation() {

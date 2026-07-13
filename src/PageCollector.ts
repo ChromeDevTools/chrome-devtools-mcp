@@ -5,7 +5,6 @@
  */
 
 import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
-import {logger} from './logger.js';
 import type {
   CDPSession,
   ConsoleMessage,
@@ -25,6 +24,7 @@ import {
   stableIdSymbol,
   type WithSymbolId,
 } from './utils/id.js';
+import {logger} from './utils/logger.js';
 
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;

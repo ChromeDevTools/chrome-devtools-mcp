@@ -9,8 +9,8 @@ import {describe, it, beforeEach, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
+import {ISSUE_UTILS} from '../../src/devtools/issueDescriptions.js';
 import {IssueFormatter} from '../../src/formatters/IssueFormatter.js';
-import {ISSUE_UTILS} from '../../src/issue-descriptions.js';
 import {getMockAggregatedIssue} from '../utils.js';
 
 describe('IssueFormatter', () => {
