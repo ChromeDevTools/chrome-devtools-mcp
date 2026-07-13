@@ -884,5 +884,9 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "list_dedicated_workers",
+    "args": []
   }
 ]

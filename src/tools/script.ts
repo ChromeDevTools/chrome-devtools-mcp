@@ -17,7 +17,7 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}${cliArgs?.experimentalWorkers ? ' or dedicated worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
@@ -62,18 +62,58 @@ Example with arguments: \`(el) => el.innerText\`
               ),
           }
         : {}),
+      ...(cliArgs?.experimentalWorkers
+        ? {
+            workerId: zod
+              .string()
+              .optional()
+              .describe(
+                `The optional dedicated worker id to evaluate the script in. Call list_dedicated_workers to obtain the available worker ids. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a worker.`,
+              ),
+          }
+        : {}),
     },
     blockedByDialog: true,
     verifyFilesSchema: ['filePath'],
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,
+        workerId,
         args: uidArgs,
         function: fnString,
         pageId,
         dialogAction,
         filePath,
       } = request.params;
+
+      if (cliArgs?.experimentalWorkers && workerId) {
+        if (uidArgs && uidArgs.length > 0) {
+          throw new Error(
+            'args (element uids) cannot be used when evaluating in a worker.',
+          );
+        }
+        if (pageId) {
+          throw new Error('specify either a pageId or a workerId.');
+        }
+
+        const worker = getDedicatedWorker(context, workerId);
+        const result = await context
+          .getSelectedMcpPage()
+          .waitForEventsAfterAction(
+            async () => {
+              await performEvaluation(worker, fnString, [], response, {
+                filePath,
+                context,
+              });
+            },
+            {handleDialog: dialogAction ?? 'accept'},
+          );
+        if (result.dialogHandled) {
+          context.getSelectedMcpPage().clearDialog();
+        }
+        response.attachWaitForResult(result);
+        return;
+      }
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
@@ -137,6 +177,34 @@ Example with arguments: \`(el) => el.innerText\`
   };
 });
 
+export const listDedicatedWorkers = defineTool({
+  name: 'list_dedicated_workers',
+  description: `List the dedicated Web Workers running in the currently selected page. Returns a worker id for each one that can be passed as the 'workerId' argument to evaluate_script to run a script inside that worker's execution context.`,
+  annotations: {
+    category: ToolCategory.DEBUGGING,
+    readOnlyHint: true,
+    conditions: ['experimentalWorkers'],
+  },
+  schema: {},
+  blockedByDialog: false,
+  verifyFilesSchema: [],
+  handler: async (_request, response, context) => {
+    const workers = context.createDedicatedWorkersSnapshot();
+
+    if (!workers.length) {
+      response.appendResponseLine(
+        'No dedicated workers found in the selected page.',
+      );
+      return;
+    }
+
+    response.appendResponseLine('## Dedicated Workers');
+    for (const worker of workers) {
+      response.appendResponseLine(`${worker.id}: ${worker.url}`);
+    }
+  },
+});
+
 const performEvaluation = async (
   evaluatable: Evaluatable,
   fnString: string,
@@ -190,6 +258,20 @@ const getPageOrFrame = async (
   }
 
   return pageOrFrame;
+};
+
+const getDedicatedWorker = (context: Context, workerId: string): WebWorker => {
+  const dedicatedWorkers = context.createDedicatedWorkersSnapshot();
+
+  const dedicatedWorker = dedicatedWorkers.find(
+    worker => context.getDedicatedWorkerId(worker) === workerId,
+  );
+
+  if (!dedicatedWorker) {
+    throw new Error('Dedicated worker not found.');
+  }
+
+  return dedicatedWorker.worker;
 };
 
 const getWebWorker = async (

@@ -728,6 +728,12 @@ export const commands: Commands = {
       },
     },
   },
+  list_dedicated_workers: {
+    description:
+      "List the dedicated Web Workers running in the currently selected page. Returns a worker id for each one that can be passed as the 'workerId' argument to evaluate_script to run a script inside that worker's execution context. (requires flag: --experimentalWorkers=true)",
+    category: 'Debugging',
+    args: {},
+  },
   list_extensions: {
     description:
       'Lists all the Chrome extensions installed in the browser. This includes their name, ID, version, and enabled status. (requires flag: --categoryExtensions=true)',

@@ -33,13 +33,14 @@ import {
   type Extension,
   type Root,
   type DevTools,
+  type WebWorker,
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {Logger} from './types.js';
-import type {ExtensionServiceWorker} from './types.js';
+import type {DedicatedWorker, ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -84,6 +85,10 @@ export class McpContext implements Context {
 
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
+
+  #dedicatedWorkers: DedicatedWorker[] = [];
+  #dedicatedWorkerMap = new WeakMap<WebWorker, string>();
+  #nextDedicatedWorkerId = 1;
 
   #traceResults: TraceResult[] = [];
 
@@ -586,6 +591,43 @@ export class McpContext implements Context {
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined {
     return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
+  }
+
+  /**
+   * Creates a snapshot of the dedicated Web Workers of the currently selected
+   * page. This is intentionally not part of the default page snapshot: worker
+   * execution contexts are only enumerated when a tool explicitly asks for
+   * them, so they don't add to the baseline token usage.
+   */
+  createDedicatedWorkersSnapshot(): DedicatedWorker[] {
+    const workers = this.getSelectedMcpPage().pptrPage.workers();
+
+    for (const worker of workers) {
+      if (!this.#dedicatedWorkerMap.has(worker)) {
+        this.#dedicatedWorkerMap.set(
+          worker,
+          'worker-' + this.#nextDedicatedWorkerId++,
+        );
+      }
+    }
+
+    this.#dedicatedWorkers = workers.map(worker => {
+      return {
+        worker,
+        id: this.#dedicatedWorkerMap.get(worker)!,
+        url: worker.url(),
+      };
+    });
+
+    return this.#dedicatedWorkers;
+  }
+
+  getDedicatedWorkers(): DedicatedWorker[] {
+    return this.#dedicatedWorkers;
+  }
+
+  getDedicatedWorkerId(dedicatedWorker: DedicatedWorker): string | undefined {
+    return this.#dedicatedWorkerMap.get(dedicatedWorker.worker);
   }
 
   getPages(): McpPage[] {

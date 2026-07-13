@@ -30,13 +30,14 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (8 tools)
+- **[Debugging](#debugging)** (9 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+  - [`list_dedicated_workers`](#list_dedicated_workers)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
 - **[Memory](#memory)** (11 tools)
@@ -421,6 +422,14 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+### `list_dedicated_workers`
+
+**Description:** List the dedicated Web Workers running in the currently selected page. Returns a worker id for each one that can be passed as the 'workerId' argument to [`evaluate_script`](#evaluate_script) to run a script inside that worker's execution context. (requires flag: --experimentalWorkers=true)
+
+**Parameters:** None
 
 ---
 

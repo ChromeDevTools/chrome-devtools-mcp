@@ -28,6 +28,7 @@ import type {
   TextSnapshotNode,
   GeolocationOptions,
   ExtensionServiceWorker,
+  DedicatedWorker,
 } from '../types.js';
 import type {PaginationOptions} from '../utils/types.js';
 import type {WaitForEventsResult, DialogAction} from '../WaitForHelper.js';
@@ -230,6 +231,9 @@ export type Context = Readonly<{
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,
   ): string | undefined;
+  createDedicatedWorkersSnapshot(): DedicatedWorker[];
+  getDedicatedWorkers(): DedicatedWorker[];
+  getDedicatedWorkerId(dedicatedWorker: DedicatedWorker): string | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
