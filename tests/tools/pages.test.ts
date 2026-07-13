@@ -17,6 +17,7 @@ import {
   newPage,
   closePage,
   selectPage,
+  selectForegroundPage,
   navigatePage,
   resizePage,
   handleDialog,
@@ -621,6 +622,49 @@ describe('pages', () => {
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
+      });
+    });
+  });
+  describe('select_foreground_page', () => {
+    it('selects the foreground tab when one page is visible', async () => {
+      await withMcpContext(async (response, context) => {
+        // Open a second page.
+        const page2 = await context.newPage();
+        assert.strictEqual(context.getSelectedMcpPage(), page2);
+
+        // Bring the first page to the front so it becomes the visible tab.
+        await context.getPageById(1).pptrPage.bringToFront();
+
+        // select_foreground_page should detect and select page 1.
+        await selectForegroundPage.handler({params: {}}, response, context);
+        assert.strictEqual(context.getSelectedMcpPage().id, 1);
+        assert.ok(response.includePages);
+      });
+    });
+
+    it('reports failure when visibility cannot be determined', async () => {
+      await withMcpContext(async (response, context) => {
+        // Force the visibility probe to fail on the only page so that no
+        // foreground tab can be determined. This deterministically exercises
+        // the "undefined" branch regardless of the browser's real visibility
+        // state.
+        const page = context.getSelectedMcpPage();
+        sinon
+          .stub(page.pptrPage, 'evaluate')
+          .rejects(new Error('evaluate unavailable'));
+
+        await selectForegroundPage.handler({params: {}}, response, context);
+
+        const result = await response.handle('select_foreground_page', context);
+        const textContent = result.content.find(c => c.type === 'text') as {
+          type: 'text';
+          text: string;
+        };
+        assert.ok(textContent);
+        // Must be the failure message specifically. The success message also
+        // contains the word "foreground", so asserting on that alone would
+        // pass even when the tool selected a page.
+        assert.ok(textContent.text.includes('Could not determine'));
       });
     });
   });

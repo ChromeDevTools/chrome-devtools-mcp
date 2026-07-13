@@ -206,6 +206,7 @@ export type Context = Readonly<{
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;
+  selectForegroundPage(): Promise<{id: number; url: string} | undefined>;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,

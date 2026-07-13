@@ -1002,6 +1002,12 @@ export const commands: Commands = {
     category: 'Debugging',
     args: {},
   },
+  select_foreground_page: {
+    description:
+      'Detect and select the browser tab currently visible to the user. This queries every open page for its visibility state and selects the foreground tab. Useful when connecting to an existing browser where the MCP-selected page may differ from the tab the user is actually viewing.',
+    category: 'Navigation automation',
+    args: {},
+  },
   select_page: {
     description: 'Select a page as a context for future tool calls.',
     category: 'Navigation automation',

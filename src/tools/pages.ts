@@ -67,6 +67,37 @@ export const selectPage = defineTool({
   },
 });
 
+export const selectForegroundPage = defineTool({
+  name: 'select_foreground_page',
+  description:
+    `Detect and select the browser tab currently visible to the user. ` +
+    `This queries every open page for its visibility state and selects the ` +
+    `foreground tab. Useful when connecting to an existing browser where the ` +
+    `MCP-selected page may differ from the tab the user is actually viewing.`,
+  annotations: {
+    category: ToolCategory.NAVIGATION,
+    readOnlyHint: true,
+  },
+  schema: {},
+  blockedByDialog: false,
+  verifyFilesSchema: [],
+  handler: async (_request, response, context) => {
+    const result = await context.selectForegroundPage();
+    if (result) {
+      response.appendResponseLine(
+        `Selected page ${result.id} (${result.url}) as the foreground tab.`,
+      );
+    } else {
+      response.appendResponseLine(
+        `Could not determine a single foreground tab. Use select_page to choose manually.`,
+      );
+    }
+    response.setIncludePages(true);
+    response.setListThirdPartyDeveloperTools();
+    response.setListWebMcpTools();
+  },
+});
+
 export const closePage = defineTool({
   name: 'close_page',
   description: `Closes the page by its index. The last open page cannot be closed.`,

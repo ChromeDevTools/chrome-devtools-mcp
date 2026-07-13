@@ -401,6 +401,44 @@ export class McpContext implements Context {
   }
 
   /**
+   * Finds the page whose tab is currently in the foreground (visible to the
+   * user) by querying `document.visibilityState` on every known page.  If
+   * exactly one page reports `"visible"`, it is selected and returned.
+   *
+   * Returns `undefined` when no visible page can be determined (e.g. all pages
+   * are hidden, multiple pages report visible, or evaluation fails).
+   */
+  async selectForegroundPage(): Promise<{id: number; url: string} | undefined> {
+    const pages = Array.from(this.#mcpPages.values());
+    if (pages.length === 0) {
+      return undefined;
+    }
+
+    const results = await Promise.allSettled(
+      pages.map(async mcpPage => {
+        const visible = await mcpPage.pptrPage.evaluate(
+          () => document.visibilityState === 'visible',
+        );
+        return {mcpPage, visible};
+      }),
+    );
+
+    const visiblePages: McpPage[] = [];
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.visible) {
+        visiblePages.push(result.value.mcpPage);
+      }
+    }
+
+    if (visiblePages.length === 1) {
+      this.selectPage(visiblePages[0]);
+      return {id: visiblePages[0].id, url: visiblePages[0].pptrPage.url()};
+    }
+
+    return undefined;
+  }
+
+  /**
    * Returns details about the last page snapshot automatically replacing the
    * selection because the selected page disappeared from the page list, or
    * `undefined` if the snapshot left the selection intact. Recomputed on every

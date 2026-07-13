@@ -884,5 +884,9 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "select_foreground_page",
+    "args": []
   }
 ]
