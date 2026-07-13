@@ -47,6 +47,7 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getSelectedMcpPage.returns(mockPage);
+    mockPage.enableFocusEmulation.resolves();
 
     const toolMutex = new Mutex();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
@@ -64,6 +65,62 @@ describe('ToolHandler', () => {
     await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+    assert.strictEqual(mockPage.enableFocusEmulation.calledOnce, true);
+    assert.strictEqual(handlerCalled, true);
+  });
+
+  it('enables focus emulation for pages targeted by page ID', async () => {
+    let handlerCalled = false;
+    const tool: DefinedPageTool = {
+      name: 'page_tool',
+      description: 'A page scoped tool',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: [],
+      pageScoped: true,
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockPage = sinon.createStubInstance(McpPage);
+    mockContext.getPageById.withArgs(7).returns(mockPage);
+    let resolveFocus: (() => void) | undefined;
+    mockPage.enableFocusEmulation.returns(
+      new Promise(resolve => {
+        resolveFocus = resolve;
+      }),
+    );
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--experimental-page-id-routing'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    assert.strictEqual(toolHandler.shouldRegister, true);
+    const handling = toolHandler.handle({pageId: 7});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(handlerCalled, false);
+    resolveFocus?.();
+    await handling;
+
+    assert.strictEqual(mockContext.getPageById.calledOnceWithExactly(7), true);
+    assert.strictEqual(mockContext.getSelectedMcpPage.called, false);
+    assert.strictEqual(mockPage.enableFocusEmulation.calledOnce, true);
     assert.strictEqual(handlerCalled, true);
   });
 

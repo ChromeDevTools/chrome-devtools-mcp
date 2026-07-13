@@ -238,6 +238,7 @@ export class ToolHandler {
             !this.serverArgs.slim
               ? context.getPageById(pageId)
               : context.getSelectedMcpPage();
+          await page.enableFocusEmulation();
           response.setPage(page);
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();

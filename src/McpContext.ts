@@ -397,6 +397,7 @@ export class McpContext implements Context {
 
   selectPage(newPage: McpPage): void {
     this.#selectedPage = newPage;
+    void newPage.enableFocusEmulation();
     newPage.updateTimeouts();
   }
 

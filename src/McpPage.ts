@@ -73,6 +73,8 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   #devtoolsUniverse?: TargetUniverse;
+  #focusEmulationEnabled = false;
+  #focusEmulationPromise?: Promise<void>;
 
   // Dialog
   #dialog?: Dialog;
@@ -122,17 +124,27 @@ export class McpPage implements ContextPage {
   }
 
   async init(): Promise<void> {
-    await Promise.allSettled([
-      this.#initDevToolsUniverseNoThrow(),
-      this.#initFocusEmulationNoThrow(),
-    ]);
+    await this.#initDevToolsUniverseNoThrow();
   }
 
-  async #initFocusEmulationNoThrow(): Promise<void> {
-    // We emulate a focused page for all pages to support multi-agent workflows.
-    void this.pptrPage.emulateFocusedPage(true).catch(error => {
-      logger?.('Error turning on focused page emulation', error);
-    });
+  enableFocusEmulation(): Promise<void> {
+    if (this.#focusEmulationEnabled) {
+      return Promise.resolve();
+    }
+    if (!this.#focusEmulationPromise) {
+      this.#focusEmulationPromise = this.pptrPage
+        .emulateFocusedPage(true)
+        .then(() => {
+          this.#focusEmulationEnabled = true;
+        })
+        .catch(error => {
+          logger?.('Error turning on focused page emulation', error);
+        })
+        .finally(() => {
+          this.#focusEmulationPromise = undefined;
+        });
+    }
+    return this.#focusEmulationPromise;
   }
 
   async #initDevToolsUniverseNoThrow(): Promise<void> {

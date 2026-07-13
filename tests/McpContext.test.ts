@@ -17,6 +17,7 @@ import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
+import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
@@ -26,6 +27,42 @@ import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
 describe('McpContext', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  it('enables focused-page emulation only after selection and retries failures', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page2 = new McpPage(await context.browser.newPage(), 999, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+      const page2Emulate = sinon.spy(page2.pptrPage, 'emulateFocusedPage');
+      await page2.init();
+      sinon.assert.notCalled(page2Emulate);
+      context.selectPage(page2);
+      context.selectPage(page2);
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledOnceWithExactly(page2Emulate, true);
+
+      const retryPage = new McpPage(await context.browser.newPage(), 1000, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+      const retryEmulate = sinon
+        .stub(retryPage.pptrPage, 'emulateFocusedPage')
+        .onFirstCall()
+        .rejects(new Error('focus failed'))
+        .onSecondCall()
+        .resolves();
+      await retryPage.init();
+      sinon.assert.notCalled(retryEmulate);
+      context.selectPage(retryPage);
+      await new Promise(resolve => setImmediate(resolve));
+      context.selectPage(retryPage);
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledTwice(retryEmulate);
+      page2.dispose();
+      retryPage.dispose();
+    });
   });
 
   it('list pages', async () => {
