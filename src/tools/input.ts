@@ -34,42 +34,62 @@ const submitKeySchema = zod
   );
 
 /**
- * Presses `key` while `modifiers` are held, and guarantees that every key it
- * pressed down is released again — even if a key event rejects mid-sequence.
+ * Releases `key`, swallowing any failure: a failed release must not abort the
+ * releases that follow it, nor replace the error that triggered the release.
+ *
+ * If the original `up()` reached the renderer before its promise rejected, this
+ * dispatches a second key up. That is a deliberate trade: a duplicate key up is
+ * inert for a key the renderer no longer considers pressed, whereas a key left
+ * held down is not.
+ */
+async function releaseKey(keyboard: Keyboard, key: KeyInput) {
+  try {
+    await keyboard.up(key);
+  } catch (error) {
+    logger?.('failed to release key', key, error);
+  }
+}
+
+/**
+ * Presses `key` while `modifiers` are held, releasing every key that was
+ * actually pressed down even if a key event rejects mid-sequence.
  *
  * Puppeteer's `Keyboard.press()` is a bare `down()` followed by `up()` with no
- * guard of its own, so a rejection between the two leaves the key logically
- * held down in the browser.
+ * guard of its own, so a rejecting `up()` leaves the key held down in the
+ * browser. The press is split here so that a failed release can be retried
+ * without dispatching a key up for a key that never went down.
  *
- * Keys whose `down()` rejected are released too: `Keyboard.down()` latches the
- * key on the client (`_modifiers |= bit`) *before* it sends the CDP command and
- * only `up()` clears it, and `_modifiers` is stamped onto every subsequent
- * keyboard, mouse and touch event. A stray key up is harmless; a latched
- * modifier poisoning every later click is not.
+ * Modifiers are released even when their own `down()` rejected. `Keyboard.down()`
+ * sets the client-side modifier bit *before* it sends the CDP command and only
+ * `up()` clears it, and that bit is stamped onto every subsequent keyboard,
+ * mouse and touch event — so a latched modifier would silently modify every
+ * later click. Non-modifier keys carry no such bit, which is why the main key is
+ * released only once its `down()` has actually succeeded.
  */
 async function pressKeyReleasingHeldKeys(
   keyboard: Keyboard,
   key: KeyInput,
   modifiers: KeyInput[] = [],
 ) {
-  const held: KeyInput[] = [];
+  const heldModifiers: KeyInput[] = [];
+  let keyIsDown = false;
   try {
     for (const modifier of modifiers) {
-      held.push(modifier);
+      heldModifiers.push(modifier);
       await keyboard.down(modifier);
     }
-    held.push(key);
-    await keyboard.press(key);
-    held.pop();
+    // Equivalent to keyboard.press(key), which calls down(key, {}) followed by
+    // up(key). Passing {} keeps the dispatched CDP payload identical.
+    await keyboard.down(key, {});
+    keyIsDown = true;
+    await keyboard.up(key);
+    keyIsDown = false;
   } finally {
-    for (const heldKey of held.toReversed()) {
-      try {
-        await keyboard.up(heldKey);
-      } catch (error) {
-        // A failed release must not abort the remaining releases, nor replace
-        // the original error with its own.
-        logger?.('failed to release key', heldKey, error);
-      }
+    if (keyIsDown) {
+      await releaseKey(keyboard, key);
+    }
+    for (const modifier of heldModifiers.toReversed()) {
+      await releaseKey(keyboard, modifier);
     }
   }
 }
@@ -395,6 +415,14 @@ export const typeText = definePageTool({
   handler: async (request, response) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
+      // Note: Keyboard.type() presses each character through the same unguarded
+      // down()/up() pair, so a mid-string failure can still leave a character
+      // key held. Locator.fill() types short values through Keyboard.type() as
+      // well, so `fill` and `fill_form` are exposed the same way. Guarding it
+      // here would mean reimplementing type() on top of charIsKey(), which is
+      // not public API — the release belongs in Puppeteer's press(). A stuck
+      // character key is far less harmful than a stuck modifier: it carries no
+      // modifier bit, so it is not stamped onto subsequent events.
       await page.pptrPage.keyboard.type(request.params.text);
       if (request.params.submitKey) {
         await pressKeyReleasingHeldKeys(
@@ -431,28 +459,9 @@ export const drag = definePageTool({
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
       const result = await request.page.waitForEventsAfterAction(async () => {
-        let dropped = false;
-        try {
-          await fromHandle.drag(toHandle);
-          await new Promise(resolve => setTimeout(resolve, 50));
-          await toHandle.drop(fromHandle);
-          dropped = true;
-        } finally {
-          if (!dropped) {
-            // `drag()` presses the mouse button down and only `drop()` releases
-            // it, so a failed drop leaves the button held down for the rest of
-            // the session, breaking every later click. `drag()` can also throw
-            // after pressing the button (it resets its own dragging flag
-            // without releasing), and there is no way to ask whether the button
-            // is currently down — so release unconditionally. A stray mouse up
-            // is harmless; a stuck button is not.
-            try {
-              await request.page.pptrPage.mouse.up();
-            } catch (error) {
-              logger?.('failed to release the mouse button', error);
-            }
-          }
-        }
+        await fromHandle.drag(toHandle);
+        await new Promise(resolve => setTimeout(resolve, 50));
+        await toHandle.drop(fromHandle);
       });
       response.appendResponseLine(`Successfully dragged an element`);
       response.attachWaitForResult(result);
