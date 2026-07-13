@@ -17,6 +17,10 @@ import {checkForUpdates} from '../utils/check-for-updates.js';
 import {logger, saveLogsToFile} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
+// GlobalCheck Integration: Import compliance wrapper and MCP server type
+import type {IMcpServer} from '@modelcontextprotocol/sdk';
+import {GlobalCheckMcpWrapper} from '@globalcheck/mcp-server-wrapper';
+
 import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
 
 await checkForUpdates(
@@ -75,8 +79,20 @@ logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const {server} = await createMcpServer(args, {
   logFile,
 });
+
+let mcpServer: IMcpServer = server;
+// GlobalCheck Integration: Conditionally wrap the MCP server with GlobalCheck for compliance.
+// Set CHROME_DEVTOOLS_MCP_ENABLE_GLOBALCHECK=true to enable.
+// Optionally, configure policyId via GLOBALCHECK_POLICY_ID environment variable.
+if (process.env.CHROME_DEVTOOLS_MCP_ENABLE_GLOBALCHECK === 'true') {
+  logger?.('GlobalCheck enabled: Wrapping Chrome DevTools MCP server with compliance layer.');
+  mcpServer = new GlobalCheckMcpWrapper(server, {
+    policyId: process.env.GLOBALCHECK_POLICY_ID || 'chrome-devtools-mcp-default',
+  });
+}
+
 const transport = new StdioServerTransport();
-await server.connect(transport);
+await mcpServer.connect(transport);
 logger?.('Chrome DevTools MCP Server connected');
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
