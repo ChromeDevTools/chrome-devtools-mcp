@@ -141,9 +141,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'persistence-network-overrides-enabled',
   );
   if (!hasOverridesEnabled) {
-    console.log(
-      '[DevtoolsUtils] Registering persistence-network-overrides-enabled',
-    );
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.PERSISTENCE,
       settingName: 'persistence-network-overrides-enabled',
@@ -156,7 +153,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'network-log.record-log',
   );
   if (!hasRecordLog) {
-    console.log('[DevtoolsUtils] Registering network-log.record-log');
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.NETWORK,
       settingName: 'network-log.record-log',
@@ -169,7 +165,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'network-log.preserve-log',
   );
   if (!hasPreserveLog) {
-    console.log('[DevtoolsUtils] Registering network-log.preserve-log');
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.NETWORK,
       settingName: 'network-log.preserve-log',
@@ -182,7 +177,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'disable-paused-state-overlay',
   );
   if (!hasDisableOverlay) {
-    console.log('[DevtoolsUtils] Registering disable-paused-state-overlay');
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.APPEARANCE,
       settingName: 'disable-paused-state-overlay',
@@ -195,7 +189,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'emulation.touch',
   );
   if (!hasTouch) {
-    console.log('[DevtoolsUtils] Registering emulation.touch');
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.EMULATION,
       settingName: 'emulation.touch',
@@ -208,7 +201,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'emulation.idle-detection',
   );
   if (!hasIdle) {
-    console.log('[DevtoolsUtils] Registering emulation.idle-detection');
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.EMULATION,
       settingName: 'emulation.idle-detection',
@@ -221,7 +213,6 @@ export async function createTargetUniverse(
     setting => setting.settingName === 'emulation.cpu-pressure',
   );
   if (!hasCpu) {
-    console.log('[DevtoolsUtils] Registering emulation.cpu-pressure');
     DevTools.Common.Settings.registerSettingExtension({
       category: DevTools.Common.Settings.SettingCategory.EMULATION,
       settingName: 'emulation.cpu-pressure',
