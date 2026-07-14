@@ -12,7 +12,7 @@ The server returns web content to the client as text (Markdown-like) or
 structured data (`--experimentalStructuredContent`). The web content is returned
 as-is to facilitate debugging and we do not consider changes in the output
 text/Markdown structure based on the web content to be vulnerabilities. If
-structure is imporant for your use case, use structured output
+structure is important for your use case, use structured output
 (`--experimentalStructuredContent`). Prefer using this server with trusted web
 content or make sure your client takes precautions against prompt injections.
 
