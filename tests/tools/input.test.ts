@@ -1192,7 +1192,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePath: testFilePath,
+              filePaths: [testFilePath],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1233,7 +1233,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePath: [firstFilePath, secondFilePath],
+              filePaths: [firstFilePath, secondFilePath],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1283,7 +1283,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_1',
-              filePath: testFilePath,
+              filePaths: [testFilePath],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1321,7 +1321,7 @@ describe('input', () => {
             {
               params: {
                 uid: '1_1',
-                filePath: testFilePath,
+                filePaths: [testFilePath],
               },
               page: context.getSelectedMcpPage(),
             },

@@ -46,13 +46,6 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
   if (typeName === 'ZodEffects') {
     return getZodType(def.schema);
   }
-  // For unions like `string | string[]` report the array form so the param is
-  // counted; scalar values are normalized to a single-element count below.
-  if (typeName === 'ZodUnion') {
-    const options = def.options as zod.ZodTypeAny[];
-    const optionTypes = options.map(option => getZodType(option));
-    return optionTypes.includes('ZodArray') ? 'ZodArray' : optionTypes[0];
-  }
 
   if (isZodType(typeName)) {
     return typeName;
@@ -118,7 +111,7 @@ function transformValue(
   if (zodType === 'ZodString') {
     return bucketize((value as string).length);
   } else if (zodType === 'ZodArray') {
-    return Array.isArray(value) ? value.length : 1;
+    return (value as unknown[]).length;
   } else {
     return value as LoggedToolCallArgValue;
   }
@@ -128,8 +121,7 @@ function hasEquivalentType(zodType: ZodType, value: unknown): boolean {
   if (zodType === 'ZodString') {
     return typeof value === 'string';
   } else if (zodType === 'ZodArray') {
-    // `string | string[]` unions normalize scalars to a single-element count.
-    return Array.isArray(value) || typeof value === 'string';
+    return Array.isArray(value);
   } else if (zodType === 'ZodNumber') {
     return typeof value === 'number';
   } else if (zodType === 'ZodBoolean') {

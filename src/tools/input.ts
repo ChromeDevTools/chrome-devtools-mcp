@@ -464,18 +464,18 @@ export const uploadFile = definePageTool({
       .describe(
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
-    filePath: zod
-      .union([zod.string(), zod.array(zod.string()).min(1)])
+    filePaths: zod
+      .array(zod.string())
+      .min(1)
       .describe(
-        'The local path of the file to upload, or an array of paths to upload several files at once to an input that accepts multiple files',
+        'The local paths of the files to upload. Pass a single path to upload one file, or several paths to upload multiple files to an input that accepts them',
       ),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: ['filePath'],
+  verifyFilesSchema: ['filePaths'],
   handler: async (request, response, _context) => {
-    const {uid, filePath} = request.params;
-    const filePaths = Array.isArray(filePath) ? filePath : [filePath];
+    const {uid, filePaths} = request.params;
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
