@@ -12,12 +12,12 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import {logger} from '../logger.js';
 import {
   Client,
   PipeTransport,
   StdioClientTransport,
 } from '../third_party/index.js';
+import {logger} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage} from './types.js';
@@ -41,7 +41,7 @@ const pidDir = path.dirname(pidFilePath);
 const currentUserUid = os.userInfo().uid;
 
 try {
-  fs.mkdirSync(pidDir, {recursive: true});
+  fs.mkdirSync(pidDir, {recursive: true, mode: 0o700});
   if (os.platform() !== 'win32') {
     // POSIX specific checks
     try {
@@ -185,6 +185,7 @@ async function handleRequest(msg: DaemonMessage) {
         message: 'stopping',
       };
     } else if (msg.method === 'status') {
+      await started;
       return {
         success: true,
         result: JSON.stringify({

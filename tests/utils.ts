@@ -121,11 +121,13 @@ export async function withMcpContext(
     args?: string[];
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
+    allowUnrestrictedPaths?: boolean;
   } = {},
   args: Partial<ParsedArguments> = {},
 ) {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
+    McpContext.resetPageIdsForTesting();
     const response = new McpResponse(args as ParsedArguments);
     if (context) {
       context.dispose();
@@ -138,6 +140,7 @@ export async function withMcpContext(
         performanceCrux: options.performanceCrux ?? true,
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
+        allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
       },
       Locator,
     );

@@ -6,7 +6,7 @@
 
 import crypto from 'node:crypto';
 
-import {logger} from '../../logger.js';
+import {logger} from '../../utils/logger.js';
 import type {
   ChromeDevToolsMcpExtension,
   LogRequest,

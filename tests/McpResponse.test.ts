@@ -63,6 +63,32 @@ describe('McpResponse', () => {
     });
   });
 
+  it('includes a reconnect notice only when set', async () => {
+    await withMcpContext(async (response, context) => {
+      const before = await response.handle('test', context);
+      assert.ok(
+        !JSON.stringify(before.content).includes('Page ids have changed'),
+        'no reconnect notice by default',
+      );
+      assert.ok(
+        !(before.structuredContent as {reconnected?: boolean}).reconnected,
+        'structuredContent is not flagged reconnected by default',
+      );
+
+      response.setReconnectNotice();
+      const after = await response.handle('test', context);
+      assert.ok(
+        JSON.stringify(after.content).includes('Page ids have changed'),
+        'reconnect notice is included once set',
+      );
+      assert.strictEqual(
+        (after.structuredContent as {reconnected?: boolean}).reconnected,
+        true,
+        'structuredContent is flagged reconnected once set',
+      );
+    });
+  });
+
   it('allows response text lines to be added', async t => {
     await withMcpContext(async (response, context) => {
       response.appendResponseLine('Testing 1');
@@ -81,7 +107,7 @@ describe('McpResponse', () => {
 
   it('does not include anything in response if snapshot is null', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       page.accessibility.snapshot = async () => null;
       const {content, structuredContent} = await response.handle(
         'test',
@@ -96,7 +122,7 @@ describe('McpResponse', () => {
 
   it('returns correctly formatted snapshot for a simple tree', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(
         html`<button>Click me</button>
           <input
@@ -119,7 +145,7 @@ describe('McpResponse', () => {
 
   it('returns values for textboxes', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(
         html`<label
           >username<input
@@ -143,7 +169,7 @@ describe('McpResponse', () => {
 
   it('returns verbose snapshot and structured content', async t => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(html`<aside>test</aside>`);
       response.includeSnapshot({
         verbose: true,
@@ -162,7 +188,7 @@ describe('McpResponse', () => {
     const filePath = join(tmpdir(), 'test-snapshot.txt');
     try {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(html`<aside>test</aside>`);
         response.includeSnapshot({
           verbose: true,
@@ -191,7 +217,7 @@ describe('McpResponse', () => {
 
   it('preserves mapping ids across multiple snapshots', async () => {
     await withMcpContext(async (response, context) => {
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(html`
         <div>
           <button id="btn1">Button 1</button>
@@ -266,7 +292,7 @@ describe('McpResponse', () => {
             </div>
           `,
         );
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/page.html'));
 
         response.includeSnapshot();
@@ -296,7 +322,9 @@ describe('McpResponse', () => {
 
   it('adds throttling setting when it is not null', async t => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({networkConditions: 'Slow 3G'});
+      await context
+        .getSelectedMcpPage()
+        .emulate({networkConditions: 'Slow 3G'});
       const {content, structuredContent} = await response.handle(
         'test',
         context,
@@ -315,7 +343,7 @@ describe('McpResponse', () => {
         'test',
         context,
       );
-      await context.emulate({});
+      await context.getSelectedMcpPage().emulate({});
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(
         JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
@@ -341,7 +369,7 @@ describe('McpResponse', () => {
 
   it('adds cpu throttling setting when it is over 1', async t => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({cpuThrottlingRate: 4});
+      await context.getSelectedMcpPage().emulate({cpuThrottlingRate: 4});
       const {content, structuredContent} = await response.handle(
         'test',
         context,
@@ -355,7 +383,7 @@ describe('McpResponse', () => {
 
   it('does not include cpu throttling setting when it is 1', async t => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({cpuThrottlingRate: 1});
+      await context.getSelectedMcpPage().emulate({cpuThrottlingRate: 1});
       const {content, structuredContent} = await response.handle(
         'test',
         context,
@@ -369,7 +397,7 @@ describe('McpResponse', () => {
 
   it('adds viewport emulation setting when it is set', async t => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({
+      await context.getSelectedMcpPage().emulate({
         viewport: {width: 400, height: 400, deviceScaleFactor: 1},
       });
       const {content, structuredContent} = await response.handle(
@@ -385,7 +413,7 @@ describe('McpResponse', () => {
 
   it('adds userAgent emulation setting when it is set', async t => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({userAgent: 'MyUA'});
+      await context.getSelectedMcpPage().emulate({userAgent: 'MyUA'});
       const {content, structuredContent} = await response.handle(
         'test',
         context,
@@ -399,7 +427,7 @@ describe('McpResponse', () => {
 
   it('adds color scheme emulation setting when it is set', async t => {
     await withMcpContext(async (response, context) => {
-      await context.emulate({colorScheme: 'dark'});
+      await context.getSelectedMcpPage().emulate({colorScheme: 'dark'});
       const {content, structuredContent} = await response.handle(
         'test',
         context,
@@ -462,7 +490,7 @@ describe('McpResponse', () => {
   it('add network requests when setting is true', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [getMockRequest({stableId: 1}), getMockRequest({stableId: 2})];
       };
       const {content, structuredContent} = await response.handle(
@@ -479,7 +507,7 @@ describe('McpResponse', () => {
   it('does not include network requests when setting is false', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(false);
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [getMockRequest()];
       };
       const {content, structuredContent} = await response.handle(
@@ -511,10 +539,10 @@ describe('McpResponse', () => {
         postData: JSON.stringify({request: 'body'}),
         response: httpResponse,
       });
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [request];
       };
-      context.getNetworkRequestById = () => {
+      context.getSelectedMcpPage().getNetworkRequestById = () => {
         return request;
       };
       response.attachNetworkRequest(1);
@@ -535,10 +563,10 @@ describe('McpResponse', () => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
       const request = getMockRequest();
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [request];
       };
-      context.getNetworkRequestById = () => {
+      context.getSelectedMcpPage().getNetworkRequestById = () => {
         return request;
       };
       response.attachNetworkRequest(1);
@@ -556,7 +584,7 @@ describe('McpResponse', () => {
   it('adds console messages when the setting is true', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeConsoleData(true);
-      const page = context.getSelectedPptrPage();
+      const page = context.getSelectedMcpPage().pptrPage;
       const consoleMessagePromise = new Promise<void>(resolve => {
         page.on('console', () => {
           resolve();
@@ -602,7 +630,7 @@ describe('McpResponse', () => {
       };
       mockAggregatedIssue.getDescription.returns(mockDescription);
       response.setIncludeConsoleData(true);
-      context.getConsoleData = () => {
+      context.getSelectedMcpPage().getConsoleData = () => {
         return [mockAggregatedIssue];
       };
 
@@ -627,7 +655,7 @@ describe('McpResponse', () => {
       };
       mockAggregatedIssue.getDescription.returns(mockDescription);
       response.attachConsoleMessage(1);
-      context.getConsoleMessageById = () => {
+      context.getSelectedMcpPage().getConsoleMessageById = () => {
         return mockAggregatedIssue;
       };
 
@@ -646,7 +674,7 @@ describe('McpResponse network request filtering', () => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['script', 'stylesheet'],
       });
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [
           getMockRequest({resourceType: 'script'}),
           getMockRequest({resourceType: 'image'}),
@@ -670,7 +698,7 @@ describe('McpResponse network request filtering', () => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['image'],
       });
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [
           getMockRequest({resourceType: 'script'}),
           getMockRequest({resourceType: 'image'}),
@@ -693,7 +721,7 @@ describe('McpResponse network request filtering', () => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: ['font'],
       });
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [
           getMockRequest({resourceType: 'script'}),
           getMockRequest({resourceType: 'image'}),
@@ -714,7 +742,7 @@ describe('McpResponse network request filtering', () => {
   it('shows all requests when no filters are provided', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true);
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [
           getMockRequest({resourceType: 'script'}),
           getMockRequest({resourceType: 'image'}),
@@ -740,7 +768,7 @@ describe('McpResponse network request filtering', () => {
       response.setIncludeNetworkRequests(true, {
         resourceTypes: [],
       });
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return [
           getMockRequest({resourceType: 'script'}),
           getMockRequest({resourceType: 'image'}),
@@ -765,7 +793,7 @@ describe('McpResponse network pagination', () => {
   it('returns all requests when pagination is not provided', async t => {
     await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 5}, () => getMockRequest());
-      context.getNetworkRequests = () => requests;
+      context.getSelectedMcpPage().getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true);
       const {content, structuredContent} = await response.handle(
         'test',
@@ -786,7 +814,7 @@ describe('McpResponse network pagination', () => {
       const requests = Array.from({length: 30}, (_, idx) =>
         getMockRequest({method: `GET-${idx}`}),
       );
-      context.getNetworkRequests = () => {
+      context.getSelectedMcpPage().getNetworkRequests = () => {
         return requests;
       };
       response.setIncludeNetworkRequests(true, {pageSize: 10});
@@ -809,7 +837,7 @@ describe('McpResponse network pagination', () => {
       const requests = Array.from({length: 25}, (_, idx) =>
         getMockRequest({method: `GET-${idx}`}),
       );
-      context.getNetworkRequests = () => requests;
+      context.getSelectedMcpPage().getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true, {
         pageSize: 10,
         pageIdx: 1,
@@ -831,7 +859,7 @@ describe('McpResponse network pagination', () => {
   it('handles invalid page number by showing first page', async t => {
     await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 5}, () => getMockRequest());
-      context.getNetworkRequests = () => requests;
+      context.getSelectedMcpPage().getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true, {
         pageSize: 2,
         pageIdx: 10, // Invalid page number
@@ -1168,16 +1196,14 @@ describe('third-party developer tools', () => {
 
   it('includes third-party developer tools in select_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const pageId =
-        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      const pageId = context.getSelectedMcpPage().id;
       await selectPage.handler({params: {pageId}}, response, context);
     }, 'select_page');
   });
 
   it('includes third-party developer tools in close_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const pageId =
-        context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+      const pageId = context.getSelectedMcpPage().id;
       await closePage.handler({params: {pageId}}, response, context);
     }, 'close_page');
   });
@@ -1523,8 +1549,7 @@ describe('webmcp', () => {
       t,
       {categoryExperimentalWebmcp: true},
       async (response, context) => {
-        const pageId =
-          context.getPageId(context.getSelectedMcpPage().pptrPage) ?? 1;
+        const pageId = context.getSelectedMcpPage().id;
         await selectPage.handler({params: {pageId}}, response, context);
       },
       'select_page',

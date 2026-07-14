@@ -21,7 +21,10 @@ import {
   getHeapSnapshotRetainingPaths,
   getHeapSnapshotEdges,
   getHeapSnapshotDominators,
+  compareHeapSnapshots,
+  getHeapSnapshotDuplicateStrings,
 } from '../../src/tools/memory.js';
+import {stableIdSymbol} from '../../src/utils/id.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
@@ -102,6 +105,31 @@ describe('memory', () => {
         t.assert.snapshot(output);
       });
     });
+
+    it('with objectsRetainedByContexts filterName', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDetails.handler(
+          {params: {filePath, filterName: 'objectsRetainedByContexts'}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDetails.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
   });
 
   describe('get_heapsnapshot_class_nodes', () => {
@@ -116,6 +144,43 @@ describe('memory', () => {
 
         await getHeapSnapshotClassNodes.handler(
           {params: {filePath, id: 19}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotClassNodes.name,
+          context,
+        );
+
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with objectsRetainedByContexts filterName', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        const aggregateData = await context.getHeapSnapshotAggregates(
+          filePath,
+          'objectsRetainedByContexts',
+        );
+        const aggregate = Object.values(aggregateData.aggregates).find(
+          a => a.name === 'Function',
+        );
+        assert.ok(aggregate);
+        const id = aggregate[stableIdSymbol];
+        assert.ok(id);
+
+        await getHeapSnapshotClassNodes.handler(
+          {params: {filePath, id, filterName: 'objectsRetainedByContexts'}},
           response,
           context,
         );
@@ -351,6 +416,197 @@ describe('memory', () => {
 
         const responseData = await response.handle(
           getHeapSnapshotDominators.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('compare_heapsnapshots', () => {
+    it('compare heap-1 to heap-2', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-1.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+
+        await compareHeapSnapshots.handler(
+          {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareHeapSnapshots.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('compare heap-2 to heap-3', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-3.heapsnapshot',
+        );
+
+        await compareHeapSnapshots.handler(
+          {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareHeapSnapshots.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('compare heap-1 to heap-2 with classIndex filter', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-1.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+
+        await compareHeapSnapshots.handler(
+          {
+            params: {
+              baseFilePath: filePathA,
+              currentFilePath: filePathB,
+              classIndex: 2, // NewObject
+            },
+          },
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          compareHeapSnapshots.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('compare heap-1 to heap-2 with invalid classIndex throws error', async () => {
+      await withMcpContext(async (response, context) => {
+        const filePathA = join(
+          process.cwd(),
+          'tests/fixtures/heap-1.heapsnapshot',
+        );
+        const filePathB = join(
+          process.cwd(),
+          'tests/fixtures/heap-2.heapsnapshot',
+        );
+
+        await assert.rejects(
+          compareHeapSnapshots.handler(
+            {
+              params: {
+                baseFilePath: filePathA,
+                currentFilePath: filePathB,
+                classIndex: 99,
+              },
+            },
+            response,
+            context,
+          ),
+          /Invalid classIndex: 99. Total classes with changes: 10/,
+        );
+      });
+    });
+  });
+
+  // Verifies that the caching mechanism in HeapSnapshotManager correctly
+  // distinguishes comparisons when the same "current" snapshot is compared
+  // against different "base" snapshots. If the cache key (diffCacheKey) is
+  // not unique per base snapshot, the second comparison might incorrectly
+  // return cached results from the first comparison.
+  it('compares the same current snapshot against different bases', async () => {
+    await withMcpContext(async (_response, context) => {
+      const filePathA = join(
+        process.cwd(),
+        'tests/fixtures/heap-1.heapsnapshot',
+      );
+      const filePathB = join(
+        process.cwd(),
+        'tests/fixtures/heap-2.heapsnapshot',
+      );
+      const filePathC = join(
+        process.cwd(),
+        'tests/fixtures/heap-3.heapsnapshot',
+      );
+
+      const firstDiff = await context.getHeapSnapshotClassDiffs(
+        filePathA,
+        filePathC,
+      );
+      const secondDiff = await context.getHeapSnapshotClassDiffs(
+        filePathB,
+        filePathC,
+      );
+      const firstNewObjectDiff = firstDiff.find(
+        entry => entry.className === 'NewObject',
+      );
+      const secondNewObjectDiff = secondDiff.find(
+        entry => entry.className === 'NewObject',
+      );
+      assert.ok(firstNewObjectDiff);
+      assert.ok(secondNewObjectDiff);
+      assert.equal(firstNewObjectDiff.addedCount, 7);
+      assert.equal(secondNewObjectDiff.addedCount, 5);
+    });
+  });
+
+  describe('get_heapsnapshot_duplicate_strings', () => {
+    it('with default options', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDuplicateStrings.handler(
+          {params: {filePath}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDuplicateStrings.name,
           context,
         );
         const output = responseData.content

@@ -9,7 +9,7 @@ import process from 'node:process';
 import readline from 'node:readline';
 import {parseArgs} from 'node:util';
 
-import {logger, flushLogs, saveLogsToFile} from '../../logger.js';
+import {logger, flushLogs, saveLogsToFile} from '../../utils/logger.js';
 import type {OsType} from '../types.js';
 import {WatchdogMessageType} from '../types.js';
 

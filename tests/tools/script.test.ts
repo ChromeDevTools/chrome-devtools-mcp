@@ -78,7 +78,7 @@ describe('script', () => {
 
     it('work for complex objects', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
 
@@ -106,7 +106,7 @@ describe('script', () => {
 
     it('work for scripts that trigger dialogs', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
@@ -129,7 +129,7 @@ describe('script', () => {
 
     it('work for scripts that trigger dialogs and dismiss them', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
@@ -152,7 +152,7 @@ describe('script', () => {
 
     it('work for scripts that trigger prompts and fill them', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
@@ -175,7 +175,7 @@ describe('script', () => {
 
     it('work for async functions', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
 
@@ -198,7 +198,7 @@ describe('script', () => {
 
     it('work with one argument', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
@@ -225,7 +225,7 @@ describe('script', () => {
 
     it('work with multiple args', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
@@ -258,7 +258,7 @@ describe('script', () => {
       server.addHtmlRoute('/main', html`<iframe src="/iframe"></iframe>`);
 
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/main'));
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),

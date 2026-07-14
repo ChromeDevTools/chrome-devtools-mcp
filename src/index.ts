@@ -9,10 +9,8 @@ import type fs from 'node:fs';
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {loadIssueDescriptions} from './issue-descriptions.js';
-import {logger} from './logger.js';
+import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
-import {Mutex} from './Mutex.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -25,6 +23,8 @@ import {
 import {ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
+import {logger} from './utils/logger.js';
+import {Mutex} from './utils/Mutex.js';
 import {VERSION} from './version.js';
 
 export {buildFlag} from './ToolHandler.js';
@@ -86,6 +86,13 @@ export async function createMcpServer(
           void updateRoots();
         },
       );
+    } else if (!serverArgs.allowUnrestrictedPaths) {
+      console.warn(
+        '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
+          'capability. File-writing tools will be restricted to the OS temp directory. ' +
+          'To restore the previous unrestricted behavior, start the server with ' +
+          '--allow-unrestricted-paths.',
+      );
     }
   };
 
@@ -146,6 +153,9 @@ export async function createMcpServer(
         performanceCrux: serverArgs.performanceCrux,
         allowList: allowlist,
         blocklist: blocklist,
+        allowUnrestrictedPaths: serverArgs.allowUnrestrictedPaths,
+        // Surfaces a one-time note in the next response after a reconnect.
+        reconnected: context !== undefined,
       });
       await updateRoots();
     }

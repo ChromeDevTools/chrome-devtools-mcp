@@ -10,7 +10,6 @@ import path from 'node:path';
 
 import {zod} from '../third_party/index.js';
 import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
-import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -20,7 +19,9 @@ async function generateTempFilePath(): Promise<string> {
   return path.join(dir, `screencast.mp4`);
 }
 
-const supportedExtensions: Array<`.${string}`> = ['.webm', '.mp4'];
+type SupportedVideoExtension = '.webm' | '.mp4';
+
+const supportedExtensions: SupportedVideoExtension[] = ['.webm', '.mp4'];
 
 export const startScreencast = definePageTool(args => ({
   name: 'screencast_start',
@@ -68,14 +69,15 @@ export const startScreencast = definePageTool(args => ({
           `Supported formats: ${supportedExtensions.join(', ')} (case-insensitive).`,
       );
     }
-    const enforcedExtension: `.${string}` = matchedExtension ?? '.mp4';
+    const enforcedExtension: SupportedVideoExtension =
+      matchedExtension ?? '.mp4';
     const format: VideoFormat = (matchedExtension?.substring(1) ??
       'mp4') as VideoFormat;
 
-    const resolvedPath = ensureExtension(
-      path.resolve(filePath),
+    const resolvedPath = await context.ensureExtension(
+      filePath,
       enforcedExtension,
-    ) as `${string}.webm`;
+    );
 
     const page = request.page;
 

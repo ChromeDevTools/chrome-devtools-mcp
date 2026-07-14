@@ -11,7 +11,7 @@ import {before, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {loadIssueDescriptions} from '../../src/issue-descriptions.js';
+import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {CdpWebWorker} from '../../src/third_party/index.js';
@@ -284,7 +284,7 @@ describe('console', () => {
 
       it('when dialog is open', async t => {
         await withMcpContext(async (response, context) => {
-          const page = context.getSelectedPptrPage();
+          const page = context.getSelectedMcpPage().pptrPage;
           await page.setContent(
             '<script>console.log("Pre-dialog message")</script>',
           );
@@ -345,7 +345,7 @@ describe('console', () => {
     });
 
     describe('issues type', () => {
-      it('gets issue details with node id parsing', async t => {
+      it.only('gets issue details with node id parsing', async t => {
         await withMcpContext(async (response, context) => {
           const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {
@@ -403,7 +403,7 @@ describe('console', () => {
           `);
           page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
-          const messages = context.getConsoleData(page);
+          const messages = page.getConsoleData();
           let issueMsg;
           for (const message of messages) {
             if (message instanceof DevTools.AggregatedIssue) {
@@ -412,7 +412,7 @@ describe('console', () => {
             }
           }
           assert.ok(issueMsg);
-          const id = context.getConsoleMessageStableId(issueMsg);
+          const id = response.getConsoleMessageStableId(issueMsg);
           assert.ok(id);
           await listConsoleMessages().handler(
             {params: {types: ['issue']}, page: context.getSelectedMcpPage()},
@@ -627,7 +627,7 @@ describe('console', () => {
 
     it('when dialog is open', async t => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(
           '<script>console.error("This is an error")</script>',
         );

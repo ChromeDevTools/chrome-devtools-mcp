@@ -244,10 +244,14 @@ describe('e2e', () => {
   it('allows file access if roots capability is missing', async () => {
     await withClient(
       async client => {
+        // Use os.tmpdir() rather than a hardcoded /tmp path.
+        // On macOS, os.tmpdir() returns /var/folders/... (not /tmp), so a
+        // hardcoded /tmp path is outside the allowed root after the
+        // validatePath fix and would be rejected with Access denied.
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
-            filePath: '/tmp/test.png',
+            filePath: path.join(os.tmpdir(), 'test.png'),
           },
         });
 
@@ -305,7 +309,9 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
-            filePath: '/tmp/test.png',
+            // Use os.tmpdir() so validatePath passes on macOS/Windows before
+            // reaching the dialog-blocked check.
+            filePath: path.join(os.tmpdir(), 'test.png'),
           },
         });
 

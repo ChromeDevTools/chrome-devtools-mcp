@@ -232,11 +232,13 @@
   },
   {
     "name": "experimental_navigation_allowlist",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_navigation_allowlist_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_page_id_routing",
@@ -346,6 +348,28 @@
   },
   {
     "name": "screenshot_max_height_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_data_format_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_data_format",
+    "flagType": "enum",
+    "choices": [
+      "EXPERIMENTAL_DATA_FORMAT_UNSPECIFIED",
+      "EXPERIMENTAL_DATA_FORMAT_DEFAULT",
+      "EXPERIMENTAL_DATA_FORMAT_TOON",
+      "EXPERIMENTAL_DATA_FORMAT_GCF"
+    ]
+  },
+  {
+    "name": "allow_unrestricted_paths_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allow_unrestricted_paths",
     "flagType": "boolean"
   }
 ]

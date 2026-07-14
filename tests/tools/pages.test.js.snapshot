@@ -1,5 +1,5 @@
 exports[`pages > close_page > when dialog is open 1`] = `
-{"content":[{"type":"text","text":"## Pages\\n1: about:blank [selected]"}],"structuredContent":{"pages":[{"id":1,"url":"about:blank","title":"","selected":true}]}}
+{"content":[{"type":"text","text":"Note: the previously selected page was closed. Page 1 is now selected.\\n## Pages\\n1: about:blank [selected]"}],"structuredContent":{"pages":[{"id":1,"url":"about:blank","title":"","selected":true}]}}
 `;
 
 exports[`pages > list_pages > list pages for extension pages with --category-extensions 1`] = `

@@ -121,9 +121,9 @@ To use the Chrome DevTools MCP server follow the instructions from <a href="http
     "chrome-devtools": {
       "command": "npx",
       "args": [
+        "-y",
         "chrome-devtools-mcp@latest",
-        "--browser-url=http://127.0.0.1:9222",
-        "-y"
+        "--browser-url=http://127.0.0.1:9222"
       ]
     }
   }
@@ -334,6 +334,16 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
 </details>
 
 <details>
+  <summary>Grok Build CLI</summary>
+
+```bash
+grok mcp add chrome-devtools npx chrome-devtools-mcp@latest
+```
+
+See the <a href="https://docs.x.ai/build/features/skills-plugins-marketplaces">docs</a> for more options
+</details>
+
+<details>
   <summary>JetBrains AI Assistant & Junie</summary>
 
 Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
@@ -514,12 +524,14 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
-- **Memory** (9 tools)
+- **Memory** (11 tools)
   - [`take_heapsnapshot`](docs/tool-reference.md#take_heapsnapshot)
   - [`close_heapsnapshot`](docs/tool-reference.md#close_heapsnapshot)
+  - [`compare_heapsnapshots`](docs/tool-reference.md#compare_heapsnapshots)
   - [`get_heapsnapshot_class_nodes`](docs/tool-reference.md#get_heapsnapshot_class_nodes)
   - [`get_heapsnapshot_details`](docs/tool-reference.md#get_heapsnapshot_details)
   - [`get_heapsnapshot_dominators`](docs/tool-reference.md#get_heapsnapshot_dominators)
+  - [`get_heapsnapshot_duplicate_strings`](docs/tool-reference.md#get_heapsnapshot_duplicate_strings)
   - [`get_heapsnapshot_edges`](docs/tool-reference.md#get_heapsnapshot_edges)
   - [`get_heapsnapshot_retainers`](docs/tool-reference.md#get_heapsnapshot_retainers)
   - [`get_heapsnapshot_retaining_paths`](docs/tool-reference.md#get_heapsnapshot_retaining_paths)
@@ -739,6 +751,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
   If true, redacts some of the network headers considered sensitive before returning to the client.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--allowUnrestrictedPaths`/ `--allow-unrestricted-paths`**
+  If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, file-writing tools are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
   - **Type:** boolean
   - **Default:** `false`
 

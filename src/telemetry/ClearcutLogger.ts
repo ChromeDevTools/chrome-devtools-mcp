@@ -7,8 +7,8 @@
 import process from 'node:process';
 
 import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
-import {logger} from '../logger.js';
 import type {zod, ShapeOutput} from '../third_party/index.js';
+import {logger} from '../utils/logger.js';
 
 import type {ErrorCode} from './errors.js';
 import type {LocalState, Persistence} from './persistence.js';

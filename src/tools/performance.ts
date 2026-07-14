@@ -6,13 +6,13 @@
 
 import zlib from 'node:zlib';
 
-import {logger} from '../logger.js';
 import {zod, DevTools} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
 } from '../trace-processing/parse.js';
+import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response, ContextPage} from './ToolDefinition.js';
@@ -205,7 +205,7 @@ async function stopTracingAndAppendOutput(
       const file = await context.saveFile(
         dataToWrite,
         filePath,
-        filePath.endsWith('.gz') ? '.json.gz' : '.json',
+        filePath.endsWith('.gz') ? '.gz' : '.json',
       );
       response.appendResponseLine(
         `The raw trace data was saved to ${file.filename}.`,

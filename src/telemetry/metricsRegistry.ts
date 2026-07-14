@@ -10,6 +10,7 @@ import {
   transformArgName,
   transformArgType,
   getZodType,
+  getEnumValues,
   PARAM_BLOCKLIST,
   stripUnderscoreBeforeNumber,
 } from './transformation.js';
@@ -103,13 +104,7 @@ export function generateToolMetrics(tools: ToolDefinition[]): ToolMetric[] {
       let argType = transformArgType(zodType);
 
       if (argType === 'enum') {
-        let values;
-        if (schema._def.values?.length > 0) {
-          values = schema._def.values;
-        } else {
-          values = schema._def.innerType._def.values;
-        }
-        argType = validateEnumHomogeneity(values);
+        argType = validateEnumHomogeneity(getEnumValues(schema));
       }
 
       args.push({

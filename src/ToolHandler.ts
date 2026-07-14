@@ -5,10 +5,9 @@
  */
 
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import {logger} from './logger.js';
 import type {McpContext} from './McpContext.js';
+import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
-import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {bucketizeLatency} from './telemetry/transformation.js';
@@ -18,6 +17,8 @@ import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
+import {logger} from './utils/logger.js';
+import type {Mutex} from './utils/Mutex.js';
 
 export function buildFlag(category: ToolCategory) {
   return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
@@ -213,12 +214,14 @@ export class ToolHandler {
       );
       const context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
-      await context.detectOpenDevToolsWindows();
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+      if (context.consumeReconnectNotice()) {
+        response.setReconnectNotice();
+      }
       try {
         if (this.tool.verifyFilesSchema) {
           for (const key of this.tool.verifyFilesSchema) {
@@ -262,10 +265,18 @@ export class ToolHandler {
       } catch (err) {
         response.setError(err);
       }
+      // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
+      let dataFormat: DataFormat = 'default';
+      if (this.serverArgs.experimentalDataFormat) {
+        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
+      } else if (this.serverArgs.experimentalToonFormat) {
+        dataFormat = 'toon';
+      }
+
       const {content, structuredContent} = await response.handle(
         this.tool.name,
         context,
-        this.serverArgs.experimentalToonFormat ?? false,
+        dataFormat,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;

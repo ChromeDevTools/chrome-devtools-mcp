@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ISSUE_UTILS} from '../issue-descriptions.js';
-import {logger} from '../logger.js';
+import {ISSUE_UTILS} from '../devtools/issueDescriptions.js';
 import {DevTools} from '../third_party/index.js';
+import {logger} from '../utils/logger.js';
 
 export interface IssueFormatterOptions {
   requestIdResolver?: (requestId: string) => number | undefined;

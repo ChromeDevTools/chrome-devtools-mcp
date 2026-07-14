@@ -7,6 +7,13 @@ updates:
       day: 'sunday'
       time: '02:00'
       timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
+      exclude:
+        - 'chrome-devtools-frontend'
+        - 'puppeteer*'
+        - 'lighthouse'
+        - '@google/genai'
     groups:
       dependencies:
         dependency-type: production
@@ -41,6 +48,10 @@ updates:
       day: 'sunday'
       time: '04:00'
       timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
+      exclude:
+        - 'googleapis/*'
     groups:
       all:
         patterns:

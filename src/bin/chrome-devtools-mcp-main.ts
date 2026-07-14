@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import '../polyfill.js';
+import '../utils/polyfill.js';
 
 import process from 'node:process';
 
 import {closeBrowser} from '../browser.js';
 import {createMcpServer, logDisclaimers} from '../index.js';
-import {logger, saveLogsToFile} from '../logger.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {StdioServerTransport} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
+import {logger, saveLogsToFile} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
