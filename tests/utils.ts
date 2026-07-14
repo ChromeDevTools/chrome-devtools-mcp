@@ -265,6 +265,8 @@ export function stabilizeStructuredContent(content: unknown): unknown {
     for (const [key, value] of Object.entries(content)) {
       if (key === 'snapshotFilePath' && typeof value === 'string') {
         result[key] = '<file>';
+      } else if (key === 'targetId' && typeof value === 'string') {
+        result[key] = '<targetId>';
       } else {
         result[key] = stabilizeStructuredContent(value);
       }

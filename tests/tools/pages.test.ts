@@ -22,7 +22,12 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
+import {
+  assertNoServiceWorkerReported,
+  html,
+  stabilizeStructuredContent,
+  withMcpContext,
+} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
   import.meta.dirname,
@@ -61,6 +66,46 @@ describe('pages', () => {
         // list_pages should still work even though the selected page is gone.
         await listPages().handler({params: {}}, response, context);
         assert.ok(response.includePages);
+      });
+    });
+    it('includes the CDP targetId for each listed page', async () => {
+      await withMcpContext(async (response, context) => {
+        // A second page, so targetIds must be present and distinct per page.
+        await context.newPage();
+
+        const listPageDef = listPages();
+        await listPageDef.handler({params: {}}, response, context);
+        const result = await response.handle(listPageDef.name, context);
+
+        const pages = (
+          result.structuredContent as {
+            pages: Array<{id: number; targetId: string}>;
+          }
+        ).pages;
+        assert.ok(pages.length >= 2);
+
+        // Every page carries a non-empty, distinct targetId.
+        for (const page of pages) {
+          assert.strictEqual(typeof page.targetId, 'string');
+          assert.ok(page.targetId.length > 0);
+        }
+        assert.strictEqual(
+          new Set(pages.map(p => p.targetId)).size,
+          pages.length,
+        );
+
+        // Each reported targetId resolves to a real CDP page target, checked via
+        // a separate path than the one that produced the output.
+        const pageTargetIds = new Set(
+          context.browser
+            .targets()
+            .filter(t => t.type() === 'page')
+            // @ts-expect-error use internal Puppeteer API to get target ID
+            .map(t => t._targetId as string),
+        );
+        for (const page of pages) {
+          assert.ok(pageTargetIds.has(page.targetId));
+        }
       });
     });
     it(`list pages for extension pages with --category-extensions`, async t => {
@@ -224,7 +269,7 @@ describe('pages', () => {
         await listPages().handler({params: {}}, response, context);
 
         const result = await response.handle('list_pages', context);
-        t.assert.snapshot(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(stabilizeStructuredContent(result)));
         await dialog.dismiss();
         await evalPromise;
       });
@@ -405,7 +450,7 @@ describe('pages', () => {
         );
 
         const result = await response.handle('new_page', context);
-        t.assert.snapshot(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(stabilizeStructuredContent(result)));
         await dialog.dismiss();
         await evalPromise;
       });
@@ -508,7 +553,7 @@ describe('pages', () => {
         await closePage.handler({params: {pageId: 2}}, response, context);
 
         const result = await response.handle('close_page', context);
-        t.assert.snapshot(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(stabilizeStructuredContent(result)));
       });
     });
   });
@@ -618,7 +663,7 @@ describe('pages', () => {
         await selectPage.handler({params: {pageId: 1}}, response, context);
 
         const result = await response.handle('select_page', context);
-        t.assert.snapshot(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(stabilizeStructuredContent(result)));
         await dialog.dismiss();
         await evalPromise;
       });
@@ -898,7 +943,7 @@ describe('pages', () => {
         );
 
         const result = await response.handle('navigate_page', context);
-        t.assert.snapshot(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(stabilizeStructuredContent(result)));
       });
     });
   });
@@ -1090,7 +1135,7 @@ describe('pages', () => {
         );
 
         const result = await response.handle('resize_page', context);
-        t.assert.snapshot(JSON.stringify(result));
+        t.assert.snapshot(JSON.stringify(stabilizeStructuredContent(result)));
         await dialog.dismiss();
         await evalPromise;
       });

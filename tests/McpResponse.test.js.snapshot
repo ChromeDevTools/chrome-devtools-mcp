@@ -325,7 +325,8 @@ exports[`McpResponse > list pages 2`] = `
       "id": 1,
       "url": "about:blank",
       "title": "",
-      "selected": true
+      "selected": true,
+      "targetId": "<targetId>"
     }
   ]
 }
@@ -1299,7 +1300,8 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
       "id": 1,
       "url": "about:blank",
       "title": "My test page",
-      "selected": true
+      "selected": true,
+      "targetId": "<targetId>"
     }
   ],
   "webmcpTools": [
@@ -1332,7 +1334,8 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
       "id": 1,
       "url": "about:blank",
       "title": "My test page",
-      "selected": true
+      "selected": true,
+      "targetId": "<targetId>"
     }
   ],
   "webmcpTools": [
@@ -1363,7 +1366,8 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
       "id": 1,
       "url": "about:blank",
       "title": "My test page",
-      "selected": true
+      "selected": true,
+      "targetId": "<targetId>"
     }
   ],
   "webmcpTools": [
@@ -1394,7 +1398,8 @@ exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
       "id": 1,
       "url": "about:blank",
       "title": "My test page",
-      "selected": true
+      "selected": true,
+      "targetId": "<targetId>"
     }
   ]
 }

@@ -1374,12 +1374,17 @@ function createStructuredPage(
     url: string;
     title: string;
     selected: boolean;
+    targetId: string;
     isolatedContext?: string;
   } = {
     id: mcpPage.id,
     url: mcpPage.pptrPage.url(),
     title,
     selected: context.isPageSelected(mcpPage),
+    // CDP target id, stable per tab within a browser session, so clients can
+    // correlate an MCP page to its underlying CDP target.
+    // @ts-expect-error use internal Puppeteer API to get target ID
+    targetId: mcpPage.pptrPage.target()._targetId,
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
