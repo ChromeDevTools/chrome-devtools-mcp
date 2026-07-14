@@ -243,7 +243,7 @@ export async function createTargetUniverse(
     hostConfig: {},
     inspectorFrontendHost:
       DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
-    supportsEmulation: true,
+    supportsEmulation: false,
   });
 
   const connection = new PuppeteerDevToolsConnection(session);
