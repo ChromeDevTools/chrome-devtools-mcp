@@ -23,6 +23,69 @@ export type Commands = Record<
   }
 >;
 export const commands: Commands = {
+  add_network_override: {
+    description:
+      'Adds a page-scoped network override that redirects matching requests or fulfills them from a local file. Add the override before navigating or reloading the page.',
+    category: 'Network',
+    args: {
+      urlPattern: {
+        name: 'urlPattern',
+        type: 'string',
+        description:
+          "CDP URL pattern to match. Use '*' for any sequence, '?' for one character, and a backslash to escape a wildcard.",
+        required: true,
+      },
+      resourceType: {
+        name: 'resourceType',
+        type: 'string',
+        description:
+          'Only override requests of this resource type. When omitted, all resource types can match.',
+        required: false,
+        enum: [
+          'document',
+          'stylesheet',
+          'image',
+          'media',
+          'font',
+          'script',
+          'texttrack',
+          'xhr',
+          'fetch',
+          'prefetch',
+          'eventsource',
+          'websocket',
+          'manifest',
+          'signedexchange',
+          'ping',
+          'cspviolationreport',
+          'preflight',
+          'fedcm',
+          'other',
+        ],
+      },
+      redirectUrl: {
+        name: 'redirectUrl',
+        type: 'string',
+        description:
+          'Absolute HTTP(S) URL to load instead. Exactly one of redirectUrl or responseFilePath is required.',
+        required: false,
+      },
+      responseFilePath: {
+        name: 'responseFilePath',
+        type: 'string',
+        description:
+          'Local file to serve as the response. The file is read again for every matching request so rebuilds are picked up. Exactly one of responseFilePath or redirectUrl is required.',
+        required: false,
+      },
+      contentType: {
+        name: 'contentType',
+        type: 'string',
+        description:
+          'Content-Type for a local-file response. When omitted, it is inferred from the file extension.',
+        required: false,
+      },
+    },
+  },
   click: {
     description: 'Clicks on the provided element',
     category: 'Input automation',
@@ -753,6 +816,12 @@ export const commands: Commands = {
     category: 'Extensions',
     args: {},
   },
+  list_network_overrides: {
+    description:
+      'Lists the network overrides configured for the selected page.',
+    category: 'Network',
+    args: {},
+  },
   list_network_requests: {
     description:
       'List all requests for the currently selected page since the last navigation.',
@@ -978,6 +1047,18 @@ export const commands: Commands = {
         name: 'id',
         type: 'string',
         description: 'ID of the extension to reload.',
+        required: true,
+      },
+    },
+  },
+  remove_network_override: {
+    description: 'Removes a network override from the selected page.',
+    category: 'Network',
+    args: {
+      id: {
+        name: 'id',
+        type: 'integer',
+        description: 'ID returned by add_network_override.',
         required: true,
       },
     },

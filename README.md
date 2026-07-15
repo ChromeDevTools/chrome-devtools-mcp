@@ -15,8 +15,9 @@ A [CLI](docs/cli.md) is also provided for use without MCP.
 - **Get performance insights**: Uses [Chrome
   DevTools](https://github.com/ChromeDevTools/devtools-frontend) to record
   traces and extract actionable performance insights.
-- **Advanced browser debugging**: Analyze network requests, take screenshots and
-  check browser console messages (with source-mapped stack traces).
+- **Advanced browser debugging**: Analyze and override network requests, take
+  screenshots and check browser console messages (with source-mapped stack
+  traces).
 - **Reliable automation**. Uses
   [puppeteer](https://github.com/puppeteer/puppeteer) to automate actions in
   Chrome and automatically wait for action results.
@@ -512,9 +513,12 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
   - [`performance_analyze_insight`](docs/tool-reference.md#performance_analyze_insight)
   - [`performance_start_trace`](docs/tool-reference.md#performance_start_trace)
   - [`performance_stop_trace`](docs/tool-reference.md#performance_stop_trace)
-- **Network** (2 tools)
+- **Network** (5 tools)
+  - [`add_network_override`](docs/tool-reference.md#add_network_override)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
+  - [`list_network_overrides`](docs/tool-reference.md#list_network_overrides)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
+  - [`remove_network_override`](docs/tool-reference.md#remove_network_override)
 - **Debugging** (8 tools)
   - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
   - [`get_console_message`](docs/tool-reference.md#get_console_message)

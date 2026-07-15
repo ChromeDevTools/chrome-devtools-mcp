@@ -27,9 +27,12 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (5 tools)
+  - [`add_network_override`](#add_network_override)
   - [`get_network_request`](#get_network_request)
+  - [`list_network_overrides`](#list_network_overrides)
   - [`list_network_requests`](#list_network_requests)
+  - [`remove_network_override`](#remove_network_override)
 - **[Debugging](#debugging)** (8 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -319,6 +322,20 @@
 
 ## Network
 
+### `add_network_override`
+
+**Description:** Adds a page-scoped network override that redirects matching requests or fulfills them from a local file. Add the override before navigating or reloading the page.
+
+**Parameters:**
+
+- **urlPattern** (string) **(required)**: CDP URL pattern to match. Use '*' for any sequence, '?' for one character, and a backslash to escape a wildcard.
+- **contentType** (string) _(optional)_: Content-Type for a local-file response. When omitted, it is inferred from the file extension.
+- **redirectUrl** (string) _(optional)_: Absolute HTTP(S) URL to load instead. Exactly one of redirectUrl or responseFilePath is required.
+- **resourceType** (enum: "document", "stylesheet", "image", "media", "font", "script", "texttrack", "xhr", "fetch", "prefetch", "eventsource", "websocket", "manifest", "signedexchange", "ping", "cspviolationreport", "preflight", "fedcm", "other") _(optional)_: Only override requests of this resource type. When omitted, all resource types can match.
+- **responseFilePath** (string) _(optional)_: Local file to serve as the response. The file is read again for every matching request so rebuilds are picked up. Exactly one of responseFilePath or redirectUrl is required.
+
+---
+
 ### `get_network_request`
 
 **Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.
@@ -328,6 +345,14 @@
 - **reqid** (number) _(optional)_: The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.
 - **requestFilePath** (string) _(optional)_: The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.
 - **responseFilePath** (string) _(optional)_: The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.
+
+---
+
+### `list_network_overrides`
+
+**Description:** Lists the network overrides configured for the selected page.
+
+**Parameters:** None
 
 ---
 
@@ -341,6 +366,16 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+
+---
+
+### `remove_network_override`
+
+**Description:** Removes a network override from the selected page.
+
+**Parameters:**
+
+- **id** (integer) **(required)**: ID returned by [`add_network_override`](#add_network_override).
 
 ---
 

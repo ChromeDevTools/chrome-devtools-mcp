@@ -101,6 +101,10 @@ chrome-devtools list_network_requests # List all network requests
 chrome-devtools list_network_requests --pageSize 50 --pageIdx 0 # List network requests with pagination
 chrome-devtools list_network_requests --resourceTypes Fetch # Filter requests by resource type
 chrome-devtools list_network_requests --includePreservedRequests true # Include preserved requests
+chrome-devtools add_network_override --urlPattern 'https://example.com/app.js*' --resourceType script --redirectUrl 'https://dev.example.com/app.js'
+chrome-devtools add_network_override --urlPattern 'https://example.com/app.js*' --resourceType script --responseFilePath /absolute/path/to/app.js
+chrome-devtools list_network_overrides
+chrome-devtools remove_network_override --id 1
 ```
 
 ## Debugging & Inspection

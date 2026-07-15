@@ -29,6 +29,28 @@ Addional tooling can be enabled by providing the following flags:
 - Use pagination (`pageIdx`, `pageSize`) and filtering (`types`) to minimize data
 - Set `includeSnapshot: false` on input actions unless you need updated page state
 
+### Testing with a network override
+
+Use network overrides when a production page should load a development resource
+without changing the production HTML:
+
+1. Call `add_network_override` before the target navigation or reload.
+2. Provide `urlPattern` and exactly one action:
+   - `redirectUrl` to load another HTTP(S) URL.
+   - `responseFilePath` to fulfill the request from a local file.
+3. Restrict the rule with `resourceType` when possible, for example `script`.
+4. Navigate or reload, then use `list_network_requests` and page behavior to
+   verify the replacement.
+5. Call `list_network_overrides` to inspect active rules and
+   `remove_network_override` when the experiment is complete.
+
+Overrides are scoped to the selected page, persist across its navigations, and
+are removed when that page closes. Newer matching rules take precedence. Local
+files are read again for every match, so a rebuild is picked up on the next
+reload. Service-worker-generated responses can bypass network interception.
+Changed script bytes still fail an incompatible Subresource Integrity hash, and
+cross-origin redirects remain subject to CSP and CORS.
+
 ### Tool selection
 
 - **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)

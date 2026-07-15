@@ -756,6 +756,15 @@ export class McpContext implements Context {
     throw new Error(`Not allowed by allowlist: ${url}`);
   }
 
+  validateNetworkUrl(url: string): void {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+      throw new Error('Unsupported URL protocol: ' + parsedUrl.protocol);
+    }
+    this.#validateUrlNotBlocked(parsedUrl);
+    this.#validateUrlAllowed(parsedUrl);
+  }
+
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
 

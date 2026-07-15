@@ -12,6 +12,10 @@ import type {
   DuplicateStringGroup,
 } from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
+import type {
+  NetworkOverride,
+  NetworkOverrideInput,
+} from '../NetworkOverrideManager.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -194,6 +198,7 @@ export type SupportedExtensions =
  */
 export type Context = Readonly<{
   validatePath(filePath?: string): Promise<void>;
+  validateNetworkUrl(url: string): void;
   ensureExtension<Extension extends `.${string}`>(
     filePath: string,
     extension: Extension,
@@ -334,6 +339,9 @@ export type ContextPage = Readonly<{
     viewport?: Viewport;
   }): Promise<void>;
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  addNetworkOverride(input: NetworkOverrideInput): Promise<NetworkOverride>;
+  listNetworkOverrides(): NetworkOverride[];
+  removeNetworkOverride(id: number): Promise<boolean>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

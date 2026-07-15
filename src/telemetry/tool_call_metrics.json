@@ -886,6 +886,44 @@
     ]
   },
   {
+    "name": "add_network_override",
+    "args": [
+      {
+        "name": "url_pattern_length",
+        "argType": "number"
+      },
+      {
+        "name": "resource_type",
+        "argType": "string"
+      },
+      {
+        "name": "redirect_url_length",
+        "argType": "number"
+      },
+      {
+        "name": "response_file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "content_type_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "list_network_overrides",
+    "args": []
+  },
+  {
+    "name": "remove_network_override",
+    "args": [
+      {
+        "name": "id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
     "name": "get_heapsnapshot_object_details",
     "args": [
       {

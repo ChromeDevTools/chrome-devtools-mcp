@@ -60,6 +60,11 @@ import {
   type TargetUniverse,
 } from './devtools/DevtoolsUtils.js';
 import {
+  NetworkOverrideManager,
+  type NetworkOverride,
+  type NetworkOverrideInput,
+} from './NetworkOverrideManager.js';
+import {
   ConsoleCollector,
   NetworkCollector,
   type ListenerMap,
@@ -137,6 +142,7 @@ export class McpPage implements ContextPage {
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
+  #networkOverrideManager: NetworkOverrideManager;
 
   constructor(
     page: Page,
@@ -150,6 +156,7 @@ export class McpPage implements ContextPage {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.pptrPage = page;
+    this.#networkOverrideManager = new NetworkOverrideManager(page);
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
@@ -424,8 +431,21 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.pptrPage.off('dialog', this.#dialogHandler);
+    void this.#networkOverrideManager.dispose();
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
+  }
+
+  addNetworkOverride(input: NetworkOverrideInput): Promise<NetworkOverride> {
+    return this.#networkOverrideManager.add(input);
+  }
+
+  listNetworkOverrides(): NetworkOverride[] {
+    return this.#networkOverrideManager.list();
+  }
+
+  removeNetworkOverride(id: number): Promise<boolean> {
+    return this.#networkOverrideManager.remove(id);
   }
 
   async executeThirdPartyDeveloperTool(
