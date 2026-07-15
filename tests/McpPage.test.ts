@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -286,6 +286,52 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
+  describe('network overrides', () => {
+    // eslint-disable-next-line @local/no-sinon-restore-in-hooks
+    afterEach(() => sinon.restore());
+    it('initializes interception and releases it after the last override', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const override = await page.addNetworkOverride({
+        kind: 'redirect',
+        urlPattern: '*.js',
+        redirectUrl: 'https://example.com/replacement.js',
+      });
+      assert.deepStrictEqual(page.listNetworkOverrides(), [override]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setCacheEnabled, false);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      assert.strictEqual(await page.removeNetworkOverride(override.id), true);
+      assert.deepStrictEqual(page.listNetworkOverrides(), []);
+      sinon.assert.calledWithExactly(
+        pptrPage.setRequestInterception.secondCall,
+        false,
+      );
+      sinon.assert.calledWithExactly(pptrPage.setCacheEnabled.secondCall, true);
+      page.dispose();
+    });
+
+    it('rejects adding overrides after disposal', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      page.dispose();
+      await assert.rejects(
+        page.addNetworkOverride({
+          kind: 'redirect',
+          urlPattern: '*.js',
+          redirectUrl: 'https://example.com/replacement.js',
+        }),
+        /already been disposed/,
+      );
+      sinon.assert.notCalled(pptrPage.setRequestInterception);
+    });
+  });
+
   async function createMcpPage(options: {config?: ReadonlyServerConfig} = {}) {
     const pptrPage = createMockPuppeteerPage();
     pptrPage.emulateFocusedPage.resolves();
