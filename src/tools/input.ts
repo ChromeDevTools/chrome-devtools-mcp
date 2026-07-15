@@ -467,9 +467,7 @@ export const uploadFile = definePageTool({
     filePaths: zod
       .array(zod.string())
       .min(1)
-      .describe(
-        'The local paths of the files to upload. Pass a single path to upload one file, or several paths to upload multiple files to an input that accepts them',
-      ),
+      .describe('One or more local paths of files to upload.'),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
