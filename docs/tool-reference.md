@@ -27,9 +27,12 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (5 tools)
   - [`get_network_request`](#get_network_request)
+  - [`get_websocket_message`](#get_websocket_message)
   - [`list_network_requests`](#list_network_requests)
+  - [`list_websocket_connections`](#list_websocket_connections)
+  - [`list_websocket_messages`](#list_websocket_messages)
 - **[Debugging](#debugging)** (8 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -330,6 +333,18 @@
 
 ---
 
+### `get_websocket_message`
+
+**Description:** Get the payload of a WebSocket message by its id. You can list messages with [`list_websocket_messages`](#list_websocket_messages). Stored payloads are capped at 100000 characters.
+
+**Parameters:**
+
+- **messageId** (integer) **(required)**: The id of the message as reported by [`list_websocket_messages`](#list_websocket_messages).
+- **wsId** (integer) **(required)**: The id of the WebSocket connection as reported by [`list_websocket_connections`](#list_websocket_connections).
+- **filePath** (string) _(optional)_: The absolute or relative path of a file to save the payload to. If omitted, the payload is returned inline. The file is saved with a .txt extension and the path must be inside the configured workspace roots.
+
+---
+
 ### `list_network_requests`
 
 **Description:** List all requests for the currently selected page since the last navigation.
@@ -340,6 +355,30 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+
+---
+
+### `list_websocket_connections`
+
+**Description:** List the WebSocket connections of the currently selected page. Open connections are always listed, including connections created early during page load; closed connections are listed until the page navigates. Traffic is captured from the moment the page is inspected: messages exchanged before that are not recorded, so reload the page to capture a connection from its start. Use [`list_websocket_messages`](#list_websocket_messages) to inspect the messages of a connection; wsIds are scoped to the page that created the connection.
+
+**Parameters:**
+
+- **includePreservedConnections** (boolean) _(optional)_: Set to true to also return closed connections preserved over the last 3 navigations.
+
+---
+
+### `list_websocket_messages`
+
+**Description:** List the messages of a WebSocket connection of the currently selected page, oldest first. Message payloads are shown as a single-line preview; use [`get_websocket_message`](#get_websocket_message) for a full payload. Only data messages are recorded (no ping/pong control frames). Retention is bounded per connection: the last 500 messages within a 2MB budget, and stored payloads are capped at 100000 characters (longer ones are marked truncated).
+
+**Parameters:**
+
+- **wsId** (integer) **(required)**: The id of the WebSocket connection as reported by [`list_websocket_connections`](#list_websocket_connections).
+- **direction** (enum: "sent", "received") _(optional)_: Only return messages sent by the page ("sent") or received from the server ("received").
+- **filter** (string) _(optional)_: Case-sensitive substring; only messages whose payload contains it are returned.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all retained messages.
 
 ---
 

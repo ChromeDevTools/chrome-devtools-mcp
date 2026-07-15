@@ -101,6 +101,8 @@ import {
   type WaitForEventsResult,
   type DialogAction,
 } from './WaitForHelper.js';
+import {WebSocketCollector} from './WebSocketCollector.js';
+import type {WebSocketConnection} from './WebSocketCollector.js';
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
@@ -134,6 +136,7 @@ export class McpPage implements ContextPage {
 
   networkCollector: NetworkCollector;
   consoleCollector: ConsoleCollector;
+  webSocketCollector: WebSocketCollector;
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
@@ -171,6 +174,7 @@ export class McpPage implements ContextPage {
         },
       } as ListenerMap;
     });
+    this.webSocketCollector = new WebSocketCollector(page);
   }
 
   async init(): Promise<void> {
@@ -375,6 +379,28 @@ export class McpPage implements ContextPage {
     return this.networkCollector.getById(reqid);
   }
 
+  getWebSocketConnections(
+    includePreservedConnections?: boolean,
+  ): WebSocketConnection[] {
+    return this.webSocketCollector.getData(includePreservedConnections);
+  }
+
+  getWebSocketConnectionStableId(connection: WebSocketConnection): number {
+    return this.webSocketCollector.getIdForResource(connection);
+  }
+
+  getWebSocketConnectionById(wsId: number): WebSocketConnection {
+    const connection = this.webSocketCollector.find(item => {
+      return this.webSocketCollector.getIdForResource(item) === wsId;
+    });
+    if (!connection) {
+      throw new Error(
+        `No WebSocket connection with wsId=${wsId} on the selected page. wsIds are scoped to the page that created the connection; list the connections of the currently selected page first.`,
+      );
+    }
+    return connection;
+  }
+
   get networkConditions(): string | null {
     return this.emulationSettings.networkConditions ?? null;
   }
@@ -426,6 +452,7 @@ export class McpPage implements ContextPage {
     this.pptrPage.off('dialog', this.#dialogHandler);
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
+    this.webSocketCollector.dispose();
   }
 
   async executeThirdPartyDeveloperTool(

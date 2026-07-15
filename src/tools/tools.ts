@@ -23,6 +23,7 @@ import * as snapshotTools from './snapshot.js';
 import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
 import type {ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
+import * as websocketTools from './websockets.js';
 
 export const createTools = (args: ParsedArguments) => {
   const rawTools = args.slim
@@ -43,6 +44,7 @@ export const createTools = (args: ParsedArguments) => {
         ...Object.values(snapshotTools),
         ...Object.values(thirdPartyDeveloperTools),
         ...Object.values(webmcpTools),
+        ...Object.values(websocketTools),
       ];
 
   const tools = [];

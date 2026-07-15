@@ -596,6 +596,34 @@ export const commands: Commands = {
       },
     },
   },
+  get_websocket_message: {
+    description:
+      'Get the payload of a WebSocket message by its id. You can list messages with list_websocket_messages. Stored payloads are capped at 100000 characters.',
+    category: 'Network',
+    args: {
+      wsId: {
+        name: 'wsId',
+        type: 'integer',
+        description:
+          'The id of the WebSocket connection as reported by list_websocket_connections.',
+        required: true,
+      },
+      messageId: {
+        name: 'messageId',
+        type: 'integer',
+        description:
+          'The id of the message as reported by list_websocket_messages.',
+        required: true,
+      },
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description:
+          'The absolute or relative path of a file to save the payload to. If omitted, the payload is returned inline. The file is saved with a .txt extension and the path must be inside the configured workspace roots.',
+        required: false,
+      },
+    },
+  },
   handle_dialog: {
     description:
       'If a browser dialog was opened, use this command to handle it',
@@ -780,6 +808,64 @@ export const commands: Commands = {
       'Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)',
     category: 'WebMCP',
     args: {},
+  },
+  list_websocket_connections: {
+    description:
+      'List the WebSocket connections of the currently selected page. Open connections are always listed, including connections created early during page load; closed connections are listed until the page navigates. Traffic is captured from the moment the page is inspected: messages exchanged before that are not recorded, so reload the page to capture a connection from its start. Use list_websocket_messages to inspect the messages of a connection; wsIds are scoped to the page that created the connection.',
+    category: 'Network',
+    args: {
+      includePreservedConnections: {
+        name: 'includePreservedConnections',
+        type: 'boolean',
+        description:
+          'Set to true to also return closed connections preserved over the last 3 navigations.',
+        required: false,
+        default: false,
+      },
+    },
+  },
+  list_websocket_messages: {
+    description:
+      'List the messages of a WebSocket connection of the currently selected page, oldest first. Message payloads are shown as a single-line preview; use get_websocket_message for a full payload. Only data messages are recorded (no ping/pong control frames). Retention is bounded per connection: the last 500 messages within a 2MB budget, and stored payloads are capped at 100000 characters (longer ones are marked truncated).',
+    category: 'Network',
+    args: {
+      wsId: {
+        name: 'wsId',
+        type: 'integer',
+        description:
+          'The id of the WebSocket connection as reported by list_websocket_connections.',
+        required: true,
+      },
+      direction: {
+        name: 'direction',
+        type: 'string',
+        description:
+          'Only return messages sent by the page ("sent") or received from the server ("received").',
+        required: false,
+        enum: ['sent', 'received'],
+      },
+      filter: {
+        name: 'filter',
+        type: 'string',
+        description:
+          'Case-sensitive substring; only messages whose payload contains it are returned.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'integer',
+        description:
+          'Maximum number of messages to return. When omitted, returns all retained messages.',
+        required: false,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'integer',
+        description:
+          'Page number to return (0-based). When omitted, returns the first page.',
+        required: false,
+      },
+    },
   },
   navigate_page: {
     description:

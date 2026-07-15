@@ -31,6 +31,7 @@ import type {
 } from '../types.js';
 import type {PaginationOptions} from '../types.js';
 import type {WaitForEventsResult, DialogAction} from '../WaitForHelper.js';
+import type {WebSocketConnection} from '../WebSocketCollector.js';
 
 import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
@@ -293,6 +294,12 @@ export type ContextPage = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpRequestId(cdpRequestId: string): number | undefined;
+
+  getWebSocketConnections(
+    includePreservedConnections?: boolean,
+  ): WebSocketConnection[];
+  getWebSocketConnectionStableId(connection: WebSocketConnection): number;
+  getWebSocketConnectionById(wsId: number): WebSocketConnection;
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;

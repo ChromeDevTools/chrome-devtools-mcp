@@ -35,6 +35,14 @@ Addional tooling can be enabled by providing the following flags:
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
 - **Additional details**: `evaluate_script` for data not in accessibility tree
 
+### Inspecting WebSocket traffic
+
+1. Connections: `list_websocket_connections` lists the WebSocket connections of the selected page with their `wsId`.
+2. Messages: `list_websocket_messages` with a `wsId` lists sent/received payloads; narrow with `direction` and a payload `filter`.
+3. Full payload: `get_websocket_message` returns one message in full (`filePath` saves it to a file).
+
+Messages are recorded from the moment the page is inspected; reload the page to capture a connection from its start. Open connections stay listed across client-side route changes; pass `includePreservedConnections` to also see connections closed by earlier navigations.
+
 ### Parallel execution
 
 You can send multiple tool calls in parallel, but maintain correct order: navigate → wait → snapshot → interact.
