@@ -250,21 +250,15 @@ nodeId,nodeName,selfSize,retainedSize
 exports[`memory > get_heapsnapshot_duplicate_strings > with default options 1`] = `
 ## Heap Snapshot Data
 ### Duplicate Strings
-Showing 1-13 of 13 (Page 1 of 1).
+Showing 1-7 of 7 (Page 1 of 1).
 value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds
 "get disposed",8,0.2 kB,0.2 kB,false,@30685 @30731 @33713 @33781 @42891 @42947 @45203 @45233
 "WebAssembly.Suspending",4,0.1 kB,0.1 kB,false,@44967 @45473 @46069 @46195
 "extensions::SafeBuiltins",2,0.1 kB,0.1 kB,false,@25155 @26209
 "WebAssembly",2,0.0 kB,0.0 kB,false,@7495 @15037
-"EventTarget",3,0.0 kB,0.0 kB,false,@13309 @25089 @26185
+"EventTarget",2,0.0 kB,0.0 kB,false,@25089 @26185
 "v8/LoadTimes",2,0.0 kB,0.0 kB,false,@25159 @26365
-"Document",3,0.0 kB,0.0 kB,false,@12341 @25969 @26603
-"WebAssembly.Exception",2,0.0 kB,0.0 kB,false,@1855 @7473
-"WebAssembly.Module",2,0.0 kB,0.0 kB,false,@1857 @7429
-"HTMLBodyElement",2,0.0 kB,0.0 kB,false,@13679 @44753
-"MutationObserver",2,0.0 kB,0.0 kB,false,@14347 @32179
-"HTMLElement",2,0.0 kB,0.0 kB,false,@11557 @43899
-" ",2,0.0 kB,0.0 kB,false,@725 @789
+"Document",2,0.0 kB,0.0 kB,false,@25969 @26603
 `;
 
 exports[`memory > get_heapsnapshot_edges > with pagination 1`] = `
