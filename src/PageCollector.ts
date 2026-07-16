@@ -374,7 +374,10 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     super(browser, listeners);
   }
   override splitAfterNavigation(page: Page) {
-    const navigations = this.storage.get(page) ?? [];
+    const navigations = this.storage.get(page);
+    if (!navigations) {
+      return;
+    }
 
     const requests = navigations[0];
 
