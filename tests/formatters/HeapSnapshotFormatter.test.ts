@@ -11,6 +11,8 @@ import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.
 import {DevTools} from '../../src/third_party/index.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+
 describe('HeapSnapshotFormatter', () => {
   DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
     create: true,
@@ -62,15 +64,15 @@ describe('HeapSnapshotFormatter', () => {
           id: 1,
           className: 'ObjectA',
           count: 10,
-          selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(100),
-          retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(1000),
+          selfSize: formatBytesToKb(100),
+          retainedSize: formatBytesToKb(1000),
         },
         {
           id: 2,
           className: 'ObjectB',
           count: 5,
-          selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(50),
-          retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(500),
+          selfSize: formatBytesToKb(50),
+          retainedSize: formatBytesToKb(500),
         },
       ]);
     });
@@ -146,7 +148,7 @@ describe('HeapSnapshotFormatter', () => {
       const result = HeapSnapshotFormatter.formatDiffSummary(summarized);
       const expected = [
         'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
-        `0,Balanced,1,1,0,${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(0)}`,
+        `0,Balanced,1,1,0,${formatBytesToKb(100)},${formatBytesToKb(100)},${formatBytesToKb(0)}`,
       ].join('\n');
 
       assert.strictEqual(result, expected);
@@ -175,8 +177,8 @@ describe('HeapSnapshotFormatter', () => {
       };
 
       const formatted = HeapSnapshotFormatter.formatDiffDetails(details);
-      const formatted120 = DevTools.I18n.ByteUtilities.formatBytesToKb(120);
-      const formatted60 = DevTools.I18n.ByteUtilities.formatBytesToKb(60);
+      const formatted120 = formatBytesToKb(120);
+      const formatted60 = formatBytesToKb(60);
 
       const expected = [
         `MyClass: # new: 2, # deleted: 1, # delta: +1, alloc size: +${formatted120}, freed size: +${formatted60}, size delta: +${formatted60}`,
@@ -278,8 +280,8 @@ describe('HeapSnapshotFormatter', () => {
       const result = HeapSnapshotFormatter.formatDominators(mockDominators);
       const expected = [
         'nodeId,nodeName,selfSize,retainedSize',
-        `10,ClassA,${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(1000)}`,
-        `20,ClassB,${DevTools.I18n.ByteUtilities.formatBytesToKb(50)},${DevTools.I18n.ByteUtilities.formatBytesToKb(500)}`,
+        `10,ClassA,${formatBytesToKb(100)},${formatBytesToKb(1000)}`,
+        `20,ClassB,${formatBytesToKb(50)},${formatBytesToKb(500)}`,
       ].join('\n');
 
       assert.strictEqual(result, expected);
@@ -323,10 +325,10 @@ describe('HeapSnapshotFormatter', () => {
       const result = HeapSnapshotFormatter.formatNativeContextSizes(mockSizes);
       const expected = [
         'nodeId,nodeName,selfSize,retainedSize,attributedSize',
-        `20,system / NativeContext / https://example.com,${DevTools.I18n.ByteUtilities.formatBytesToKb(200)},${DevTools.I18n.ByteUtilities.formatBytesToKb(5000)},${DevTools.I18n.ByteUtilities.formatBytesToKb(2000)}`,
-        `10,system / NativeContext,${DevTools.I18n.ByteUtilities.formatBytesToKb(100)},${DevTools.I18n.ByteUtilities.formatBytesToKb(1000)},${DevTools.I18n.ByteUtilities.formatBytesToKb(500)}`,
-        `Shared Size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(300)}`,
-        `Unattributed Size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(400)}`,
+        `20,system / NativeContext / https://example.com,${formatBytesToKb(200)},${formatBytesToKb(5000)},${formatBytesToKb(2000)}`,
+        `10,system / NativeContext,${formatBytesToKb(100)},${formatBytesToKb(1000)},${formatBytesToKb(500)}`,
+        `Shared Size: ${formatBytesToKb(300)}`,
+        `Unattributed Size: ${formatBytesToKb(400)}`,
       ].join('\n');
 
       assert.strictEqual(result, expected);

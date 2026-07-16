@@ -53,6 +53,8 @@ import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
 
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+
 export type DataFormat = 'default' | 'toon' | 'gcf';
 
 interface TraceInsightData {
@@ -1073,9 +1075,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         response.push(`Objects: ${aggregateData.objectCount}`);
         response.push(
-          `Total shallow size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(
-            aggregateData.totalSelfSize,
-          )}`,
+          `Total shallow size: ${formatBytesToKb(aggregateData.totalSelfSize)}`,
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.aggregateStats = {
