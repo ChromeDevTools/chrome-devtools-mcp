@@ -51,13 +51,7 @@ if (userArgs.length > 0) {
       process.exit(0);
     }
   } else if (files.length === 0) {
-    const {glob} = await import('node:fs/promises');
-    for await (const tsFile of glob('tests/**/*.test.ts')) {
-      if (tsFile.replace(/\\/g, '/') === 'tests/third_party_notices.test.ts') {
-        continue;
-      }
-      files.push(path.join('build', tsFile.replace(/\.ts$/, '.js')));
-    }
+    files.push('build/tests/**/*.test.js');
   }
 }
 
