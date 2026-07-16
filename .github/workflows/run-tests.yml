@@ -71,6 +71,13 @@ jobs:
           ${{ matrix.os == 'windows-latest' && '--test-concurrency=1' || '' }}
           ${{ github.event_name == 'merge_group' && '--retry' || '' }}
 
+      - name: Run notices tests
+        shell: bash
+        run: >
+          npm run test:notices:no-build --
+          ${{ matrix.os == 'windows-latest' && '--test-concurrency=1' || '' }}
+          ${{ github.event_name == 'merge_group' && '--retry' || '' }}
+
   # Gating job for branch protection.
   test-success:
     name: '[Required] Tests passed'

@@ -22,6 +22,8 @@
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/bin/chrome-devtools-mcp.js",
     "test": "npm run build && node scripts/test.mjs",
     "test:no-build": "node scripts/test.mjs",
+    "test:notices": "npm run bundle && node scripts/test.mjs tests/third_party_notices.test.ts",
+    "test:notices:no-build": "node scripts/test.mjs tests/third_party_notices.test.ts",
     "test:only": "npm run build && node scripts/test.mjs --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
     "prepare": "node scripts/prepare.ts",
