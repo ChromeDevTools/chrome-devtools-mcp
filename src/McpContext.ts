@@ -646,8 +646,13 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
+    objectId?: number,
   ): Promise<HeapSnapshotAggregateData> {
-    return await this.#heapSnapshotManager.getAggregates(filePath, filterName);
+    return await this.#heapSnapshotManager.getAggregates(
+      filePath,
+      filterName,
+      objectId,
+    );
   }
 
   async getHeapSnapshotDuplicateStrings(
@@ -678,11 +683,13 @@ export class McpContext implements Context {
     filePath: string,
     id: number,
     filterName?: string,
+    objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     return await this.#heapSnapshotManager.getNodesById(
       filePath,
       id,
       filterName,
+      objectId,
     );
   }
 

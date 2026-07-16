@@ -61,6 +61,25 @@ nodeId,nodeName,type,distance,selfSize,retainedSize
 Showing 1-6 of 6 (Page 1 of 1).
 `;
 
+exports[`memory > get_heapsnapshot_details > with attributedToSpecificNativeContext filterName and objectId 1`] = `
+## Heap Snapshot Data
+Objects: 4589
+Total shallow size: 350 kB
+Showing 1-10 of 150 (Page 1 of 15).
+Next page: 1
+id,name,count,selfSize,maxRetainedSize
+1,(system),1739,115 kB,350 kB
+7,Function,1095,34.9 kB,72.2 kB
+11,(object shape),769,52.6 kB,53.3 kB
+10,Window (global*) / https://example.com,1,40.5 kB,51.0 kB
+36,(array),6,9.1 kB,46.0 kB
+17,Window (prototype) / https://example.com,2,26.7 kB,26.9 kB
+4,(compiled code),323,19.3 kB,19.4 kB
+3,(string),376,10.5 kB,10.5 kB
+19,Window (internal cache) / https://example.com,2,0.2 kB,10.1 kB
+72,Document,1,8.4 kB,8.7 kB
+`;
+
 exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Objects: 11940
@@ -236,6 +255,19 @@ id,name,count,selfSize,maxRetainedSize
 3,Function,6,0.2 kB,0.7 kB
 2,(compiled code),22,0.5 kB,0.5 kB
 4,Array,4,0.3 kB,0.3 kB
+`;
+
+exports[`memory > get_heapsnapshot_details > with sharedNativeContext filterName 1`] = `
+## Heap Snapshot Data
+Objects: 558
+Total shallow size: 22.9 kB
+Showing 1-5 of 5 (Page 1 of 1).
+id,name,count,selfSize,maxRetainedSize
+3,(string),443,16.6 kB,16.6 kB
+1,(compiled code),85,5.9 kB,9.8 kB
+4,(system),12,0.2 kB,0.6 kB
+2,(number),16,0.2 kB,0.2 kB
+5,(concatenated string),2,0.0 kB,0.1 kB
 `;
 
 exports[`memory > get_heapsnapshot_dominators > with valid nodeId 1`] = `

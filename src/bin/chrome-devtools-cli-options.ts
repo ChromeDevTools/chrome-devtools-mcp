@@ -359,7 +359,17 @@ export const commands: Commands = {
           'objectsRetainedByConsole',
           'objectsRetainedByEventHandlers',
           'objectsRetainedByContexts',
+          'sharedNativeContext',
+          'noNativeContext',
+          'attributedToSpecificNativeContext',
         ],
+      },
+      objectId: {
+        name: 'objectId',
+        type: 'number',
+        description:
+          'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -396,7 +406,17 @@ export const commands: Commands = {
           'objectsRetainedByConsole',
           'objectsRetainedByEventHandlers',
           'objectsRetainedByContexts',
+          'sharedNativeContext',
+          'noNativeContext',
+          'attributedToSpecificNativeContext',
         ],
+      },
+      objectId: {
+        name: 'objectId',
+        type: 'number',
+        description:
+          'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
