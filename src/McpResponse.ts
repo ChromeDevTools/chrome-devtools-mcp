@@ -53,6 +53,8 @@ import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
 
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+
 export type DataFormat = 'default' | 'toon' | 'gcf';
 
 interface TraceInsightData {
@@ -83,12 +85,14 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
+    nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
     classDiffs?: HeapSnapshotClassDiff[];
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
+    objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -330,12 +334,14 @@ export class McpResponse implements Response {
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+    nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       stats,
       staticData,
+      nativeContextSizes,
     };
   }
 
@@ -398,6 +404,16 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+    };
+  }
+
+  setHeapSnapshotObjectDetails(
+    objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      objectInfo,
     };
   }
 
@@ -730,6 +746,7 @@ export class McpResponse implements Response {
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
+        nativeContextSizes?: object;
         aggregateStats?: {
           objectCount: number;
           totalSelfSize: number;
@@ -742,6 +759,7 @@ export class McpResponse implements Response {
       heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
+      heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1035,6 +1053,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
       }
+      const nativeContextSizes = this.#heapSnapshotOptions.nativeContextSizes;
+      if (nativeContextSizes) {
+        response.push('### Native Contexts');
+        response.push(
+          HeapSnapshotFormatter.formatNativeContextSizes(nativeContextSizes),
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
+      }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {
         const sortedEntries = HeapSnapshotFormatter.sort(
@@ -1048,9 +1075,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         response.push(`Objects: ${aggregateData.objectCount}`);
         response.push(
-          `Total shallow size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(
-            aggregateData.totalSelfSize,
-          )}`,
+          `Total shallow size: ${formatBytesToKb(aggregateData.totalSelfSize)}`,
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.aggregateStats = {
@@ -1163,6 +1188,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(formatted);
 
         structuredContent.heapSnapshotDuplicateStrings = paginationData.items;
+      }
+      const objectInfo = this.#heapSnapshotOptions.objectInfo;
+      if (objectInfo) {
+        response.push('### Object Details');
+        response.push(
+          compactEncode
+            ? compactEncode(objectInfo)
+            : HeapSnapshotFormatter.formatObjectInfo(objectInfo),
+        );
+        structuredContent.heapSnapshotObjectDetails = objectInfo;
       }
     }
 

@@ -39,7 +39,7 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (11 tools)
+- **[Memory](#memory)** (12 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
   - [`compare_heapsnapshots`](#compare_heapsnapshots)
@@ -48,6 +48,7 @@
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
   - [`get_heapsnapshot_duplicate_strings`](#get_heapsnapshot_duplicate_strings)
   - [`get_heapsnapshot_edges`](#get_heapsnapshot_edges)
+  - [`get_heapsnapshot_object_details`](#get_heapsnapshot_object_details)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
   - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
@@ -539,6 +540,17 @@ in the DevTools Elements panel (if any).
 
 ---
 
+### `get_heapsnapshot_object_details`
+
+**Description:** Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **nodeId** (number) **(required)**: The node ID to get object details for.
+
+---
+
 ### `get_heapsnapshot_retainers`
 
 **Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
@@ -568,7 +580,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)
+**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 

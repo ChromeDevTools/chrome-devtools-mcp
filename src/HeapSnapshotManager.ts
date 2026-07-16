@@ -120,6 +120,13 @@ export class HeapSnapshotManager {
     return snapshot.staticData;
   }
 
+  async getNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getNativeContextSizes();
+  }
+
   async getOrCreateIdForClassKey(
     filePath: string,
     classKey: string,
@@ -165,6 +172,18 @@ export class HeapSnapshotManager {
     }
     const provider = snapshot.createRetainingEdgesProvider(nodeIndex);
     return await provider.serializeItemsRange(0, Infinity);
+  }
+
+  async getObjectInfo(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    return await snapshot.getObjectInfo(nodeIndex);
   }
 
   async getRetainingPaths(

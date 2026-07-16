@@ -668,6 +668,12 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
+  async getHeapSnapshotNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    return await this.#heapSnapshotManager.getNativeContextSizes(filePath);
+  }
+
   async getHeapSnapshotNodesById(
     filePath: string,
     id: number,
@@ -685,6 +691,13 @@ export class McpContext implements Context {
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
+  }
+
+  async getHeapSnapshotObjectDetails(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    return await this.#heapSnapshotManager.getObjectInfo(filePath, nodeId);
   }
 
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
