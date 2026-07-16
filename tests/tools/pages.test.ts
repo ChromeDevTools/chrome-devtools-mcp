@@ -1293,7 +1293,7 @@ describe('pages', () => {
         const result = await response.handle('get_tab_id', context);
         // @ts-expect-error _tabId is internal.
         assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
-        assert.deepStrictEqual(response.responseLines, []);
+        assert.deepStrictEqual(response.responseLines, ['Tab ID: test-tab-id']);
       });
     });
   });
