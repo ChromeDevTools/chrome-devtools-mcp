@@ -92,4 +92,58 @@ describe('resolveCanonicalPath', () => {
       await fs.rm(tmpDir, {recursive: true, force: true});
     }
   });
+
+  it('should resolve a dangling symlink to its target rather than its own path', async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    );
+    try {
+      const insideDir = path.join(tmpDir, 'inside');
+      const outsideDir = path.join(tmpDir, 'outside');
+      await fs.mkdir(insideDir);
+      await fs.mkdir(outsideDir);
+
+      // A symlink that lives inside `insideDir` but points at a not-yet-created
+      // file under `outsideDir`. fs.realpath() reports ENOENT for such a link,
+      // so it must be resolved explicitly to its target.
+      const danglingLink = path.join(insideDir, 'report.txt');
+      const linkTarget = path.join(outsideDir, 'pwned.txt');
+      await fs.symlink(linkTarget, danglingLink);
+
+      const resolved = await resolveCanonicalPath(danglingLink);
+      assert.strictEqual(
+        resolved,
+        path.join(await fs.realpath(outsideDir), 'pwned.txt'),
+      );
+    } finally {
+      await fs.rm(tmpDir, {recursive: true, force: true});
+    }
+  });
+
+  it('should resolve a not-yet-existing file through a dangling directory symlink', async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    );
+    try {
+      const insideDir = path.join(tmpDir, 'inside');
+      await fs.mkdir(insideDir);
+
+      // `escape` is a directory symlink inside `insideDir` whose target does
+      // not exist yet. Both the target directory and the final file are
+      // missing, so the walk must still resolve the intermediate symlink.
+      const escapeLink = path.join(insideDir, 'escape');
+      const escapeTarget = path.join(tmpDir, 'outside-dir');
+      await fs.symlink(escapeTarget, escapeLink, 'dir');
+
+      const filePath = path.join(escapeLink, 'out.txt');
+
+      const resolved = await resolveCanonicalPath(filePath);
+      assert.strictEqual(
+        resolved,
+        path.join(await fs.realpath(tmpDir), 'outside-dir', 'out.txt'),
+      );
+    } finally {
+      await fs.rm(tmpDir, {recursive: true, force: true});
+    }
+  });
 });
