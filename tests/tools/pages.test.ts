@@ -12,8 +12,6 @@ import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {parseArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
-import {ToolHandler} from '../../src/ToolHandler.js';
 import {
   listPages,
   newPage,
@@ -24,8 +22,6 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import type {DefinedPageTool} from '../../src/tools/ToolDefinition.js';
-import {Mutex} from '../../src/utils/Mutex.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -1301,35 +1297,29 @@ describe('pages', () => {
     });
 
     it('reports the tab id when structured content is disabled', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        // @ts-expect-error _tabId is internal.
-        const tabId = page._tabId as string;
-        assert.ok(tabId);
-        const serverArgs = parseArguments(
-          '1.0.0',
-          ['node', 'script.js', '--experimentalInteropTools'],
-          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
-        const toolHandler = new ToolHandler(
-          getTabId as unknown as DefinedPageTool,
-          serverArgs,
-          async () => context,
-          new Mutex(),
-        );
-
-        const result = await toolHandler.handle({pageId: 1});
-
-        assert.strictEqual(result.isError, undefined);
-        assert.strictEqual(result.structuredContent, undefined);
-        const text = result.content
-          .map(part => (part.type === 'text' ? part.text : ''))
-          .join('\n');
-        assert.ok(
-          text.includes(tabId),
-          `expected the tab id in the response, got: ${text}`,
-        );
-      });
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          // @ts-expect-error _tabId is internal.
+          const tabId = page._tabId as string;
+          assert.ok(tabId);
+          await getTabId.handler(
+            {params: {pageId: 1}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+          const result = await response.handle('get_tab_id', context);
+          const text = result.content
+            .map(part => (part.type === 'text' ? part.text : ''))
+            .join('\n');
+          assert.ok(
+            text.includes(tabId),
+            `expected the tab id in the response, got: ${text}`,
+          );
+        },
+        {},
+        {experimentalInteropTools: true, experimentalStructuredContent: false},
+      );
     });
 
     it('reports when the tab id is not available', async () => {
