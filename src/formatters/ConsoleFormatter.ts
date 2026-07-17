@@ -5,11 +5,12 @@
  */
 
 import {
+  createStackTrace,
   createStackTraceForConsoleMessage,
   type TargetUniverse,
   SymbolizedError,
 } from '../devtools/DevtoolsUtils.js';
-import {UncaughtError} from '../PageCollector.js';
+import {BufferedConsoleMessage, UncaughtError} from '../PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
@@ -78,7 +79,7 @@ export class ConsoleFormatter {
   }
 
   static async from(
-    msg: ConsoleMessage | UncaughtError,
+    msg: ConsoleMessage | BufferedConsoleMessage | UncaughtError,
     options: ConsoleFormatterOptions,
   ): Promise<ConsoleFormatter> {
     const ignoreListManager = options?.devTools?.universe.context.get(
@@ -120,6 +121,35 @@ export class ConsoleFormatter {
         text: error.message,
         stack: error.stackTrace,
         cause: error.cause,
+        isIgnored,
+      });
+    }
+
+    if (msg instanceof BufferedConsoleMessage) {
+      let stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined;
+      if (options.resolvedStackTraceForTesting) {
+        stack = options.resolvedStackTraceForTesting;
+      } else if (
+        options.fetchDetailedData &&
+        options.devTools &&
+        msg.rawStackTrace
+      ) {
+        try {
+          stack = await createStackTrace(
+            options.devTools,
+            msg.rawStackTrace,
+            msg.targetId,
+          );
+        } catch {
+          // ignore
+        }
+      }
+      return new ConsoleFormatter({
+        id: options.id,
+        type: msg.type(),
+        text: msg.text(),
+        argCount: msg.argsCount,
+        stack,
         isIgnored,
       });
     }

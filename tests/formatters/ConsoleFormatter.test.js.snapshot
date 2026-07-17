@@ -1,3 +1,16 @@
+exports[`ConsoleFormatter > toString/toJSON > formats a buffered console message toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Recovered from the buffer",
+  "argsCount": 2,
+  "id": 1
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats a buffered console message toString 1`] = `
+msgid=1 [log] Recovered from the buffer (2 args)
+`;
+
 exports[`ConsoleFormatter > toString/toJSON > formats a console.log message toJSON 1`] = `
 {
   "type": "log",
@@ -88,6 +101,25 @@ Message: log> Hello stack trace!
 at foo (foo.ts:10:2)
 --- await ------------------------------
 at bar (foo.ts:20:2)
+Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a buffered console message toJSONDetailed 1`] = `
+{
+  "id": 1,
+  "type": "error",
+  "text": "Recovered from the buffer",
+  "argsCount": 1,
+  "args": [],
+  "stackTrace": "at foo (foo.ts:10:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats a buffered console message toStringDetailed 1`] = `
+ID: 1
+Message: error> Recovered from the buffer
+### Stack trace
+at foo (foo.ts:10:2)
 Note: line and column numbers use 1-based indexing
 `;
 

@@ -8,10 +8,13 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {before, describe, it} from 'node:test';
 
+import logger from 'debug';
+import {Locator} from 'puppeteer';
 import type {Dialog} from 'puppeteer-core';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
+import {McpContext} from '../../src/McpContext.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {CdpWebWorker} from '../../src/third_party/index.js';
@@ -24,6 +27,7 @@ import {installExtension} from '../../src/tools/extensions.js';
 import {serverHooks} from '../server.js';
 import {
   getTextContent,
+  withBrowser,
   withMcpContext,
   stabilizeStructuredContent,
   extractExtensionId,
@@ -200,6 +204,81 @@ describe('console', () => {
         const formattedResponse = await response.handle('test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] Uncaught  (0 args)'));
+      });
+    });
+
+    it('lists messages logged before the collector attached', async () => {
+      await withBrowser(async (browser, page) => {
+        // Log while nothing is attached yet. The uncaught error resolves the
+        // promise via the error event, so it is buffered once evaluate
+        // returns.
+        await page.evaluate(async () => {
+          console.log('pre-attach log');
+          // A fetch to a restricted port fails in the browser itself,
+          // producing a deterministic network error log entry.
+          await fetch('http://127.0.0.1:1/').catch(() => undefined);
+          await new Promise<void>(resolve => {
+            window.addEventListener('error', () => resolve());
+            setTimeout(() => {
+              throw new Error('pre-attach error');
+            }, 0);
+          });
+        });
+
+        TextSnapshot.resetCounter();
+        McpContext.resetPageIdsForTesting();
+        const context = await McpContext.from(
+          browser,
+          logger('test'),
+          {
+            experimentalDevToolsDebugging: false,
+            performanceCrux: false,
+          },
+          Locator,
+        );
+        try {
+          // No waiting for the backfill here: reading right after attach must
+          // not race it, since `getConsoleData()` awaits it internally.
+          const mcpPage = context.getSelectedMcpPage();
+          await mcpPage.pptrPage.evaluate(() => {
+            console.log('post-attach log');
+          });
+
+          const response = new McpResponse({} as ParsedArguments);
+          response.setPage(mcpPage);
+          await listConsoleMessages().handler(
+            {params: {}, page: mcpPage},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle('test', context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+
+          assert.ok(
+            textContent.includes('[log] pre-attach log'),
+            'Should contain the buffered log',
+          );
+          assert.ok(
+            textContent.includes('pre-attach error'),
+            'Should contain the buffered uncaught error',
+          );
+          assert.ok(
+            textContent.includes('Failed to load resource'),
+            'Should contain the buffered network error log entry',
+          );
+          assert.ok(
+            textContent.indexOf('pre-attach log') <
+              textContent.indexOf('post-attach log'),
+            'Buffered messages should come first',
+          );
+          assert.equal(
+            textContent.split('post-attach log').length,
+            2,
+            'Live messages should not be duplicated by the backfill',
+          );
+        } finally {
+          context.dispose();
+        }
       });
     });
 
@@ -403,7 +482,7 @@ describe('console', () => {
           `);
           page.textSnapshot = await TextSnapshot.create(page);
           await issuePromise;
-          const messages = page.getConsoleData();
+          const messages = await page.getConsoleData();
           let issueMsg;
           for (const message of messages) {
             if (message instanceof DevTools.AggregatedIssue) {

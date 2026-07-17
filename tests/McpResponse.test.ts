@@ -626,7 +626,7 @@ describe('McpResponse', () => {
       };
       mockAggregatedIssue.getDescription.returns(mockDescription);
       response.setIncludeConsoleData(true);
-      context.getSelectedMcpPage().getConsoleData = () => {
+      context.getSelectedMcpPage().getConsoleData = async () => {
         return [mockAggregatedIssue];
       };
 
@@ -651,7 +651,7 @@ describe('McpResponse', () => {
       };
       mockAggregatedIssue.getDescription.returns(mockDescription);
       response.attachConsoleMessage(1);
-      context.getSelectedMcpPage().getConsoleMessageById = () => {
+      context.getSelectedMcpPage().getConsoleMessageById = async () => {
         return mockAggregatedIssue;
       };
 
