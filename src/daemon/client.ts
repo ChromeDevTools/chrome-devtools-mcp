@@ -143,6 +143,11 @@ export async function sendCommand(
   sessionId: string,
   timeout = SEND_COMMAND_TIMEOUT,
 ): Promise<DaemonResponse> {
+  // Before connecting and sending, verify the daemon is still alive.
+  if (!isDaemonRunning(sessionId)) {
+    throw new Error('Daemon is not running.');
+  }
+
   const socketPath = getSocketPath(sessionId);
 
   const socket = net.createConnection({

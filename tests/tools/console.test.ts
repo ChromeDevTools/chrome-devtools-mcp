@@ -345,7 +345,7 @@ describe('console', () => {
     });
 
     describe('issues type', () => {
-      it.only('gets issue details with node id parsing', async t => {
+      it('gets issue details with node id parsing', async t => {
         await withMcpContext(async (response, context) => {
           const page = context.getSelectedMcpPage();
           const issuePromise = new Promise<void>(resolve => {

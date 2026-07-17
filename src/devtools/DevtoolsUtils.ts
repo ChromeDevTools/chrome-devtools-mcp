@@ -145,6 +145,10 @@ export async function createTargetUniverse(
         DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
+    hostConfig: {},
+    inspectorFrontendHost:
+      DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
+    supportsEmulation: false,
   });
 
   const connection = new PuppeteerDevToolsConnection(session);

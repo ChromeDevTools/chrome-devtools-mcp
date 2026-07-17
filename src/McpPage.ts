@@ -4,6 +4,57 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
+  if (typeof schema === 'boolean') {
+    return;
+  }
+
+  let isHtmlElement = false;
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'x-mcp-type' && value === 'HTMLElement') {
+      isHtmlElement = true;
+      break;
+    }
+  }
+
+  if (isHtmlElement) {
+    schema.properties = {uid: {type: 'string'}};
+    schema.required = ['uid'];
+  }
+
+  if (schema.properties) {
+    for (const key of Object.keys(schema.properties)) {
+      replaceHtmlElementsWithUids(schema.properties[key]);
+    }
+  }
+
+  if (schema.items) {
+    if (Array.isArray(schema.items)) {
+      for (const item of schema.items) {
+        replaceHtmlElementsWithUids(item);
+      }
+    } else {
+      replaceHtmlElementsWithUids(schema.items);
+    }
+  }
+
+  if (schema.anyOf) {
+    for (const s of schema.anyOf) {
+      replaceHtmlElementsWithUids(s);
+    }
+  }
+  if (schema.allOf) {
+    for (const s of schema.allOf) {
+      replaceHtmlElementsWithUids(s);
+    }
+  }
+  if (schema.oneOf) {
+    for (const s of schema.oneOf) {
+      replaceHtmlElementsWithUids(s);
+    }
+  }
+}
+
 import {
   createTargetUniverse,
   type TargetUniverse,
@@ -27,6 +78,7 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   type DevTools,
+  type JSONSchema7Definition,
 } from './third_party/index.js';
 import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -169,6 +221,104 @@ export class McpPage implements ContextPage {
 
   getThirdPartyDeveloperTools(): ToolGroups {
     return this.thirdPartyDeveloperTools;
+  }
+
+  async getToolGroups(): Promise<ToolGroups> {
+    // Check if there is a `devtoolstooldiscovery` event listener
+    const windowHandle = await this.pptrPage.evaluateHandle(() => window);
+    // @ts-expect-error internal API
+    const client = this.pptrPage._client();
+    const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
+      await client.send('DOMDebugger.getEventListeners', {
+        objectId: windowHandle.remoteObject().objectId,
+      });
+    if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
+      return [];
+    }
+
+    const toolGroups = await this.pptrPage.evaluate(() => {
+      if (window.__dtmcp) {
+        window.__dtmcp.toolGroups = [];
+      }
+      return new Promise<ToolGroups>(resolve => {
+        const event = new CustomEvent('devtoolstooldiscovery');
+        const groups: ToolGroups = [];
+        // @ts-expect-error Adding custom property
+        event.respondWith = toolGroup => {
+          if (!window.__dtmcp) {
+            window.__dtmcp = {};
+          }
+          if (!window.__dtmcp.toolGroups) {
+            window.__dtmcp.toolGroups = [];
+          }
+
+          if (
+            typeof toolGroup.name !== 'string' ||
+            (toolGroup.description &&
+              typeof toolGroup.description !== 'string') ||
+            !Array.isArray(toolGroup.tools)
+          ) {
+            console.error('Invalid toolGroup:', toolGroup);
+            return;
+          }
+          for (const tool of toolGroup.tools) {
+            if (
+              typeof tool.name !== 'string' ||
+              typeof tool.description !== 'string' ||
+              typeof tool.inputSchema !== 'object' ||
+              typeof tool.execute !== 'function'
+            ) {
+              console.error('Invalid tool:', tool);
+              return;
+            }
+          }
+
+          window.__dtmcp.toolGroups.push(toolGroup);
+
+          // When receiving a toolGroup for the first time, expose a simple execution helper
+          if (!window.__dtmcp.executeTool) {
+            window.__dtmcp.executeTool = async (toolName, args) => {
+              if (
+                !window.__dtmcp?.toolGroups ||
+                window.__dtmcp.toolGroups.length === 0
+              ) {
+                throw new Error('No tools found on the page');
+              }
+              for (const group of window.__dtmcp.toolGroups) {
+                const tool = group.tools?.find(t => t.name === toolName);
+                if (tool) {
+                  return await tool.execute(args);
+                }
+              }
+              throw new Error(`Tool ${toolName} not found`);
+            };
+          }
+
+          groups.push(toolGroup);
+        };
+        window.dispatchEvent(event);
+        // If at least one toolGroup was added synchronously, resolve with the array.
+        // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve with an empty array.
+        if (groups.length > 0) {
+          resolve(groups);
+        } else {
+          setTimeout(() => {
+            if (groups.length > 0) {
+              resolve(groups);
+            } else {
+              resolve([]);
+            }
+          }, 0);
+        }
+      });
+    });
+
+    for (const group of toolGroups) {
+      for (const tool of group.tools ?? []) {
+        replaceHtmlElementsWithUids(tool.inputSchema);
+      }
+    }
+    return toolGroups;
   }
 
   getWebMcpTools(): WebMCPTool[] {

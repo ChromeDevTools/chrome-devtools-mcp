@@ -114,6 +114,7 @@ export interface Response {
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+    nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
@@ -132,6 +133,9 @@ export interface Response {
   setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+  ): void;
+  setHeapSnapshotObjectDetails(
+    objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -233,6 +237,7 @@ export type Context = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
+    objectId?: number,
   ): Promise<HeapSnapshotAggregateData>;
   getHeapSnapshotDuplicateStrings(
     filePath: string,
@@ -243,15 +248,23 @@ export type Context = Readonly<{
   getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
+  getHeapSnapshotNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes>;
   getHeapSnapshotNodesById(
     filePath: string,
     id: number,
     filterName?: string,
+    objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
   getHeapSnapshotRetainers(
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  getHeapSnapshotObjectDetails(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo>;
   closeHeapSnapshot(filePath: string): Promise<boolean>;
   getHeapSnapshotRetainingPaths(
     filePath: string,

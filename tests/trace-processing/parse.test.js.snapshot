@@ -27,7 +27,7 @@ Available insights:
     description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.
     relevant trace bounds: {min: 122410996889µs, max: 122411126100µs}
     example question: Help me optimize my LCP score
-    example question: Which LCP phase was most problematic?
+    example question: Which LCP subpart was most problematic?
     example question: What can I do to reduce the LCP time for this page load?
   - insight name: LCPDiscovery
     description: [Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading

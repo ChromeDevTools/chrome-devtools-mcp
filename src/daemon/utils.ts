@@ -26,13 +26,15 @@ export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
 // Using these paths due to strict limits on the POSIX socket path length.
 export function getSocketPath(sessionId: string): string {
   const uid = os.userInfo().uid;
+  const username = os.userInfo().username;
   const suffix = sessionId ? `-${sessionId}` : '';
   const appName = APP_NAME + suffix;
 
   if (IS_WINDOWS) {
     // Windows uses Named Pipes, not file paths.
     // This format is required for server.listen()
-    return path.join('\\\\.\\pipe', appName, 'server.sock');
+    // Append username to prevent cross-user named pipe squatting
+    return path.join('\\\\.\\pipe', `${appName}-${username}`, 'server.sock');
   }
 
   // 1. Try XDG_RUNTIME_DIR (Linux standard, sometimes macOS)

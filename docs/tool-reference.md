@@ -39,7 +39,7 @@
   - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-- **[Memory](#memory)** (11 tools)
+- **[Memory](#memory)** (12 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`close_heapsnapshot`](#close_heapsnapshot)
   - [`compare_heapsnapshots`](#compare_heapsnapshots)
@@ -48,6 +48,7 @@
   - [`get_heapsnapshot_dominators`](#get_heapsnapshot_dominators)
   - [`get_heapsnapshot_duplicate_strings`](#get_heapsnapshot_duplicate_strings)
   - [`get_heapsnapshot_edges`](#get_heapsnapshot_edges)
+  - [`get_heapsnapshot_object_details`](#get_heapsnapshot_object_details)
   - [`get_heapsnapshot_retainers`](#get_heapsnapshot_retainers)
   - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
@@ -484,7 +485,8 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **id** (number) **(required)**: The ID for the class, obtained from details.
-- **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts") _(optional)_: An optional filter to apply to the nodes.
+- **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the nodes.
+- **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 
@@ -497,7 +499,8 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
-- **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts") _(optional)_: An optional filter to apply to the aggregates.
+- **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the aggregates.
+- **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
 - **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
 - **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
 
@@ -539,6 +542,17 @@ in the DevTools Elements panel (if any).
 
 ---
 
+### `get_heapsnapshot_object_details`
+
+**Description:** Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)
+
+**Parameters:**
+
+- **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **nodeId** (number) **(required)**: The node ID to get object details for.
+
+---
+
 ### `get_heapsnapshot_retainers`
 
 **Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
@@ -568,7 +582,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)
+**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 

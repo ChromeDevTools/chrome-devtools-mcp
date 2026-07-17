@@ -262,7 +262,7 @@ async function startSocketServer() {
   });
 }
 
-async function cleanup() {
+async function cleanup(exitCode = 0) {
   console.log('Cleaning up daemon...');
 
   try {
@@ -291,7 +291,7 @@ async function cleanup() {
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);
   }
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 // Handle shutdown signals
@@ -308,13 +308,15 @@ process.on('SIGHUP', () => {
 // Handle uncaught errors
 process.on('uncaughtException', error => {
   logger?.('Uncaught exception:', error);
+  void cleanup(1);
 });
 process.on('unhandledRejection', error => {
   logger?.('Unhandled rejection:', error);
+  void cleanup(1);
 });
 
 // Start the server
 const started = startSocketServer().catch(error => {
   logger?.('Failed to start daemon server:', error);
-  process.exit(1);
+  void cleanup(1);
 });
