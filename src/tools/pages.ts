@@ -408,6 +408,12 @@ export const getTabId = definePageTool({
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
+    // Puppeteer returns an empty string when the tab id is not known.
+    if (!tabId) {
+      response.appendResponseLine('The tab ID is not available for this page');
+      return;
+    }
     response.setTabId(tabId);
+    response.appendResponseLine(`Tab ID: ${tabId}`);
   },
 });

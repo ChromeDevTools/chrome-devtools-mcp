@@ -1282,18 +1282,62 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         // @ts-expect-error _tabId is internal.
-        assert.ok(typeof page._tabId === 'string');
-        // @ts-expect-error _tabId is internal.
-        page._tabId = 'test-tab-id';
+        const tabId = page._tabId as string;
+        assert.ok(tabId);
         await getTabId.handler(
           {params: {pageId: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
         );
         const result = await response.handle('get_tab_id', context);
+        // @ts-expect-error structuredContent is not typed.
+        assert.strictEqual(result.structuredContent.tabId, tabId);
+        assert.deepStrictEqual(response.responseLines, [`Tab ID: ${tabId}`]);
+      });
+    });
+
+    it('reports the tab id when structured content is disabled', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          // @ts-expect-error _tabId is internal.
+          const tabId = page._tabId as string;
+          assert.ok(tabId);
+          await getTabId.handler(
+            {params: {pageId: 1}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+          const result = await response.handle('get_tab_id', context);
+          const text = result.content
+            .map(part => (part.type === 'text' ? part.text : ''))
+            .join('\n');
+          assert.ok(
+            text.includes(tabId),
+            `expected the tab id in the response, got: ${text}`,
+          );
+        },
+        {},
+        {experimentalInteropTools: true, experimentalStructuredContent: false},
+      );
+    });
+
+    it('reports when the tab id is not available', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
         // @ts-expect-error _tabId is internal.
-        assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
-        assert.deepStrictEqual(response.responseLines, []);
+        page._tabId = '';
+        await getTabId.handler(
+          {params: {pageId: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const result = await response.handle('get_tab_id', context);
+        // @ts-expect-error structuredContent is not typed.
+        assert.strictEqual(result.structuredContent.tabId, undefined);
+        assert.deepStrictEqual(response.responseLines, [
+          'The tab ID is not available for this page',
+        ]);
       });
     });
   });
