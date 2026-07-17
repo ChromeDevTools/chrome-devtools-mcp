@@ -1,6 +1,6 @@
 # Common Memory Leaks
 
-When analyzing a retainer trace from `memlab`, look for these common patterns in the codebase:
+When analyzing retaining paths, retainers, or dominator chains from the built-in heap snapshot tools, look for these common patterns in the codebase:
 
 ## 1. Uncleared Event Listeners
 
