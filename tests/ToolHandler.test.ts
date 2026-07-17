@@ -12,7 +12,6 @@ import sinon from 'sinon';
 import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
-import {Mutex} from '../src/Mutex.js';
 import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
@@ -20,6 +19,7 @@ import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
+import {Mutex} from '../src/utils/Mutex.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {

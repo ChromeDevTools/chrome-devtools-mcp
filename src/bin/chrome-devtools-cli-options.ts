@@ -359,7 +359,17 @@ export const commands: Commands = {
           'objectsRetainedByConsole',
           'objectsRetainedByEventHandlers',
           'objectsRetainedByContexts',
+          'sharedNativeContext',
+          'noNativeContext',
+          'attributedToSpecificNativeContext',
         ],
+      },
+      objectId: {
+        name: 'objectId',
+        type: 'number',
+        description:
+          'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -396,7 +406,17 @@ export const commands: Commands = {
           'objectsRetainedByConsole',
           'objectsRetainedByEventHandlers',
           'objectsRetainedByContexts',
+          'sharedNativeContext',
+          'noNativeContext',
+          'attributedToSpecificNativeContext',
         ],
+      },
+      objectId: {
+        name: 'objectId',
+        type: 'number',
+        description:
+          'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -487,6 +507,25 @@ export const commands: Commands = {
       },
     },
   },
+  get_heapsnapshot_object_details: {
+    description:
+      'Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      nodeId: {
+        name: 'nodeId',
+        type: 'number',
+        description: 'The node ID to get object details for.',
+        required: true,
+      },
+    },
+  },
   get_heapsnapshot_retainers: {
     description:
       'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
@@ -557,7 +596,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_summary: {
     description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)',
+      'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {

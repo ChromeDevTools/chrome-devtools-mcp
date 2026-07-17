@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {PaginationOptions} from './types.js';
+import type {PaginationOptions} from '../types.js';
 
 export interface PaginationResult<Item> {
   items: readonly Item[];

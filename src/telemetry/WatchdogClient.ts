@@ -7,7 +7,7 @@
 import {spawn, type ChildProcess} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-import {logger} from '../logger.js';
+import {logger} from '../utils/logger.js';
 
 import type {WatchdogMessage, OsType} from './types.js';
 

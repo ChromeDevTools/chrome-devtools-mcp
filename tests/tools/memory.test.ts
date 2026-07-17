@@ -23,6 +23,7 @@ import {
   getHeapSnapshotDominators,
   compareHeapSnapshots,
   getHeapSnapshotDuplicateStrings,
+  getHeapSnapshotObjectDetails,
 } from '../../src/tools/memory.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {withMcpContext} from '../utils.js';
@@ -115,6 +116,63 @@ describe('memory', () => {
 
         await getHeapSnapshotDetails.handler(
           {params: {filePath, filterName: 'objectsRetainedByContexts'}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDetails.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with sharedNativeContext filterName', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDetails.handler(
+          {params: {filePath, filterName: 'sharedNativeContext'}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotDetails.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with attributedToSpecificNativeContext filterName and objectId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDetails.handler(
+          {
+            params: {
+              filePath,
+              filterName: 'attributedToSpecificNativeContext',
+              objectId: 7249,
+              pageSize: 10,
+            },
+          },
           response,
           context,
         );
@@ -235,6 +293,33 @@ describe('memory', () => {
 
         const responseData = await response.handle(
           getHeapSnapshotRetainers.name,
+          context,
+        );
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('get_heapsnapshot_object_details', () => {
+    it('with valid nodeId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotObjectDetails.handler(
+          {params: {filePath, nodeId: 25341}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(
+          getHeapSnapshotObjectDetails.name,
           context,
         );
         const output = responseData.content

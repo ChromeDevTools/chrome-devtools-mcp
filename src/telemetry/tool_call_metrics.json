@@ -688,6 +688,10 @@
       {
         "name": "filter_name",
         "argType": "string"
+      },
+      {
+        "name": "object_id",
+        "argType": "number"
       }
     ]
   },
@@ -709,6 +713,10 @@
       {
         "name": "filter_name",
         "argType": "string"
+      },
+      {
+        "name": "object_id",
+        "argType": "number"
       }
     ]
   },
@@ -888,5 +896,18 @@
   {
     "name": "list_dedicated_workers",
     "args": []
+  },
+  {
+    "name": "get_heapsnapshot_object_details",
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "node_id",
+        "argType": "number"
+      }
+    ]
   }
 ]

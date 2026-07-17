@@ -26,19 +26,13 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {
-  DevTools,
-  getToonEncode,
-  getGcfEncode,
-  type Protocol,
-} from './third_party/index.js';
+import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
   Page,
   ResourceType,
   TextContent,
-  JSONSchema7Definition,
   Extension,
   HTTPRequest,
 } from './third_party/index.js';
@@ -53,11 +47,13 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {InsightName, TraceResult} from './trace-processing/parse.js';
 import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import type {PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
-import type {PaginationOptions} from './utils/types.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
+
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
 export type DataFormat = 'default' | 'toon' | 'gcf';
 
@@ -65,155 +61,6 @@ interface TraceInsightData {
   trace: TraceResult;
   insightSetId: string;
   insightName: InsightName;
-}
-
-export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
-  if (typeof schema === 'boolean') {
-    return;
-  }
-
-  let isHtmlElement = false;
-  for (const [key, value] of Object.entries(schema)) {
-    if (key === 'x-mcp-type' && value === 'HTMLElement') {
-      isHtmlElement = true;
-      break;
-    }
-  }
-
-  if (isHtmlElement) {
-    schema.properties = {uid: {type: 'string'}};
-    schema.required = ['uid'];
-  }
-
-  if (schema.properties) {
-    for (const key of Object.keys(schema.properties)) {
-      replaceHtmlElementsWithUids(schema.properties[key]);
-    }
-  }
-
-  if (schema.items) {
-    if (Array.isArray(schema.items)) {
-      for (const item of schema.items) {
-        replaceHtmlElementsWithUids(item);
-      }
-    } else {
-      replaceHtmlElementsWithUids(schema.items);
-    }
-  }
-
-  if (schema.anyOf) {
-    for (const s of schema.anyOf) {
-      replaceHtmlElementsWithUids(s);
-    }
-  }
-  if (schema.allOf) {
-    for (const s of schema.allOf) {
-      replaceHtmlElementsWithUids(s);
-    }
-  }
-  if (schema.oneOf) {
-    for (const s of schema.oneOf) {
-      replaceHtmlElementsWithUids(s);
-    }
-  }
-}
-
-async function getToolGroups(page: McpPage): Promise<ToolGroups> {
-  // Check if there is a `devtoolstooldiscovery` event listener
-  const windowHandle = await page.pptrPage.evaluateHandle(() => window);
-  // @ts-expect-error internal API
-  const client = page.pptrPage._client();
-  const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
-    await client.send('DOMDebugger.getEventListeners', {
-      objectId: windowHandle.remoteObject().objectId,
-    });
-  if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-    return [];
-  }
-
-  const toolGroups = await page.pptrPage.evaluate(() => {
-    if (window.__dtmcp) {
-      window.__dtmcp.toolGroups = [];
-    }
-    return new Promise<ToolGroups>(resolve => {
-      const event = new CustomEvent('devtoolstooldiscovery');
-      const groups: ToolGroups = [];
-      // @ts-expect-error Adding custom property
-      event.respondWith = toolGroup => {
-        if (!window.__dtmcp) {
-          window.__dtmcp = {};
-        }
-        if (!window.__dtmcp.toolGroups) {
-          window.__dtmcp.toolGroups = [];
-        }
-
-        if (
-          typeof toolGroup.name !== 'string' ||
-          (toolGroup.description &&
-            typeof toolGroup.description !== 'string') ||
-          !Array.isArray(toolGroup.tools)
-        ) {
-          console.error('Invalid toolGroup:', toolGroup);
-          return;
-        }
-        for (const tool of toolGroup.tools) {
-          if (
-            typeof tool.name !== 'string' ||
-            typeof tool.description !== 'string' ||
-            typeof tool.inputSchema !== 'object' ||
-            typeof tool.execute !== 'function'
-          ) {
-            console.error('Invalid tool:', tool);
-            return;
-          }
-        }
-
-        window.__dtmcp.toolGroups.push(toolGroup);
-
-        // When receiving a toolGroup for the first time, expose a simple execution helper
-        if (!window.__dtmcp.executeTool) {
-          window.__dtmcp.executeTool = async (toolName, args) => {
-            if (
-              !window.__dtmcp?.toolGroups ||
-              window.__dtmcp.toolGroups.length === 0
-            ) {
-              throw new Error('No tools found on the page');
-            }
-            for (const group of window.__dtmcp.toolGroups) {
-              const tool = group.tools?.find(t => t.name === toolName);
-              if (tool) {
-                return await tool.execute(args);
-              }
-            }
-            throw new Error(`Tool ${toolName} not found`);
-          };
-        }
-
-        groups.push(toolGroup);
-      };
-      window.dispatchEvent(event);
-      // If at least one toolGroup was added synchronously, resolve with the array.
-      // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve with an empty array.
-      if (groups.length > 0) {
-        resolve(groups);
-      } else {
-        setTimeout(() => {
-          if (groups.length > 0) {
-            resolve(groups);
-          } else {
-            resolve([]);
-          }
-        }, 0);
-      }
-    });
-  });
-
-  for (const group of toolGroups) {
-    for (const tool of group.tools ?? []) {
-      replaceHtmlElementsWithUids(tool.inputSchema);
-    }
-  }
-  return toolGroups;
 }
 
 export class McpResponse implements Response {
@@ -238,12 +85,14 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
+    nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
     classDiffs?: HeapSnapshotClassDiff[];
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
+    objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -346,7 +195,7 @@ export class McpResponse implements Response {
     this.#networkRequestsOptions = {
       include: value,
       pagination:
-        options?.pageSize || options?.pageIdx
+        options?.pageSize !== undefined || options?.pageIdx !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -374,7 +223,7 @@ export class McpResponse implements Response {
     this.#consoleDataOptions = {
       include: value,
       pagination:
-        options?.pageSize || options?.pageIdx
+        options?.pageSize !== undefined || options?.pageIdx !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -485,12 +334,14 @@ export class McpResponse implements Response {
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+    nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       stats,
       staticData,
+      nativeContextSizes,
     };
   }
 
@@ -553,6 +404,16 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+    };
+  }
+
+  setHeapSnapshotObjectDetails(
+    objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      objectInfo,
     };
   }
 
@@ -685,7 +546,7 @@ export class McpResponse implements Response {
       this.#listThirdPartyDeveloperTools &&
       this.#page
     ) {
-      thirdPartyDeveloperTools = await getToolGroups(this.#page);
+      thirdPartyDeveloperTools = await this.#page.getToolGroups();
       if (thirdPartyDeveloperTools) {
         this.#page.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
       }
@@ -885,6 +746,7 @@ export class McpResponse implements Response {
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
+        nativeContextSizes?: object;
         aggregateStats?: {
           objectCount: number;
           totalSelfSize: number;
@@ -897,6 +759,7 @@ export class McpResponse implements Response {
       heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
+      heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1190,6 +1053,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
       }
+      const nativeContextSizes = this.#heapSnapshotOptions.nativeContextSizes;
+      if (nativeContextSizes) {
+        response.push('### Native Contexts');
+        response.push(
+          HeapSnapshotFormatter.formatNativeContextSizes(nativeContextSizes),
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
+      }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {
         const sortedEntries = HeapSnapshotFormatter.sort(
@@ -1203,9 +1075,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         response.push(`Objects: ${aggregateData.objectCount}`);
         response.push(
-          `Total shallow size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(
-            aggregateData.totalSelfSize,
-          )}`,
+          `Total shallow size: ${formatBytesToKb(aggregateData.totalSelfSize)}`,
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.aggregateStats = {
@@ -1318,6 +1188,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
         response.push(formatted);
 
         structuredContent.heapSnapshotDuplicateStrings = paginationData.items;
+      }
+      const objectInfo = this.#heapSnapshotOptions.objectInfo;
+      if (objectInfo) {
+        response.push('### Object Details');
+        response.push(
+          compactEncode
+            ? compactEncode(objectInfo)
+            : HeapSnapshotFormatter.formatObjectInfo(objectInfo),
+        );
+        structuredContent.heapSnapshotObjectDetails = objectInfo;
       }
     }
 

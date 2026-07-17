@@ -9,10 +9,8 @@ import type fs from 'node:fs';
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
-import {loadIssueDescriptions} from './issue-descriptions.js';
-import {logger} from './logger.js';
+import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
-import {Mutex} from './Mutex.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -25,6 +23,8 @@ import {
 import {ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
+import {logger} from './utils/logger.js';
+import {Mutex} from './utils/Mutex.js';
 import {VERSION} from './version.js';
 
 export {buildFlag} from './ToolHandler.js';
