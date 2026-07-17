@@ -688,6 +688,10 @@
       {
         "name": "filter_name",
         "argType": "string"
+      },
+      {
+        "name": "object_id",
+        "argType": "number"
       }
     ]
   },
@@ -709,6 +713,10 @@
       {
         "name": "filter_name",
         "argType": "string"
+      },
+      {
+        "name": "object_id",
+        "argType": "number"
       }
     ]
   },

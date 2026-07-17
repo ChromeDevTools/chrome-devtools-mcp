@@ -237,6 +237,7 @@ export type Context = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
+    objectId?: number,
   ): Promise<HeapSnapshotAggregateData>;
   getHeapSnapshotDuplicateStrings(
     filePath: string,
@@ -254,6 +255,7 @@ export type Context = Readonly<{
     filePath: string,
     id: number,
     filterName?: string,
+    objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
   getHeapSnapshotRetainers(
     filePath: string,

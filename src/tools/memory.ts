@@ -14,6 +14,9 @@ const HEAP_SNAPSHOT_FILTERS: readonly [string, ...string[]] = [
   'objectsRetainedByConsole',
   'objectsRetainedByEventHandlers',
   'objectsRetainedByContexts',
+  'sharedNativeContext',
+  'noNativeContext',
+  'attributedToSpecificNativeContext',
 ];
 
 export const takeHeapSnapshot = definePageTool({
@@ -87,6 +90,12 @@ export const getHeapSnapshotDetails = defineTool({
       .enum(HEAP_SNAPSHOT_FILTERS)
       .optional()
       .describe('An optional filter to apply to the aggregates.'),
+    objectId: zod
+      .number()
+      .optional()
+      .describe(
+        'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+      ),
     pageIdx: zod
       .number()
       .optional()
@@ -102,6 +111,7 @@ export const getHeapSnapshotDetails = defineTool({
     const aggregates = await context.getHeapSnapshotAggregates(
       request.params.filePath,
       request.params.filterName,
+      request.params.objectId,
     );
 
     response.setHeapSnapshotAggregates(aggregates, {
@@ -127,6 +137,12 @@ export const getHeapSnapshotClassNodes = defineTool({
       .enum(HEAP_SNAPSHOT_FILTERS)
       .optional()
       .describe('An optional filter to apply to the nodes.'),
+    objectId: zod
+      .number()
+      .optional()
+      .describe(
+        'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+      ),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
@@ -137,6 +153,7 @@ export const getHeapSnapshotClassNodes = defineTool({
       request.params.filePath,
       request.params.id,
       request.params.filterName,
+      request.params.objectId,
     );
 
     response.setHeapSnapshotNodes(nodes, {

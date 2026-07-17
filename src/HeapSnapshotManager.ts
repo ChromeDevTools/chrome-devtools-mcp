@@ -77,16 +77,37 @@ export class HeapSnapshotManager {
     return snapshot;
   }
 
+  async #applyNodeFilter(
+    snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy,
+    filter: DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter,
+    filterName?: string,
+    objectId?: number,
+  ): Promise<void> {
+    if (filterName === 'attributedToSpecificNativeContext') {
+      if (objectId === undefined) {
+        throw new Error(
+          'objectId is required when filterName is attributedToSpecificNativeContext',
+        );
+      }
+      const nodeIndex = await snapshot.nodeIndexForId(objectId);
+      if (nodeIndex === undefined) {
+        throw new Error(`Node with ID ${objectId} not found`);
+      }
+      filter.filterName = `nativeContext_${nodeIndex}`;
+    } else if (filterName) {
+      filter.filterName = filterName;
+    }
+  }
+
   async getAggregates(
     filePath: string,
     filterName?: string,
+    objectId?: number,
   ): Promise<HeapSnapshotAggregateData> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
-    if (filterName) {
-      filter.filterName = filterName;
-    }
+    await this.#applyNodeFilter(snapshot, filter, filterName, objectId);
     const aggregates: Record<string, AggregatedInfoWithId> =
       await snapshot.aggregatesWithFilter(filter);
     let objectCount = 0;
@@ -145,13 +166,12 @@ export class HeapSnapshotManager {
     filePath: string,
     id: number,
     filterName?: string,
+    objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
-    if (filterName) {
-      filter.filterName = filterName;
-    }
+    await this.#applyNodeFilter(snapshot, filter, filterName, objectId);
     const className = await this.resolveClassKeyFromId(filePath, id);
     if (!className) {
       throw new Error(`Class with ID ${id} not found in heap snapshot`);
