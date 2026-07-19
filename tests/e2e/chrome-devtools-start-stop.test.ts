@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -77,5 +78,37 @@ describe('chrome-devtools', () => {
     );
 
     await assertDaemonIsRunning(sessionId);
+  });
+
+  it('lets command-line options override config defaults', async () => {
+    const configHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'chrome-devtools-cli-config-test-'),
+    );
+    const configDirectory = path.join(configHome, 'chrome-devtools');
+    fs.mkdirSync(configDirectory);
+    fs.writeFileSync(
+      path.join(configDirectory, 'config.json'),
+      JSON.stringify({headless: false}),
+    );
+    const env = {...process.env, XDG_CONFIG_HOME: configHome};
+
+    try {
+      const startResult = await runCli(
+        ['start', '--headless=true'],
+        sessionId,
+        env,
+      );
+      assert.strictEqual(
+        startResult.status,
+        0,
+        `start command failed: ${startResult.stderr}`,
+      );
+
+      const statusResult = await runCli(['status'], sessionId, env);
+      assert.match(statusResult.stdout, /"--headless"/);
+      assert.doesNotMatch(statusResult.stdout, /"--no-headless"/);
+    } finally {
+      fs.rmSync(configHome, {recursive: true, force: true});
+    }
   });
 });
