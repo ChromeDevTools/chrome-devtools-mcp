@@ -22,7 +22,12 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
+import {
+  assertNoServiceWorkerReported,
+  html,
+  withMcpContext,
+  testHandle,
+} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
   import.meta.dirname,
@@ -82,7 +87,7 @@ describe('pages', () => {
           } as ParsedArguments);
           await listPageDef.handler({params: {}}, response, context);
 
-          const result = await response.handle(listPageDef.name, context);
+          const result = await testHandle(response, listPageDef.name, context);
           const textContent = result.content.find(c => c.type === 'text') as {
             type: 'text';
             text: string;
@@ -123,7 +128,11 @@ describe('pages', () => {
             } as ParsedArguments);
             await listPageDef.handler({params: {}}, response, context);
 
-            const result = await response.handle(listPageDef.name, context);
+            const result = await testHandle(
+              response,
+              listPageDef.name,
+              context,
+            );
             const textContent = result.content.find(c => c.type === 'text') as {
               type: 'text';
               text: string;
@@ -183,7 +192,7 @@ describe('pages', () => {
           } as ParsedArguments);
           await listPageDef.handler({params: {}}, response, context);
 
-          const result = await response.handle(listPageDef.name, context);
+          const result = await testHandle(response, listPageDef.name, context);
           const textContent = result.content.find(c => c.type === 'text') as {
             type: 'text';
             text: string;
@@ -223,7 +232,7 @@ describe('pages', () => {
 
         await listPages().handler({params: {}}, response, context);
 
-        const result = await response.handle('list_pages', context);
+        const result = await testHandle(response, 'list_pages', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -343,7 +352,7 @@ describe('pages', () => {
           response,
           context,
         );
-        const result = await response.handle('new_page', context);
+        const result = await testHandle(response, 'new_page', context);
         const pages = (
           result.structuredContent as {pages: Array<{isolatedContext?: string}>}
         ).pages;
@@ -404,7 +413,7 @@ describe('pages', () => {
           context,
         );
 
-        const result = await response.handle('new_page', context);
+        const result = await testHandle(response, 'new_page', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -507,7 +516,7 @@ describe('pages', () => {
 
         await closePage.handler({params: {pageId: 2}}, response, context);
 
-        const result = await response.handle('close_page', context);
+        const result = await testHandle(response, 'close_page', context);
         t.assert.snapshot(JSON.stringify(result));
       });
     });
@@ -617,7 +626,7 @@ describe('pages', () => {
 
         await selectPage.handler({params: {pageId: 1}}, response, context);
 
-        const result = await response.handle('select_page', context);
+        const result = await testHandle(response, 'select_page', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -897,7 +906,7 @@ describe('pages', () => {
           context,
         );
 
-        const result = await response.handle('navigate_page', context);
+        const result = await testHandle(response, 'navigate_page', context);
         t.assert.snapshot(JSON.stringify(result));
       });
     });
@@ -1089,7 +1098,7 @@ describe('pages', () => {
           context,
         );
 
-        const result = await response.handle('resize_page', context);
+        const result = await testHandle(response, 'resize_page', context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -1290,11 +1299,52 @@ describe('pages', () => {
           response,
           context,
         );
-        const result = await response.handle('get_tab_id', context);
+        const result = await testHandle(response, 'get_tab_id', context);
         // @ts-expect-error _tabId is internal.
         assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
         assert.deepStrictEqual(response.responseLines, []);
       });
+    });
+  });
+});
+
+describe('Tool response configuration for third-party developer and webmcp tools', () => {
+  it('list_pages configures third-party developer and webmcp tools', async () => {
+    await withMcpContext(async (response, context) => {
+      const tool = listPages({
+        categoryExperimentalThirdParty: true,
+        categoryExperimentalWebmcp: true,
+      } as unknown as Parameters<typeof listPages>[0]);
+      await tool.handler(
+        {params: {}} as unknown as Parameters<typeof tool.handler>[0],
+        response,
+        context,
+      );
+      assert.strictEqual(response.listThirdPartyDeveloperTools, true);
+      assert.strictEqual(response.listWebMcpTools, true);
+    });
+  });
+
+  it('select_page configures third-party developer and webmcp tools', async () => {
+    await withMcpContext(async (response, context) => {
+      const pageId = context.getSelectedMcpPage().id;
+      const tool = selectPage;
+      const toolWithArgs = tool as unknown as {
+        serverArgs: Record<string, unknown>;
+      };
+      const oldArgs = toolWithArgs.serverArgs;
+      toolWithArgs.serverArgs = {
+        categoryExperimentalThirdParty: true,
+        categoryExperimentalWebmcp: true,
+      };
+      await tool.handler(
+        {params: {pageId}} as unknown as Parameters<typeof tool.handler>[0],
+        response,
+        context,
+      );
+      toolWithArgs.serverArgs = oldArgs;
+      assert.strictEqual(response.listThirdPartyDeveloperTools, true);
+      assert.strictEqual(response.listWebMcpTools, true);
     });
   });
 });

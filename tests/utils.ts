@@ -23,6 +23,7 @@ import type {
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import {McpResponseFormatter} from '../src/formatters/McpResponseFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -149,6 +150,16 @@ export async function withMcpContext(
 
     await cb(response, context);
   }, options);
+}
+
+export async function testHandle(
+  response: McpResponse,
+  toolName: string,
+  context: McpContext,
+  dataFormat: 'default' | 'toon' = 'default',
+) {
+  const {data, state} = await response.handle(context, dataFormat);
+  return McpResponseFormatter.format(toolName, context, data, state);
 }
 
 export function getMockRequest(

@@ -1,0 +1,81 @@
+exports[`McpResponseFormatter > formats basic response with text lines > formats basic lines 1`] = `
+Line 1
+Line 2
+`;
+
+exports[`McpResponseFormatter > formats basic response with text lines > formats dialogs 1`] = `
+# Open dialog
+prompt: Prompt dialog (default value: "default value").
+Call handle_dialog to handle it before continuing.
+`;
+
+exports[`McpResponseFormatter > formats basic response with text lines > formats emulation settings 1`] = `
+Emulating viewport: {"width":800,"height":600,"deviceScaleFactor":1}
+Emulating user agent: MockAgent
+Emulating CPU throttling: 2x slowdown
+Emulating color scheme: dark
+`;
+
+exports[`McpResponseFormatter > formats basic response with text lines > formats extension pages 1`] = `
+## Extension Pages
+3: Ext Page 1 (chrome-extension://abc/page.html)
+`;
+
+exports[`McpResponseFormatter > formats basic response with text lines > formats page listing 1`] = `
+## Pages
+1: Title 1 (http://example.com) [selected]
+2: Title 2 (http://test.com)
+`;
+
+exports[`McpResponseFormatter > formats basic response with text lines > formats third party tools 1`] = `
+## Third-party developer tools
+MyGroup: undefined
+Available tools:
+name="MyTool", description="desc", inputSchema={}
+`;
+
+exports[`McpResponseFormatter > formats basic response with text lines > formats webmcp tools 1`] = `
+## WebMCP tools
+name="MyWebMCPTool", description="desc", inputSchema={}, annotations={"category":"test"}
+`;
+
+exports[`McpResponseFormatter > formats console messages 1`] = `
+## Console messages
+Showing 1-2 of 2 (Page 1 of 1).
+Console log 1
+Console log 2
+`;
+
+exports[`McpResponseFormatter > formats error message 1`] = `
+Error: Something went wrong
+`;
+
+exports[`McpResponseFormatter > formats network requests 1`] = `
+## Network requests
+Showing 1-1 of 1 (Page 1 of 1).
+GET http://example.com 200
+`;
+
+exports[`McpResponseFormatter > formats paginated network requests 1`] = `
+## Network requests
+Showing 1-10 of 15 (Page 1 of 2).
+Next page: 1
+GET http://example.com/0 200
+GET http://example.com/1 200
+GET http://example.com/2 200
+GET http://example.com/3 200
+GET http://example.com/4 200
+GET http://example.com/5 200
+GET http://example.com/6 200
+GET http://example.com/7 200
+GET http://example.com/8 200
+GET http://example.com/9 200
+`;
+
+exports[`McpResponseFormatter > formats reconnect notice 1`] = `
+Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call list_pages to see open pages.
+`;
+
+exports[`McpResponseFormatter > formats snapshot 1`] = `
+Saved snapshot to Hello World.
+`;

@@ -21,7 +21,13 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
+import {
+  getMockRequest,
+  html,
+  withBrowser,
+  withMcpContext,
+  testHandle,
+} from './utils.js';
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -297,7 +303,7 @@ describe('McpContext', () => {
         .returns([mockRequest]);
 
       response.setIncludeNetworkRequests(true);
-      const result = await response.handle('test', context);
+      const result = await testHandle(response, 'test', context);
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
@@ -314,7 +320,7 @@ describe('McpContext', () => {
         .returns(mockRequest);
 
       response.attachNetworkRequest(456);
-      const result = await response.handle('test', context);
+      const result = await testHandle(response, 'test', context);
 
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
@@ -365,7 +371,7 @@ describe('McpContext', () => {
         requestFilePath: reqFilePath,
         responseFilePath: resFilePath,
       });
-      const result = await response.handle('test', context);
+      const result = await testHandle(response, 'test', context);
 
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
 

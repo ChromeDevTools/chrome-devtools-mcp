@@ -21,7 +21,7 @@ import {
   traceResultIsSuccess,
 } from '../../src/trace-processing/parse.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
-import {withMcpContext} from '../utils.js';
+import {withMcpContext, testHandle} from '../utils.js';
 
 describe('performance', () => {
   afterEach(() => {
@@ -416,7 +416,11 @@ describe('performance', () => {
           context,
         );
 
-        const result = await response.handle('performance_stop_trace', context);
+        const result = await testHandle(
+          response,
+          'performance_stop_trace',
+          context,
+        );
         const fullOutput = result.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -480,7 +484,11 @@ describe('performance', () => {
           context,
         );
 
-        const result = await response.handle('performance_stop_trace', context);
+        const result = await testHandle(
+          response,
+          'performance_stop_trace',
+          context,
+        );
         const fullOutput = result.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');

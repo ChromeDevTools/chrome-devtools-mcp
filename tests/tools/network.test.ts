@@ -17,6 +17,7 @@ import {
   html,
   stabilizeResponseOutput,
   withMcpContext,
+  testHandle,
 } from '../utils.js';
 
 describe('network', () => {
@@ -54,7 +55,11 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('list_request', context);
+        const responseData = await testHandle(
+          response,
+          'list_request',
+          context,
+        );
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
@@ -82,7 +87,11 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('list_request', context);
+        const responseData = await testHandle(
+          response,
+          'list_request',
+          context,
+        );
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
@@ -125,7 +134,11 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('list_request', context);
+        const responseData = await testHandle(
+          response,
+          'list_request',
+          context,
+        );
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
@@ -179,7 +192,7 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('get_request', context);
+        const responseData = await testHandle(response, 'get_request', context);
 
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),

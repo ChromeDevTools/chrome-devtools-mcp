@@ -26,7 +26,7 @@ import {
   getHeapSnapshotObjectDetails,
 } from '../../src/tools/memory.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
-import {withMcpContext} from '../utils.js';
+import {withMcpContext, testHandle} from '../utils.js';
 
 describe('memory', () => {
   describe('take_heapsnapshot', () => {
@@ -68,7 +68,8 @@ describe('memory', () => {
         );
 
         // Call handle to trigger formatting (similar to network tests)
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotSummary.name,
           context,
         );
@@ -95,7 +96,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotDetails.name,
           context,
         );
@@ -120,7 +122,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotDetails.name,
           context,
         );
@@ -145,7 +148,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotDetails.name,
           context,
         );
@@ -177,7 +181,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotDetails.name,
           context,
         );
@@ -206,7 +211,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotClassNodes.name,
           context,
         );
@@ -243,7 +249,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotClassNodes.name,
           context,
         );
@@ -291,7 +298,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotRetainers.name,
           context,
         );
@@ -318,7 +326,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotObjectDetails.name,
           context,
         );
@@ -391,7 +400,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotRetainingPaths.name,
           context,
         );
@@ -416,7 +426,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotRetainingPaths.name,
           context,
         );
@@ -447,7 +458,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotEdges.name,
           context,
         );
@@ -472,7 +484,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotEdges.name,
           context,
         );
@@ -499,7 +512,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotDominators.name,
           context,
         );
@@ -530,7 +544,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           compareHeapSnapshots.name,
           context,
         );
@@ -559,7 +574,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           compareHeapSnapshots.name,
           context,
         );
@@ -594,7 +610,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           compareHeapSnapshots.name,
           context,
         );
@@ -690,7 +707,8 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
+        const responseData = await testHandle(
+          response,
           getHeapSnapshotDuplicateStrings.name,
           context,
         );

@@ -17,7 +17,7 @@ import {
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
 import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
-import {withMcpContext} from '../utils.js';
+import {withMcpContext, testHandle} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
   describe('list_3p_developer_tools', () => {
@@ -57,7 +57,8 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
+          const result = await testHandle(
+            response,
             'list_3p_developer_tools',
             context,
           );
@@ -103,7 +104,8 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
+          const result = await testHandle(
+            response,
             'list_3p_developer_tools',
             context,
           );
@@ -139,7 +141,8 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
+          const result = await testHandle(
+            response,
             'list_3p_developer_tools',
             context,
           );
@@ -169,7 +172,8 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
+          const result = await testHandle(
+            response,
             'list_3p_developer_tools',
             context,
           );
@@ -233,7 +237,8 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
+          const result = await testHandle(
+            response,
             'list_3p_developer_tools',
             context,
           );
@@ -280,7 +285,7 @@ describe('thirdPartyDeveloperTools', () => {
             response,
             context,
           );
-          await response.handle('list_3p_developer_tools', context);
+          await testHandle(response, 'list_3p_developer_tools', context);
 
           let groupsLength = await page.pptrPage.evaluate(
             () => window.__dtmcp?.toolGroups?.length,
@@ -292,7 +297,7 @@ describe('thirdPartyDeveloperTools', () => {
             response,
             context,
           );
-          await response.handle('list_3p_developer_tools', context);
+          await testHandle(response, 'list_3p_developer_tools', context);
 
           groupsLength = await page.pptrPage.evaluate(
             () => window.__dtmcp?.toolGroups?.length,
@@ -319,7 +324,7 @@ describe('thirdPartyDeveloperTools', () => {
         response,
         context,
       );
-      await response.handle('list_3p_developer_tools', context);
+      await testHandle(response, 'list_3p_developer_tools', context);
     }
 
     it('executes a tool', async () => {

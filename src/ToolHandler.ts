@@ -5,6 +5,7 @@
  */
 
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
+import {McpResponseFormatter} from './formatters/McpResponseFormatter.js';
 import type {McpContext} from './McpContext.js';
 import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
@@ -270,11 +271,23 @@ export class ToolHandler {
         dataFormat = 'toon';
       }
 
-      const {content, structuredContent} = await response.handle(
-        this.tool.name,
-        context,
-        dataFormat,
-      );
+      let content, structuredContent;
+      if (this.serverArgs.slim) {
+        const text = {
+          type: 'text' as const,
+          text: response.responseLines.join('\n'),
+        };
+        content = [text];
+        structuredContent = text;
+      } else {
+        const {data, state} = await response.handle(context, dataFormat);
+        ({content, structuredContent} = McpResponseFormatter.format(
+          this.tool.name,
+          context,
+          data,
+          state,
+        ));
+      }
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
       } = {

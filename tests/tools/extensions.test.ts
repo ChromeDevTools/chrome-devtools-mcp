@@ -24,6 +24,7 @@ import {
   assertNoServiceWorkerReported,
   extractExtensionId,
   withMcpContext,
+  testHandle,
   html,
   getTextContent,
 } from '../utils.js';
@@ -206,7 +207,11 @@ describe('extension', () => {
           context,
         );
 
-        const result = await response.handle('list_console_messages', context);
+        const result = await testHandle(
+          response,
+          'list_console_messages',
+          context,
+        );
         const consoleOutput = getTextContent(result.content[0]);
         assert.ok(
           consoleOutput.includes('from content script!'),

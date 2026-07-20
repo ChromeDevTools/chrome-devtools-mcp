@@ -25,6 +25,7 @@ import {serverHooks} from '../server.js';
 import {
   getTextContent,
   withMcpContext,
+  testHandle,
   stabilizeStructuredContent,
   extractExtensionId,
   assertNoServiceWorkerReported,
@@ -108,7 +109,7 @@ describe('console', () => {
           context,
         );
 
-        const formattedResponse = await response2.handle('test', context);
+        const formattedResponse = await testHandle(response2, 'test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
 
         const sanitizedText = textContent.replaceAll(
@@ -165,7 +166,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] This is an error'));
       });
@@ -182,7 +183,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
         t.assert.snapshot(textContent);
       });
@@ -197,7 +198,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] Uncaught  (0 args)'));
       });
@@ -221,7 +222,7 @@ describe('console', () => {
             response,
             context,
           );
-          const formattedResponse = await response.handle('test', context);
+          const formattedResponse = await testHandle(response, 'test', context);
           const textContent = getTextContent(formattedResponse.content[0]);
           assert.ok(
             textContent.includes(
@@ -251,7 +252,11 @@ describe('console', () => {
             context,
           );
           {
-            const formattedResponse = await response.handle('test', context);
+            const formattedResponse = await testHandle(
+              response,
+              'test',
+              context,
+            );
             const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
@@ -271,7 +276,11 @@ describe('console', () => {
           );
           await anotherIssuePromise;
           {
-            const formattedResponse = await response.handle('test', context);
+            const formattedResponse = await testHandle(
+              response,
+              'test',
+              context,
+            );
             const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
@@ -304,7 +313,8 @@ describe('console', () => {
             context,
           );
 
-          const result = await response.handle(
+          const result = await testHandle(
+            response,
             'list_console_messages',
             context,
           );
@@ -335,7 +345,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(
           textContent.includes('msgid=1 [error] This is an error'),
@@ -370,7 +380,11 @@ describe('console', () => {
             response2,
             context,
           );
-          const formattedResponse = await response2.handle('test', context);
+          const formattedResponse = await testHandle(
+            response2,
+            'test',
+            context,
+          );
           t.assert.snapshot(getTextContent(formattedResponse.content[0]));
         });
       });
@@ -426,7 +440,11 @@ describe('console', () => {
             response2,
             context,
           );
-          const formattedResponse = await response2.handle('test', context);
+          const formattedResponse = await testHandle(
+            response2,
+            'test',
+            context,
+          );
           const rawText = getTextContent(formattedResponse.content[0]);
           const sanitizedText = rawText
             .replaceAll(/ID: \d+/g, 'ID: <ID>')
@@ -459,7 +477,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
@@ -488,7 +506,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
@@ -517,7 +535,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
@@ -546,7 +564,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
@@ -575,7 +593,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
@@ -618,7 +636,7 @@ describe('console', () => {
           response,
           context,
         );
-        const formattedResponse = await response.handle('test', context);
+        const formattedResponse = await testHandle(response, 'test', context);
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
@@ -652,7 +670,11 @@ describe('console', () => {
           context,
         );
 
-        const result = await response.handle('get_console_message', context);
+        const result = await testHandle(
+          response,
+          'get_console_message',
+          context,
+        );
         t.assert.snapshot(
           JSON.stringify(
             stabilizeStructuredContent(result.structuredContent),
