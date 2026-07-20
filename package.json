@@ -82,7 +82,7 @@
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
     "sinon": "^22.0.0",
-    "typescript": "^6.0.2",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.43.0",
     "yargs": "18.0.0"
   },
