@@ -1,4 +1,4 @@
-exports[`THIRD_PARTY_NOTICES > matches snapshot if exists 1`] = `
+exports[`THIRD_PARTY_NOTICES > matches snapshot 1`] = `
 Name: core-js
 URL: https://core-js.io
 Version: <VERSION>
