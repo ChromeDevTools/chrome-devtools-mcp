@@ -133,7 +133,7 @@ export async function withMcpContext(
     }
     context = await McpContext.from(
       browser,
-      undefined,
+      () => undefined,
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,

@@ -9,16 +9,15 @@ import {debuglog} from 'node:util';
 
 import type {Logger} from '../types.js';
 
-const mcpDebugNamespace = 'mcp:log';
-
-const nodeDebugLogger = debuglog(mcpDebugNamespace);
-
 let fileLogger: ((...args: unknown[]) => void) | null = null;
 
 export function saveLogsToFile(fileName: string): fs.WriteStream {
   const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
 
   fileLogger = (...chunks: unknown[]) => {
+    if (logFile.closed) {
+      return;
+    }
     logFile.write(`${chunks.join(' ')}\n`);
   };
 
@@ -43,12 +42,15 @@ export function flushLogs(
   });
 }
 
-let logger: Logger | undefined;
+const mcpDebugNamespace = 'mcp:log';
 
-if (fileLogger) {
-  logger = fileLogger;
-} else if (nodeDebugLogger.enabled) {
-  logger = nodeDebugLogger as unknown as Logger;
-}
+const nodeDebugLogger = debuglog(mcpDebugNamespace);
 
-export {logger};
+export const logger: Logger = () => {
+  if (fileLogger) {
+    return fileLogger;
+  } else if (nodeDebugLogger.enabled) {
+    return nodeDebugLogger as unknown as Logger;
+  }
+  return undefined;
+};

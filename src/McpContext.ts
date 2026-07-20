@@ -157,7 +157,7 @@ export class McpContext implements Context {
       }
       void this.#createMcpPage(page);
     } catch (err) {
-      this.logger?.('Error handling targetcreated', err);
+      this.logger()?.('Error handling targetcreated', err);
     }
   };
 
@@ -179,7 +179,7 @@ export class McpContext implements Context {
         this.#mcpPages.delete(foundPage);
       }
     } catch (err) {
-      this.logger?.('Error handling targetdestroyed', err);
+      this.logger()?.('Error handling targetdestroyed', err);
     }
   };
 
@@ -554,7 +554,7 @@ export class McpContext implements Context {
             allPages.push(page);
           }
         } catch (e) {
-          this.logger?.('Failed to get page for extension target', e);
+          this.logger()?.('Failed to get page for extension target', e);
         }
       }),
     );
@@ -600,7 +600,7 @@ export class McpContext implements Context {
       await fs.writeFile(filePath, data);
       return {filename: filePath};
     } catch (err) {
-      this.logger?.(err);
+      this.logger()?.(err);
       throw new Error('Could not save a file', {cause: err});
     }
   }
