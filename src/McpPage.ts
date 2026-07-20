@@ -183,7 +183,7 @@ export class McpPage implements ContextPage {
   async #initFocusEmulationNoThrow(): Promise<void> {
     // We emulate a focused page for all pages to support multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
-      logger?.('Error turning on focused page emulation', error);
+      logger()?.('Error turning on focused page emulation', error);
     });
   }
 
@@ -195,7 +195,7 @@ export class McpPage implements ContextPage {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session);
     } catch (e) {
-      logger?.('Failed to initialize DevTools universe', e);
+      logger()?.('Failed to initialize DevTools universe', e);
     }
   }
 
@@ -327,7 +327,7 @@ export class McpPage implements ContextPage {
 
   resolveCdpRequestId(cdpRequestId: string): number | undefined {
     if (!cdpRequestId) {
-      logger?.('no network request');
+      logger()?.('no network request');
       return;
     }
     const request = this.networkCollector.find(request => {
@@ -335,7 +335,7 @@ export class McpPage implements ContextPage {
       return request.id === cdpRequestId;
     });
     if (!request) {
-      logger?.('no network request for ' + cdpRequestId);
+      logger()?.('no network request for ' + cdpRequestId);
       return;
     }
     return this.networkCollector.getIdForResource(request);
@@ -566,7 +566,7 @@ export class McpPage implements ContextPage {
       for (const handle of oldHandles) {
         await handle
           .dispose()
-          .catch(e => logger?.('Failed to dispose old handle', e));
+          .catch(e => logger()?.('Failed to dispose old handle', e));
       }
     }
 
@@ -574,7 +574,7 @@ export class McpPage implements ContextPage {
       elementHandles.map(async (elementHandle, index) => {
         const backendNodeId = await elementHandle.backendNodeId();
         if (!backendNodeId) {
-          logger?.(
+          logger()?.(
             `No backendNodeId for stashed DOM element with index ${index}`,
           );
           return `stashed-${index}`;
@@ -582,7 +582,7 @@ export class McpPage implements ContextPage {
         const cdpElementId =
           this.textSnapshot?.resolveCdpElementId(backendNodeId);
         if (!cdpElementId) {
-          logger?.(
+          logger()?.(
             `Could not get cdpElementId for backend node ${backendNodeId}`,
           );
           return `stashed-${index}`;
@@ -655,10 +655,10 @@ export class McpPage implements ContextPage {
 
   async getDevToolsData(): Promise<DevToolsData> {
     try {
-      logger?.('Getting DevTools UI data');
+      logger()?.('Getting DevTools UI data');
       const devtoolsPage = await this.getDevToolsPage();
       if (!devtoolsPage) {
-        logger?.('No DevTools page detected');
+        logger()?.('No DevTools page detected');
         return {};
       }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
@@ -681,7 +681,7 @@ export class McpPage implements ContextPage {
       );
       return {cdpBackendNodeId, cdpRequestId};
     } catch (err) {
-      logger?.('error getting devtools data', err);
+      logger()?.('error getting devtools data', err);
     }
     return {};
   }

@@ -282,7 +282,7 @@ export const navigatePage = definePageTool(() => {
           await page.pptrPage
             .removeScriptToEvaluateOnNewDocument(initScriptId)
             .catch(error => {
-              logger?.(`Failed to remove init script`, error);
+              logger()?.(`Failed to remove init script`, error);
             });
         }
       }
@@ -366,7 +366,7 @@ export const handleDialog = definePageTool({
           await dialog.accept(request.params.promptText);
         } catch (err) {
           // Likely already handled by the user outside of MCP.
-          logger?.(err);
+          logger()?.(err);
         }
         response.appendResponseLine('Successfully accepted the dialog');
         break;
@@ -376,7 +376,7 @@ export const handleDialog = definePageTool({
           await dialog.dismiss();
         } catch (err) {
           // Likely already handled.
-          logger?.(err);
+          logger()?.(err);
         }
         response.appendResponseLine('Successfully dismissed the dialog');
         break;

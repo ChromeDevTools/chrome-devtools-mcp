@@ -11,7 +11,6 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import logger from 'debug';
 import {Locator} from 'puppeteer';
 import sinon from 'sinon';
 
@@ -233,7 +232,7 @@ describe('McpContext', () => {
       };
       const first = await McpContext.from(
         browser,
-        logger('test'),
+        () => undefined,
         options,
         Locator,
       );
@@ -245,7 +244,7 @@ describe('McpContext', () => {
       // the next page keeps counting up rather than colliding with it.
       const second = await McpContext.from(
         browser,
-        logger('test'),
+        () => undefined,
         options,
         Locator,
       );
@@ -268,7 +267,7 @@ describe('McpContext', () => {
     await withBrowser(async browser => {
       const context = await McpContext.from(
         browser,
-        logger('test'),
+        () => undefined,
         {
           experimentalDevToolsDebugging: false,
           performanceCrux: false,
