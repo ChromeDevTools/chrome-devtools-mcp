@@ -9,7 +9,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 describe('THIRD_PARTY_NOTICES', () => {
-  it('matches snapshot if exists', t => {
+  it('matches snapshot', t => {
     const noticesPath = path.join(
       process.cwd(),
       'build/src/third_party/THIRD_PARTY_NOTICES',
