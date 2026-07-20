@@ -8,7 +8,10 @@ import {describe, it} from 'node:test';
 
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
-import {UncaughtError} from '../../src/PageCollector.js';
+import {
+  BufferedConsoleMessage,
+  UncaughtError,
+} from '../../src/PageCollector.js';
 import type {ConsoleMessage, Protocol} from '../../src/third_party/index.js';
 import type {DevTools} from '../../src/third_party/index.js';
 
@@ -67,6 +70,16 @@ describe('ConsoleFormatter', () => {
       const message = createMockMessage({
         type: () => 'log',
         text: () => 'Hello, world!',
+      });
+      return await ConsoleFormatter.from(message, {id: 1});
+    });
+
+    formatterTestConcise('formats a buffered console message', async () => {
+      const message = new BufferedConsoleMessage({
+        type: 'log',
+        text: 'Recovered from the buffer',
+        argsCount: 2,
+        targetId: 'target-1',
       });
       return await ConsoleFormatter.from(message, {id: 1});
     });
@@ -191,6 +204,32 @@ describe('ConsoleFormatter', () => {
       return await ConsoleFormatter.from(message, {
         id: 1,
         fetchDetailedData: true,
+      });
+    });
+
+    formatterTestDetailed('formats a buffered console message', async () => {
+      const message = new BufferedConsoleMessage({
+        type: 'error',
+        text: 'Recovered from the buffer',
+        argsCount: 1,
+        targetId: 'target-1',
+      });
+      const stackTrace = {
+        syncFragment: {
+          frames: [
+            {
+              line: 10,
+              column: 2,
+              url: 'foo.ts',
+              name: 'foo',
+            },
+          ],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+      return await ConsoleFormatter.from(message, {
+        id: 1,
+        resolvedStackTraceForTesting: stackTrace,
       });
     });
 

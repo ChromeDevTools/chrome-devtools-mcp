@@ -7,18 +7,26 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import type {Frame, HTTPRequest, Protocol} from 'puppeteer-core';
+import type {
+  CDPSession,
+  ConsoleMessage,
+  Frame,
+  HTTPRequest,
+  Protocol,
+} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ListenerMap} from '../src/PageCollector.js';
 import {
+  BufferedConsoleMessage,
   ConsoleCollector,
   NetworkCollector,
   PageCollector,
+  UncaughtError,
 } from '../src/PageCollector.js';
 import {DevTools} from '../src/third_party/index.js';
 
-import {getMockRequest, getMockBrowser} from './utils.js';
+import {getMockRequest, getMockBrowser, mockListener} from './utils.js';
 
 describe('PageCollector', () => {
   it('works', async () => {
@@ -246,6 +254,35 @@ describe('NetworkCollector', () => {
   });
 });
 
+function getMockCdpSessionWithReplay(
+  replayed: Array<
+    | ['Runtime.consoleAPICalled', Protocol.Runtime.ConsoleAPICalledEvent]
+    | ['Runtime.exceptionThrown', Protocol.Runtime.ExceptionThrownEvent]
+    | ['Log.entryAdded', Protocol.Log.EntryAddedEvent]
+  >,
+): CDPSession {
+  const session = {
+    ...mockListener(),
+    async send(method: string) {
+      if (method === 'Target.getTargetInfo') {
+        return {targetInfo: {targetId: '<mock target ID>'}};
+      }
+      // Chromium replays buffered events before the enable call resolves.
+      const domain = method.split('.')[0];
+      for (const [eventName, event] of replayed) {
+        if (method.endsWith('.enable') && eventName.startsWith(domain)) {
+          session.emit(eventName, event);
+        }
+      }
+      return undefined;
+    },
+    async detach() {
+      // no-op
+    },
+  };
+  return session as unknown as CDPSession;
+}
+
 describe('ConsoleCollector', () => {
   let issue: Protocol.Audits.InspectorIssue;
 
@@ -374,5 +411,170 @@ describe('ConsoleCollector', () => {
         );
       }),
     );
+  });
+
+  it('backfills messages buffered before construction', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    page.createCDPSession = async () =>
+      getMockCdpSessionWithReplay([
+        [
+          'Runtime.consoleAPICalled',
+          {
+            type: 'warning',
+            args: [
+              {type: 'string', value: 'buffered'},
+              {type: 'number', value: 42},
+            ],
+            executionContextId: 1,
+            timestamp: Date.now() - 2000,
+          },
+        ],
+        [
+          'Runtime.exceptionThrown',
+          {
+            timestamp: Date.now() - 1000,
+            exceptionDetails: {
+              exceptionId: 1,
+              text: 'Uncaught',
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+          },
+        ],
+        [
+          'Log.entryAdded',
+          {
+            entry: {
+              source: 'network',
+              level: 'error',
+              text: 'Failed to load resource: net::ERR_CONNECTION_REFUSED',
+              // The oldest event, though replayed last (the Log domain is
+              // enabled after Runtime) - the merge must order it first.
+              timestamp: Date.now() - 3000,
+            },
+          },
+        ],
+        [
+          'Log.entryAdded',
+          {
+            entry: {
+              source: 'worker',
+              level: 'verbose',
+              text: 'skipped like in live collection',
+              timestamp: Date.now() - 3000,
+            },
+          },
+        ],
+      ]);
+
+    const collector = new ConsoleCollector(page, collect => {
+      return {
+        console: message => {
+          collect(message);
+        },
+        uncaughtError: error => {
+          collect(error);
+        },
+      } as ListenerMap;
+    });
+    await collector.backfilled;
+
+    const data = collector.getData();
+    assert.equal(data.length, 3);
+    const logEntry = data[0];
+    assert.ok(logEntry instanceof BufferedConsoleMessage);
+    assert.equal(logEntry.type(), 'error');
+    assert.ok(logEntry.text().startsWith('Failed to load resource'));
+    const message = data[1];
+    assert.ok(message instanceof BufferedConsoleMessage);
+    assert.equal(message.type(), 'warn');
+    assert.equal(message.text(), 'buffered 42');
+    assert.equal(message.argsCount, 2);
+    assert.ok(data[2] instanceof UncaughtError);
+  });
+
+  it('prepends backfilled messages and drops post-attach replays', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    page.createCDPSession = async () =>
+      getMockCdpSessionWithReplay([
+        [
+          'Runtime.consoleAPICalled',
+          {
+            type: 'log',
+            args: [{type: 'string', value: 'buffered'}],
+            executionContextId: 1,
+            timestamp: Date.now() - 1000,
+          },
+        ],
+        [
+          'Runtime.consoleAPICalled',
+          {
+            type: 'log',
+            // Live collection already has anything logged after attach time,
+            // so this replayed event must be dropped.
+            args: [{type: 'string', value: 'already collected live'}],
+            executionContextId: 1,
+            timestamp: Date.now() + 60_000,
+          },
+        ],
+      ]);
+
+    const collector = new ConsoleCollector(page, collect => {
+      return {
+        console: message => {
+          collect(message);
+        },
+      } as ListenerMap;
+    });
+    const liveMessage = {} as ConsoleMessage;
+    page.emit('console', liveMessage);
+    await collector.backfilled;
+
+    const data = collector.getData();
+    assert.equal(data.length, 2);
+    const backfilled = data[0];
+    assert.ok(backfilled instanceof BufferedConsoleMessage);
+    assert.equal(backfilled.text(), 'buffered');
+    assert.equal(data[1], liveMessage);
+  });
+
+  it('keeps backfilled messages out of newer navigations', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    mainFrame.page = () => page;
+    const {promise: sessionPromise, resolve: resolveSession} =
+      Promise.withResolvers<CDPSession>();
+    page.createCDPSession = () => sessionPromise;
+
+    const collector = new ConsoleCollector(page, collect => {
+      return {
+        console: message => {
+          collect(message);
+        },
+      } as ListenerMap;
+    });
+    // The page navigates before the backfill session is ready, so the
+    // recovered message belongs to the previous navigation's bucket.
+    page.emit('framenavigated', page.mainFrame());
+    resolveSession(
+      getMockCdpSessionWithReplay([
+        [
+          'Runtime.consoleAPICalled',
+          {
+            type: 'log',
+            args: [{type: 'string', value: 'buffered'}],
+            executionContextId: 1,
+            timestamp: Date.now() - 1000,
+          },
+        ],
+      ]),
+    );
+    await collector.backfilled;
+
+    assert.equal(collector.getData().length, 0);
+    assert.equal(collector.getData(true).length, 1);
   });
 });
