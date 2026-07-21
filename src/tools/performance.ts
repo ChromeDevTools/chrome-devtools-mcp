@@ -63,8 +63,9 @@ export const startTrace = definePageTool({
 
     if (request.params.reload) {
       // Before starting the recording, navigate to about:blank to clear out any state.
+      // We use `load` because `networkidle0` is known to be flaky for about:blank in Puppeteer.
       await page.pptrPage.goto('about:blank', {
-        waitUntil: ['networkidle0'],
+        waitUntil: 'load',
       });
     }
 

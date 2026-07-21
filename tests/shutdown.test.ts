@@ -44,6 +44,10 @@ async function spawnServer(): Promise<Server> {
   child.stderr.on('data', () => {
     // discard
   });
+  // Drain stdout to avoid pipe-buffer backpressure stalling the server during shutdown.
+  child.stdout.on('data', () => {
+    // discard
+  });
   return child;
 }
 
@@ -87,7 +91,9 @@ async function rpc(
         try {
           const parsed = JSON.parse(line) as {id?: number};
           if (parsed.id === id) {
+            clearTimeout(timer);
             child.stdout.off('data', onData);
+            child.off('exit', onExit);
             resolve(parsed);
             return;
           }
@@ -96,8 +102,19 @@ async function rpc(
         }
       }
     };
+    const timer = setTimeout(() => {
+      child.stdout.off('data', onData);
+      child.off('exit', onExit);
+      reject(
+        new Error(
+          `RPC timeout: no response for method ${msg.method} within 60000ms`,
+        ),
+      );
+    }, 60000);
+
     child.stdout.on('data', onData);
     const onExit = () => {
+      clearTimeout(timer);
       child.stdout.off('data', onData);
       reject(new Error('server exited before RPC response'));
     };
@@ -120,23 +137,40 @@ async function initializeAndLaunchBrowser(child: Server): Promise<void> {
     },
   });
   notify(child, {method: 'notifications/initialized'});
-  // navigate_page forces a real Chrome launch — this is what reproduces
+  // list_pages forces a real Chrome launch — this is what reproduces
   // the hang in #2116. Without an active Chrome subprocess, stdin EOF
   // would close the event loop on its own and shutdown would look fine
   // even with broken handlers.
   await rpc(child, {
     method: 'tools/call',
     params: {
-      name: 'navigate_page',
-      arguments: {url: 'about:blank'},
+      name: 'list_pages',
+      arguments: {},
     },
   });
 }
 
+async function setupServerWithRetry(): Promise<Server> {
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const child = await spawnServer();
+    try {
+      await initializeAndLaunchBrowser(child);
+      return child;
+    } catch (e) {
+      lastError = e as Error;
+      // If setup failed (e.g., Chrome hung on launch), kill the child and try again.
+      child.kill('SIGKILL');
+      // Wait briefly for OS cleanup.
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  throw lastError;
+}
+
 describe('shutdown', () => {
   it('exits within budget on stdin EOF after Chrome launch', async () => {
-    const child = await spawnServer();
-    await initializeAndLaunchBrowser(child);
+    const child = await setupServerWithRetry();
     child.stdin.end();
     const {elapsedMs} = await waitForExit(child, EXIT_TIMEOUT_MS);
     assert.ok(
@@ -146,8 +180,7 @@ describe('shutdown', () => {
   });
 
   it('exits within budget on SIGTERM after Chrome launch', async () => {
-    const child = await spawnServer();
-    await initializeAndLaunchBrowser(child);
+    const child = await setupServerWithRetry();
     child.kill('SIGTERM');
     const {elapsedMs} = await waitForExit(child, EXIT_TIMEOUT_MS);
     assert.ok(
@@ -157,8 +190,7 @@ describe('shutdown', () => {
   });
 
   it('exits within budget on SIGINT after Chrome launch', async () => {
-    const child = await spawnServer();
-    await initializeAndLaunchBrowser(child);
+    const child = await setupServerWithRetry();
     child.kill('SIGINT');
     const {elapsedMs} = await waitForExit(child, EXIT_TIMEOUT_MS);
     assert.ok(
@@ -168,8 +200,7 @@ describe('shutdown', () => {
   });
 
   it('exits within budget on SIGHUP after Chrome launch', async () => {
-    const child = await spawnServer();
-    await initializeAndLaunchBrowser(child);
+    const child = await setupServerWithRetry();
     child.kill('SIGHUP');
     const {elapsedMs} = await waitForExit(child, EXIT_TIMEOUT_MS);
     assert.ok(

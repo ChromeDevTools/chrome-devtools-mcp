@@ -51,7 +51,7 @@ async function shutdown(reason: string): Promise<void> {
   setTimeout(() => {
     logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
-  }, 10000).unref();
+  }, 5000).unref();
   await closeBrowser();
   process.exit(0);
 }

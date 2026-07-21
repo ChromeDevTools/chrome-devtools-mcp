@@ -238,7 +238,7 @@ describe('pages', () => {
           context.getSelectedMcpPage(),
         );
         await newPage().handler(
-          {params: {url: 'about:blank'}},
+          {params: {url: 'data:text/html,<html></html>'}},
           response,
           context,
         );
@@ -260,7 +260,7 @@ describe('pages', () => {
           true,
         );
         await newPage().handler(
-          {params: {url: 'about:blank', background: true}},
+          {params: {url: 'data:text/html,<html></html>', background: true}},
           response,
           context,
         );
@@ -281,7 +281,12 @@ describe('pages', () => {
     it('creates a page in an isolated context', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-a',
+            },
+          },
           response,
           context,
         );
@@ -294,14 +299,24 @@ describe('pages', () => {
     it('reuses the same context for the same isolatedContext name', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-a',
+            },
+          },
           response,
           context,
         );
         const mcpPage1 = context.getSelectedMcpPage();
         const page1 = mcpPage1.pptrPage;
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-a',
+            },
+          },
           response,
           context,
         );
@@ -317,14 +332,24 @@ describe('pages', () => {
     it('creates separate contexts for different isolatedContext names', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-a',
+            },
+          },
           response,
           context,
         );
         const mcpPageA = context.getSelectedMcpPage();
         const pageA = mcpPageA.pptrPage;
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-b'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-b',
+            },
+          },
           response,
           context,
         );
@@ -339,7 +364,12 @@ describe('pages', () => {
     it('includes isolatedContext in page listing', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-a',
+            },
+          },
           response,
           context,
         );
@@ -357,7 +387,7 @@ describe('pages', () => {
         const mcpPage = context.getSelectedMcpPage();
         assert.strictEqual(mcpPage.isolatedContextName, undefined);
         await newPage().handler(
-          {params: {url: 'about:blank'}},
+          {params: {url: 'data:text/html,<html></html>'}},
           response,
           context,
         );
@@ -371,7 +401,12 @@ describe('pages', () => {
     it('closes an isolated page without errors', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'session-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'session-a',
+            },
+          },
           response,
           context,
         );
@@ -399,7 +434,7 @@ describe('pages', () => {
         const dialog = await dialogPromise;
 
         await newPage().handler(
-          {params: {url: 'about:blank'}},
+          {params: {url: 'data:text/html,<html></html>'}},
           response,
           context,
         );
@@ -559,7 +594,12 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         // Create pages in separate isolated contexts.
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-a'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'ctx-a',
+            },
+          },
           response,
           context,
         );
@@ -567,7 +607,12 @@ describe('pages', () => {
         const pageAId = context.getSelectedMcpPage().id;
 
         await newPage().handler(
-          {params: {url: 'about:blank', isolatedContext: 'ctx-b'}},
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              isolatedContext: 'ctx-b',
+            },
+          },
           response,
           context,
         );
@@ -683,7 +728,7 @@ describe('pages', () => {
           await navigatePage().handler(
             {
               params: {
-                url: 'about:blank',
+                url: 'data:text/html,<html></html>',
                 timeout: 12345,
               },
               page: context.getSelectedMcpPage(),

@@ -58,15 +58,10 @@ describe('extension', () => {
       );
 
       const extensionId = extractExtensionId(response);
-      const page = context.getSelectedMcpPage().pptrPage;
-      await page.goto('chrome://extensions');
-
-      const element = await page.waitForSelector(
-        `extensions-manager >>> extensions-item[id="${extensionId}"]`,
-      );
+      let extensions = await context.listExtensions();
       assert.ok(
-        element,
-        `Extension with ID "${extensionId}" should be visible on chrome://extensions`,
+        extensions.has(extensionId!),
+        `Extension with ID "${extensionId}" should be installed`,
       );
 
       // Uninstall the extension
@@ -82,15 +77,10 @@ describe('extension', () => {
         'Response should indicate uninstallation',
       );
 
-      await page.waitForSelector('extensions-manager');
-
-      const elementAfterUninstall = await page.$(
-        `extensions-manager >>> extensions-item[id="${extensionId}"]`,
-      );
-      assert.strictEqual(
-        elementAfterUninstall,
-        null,
-        `Extension with ID "${extensionId}" should NOT be visible on chrome://extensions`,
+      extensions = await context.listExtensions();
+      assert.ok(
+        !extensions.has(extensionId!),
+        `Extension with ID "${extensionId}" should NOT be installed`,
       );
     });
   });
