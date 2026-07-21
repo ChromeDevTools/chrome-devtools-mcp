@@ -94,6 +94,13 @@ export async function withBrowser(
   const key = JSON.stringify(launchOptions);
 
   let browser = browsers.get(key);
+  // A cached browser can die mid-run (crash, pipe drop, teardown race). Reusing the
+  // dead handle makes every later same-key test fail with `Target closed`, so drop a
+  // disconnected one and let the miss path relaunch it.
+  if (browser && !browser.connected) {
+    browsers.delete(key);
+    browser = undefined;
+  }
   if (!browser) {
     browser = await puppeteer.launch(launchOptions);
     browsers.set(key, browser);
