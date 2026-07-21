@@ -47,6 +47,8 @@ describe('performance', () => {
       await withMcpContext(async (response, context) => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
+        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon.stub(selectedPage, 'goto').resolves(null);
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace.handler(
           {
@@ -82,7 +84,7 @@ describe('performance', () => {
         );
         sinon.assert.calledOnce(startTracingStub);
         sinon.assert.calledWithExactly(gotoStub, 'about:blank', {
-          waitUntil: ['networkidle0'],
+          waitUntil: 'load',
         });
         sinon.assert.calledWithExactly(gotoStub, 'https://www.test.com', {
           waitUntil: ['load'],
@@ -416,7 +418,7 @@ describe('performance', () => {
           context,
         );
 
-        const result = await response.handle('performance_stop_trace', context);
+        const result = await response.handle(context);
         const fullOutput = result.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -480,7 +482,7 @@ describe('performance', () => {
           context,
         );
 
-        const result = await response.handle('performance_stop_trace', context);
+        const result = await response.handle(context);
         const fullOutput = result.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');

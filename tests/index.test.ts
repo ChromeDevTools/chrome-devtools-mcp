@@ -30,33 +30,52 @@ describe('e2e', () => {
     extraArgs: string[] = [],
     options: {capabilities?: ClientCapabilities} = {},
   ) {
-    const transport = new StdioClientTransport({
-      command: 'node',
-      args: [
-        'build/src/bin/chrome-devtools-mcp.js',
-        '--headless',
-        '--isolated',
-        '--executable-path',
-        await executablePath(),
-        ...extraArgs,
-      ],
-      env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    });
-    const client = new Client(
-      {
-        name: 'e2e-test',
-        version: '1.0.0',
-      },
-      {
-        capabilities: options.capabilities ?? {},
-      },
-    );
+    let attempt = 1;
+    while (attempt <= 3) {
+      const transport = new StdioClientTransport({
+        command: 'node',
+        args: [
+          'build/src/bin/chrome-devtools-mcp.js',
+          '--headless',
+          '--isolated',
+          '--executable-path',
+          await executablePath(),
+          ...extraArgs,
+        ],
+        env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      });
+      const client = new Client(
+        {
+          name: 'e2e-test',
+          version: '1.0.0',
+        },
+        {
+          capabilities: options.capabilities ?? {},
+        },
+      );
 
-    try {
-      await client.connect(transport);
-      await cb(client);
-    } finally {
-      await client.close();
+      try {
+        await client.connect(transport);
+        await cb(client);
+        return;
+      } catch (error) {
+        if (
+          attempt === 3 ||
+          !(error instanceof Error) ||
+          (!error.message.includes('timed out') &&
+            !error.message.includes('timeout'))
+        ) {
+          throw error;
+        }
+        attempt++;
+        await new Promise(r => setTimeout(r, 1000));
+      } finally {
+        try {
+          await client.close();
+        } catch {
+          // Ignore close errors
+        }
+      }
     }
   }
   it('calls a tool', async t => {

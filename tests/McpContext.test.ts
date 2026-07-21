@@ -297,7 +297,7 @@ describe('McpContext', () => {
         .returns([mockRequest]);
 
       response.setIncludeNetworkRequests(true);
-      const result = await response.handle('test', context);
+      const result = await response.handle(context);
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
@@ -314,7 +314,7 @@ describe('McpContext', () => {
         .returns(mockRequest);
 
       response.attachNetworkRequest(456);
-      const result = await response.handle('test', context);
+      const result = await response.handle(context);
 
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
@@ -365,7 +365,7 @@ describe('McpContext', () => {
         requestFilePath: reqFilePath,
         responseFilePath: resFilePath,
       });
-      const result = await response.handle('test', context);
+      const result = await response.handle(context);
 
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
 

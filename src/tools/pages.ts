@@ -409,5 +409,6 @@ export const getTabId = definePageTool({
     const page = context.getPageById(request.params.pageId);
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
     response.setTabId(tabId);
+    response.appendResponseLine(`Tab ID: ${tabId}`);
   },
 });

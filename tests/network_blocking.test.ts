@@ -59,7 +59,7 @@ describe('Network Blocking Integration', () => {
             params: {
               function: `async () => {
                 try {
-                  await fetch("${blockedUrl}");
+                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
                   return 'SUCCESS';
                 } catch (err) {
                   return err instanceof Error ? err.message : String(err);
@@ -124,7 +124,7 @@ describe('Network Blocking Integration', () => {
             params: {
               function: `async () => {
                 try {
-                  await fetch("${blockedUrl}");
+                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
                   return 'SUCCESS';
                 } catch (err) {
                   return err instanceof Error ? err.message : String(err);
@@ -177,7 +177,7 @@ describe('Network Blocking Integration', () => {
             params: {
               function: `async () => {
                 try {
-                  await fetch("${blockedUrl}");
+                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
                   return 'SUCCESS';
                 } catch (err) {
                   return err instanceof Error ? err.message : String(err);
@@ -218,7 +218,7 @@ describe('Network Blocking Integration', () => {
             params: {
               function: `async () => {
                 try {
-                  await fetch("${blockedUrl}");
+                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
                   return 'SUCCESS';
                 } catch (err) {
                   return err instanceof Error ? err.message : String(err);

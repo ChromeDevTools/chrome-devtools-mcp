@@ -68,10 +68,7 @@ describe('memory', () => {
         );
 
         // Call handle to trigger formatting (similar to network tests)
-        const responseData = await response.handle(
-          getHeapSnapshotSummary.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -95,10 +92,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDetails.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -120,10 +114,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDetails.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -145,10 +136,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDetails.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -177,10 +165,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDetails.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -206,10 +191,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotClassNodes.name,
-          context,
-        );
+        const responseData = await response.handle(context);
 
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
@@ -243,10 +225,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotClassNodes.name,
-          context,
-        );
+        const responseData = await response.handle(context);
 
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
@@ -291,10 +270,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotRetainers.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -318,10 +294,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotObjectDetails.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -391,10 +364,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotRetainingPaths.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -416,10 +386,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotRetainingPaths.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -447,10 +414,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotEdges.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -472,10 +436,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotEdges.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -499,10 +460,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDominators.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -530,10 +488,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          compareHeapSnapshots.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -559,10 +514,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          compareHeapSnapshots.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -594,10 +546,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          compareHeapSnapshots.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -690,10 +639,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDuplicateStrings.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');

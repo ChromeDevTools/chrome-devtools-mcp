@@ -17,7 +17,10 @@ describe('webmcp', () => {
     it('list webmcp tools in navigate_page response', async () => {
       await withMcpContext(async (response, context) => {
         await navigatePage().handler(
-          {params: {url: 'about:blank'}, page: context.getSelectedMcpPage()},
+          {
+            params: {url: 'data:text/html,<html></html>'},
+            page: context.getSelectedMcpPage(),
+          },
           response,
           context,
         );

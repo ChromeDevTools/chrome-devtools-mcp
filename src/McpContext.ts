@@ -616,12 +616,25 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    const id = await this.browser.installExtension(extensionPath);
+    const id = await Promise.race([
+      this.browser.installExtension(extensionPath),
+      new Promise<string>((_, rej) =>
+        setTimeout(() => rej(new Error('Timeout installing extension')), 30000),
+      ),
+    ]);
     return id;
   }
 
   async uninstallExtension(id: string): Promise<void> {
-    await this.browser.uninstallExtension(id);
+    await Promise.race([
+      this.browser.uninstallExtension(id),
+      new Promise<void>((_, rej) =>
+        setTimeout(
+          () => rej(new Error('Timeout uninstalling extension')),
+          30000,
+        ),
+      ),
+    ]);
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
