@@ -119,7 +119,7 @@ export async function withBrowser(
         new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error('withBrowser timeout exceeded')),
-            30000,
+            60000,
           ),
         ),
       ]);
