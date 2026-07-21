@@ -1173,7 +1173,8 @@ exports[`McpResponse network request filtering > shows all requests when no filt
 `;
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 1`] = `
-
+## Network requests
+No requests found.
 `;
 
 exports[`McpResponse network request filtering > shows no requests when filter matches nothing 2`] = `

@@ -13,10 +13,7 @@ import type {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
 
 export class SlimMcpResponse extends McpResponse {
-  override async handle(
-    _toolName: string,
-    _context: McpContext,
-  ): Promise<{
+  override async handle(_context: McpContext): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
   }> {

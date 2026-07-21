@@ -271,7 +271,6 @@ export class ToolHandler {
       }
 
       const {content, structuredContent} = await response.handle(
-        this.tool.name,
         context,
         dataFormat,
       );

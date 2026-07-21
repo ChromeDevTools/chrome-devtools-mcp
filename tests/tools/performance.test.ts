@@ -416,7 +416,7 @@ describe('performance', () => {
           context,
         );
 
-        const result = await response.handle('performance_stop_trace', context);
+        const result = await response.handle(context);
         const fullOutput = result.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -480,7 +480,7 @@ describe('performance', () => {
           context,
         );
 
-        const result = await response.handle('performance_stop_trace', context);
+        const result = await response.handle(context);
         const fullOutput = result.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');

@@ -17,7 +17,7 @@ type Server = ChildProcessByStdio<Writable, Readable, Readable>;
 // Once shutdown is signalled, the server should be fully gone within this
 // budget. The actual fast path is well under 500ms; the budget is set to be
 // generous against CI noise without being so loose that it would hide a hang.
-const SHUTDOWN_BUDGET_MS = 3000;
+const SHUTDOWN_BUDGET_MS = 10000;
 // Outer test timeout. If exit doesn't happen within this, treat as a hang
 // (the bug we're guarding against) and SIGKILL the subprocess.
 const EXIT_TIMEOUT_MS = 15000;

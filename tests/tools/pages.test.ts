@@ -82,7 +82,7 @@ describe('pages', () => {
           } as ParsedArguments);
           await listPageDef.handler({params: {}}, response, context);
 
-          const result = await response.handle(listPageDef.name, context);
+          const result = await response.handle(context);
           const textContent = result.content.find(c => c.type === 'text') as {
             type: 'text';
             text: string;
@@ -123,7 +123,7 @@ describe('pages', () => {
             } as ParsedArguments);
             await listPageDef.handler({params: {}}, response, context);
 
-            const result = await response.handle(listPageDef.name, context);
+            const result = await response.handle(context);
             const textContent = result.content.find(c => c.type === 'text') as {
               type: 'text';
               text: string;
@@ -183,7 +183,7 @@ describe('pages', () => {
           } as ParsedArguments);
           await listPageDef.handler({params: {}}, response, context);
 
-          const result = await response.handle(listPageDef.name, context);
+          const result = await response.handle(context);
           const textContent = result.content.find(c => c.type === 'text') as {
             type: 'text';
             text: string;
@@ -223,7 +223,7 @@ describe('pages', () => {
 
         await listPages().handler({params: {}}, response, context);
 
-        const result = await response.handle('list_pages', context);
+        const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -343,7 +343,7 @@ describe('pages', () => {
           response,
           context,
         );
-        const result = await response.handle('new_page', context);
+        const result = await response.handle(context);
         const pages = (
           result.structuredContent as {pages: Array<{isolatedContext?: string}>}
         ).pages;
@@ -404,7 +404,7 @@ describe('pages', () => {
           context,
         );
 
-        const result = await response.handle('new_page', context);
+        const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -507,7 +507,7 @@ describe('pages', () => {
 
         await closePage.handler({params: {pageId: 2}}, response, context);
 
-        const result = await response.handle('close_page', context);
+        const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
       });
     });
@@ -617,7 +617,7 @@ describe('pages', () => {
 
         await selectPage.handler({params: {pageId: 1}}, response, context);
 
-        const result = await response.handle('select_page', context);
+        const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -897,7 +897,7 @@ describe('pages', () => {
           context,
         );
 
-        const result = await response.handle('navigate_page', context);
+        const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
       });
     });
@@ -1089,7 +1089,7 @@ describe('pages', () => {
           context,
         );
 
-        const result = await response.handle('resize_page', context);
+        const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
         await dialog.dismiss();
         await evalPromise;
@@ -1290,7 +1290,7 @@ describe('pages', () => {
           response,
           context,
         );
-        const result = await response.handle('get_tab_id', context);
+        const result = await response.handle(context);
         // @ts-expect-error _tabId is internal.
         assert.strictEqual(result.structuredContent.tabId, 'test-tab-id');
         assert.deepStrictEqual(response.responseLines, ['Tab ID: test-tab-id']);

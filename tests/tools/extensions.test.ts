@@ -206,7 +206,7 @@ describe('extension', () => {
           context,
         );
 
-        const result = await response.handle('list_console_messages', context);
+        const result = await response.handle(context);
         const consoleOutput = getTextContent(result.content[0]);
         assert.ok(
           consoleOutput.includes('from content script!'),

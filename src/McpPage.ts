@@ -318,6 +318,9 @@ export class McpPage implements ContextPage {
         replaceHtmlElementsWithUids(tool.inputSchema);
       }
     }
+
+    this.thirdPartyDeveloperTools = toolGroups;
+
     return toolGroups;
   }
 
