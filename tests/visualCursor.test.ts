@@ -15,9 +15,9 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {click, clickAt} from '../src/tools/input.js';
 import {
   animateCursorTo,
-  CURSOR_MOVE_DURATION_MS,
+  buildVisualCursorInjectionScript,
+  DEFAULT_VISUAL_CURSOR_DURATION_MS,
   ensureVisualCursor,
-  VISUAL_CURSOR_INJECTION_SCRIPT,
 } from '../src/visualCursor.js';
 
 import {html, withMcpContext} from './utils.js';
@@ -45,28 +45,56 @@ describe('visualCursor', () => {
     });
   });
 
+  describe('--visual-cursor-duration CLI flag', () => {
+    it('defaults to 800', () => {
+      const args = parseArguments('1.0.0', ['node', 'main.js'], {});
+      assert.strictEqual(args.visualCursorDuration, 800);
+    });
+
+    it('parses --visual-cursor-duration', () => {
+      const args = parseArguments(
+        '1.0.0',
+        ['node', 'main.js', '--visual-cursor-duration', '500'],
+        {},
+      );
+      assert.strictEqual(args.visualCursorDuration, 500);
+    });
+  });
+
   describe('injection script', () => {
     it('exposes the ghost cursor helpers on window', () => {
-      assert.ok(
-        VISUAL_CURSOR_INJECTION_SCRIPT.includes('__ghostCursorInstalled'),
-      );
-      assert.ok(VISUAL_CURSOR_INJECTION_SCRIPT.includes('__ghostCursorMove'));
-      assert.ok(VISUAL_CURSOR_INJECTION_SCRIPT.includes('__ghostCursorRipple'));
+      const script = buildVisualCursorInjectionScript();
+      assert.ok(script.includes('__ghostCursorInstalled'));
+      assert.ok(script.includes('__ghostCursorMove'));
+      assert.ok(script.includes('__ghostCursorRipple'));
     });
 
     it('renders a non-interactive cursor on top of the page', () => {
-      assert.ok(VISUAL_CURSOR_INJECTION_SCRIPT.includes('2147483647'));
-      assert.ok(VISUAL_CURSOR_INJECTION_SCRIPT.includes('pointerEvents'));
-      assert.ok(
-        VISUAL_CURSOR_INJECTION_SCRIPT.includes(
-          `${CURSOR_MOVE_DURATION_MS}ms cubic-bezier(.33,.9,.25,1)`,
-        ),
-      );
+      const script = buildVisualCursorInjectionScript();
+      assert.ok(script.includes('2147483647'));
+      assert.ok(script.includes('pointerEvents'));
+    });
+
+    it('uses the default duration of 800ms', () => {
+      assert.strictEqual(DEFAULT_VISUAL_CURSOR_DURATION_MS, 800);
+      const script = buildVisualCursorInjectionScript();
+      assert.ok(script.includes('800ms cubic-bezier(.33,.9,.25,1)'));
+      // The fallback timeout in __ghostCursorMove is the duration plus a
+      // small buffer.
+      assert.ok(script.includes('setTimeout(finish, 800 + 50)'));
+    });
+
+    it('embeds a custom duration', () => {
+      const script = buildVisualCursorInjectionScript(1200);
+      assert.ok(script.includes('1200ms cubic-bezier(.33,.9,.25,1)'));
+      assert.ok(script.includes('setTimeout(finish, 1200 + 50)'));
+      assert.ok(!script.includes('800ms'));
     });
 
     it('embeds the blue cursor svg and ripple styles', () => {
-      assert.ok(VISUAL_CURSOR_INJECTION_SCRIPT.includes('1f6feb'));
-      assert.ok(VISUAL_CURSOR_INJECTION_SCRIPT.includes('scale(2.2)'));
+      const script = buildVisualCursorInjectionScript();
+      assert.ok(script.includes('1f6feb'));
+      assert.ok(script.includes('scale(2.2)'));
     });
   });
 
@@ -133,6 +161,20 @@ describe('visualCursor', () => {
           top: '130px',
           rippleCount: 1,
         });
+      });
+    });
+
+    it('applies a custom duration to the cursor transition', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(html`<button>test</button>`);
+        await animateCursorTo(page, 50, 60, 100);
+        const transition = await page.evaluate(() => {
+          return document.getElementById('__ghost-cursor')?.style.transition;
+        });
+        // The browser normalizes the transition shorthand (e.g. adds leading
+        // zeros), so only assert on the duration itself.
+        assert.ok(transition?.includes('100ms'));
       });
     });
 

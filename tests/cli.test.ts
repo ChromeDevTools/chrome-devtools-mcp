@@ -33,6 +33,8 @@ describe('cli args parsing', () => {
     allowUnrestrictedPaths: false,
     'visual-cursor': false,
     visualCursor: false,
+    'visual-cursor-duration': 800,
+    visualCursorDuration: 800,
   };
 
   it('parses with default args', async () => {

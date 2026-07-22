@@ -14,19 +14,27 @@ import {logger} from './utils/logger.js';
 export const CURSOR_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24"><path d="M5 3l14 9-6.5 1.2L9 19.5z" fill="#1f6feb" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
 
-// Duration of the cursor slide animation in milliseconds. Kept in sync with
-// the CSS transition inside VISUAL_CURSOR_INJECTION_SCRIPT.
-export const CURSOR_MOVE_DURATION_MS = 350;
+/**
+ * Default duration of the cursor slide animation in milliseconds. Can be
+ * overridden with the --visual-cursor-duration CLI flag.
+ */
+export const DEFAULT_VISUAL_CURSOR_DURATION_MS = 800;
 
 /**
- * Idempotent script injected into pages. It creates a fixed-position ghost
- * cursor element and exposes two helpers on `window`:
+ * Builds the idempotent script injected into pages. It creates a
+ * fixed-position ghost cursor element and exposes two helpers on `window`:
  * - `__ghostCursorMove(x, y)`: smoothly slides the cursor to the given
  *   viewport coordinates and resolves once the transition finished.
  * - `__ghostCursorRipple()`: shows an expanding ripple at the current cursor
  *   position to highlight the click point.
+ *
+ * @param durationMs Duration of the slide animation (and the upper bound of
+ * the wait in `__ghostCursorMove`).
  */
-export const VISUAL_CURSOR_INJECTION_SCRIPT = `(() => {
+export function buildVisualCursorInjectionScript(
+  durationMs: number = DEFAULT_VISUAL_CURSOR_DURATION_MS,
+): string {
+  return `(() => {
   if (window.__ghostCursorInstalled) {
     return;
   }
@@ -43,7 +51,7 @@ export const VISUAL_CURSOR_INJECTION_SCRIPT = `(() => {
     pointerEvents: 'none',
     filter: 'drop-shadow(0 2px 6px rgba(0,0,0,.5))',
     transition:
-      'left ${CURSOR_MOVE_DURATION_MS}ms cubic-bezier(.33,.9,.25,1), top ${CURSOR_MOVE_DURATION_MS}ms cubic-bezier(.33,.9,.25,1)',
+      'left ${durationMs}ms cubic-bezier(.33,.9,.25,1), top ${durationMs}ms cubic-bezier(.33,.9,.25,1)',
   });
   // At document-start the DOM may not exist yet, so defer mounting until the
   // root element is available.
@@ -78,7 +86,7 @@ export const VISUAL_CURSOR_INJECTION_SCRIPT = `(() => {
       cursor.addEventListener('transitionend', onTransitionEnd);
       // Fallback in case the transition event never fires (e.g. the page is
       // hidden and transitions are throttled).
-      setTimeout(finish, ${CURSOR_MOVE_DURATION_MS} + 50);
+      setTimeout(finish, ${durationMs} + 50);
       cursor.style.left = x + 'px';
       cursor.style.top = y + 'px';
     });
@@ -112,6 +120,7 @@ export const VISUAL_CURSOR_INJECTION_SCRIPT = `(() => {
     }, 500);
   };
 })();`;
+}
 
 interface GhostCursorWindow {
   __ghostCursorMove?: (x: number, y: number) => Promise<void>;
@@ -127,29 +136,36 @@ const registeredPages = new WeakSet<Page>();
  * re-installed after every navigation, and injects it into the current
  * document right away. Safe to call multiple times for the same page.
  */
-export async function ensureVisualCursor(page: Page): Promise<void> {
+export async function ensureVisualCursor(
+  page: Page,
+  durationMs: number = DEFAULT_VISUAL_CURSOR_DURATION_MS,
+): Promise<void> {
   if (!registeredPages.has(page)) {
-    await page.evaluateOnNewDocument(VISUAL_CURSOR_INJECTION_SCRIPT);
+    await page.evaluateOnNewDocument(
+      buildVisualCursorInjectionScript(durationMs),
+    );
     registeredPages.add(page);
   }
   // The in-page script itself is idempotent, so re-evaluating it for the
   // current document is safe.
-  await page.evaluate(VISUAL_CURSOR_INJECTION_SCRIPT);
+  await page.evaluate(buildVisualCursorInjectionScript(durationMs));
 }
 
 /**
  * Slides the ghost cursor to the target coordinates, waits for the move to
- * finish and then shows a click ripple. Any failure (e.g. CSP restrictions,
- * a navigation in flight, a closed page) is swallowed so that the actual
- * input action is never affected.
+ * finish and then shows a click ripple. The ripple is fire-and-forget, so the
+ * only added latency is the slide animation itself. Any failure (e.g. CSP
+ * restrictions, a navigation in flight, a closed page) is swallowed so that
+ * the actual input action is never affected.
  */
 export async function animateCursorTo(
   page: Page,
   x: number,
   y: number,
+  durationMs: number = DEFAULT_VISUAL_CURSOR_DURATION_MS,
 ): Promise<void> {
   try {
-    await ensureVisualCursor(page);
+    await ensureVisualCursor(page, durationMs);
     await page.evaluate(
       (targetX, targetY) => {
         return (window as unknown as GhostCursorWindow).__ghostCursorMove?.(

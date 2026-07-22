@@ -145,6 +145,23 @@ export const cliOptions = {
       'If specified, shows an animated ghost cursor on the page before mouse actions (click, double click, click at coordinates, drag) so a human observer can follow where the agent is interacting. Defaults to false.',
     default: false,
   },
+  visualCursorDuration: {
+    type: 'number',
+    description:
+      'Duration in milliseconds of the ghost cursor slide animation shown with --visual-cursor. Defaults to 800.',
+    default: 800,
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(
+          `Invalid visualCursorDuration ${value}. Expected a positive integer.`,
+        );
+      }
+      return value;
+    },
+  },
   proxyServer: {
     type: 'string',
     description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,

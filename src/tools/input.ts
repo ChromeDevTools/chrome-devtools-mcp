@@ -134,7 +134,12 @@ export const click = definePageTool(cliArgs => ({
       if (cliArgs?.visualCursor && !shouldSelectNativeOption) {
         const point = await getElementCenterPoint(handle);
         if (point) {
-          await animateCursorTo(request.page.pptrPage, point.x, point.y);
+          await animateCursorTo(
+            request.page.pptrPage,
+            point.x,
+            point.y,
+            cliArgs.visualCursorDuration,
+          );
         }
       }
       const result = await request.page.waitForEventsAfterAction(async () => {
@@ -185,7 +190,12 @@ export const clickAt = definePageTool(cliArgs => ({
   handler: async (request, response) => {
     const page = request.page;
     if (cliArgs?.visualCursor) {
-      await animateCursorTo(page.pptrPage, request.params.x, request.params.y);
+      await animateCursorTo(
+        page.pptrPage,
+        request.params.x,
+        request.params.y,
+        cliArgs.visualCursorDuration,
+      );
     }
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
@@ -420,7 +430,12 @@ export const drag = definePageTool(cliArgs => ({
       if (cliArgs?.visualCursor) {
         const point = await getElementCenterPoint(fromHandle);
         if (point) {
-          await animateCursorTo(request.page.pptrPage, point.x, point.y);
+          await animateCursorTo(
+            request.page.pptrPage,
+            point.x,
+            point.y,
+            cliArgs.visualCursorDuration,
+          );
         }
       }
       const result = await request.page.waitForEventsAfterAction(async () => {
