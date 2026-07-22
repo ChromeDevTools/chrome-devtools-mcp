@@ -15,19 +15,23 @@ import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-option
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {
-  click,
+  click as clickFactory,
   hover,
   fill,
-  drag,
+  drag as dragFactory,
   fillForm,
   uploadFile,
   pressKey,
-  clickAt,
+  clickAt as clickAtFactory,
   typeText,
 } from '../../src/tools/input.js';
 import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext, getTextContent} from '../utils.js';
+
+const click = clickFactory({} as ParsedArguments);
+const clickAt = clickAtFactory({} as ParsedArguments);
+const drag = dragFactory({} as ParsedArguments);
 
 describe('input', () => {
   const server = serverHooks();

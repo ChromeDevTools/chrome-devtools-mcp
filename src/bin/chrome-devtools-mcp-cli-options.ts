@@ -139,6 +139,12 @@ export const cliOptions = {
       };
     },
   },
+  visualCursor: {
+    type: 'boolean',
+    description:
+      'If specified, shows an animated ghost cursor on the page before mouse actions (click, double click, click at coordinates, drag) so a human observer can follow where the agent is interacting. Defaults to false.',
+    default: false,
+  },
   proxyServer: {
     type: 'string',
     description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,

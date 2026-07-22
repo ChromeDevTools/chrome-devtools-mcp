@@ -31,6 +31,8 @@ describe('cli args parsing', () => {
     redactNetworkHeaders: false,
     'allow-unrestricted-paths': false,
     allowUnrestrictedPaths: false,
+    'visual-cursor': false,
+    visualCursor: false,
   };
 
   it('parses with default args', async () => {

@@ -10,6 +10,7 @@ import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
+import {animateCursorTo} from '../visualCursor.js';
 import type {WaitForEventsResult} from '../WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
@@ -41,6 +42,25 @@ function handleActionError(error: unknown, uid: string) {
       cause: error,
     },
   );
+}
+
+/**
+ * Best-effort center point of an element used to position the visual cursor
+ * before a mouse action. Returns undefined when the element has no layout
+ * box (e.g. it is not visible).
+ */
+async function getElementCenterPoint(
+  handle: ElementHandle<Element>,
+): Promise<{x: number; y: number} | undefined> {
+  try {
+    return await handle.clickablePoint();
+  } catch {
+    const box = await handle.boundingBox();
+    if (!box) {
+      return undefined;
+    }
+    return {x: box.x + box.width / 2, y: box.y + box.height / 2};
+  }
 }
 
 async function selectNativeSelectOption(handle: ElementHandle<Element>) {
@@ -86,7 +106,7 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
   }
 }
 
-export const click = definePageTool({
+export const click = definePageTool(cliArgs => ({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -111,6 +131,12 @@ export const click = definePageTool({
     const shouldSelectNativeOption =
       !request.params.dblClick && aXNode?.role === 'option';
     try {
+      if (cliArgs?.visualCursor && !shouldSelectNativeOption) {
+        const point = await getElementCenterPoint(handle);
+        if (point) {
+          await animateCursorTo(request.page.pptrPage, point.x, point.y);
+        }
+      }
       const result = await request.page.waitForEventsAfterAction(async () => {
         if (
           shouldSelectNativeOption &&
@@ -138,9 +164,9 @@ export const click = definePageTool({
       void handle.dispose();
     }
   },
-});
+}));
 
-export const clickAt = definePageTool({
+export const clickAt = definePageTool(cliArgs => ({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
   annotations: {
@@ -158,6 +184,9 @@ export const clickAt = definePageTool({
   verifyFilesSchema: [],
   handler: async (request, response) => {
     const page = request.page;
+    if (cliArgs?.visualCursor) {
+      await animateCursorTo(page.pptrPage, request.params.x, request.params.y);
+    }
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.mouse.click(request.params.x, request.params.y, {
         count: request.params.dblClick ? 2 : 1,
@@ -173,7 +202,7 @@ export const clickAt = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
 export const hover = definePageTool({
   name: 'hover',
@@ -368,7 +397,7 @@ export const typeText = definePageTool({
   },
 });
 
-export const drag = definePageTool({
+export const drag = definePageTool(cliArgs => ({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
@@ -388,6 +417,12 @@ export const drag = definePageTool({
     );
     const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
+      if (cliArgs?.visualCursor) {
+        const point = await getElementCenterPoint(fromHandle);
+        if (point) {
+          await animateCursorTo(request.page.pptrPage, point.x, point.y);
+        }
+      }
       const result = await request.page.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -403,7 +438,7 @@ export const drag = definePageTool({
       void toHandle.dispose();
     }
   },
-});
+}));
 
 export const fillForm = definePageTool({
   name: 'fill_form',
