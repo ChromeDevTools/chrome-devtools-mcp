@@ -8,14 +8,18 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
+import {WaitForHelper} from '../../src/WaitForHelper.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
   extractExtensionId,
+  getTextContent,
   html,
   withMcpContext,
 } from '../utils.js';
@@ -40,6 +44,56 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
+      });
+    });
+    it('skips the stable DOM wait when waitForStableDom is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const spy = sinon.spy(WaitForHelper.prototype, 'waitForStableDom');
+        try {
+          await evaluateScript().handler(
+            {
+              params: {function: String(() => 1), waitForStableDom: false},
+            },
+            response,
+            context,
+          );
+          sinon.assert.notCalled(spy);
+
+          await evaluateScript().handler(
+            {
+              params: {function: String(() => 1)},
+            },
+            response,
+            context,
+          );
+          sinon.assert.calledOnce(spy);
+        } finally {
+          spy.restore();
+        }
+      });
+    });
+    it('still awaits a navigation when waitForStableDom is false', async () => {
+      await withMcpContext(async (response, context) => {
+        server.addHtmlRoute('/nav-target', html`<main>navigated</main>`);
+        const url = server.getRoute('/nav-target');
+        await evaluateScript().handler(
+          {
+            params: {
+              function: `() => {
+                location.href = '${url}';
+              }`,
+              waitForStableDom: false,
+            },
+          },
+          response,
+          context,
+        );
+        const result = await response.handle('test', context);
+        const textContent = getTextContent(result.content[0]);
+        assert.ok(
+          textContent.includes(`Page navigated to ${url}`),
+          `Expected the navigation to be awaited and reported, got: ${textContent}`,
+        );
       });
     });
     it('runs in selected page', async () => {

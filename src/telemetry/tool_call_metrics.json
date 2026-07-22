@@ -119,6 +119,10 @@
       {
         "name": "file_path_length",
         "argType": "number"
+      },
+      {
+        "name": "wait_for_stable_dom",
+        "argType": "boolean"
       }
     ]
   },
