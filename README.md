@@ -307,7 +307,6 @@ devin mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
 
 </details>
 
-
 <details>
   <summary>Factory CLI</summary>
 Use the Factory CLI to add the Chrome DevTools MCP server (<a href="https://docs.factory.ai/cli/configuration/mcp">guide</a>):
