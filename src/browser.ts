@@ -44,6 +44,40 @@ function makeTargetFilter(enableExtensions = false) {
   };
 }
 
+function browserJsonVersionEndpoint(browserURL: string): string {
+  const endpointURL = new URL(browserURL);
+  const pathname = endpointURL.pathname.endsWith('/')
+    ? endpointURL.pathname
+    : `${endpointURL.pathname}/`;
+  endpointURL.pathname = `${pathname}json/version`;
+  endpointURL.search = '';
+  endpointURL.hash = '';
+  return endpointURL.toString();
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export async function resolveBrowserWSEndpoint(
+  browserURL: string,
+): Promise<string> {
+  const endpointURL = browserJsonVersionEndpoint(browserURL);
+  const response = await fetch(endpointURL);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch browser webSocket URL from ${endpointURL}: HTTP ${response.status}`,
+    );
+  }
+
+  const payload: unknown = await response.json();
+  if (!isObject(payload) || typeof payload.webSocketDebuggerUrl !== 'string') {
+    throw new Error(`No webSocketDebuggerUrl found at ${endpointURL}`);
+  }
+
+  return payload.webSocketDebuggerUrl;
+}
+
 export async function ensureBrowserConnected(options: {
   browserURL?: string;
   wsEndpoint?: string;
@@ -75,7 +109,9 @@ export async function ensureBrowserConnected(options: {
       connectOptions.headers = options.wsHeaders;
     }
   } else if (options.browserURL) {
-    connectOptions.browserURL = options.browserURL;
+    connectOptions.browserWSEndpoint = await resolveBrowserWSEndpoint(
+      options.browserURL,
+    );
   } else if (channel || options.userDataDir) {
     const userDataDir = options.userDataDir;
     if (userDataDir) {

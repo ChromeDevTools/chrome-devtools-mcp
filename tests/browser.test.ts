@@ -11,7 +11,12 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
+import {
+  detectDisplay,
+  ensureBrowserConnected,
+  launch,
+  resolveBrowserWSEndpoint,
+} from '../src/browser.js';
 import type {Browser} from '../src/third_party/index.js';
 
 import {serverHooks} from './server.js';
@@ -52,8 +57,127 @@ async function runWithRetry(fn: () => Promise<void>) {
 }
 
 describe('browser', () => {
+  const server = serverHooks();
+
   it('detects display does not crash', () => {
     detectDisplay();
+  });
+
+  it('discovers an existing browser behind a path prefix', async () => {
+    const wsEndpoint = 'ws://localhost:9222/devtools/browser/abc123';
+    server.addRoute('/t/abc123/json/version', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({webSocketDebuggerUrl: wsEndpoint}));
+    });
+
+    assert.strictEqual(
+      await resolveBrowserWSEndpoint(`${server.baseUrl}/t/abc123`),
+      wsEndpoint,
+    );
+  });
+
+  it('discovers an existing browser at the root discovery URL', async () => {
+    const wsEndpoint = 'ws://localhost:9222/devtools/browser/root';
+    server.addRoute('/json/version', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({webSocketDebuggerUrl: wsEndpoint}));
+    });
+
+    assert.strictEqual(
+      await resolveBrowserWSEndpoint(server.baseUrl),
+      wsEndpoint,
+    );
+  });
+
+  it('drops browserURL query strings before discovery', async () => {
+    const wsEndpoint = 'ws://localhost:9222/devtools/browser/query';
+    server.addRoute('/t/query/json/version', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({webSocketDebuggerUrl: wsEndpoint}));
+    });
+
+    assert.strictEqual(
+      await resolveBrowserWSEndpoint(`${server.baseUrl}/t/query?token=secret`),
+      wsEndpoint,
+    );
+  });
+
+  it('discovers an existing browser behind a trailing-slash path prefix', async () => {
+    const wsEndpoint = 'ws://localhost:9222/devtools/browser/slash';
+    server.addRoute('/t/slash/json/version', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({webSocketDebuggerUrl: wsEndpoint}));
+    });
+
+    assert.strictEqual(
+      await resolveBrowserWSEndpoint(`${server.baseUrl}/t/slash/`),
+      wsEndpoint,
+    );
+  });
+
+  it('does not include URL fragments in discovery errors', async () => {
+    server.addRoute('/fragment/json/version', (_req, res) => {
+      res.statusCode = 500;
+      res.end();
+    });
+
+    await assert.rejects(
+      resolveBrowserWSEndpoint(`${server.baseUrl}/fragment#debugger`),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message.includes('/fragment/json/version') &&
+        !error.message.includes('#debugger'),
+    );
+  });
+
+  it('uses the prefixed discovery URL when connecting by browserURL', async () => {
+    let discoveryRequests = 0;
+    server.addRoute('/t/abc123/json/version', (_req, res) => {
+      discoveryRequests++;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          webSocketDebuggerUrl: 'ws://127.0.0.1:9/devtools/browser/abc123',
+        }),
+      );
+    });
+
+    await assert.rejects(
+      ensureBrowserConnected({
+        browserURL: `${server.baseUrl}/t/abc123`,
+        devtools: false,
+      }),
+      /Could not connect to Chrome/,
+    );
+    assert.strictEqual(discoveryRequests, 1);
+  });
+
+  it('rejects invalid browser discovery responses', async () => {
+    server.addRoute('/missing/json/version', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({}));
+    });
+    server.addRoute('/invalid/json/version', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(null));
+    });
+    server.addRoute('/failed/json/version', (_req, res) => {
+      res.statusCode = 500;
+      res.end();
+    });
+
+    await assert.rejects(
+      resolveBrowserWSEndpoint(`${server.baseUrl}/missing`),
+      /No webSocketDebuggerUrl found/,
+    );
+    await assert.rejects(
+      resolveBrowserWSEndpoint(`${server.baseUrl}/invalid`),
+      /No webSocketDebuggerUrl found/,
+    );
+    await assert.rejects(
+      resolveBrowserWSEndpoint(`${server.baseUrl}/failed`),
+      /HTTP 500/,
+    );
   });
 
   it('cannot launch multiple times with the same profile', async () => {
