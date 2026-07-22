@@ -48,6 +48,7 @@
   "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
+    "@blackwell-systems/gcf": "^2.2.2",
     "@eslint/js": "^9.35.0",
     "@google/genai": "^2.0.1",
     "@modelcontextprotocol/sdk": "1.29.0",
@@ -55,7 +56,6 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
-    "@blackwell-systems/gcf": "^2.2.2",
     "@toon-format/toon": "^2.2.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
@@ -65,7 +65,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1662965",
+    "chrome-devtools-frontend": "1.0.1664619",
     "core-js": "3.49.0",
     "debug": "4.4.3",
     "eslint": "^9.35.0",
@@ -85,8 +85,8 @@
     "yargs": "18.0.0"
   },
   "peerDependencies": {
-    "@toon-format/toon": "^2.2.0",
-    "@blackwell-systems/gcf": "^2.2.2"
+    "@blackwell-systems/gcf": "^2.2.2",
+    "@toon-format/toon": "^2.2.0"
   },
   "peerDependenciesMeta": {
     "@toon-format/toon": {
