@@ -1100,6 +1100,88 @@ export const commands: Commands = {
       },
     },
   },
+  query_heapsnapshot_objects: {
+    description:
+      'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, minRetainedSize, maxRetainedSize, minSelfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      className: {
+        name: 'className',
+        type: 'string',
+        description: 'Optional regex or text matching object class name.',
+        required: false,
+      },
+      propertyName: {
+        name: 'propertyName',
+        type: 'string',
+        description:
+          'Optional property name filter for outgoing reference edges.',
+        required: false,
+      },
+      nodeType: {
+        name: 'nodeType',
+        type: 'string',
+        description:
+          'Optional V8 node type filter (e.g. object, closure, string, array, code).',
+        required: false,
+      },
+      minRetainedSize: {
+        name: 'minRetainedSize',
+        type: 'number',
+        description: 'Minimum retained size in bytes.',
+        required: false,
+      },
+      maxRetainedSize: {
+        name: 'maxRetainedSize',
+        type: 'number',
+        description: 'Maximum retained size in bytes.',
+        required: false,
+      },
+      minSelfSize: {
+        name: 'minSelfSize',
+        type: 'number',
+        description: 'Minimum self size in bytes.',
+        required: false,
+      },
+      maxSelfSize: {
+        name: 'maxSelfSize',
+        type: 'number',
+        description: 'Maximum self size in bytes.',
+        required: false,
+      },
+      isDetached: {
+        name: 'isDetached',
+        type: 'boolean',
+        description: 'Whether to filter for detached DOM nodes.',
+        required: false,
+      },
+      sortBy: {
+        name: 'sortBy',
+        type: 'string',
+        description: 'Sort order for results. Default is retainedSize.',
+        required: false,
+        enum: ['retainedSize', 'selfSize', 'id'],
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination.',
+        required: false,
+      },
+    },
+  },
   reload_extension: {
     description:
       'Reloads an unpacked Chrome extension by its ID. (requires flag: --categoryExtensions=true)',

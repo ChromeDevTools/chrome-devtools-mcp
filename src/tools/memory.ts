@@ -465,3 +465,80 @@ export const getHeapSnapshotObjectDetails = defineTool({
     response.setHeapSnapshotObjectDetails(objectInfo);
   },
 });
+
+export const queryHeapSnapshotObjects = defineTool({
+  name: 'query_heapsnapshot_objects',
+  description:
+    'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, minRetainedSize, maxRetainedSize, minSelfSize, isDetached, sortBy).',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  blockedByDialog: false,
+  verifyFilesSchema: {filePath: true},
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    className: zod
+      .string()
+      .optional()
+      .describe('Optional regex or text matching object class name.'),
+    propertyName: zod
+      .string()
+      .optional()
+      .describe('Optional property name filter for outgoing reference edges.'),
+    nodeType: zod
+      .string()
+      .optional()
+      .describe(
+        'Optional V8 node type filter (e.g. object, closure, string, array, code).',
+      ),
+    minRetainedSize: zod
+      .number()
+      .optional()
+      .describe('Minimum retained size in bytes.'),
+    maxRetainedSize: zod
+      .number()
+      .optional()
+      .describe('Maximum retained size in bytes.'),
+    minSelfSize: zod
+      .number()
+      .optional()
+      .describe('Minimum self size in bytes.'),
+    maxSelfSize: zod
+      .number()
+      .optional()
+      .describe('Maximum self size in bytes.'),
+    isDetached: zod
+      .boolean()
+      .optional()
+      .describe('Whether to filter for detached DOM nodes.'),
+    sortBy: zod
+      .enum(['retainedSize', 'selfSize', 'id'])
+      .optional()
+      .describe('Sort order for results. Default is retainedSize.'),
+    pageIdx: zod.number().optional().describe('The page index for pagination.'),
+    pageSize: zod.number().optional().describe('The page size for pagination.'),
+  },
+  handler: async (request, response, context) => {
+    const range = await context.queryHeapSnapshotObjects(
+      request.params.filePath,
+      {
+        className: request.params.className,
+        propertyName: request.params.propertyName,
+        nodeType: request.params.nodeType,
+        minRetainedSize: request.params.minRetainedSize,
+        maxRetainedSize: request.params.maxRetainedSize,
+        minSelfSize: request.params.minSelfSize,
+        maxSelfSize: request.params.maxSelfSize,
+        isDetached: request.params.isDetached,
+        sortBy: request.params.sortBy,
+      },
+    );
+
+    response.setHeapSnapshotNodes(range, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+});

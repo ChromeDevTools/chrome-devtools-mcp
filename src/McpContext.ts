@@ -17,6 +17,7 @@ import type {
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
+  HeapQueryOptions,
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
 import {type UncaughtError} from './collectors/PageCollector.js';
@@ -748,6 +749,13 @@ export class McpContext implements Context {
     filePath: string,
   ): Promise<DuplicateStringGroup[]> {
     return await this.#heapSnapshotManager.getDuplicateStrings(filePath);
+  }
+
+  async queryHeapSnapshotObjects(
+    filePath: string,
+    options: HeapQueryOptions,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    return await this.#heapSnapshotManager.queryObjects(filePath, options);
   }
 
   async getHeapSnapshotStats(

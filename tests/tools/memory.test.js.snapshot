@@ -449,3 +449,66 @@ Retained by context size: 3.5 kB (148 objects)
 Not retained by context size: 798 kB (11792 objects)
 Total size: 802 kB
 `;
+
+exports[`memory > query_heapsnapshot_objects > with className filter 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+30967,Window (prototype) / https://example.com,object,4,26.6 kB,26.7 kB
+42085,Window (prototype) / https://example.com,object,4,26.6 kB,26.7 kB
+32995,Window (internal cache) / https://example.com,object,3,0.2 kB,10.1 kB
+41995,Window (internal cache) / https://example.com,object,3,0.2 kB,10.1 kB
+16321,Window / https://example.com,native,2,0.9 kB,1.9 kB
+16329,Window,closure,3,0.1 kB,0.4 kB
+16341,Window,closure,3,0.1 kB,0.4 kB
+30975,Window (prototype) / https://example.com,object,3,0.0 kB,0.2 kB
+Showing 1-10 of 34 (Page 1 of 4).
+Next page: 1
+`;
+
+exports[`memory > query_heapsnapshot_objects > with default options 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+1,,synthetic,100000000,0.0 kB,802 kB
+7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
+7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+3,(GC roots),synthetic,100000001,0.0 kB,45.6 kB
+49547,,array,2,4.1 kB,41.0 kB
+36241,,array,2,4.1 kB,41.0 kB
+Showing 1-10 of 27466 (Page 1 of 2747).
+Next page: 1
+`;
+
+exports[`memory > query_heapsnapshot_objects > with minRetainedSize filter 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+1,,synthetic,100000000,0.0 kB,802 kB
+7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
+7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+3,(GC roots),synthetic,100000001,0.0 kB,45.6 kB
+49547,,array,2,4.1 kB,41.0 kB
+36241,,array,2,4.1 kB,41.0 kB
+Showing 1-10 of 148 (Page 1 of 15).
+Next page: 1
+`;
+
+exports[`memory > query_heapsnapshot_objects > with sortBy selfSize and pagination 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+1,,synthetic,100000000,0.0 kB,802 kB
+7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
+7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
+Showing 1-5 of 27466 (Page 1 of 5494).
+Next page: 1
+`;
