@@ -614,6 +614,16 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
   - **Default:** `false`
 
+- **`--visualCursor`/ `--visual-cursor`**
+  If specified, shows an animated ghost cursor on the page before mouse actions (click, double click, click at coordinates, drag) so a human observer can follow where the agent is interacting. Defaults to false.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--visualCursorDuration`/ `--visual-cursor-duration`**
+  Duration in milliseconds of the ghost cursor slide animation shown with --visual-cursor. Defaults to 800.
+  - **Type:** number
+  - **Default:** `800`
+
 - **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string

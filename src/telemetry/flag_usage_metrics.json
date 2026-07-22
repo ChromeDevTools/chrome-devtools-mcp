@@ -371,5 +371,17 @@
   {
     "name": "allow_unrestricted_paths",
     "flagType": "boolean"
+  },
+  {
+    "name": "visual_cursor_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "visual_cursor",
+    "flagType": "boolean"
+  },
+  {
+    "name": "visual_cursor_duration_present",
+    "flagType": "boolean"
   }
 ]
