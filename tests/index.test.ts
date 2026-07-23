@@ -10,14 +10,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  ListRootsRequestSchema,
-  RootsListChangedNotificationSchema,
-  type ClientCapabilities,
-  type TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
+import {Client} from '@modelcontextprotocol/client';
+import type {
+  ClientCapabilities,
+  TextContent,
+} from '@modelcontextprotocol/client';
+import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
+import {RootsListChangedNotificationSchema} from '@modelcontextprotocol/core';
 import {executablePath} from 'puppeteer';
 
 import type {ToolCategory} from '../src/tools/categories.js';
@@ -28,7 +27,10 @@ describe('e2e', () => {
   async function withClient(
     cb: (client: Client) => Promise<void>,
     extraArgs: string[] = [],
-    options: {capabilities?: ClientCapabilities} = {},
+    options: {
+      capabilities?: ClientCapabilities;
+      versionNegotiation?: {mode: 'auto' | 'legacy' | {pin: string}};
+    } = {},
   ) {
     let attempt = 1;
     while (attempt <= 3) {
@@ -51,6 +53,9 @@ describe('e2e', () => {
         },
         {
           capabilities: options.capabilities ?? {},
+          ...(options.versionNegotiation
+            ? {versionNegotiation: options.versionNegotiation}
+            : {}),
         },
       );
 
@@ -78,6 +83,21 @@ describe('e2e', () => {
       }
     }
   }
+  it('connects and negotiates 2026-07-28 era', async () => {
+    await withClient(
+      async client => {
+        assert.strictEqual(client.getProtocolEra(), 'modern');
+        const result = await client.callTool({
+          name: 'list_pages',
+          arguments: {},
+        });
+        assert.ok(result.content);
+      },
+      [],
+      {versionNegotiation: {mode: 'auto'}},
+    );
+  });
+
   it('calls a tool', async t => {
     await withClient(async client => {
       const result = await client.callTool({
@@ -212,7 +232,7 @@ describe('e2e', () => {
 
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           resolvePromise();
           return {roots};
         });
@@ -236,7 +256,7 @@ describe('e2e', () => {
   it('denies file access if roots list is empty', async () => {
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           return {roots: []};
         });
 

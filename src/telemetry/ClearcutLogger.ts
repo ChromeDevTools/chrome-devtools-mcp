@@ -7,7 +7,6 @@
 import process from 'node:process';
 
 import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
-import type {zod, ShapeOutput} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 
 import type {ErrorCode} from './errors.js';
@@ -108,8 +107,8 @@ export class ClearcutLogger {
 
   async logToolInvocation(args: {
     toolName: string;
-    params: ShapeOutput<zod.ZodRawShape>;
-    schema: zod.ZodRawShape;
+    params: Record<string, unknown>;
+    schema: Record<string, unknown>;
     success: boolean;
     latencyMs: number;
   }): Promise<void> {

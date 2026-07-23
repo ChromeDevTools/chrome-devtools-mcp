@@ -13,13 +13,7 @@ import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
-import {
-  McpServer,
-  type CallToolResult,
-  SetLevelRequestSchema,
-  ListRootsResultSchema,
-  RootsListChangedNotificationSchema,
-} from './third_party/index.js';
+import {McpServer, type CallToolResult} from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
@@ -54,7 +48,7 @@ export async function createMcpServer(
     },
     {capabilities: {logging: {}}},
   );
-  server.server.setRequestHandler(SetLevelRequestSchema, () => {
+  server.server.setRequestHandler('logging/setLevel', () => {
     return {};
   });
 
@@ -63,10 +57,7 @@ export async function createMcpServer(
       return;
     }
     try {
-      const roots = await server.server.request(
-        {method: 'roots/list'},
-        ListRootsResultSchema,
-      );
+      const roots = await server.server.request({method: 'roots/list'});
       context?.setRoots(roots.roots);
     } catch (e) {
       logger?.('Failed to list roots', e);
@@ -81,7 +72,7 @@ export async function createMcpServer(
     if (server.server.getClientCapabilities()?.roots) {
       void updateRoots();
       server.server.setNotificationHandler(
-        RootsListChangedNotificationSchema,
+        'notifications/roots/list_changed',
         () => {
           void updateRoots();
         },
@@ -184,6 +175,10 @@ export async function createMcpServer(
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {
+        const clientName = server.server.getClientVersion()?.name;
+        if (clientName) {
+          ClearcutLogger.get()?.setClientName(clientName);
+        }
         return await toolHandler.handle(params);
       },
     );

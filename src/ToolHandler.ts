@@ -144,13 +144,17 @@ function buildUnknownArgumentsMessage(
 }
 
 export class ToolHandler {
-  readonly inputSchema: zod.ZodRawShape;
-  readonly registeredInputSchema: zod.ZodTypeAny;
+  readonly inputSchema: Record<string, unknown>;
+  readonly registeredInputSchema: ReturnType<
+    ReturnType<typeof zod.object>['passthrough']
+  >;
   readonly shouldRegister: boolean;
   private readonly disabledReason?: string;
 
   constructor(
-    private readonly tool: ToolDefinition | DefinedPageTool,
+    private readonly tool:
+      | ToolDefinition<Record<string, unknown>>
+      | DefinedPageTool<Record<string, unknown>>,
     private readonly serverArgs: ReturnType<typeof parseArguments>,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,

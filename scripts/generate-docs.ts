@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 
-import type {Tool} from '@modelcontextprotocol/sdk/types.js';
+import type {Tool} from '@modelcontextprotocol/server';
 
 import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
 import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';

@@ -8,7 +8,7 @@ import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type Request} from './ToolDefinition.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
 const FILTERABLE_MESSAGE_TYPES: [
@@ -39,6 +39,44 @@ const FILTERABLE_MESSAGE_TYPES: [
 
 const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 
+const consoleSchema = {
+  pageSize: zod
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Maximum number of messages to return. When omitted, returns all messages.',
+    ),
+  pageIdx: zod
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      'Page number to return (0-based). When omitted, returns the first page.',
+    ),
+  types: zod
+    .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
+    .optional()
+    .describe(
+      'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
+    ),
+  includePreservedMessages: zod
+    .boolean()
+    .default(false)
+    .optional()
+    .describe(
+      'Set to true to return the preserved messages over the last 3 navigations.',
+    ),
+  serviceWorkerId: zod
+    .string()
+    .optional()
+    .describe(
+      'Filter messages to only return messages of the specified service worker.',
+    ),
+};
+
 export const listConsoleMessages = definePageTool(cliArgs => {
   return {
     name: LIST_CONSOLE_MESSAGES_TOOL_NAME,
@@ -47,46 +85,10 @@ export const listConsoleMessages = definePageTool(cliArgs => {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: true,
     },
-    schema: {
-      pageSize: zod
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(
-          'Maximum number of messages to return. When omitted, returns all messages.',
-        ),
-      pageIdx: zod
-        .number()
-        .int()
-        .min(0)
-        .optional()
-        .describe(
-          'Page number to return (0-based). When omitted, returns the first page.',
-        ),
-      types: zod
-        .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
-        .optional()
-        .describe(
-          'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
-        ),
-      includePreservedMessages: zod
-        .boolean()
-        .default(false)
-        .optional()
-        .describe(
-          'Set to true to return the preserved messages over the last 3 navigations.',
-        ),
-      serviceWorkerId: zod
-        .string()
-        .optional()
-        .describe(
-          'Filter messages to only return messages of the specified service worker.',
-        ),
-    },
+    schema: consoleSchema,
     blockedByDialog: false,
     verifyFilesSchema: [],
-    handler: async (request, response) => {
+    handler: async (request: Request<typeof consoleSchema>, response) => {
       response.setIncludeConsoleData(true, {
         pageSize: request.params.pageSize,
         pageIdx: request.params.pageIdx,
