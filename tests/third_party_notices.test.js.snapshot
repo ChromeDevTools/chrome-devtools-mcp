@@ -3422,13 +3422,13 @@ APPENDIX: How to apply the Apache License to your work
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: ms
-URL: vercel/ms
+URL: zeit/ms
 Version: <VERSION>
 License: MIT
 
 The MIT License (MIT)
 
-Copyright (c) 2020 Vercel, Inc.
+Copyright (c) 2016 Zeit, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

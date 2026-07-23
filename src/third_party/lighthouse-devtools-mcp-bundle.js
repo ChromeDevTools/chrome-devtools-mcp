@@ -1,5 +1,5 @@
 /**
- * Lighthouse v13.4.0-26-g1d58f5b06 (Jul 21 2026)
+ * Lighthouse v13.4.1 (Jul 23 2026)
  *
  * Automated auditing, performance metrics, and best practices for the web.
  *
@@ -9918,7 +9918,7 @@ var init_format = __esm({
     };
     LOCALE_MESSAGES = locales;
     DEFAULT_LOCALE = "en-US";
-    CANONICAL_LOCALES = ["ar-XB.json", "ar.json", "bg.json", "ca.json", "cs.json", "da.json", "de.json", "el.json", "en-GB.json", "en-US.ctc.json", "en-US.json", "en-XA.json", "en-XL.ctc.json", "en-XL.json", "es-419.json", "es.json", "fi.json", "fil.json", "fr.json", "he.json", "hi.json", "hr.json", "hu.json", "id.json", "it.json", "ja.json", "ko.json", "lt.json", "lv.json", "nl.json", "no.json", "pl.json", "pt-PT.json", "pt.json", "ro.json", "ru.json", "sk.json", "sl.json", "sr-Latn.json", "sr.json", "sv.json", "ta.json", "te.json", "th.json", "tr.json", "uk.json", "vi.json", "zh-HK.json", "zh-TW.json", "zh.json"].filter((basename) => basename.endsWith(".json") && !basename.endsWith(".ctc.json")).map((locale) => locale.replace(".json", "")).sort();
+    CANONICAL_LOCALES = ["ar-XB.json", "ar.json", "bg.json", "ca.json", "cs.json", "da.json", "de.json", "el.json", "en-GB.json", "en-US.json", "en-XA.json", "en-XL.json", "es-419.json", "es.json", "fi.json", "fil.json", "fr.json", "he.json", "hi.json", "hr.json", "hu.json", "id.json", "it.json", "ja.json", "ko.json", "lt.json", "lv.json", "nl.json", "no.json", "pl.json", "pt-PT.json", "pt.json", "ro.json", "ru.json", "sk.json", "sl.json", "sr-Latn.json", "sr.json", "sv.json", "ta.json", "te.json", "th.json", "tr.json", "uk.json", "vi.json", "zh-HK.json", "zh-TW.json", "zh.json"].filter((basename) => basename.endsWith(".json") && !basename.endsWith(".ctc.json")).map((locale) => locale.replace(".json", "")).sort();
     MESSAGE_I18N_ID_REGEX = / | [^\s]+$/;
     formats = {
       number: {
