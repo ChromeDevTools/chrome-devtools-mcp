@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {zod, ShapeOutput} from '../third_party/index.js';
 import type {DevToolsData} from '../tools/ToolDefinition.js';
 import {isLocalhost} from '../utils/url.js';
 
@@ -32,13 +31,35 @@ const SUPPORTED_ZOD_TYPES = [
 ] as const;
 type ZodType = (typeof SUPPORTED_ZOD_TYPES)[number];
 
+interface ZodLikeSchema {
+  _def: {
+    typeName?: string;
+    type?: string;
+    innerType?: unknown;
+    schema?: unknown;
+    in?: unknown;
+    values?: unknown[];
+    entries?: Record<string, unknown>;
+  };
+}
+
+function isObjectWithDef(val: unknown): val is ZodLikeSchema {
+  return typeof val === 'object' && val !== null && '_def' in val;
+}
+
 function isZodType(type: string): type is ZodType {
   return SUPPORTED_ZOD_TYPES.includes(type as ZodType);
 }
 
-export function getZodType(zodType: zod.ZodTypeAny): ZodType {
+export function getZodType(zodType: unknown): ZodType {
+  if (!isObjectWithDef(zodType)) {
+    throw new Error('Invalid zod schema');
+  }
   const def = zodType._def;
-  const typeName = def.typeName;
+  let typeName = def.typeName;
+  if (!typeName && def.type) {
+    typeName = 'Zod' + def.type.charAt(0).toUpperCase() + def.type.slice(1);
+  }
 
   if (
     typeName === 'ZodOptional' ||
@@ -50,8 +71,11 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
   if (typeName === 'ZodEffects') {
     return getZodType(def.schema);
   }
+  if (typeName === 'ZodPipeline' || typeName === 'ZodPipe') {
+    return getZodType(def.in);
+  }
 
-  if (isZodType(typeName)) {
+  if (typeName && isZodType(typeName)) {
     return typeName;
   }
   throw new Error(`Unsupported zod type for tool parameter: ${typeName}`);
@@ -61,9 +85,15 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
  * Resolves the values of an enum parameter, unwrapping any optional/default/
  * nullable/effects wrappers (in any order), mirroring {@link getZodType}.
  */
-export function getEnumValues(zodType: zod.ZodTypeAny): unknown[] {
+export function getEnumValues(zodType: unknown): unknown[] {
+  if (!isObjectWithDef(zodType)) {
+    throw new Error('Invalid zod schema');
+  }
   const def = zodType._def;
-  const typeName = def.typeName;
+  let typeName = def.typeName;
+  if (!typeName && def.type) {
+    typeName = 'Zod' + def.type.charAt(0).toUpperCase() + def.type.slice(1);
+  }
 
   if (
     typeName === 'ZodOptional' ||
@@ -75,8 +105,16 @@ export function getEnumValues(zodType: zod.ZodTypeAny): unknown[] {
   if (typeName === 'ZodEffects') {
     return getEnumValues(def.schema);
   }
+  if (typeName === 'ZodPipeline' || typeName === 'ZodPipe') {
+    return getEnumValues(def.in);
+  }
   if (typeName === 'ZodEnum') {
-    return def.values;
+    if (def.values) {
+      return def.values;
+    }
+    if (def.entries) {
+      return Object.values(def.entries);
+    }
   }
   throw new Error(`Cannot resolve enum values for zod type: ${typeName}`);
 }
@@ -166,10 +204,10 @@ function hasEquivalentType(zodType: ZodType, value: unknown): boolean {
 }
 
 export function sanitizeParams(
-  params: ShapeOutput<zod.ZodRawShape>,
-  schema: zod.ZodRawShape,
-): ShapeOutput<zod.ZodRawShape> {
-  const transformed: ShapeOutput<zod.ZodRawShape> = {};
+  params: Record<string, unknown>,
+  schema: Record<string, unknown>,
+): Record<string, unknown> {
+  const transformed: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(params)) {
     if (PARAM_BLOCKLIST.has(name)) {
       continue;

@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  TextContent,
-  ImageContent,
-} from '@modelcontextprotocol/sdk/types.js';
+import type {TextContent, ImageContent} from '@modelcontextprotocol/server';
 
 import type {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';

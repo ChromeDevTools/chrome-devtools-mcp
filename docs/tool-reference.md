@@ -212,7 +212,7 @@
 - **handleBeforeUnload** (enum: "accept", "dismiss") _(optional)_: Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.
 - **ignoreCache** (boolean) _(optional)_: Whether to ignore cache on reload.
 - **initScript** (string) _(optional)_: A JavaScript script to be executed on each new document before any other scripts for the next navigation.
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+- **timeout** (number) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **type** (enum: "url", "back", "forward", "reload") _(optional)_: Navigate the page by URL, back or forward in history, or reload.
 - **url** (string) _(optional)_: Target URL (only type=url)
 
@@ -227,7 +227,7 @@
 - **url** (string) **(required)**: URL to load in a new page.
 - **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
 - **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+- **timeout** (number) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -249,7 +249,7 @@
 **Parameters:**
 
 - **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
-- **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
+- **timeout** (number) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
 
@@ -338,8 +338,8 @@
 **Parameters:**
 
 - **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
+- **pageIdx** (number) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (number) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
 
 ---
@@ -391,8 +391,8 @@
 **Parameters:**
 
 - **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
+- **pageIdx** (number) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (number) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
 - **serviceWorkerId** (string) _(optional)_: Filter messages to only return messages of the specified service worker.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
 
