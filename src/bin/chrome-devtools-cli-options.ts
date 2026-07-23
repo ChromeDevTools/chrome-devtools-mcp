@@ -1194,10 +1194,10 @@ export const commands: Commands = {
           'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
         required: true,
       },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'The local path of the file to upload',
+      filePaths: {
+        name: 'filePaths',
+        type: 'array',
+        description: 'One or more local paths of files to upload.',
         required: true,
       },
       includeSnapshot: {
