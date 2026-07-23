@@ -52,7 +52,6 @@
   "devDependencies": {
     "@eslint/js": "^9.35.0",
     "@google/genai": "^2.0.1",
-    "@modelcontextprotocol/sdk": "1.29.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -84,7 +83,11 @@
     "sinon": "^22.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
-    "yargs": "18.0.0"
+    "yargs": "18.0.0",
+    "@modelcontextprotocol/client": "^2.0.0-beta.5",
+    "@modelcontextprotocol/server": "^2.0.0-beta.5",
+    "@modelcontextprotocol/core": "^2.0.0-beta.5",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@toon-format/toon": "^2.2.0",

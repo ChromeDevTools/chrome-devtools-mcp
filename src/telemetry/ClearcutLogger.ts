@@ -108,8 +108,8 @@ export class ClearcutLogger {
 
   async logToolInvocation(args: {
     toolName: string;
-    params: ShapeOutput<zod.ZodRawShape>;
-    schema: zod.ZodRawShape;
+    params: Record<string, unknown>;
+    schema: Record<string, unknown>;
     success: boolean;
     latencyMs: number;
   }): Promise<void> {

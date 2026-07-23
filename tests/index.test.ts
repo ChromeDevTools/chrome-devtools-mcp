@@ -10,14 +10,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  ListRootsRequestSchema,
-  RootsListChangedNotificationSchema,
-  type ClientCapabilities,
-  type TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
+import {Client} from '@modelcontextprotocol/client';
+import type {
+  ClientCapabilities,
+  TextContent,
+} from '@modelcontextprotocol/client';
+import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
+import {RootsListChangedNotificationSchema} from '@modelcontextprotocol/core';
 import {executablePath} from 'puppeteer';
 
 import type {ToolCategory} from '../src/tools/categories.js';
@@ -212,7 +211,7 @@ describe('e2e', () => {
 
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           resolvePromise();
           return {roots};
         });
@@ -236,7 +235,7 @@ describe('e2e', () => {
   it('denies file access if roots list is empty', async () => {
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           return {roots: []};
         });
 

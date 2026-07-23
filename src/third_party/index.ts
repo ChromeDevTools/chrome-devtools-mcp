@@ -10,6 +10,7 @@ import 'core-js/proposals/iterator-helpers.js';
 
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
+import {z as zod} from 'zod/v4';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
@@ -19,22 +20,42 @@ export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
 export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
-export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
-export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-export {Client} from '@modelcontextprotocol/sdk/client/index.js';
+export {McpServer} from '@modelcontextprotocol/server';
+export {StdioServerTransport} from '@modelcontextprotocol/server/stdio';
+export {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
+export {Client} from '@modelcontextprotocol/client';
 export {
   type CallToolResult,
-  SetLevelRequestSchema,
   type ImageContent,
   type TextContent,
   type Root,
+} from '@modelcontextprotocol/server';
+export {
+  SetLevelRequestSchema,
   ListRootsRequestSchema,
   RootsListChangedNotificationSchema,
   ListRootsResultSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-export {z as zod} from 'zod';
+} from '@modelcontextprotocol/core';
+export {zod};
+type InferZodOutput<V> = V extends undefined
+  ? undefined
+  : NonNullable<V> extends {_output: infer O}
+    ? O | (undefined extends V ? undefined : never)
+    : NonNullable<V> extends zod.ZodTypeAny
+      ? zod.output<NonNullable<V>> | (undefined extends V ? undefined : never)
+      : unknown;
+
+export type ShapeOutput<
+  T extends Record<string, unknown> = Record<string, unknown>,
+> = {
+  [
+    K in keyof T as undefined extends InferZodOutput<T[K]> ? K : never
+  ]?: InferZodOutput<T[K]>;
+} & {
+  [
+    K in keyof T as undefined extends InferZodOutput<T[K]> ? never : K
+  ]: InferZodOutput<T[K]>;
+};
 export {default as ajv} from 'ajv';
 export {
   Locator,

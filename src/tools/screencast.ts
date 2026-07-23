@@ -12,7 +12,7 @@ import {zod} from '../third_party/index.js';
 import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageRequest} from './ToolDefinition.js';
 
 async function generateTempFilePath(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
@@ -23,6 +23,15 @@ type SupportedVideoExtension = '.webm' | '.mp4';
 
 const supportedExtensions: SupportedVideoExtension[] = ['.webm', '.mp4'];
 
+const screencastSchema = {
+  filePath: zod
+    .string()
+    .optional()
+    .describe(
+      `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
+    ),
+};
+
 export const startScreencast = definePageTool(args => ({
   name: 'screencast_start',
   description: `Starts recording a screencast (video) of the selected page in specified format.`,
@@ -31,17 +40,14 @@ export const startScreencast = definePageTool(args => ({
     readOnlyHint: false,
     conditions: ['experimentalScreencast'],
   },
-  schema: {
-    filePath: zod
-      .string()
-      .optional()
-      .describe(
-        `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
-      ),
-  },
+  schema: screencastSchema,
   blockedByDialog: false,
   verifyFilesSchema: ['filePath'],
-  handler: async (request, response, context) => {
+  handler: async (
+    request: PageRequest<typeof screencastSchema>,
+    response,
+    context,
+  ) => {
     if (context.getScreenRecorder() !== null) {
       response.appendResponseLine(
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
