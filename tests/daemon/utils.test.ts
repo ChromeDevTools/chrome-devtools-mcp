@@ -26,7 +26,7 @@ describe('serializeArgs', () => {
       $0: 'test',
     } as unknown as ParsedArguments;
     const result = serializeArgs(options, argv);
-    assert.deepStrictEqual(result, ['--baz', 'value']);
+    assert.deepStrictEqual(result, ['--baz=value']);
   });
 
   it('should handle boolean values', () => {
@@ -41,15 +41,24 @@ describe('serializeArgs', () => {
     assert.deepStrictEqual(result, ['--foo', '--no-bar']);
   });
 
-  it('should handle array values', () => {
-    const options: Record<string, YargsOptions> = {foo: {}};
+  it('should handle array values including hyphenated flags', () => {
+    const options: Record<string, YargsOptions> = {foo: {}, chromeArg: {}};
     const argv = {
       foo: ['val1', 'val2'],
+      chromeArg: [
+        '--use-fake-device-for-media-stream',
+        '--use-file-for-fake-audio-capture=/tmp/test.wav',
+      ],
       _: [],
       $0: 'test',
     } as unknown as ParsedArguments;
     const result = serializeArgs(options, argv);
-    assert.deepStrictEqual(result, ['--foo', 'val1', '--foo', 'val2']);
+    assert.deepStrictEqual(result, [
+      '--foo=val1',
+      '--foo=val2',
+      '--chrome-arg=--use-fake-device-for-media-stream',
+      '--chrome-arg=--use-file-for-fake-audio-capture=/tmp/test.wav',
+    ]);
   });
 
   it('should handle primitive values', () => {
@@ -61,7 +70,7 @@ describe('serializeArgs', () => {
       $0: 'test',
     } as unknown as ParsedArguments;
     const result = serializeArgs(options, argv);
-    assert.deepStrictEqual(result, ['--foo', 'string', '--bar', '42']);
+    assert.deepStrictEqual(result, ['--foo=string', '--bar=42']);
   });
 
   it('should convert camelCase keys to kebab-case', () => {
@@ -77,9 +86,9 @@ describe('serializeArgs', () => {
     } as unknown as ParsedArguments;
     const result = serializeArgs(options, argv);
     assert.deepStrictEqual(result, [
-      '--camel-case-key',
-      'value1',
+      '--camel-case-key=value1',
       '--another-key',
     ]);
   });
 });
+
