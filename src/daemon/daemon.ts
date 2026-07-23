@@ -140,6 +140,7 @@ async function setupMCPClient() {
     },
     {
       capabilities: {},
+      versionNegotiation: {mode: 'auto'},
     },
   );
   await mcpClient.connect(mcpTransport);

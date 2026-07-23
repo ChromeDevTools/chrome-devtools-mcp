@@ -27,7 +27,10 @@ describe('e2e', () => {
   async function withClient(
     cb: (client: Client) => Promise<void>,
     extraArgs: string[] = [],
-    options: {capabilities?: ClientCapabilities} = {},
+    options: {
+      capabilities?: ClientCapabilities;
+      versionNegotiation?: {mode: 'auto' | 'legacy' | {pin: string}};
+    } = {},
   ) {
     let attempt = 1;
     while (attempt <= 3) {
@@ -50,6 +53,9 @@ describe('e2e', () => {
         },
         {
           capabilities: options.capabilities ?? {},
+          ...(options.versionNegotiation
+            ? {versionNegotiation: options.versionNegotiation}
+            : {}),
         },
       );
 
@@ -77,6 +83,21 @@ describe('e2e', () => {
       }
     }
   }
+  it('connects and negotiates 2026-07-28 era', async () => {
+    await withClient(
+      async client => {
+        assert.strictEqual(client.getProtocolEra(), 'modern');
+        const result = await client.callTool({
+          name: 'list_pages',
+          arguments: {},
+        });
+        assert.ok(result.content);
+      },
+      [],
+      {versionNegotiation: {mode: 'auto'}},
+    );
+  });
+
   it('calls a tool', async t => {
     await withClient(async client => {
       const result = await client.callTool({

@@ -21,7 +21,10 @@ export {default as semver} from 'semver';
 export {default as debug} from 'debug';
 export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/server';
-export {StdioServerTransport} from '@modelcontextprotocol/server/stdio';
+export {
+  StdioServerTransport,
+  serveStdio,
+} from '@modelcontextprotocol/server/stdio';
 export {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 export {Client} from '@modelcontextprotocol/client';
 export {

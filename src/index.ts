@@ -175,6 +175,10 @@ export async function createMcpServer(
         annotations: tool.annotations,
       },
       async (params): Promise<CallToolResult> => {
+        const clientName = server.server.getClientVersion()?.name;
+        if (clientName) {
+          ClearcutLogger.get()?.setClientName(clientName);
+        }
         return await toolHandler.handle(params);
       },
     );

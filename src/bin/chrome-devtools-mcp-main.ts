@@ -12,7 +12,7 @@ import {closeBrowser} from '../browser.js';
 import {createMcpServer, logDisclaimers} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
-import {StdioServerTransport} from '../third_party/index.js';
+import {serveStdio} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {logger, saveLogsToFile} from '../utils/logger.js';
 import {VERSION} from '../version.js';
@@ -55,29 +55,24 @@ async function shutdown(reason: string): Promise<void> {
   await closeBrowser();
   process.exit(0);
 }
-process.stdin.on('end', () => {
-  void shutdown('stdin end');
-});
-process.stdin.on('close', () => {
-  void shutdown('stdin close');
-});
-process.on('SIGTERM', () => {
-  void shutdown('SIGTERM');
-});
-process.on('SIGINT', () => {
-  void shutdown('SIGINT');
-});
-process.on('SIGHUP', () => {
-  void shutdown('SIGHUP');
-});
+for (const event of ['end', 'close'] as const) {
+  process.stdin.on(event, () => {
+    void shutdown(`stdin ${event}`);
+  });
+}
+for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
+  process.on(signal, () => {
+    void shutdown(signal);
+  });
+}
 
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
 const {server} = await createMcpServer(args, {
   logFile,
 });
-const transport = new StdioServerTransport();
-await server.connect(transport);
-logger?.('Chrome DevTools MCP Server connected');
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
 void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, cliOptions));
+
+serveStdio(() => server);
+logger?.('Chrome DevTools MCP Server connected via serveStdio');
