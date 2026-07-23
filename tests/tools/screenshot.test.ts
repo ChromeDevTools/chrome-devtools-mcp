@@ -345,6 +345,43 @@ describe('screenshot', () => {
       });
     });
 
+    it('downscales viewport screenshot when no viewport is emulated', async () => {
+      const tool = screenshot({
+        screenshotMaxWidth: 100,
+      } as ParsedArguments);
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        // No setViewport call here: the browser is launched and connected with
+        // `defaultViewport: null`, so this is what a page looks like unless the
+        // emulate tool has set a viewport.
+        assert.equal(page.viewport(), null);
+        await page.setContent(
+          html`<div style="width:100vw;height:100vh;background:red"></div>`,
+        );
+        const source = await page.evaluate(() => ({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }));
+
+        await tool.handler(
+          {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        assert.equal(response.images.length, 1);
+        const buf = Buffer.from(response.images[0].data, 'base64');
+        assert.equal(pngWidth(buf), 100);
+        // The window size comes from the environment rather than an emulated
+        // viewport, so allow a pixel of rounding slack on the derived height.
+        const expectedHeight = Math.round(source.height * (100 / source.width));
+        assert.ok(
+          Math.abs(pngHeight(buf) - expectedHeight) <= 1,
+          `expected height ~${expectedHeight}, got ${pngHeight(buf)}`,
+        );
+      });
+    });
+
     it('downscales using the smaller scale when both max-width and max-height are set', async () => {
       const tool = screenshot({
         screenshotMaxWidth: 400,

@@ -43,10 +43,20 @@ async function getSourceBox(
     return {x: 0, y: 0, width: dims.width, height: dims.height};
   }
   const viewport = page.viewport();
-  if (!viewport) {
+  if (viewport) {
+    return {x: 0, y: 0, width: viewport.width, height: viewport.height};
+  }
+  // The browser is launched and connected with `defaultViewport: null`, so
+  // `page.viewport()` stays null until something emulates one. Fall back to the
+  // window's own dimensions, which is the area a viewport screenshot captures.
+  const dims = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  if (dims.width <= 0 || dims.height <= 0) {
     return undefined;
   }
-  return {x: 0, y: 0, width: viewport.width, height: viewport.height};
+  return {x: 0, y: 0, width: dims.width, height: dims.height};
 }
 
 function computeDownscaleClip(

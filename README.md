@@ -295,6 +295,19 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
 </details>
 
 <details>
+  <summary>Devin CLI</summary>
+
+**Install via CLI (MCP only)**
+
+Use the Devin CLI to add the Chrome DevTools MCP server (<a href="https://docs.devin.ai/cli/extensibility/mcp/configuration">guide</a>):
+
+```bash
+devin mcp add chrome-devtools -- npx chrome-devtools-mcp@latest
+```
+
+</details>
+
+<details>
   <summary>Factory CLI</summary>
 Use the Factory CLI to add the Chrome DevTools MCP server (<a href="https://docs.factory.ai/cli/configuration/mcp">guide</a>):
 
