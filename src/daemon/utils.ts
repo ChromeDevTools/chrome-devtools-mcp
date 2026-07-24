@@ -128,10 +128,10 @@ export function serializeArgs(
       }
     } else if (Array.isArray(value)) {
       for (const item of value) {
-        args.push(`--${kebabKey}`, String(item));
+        args.push(`--${kebabKey}=${String(item)}`);
       }
     } else {
-      args.push(`--${kebabKey}`, String(value));
+      args.push(`--${kebabKey}=${String(value)}`);
     }
   }
   return args;
