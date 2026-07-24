@@ -415,6 +415,7 @@ export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
 export async function runCli(
   args: string[],
   sessionId?: string,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
   return new Promise((resolve, reject) => {
     const finalArgs = [...args];
@@ -422,7 +423,7 @@ export async function runCli(
       finalArgs.push('--sessionId', sessionId);
     }
     const child = spawn('node', [CLI_PATH, ...finalArgs], {
-      env: process.env,
+      env,
     });
     let stdout = '';
     let stderr = '';

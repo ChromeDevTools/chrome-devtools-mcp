@@ -24,6 +24,7 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
+import {readCliConfig} from './chrome-devtools-cli-config.js';
 import {commands} from './chrome-devtools-cli-options.js';
 import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
 
@@ -60,6 +61,21 @@ startCliOptions.headless!.default = true;
 startCliOptions.isolated!.description =
   'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
 startCliOptions.categoryExtensions!.default = true;
+
+function getConfiguredStartArgs(): string[] {
+  const config = readCliConfig();
+  yargs([])
+    .locale('en')
+    .options(startCliOptions)
+    .config(config)
+    .strict()
+    .exitProcess(false)
+    .fail((message, error) => {
+      throw error ?? new Error(message);
+    })
+    .parseSync();
+  return serializeArgs(cliOptions, config);
+}
 
 const y = yargs(hideBin(process.argv))
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
@@ -123,6 +139,7 @@ y.command(
   y =>
     y
       .options(startCliOptions)
+      .config(readCliConfig())
       .example(
         '$0 start --browserUrl http://localhost:9222',
         'Start the server connecting to an existing browser',
@@ -263,7 +280,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
       const sessionId = argv.sessionId as string;
       try {
         if (!isDaemonRunning(sessionId)) {
-          await start([], sessionId);
+          await start(getConfiguredStartArgs(), sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
