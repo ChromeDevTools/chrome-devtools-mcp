@@ -1,5 +1,7 @@
 # Chrome DevTools for agents
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.ChromeDevTools%2Fchrome-devtools-mcp.svg)](https://mcptoplist.com/server/io.github.ChromeDevTools%2Fchrome-devtools-mcp)
+
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 
 Chrome DevTools for agents (`chrome-devtools-mcp`) lets your coding agent (such as Antigravity, Claude, Cursor or Copilot)
