@@ -1,3 +1,5 @@
+[![mcpindex](https://mcpindex.ai/api/v1/badge/io-github-chromedevtools-chrome-devtools-mcp)](https://mcpindex.ai/server/io-github-chromedevtools-chrome-devtools-mcp)
+
 # Chrome DevTools for agents
 
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
