@@ -528,13 +528,14 @@ If you run into any issues, checkout our [troubleshooting guide](./docs/troubles
 - **Network** (2 tools)
   - [`get_network_request`](docs/tool-reference.md#get_network_request)
   - [`list_network_requests`](docs/tool-reference.md#list_network_requests)
-- **Debugging** (8 tools)
+- **Debugging** (9 tools)
   - [`evaluate_script`](docs/tool-reference.md#evaluate_script)
   - [`get_console_message`](docs/tool-reference.md#get_console_message)
   - [`lighthouse_audit`](docs/tool-reference.md#lighthouse_audit)
   - [`list_console_messages`](docs/tool-reference.md#list_console_messages)
   - [`take_screenshot`](docs/tool-reference.md#take_screenshot)
   - [`take_snapshot`](docs/tool-reference.md#take_snapshot)
+  - [`list_dedicated_workers`](docs/tool-reference.md#list_dedicated_workers)
   - [`screencast_start`](docs/tool-reference.md#screencast_start)
   - [`screencast_stop`](docs/tool-reference.md#screencast_stop)
 - **Memory** (12 tools)
@@ -664,6 +665,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--experimentalIncludeAllPages`/ `--experimental-include-all-pages`**
   Whether to include all kinds of pages such as webviews or background pages as pages.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--experimentalWorkers`/ `--experimental-workers`**
+  Whether to expose tools for enumerating dedicated Web Workers of the selected page and evaluating scripts inside them. Off by default so that worker execution contexts do not add to the baseline token usage.
   - **Type:** boolean
   - **Default:** `false`
 

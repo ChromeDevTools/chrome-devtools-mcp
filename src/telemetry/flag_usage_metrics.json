@@ -371,5 +371,13 @@
   {
     "name": "allow_unrestricted_paths",
     "flagType": "boolean"
+  },
+  {
+    "name": "experimental_workers_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_workers",
+    "flagType": "boolean"
   }
 ]
