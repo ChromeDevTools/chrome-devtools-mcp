@@ -91,4 +91,3 @@ describe('serializeArgs', () => {
     ]);
   });
 });
-
