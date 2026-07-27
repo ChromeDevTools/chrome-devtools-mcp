@@ -18,7 +18,7 @@ import sinon from 'sinon';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
+import {DevTools, type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
 import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
@@ -300,6 +300,66 @@ describe('McpContext', () => {
         !context.hasHeapSnapshots(),
         'heap snapshots freed on teardown',
       );
+    });
+  });
+
+  it('terminates heap snapshot workers when the context is recreated on reconnect', async () => {
+    await withBrowser(async browser => {
+      const options = {
+        experimentalDevToolsDebugging: false,
+        performanceCrux: false,
+      };
+      // Spying on the proxy still calls through, so the worker thread is really
+      // terminated while we record that the dispose happened.
+      const disposeWorker = sinon.spy(
+        DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy
+          .prototype,
+        'dispose',
+      );
+      const filePath = path.join(
+        process.cwd(),
+        'tests/fixtures/example.heapsnapshot',
+      );
+
+      const first = await McpContext.from(
+        browser,
+        logger('test'),
+        options,
+        Locator,
+      );
+      await first.getHeapSnapshotStats(filePath);
+      assert.ok(first.hasHeapSnapshots(), 'snapshot loaded before reconnect');
+
+      // Loading a snapshot spins up short-lived helper workers of its own, so
+      // ignore anything disposed during the load and only watch what teardown
+      // frees.
+      disposeWorker.resetHistory();
+
+      // getContext() in index.ts disposes the previous context before a new one
+      // replaces it on reconnect. Without that dispose the worker thread leaks.
+      first.dispose();
+      const second = await McpContext.from(
+        browser,
+        logger('test'),
+        options,
+        Locator,
+      );
+      try {
+        assert.ok(
+          disposeWorker.called,
+          'heap snapshot worker thread terminated on reconnect',
+        );
+        assert.ok(
+          !first.hasHeapSnapshots(),
+          'old context released its heap snapshots',
+        );
+        assert.ok(
+          !second.hasHeapSnapshots(),
+          'recreated context starts without leaked snapshots',
+        );
+      } finally {
+        second.dispose();
+      }
     });
   });
 
