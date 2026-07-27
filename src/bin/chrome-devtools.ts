@@ -263,7 +263,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
       const sessionId = argv.sessionId as string;
       try {
         if (!isDaemonRunning(sessionId)) {
-          await start([], sessionId);
+          await start(serializeArgs(cliOptions, argv), sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
