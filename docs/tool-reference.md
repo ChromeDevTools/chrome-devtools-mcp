@@ -64,9 +64,8 @@
 - **[WebMCP](#webmcp)** (2 tools)
   - [`execute_webmcp_tool`](#execute_webmcp_tool)
   - [`list_webmcp_tools`](#list_webmcp_tools)
-- **[Progressive Web Apps](#progressive-web-apps)** (5 tools)
+- **[Progressive Web Apps](#progressive-web-apps)** (4 tools)
   - [`get_os_app_state`](#get_os_app_state)
-  - [`install_current_page_as_pwa`](#install_current_page_as_pwa)
   - [`install_pwa`](#install_pwa)
   - [`launch_pwa`](#launch_pwa)
   - [`uninstall_pwa`](#uninstall_pwa)
@@ -711,16 +710,6 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Parameters:**
 
 - **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
-
----
-
-### `install_current_page_as_pwa`
-
-**Description:** Installs the currently selected page as a Progressive Web App. Reads the page's web app manifest, derives the manifest ID automatically, and installs it via the PWA CDP domain. Use [`install_pwa`](#install_pwa) directly if you already know the manifest ID. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)
-
-**Parameters:**
-
-- **displayMode** (enum: "standalone", "browser") _(optional)_: Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.
 
 ---
 

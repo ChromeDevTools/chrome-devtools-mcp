@@ -689,21 +689,6 @@ export const commands: Commands = {
       },
     },
   },
-  install_current_page_as_pwa: {
-    description:
-      "Installs the currently selected page as a Progressive Web App. Reads the page's web app manifest, derives the manifest ID automatically, and installs it via the PWA CDP domain. Use install_pwa directly if you already know the manifest ID. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)",
-    category: 'Progressive Web Apps',
-    args: {
-      displayMode: {
-        name: 'displayMode',
-        type: 'string',
-        description:
-          'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
-        required: false,
-        enum: ['standalone', 'browser'],
-      },
-    },
-  },
   install_extension: {
     description:
       'Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)',
