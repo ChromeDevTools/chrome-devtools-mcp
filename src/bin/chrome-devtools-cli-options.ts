@@ -635,6 +635,20 @@ export const commands: Commands = {
       },
     },
   },
+  get_os_app_state: {
+    description:
+      'Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+        required: true,
+      },
+    },
+  },
   handle_dialog: {
     description:
       'If a browser dialog was opened, use this command to handle it',
@@ -675,6 +689,21 @@ export const commands: Commands = {
       },
     },
   },
+  install_current_page_as_pwa: {
+    description:
+      "Installs the currently selected page as a Progressive Web App. Reads the page's web app manifest, derives the manifest ID automatically, and installs it via the PWA CDP domain. Use install_pwa directly if you already know the manifest ID. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)",
+    category: 'Progressive Web Apps',
+    args: {
+      displayMode: {
+        name: 'displayMode',
+        type: 'string',
+        description:
+          'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
+        required: false,
+        enum: ['standalone', 'browser'],
+      },
+    },
+  },
   install_extension: {
     description:
       'Installs a Chrome extension from the given path. (requires flag: --categoryExtensions=true)',
@@ -685,6 +714,56 @@ export const commands: Commands = {
         type: 'string',
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
+      },
+    },
+  },
+  install_pwa: {
+    description:
+      'Installs a Progressive Web App (PWA) identified by its manifest ID. This drives the same install flow as the omnibox install button via the PWA CDP domain, without requiring a manual user gesture. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+        required: true,
+      },
+      installUrlOrBundleUrl: {
+        name: 'installUrlOrBundleUrl',
+        type: 'string',
+        description:
+          'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
+        required: true,
+      },
+      displayMode: {
+        name: 'displayMode',
+        type: 'string',
+        description:
+          'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
+        required: false,
+        enum: ['standalone', 'browser'],
+      },
+    },
+  },
+  launch_pwa: {
+    description:
+      'Launches an installed Progressive Web App in its own app window. Optionally opens a specific URL within the same app instead of the default start URL. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+        required: true,
+      },
+      url: {
+        name: 'url',
+        type: 'string',
+        description:
+          'Optional URL within the app to open instead of the default start URL.',
+        required: false,
       },
     },
   },
@@ -1179,6 +1258,20 @@ export const commands: Commands = {
         name: 'id',
         type: 'string',
         description: 'ID of the extension to uninstall.',
+        required: true,
+      },
+    },
+  },
+  uninstall_pwa: {
+    description:
+      'Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
         required: true,
       },
     },

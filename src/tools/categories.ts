@@ -15,6 +15,7 @@ export enum ToolCategory {
   THIRD_PARTY = 'experimentalThirdParty',
   MEMORY = 'memory',
   WEBMCP = 'experimentalWebmcp',
+  PWA = 'pwa',
 }
 
 export const labels = {
@@ -28,10 +29,12 @@ export const labels = {
   [ToolCategory.THIRD_PARTY]: 'Third-party',
   [ToolCategory.MEMORY]: 'Memory',
   [ToolCategory.WEBMCP]: 'WebMCP',
+  [ToolCategory.PWA]: 'Progressive Web Apps',
 };
 
 export const OFF_BY_DEFAULT_CATEGORIES = [
   ToolCategory.EXTENSIONS,
   ToolCategory.THIRD_PARTY,
   ToolCategory.WEBMCP,
+  ToolCategory.PWA,
 ];
