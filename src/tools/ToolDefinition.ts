@@ -195,6 +195,7 @@ export type SupportedExtensions =
  */
 export type Context = Readonly<{
   validatePath(filePath?: string): Promise<void>;
+  hasNetworkRestrictions(): boolean;
   ensureExtension<Extension extends `.${string}`>(
     filePath: string,
     extension: Extension,

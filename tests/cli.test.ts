@@ -21,6 +21,8 @@ describe('cli args parsing', () => {
     categoryExtensions: false,
     'category-experimental-third-party': false,
     categoryExperimentalThirdParty: false,
+    'category-pwa': false,
+    categoryPwa: false,
     'auto-connect': undefined,
     autoConnect: undefined,
     'performance-crux': true,
