@@ -285,6 +285,24 @@ describe('McpContext', () => {
     });
   });
 
+  it('disposes loaded heap snapshots on teardown', async () => {
+    await withMcpContext(async (_response, context) => {
+      const filePath = path.join(
+        process.cwd(),
+        'tests/fixtures/example.heapsnapshot',
+      );
+      await context.getHeapSnapshotStats(filePath);
+      assert.ok(context.hasHeapSnapshots(), 'snapshot loaded before teardown');
+
+      context.dispose();
+
+      assert.ok(
+        !context.hasHeapSnapshots(),
+        'heap snapshots freed on teardown',
+      );
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({

@@ -403,4 +403,11 @@ export class HeapSnapshotManager {
     }
     return false;
   }
+
+  disposeAll(): void {
+    for (const cached of this.#snapshots.values()) {
+      cached.worker.dispose();
+    }
+    this.#snapshots.clear();
+  }
 }

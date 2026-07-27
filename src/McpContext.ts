@@ -139,6 +139,7 @@ export class McpContext implements Context {
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
     this.#serviceWorkerConsoleCollector.dispose();
+    this.#heapSnapshotManager.disposeAll();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
