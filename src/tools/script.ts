@@ -129,6 +129,9 @@ Example with arguments: \`(el) => el.innerText\`
           },
           {handleDialog: dialogAction ?? 'accept'},
         );
+        if (result.dialogHandled) {
+          mcpPage.clearDialog();
+        }
         response.attachWaitForResult(result);
       } finally {
         void Promise.allSettled(args.map(arg => arg.dispose()));

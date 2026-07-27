@@ -150,6 +150,34 @@ describe('script', () => {
       });
     });
 
+    it('clears the dialog state after auto-handling a dialog', async () => {
+      await withMcpContext(async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          html`<button id="test">test</button>`,
+        );
+
+        await evaluateScript().handler(
+          {
+            params: {
+              function: String(() => {
+                confirm('hello');
+                return 'done';
+              }),
+            },
+          },
+          response,
+          context,
+        );
+
+        // After the dialog is auto-accepted, the stored dialog reference must
+        // be cleared. Otherwise throwIfDialogOpen() wedges every subsequent
+        // blockedByDialog tool with a false "A dialog is open" error.
+        assert.strictEqual(mcpPage.getDialog(), undefined);
+        assert.doesNotThrow(() => mcpPage.throwIfDialogOpen());
+      });
+    });
+
     it('work for scripts that trigger prompts and fill them', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
