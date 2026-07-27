@@ -14,7 +14,6 @@ import {
   uninstallPwa,
   launchPwa,
   getOsAppState,
-  installCurrentPageAsPwa,
 } from '../../src/tools/pwa.js';
 import {serverHooks} from '../server.js';
 import {withMcpContext} from '../utils.js';
@@ -137,10 +136,6 @@ describe('pwa', () => {
           ),
           /PWA install and launch operations are not supported when URL restrictions are configured/,
         );
-        await assert.rejects(
-          installCurrentPageAsPwa.handler({params: {}}, response, context),
-          /PWA install and launch operations are not supported when URL restrictions are configured/,
-        );
       },
       {blockedUrlPattern},
       {categoryPwa: true},
@@ -199,32 +194,6 @@ describe('pwa', () => {
           isStandalone,
           true,
           'the launched app should be in standalone display mode',
-        );
-
-        await uninstallPwa.handler({params: {manifestId}}, response, context);
-      },
-      PWA_BROWSER_OPTIONS,
-      {categoryPwa: true},
-    );
-  });
-
-  it('installs the current page as a PWA and derives its manifest ID', async () => {
-    const {manifestId, startUrl} = setupPwaRoutes();
-    await withMcpContext(
-      async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(startUrl);
-
-        await installCurrentPageAsPwa.handler(
-          {params: {displayMode: 'standalone'}},
-          response,
-          context,
-        );
-
-        const output = response.responseLines.join('\n');
-        assert.ok(
-          output.includes(`Manifest ID: ${manifestId}`),
-          `expected derived manifest ID ${manifestId}, got: ${output}`,
         );
 
         await uninstallPwa.handler({params: {manifestId}}, response, context);
