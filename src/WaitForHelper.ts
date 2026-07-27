@@ -19,6 +19,10 @@ export class WaitForHelper {
   #navigationTimeout: number;
 
   #dialogOpened = false;
+  // Set when any dialog is observed during the action, whether or not this
+  // helper handled it. A dialog pauses the renderer, so DOM-stability
+  // evaluation would hang until protocolTimeout; we use this to skip it.
+  #dialogDetected = false;
   #initialUrl: string;
 
   constructor(
@@ -40,31 +44,45 @@ export class WaitForHelper {
    * for the DOM to be stable before returning.
    */
   async waitForStableDom(): Promise<void> {
-    const stableDomObserver = await this.#page.evaluateHandle(timeout => {
-      let timeoutId: ReturnType<typeof setTimeout>;
-      function callback() {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          domObserver.resolver.resolve();
-          domObserver.observer.disconnect();
-        }, timeout);
-      }
-      const domObserver = {
-        resolver: Promise.withResolvers<void>(),
-        observer: new MutationObserver(callback),
-      };
-      // It's possible that the DOM is not gonna change so we
-      // need to start the timeout initially.
-      callback();
+    // Bound the setup evaluation against the abort signal and the stable-DOM
+    // timeout. Without this cap a paused renderer (e.g. an open dialog) would
+    // make evaluateHandle hang until protocolTimeout (default 180s) while the
+    // tool mutex is held. The `.catch` swallows the eventual ProtocolError if
+    // the timeout wins first, so it does not surface as an unhandled rejection.
+    const stableDomObserver = await Promise.race([
+      this.#page
+        .evaluateHandle(timeout => {
+          let timeoutId: ReturnType<typeof setTimeout>;
+          function callback() {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+              domObserver.resolver.resolve();
+              domObserver.observer.disconnect();
+            }, timeout);
+          }
+          const domObserver = {
+            resolver: Promise.withResolvers<void>(),
+            observer: new MutationObserver(callback),
+          };
+          // It's possible that the DOM is not gonna change so we
+          // need to start the timeout initially.
+          callback();
 
-      domObserver.observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-      });
+          domObserver.observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+          });
 
-      return domObserver;
-    }, this.#stableDomFor);
+          return domObserver;
+        }, this.#stableDomFor)
+        .catch(() => undefined),
+      this.timeout(this.#stableDomTimeout).then(() => undefined),
+    ]);
+
+    if (!stableDomObserver) {
+      return;
+    }
 
     this.#abortController.signal.addEventListener('abort', async () => {
       try {
@@ -141,34 +159,42 @@ export class WaitForHelper {
     if (this.#abortController.signal.aborted) {
       throw new Error("Can't re-use a WaitForHelper");
     }
-    if (options?.handleDialog) {
-      const dialogHandler = (
-        dialog: Pick<Dialog, 'accept' | 'dismiss' | 'type'>,
-      ) => {
-        let actionToTake: DialogAction | undefined;
+    const dialogHandler = (
+      dialog: Pick<Dialog, 'accept' | 'dismiss' | 'type'>,
+    ) => {
+      // Record every dialog so waitForStableDom is skipped: an open dialog
+      // pauses the renderer, so the DOM-stability evaluation would otherwise
+      // hang until protocolTimeout (default 180s) while holding the tool
+      // mutex, wedging the whole session.
+      this.#dialogDetected = true;
 
-        if (typeof options.handleDialog === 'object') {
-          actionToTake = options.handleDialog[dialog.type()];
+      if (!options?.handleDialog) {
+        return;
+      }
+
+      let actionToTake: DialogAction | undefined;
+
+      if (typeof options.handleDialog === 'object') {
+        actionToTake = options.handleDialog[dialog.type()];
+      } else {
+        actionToTake = options.handleDialog;
+      }
+
+      if (actionToTake) {
+        this.#dialogOpened = true;
+        if (actionToTake === 'dismiss') {
+          void dialog.dismiss();
+        } else if (actionToTake === 'accept') {
+          void dialog.accept();
         } else {
-          actionToTake = options.handleDialog;
+          void dialog.accept(actionToTake);
         }
-
-        if (actionToTake) {
-          this.#dialogOpened = true;
-          if (actionToTake === 'dismiss') {
-            void dialog.dismiss();
-          } else if (actionToTake === 'accept') {
-            void dialog.accept();
-          } else {
-            void dialog.accept(actionToTake);
-          }
-        }
-      };
-      this.#page.on('dialog', dialogHandler);
-      this.#abortController.signal.addEventListener('abort', () => {
-        this.#page.off('dialog', dialogHandler);
-      });
-    }
+      }
+    };
+    this.#page.on('dialog', dialogHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      this.#page.off('dialog', dialogHandler);
+    });
 
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
@@ -193,7 +219,7 @@ export class WaitForHelper {
     try {
       await navigationFinished;
 
-      if (this.#dialogOpened) {
+      if (this.#dialogOpened || this.#dialogDetected) {
         return this.#getResult();
       }
 
