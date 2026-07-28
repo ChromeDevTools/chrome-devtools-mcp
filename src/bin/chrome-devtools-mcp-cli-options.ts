@@ -262,6 +262,7 @@ export const cliOptions = {
     type: 'boolean',
     hidden: false,
     default: false,
+    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
   },
@@ -400,14 +401,6 @@ export function parseArguments(
           "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
         );
         args.usageStatistics = false;
-      }
-      if (
-        args.categoryPwa &&
-        (args.autoConnect || args.browserUrl || args.wsEndpoint)
-      ) {
-        throw new Error(
-          '--category-pwa requires a pipe-launched browser and cannot be used with --auto-connect, --browser-url, or --ws-endpoint.',
-        );
       }
     })
     .example([
