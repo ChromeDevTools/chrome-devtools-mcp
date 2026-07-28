@@ -42,8 +42,8 @@ export const installPwa = defineTool({
   name: 'install_pwa',
   description:
     'Installs a Progressive Web App (PWA) identified by its manifest ID. ' +
-    'This drives the same install flow as the omnibox install button via the ' +
-    'PWA CDP domain, without requiring a manual user gesture. This operation ' +
+    'This installs through the PWA CDP domain without a user gesture or install ' +
+    'dialog. DevTools installs default to browser display mode. This operation ' +
     'is unavailable when URL restrictions are configured.',
   annotations: {
     category: ToolCategory.PWA,
@@ -110,10 +110,10 @@ export const uninstallPwa = defineTool({
 export const launchPwa = defineTool({
   name: 'launch_pwa',
   description:
-    'Launches an installed Progressive Web App in its own app window. ' +
-    'Optionally opens a specific URL within the same app instead of the ' +
-    'default start URL. This operation is unavailable when URL restrictions ' +
-    'are configured.',
+    'Launches an installed Progressive Web App using its saved display mode. ' +
+    'Optionally opens a specific URL within the same app instead of the default ' +
+    'start URL. This operation is unavailable when URL restrictions are ' +
+    'configured.',
   annotations: {
     category: ToolCategory.PWA,
     readOnlyHint: false,
