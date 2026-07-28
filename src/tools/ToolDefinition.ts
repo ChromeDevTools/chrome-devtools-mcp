@@ -15,10 +15,14 @@ import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
-  Browser,
   ElementHandle,
   Extension,
+  GetPWAStateOptions,
+  InstallPWAOptions,
+  LaunchPWAOptions,
+  PWAState,
   ScreenRecorder,
+  UninstallPWAOptions,
   Viewport,
   DevTools,
   Protocol,
@@ -194,9 +198,12 @@ export type SupportedExtensions =
  * Only add methods used by tools/*.
  */
 export type Context = Readonly<{
-  readonly browser: Browser;
   validatePath(filePath?: string): Promise<void>;
   hasNetworkRestrictions(): boolean;
+  installPWA(options: InstallPWAOptions): Promise<string>;
+  uninstallPWA(options: UninstallPWAOptions): Promise<void>;
+  launchPWA(options: LaunchPWAOptions): Promise<Page>;
+  getPWAState(options: GetPWAStateOptions): Promise<PWAState>;
   ensureExtension<Extension extends `.${string}`>(
     filePath: string,
     extension: Extension,

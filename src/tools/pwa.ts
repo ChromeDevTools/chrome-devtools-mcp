@@ -69,7 +69,7 @@ export const installPwa = defineTool({
     if (installUrl.protocol === 'file:') {
       await context.validatePath(fileURLToPath(installUrl));
     }
-    await context.browser.installPWA({
+    await context.installPWA({
       manifestId,
       installUrlOrBundleUrl,
       displayMode,
@@ -99,7 +99,7 @@ export const uninstallPwa = defineTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
-    await context.browser.uninstallPWA({manifestId});
+    await context.uninstallPWA({manifestId});
     response.appendResponseLine(
       `Uninstalled PWA with manifest ID: ${manifestId}`,
     );
@@ -132,7 +132,7 @@ export const launchPwa = defineTool({
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
     ensureNoNetworkRestrictions(context);
-    const page = await context.browser.launchPWA({manifestId, url});
+    const page = await context.launchPWA({manifestId, url});
     response.appendResponseLine(
       `Launched PWA with manifest ID: ${manifestId} (${page.url()})`,
     );
@@ -156,7 +156,7 @@ export const getOsAppState = defineTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
-    const state = await context.browser.getPWAState({manifestId});
+    const state = await context.getPWAState({manifestId});
     response.appendResponseLine(`OS app state for manifest ID: ${manifestId}`);
     response.appendResponseLine(`Badge count: ${state.badgeCount}`);
     response.appendResponseLine(
