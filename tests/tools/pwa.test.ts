@@ -115,6 +115,44 @@ describe('pwa', () => {
     );
   });
 
+  it('does not require a selected page for browser-scoped operations', async () => {
+    const {manifestId, startUrl} = setupPwaRoutes();
+    await withMcpContext(
+      async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        sinon
+          .stub(context, 'getSelectedMcpPage')
+          .throws(new Error('No page selected'));
+        const install = sinon
+          .stub(context.browser, 'installPWA')
+          .resolves(manifestId);
+        const launch = sinon.stub(context.browser, 'launchPWA').resolves(page);
+        const getState = sinon
+          .stub(context.browser, 'getPWAState')
+          .resolves({badgeCount: 0, fileHandlers: []});
+        const uninstall = sinon
+          .stub(context.browser, 'uninstallPWA')
+          .resolves();
+
+        await installPwa.handler(
+          {params: {manifestId, installUrlOrBundleUrl: startUrl}},
+          response,
+          context,
+        );
+        await launchPwa.handler({params: {manifestId}}, response, context);
+        await getOsAppState.handler({params: {manifestId}}, response, context);
+        await uninstallPwa.handler({params: {manifestId}}, response, context);
+
+        assert.ok(install.calledOnce);
+        assert.ok(launch.calledOnce);
+        assert.ok(getState.calledOnce);
+        assert.ok(uninstall.calledOnce);
+      },
+      PWA_BROWSER_OPTIONS,
+      {categoryPwa: true},
+    );
+  });
+
   it('enforces URL restrictions for install and launch', async () => {
     const {manifestId, startUrl} = setupPwaRoutes();
     const blockedUrlPattern = [`${server.baseUrl}/pwa/*`];

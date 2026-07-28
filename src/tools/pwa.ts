@@ -12,15 +12,6 @@ import {ToolCategory} from './categories.js';
 import type {Context} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
 
-/**
- * Returns the browser-level Puppeteer {@link Browser} for the current session.
- * The PWA APIs are browser-scoped (they wrap the `PWA.*` CDP domain, which
- * operates on the browser target rather than any single page target).
- */
-function getBrowser(context: Context) {
-  return context.getSelectedMcpPage().pptrPage.browser();
-}
-
 function ensureNoNetworkRestrictions(context: Context): void {
   if (context.hasNetworkRestrictions()) {
     throw new Error(
@@ -78,7 +69,7 @@ export const installPwa = defineTool({
     if (installUrl.protocol === 'file:') {
       await context.validatePath(fileURLToPath(installUrl));
     }
-    await getBrowser(context).installPWA({
+    await context.browser.installPWA({
       manifestId,
       installUrlOrBundleUrl,
       displayMode,
@@ -108,7 +99,7 @@ export const uninstallPwa = defineTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
-    await getBrowser(context).uninstallPWA({manifestId});
+    await context.browser.uninstallPWA({manifestId});
     response.appendResponseLine(
       `Uninstalled PWA with manifest ID: ${manifestId}`,
     );
@@ -141,7 +132,7 @@ export const launchPwa = defineTool({
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
     ensureNoNetworkRestrictions(context);
-    const page = await getBrowser(context).launchPWA({manifestId, url});
+    const page = await context.browser.launchPWA({manifestId, url});
     response.appendResponseLine(
       `Launched PWA with manifest ID: ${manifestId} (${page.url()})`,
     );
@@ -165,7 +156,7 @@ export const getOsAppState = defineTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
-    const state = await getBrowser(context).getPWAState({manifestId});
+    const state = await context.browser.getPWAState({manifestId});
     response.appendResponseLine(`OS app state for manifest ID: ${manifestId}`);
     response.appendResponseLine(`Badge count: ${state.badgeCount}`);
     response.appendResponseLine(

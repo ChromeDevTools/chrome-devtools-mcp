@@ -15,6 +15,7 @@ import type {McpPage} from '../McpPage.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
+  Browser,
   ElementHandle,
   Extension,
   ScreenRecorder,
@@ -193,6 +194,7 @@ export type SupportedExtensions =
  * Only add methods used by tools/*.
  */
 export type Context = Readonly<{
+  readonly browser: Browser;
   validatePath(filePath?: string): Promise<void>;
   hasNetworkRestrictions(): boolean;
   ensureExtension<Extension extends `.${string}`>(
