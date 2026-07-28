@@ -123,16 +123,12 @@ describe('pwa', () => {
         sinon
           .stub(context, 'getSelectedMcpPage')
           .throws(new Error('No page selected'));
-        const install = sinon
-          .stub(context.browser, 'installPWA')
-          .resolves(manifestId);
-        const launch = sinon.stub(context.browser, 'launchPWA').resolves(page);
+        const install = sinon.stub(context, 'installPWA').resolves(manifestId);
+        const launch = sinon.stub(context, 'launchPWA').resolves(page);
         const getState = sinon
-          .stub(context.browser, 'getPWAState')
+          .stub(context, 'getPWAState')
           .resolves({badgeCount: 0, fileHandlers: []});
-        const uninstall = sinon
-          .stub(context.browser, 'uninstallPWA')
-          .resolves();
+        const uninstall = sinon.stub(context, 'uninstallPWA').resolves();
 
         await installPwa.handler(
           {params: {manifestId, installUrlOrBundleUrl: startUrl}},
