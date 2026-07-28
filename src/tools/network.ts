@@ -34,7 +34,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 
 export const listNetworkRequests = definePageTool({
   name: 'list_network_requests',
-  description: `List all requests for the currently selected page since the last navigation.`,
+  description: `List the most recent requests for the currently selected page since the last navigation. Up to 1,000 requests are retained per navigation.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,

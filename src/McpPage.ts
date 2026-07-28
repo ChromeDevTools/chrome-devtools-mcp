@@ -159,7 +159,10 @@ export class McpPage implements ContextPage {
     };
     page.on('dialog', this.#dialogHandler);
 
-    this.networkCollector = new NetworkCollector(page);
+    this.networkCollector = new NetworkCollector(
+      page,
+      NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION,
+    );
     this.consoleCollector = new ConsoleCollector(page, collect => {
       return {
         console: event => {
@@ -848,15 +851,19 @@ export class McpPage implements ContextPage {
    */
   async setUpNetworkCollectorForTesting() {
     this.networkCollector.dispose();
-    this.networkCollector = new NetworkCollector(this.pptrPage, collect => {
-      return {
-        request: req => {
-          if (req.url().includes('favicon.ico')) {
-            return;
-          }
-          collect(req);
-        },
-      } as ListenerMap;
-    });
+    this.networkCollector = new NetworkCollector(
+      this.pptrPage,
+      NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION,
+      collect => {
+        return {
+          request: req => {
+            if (req.url().includes('favicon.ico')) {
+              return;
+            }
+            collect(req);
+          },
+        } as ListenerMap;
+      },
+    );
   }
 }
