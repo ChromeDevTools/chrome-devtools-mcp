@@ -920,16 +920,6 @@
     ]
   },
   {
-    "name": "install_current_page_as_pwa",
-    "args": [
-      {
-        "name": "display_mode",
-        "argType": "string"
-      }
-    ],
-    "isDeprecated": true
-  },
-  {
     "name": "install_pwa",
     "args": [
       {
