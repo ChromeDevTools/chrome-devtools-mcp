@@ -261,7 +261,6 @@ export const cliOptions = {
   categoryPwa: {
     type: 'boolean',
     hidden: false,
-    default: false,
     conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
@@ -381,8 +380,10 @@ export function parseArguments(
   version: string,
   argv = process.argv,
   env = process.env,
+  exitProcess = true,
 ) {
   const yargsInstance = yargs(hideBin(argv))
+    .exitProcess(exitProcess)
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
     .middleware(args => {
