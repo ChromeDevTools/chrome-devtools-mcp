@@ -147,8 +147,6 @@ export async function createMcpServer(
           });
 
     if (context?.browser !== browser) {
-      // Free resources tied to the previous context (heap snapshot workers,
-      // console collectors, page listeners) before replacing it on reconnect.
       context?.dispose();
       context = await McpContext.from(browser, logger, {
         experimentalDevToolsDebugging: devtools,
