@@ -401,6 +401,14 @@ export function parseArguments(
         );
         args.usageStatistics = false;
       }
+      if (
+        args.categoryPwa &&
+        (args.autoConnect || args.browserUrl || args.wsEndpoint)
+      ) {
+        throw new Error(
+          '--category-pwa requires a pipe-launched browser and cannot be used with --auto-connect, --browser-url, or --ws-endpoint.',
+        );
+      }
     })
     .example([
       [
