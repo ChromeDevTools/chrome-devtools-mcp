@@ -159,10 +159,7 @@ export class McpPage implements ContextPage {
     };
     page.on('dialog', this.#dialogHandler);
 
-    this.networkCollector = new NetworkCollector(
-      page,
-      NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION,
-    );
+    this.networkCollector = new NetworkCollector(page);
     this.consoleCollector = new ConsoleCollector(page, collect => {
       return {
         console: event => {
@@ -853,7 +850,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION,
+      undefined,
       collect => {
         return {
           request: req => {

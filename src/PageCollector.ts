@@ -293,11 +293,11 @@ class PageEventSubscriber {
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
-  static readonly DEFAULT_MAX_REQUESTS_PER_NAVIGATION = 1_000;
+  static readonly MAX_REQUESTS_PER_NAVIGATION = 1_000;
 
   constructor(
     page: Page,
-    maxRequestsPerNavigation = NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION,
+    maxRequestsPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
     listeners: (
       collector: (item: HTTPRequest) => void,
     ) => ListenerMap<PageEvents> = collect => {

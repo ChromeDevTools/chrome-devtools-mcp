@@ -132,8 +132,7 @@ describe('NetworkCollector', () => {
     const collector = new NetworkCollector(page);
     const requests = Array.from(
       {
-        length:
-          NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION + 1,
+        length: NetworkCollector.MAX_REQUESTS_PER_NAVIGATION + 1,
       },
       (_, index) =>
         getMockRequest({url: `http://example.com/request-${index + 1}`}),
@@ -146,7 +145,7 @@ describe('NetworkCollector', () => {
     const retainedRequests = collector.getData();
     assert.equal(
       retainedRequests.length,
-      NetworkCollector.DEFAULT_MAX_REQUESTS_PER_NAVIGATION,
+      NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
     );
     assert.deepEqual(retainedRequests, requests.slice(1));
     assert.equal(collector.getIdForResource(retainedRequests[0]), 2);
