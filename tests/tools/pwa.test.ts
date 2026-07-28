@@ -5,7 +5,9 @@
  */
 
 import assert from 'node:assert';
+import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
 
@@ -16,7 +18,7 @@ import {
   getOsAppState,
 } from '../../src/tools/pwa.js';
 import {serverHooks} from '../server.js';
-import {withMcpContext} from '../utils.js';
+import {getTextContent, withMcpContext} from '../utils.js';
 
 // The `PWA` CDP domain is only available over a pipe connection, which
 // `withMcpContext` uses by default.
@@ -59,7 +61,11 @@ describe('pwa', () => {
     sinon.restore();
   });
 
-  function setupPwaRoutes(): {manifestId: string; startUrl: string} {
+  function setupPwaRoutes(): {
+    manifestId: string;
+    startUrl: string;
+    explicitUrl: string;
+  } {
     server.addRoute('/pwa/index.html', (_req, res) => {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.statusCode = 200;
@@ -70,9 +76,14 @@ describe('pwa', () => {
       res.statusCode = 200;
       res.end(MANIFEST);
     });
+    server.addHtmlRoute(
+      '/pwa/secondary.html',
+      '<h1>Explicit PWA launch URL</h1>',
+    );
     return {
       manifestId: `${server.baseUrl}/pwa/`,
       startUrl: `${server.baseUrl}/pwa/index.html`,
+      explicitUrl: `${server.baseUrl}/pwa/secondary.html`,
     };
   }
 
@@ -97,6 +108,10 @@ describe('pwa', () => {
           stateOutput.includes('Badge count: 0'),
           `expected a badge count in OS state, got: ${stateOutput}`,
         );
+        assert.ok(
+          stateOutput.includes('File handlers: []'),
+          `expected file handlers in OS state, got: ${stateOutput}`,
+        );
 
         const includePages = sinon.spy(response, 'setIncludePages');
         await uninstallPwa.handler({params: {manifestId}}, response, context);
@@ -109,6 +124,42 @@ describe('pwa', () => {
         await assert.rejects(
           getOsAppState.handler({params: {manifestId}}, response, context),
         );
+      },
+      PWA_BROWSER_OPTIONS,
+      {categoryPwa: true},
+    );
+  });
+
+  it('validates file bundle paths before installation', async () => {
+    await withMcpContext(
+      async (response, context) => {
+        const manifestId = 'isolated-app://example/';
+        const filePath = path.resolve('test-app.swbn');
+        const installUrlOrBundleUrl = pathToFileURL(filePath).href;
+        const validatePath = sinon.stub(context, 'validatePath').resolves();
+        const install = sinon.stub(context, 'installPWA').resolves(manifestId);
+
+        await installPwa.handler(
+          {params: {manifestId, installUrlOrBundleUrl}},
+          response,
+          context,
+        );
+
+        assert.ok(validatePath.calledOnceWithExactly(filePath));
+        assert.ok(install.calledOnce);
+
+        validatePath.reset();
+        validatePath.rejects(new Error('Path is outside configured roots'));
+        install.resetHistory();
+        await assert.rejects(
+          installPwa.handler(
+            {params: {manifestId, installUrlOrBundleUrl}},
+            response,
+            context,
+          ),
+          /Path is outside configured roots/,
+        );
+        assert.ok(install.notCalled);
       },
       PWA_BROWSER_OPTIONS,
       {categoryPwa: true},
@@ -231,6 +282,86 @@ describe('pwa', () => {
         );
 
         await uninstallPwa.handler({params: {manifestId}}, response, context);
+      },
+      PWA_BROWSER_OPTIONS,
+      {categoryPwa: true},
+    );
+  });
+
+  it('launches an installed PWA at an explicit URL', async () => {
+    const {manifestId, startUrl, explicitUrl} = setupPwaRoutes();
+    await withMcpContext(
+      async (response, context) => {
+        await installPwa.handler(
+          {
+            params: {
+              manifestId,
+              installUrlOrBundleUrl: startUrl,
+              displayMode: 'standalone',
+            },
+          },
+          response,
+          context,
+        );
+
+        response.resetResponseLineForTesting();
+        await launchPwa.handler(
+          {params: {manifestId, url: explicitUrl}},
+          response,
+          context,
+        );
+        assert.ok(
+          response.responseLines.some(line => {
+            return line.includes(explicitUrl);
+          }),
+          `launch response should reference ${explicitUrl}`,
+        );
+
+        const appTarget = context.browser.targets().find(target => {
+          return target.url() === explicitUrl;
+        });
+        assert.ok(appTarget, 'the explicit launch target should exist');
+
+        await uninstallPwa.handler({params: {manifestId}}, response, context);
+      },
+      PWA_BROWSER_OPTIONS,
+      {categoryPwa: true},
+    );
+  });
+
+  it('selects a surviving page after uninstall closes the selected app', async () => {
+    const {manifestId, startUrl} = setupPwaRoutes();
+    await withMcpContext(
+      async (response, context) => {
+        const originalPage = context.getSelectedMcpPage();
+        await installPwa.handler(
+          {
+            params: {
+              manifestId,
+              installUrlOrBundleUrl: startUrl,
+              displayMode: 'standalone',
+            },
+          },
+          response,
+          context,
+        );
+        await launchPwa.handler({params: {manifestId}}, response, context);
+        await context.createPagesSnapshot();
+        const appPage = context.getPages().find(page => {
+          return page.pptrPage.url() === startUrl;
+        });
+        assert.ok(appPage, 'the launched app page should be listed');
+        context.selectPage(appPage);
+
+        response.resetResponseLineForTesting();
+        await uninstallPwa.handler({params: {manifestId}}, response, context);
+        const result = await response.handle(context);
+
+        assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+        assert.match(
+          getTextContent(result.content[0]),
+          /previously selected page was closed/,
+        );
       },
       PWA_BROWSER_OPTIONS,
       {categoryPwa: true},
