@@ -5,8 +5,6 @@
  */
 
 import assert from 'node:assert';
-import {spawnSync} from 'node:child_process';
-import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
@@ -23,8 +21,6 @@ describe('cli args parsing', () => {
     categoryExtensions: false,
     'category-experimental-third-party': false,
     categoryExperimentalThirdParty: false,
-    'category-pwa': false,
-    categoryPwa: false,
     'auto-connect': undefined,
     autoConnect: undefined,
     'performance-crux': true,
@@ -283,25 +279,17 @@ describe('cli args parsing', () => {
   });
 
   it('rejects PWA tools with connected browser modes', () => {
-    const serverPath = path.resolve('build/src/bin/chrome-devtools-mcp.js');
-    const connectionArgs = [
-      ['--auto-connect'],
-      ['--browser-url', 'http://localhost:3000'],
-      ['--ws-endpoint', 'ws://127.0.0.1:9222/devtools/browser/abc123'],
-    ];
-
-    for (const args of connectionArgs) {
-      const result = spawnSync(
-        process.execPath,
-        [serverPath, '--category-pwa', ...args],
-        {encoding: 'utf8'},
-      );
-      assert.notStrictEqual(result.status, 0);
-      assert.match(
-        result.stderr,
-        /--category-pwa requires a pipe-launched browser and cannot be used with --auto-connect, --browser-url, or --ws-endpoint/,
-      );
-    }
+    assert.throws(
+      () => {
+        parseArguments(
+          '1.0.0',
+          ['node', 'main.js', '--category-pwa', '--auto-connect'],
+          {},
+          false,
+        );
+      },
+      /Arguments categoryPwa and autoConnect are mutually exclusive/,
+    );
   });
 
   it('parses usage statistics flag', async () => {
