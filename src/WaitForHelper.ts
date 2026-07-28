@@ -18,10 +18,7 @@ export class WaitForHelper {
   #expectNavigationIn: number;
   #navigationTimeout: number;
 
-  #dialogOpened = false;
-  // Set when any dialog is observed during the action, whether or not this
-  // helper handled it. A dialog pauses the renderer, so DOM-stability
-  // evaluation would hang until protocolTimeout; we use this to skip it.
+  #dialogHandled = false;
   #dialogDetected = false;
   #initialUrl: string;
 
@@ -44,41 +41,37 @@ export class WaitForHelper {
    * for the DOM to be stable before returning.
    */
   async waitForStableDom(): Promise<void> {
-    // Bound the setup evaluation against the abort signal and the stable-DOM
-    // timeout. Without this cap a paused renderer (e.g. an open dialog) would
-    // make evaluateHandle hang until protocolTimeout (default 180s) while the
-    // tool mutex is held. The `.catch` swallows the eventual ProtocolError if
-    // the timeout wins first, so it does not surface as an unhandled rejection.
+    // Bound the setup evaluation against the stable-DOM timeout. Without this
+    // cap a paused renderer (e.g. an open dialog) would make evaluateHandle
+    // hang until protocolTimeout (default 180s) while the tool mutex is held.
     const stableDomObserver = await Promise.race([
-      this.#page
-        .evaluateHandle(timeout => {
-          let timeoutId: ReturnType<typeof setTimeout>;
-          function callback() {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-              domObserver.resolver.resolve();
-              domObserver.observer.disconnect();
-            }, timeout);
-          }
-          const domObserver = {
-            resolver: Promise.withResolvers<void>(),
-            observer: new MutationObserver(callback),
-          };
-          // It's possible that the DOM is not gonna change so we
-          // need to start the timeout initially.
-          callback();
+      this.#page.evaluateHandle(timeout => {
+        let timeoutId: ReturnType<typeof setTimeout>;
+        function callback() {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            domObserver.resolver.resolve();
+            domObserver.observer.disconnect();
+          }, timeout);
+        }
+        const domObserver = {
+          resolver: Promise.withResolvers<void>(),
+          observer: new MutationObserver(callback),
+        };
+        // It's possible that the DOM is not gonna change so we
+        // need to start the timeout initially.
+        callback();
 
-          domObserver.observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-          });
+        domObserver.observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
 
-          return domObserver;
-        }, this.#stableDomFor)
-        .catch(() => undefined),
-      this.timeout(this.#stableDomTimeout).then(() => undefined),
-    ]);
+        return domObserver;
+      }, this.#stableDomFor),
+      this.timeout(this.#stableDomTimeout),
+    ]).catch(() => undefined);
 
     if (!stableDomObserver) {
       return;
@@ -181,7 +174,7 @@ export class WaitForHelper {
       }
 
       if (actionToTake) {
-        this.#dialogOpened = true;
+        this.#dialogHandled = true;
         if (actionToTake === 'dismiss') {
           void dialog.dismiss();
         } else if (actionToTake === 'accept') {
@@ -219,7 +212,7 @@ export class WaitForHelper {
     try {
       await navigationFinished;
 
-      if (this.#dialogOpened || this.#dialogDetected) {
+      if (this.#dialogDetected) {
         return this.#getResult();
       }
 
@@ -241,7 +234,7 @@ export class WaitForHelper {
       ...(urlAfterAction !== this.#initialUrl
         ? {navigatedToUrl: urlAfterAction}
         : {}),
-      dialogHandled: this.#dialogOpened,
+      dialogHandled: this.#dialogHandled,
     };
   }
 }
