@@ -18,7 +18,7 @@ import sinon from 'sinon';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
+import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
 import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
@@ -282,6 +282,24 @@ describe('McpContext', () => {
       } finally {
         context.dispose();
       }
+    });
+  });
+
+  it('disposes loaded heap snapshots on teardown', async () => {
+    await withMcpContext(async (_response, context) => {
+      const filePath = path.join(
+        process.cwd(),
+        'tests/fixtures/example.heapsnapshot',
+      );
+      await context.getHeapSnapshotStats(filePath);
+      assert.ok(context.hasHeapSnapshots(), 'snapshot loaded before teardown');
+
+      context.dispose();
+
+      assert.ok(
+        !context.hasHeapSnapshots(),
+        'heap snapshots freed on teardown',
+      );
     });
   });
 

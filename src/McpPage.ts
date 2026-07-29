@@ -212,7 +212,7 @@ export class McpPage implements ContextPage {
   }
 
   throwIfDialogOpen(): void {
-    if (this.#dialog) {
+    if (this.#dialog && !this.#dialog.handled) {
       throw new Error(
         `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
       );
