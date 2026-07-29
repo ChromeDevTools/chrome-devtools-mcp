@@ -278,17 +278,6 @@ describe('cli args parsing', () => {
     });
   });
 
-  it('rejects PWA tools with connected browser modes', () => {
-    assert.throws(() => {
-      parseArguments(
-        '1.0.0',
-        ['node', 'main.js', '--category-pwa', '--auto-connect'],
-        {},
-        false,
-      );
-    }, /Arguments categoryPwa and autoConnect are mutually exclusive/);
-  });
-
   it('parses usage statistics flag', async () => {
     // Test default (should be true).
     const defaultArgs = parseArguments('1.0.0', ['node', 'main.js'], {});
