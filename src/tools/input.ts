@@ -386,21 +386,26 @@ export const drag = definePageTool({
     const fromHandle = await request.page.getElementByUid(
       request.params.from_uid,
     );
-    const toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await toHandle.drop(fromHandle);
-      });
-      response.appendResponseLine(`Successfully dragged an element`);
-      response.attachWaitForResult(result);
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
+      const toHandle = await request.page.getElementByUid(
+        request.params.to_uid,
+      );
+      try {
+        const result = await request.page.waitForEventsAfterAction(async () => {
+          await fromHandle.drag(toHandle);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          await toHandle.drop(fromHandle);
+        });
+        response.appendResponseLine(`Successfully dragged an element`);
+        response.attachWaitForResult(result);
+        if (request.params.includeSnapshot) {
+          response.includeSnapshot();
+        }
+      } finally {
+        void toHandle.dispose();
       }
     } finally {
       void fromHandle.dispose();
-      void toHandle.dispose();
     }
   },
 });

@@ -1055,6 +1055,43 @@ describe('input', () => {
         assert.ok(await page.$('text/dropped'));
       });
     });
+
+    it('disposes the source handle when the target lookup fails', async () => {
+      await withMcpContext(async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(html`<div id="drag">drag me</div>`);
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const fromHandle = await mcpPage.getElementByUid('1_1');
+        const disposeSpy = sinon.spy(fromHandle, 'dispose');
+        // First lookup (from_uid) succeeds, second (to_uid) throws as it would
+        // for a stale/invalid uid.
+        const stub = sinon.stub(mcpPage, 'getElementByUid');
+        stub.onFirstCall().resolves(fromHandle);
+        stub
+          .onSecondCall()
+          .rejects(
+            new Error('Element uid "bad" no longer exists on the page.'),
+          );
+
+        try {
+          await assert.rejects(
+            drag.handler(
+              {
+                params: {from_uid: '1_1', to_uid: 'bad'},
+                page: mcpPage,
+              },
+              response,
+              context,
+            ),
+            /no longer exists/,
+          );
+
+          sinon.assert.calledOnce(disposeSpy);
+        } finally {
+          sinon.restore();
+        }
+      });
+    });
   });
 
   describe('fill form', () => {
