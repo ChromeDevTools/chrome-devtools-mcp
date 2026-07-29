@@ -380,10 +380,8 @@ export function parseArguments(
   version: string,
   argv = process.argv,
   env = process.env,
-  exitProcess = true,
 ) {
   const yargsInstance = yargs(hideBin(argv))
-    .exitProcess(exitProcess)
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
     .middleware(args => {
