@@ -19,6 +19,7 @@ export class WaitForHelper {
   #navigationTimeout: number;
 
   #dialogHandled = false;
+  /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
 
@@ -155,10 +156,6 @@ export class WaitForHelper {
     const dialogHandler = (
       dialog: Pick<Dialog, 'accept' | 'dismiss' | 'type'>,
     ) => {
-      // Record every dialog so waitForStableDom is skipped: an open dialog
-      // pauses the renderer, so the DOM-stability evaluation would otherwise
-      // hang until protocolTimeout (default 180s) while holding the tool
-      // mutex, wedging the whole session.
       this.#dialogDetected = true;
 
       if (!options?.handleDialog) {
