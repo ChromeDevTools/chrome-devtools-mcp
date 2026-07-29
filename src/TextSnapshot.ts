@@ -150,7 +150,7 @@ export class TextSnapshot {
 
   resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
     if (!cdpBackendNodeId) {
-      logger?.('no cdpBackendNodeId');
+      logger()?.('no cdpBackendNodeId');
       return;
     }
     // TODO: index by backendNodeId instead.
@@ -281,7 +281,7 @@ export class TextSnapshot {
           collect(node);
         }
       } catch (e) {
-        logger?.(
+        logger()?.(
           `Failed to collect descendants for backend node ${backendNodeId}`,
           e,
         );

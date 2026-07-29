@@ -34,7 +34,7 @@ export interface EmulationSettings {
   extraHttpHeaders?: Record<string, string>;
 }
 
-export type Logger = ((...args: unknown[]) => void) | undefined;
+export type Logger = () => ((...args: unknown[]) => void) | undefined;
 
 export interface PaginationOptions {
   pageSize?: number;

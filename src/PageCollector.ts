@@ -259,7 +259,7 @@ class PageEventSubscriber {
         inspectorIssue,
       )[0];
       if (!issue) {
-        logger?.('No issue mapping for for the issue: ', inspectorIssue.code);
+        logger()?.('No issue mapping for for the issue: ', inspectorIssue.code);
         return;
       }
 
@@ -277,7 +277,7 @@ class PageEventSubscriber {
         },
       );
     } catch (error) {
-      logger?.('Error creating a new issue', error);
+      logger()?.('Error creating a new issue', error);
     }
   };
 }
