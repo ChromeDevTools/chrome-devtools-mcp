@@ -475,12 +475,12 @@ export const uploadFile = definePageTool({
       uid,
     )) as ElementHandle<HTMLInputElement>;
     try {
-      try {
+      const isFileInput = await handle.evaluate(
+        el => el instanceof HTMLInputElement && el.type === 'file',
+      );
+      if (isFileInput) {
         await handle.uploadFile(filePath);
-      } catch {
-        // Some sites use a proxy element to trigger file upload instead of
-        // a type=file element. In this case, we want to default to
-        // Page.waitForFileChooser() and upload the file this way.
+      } else {
         try {
           const [fileChooser] = await Promise.all([
             request.page.pptrPage.waitForFileChooser({timeout: 3000}),
@@ -489,7 +489,8 @@ export const uploadFile = definePageTool({
           await fileChooser.accept([filePath]);
         } catch {
           throw new Error(
-            `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
+            `Failed to upload file. Clicking the element did not trigger a file chooser. ` +
+              `If the element is an <input type="file">, pass its uid directly.`,
           );
         }
       }
