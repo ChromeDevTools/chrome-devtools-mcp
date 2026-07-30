@@ -18,7 +18,7 @@ import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
-import type {Mutex} from './utils/Mutex.js';
+import type {Mutex} from './third_party/index.js';
 
 export function buildFlag(category: ToolCategory) {
   return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
@@ -310,7 +310,7 @@ export class ToolHandler {
         success,
         latencyMs: bucketizeLatency(Date.now() - startTime),
       });
-      guard.dispose();
+      guard[Symbol.dispose]();
     }
   }
 }

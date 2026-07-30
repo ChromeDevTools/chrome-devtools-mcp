@@ -19,7 +19,7 @@ import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
-import {Mutex} from '../src/utils/Mutex.js';
+import {Mutex} from '../src/third_party/index.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {
