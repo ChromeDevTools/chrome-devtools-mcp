@@ -103,17 +103,18 @@ export default defineConfig([
       ],
       '@typescript-eslint/no-floating-promises': 'error',
 
-      'import/order': [
-        'error',
-        {
-          'newlines-between': 'always',
+      // Incompatible with ESLint 10
+      // 'import/order': [
+      //   'error',
+      //   {
+      //     'newlines-between': 'always',
 
-          alphabetize: {
-            order: 'asc',
-            caseInsensitive: true,
-          },
-        },
-      ],
+      //     alphabetize: {
+      //       order: 'asc',
+      //       caseInsensitive: true,
+      //     },
+      //   },
+      // ],
 
       'import/no-cycle': [
         'error',
