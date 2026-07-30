@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
+import {DisposableStack, zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
 
@@ -110,29 +110,28 @@ Example with arguments: \`(el) => el.innerText\`
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
-      try {
-        const frames = new Set<Frame>();
-        for (const uid of uidArgs ?? []) {
-          const handle = await mcpPage.getElementByUid(uid);
-          frames.add(handle.frame);
-          args.push(handle);
-        }
+      using stack = new DisposableStack();
 
-        const evaluatable = await getPageOrFrame(page, frames);
-
-        const result = await mcpPage.waitForEventsAfterAction(
-          async () => {
-            await performEvaluation(evaluatable, fnString, args, response, {
-              filePath,
-              context,
-            });
-          },
-          {handleDialog: dialogAction ?? 'accept'},
-        );
-        response.attachWaitForResult(result);
-      } finally {
-        void Promise.allSettled(args.map(arg => arg.dispose()));
+      const frames = new Set<Frame>();
+      for (const uid of uidArgs ?? []) {
+        const handle = await mcpPage.getElementByUid(uid);
+        frames.add(handle.frame);
+        stack.use(handle);
+        args.push(handle);
       }
+
+      const evaluatable = await getPageOrFrame(page, frames);
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await performEvaluation(evaluatable, fnString, args, response, {
+            filePath,
+            context,
+          });
+        },
+        {handleDialog: dialogAction ?? 'accept'},
+      );
+      response.attachWaitForResult(result);
     },
   };
 });
@@ -144,8 +143,8 @@ const performEvaluation = async (
   response: Response,
   options?: {filePath: string; context: Context},
 ) => {
-  const fn = await evaluatable.evaluateHandle(`(${fnString})`);
-  try {
+  using fn = await evaluatable.evaluateHandle(`(${fnString})`);
+
     const result = await evaluatable.evaluate(
       async (fn, ...args) => {
         // @ts-expect-error no types for function fn
@@ -170,9 +169,6 @@ const performEvaluation = async (
       response.appendResponseLine(`${result}`);
       response.appendResponseLine('```');
     }
-  } finally {
-    void fn.dispose();
-  }
 };
 
 const getPageOrFrame = async (

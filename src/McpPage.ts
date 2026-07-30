@@ -560,17 +560,14 @@ export class McpPage implements ContextPage {
     }
 
     if (elementHandles.length) {
-      const oldHandles = [...this.extraHandles];
+      using stack = new DisposableStack();
+      for (const handle of elementHandles) {
+        stack.use(handle);
+      }
       this.textSnapshot = await TextSnapshot.create(this, {
         extraHandles: elementHandles,
       });
       response.includeSnapshot();
-
-      for (const handle of oldHandles) {
-        await handle
-          .dispose()
-          .catch(e => logger?.('Failed to dispose old handle', e));
-      }
     }
 
     const cdpElementIds = await Promise.all(

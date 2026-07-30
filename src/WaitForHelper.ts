@@ -45,7 +45,7 @@ export class WaitForHelper {
     // Bound the setup evaluation against the stable-DOM timeout. Without this
     // cap a paused renderer (e.g. an open dialog) would make evaluateHandle
     // hang until protocolTimeout (default 180s) while the tool mutex is held.
-    const stableDomObserver = await Promise.race([
+    using stableDomObserver = await Promise.race([
       this.#page.evaluateHandle(timeout => {
         let timeoutId: ReturnType<typeof setTimeout>;
         function callback() {
@@ -71,7 +71,7 @@ export class WaitForHelper {
 
         return domObserver;
       }, this.#stableDomFor),
-      this.timeout(this.#stableDomTimeout),
+      this.timeout(this.#stableDomTimeout) as Promise<undefined>,
     ]).catch(() => undefined);
 
     if (!stableDomObserver) {
@@ -84,7 +84,6 @@ export class WaitForHelper {
           observer.observer.disconnect();
           observer.resolver.resolve();
         });
-        await stableDomObserver.dispose();
       } catch {
         // Ignored cleanup errors
       }

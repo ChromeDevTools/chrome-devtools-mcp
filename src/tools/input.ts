@@ -44,7 +44,7 @@ function handleActionError(error: unknown, uid: string) {
 }
 
 async function selectNativeSelectOption(handle: ElementHandle<Element>) {
-  const selectHandle = await handle.evaluateHandle(node => {
+  using selectHandle = await handle.evaluateHandle(node => {
     if (!(node instanceof HTMLOptionElement)) {
       return null;
     }
@@ -64,26 +64,22 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
 
     return select;
   });
-  try {
-    const select = selectHandle.asElement() as ElementHandle<Element> | null;
+
+    using select = selectHandle.asElement() as ElementHandle<Element> | null;
     if (!select) {
       return false;
     }
 
-    const valueHandle = await handle.getProperty('value');
-    try {
+    using valueHandle = await handle.getProperty('value');
+
       const value = await valueHandle.jsonValue();
       if (typeof value !== 'string') {
         return false;
       }
       await select.asLocator().fill(value);
-    } finally {
-      void valueHandle.dispose();
-    }
+
     return true;
-  } finally {
-    void selectHandle.dispose();
-  }
+
 }
 
 export const click = definePageTool({
@@ -106,7 +102,7 @@ export const click = definePageTool({
   verifyFilesSchema: [],
   handler: async (request, response) => {
     const uid = request.params.uid;
-    const handle = await request.page.getElementByUid(uid);
+    using handle = await request.page.getElementByUid(uid);
     const aXNode = request.page.getAXNodeByUid(uid);
     const shouldSelectNativeOption =
       !request.params.dblClick && aXNode?.role === 'option';
@@ -134,9 +130,7 @@ export const click = definePageTool({
       }
     } catch (error) {
       handleActionError(error, uid);
-    } finally {
-      void handle.dispose();
-    }
+    } 
   },
 });
 
@@ -194,7 +188,7 @@ export const hover = definePageTool({
   verifyFilesSchema: [],
   handler: async (request, response) => {
     const uid = request.params.uid;
-    const handle = await request.page.getElementByUid(uid);
+    using handle = await request.page.getElementByUid(uid);
     try {
       const result = await request.page.waitForEventsAfterAction(async () => {
         await handle.asLocator().hover();
@@ -206,8 +200,6 @@ export const hover = definePageTool({
       }
     } catch (error) {
       handleActionError(error, uid);
-    } finally {
-      void handle.dispose();
     }
   },
 });
@@ -225,22 +217,18 @@ async function selectOption(
   for (const child of aXNode.children) {
     if (child.role === 'option' && child.name === value && child.value) {
       optionFound = true;
-      const childHandle = await child.elementHandle();
+      using childHandle = await child.elementHandle();
       if (childHandle) {
-        try {
+
           const childValueHandle = await childHandle.getProperty('value');
-          try {
+
             const childValue = await childValueHandle.jsonValue();
             if (childValue) {
               await handle.asLocator().fill(childValue.toString());
             }
-          } finally {
-            void childValueHandle.dispose();
-          }
+
           break;
-        } finally {
-          void childHandle.dispose();
-        }
+
       }
     }
   }
@@ -259,7 +247,7 @@ async function fillFormElement(
   context: McpContext,
   page: ContextPage,
 ) {
-  const handle = await page.getElementByUid(uid);
+  using handle = await page.getElementByUid(uid);
   try {
     const aXNode = page.getAXNodeByUid(uid);
     // We assume that combobox needs to be handled as select if it has
@@ -293,8 +281,6 @@ async function fillFormElement(
     }
   } catch (error) {
     handleActionError(error, uid);
-  } finally {
-    void handle.dispose();
   }
 }
 
@@ -383,10 +369,10 @@ export const drag = definePageTool({
   blockedByDialog: true,
   verifyFilesSchema: [],
   handler: async (request, response) => {
-    const fromHandle = await request.page.getElementByUid(
+    using fromHandle = await request.page.getElementByUid(
       request.params.from_uid,
     );
-    const toHandle = await request.page.getElementByUid(request.params.to_uid);
+    using toHandle = await request.page.getElementByUid(request.params.to_uid);
     try {
       const result = await request.page.waitForEventsAfterAction(async () => {
         await fromHandle.drag(toHandle);
@@ -398,9 +384,6 @@ export const drag = definePageTool({
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
-    } finally {
-      void fromHandle.dispose();
-      void toHandle.dispose();
     }
   },
 });
@@ -474,7 +457,7 @@ export const uploadFile = definePageTool({
     const handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
-    try {
+
       try {
         await handle.uploadFile(filePath);
       } catch {
@@ -497,8 +480,6 @@ export const uploadFile = definePageTool({
         response.includeSnapshot();
       }
       response.appendResponseLine(`File uploaded from ${filePath}.`);
-    } finally {
-      void handle.dispose();
     }
   },
 });
