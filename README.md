@@ -637,10 +637,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
-- **`--experimentalPageIdRouting`/ `--experimental-page-id-routing`**
-  Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).
+- **`--pageIdRouting`/ `--page-id-routing`**
+  Expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.
   - **Type:** boolean
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`--experimentalDevtools`/ `--experimental-devtools`**
   Whether to enable automation over DevTools targets
@@ -820,22 +820,19 @@ You can also run `npx chrome-devtools-mcp@latest --help` to see all available co
 
 ### Concurrent sessions
 
-Most MCP clients start one Chrome DevTools MCP server per conversation. If your
-client shares a single server instance across concurrent agents or subagents,
-start the server with `--experimentalPageIdRouting`. This exposes `pageId` on
-page-scoped tools so each agent can route tool calls to the tab it is working
-with.
+Most MCP clients start one Chrome DevTools MCP server per conversation.
+By default, the server runs with `--pageIdRouting` enabled, exposing `pageId` on
+page-scoped tools so multiple agents or subagents sharing a server instance can
+route tool calls directly to the specific tab they are working with. To disable
+this behavior and default to the currently selected page, pass
+`--no-page-id-routing`.
 
 ```json
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--experimentalPageIdRouting"
-      ]
+      "args": ["-y", "chrome-devtools-mcp@latest"]
     }
   }
 }

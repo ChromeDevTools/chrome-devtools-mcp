@@ -17,15 +17,15 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the target page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
     },
     schema: {
-      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
+      ...(cliArgs?.pageIdRouting ? pageIdSchema : {}),
       function: zod.string().describe(
-        `A JavaScript function declaration to be executed by the tool in the currently selected page.
+        `A JavaScript function declaration to be executed by the tool in the target page.
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
 Example with arguments: \`(el) => el.innerText\`
 `,
@@ -104,9 +104,10 @@ Example with arguments: \`(el) => el.innerText\`
         return;
       }
 
-      const mcpPage = cliArgs?.experimentalPageIdRouting
-        ? context.getPageById(request.params.pageId)
-        : context.getSelectedMcpPage();
+      const mcpPage =
+        cliArgs?.pageIdRouting && request.params.pageId
+          ? context.getPageById(request.params.pageId)
+          : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
