@@ -150,7 +150,7 @@ export const mcpOptions = {
   pageIdRouting: {
     type: 'boolean',
     describe:
-      'Expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.',
+      'Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.',
     default: true,
   },
   experimentalDevtools: {

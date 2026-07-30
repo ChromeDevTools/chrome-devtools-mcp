@@ -296,7 +296,7 @@ export const navigatePage = definePageTool(() => {
 
 export const resizePage = definePageTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description: `Resizes the page's window so that the page has specified dimension`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,

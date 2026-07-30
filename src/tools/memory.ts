@@ -22,7 +22,7 @@ const HEAP_SNAPSHOT_FILTERS: readonly [string, ...string[]] = [
 
 export const takeHeapSnapshot = definePageTool({
   name: 'take_heapsnapshot',
-  description: `Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
+  description: `Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: false,

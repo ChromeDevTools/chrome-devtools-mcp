@@ -11,7 +11,7 @@ Addional tooling can be enabled by providing the following flags:
 - For extension tooling, use the `--categoryExtensions` flag.
 - For memory tooling, use the `--memoryDebugging` flag.
 
-**Page selection**: Tools operate on the currently selected page. Use `list_pages` to see available pages, then `select_page` to switch context.
+**Page targeting**: Page-scoped tools require a `pageId` parameter to target a specific page. Use `list_pages` to see available pages and their IDs (e.g. `pageId: 1`), or use the ID returned when creating a page with `new_page`.
 **Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.
 
 ## Workflow Patterns
@@ -20,8 +20,8 @@ Addional tooling can be enabled by providing the following flags:
 
 1. Navigate: `navigate_page` or `new_page`
 2. Wait: `wait_for` to ensure content is loaded if you know what you look for.
-3. Snapshot: `take_snapshot` to understand page structure
-4. Interact: Use element `uid`s from snapshot for `click`, `fill`, etc.
+3. Snapshot: `take_snapshot` with `pageId` to understand page structure
+4. Interact: Use element `uid`s from snapshot for `click`, `fill`, etc., passing the corresponding `pageId`.
 
 ### Efficient data retrieval
 

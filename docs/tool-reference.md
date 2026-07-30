@@ -275,7 +275,7 @@
 
 ### `emulate`
 
-**Description:** Emulates various features on the selected page.
+**Description:** Emulates various features on the target page.
 
 **Parameters:**
 
@@ -292,7 +292,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the selected page's window so that the page has specified dimension
+**Description:** Resizes the page's window so that the page has specified dimension
 
 **Parameters:**
 
@@ -318,20 +318,20 @@
 
 ### `performance_start_trace`
 
-**Description:** Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.
+**Description:** Start a performance trace on the target webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
-- **reload** (boolean) _(optional)_: Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
+- **reload** (boolean) _(optional)_: Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---
 
 ### `performance_stop_trace`
 
-**Description:** Stop the active performance trace recording on the selected webpage.
+**Description:** Stop the active performance trace recording on the target webpage.
 
 **Parameters:**
 
@@ -357,7 +357,7 @@
 
 ### `list_network_requests`
 
-**Description:** Lists the most recent requests for the currently selected page since the last navigation.
+**Description:** Lists the most recent requests for the target page since the last navigation.
 
 **Parameters:**
 
@@ -373,11 +373,11 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable.
+**Description:** Evaluate a JavaScript function inside the target page. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
 
-- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
+- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the target page.
   Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
   Example with arguments: `(el) => el.innerText`
 
@@ -414,7 +414,7 @@
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the currently selected page since the last navigation.
+**Description:** List all console messages for the target page since the last navigation.
 
 **Parameters:**
 
@@ -445,7 +445,7 @@
 
 ### `take_snapshot`
 
-**Description:** Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique
+**Description:** Take a text snapshot of the target page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
 in the DevTools Elements panel (if any).
 
@@ -459,7 +459,7 @@ in the DevTools Elements panel (if any).
 
 ### `screencast_start`
 
-**Description:** Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)
+**Description:** Starts recording a screencast (video) of the target page in specified format. (requires flag: --experimentalScreencast=true)
 
 **Parameters:**
 
@@ -470,7 +470,7 @@ in the DevTools Elements panel (if any).
 
 ### `screencast_stop`
 
-**Description:** Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)
+**Description:** Stops the active screencast recording on the target page. (requires flag: --experimentalScreencast=true)
 
 **Parameters:**
 
@@ -482,7 +482,7 @@ in the DevTools Elements panel (if any).
 
 ### `take_heapsnapshot`
 
-**Description:** Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
+**Description:** Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.
 
 **Parameters:**
 

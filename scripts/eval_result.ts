@@ -22,7 +22,7 @@ export class Result {
   }
 
   get hasPageIdRouting(): boolean {
-    return this.serverArgs.includes('--experimental-page-id-routing');
+    return !this.serverArgs.includes('--no-page-id-routing');
   }
 
   get remainingCalls(): CapturedFunctionCall[] {
@@ -102,6 +102,6 @@ export interface TestScenario {
     path: string;
     htmlContent: string;
   };
-  /** Extra CLI flags passed to the MCP server (e.g. '--experimental-page-id-routing'). */
+  /** Extra CLI flags passed to the MCP server (e.g. '--no-page-id-routing'). */
   serverArgs?: string[];
 }

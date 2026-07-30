@@ -20,10 +20,10 @@ This skill provides expert guidance and workflows for finding, diagnosing, and f
 
 When investigating a frontend web application memory leak, utilize the `chrome-devtools-mcp` tools to interact with the application and take snapshots.
 
-- Use tools like `click`, `navigate_page`, `fill`, etc., to manipulate the page into the desired state.
+- Use page-scoped tools like `click`, `navigate_page`, `fill`, etc. (specifying `pageId`) to manipulate the page into the desired state.
 - Revert the page back to the original state after interactions to see if memory is released.
 - Repeat the same user interactions 10 times to amplify the leak.
-- Use `take_heapsnapshot` to save `.heapsnapshot` files to disk at baseline, target (after actions), and final (after reverting actions) states.
+- Use `take_heapsnapshot` (with `pageId`) to save `.heapsnapshot` files to disk at baseline, target (after actions), and final (after reverting actions) states.
 
 ### 2. Comparing Snapshots
 

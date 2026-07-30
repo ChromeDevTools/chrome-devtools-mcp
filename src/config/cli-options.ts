@@ -184,7 +184,7 @@ export const commands: Commands = {
     },
   },
   emulate: {
-    description: 'Emulates various features on the selected page.',
+    description: 'Emulates various features on the target page.',
     category: 'Emulation',
     args: {
       pageId: {
@@ -247,7 +247,7 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page or service worker. Returns the response as JSON, so returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the target page or service worker. Returns the response as JSON, so returned values have to be JSON-serializable.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -260,7 +260,7 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the currently selected page.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
+          'A JavaScript function declaration to be executed by the tool in the target page.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
         required: true,
       },
       args: {
@@ -914,7 +914,7 @@ export const commands: Commands = {
   },
   list_console_messages: {
     description:
-      'List all console messages for the currently selected page since the last navigation. This includes console messages originating from extensions content scripts.',
+      'List all console messages for the target page since the last navigation. This includes console messages originating from extensions content scripts.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -977,7 +977,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'Lists the most recent requests for the currently selected page since the last navigation.',
+      'Lists the most recent requests for the target page since the last navigation.',
     category: 'Network',
     args: {
       pageId: {
@@ -1154,7 +1154,7 @@ export const commands: Commands = {
   },
   performance_start_trace: {
     description:
-      'Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.',
+      'Start a performance trace on the target webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.',
     category: 'Performance',
     args: {
       pageId: {
@@ -1167,7 +1167,7 @@ export const commands: Commands = {
         name: 'reload',
         type: 'boolean',
         description:
-          'Determines if, once tracing has started, the current selected page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
+          'Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
         required: false,
         default: true,
       },
@@ -1190,7 +1190,7 @@ export const commands: Commands = {
   },
   performance_stop_trace: {
     description:
-      'Stop the active performance trace recording on the selected webpage.',
+      'Stop the active performance trace recording on the target webpage.',
     category: 'Performance',
     args: {
       pageId: {
@@ -1322,7 +1322,7 @@ export const commands: Commands = {
   },
   resize_page: {
     description:
-      "Resizes the selected page's window so that the page has specified dimension",
+      "Resizes the page's window so that the page has specified dimension",
     category: 'Emulation',
     args: {
       pageId: {
@@ -1347,7 +1347,7 @@ export const commands: Commands = {
   },
   screencast_start: {
     description:
-      'Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)',
+      'Starts recording a screencast (video) of the target page in specified format. (requires flag: --experimentalScreencast=true)',
     category: 'Debugging',
     args: {
       pageId: {
@@ -1367,7 +1367,7 @@ export const commands: Commands = {
   },
   screencast_stop: {
     description:
-      'Stops the active screencast recording on the selected page. (requires flag: --experimentalScreencast=true)',
+      'Stops the active screencast recording on the target page. (requires flag: --experimentalScreencast=true)',
     category: 'Debugging',
     args: {
       pageId: {
@@ -1399,7 +1399,7 @@ export const commands: Commands = {
   },
   take_heapsnapshot: {
     description:
-      'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
+      'Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
     category: 'Memory',
     args: {
       pageId: {
@@ -1468,7 +1468,7 @@ export const commands: Commands = {
   },
   take_snapshot: {
     description:
-      'Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique\nidentifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected\nin the DevTools Elements panel (if any).',
+      'Take a text snapshot of the target page based on the a11y tree. The snapshot lists page elements along with a unique\nidentifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected\nin the DevTools Elements panel (if any).',
     category: 'Debugging',
     args: {
       pageId: {
