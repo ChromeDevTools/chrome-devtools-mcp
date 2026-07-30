@@ -393,7 +393,7 @@ export class HeapSnapshotManager {
     return this.#snapshots.size > 0;
   }
 
-  dispose(filePath: string): boolean {
+  disposeSnapshot(filePath: string): boolean {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {
@@ -404,7 +404,7 @@ export class HeapSnapshotManager {
     return false;
   }
 
-  disposeAll(): void {
+  dispose(): void {
     for (const cached of this.#snapshots.values()) {
       cached.worker.dispose();
     }

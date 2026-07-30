@@ -139,7 +139,7 @@ export class McpContext implements Context {
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
     this.#serviceWorkerConsoleCollector.dispose();
-    this.#heapSnapshotManager.disposeAll();
+    this.#heapSnapshotManager.dispose();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
@@ -722,7 +722,7 @@ export class McpContext implements Context {
   }
 
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
-    return this.#heapSnapshotManager.dispose(filePath);
+    return this.#heapSnapshotManager.disposeSnapshot(filePath);
   }
 
   hasHeapSnapshots(): boolean {
