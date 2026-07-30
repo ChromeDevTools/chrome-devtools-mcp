@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DisposableStack} from './third_party/index.js';
 import type {McpPage} from './McpPage.js';
 import type {
   Protocol,

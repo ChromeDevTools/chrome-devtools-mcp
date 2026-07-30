@@ -218,7 +218,7 @@ async function selectOption(
       optionFound = true;
       using childHandle = await child.elementHandle();
       if (childHandle) {
-        const childValueHandle = await childHandle.getProperty('value');
+        using childValueHandle = await childHandle.getProperty('value');
 
         const childValue = await childValueHandle.jsonValue();
         if (childValue) {
@@ -450,7 +450,7 @@ export const uploadFile = definePageTool({
   verifyFilesSchema: ['filePath'],
   handler: async (request, response) => {
     const {uid, filePath} = request.params;
-    const handle = (await request.page.getElementByUid(
+    using handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
 
