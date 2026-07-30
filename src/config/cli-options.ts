@@ -31,6 +31,12 @@ export const commands: Commands = {
     description: 'Clicks on the provided element',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       uid: {
         name: 'uid',
         type: 'string',
@@ -51,12 +57,6 @@ export const commands: Commands = {
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   click_at: {
@@ -64,6 +64,12 @@ export const commands: Commands = {
       'Clicks at the provided coordinates (requires flag: --experimentalVision=true)',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       x: {
         name: 'x',
         type: 'number',
@@ -88,12 +94,6 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -156,6 +156,12 @@ export const commands: Commands = {
     description: 'Drag an element onto another element',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       from_uid: {
         name: 'from_uid',
         type: 'string',
@@ -175,18 +181,18 @@ export const commands: Commands = {
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   emulate: {
     description: 'Emulates various features on the selected page.',
     category: 'Emulation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       networkConditions: {
         name: 'networkConditions',
         type: 'string',
@@ -237,12 +243,6 @@ export const commands: Commands = {
           'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   evaluate_script: {
@@ -250,6 +250,12 @@ export const commands: Commands = {
       'Evaluate a JavaScript function inside the currently selected page or service worker. Returns the response as JSON, so returned values have to be JSON-serializable.',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       function: {
         name: 'function',
         type: 'string',
@@ -291,12 +297,6 @@ export const commands: Commands = {
           "The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.",
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   execute_3p_developer_tool: {
@@ -304,6 +304,12 @@ export const commands: Commands = {
       'Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)',
     category: 'Third-party',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       toolName: {
         name: 'toolName',
         type: 'string',
@@ -316,12 +322,6 @@ export const commands: Commands = {
         description: 'The JSON-stringified parameters to pass to the tool',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   execute_webmcp_tool: {
@@ -329,6 +329,12 @@ export const commands: Commands = {
       'Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)',
     category: 'WebMCP',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       toolName: {
         name: 'toolName',
         type: 'string',
@@ -342,12 +348,6 @@ export const commands: Commands = {
           'The JSON-stringified parameters to pass to the WebMCP tool',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   fill: {
@@ -355,6 +355,12 @@ export const commands: Commands = {
       'Type text into an input, text area or select an option from a <select> element.',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       uid: {
         name: 'uid',
         type: 'string',
@@ -376,12 +382,6 @@ export const commands: Commands = {
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   get_console_message: {
@@ -389,17 +389,17 @@ export const commands: Commands = {
       'Gets a console message by its ID. You can get all messages by calling list_console_messages.',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       msgid: {
         name: 'msgid',
         type: 'number',
         description:
           'The msgid of a console message on the page from the listed console messages',
-        required: true,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
         required: true,
       },
     },
@@ -705,6 +705,12 @@ export const commands: Commands = {
       'Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.',
     category: 'Network',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       reqid: {
         name: 'reqid',
         type: 'number',
@@ -725,12 +731,6 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -753,6 +753,12 @@ export const commands: Commands = {
       'If a browser dialog was opened, use this command to handle it',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       action: {
         name: 'action',
         type: 'string',
@@ -766,18 +772,18 @@ export const commands: Commands = {
         description: 'Optional prompt text to enter into the dialog.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   hover: {
     description: 'Hover over the provided element',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       uid: {
         name: 'uid',
         type: 'string',
@@ -791,12 +797,6 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -868,6 +868,12 @@ export const commands: Commands = {
       'Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run performance_start_trace',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       mode: {
         name: 'mode',
         type: 'string',
@@ -891,12 +897,6 @@ export const commands: Commands = {
         description: 'Directory for reports. If omitted, uses temporary files.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   list_3p_developer_tools: {
@@ -917,6 +917,12 @@ export const commands: Commands = {
       'List all console messages for the currently selected page since the last navigation. This includes console messages originating from extensions content scripts.',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
@@ -961,12 +967,6 @@ export const commands: Commands = {
           'Filter messages to only return messages of the specified service worker.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   list_extensions: {
@@ -980,6 +980,12 @@ export const commands: Commands = {
       'Lists the most recent requests for the currently selected page since the last navigation.',
     category: 'Network',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
@@ -1009,12 +1015,6 @@ export const commands: Commands = {
         required: false,
         default: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   list_pages: {
@@ -1041,6 +1041,12 @@ export const commands: Commands = {
       'Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.',
     category: 'Navigation automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       type: {
         name: 'type',
         type: 'string',
@@ -1083,12 +1089,6 @@ export const commands: Commands = {
           'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   new_page: {
@@ -1130,6 +1130,12 @@ export const commands: Commands = {
       'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
     category: 'Performance',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       insightSetId: {
         name: 'insightSetId',
         type: 'string',
@@ -1144,12 +1150,6 @@ export const commands: Commands = {
           'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
         required: true,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   performance_start_trace: {
@@ -1157,6 +1157,12 @@ export const commands: Commands = {
       'Start a performance trace on the selected webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.',
     category: 'Performance',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       reload: {
         name: 'reload',
         type: 'boolean',
@@ -1180,12 +1186,6 @@ export const commands: Commands = {
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   performance_stop_trace: {
@@ -1193,18 +1193,18 @@ export const commands: Commands = {
       'Stop the active performance trace recording on the selected webpage.',
     category: 'Performance',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       filePath: {
         name: 'filePath',
         type: 'string',
         description:
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -1213,6 +1213,12 @@ export const commands: Commands = {
       'Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       key: {
         name: 'key',
         type: 'string',
@@ -1226,12 +1232,6 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -1325,6 +1325,12 @@ export const commands: Commands = {
       "Resizes the selected page's window so that the page has specified dimension",
     category: 'Emulation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       width: {
         name: 'width',
         type: 'number',
@@ -1337,12 +1343,6 @@ export const commands: Commands = {
         description: 'Page height',
         required: true,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   screencast_start: {
@@ -1350,18 +1350,18 @@ export const commands: Commands = {
       'Starts recording a screencast (video) of the selected page in specified format. (requires flag: --experimentalScreencast=true)',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       filePath: {
         name: 'filePath',
         type: 'string',
         description:
           'Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -1402,17 +1402,17 @@ export const commands: Commands = {
       'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
     category: 'Memory',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       filePath: {
         name: 'filePath',
         type: 'string',
         description:
           'A path to a .heapsnapshot file to save the heapsnapshot to.',
-        required: true,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
         required: true,
       },
     },
@@ -1421,6 +1421,12 @@ export const commands: Commands = {
     description: 'Take a screenshot of the page or element.',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       format: {
         name: 'format',
         type: 'string',
@@ -1458,12 +1464,6 @@ export const commands: Commands = {
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
         required: false,
       },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-      },
     },
   },
   take_snapshot: {
@@ -1471,6 +1471,12 @@ export const commands: Commands = {
       'Take a text snapshot of the currently selected page based on the a11y tree. The snapshot lists page elements along with a unique\nidentifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected\nin the DevTools Elements panel (if any).',
     category: 'Debugging',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       verbose: {
         name: 'verbose',
         type: 'boolean',
@@ -1484,12 +1490,6 @@ export const commands: Commands = {
         description:
           'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -1510,6 +1510,12 @@ export const commands: Commands = {
     description: 'Type text using keyboard into a previously focused input',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       text: {
         name: 'text',
         type: 'string',
@@ -1522,12 +1528,6 @@ export const commands: Commands = {
         description:
           'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
@@ -1562,6 +1562,12 @@ export const commands: Commands = {
     description: 'Upload a file through a provided element.',
     category: 'Input automation',
     args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
       uid: {
         name: 'uid',
         type: 'string',
@@ -1582,12 +1588,6 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
-      },
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
       },
     },
   },
