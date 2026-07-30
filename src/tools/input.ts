@@ -65,21 +65,20 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
     return select;
   });
 
-    using select = selectHandle.asElement() as ElementHandle<Element> | null;
-    if (!select) {
-      return false;
-    }
+  using select = selectHandle.asElement() as ElementHandle<Element> | null;
+  if (!select) {
+    return false;
+  }
 
-    using valueHandle = await handle.getProperty('value');
+  using valueHandle = await handle.getProperty('value');
 
-      const value = await valueHandle.jsonValue();
-      if (typeof value !== 'string') {
-        return false;
-      }
-      await select.asLocator().fill(value);
+  const value = await valueHandle.jsonValue();
+  if (typeof value !== 'string') {
+    return false;
+  }
+  await select.asLocator().fill(value);
 
-    return true;
-
+  return true;
 }
 
 export const click = definePageTool({
@@ -130,7 +129,7 @@ export const click = definePageTool({
       }
     } catch (error) {
       handleActionError(error, uid);
-    } 
+    }
   },
 });
 
@@ -219,16 +218,14 @@ async function selectOption(
       optionFound = true;
       using childHandle = await child.elementHandle();
       if (childHandle) {
+        const childValueHandle = await childHandle.getProperty('value');
 
-          const childValueHandle = await childHandle.getProperty('value');
+        const childValue = await childValueHandle.jsonValue();
+        if (childValue) {
+          await handle.asLocator().fill(childValue.toString());
+        }
 
-            const childValue = await childValueHandle.jsonValue();
-            if (childValue) {
-              await handle.asLocator().fill(childValue.toString());
-            }
-
-          break;
-
+        break;
       }
     }
   }
@@ -373,17 +370,16 @@ export const drag = definePageTool({
       request.params.from_uid,
     );
     using toHandle = await request.page.getElementByUid(request.params.to_uid);
-    try {
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        await fromHandle.drag(toHandle);
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await toHandle.drop(fromHandle);
-      });
-      response.appendResponseLine(`Successfully dragged an element`);
-      response.attachWaitForResult(result);
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
-      }
+
+    const result = await request.page.waitForEventsAfterAction(async () => {
+      await fromHandle.drag(toHandle);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await toHandle.drop(fromHandle);
+    });
+    response.appendResponseLine(`Successfully dragged an element`);
+    response.attachWaitForResult(result);
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
     }
   },
 });
@@ -458,29 +454,28 @@ export const uploadFile = definePageTool({
       uid,
     )) as ElementHandle<HTMLInputElement>;
 
+    try {
+      await handle.uploadFile(filePath);
+    } catch {
+      // Some sites use a proxy element to trigger file upload instead of
+      // a type=file element. In this case, we want to default to
+      // Page.waitForFileChooser() and upload the file this way.
       try {
-        await handle.uploadFile(filePath);
+        const [fileChooser] = await Promise.all([
+          request.page.pptrPage.waitForFileChooser({timeout: 3000}),
+          handle.asLocator().click(),
+        ]);
+        await fileChooser.accept([filePath]);
       } catch {
-        // Some sites use a proxy element to trigger file upload instead of
-        // a type=file element. In this case, we want to default to
-        // Page.waitForFileChooser() and upload the file this way.
-        try {
-          const [fileChooser] = await Promise.all([
-            request.page.pptrPage.waitForFileChooser({timeout: 3000}),
-            handle.asLocator().click(),
-          ]);
-          await fileChooser.accept([filePath]);
-        } catch {
-          throw new Error(
-            `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
-          );
-        }
+        throw new Error(
+          `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
+        );
       }
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
-      }
-      response.appendResponseLine(`File uploaded from ${filePath}.`);
     }
+    if (request.params.includeSnapshot) {
+      response.includeSnapshot();
+    }
+    response.appendResponseLine(`File uploaded from ${filePath}.`);
   },
 });
 

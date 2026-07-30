@@ -145,30 +145,30 @@ const performEvaluation = async (
 ) => {
   using fn = await evaluatable.evaluateHandle(`(${fnString})`);
 
-    const result = await evaluatable.evaluate(
-      async (fn, ...args) => {
-        // @ts-expect-error no types for function fn
-        return JSON.stringify(await fn(...args));
-      },
-      fn,
-      ...args,
+  const result = await evaluatable.evaluate(
+    async (fn, ...args) => {
+      // @ts-expect-error no types for function fn
+      return JSON.stringify(await fn(...args));
+    },
+    fn,
+    ...args,
+  );
+  if (options?.filePath) {
+    const data = new TextEncoder().encode(result ?? 'undefined');
+    const {filename} = await options.context.saveFile(
+      data,
+      options.filePath,
+      '.json',
     );
-    if (options?.filePath) {
-      const data = new TextEncoder().encode(result ?? 'undefined');
-      const {filename} = await options.context.saveFile(
-        data,
-        options.filePath,
-        '.json',
-      );
-      response.appendResponseLine(
-        `Script ran on page. Output saved to ${filename}.`,
-      );
-    } else {
-      response.appendResponseLine('Script ran on page and returned:');
-      response.appendResponseLine('```json');
-      response.appendResponseLine(`${result}`);
-      response.appendResponseLine('```');
-    }
+    response.appendResponseLine(
+      `Script ran on page. Output saved to ${filename}.`,
+    );
+  } else {
+    response.appendResponseLine('Script ran on page and returned:');
+    response.appendResponseLine('```json');
+    response.appendResponseLine(`${result}`);
+    response.appendResponseLine('```');
+  }
 };
 
 const getPageOrFrame = async (
