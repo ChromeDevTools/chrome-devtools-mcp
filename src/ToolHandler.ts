@@ -6,6 +6,7 @@
 
 import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from './McpContext.js';
+import type {McpPage} from './McpPage.js';
 import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
@@ -15,7 +16,11 @@ import type {CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
-import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
+import type {
+  DefinedPageTool,
+  DevToolsData,
+  ToolDefinition,
+} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './utils/Mutex.js';
@@ -143,6 +148,22 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
+async function getDevToolsStatus(
+  page?: McpPage,
+  context?: McpContext,
+): Promise<DevToolsData | undefined> {
+  try {
+    const targetPage =
+      page ?? (context ? context.getSelectedMcpPage() : undefined);
+    if (!targetPage) {
+      return undefined;
+    }
+    return await targetPage.getDevToolsData();
+  } catch {
+    return undefined;
+  }
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
@@ -208,11 +229,13 @@ export class ToolHandler {
     const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
+    let context: McpContext | undefined;
+    let page: McpPage | undefined;
     try {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
-      const context = await this.getContext();
+      context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
@@ -232,7 +255,7 @@ export class ToolHandler {
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
-          const page =
+          page =
             this.serverArgs.experimentalPageIdRouting &&
             pageId !== undefined &&
             !this.serverArgs.slim
@@ -303,12 +326,17 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
+      const devToolsData = await getDevToolsStatus(page, context);
+      const isDevToolsOpen = devToolsData
+        ? Object.keys(devToolsData).length > 0
+        : undefined;
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: this.tool.name,
         params,
         schema: this.inputSchema,
         success,
         latencyMs: bucketizeLatency(Date.now() - startTime),
+        isDevToolsOpen,
       });
       guard.dispose();
     }

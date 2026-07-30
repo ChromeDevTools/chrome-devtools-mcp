@@ -26,11 +26,16 @@ export interface ServerError {
 
 export type ServerShutdown = Record<string, never>;
 
+export interface ToolInvocationContext {
+  is_devtools_open?: boolean;
+}
+
 export interface ToolInvocation {
   tool_name: string;
   success: boolean;
   latency_ms: number;
   tool_params?: object;
+  context?: ToolInvocationContext;
 }
 
 export interface ServerStart {
