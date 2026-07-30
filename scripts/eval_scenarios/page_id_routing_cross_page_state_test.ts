@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 
-import type { TestScenario } from '../eval_gemini.ts';
+import type {TestScenario} from '../eval_gemini.ts';
 
 const PAGE_COUNTER =
   'data:text/html,<h1>Counter Page</h1><button id="inc-btn" onclick="document.getElementById(\'count\').innerText = parseInt(document.getElementById(\'count\').innerText) + 1">Increment</button><div id="count">0</div>';
