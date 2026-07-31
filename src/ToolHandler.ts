@@ -214,6 +214,7 @@ export class ToolHandler {
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
+    let pageUrl: string | undefined;
     try {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
@@ -248,6 +249,10 @@ export class ToolHandler {
           response.setPage(page);
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();
+          }
+          const targetPage = page ?? context.getSelectedMcpPage();
+          if (targetPage?.pptrPage?.isClosed() === false) {
+            pageUrl = targetPage.pptrPage.url();
           }
           await this.tool.handler(
             {
@@ -321,6 +326,7 @@ export class ToolHandler {
         success,
         latencyMs: bucketizeLatency(Date.now() - startTime),
         isDevToolsOpen,
+        pageUrl,
       });
       guard[Symbol.dispose]();
     }

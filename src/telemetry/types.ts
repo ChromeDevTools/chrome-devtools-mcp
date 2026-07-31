@@ -28,6 +28,7 @@ export type ServerShutdown = Record<string, never>;
 
 export interface ToolInvocationContext {
   is_devtools_open?: boolean;
+  is_localhost?: boolean;
 }
 
 export interface ToolInvocation {

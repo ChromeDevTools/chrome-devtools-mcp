@@ -81,6 +81,35 @@ describe('ClearcutLogger', () => {
         is_devtools_open: true,
       });
     });
+    it('sends context with correct is_localhost based on the URL', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      for (const {pageUrl, isLocalhost} of [
+        {pageUrl: 'http://localhost:9222/test', isLocalhost: true},
+        {pageUrl: 'https://example.com/test', isLocalhost: false},
+      ]) {
+        mockWatchdogClient.send.resetHistory();
+        await logger.logToolInvocation({
+          toolName: 'test_tool',
+          params: {},
+          schema: {},
+          success: true,
+          latencyMs: 123,
+          pageUrl,
+        });
+
+        assert(mockWatchdogClient.send.calledOnce);
+        const msg = mockWatchdogClient.send.firstCall.args[0];
+        assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+        assert.deepStrictEqual(msg.payload.tool_invocation?.context, {
+          is_localhost: isLocalhost,
+        });
+      }
+    });
     it('sends sanitized params', async () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,

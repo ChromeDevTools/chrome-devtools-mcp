@@ -112,9 +112,10 @@ describe('ToolHandler', () => {
 
   it('logs isDevToolsOpen telemetry based on getDevToolsData', async () => {
     let handlerCalled = false;
-    const tool: ToolDefinition = {
-      name: 'global_tool',
-      description: 'A global tool',
+    const tool: DefinedPageTool = {
+      name: 'page_tool',
+      description: 'A page tool',
+      pageScoped: true,
       annotations: {
         category: ToolCategory.NAVIGATION,
         readOnlyHint: true,
@@ -129,6 +130,13 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     mockContext.getDevToolsData.resolves({cdpBackendNodeId: 1});
+    const mockPage = {
+      pptrPage: {
+        isClosed: () => false,
+        url: () => 'http://localhost:9222/',
+      },
+    } as unknown as McpPage;
+    mockContext.getSelectedMcpPage.returns(mockPage);
 
     const logSpy = sinon.spy();
     sinon.stub(ClearcutLogger, 'get').returns({
@@ -151,6 +159,10 @@ describe('ToolHandler', () => {
 
     assert.strictEqual(logSpy.calledOnce, true);
     assert.strictEqual(logSpy.firstCall.args[0].isDevToolsOpen, true);
+    assert.strictEqual(
+      logSpy.firstCall.args[0].pageUrl,
+      'http://localhost:9222/',
+    );
     assert.strictEqual(handlerCalled, true);
   });
 
