@@ -485,6 +485,101 @@ describe('McpContext', () => {
     });
   });
 
+  describe('symlink security checks', () => {
+    // Symlinks are not followed on Windows by default.
+    if (os.platform() === 'win32') {
+      return;
+    }
+
+    it('saveFile refuses to write through a symlink to an existing file', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        );
+        try {
+          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+
+          const targetPath = path.join(tmpDir, 'target.txt');
+          await fs.writeFile(targetPath, 'original content', 'utf-8');
+
+          const symlinkPath = path.join(tmpDir, 'symlink.txt');
+          await fs.symlink(targetPath, symlinkPath);
+
+          const data = new TextEncoder().encode('malicious content');
+          await assert.rejects(
+            context.saveFile(data, symlinkPath, '.txt'),
+            /Could not write/,
+          );
+
+          const content = await fs.readFile(targetPath, 'utf-8');
+          assert.strictEqual(content, 'original content');
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+        }
+      });
+    });
+
+    it('saveFile refuses to write through a dangling symlink to a non-existent file', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        );
+        const outsideDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-outside-test-'),
+        );
+        try {
+          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+
+          const outsideTarget = path.join(outsideDir, 'target.txt');
+          const symlinkPath = path.join(tmpDir, 'symlink.txt');
+          await fs.symlink(outsideTarget, symlinkPath);
+
+          const data = new TextEncoder().encode('malicious content');
+          await assert.rejects(
+            context.saveFile(data, symlinkPath, '.txt'),
+            /Could not write/,
+          );
+
+          await assert.rejects(fs.stat(outsideTarget));
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+          await fs.rm(outsideDir, {recursive: true, force: true});
+        }
+      });
+    });
+
+    it('saveFile allows writing to a file within an allowed symlinked directory', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        );
+        try {
+          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+
+          const realDir = path.join(tmpDir, 'real_dir');
+          await fs.mkdir(realDir, {recursive: true});
+
+          const symlinkedDir = path.join(tmpDir, 'symlinked_dir');
+          await fs.symlink(realDir, symlinkedDir);
+
+          const targetFilePath = path.join(symlinkedDir, 'test.txt');
+          const data = new TextEncoder().encode('allowed content');
+
+          const result = await context.saveFile(data, targetFilePath, '.txt');
+          assert.strictEqual(result.filename, targetFilePath);
+
+          const content = await fs.readFile(
+            path.join(realDir, 'test.txt'),
+            'utf-8',
+          );
+          assert.strictEqual(content, 'allowed content');
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+        }
+      });
+    });
+  });
+
   describe('loadResource', () => {
     describe('file protocol', () => {
       it('calls validatePath', async () => {
