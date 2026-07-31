@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {McpContext} from '../../src/McpContext.js';
+import type {McpPage} from '../../src/McpPage.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {
@@ -18,6 +19,17 @@ import {
 } from '../../src/tools/thirdPartyDeveloper.js';
 import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
 import {withMcpContext} from '../utils.js';
+
+function parseUidResult(responseLine: string): string {
+  const result: unknown = JSON.parse(responseLine);
+  assert.ok(
+    result !== null &&
+      typeof result === 'object' &&
+      'uid' in result &&
+      typeof result.uid === 'string',
+  );
+  return result.uid;
+}
 
 describe('thirdPartyDeveloperTools', () => {
   describe('list_3p_developer_tools', () => {
@@ -307,6 +319,71 @@ describe('thirdPartyDeveloperTools', () => {
       await response.handle(context);
     }
 
+    async function setupDirectThirdPartyDeveloperTool(
+      response: McpResponse,
+      context: McpContext,
+      evaluateFn: () => void,
+    ) {
+      const page = await context.newPage();
+      response.setPage(page);
+      page.thirdPartyDeveloperTools = [
+        {
+          name: 'test-group',
+          description: 'test description',
+          tools: [
+            {
+              name: 'test-tool',
+              description: 'test tool description',
+              inputSchema: {},
+            },
+          ],
+        },
+      ];
+      await page.pptrPage.evaluate(evaluateFn);
+      return page;
+    }
+
+    async function executeTestTool(
+      page: McpPage,
+      response: McpResponse,
+      context: McpContext,
+    ): Promise<void> {
+      await executeThirdPartyDeveloperTool.handler(
+        {
+          params: {
+            toolName: 'test-tool',
+            params: JSON.stringify({}),
+          },
+          page: page,
+        },
+        response,
+        context,
+      );
+    }
+
+    function pauseSnapshotCreation() {
+      const snapshotStarted = Promise.withResolvers<void>();
+      const continueSnapshot = Promise.withResolvers<void>();
+      const createSnapshot = TextSnapshot.create;
+      const snapshotStub = sinon
+        .stub(TextSnapshot, 'create')
+        .callsFake(async (mcpPage, options) => {
+          snapshotStarted.resolve();
+          await continueSnapshot.promise;
+          return await createSnapshot(mcpPage, options);
+        });
+
+      return {
+        started: snapshotStarted.promise,
+        resume: () => {
+          continueSnapshot.resolve();
+        },
+        restore: () => {
+          snapshotStub.restore();
+        },
+      };
+    }
+
     it('executes a tool', async () => {
       await withMcpContext(
         async (response, context) => {
@@ -572,6 +649,10 @@ describe('thirdPartyDeveloperTools', () => {
             2,
           ),
         );
+        await assert.rejects(
+          handle.evaluate(element => element.id),
+          /disposed/,
+        );
       });
     });
 
@@ -721,53 +802,314 @@ describe('thirdPartyDeveloperTools', () => {
       );
     });
 
-    it('stashDOMElement stashes elements and returns UID', async () => {
+    it('clears stashed elements when serializing a tool result fails', async () => {
       await withMcpContext(
         async (response, context) => {
-          const page = await context.newPage();
-          response.setPage(page);
-
-          page.thirdPartyDeveloperTools = [
-            {
-              name: 'test-group',
-              description: 'test description',
-              tools: [
-                {
-                  name: 'test-tool',
-                  description: 'test tool description',
-                  inputSchema: {},
-                },
-              ],
-            },
-          ];
-
-          await page.pptrPage.evaluate(() => {
-            window.__dtmcp = {
-              executeTool: async () => {
-                const div = document.createElement('div');
-                div.id = 'test-element';
-                document.body.appendChild(div);
-                return div;
-              },
-            };
-          });
-
-          await executeThirdPartyDeveloperTool.handler(
-            {
-              params: {
-                toolName: 'test-tool',
-                params: JSON.stringify({}),
-              },
-              page: page,
-            },
+          const page = await setupDirectThirdPartyDeveloperTool(
             response,
             context,
+            () => {
+              window.__dtmcp = {
+                executeTool: async () => [
+                  document.createElement('div'),
+                  new Proxy(
+                    {},
+                    {
+                      getPrototypeOf: () => {
+                        throw new Error('Failed to serialize tool result');
+                      },
+                    },
+                  ),
+                ],
+              };
+            },
+          );
+
+          await assert.rejects(
+            executeTestTool(page, response, context),
+            /Failed to serialize tool result/,
           );
 
           assert.strictEqual(
-            response.responseLines[0],
-            JSON.stringify({uid: '1_1'}, null, 2),
+            await page.pptrPage.evaluate(
+              () => window.__dtmcp?.stashedElements?.length,
+            ),
+            0,
           );
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('preserves handle extraction errors when stash cleanup fails', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await setupDirectThirdPartyDeveloperTool(
+            response,
+            context,
+            () => {
+              window.__dtmcp = {
+                executeTool: async () => document.createElement('div'),
+              };
+            },
+          );
+          const evaluateHandleStub = sinon
+            .stub(page.pptrPage, 'evaluateHandle')
+            .callsFake(async () => {
+              await page.pptrPage.close();
+              throw new Error('Primary handle extraction failed');
+            });
+
+          try {
+            await assert.rejects(
+              executeTestTool(page, response, context),
+              /Primary handle extraction failed/,
+            );
+          } finally {
+            evaluateHandleStub.restore();
+          }
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('keeps stashed element UIDs reusable', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await setupDirectThirdPartyDeveloperTool(
+            response,
+            context,
+            () => {
+              window.__dtmcp = {
+                executeTool: async () => {
+                  const div = document.createElement('div');
+                  div.id = 'test-element';
+                  return div;
+                },
+              };
+            },
+          );
+
+          await executeTestTool(page, response, context);
+
+          const uid = parseUidResult(response.responseLines[0]);
+
+          {
+            using firstHandle = await page.getElementByUid(uid);
+            assert.strictEqual(
+              await firstHandle.evaluate(element => element.id),
+              'test-element',
+            );
+          }
+          {
+            using secondHandle = await page.getElementByUid(uid);
+            assert.strictEqual(
+              await secondHandle.evaluate(element => element.id),
+              'test-element',
+            );
+          }
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('disposes stashed element handles when replaced and on teardown', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await setupDirectThirdPartyDeveloperTool(
+            response,
+            context,
+            () => {
+              let elementCounter = 0;
+              window.__dtmcp = {
+                executeTool: async () => {
+                  const div = document.createElement('div');
+                  div.id = `test-element-${elementCounter++}`;
+                  return div;
+                },
+              };
+            },
+          );
+
+          await executeTestTool(page, response, context);
+          const originalUid = parseUidResult(response.responseLines[0]);
+          const originalHandle = page.extraHandles[0];
+          assert.ok(originalHandle);
+          assert.strictEqual(
+            await originalHandle.evaluate(element => element.id),
+            'test-element-0',
+          );
+          assert.strictEqual(
+            await page.pptrPage.evaluate(
+              () => window.__dtmcp?.stashedElements?.length,
+            ),
+            0,
+          );
+
+          await executeTestTool(page, response, context);
+          await assert.rejects(
+            originalHandle.evaluate(element => element.id),
+            /disposed/,
+          );
+          assert.strictEqual(page.extraHandles.length, 1);
+          await assert.rejects(async () => {
+            using oldHandle = await page.getElementByUid(originalUid);
+            await oldHandle.evaluate(element => element.id);
+          }, /not found/);
+
+          const currentHandle = page.extraHandles.at(-1);
+          assert.ok(currentHandle);
+          assert.strictEqual(
+            await currentHandle.evaluate(element => element.id),
+            'test-element-1',
+          );
+
+          const currentSnapshot = page.textSnapshot;
+          await page.pptrPage.evaluate(() => {
+            if (window.__dtmcp) {
+              window.__dtmcp.executeTool = async () => 'simple-result';
+            }
+          });
+          await executeTestTool(page, response, context);
+          assert.strictEqual(page.textSnapshot, currentSnapshot);
+          assert.strictEqual(
+            response.responseLines.at(-1),
+            JSON.stringify('simple-result', null, 2),
+          );
+
+          context.dispose();
+          await assert.rejects(
+            currentHandle.evaluate(element => element.id),
+            /disposed/,
+          );
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('releases stashed element handles after main frame navigation', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await setupDirectThirdPartyDeveloperTool(
+            response,
+            context,
+            () => {
+              window.__dtmcp = {
+                executeTool: async () => {
+                  const div = document.createElement('div');
+                  div.id = 'test-element';
+                  return div;
+                },
+              };
+            },
+          );
+
+          await executeTestTool(page, response, context);
+
+          const uid = parseUidResult(response.responseLines[0]);
+          const retainedHandle = page.extraHandles[0];
+          assert.ok(retainedHandle);
+
+          await page.pptrPage.goto(
+            'data:text/html,<main>Navigated page</main>',
+          );
+
+          assert.deepStrictEqual(page.extraHandles, []);
+          await assert.rejects(
+            retainedHandle.evaluate(element => element.id),
+            /disposed/,
+          );
+
+          page.textSnapshot = await TextSnapshot.create(page);
+          await assert.rejects(async () => {
+            using oldHandle = await page.getElementByUid(uid);
+            await oldHandle.evaluate(element => element.id);
+          }, /not found/);
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('does not retain stashed handles if navigation occurs during snapshot creation', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await setupDirectThirdPartyDeveloperTool(
+            response,
+            context,
+            () => {
+              window.__dtmcp = {
+                executeTool: async () => document.createElement('div'),
+              };
+            },
+          );
+          const pausedSnapshot = pauseSnapshotCreation();
+
+          try {
+            const execution = executeTestTool(page, response, context);
+            await pausedSnapshot.started;
+
+            await Promise.all([
+              page.pptrPage.waitForNavigation({timeout: 5_000}),
+              page.pptrPage.evaluate(() => {
+                window.location.hash = 'navigation-during-snapshot';
+              }),
+            ]);
+            pausedSnapshot.resume();
+
+            await assert.rejects(execution, /changed/);
+            assert.deepStrictEqual(page.extraHandles, []);
+          } finally {
+            pausedSnapshot.resume();
+            pausedSnapshot.restore();
+            page.dispose();
+          }
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('does not retain stashed handles after page teardown', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = await setupDirectThirdPartyDeveloperTool(
+            response,
+            context,
+            () => {
+              window.__dtmcp = {
+                executeTool: async () => document.createElement('div'),
+              };
+            },
+          );
+
+          const pausedSnapshot = pauseSnapshotCreation();
+          const evaluateHandleSpy = sinon.spy(page.pptrPage, 'evaluateHandle');
+
+          try {
+            const execution = executeTestTool(page, response, context);
+
+            await pausedSnapshot.started;
+            const pendingHandle = await evaluateHandleSpy.firstCall.returnValue;
+            context.dispose();
+            pausedSnapshot.resume();
+
+            await assert.rejects(execution, /disposed/);
+            assert.deepStrictEqual(page.extraHandles, []);
+            await assert.rejects(
+              pendingHandle.evaluate(element => element),
+              /disposed/,
+            );
+          } finally {
+            pausedSnapshot.resume();
+            pausedSnapshot.restore();
+            evaluateHandleSpy.restore();
+            page.dispose();
+          }
         },
         undefined,
         {categoryExperimentalThirdParty: true},
@@ -817,10 +1159,7 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          assert.strictEqual(
-            response.responseLines[0],
-            JSON.stringify({uid: '1_1'}, null, 2),
-          );
+          assert.ok(parseUidResult(response.responseLines[0]));
         },
         undefined,
         {categoryExperimentalThirdParty: true},
