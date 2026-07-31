@@ -103,7 +103,8 @@ describe('ToolHandler', () => {
     assert.strictEqual(toolHandler.shouldRegister, true);
     const result = await toolHandler.handle({});
 
-    assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+    assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
+    assert.strictEqual(mockContext.getSelectedMcpPage.called, false);
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
@@ -127,9 +128,7 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    const mockPage = sinon.createStubInstance(McpPage);
-    mockPage.getDevToolsData.resolves({cdpBackendNodeId: 1});
-    mockContext.getSelectedMcpPage.returns(mockPage);
+    mockContext.getDevToolsData.resolves({cdpBackendNodeId: 1});
 
     const logSpy = sinon.spy();
     sinon.stub(ClearcutLogger, 'get').returns({

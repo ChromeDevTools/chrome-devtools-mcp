@@ -35,7 +35,11 @@ import {
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
+import type {
+  Context,
+  DevToolsData,
+  SupportedExtensions,
+} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
@@ -371,6 +375,25 @@ export class McpContext implements Context {
       );
     }
     return page;
+  }
+
+  async getDevToolsData(page?: McpPage): Promise<DevToolsData | undefined> {
+    const targetPage = page ?? this.#selectedPage;
+    if (!targetPage) {
+      return undefined;
+    }
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<undefined>(resolve => {
+      timeoutId = setTimeout(() => resolve(undefined), 500);
+    });
+    const dataPromise = targetPage.getDevToolsData();
+    try {
+      return await Promise.race([dataPromise, timeoutPromise]);
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timeoutId!);
+    }
   }
 
   /**

@@ -17,6 +17,7 @@ import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
+import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
@@ -589,6 +590,37 @@ describe('McpContext', () => {
             allowedUrlPattern: ['https://example.com/allowed*'],
           },
         );
+      });
+    });
+
+    describe('getDevToolsData', () => {
+      it('returns devtools data from passed page', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mockPage = sinon.createStubInstance(McpPage);
+          mockPage.getDevToolsData.resolves({cdpBackendNodeId: 42});
+          const result = await context.getDevToolsData(mockPage);
+          assert.deepStrictEqual(result, {cdpBackendNodeId: 42});
+        });
+      });
+
+      it('returns undefined when getDevToolsData times out', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mockPage = sinon.createStubInstance(McpPage);
+          mockPage.getDevToolsData.returns(
+            new Promise(resolve => {
+              setTimeout(() => resolve({cdpBackendNodeId: 100}), 600);
+            }),
+          );
+          const result = await context.getDevToolsData(mockPage);
+          assert.strictEqual(result, undefined);
+        });
+      });
+
+      it('returns empty object from selected page when devtools is closed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const result = await context.getDevToolsData();
+          assert.deepStrictEqual(result, {});
+        });
       });
     });
   });

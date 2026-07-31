@@ -148,22 +148,6 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
-async function getDevToolsStatus(
-  page?: McpPage,
-  context?: McpContext,
-): Promise<DevToolsData | undefined> {
-  try {
-    const targetPage =
-      page ?? (context ? context.getSelectedMcpPage() : undefined);
-    if (!targetPage) {
-      return undefined;
-    }
-    return await targetPage.getDevToolsData();
-  } catch {
-    return undefined;
-  }
-}
-
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
@@ -229,13 +213,12 @@ export class ToolHandler {
     const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
-    let context: McpContext | undefined;
-    let page: McpPage | undefined;
+    let devToolsData: DevToolsData | undefined;
     try {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
-      context = await this.getContext();
+      const context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
@@ -245,6 +228,7 @@ export class ToolHandler {
       if (context.consumeReconnectNotice()) {
         response.setReconnectNotice();
       }
+      let page: McpPage | undefined;
       try {
         if (this.tool.verifyFilesSchema) {
           for (const key of this.tool.verifyFilesSchema) {
@@ -285,6 +269,7 @@ export class ToolHandler {
       } catch (err) {
         response.setError(err);
       }
+      devToolsData = await context.getDevToolsData(page);
       // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
       let dataFormat: DataFormat = 'default';
       if (this.serverArgs.experimentalDataFormat) {
@@ -326,7 +311,6 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
-      const devToolsData = await getDevToolsStatus(page, context);
       const isDevToolsOpen = devToolsData
         ? Object.keys(devToolsData).length > 0
         : undefined;
