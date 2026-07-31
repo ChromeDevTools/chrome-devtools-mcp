@@ -75,7 +75,34 @@ export async function ensureBrowserConnected(options: {
       connectOptions.headers = options.wsHeaders;
     }
   } else if (options.browserURL) {
-    connectOptions.browserURL = options.browserURL;
+    // Puppeteer's getWSEndpoint() uses `new URL('/json/version', browserURL)`
+    // which replaces the entire pathname when the second argument is an
+    // absolute path. For a browserURL with a path prefix (e.g. behind a
+    // reverse proxy like `http://host/t/abc123`), this drops the prefix and
+    // discovery fails (issue #2394). Resolve the WebSocket endpoint ourselves
+    // and pass it as `browserWSEndpoint` so Puppeteer skips getWSEndpoint().
+    const parsedBrowserURL = new URL(options.browserURL);
+    const discoveryURL = new URL(
+      parsedBrowserURL.pathname.replace(/\/?$/, '/') + 'json/version',
+      parsedBrowserURL.origin,
+    );
+    // Preserve any search params from the original URL.
+    parsedBrowserURL.searchParams.forEach((value, key) => {
+      discoveryURL.searchParams.set(key, value);
+    });
+    const response = await fetch(discoveryURL);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch browser webSocket URL from ${discoveryURL.href} (status ${response.status})`,
+      );
+    }
+    const data = (await response.json()) as {webSocketDebuggerUrl?: string};
+    if (!data.webSocketDebuggerUrl) {
+      throw new Error(
+        `Browser at ${discoveryURL.href} did not return a webSocketDebuggerUrl`,
+      );
+    }
+    connectOptions.browserWSEndpoint = data.webSocketDebuggerUrl;
   } else if (channel || options.userDataDir) {
     const userDataDir = options.userDataDir;
     if (userDataDir) {
