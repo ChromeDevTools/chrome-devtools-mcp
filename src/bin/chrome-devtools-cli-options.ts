@@ -775,7 +775,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'List the most recent requests for the currently selected page since the last navigation. Up to 1,000 requests are retained per navigation.',
+      'Lists the most recent requests for the currently selected page since the last navigation.',
     category: 'Network',
     args: {
       pageSize: {

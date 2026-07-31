@@ -333,7 +333,7 @@
 
 ### `list_network_requests`
 
-**Description:** List the most recent requests for the currently selected page since the last navigation. Up to 1,000 requests are retained per navigation.
+**Description:** Lists the most recent requests for the currently selected page since the last navigation.
 
 **Parameters:**
 
