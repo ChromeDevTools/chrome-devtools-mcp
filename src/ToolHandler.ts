@@ -250,10 +250,6 @@ export class ToolHandler {
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();
           }
-          const targetPage = page ?? context.getSelectedMcpPage();
-          if (targetPage?.pptrPage?.isClosed() === false) {
-            pageUrl = targetPage.pptrPage.url();
-          }
           await this.tool.handler(
             {
               params,
@@ -275,6 +271,10 @@ export class ToolHandler {
         response.setError(err);
       }
       devToolsData = await context.getDevToolsData(page);
+      const targetPage = page ?? context.getSelectedMcpPage();
+      if (targetPage?.pptrPage?.isClosed() === false) {
+        pageUrl = targetPage.pptrPage.url();
+      }
       // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
       let dataFormat: DataFormat = 'default';
       if (this.serverArgs.experimentalDataFormat) {

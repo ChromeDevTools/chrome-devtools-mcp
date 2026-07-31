@@ -104,7 +104,7 @@ describe('ToolHandler', () => {
     const result = await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
-    assert.strictEqual(mockContext.getSelectedMcpPage.called, false);
+    assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
