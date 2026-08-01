@@ -92,4 +92,76 @@ describe('resolveCanonicalPath', () => {
       await fs.rm(tmpDir, {recursive: true, force: true});
     }
   });
+
+  it('should resolve a dangling symlink to its target, not to the link', async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    );
+    try {
+      const inside = path.join(tmpDir, 'inside');
+      const outside = path.join(tmpDir, 'outside');
+      await fs.mkdir(inside);
+      await fs.mkdir(outside);
+
+      // The target does not exist, so realpath() reports ENOENT for the link
+      // just as it would for a missing file.
+      const target = path.join(outside, 'not-created-yet.txt');
+      const link = path.join(inside, 'link.txt');
+      await fs.symlink(target, link);
+
+      const resolved = await resolveCanonicalPath(link);
+      const canonicalOutside = await fs.realpath(outside);
+      assert.strictEqual(
+        resolved,
+        path.join(canonicalOutside, 'not-created-yet.txt'),
+      );
+    } finally {
+      await fs.rm(tmpDir, {recursive: true, force: true});
+    }
+  });
+
+  it('should resolve through a dangling symlink used as a parent directory', async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    );
+    try {
+      const inside = path.join(tmpDir, 'inside');
+      const outside = path.join(tmpDir, 'outside');
+      await fs.mkdir(inside);
+      await fs.mkdir(outside);
+
+      const targetDir = path.join(outside, 'not-created-yet');
+      const linkDir = path.join(inside, 'link_dir');
+      await fs.symlink(targetDir, linkDir, 'dir');
+
+      const resolved = await resolveCanonicalPath(
+        path.join(linkDir, 'file.txt'),
+      );
+      const canonicalOutside = await fs.realpath(outside);
+      assert.strictEqual(
+        resolved,
+        path.join(canonicalOutside, 'not-created-yet', 'file.txt'),
+      );
+    } finally {
+      await fs.rm(tmpDir, {recursive: true, force: true});
+    }
+  });
+
+  it('should not loop forever on a self-referential dangling symlink', async () => {
+    const tmpDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    );
+    try {
+      const a = path.join(tmpDir, 'a');
+      const b = path.join(tmpDir, 'b');
+      await fs.symlink(b, a);
+      await fs.symlink(a, b);
+
+      await assert.rejects(async () => {
+        await resolveCanonicalPath(a);
+      });
+    } finally {
+      await fs.rm(tmpDir, {recursive: true, force: true});
+    }
+  });
 });
