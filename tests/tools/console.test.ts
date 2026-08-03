@@ -225,7 +225,7 @@ describe('console', () => {
           const textContent = getTextContent(formattedResponse.content[0]);
           assert.ok(
             textContent.includes(
-              `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+              `msgid=1 [issue] An element doesn’t have an autocomplete attribute (count: 1)`,
             ),
           );
         });
@@ -255,7 +255,7 @@ describe('console', () => {
             const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
-                `msgid=1 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+                `msgid=1 [issue] An element doesn’t have an autocomplete attribute (count: 1)`,
               ),
             );
           }
@@ -275,7 +275,7 @@ describe('console', () => {
             const textContent = getTextContent(formattedResponse.content[0]);
             assert.ok(
               textContent.includes(
-                `msgid=2 [issue] An element doesn't have an autocomplete attribute (count: 1)`,
+                `msgid=2 [issue] An element doesn’t have an autocomplete attribute (count: 1)`,
               ),
             );
           }

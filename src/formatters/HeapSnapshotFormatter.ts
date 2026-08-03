@@ -166,7 +166,7 @@ export class HeapSnapshotFormatter {
   toString(): string {
     const sorted = this.#getSortedAggregates();
     const lines: string[] = [];
-    lines.push('id,name,count,selfSize,maxRetainedSize');
+    lines.push('id,name,count,selfSize,retainedSize');
 
     for (const info of sorted) {
       const id = info[stableIdSymbol] ?? '';

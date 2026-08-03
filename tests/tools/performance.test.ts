@@ -168,6 +168,47 @@ describe('performance', () => {
       });
     });
 
+    it('resets the running flag if a setup step throws', async () => {
+      await withMcpContext(async (response, context) => {
+        const selectedPage = context.getSelectedMcpPage().pptrPage;
+        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        const gotoStub = sinon
+          .stub(selectedPage, 'goto')
+          .rejects(new Error('Navigation failed'));
+        const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
+        sinon
+          .stub(selectedPage.tracing, 'stop')
+          .rejects(new Error('Cannot stop recording: tracing was not started'));
+        await assert.rejects(
+          startTrace.handler(
+            {
+              params: {reload: true, autoStop: true},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /Navigation failed/,
+        );
+        sinon.assert.notCalled(startTracingStub);
+        assert.strictEqual(context.isRunningPerformanceTrace(), false);
+
+        // A follow-up start_trace must proceed instead of reporting that a
+        // trace is already running.
+        gotoStub.resolves(null);
+        await startTrace.handler(
+          {
+            params: {reload: true, autoStop: false},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        sinon.assert.calledOnce(startTracingStub);
+        assert.ok(context.isRunningPerformanceTrace());
+      });
+    });
+
     it('supports filePath', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       // rawData is the decompressed buffer (based on loadTraceAsBuffer implementation).
