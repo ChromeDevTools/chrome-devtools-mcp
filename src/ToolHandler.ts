@@ -11,7 +11,7 @@ import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/transformation.js';
+import {bucketizeLatency, buildContext} from './telemetry/transformation.js';
 import type {CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
@@ -316,17 +316,14 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
-      const isDevToolsOpen = devToolsData
-        ? Object.keys(devToolsData).length > 0
-        : undefined;
+      const context = buildContext(devToolsData, pageUrl);
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: this.tool.name,
         params,
         schema: this.inputSchema,
         success,
         latencyMs: bucketizeLatency(Date.now() - startTime),
-        isDevToolsOpen,
-        pageUrl,
+        context,
       });
       guard[Symbol.dispose]();
     }

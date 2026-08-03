@@ -9,7 +9,6 @@ import process from 'node:process';
 import {DAEMON_CLIENT_NAME} from '../daemon/utils.js';
 import type {zod, ShapeOutput} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
-import {isLocalhost} from '../utils/url.js';
 
 import type {ErrorCode} from './errors.js';
 import type {LocalState, Persistence} from './persistence.js';
@@ -114,8 +113,7 @@ export class ClearcutLogger {
     schema: zod.ZodRawShape;
     success: boolean;
     latencyMs: number;
-    isDevToolsOpen?: boolean;
-    pageUrl?: string;
+    context: ToolInvocationContext;
   }): Promise<void> {
     const sanitizedToolName = stripUnderscoreBeforeNumber(args.toolName);
     const tool_invocation: ToolInvocation = {
@@ -123,15 +121,8 @@ export class ClearcutLogger {
       success: args.success,
       latency_ms: args.latencyMs,
     };
-    const context: ToolInvocationContext = {};
-    if (args.isDevToolsOpen !== undefined) {
-      context.is_devtools_open = args.isDevToolsOpen;
-    }
-    if (args.pageUrl !== undefined) {
-      context.is_localhost = isLocalhost(args.pageUrl);
-    }
-    if (Object.keys(context).length > 0) {
-      tool_invocation.context = context;
+    if (Object.keys(args.context).length > 0) {
+      tool_invocation.context = args.context;
     }
     if (Object.keys(args.params).length > 0) {
       tool_invocation.tool_params = {

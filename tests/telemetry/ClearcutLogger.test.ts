@@ -50,6 +50,7 @@ describe('ClearcutLogger', () => {
         schema: {},
         success: true,
         latencyMs: 123,
+        context: {},
       });
 
       assert(mockWatchdogClient.send.calledOnce);
@@ -59,7 +60,7 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 123);
     });
-    it('sends context with is_devtools_open', async () => {
+    it('sends context when provided', async () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
         appVersion: '1.0.0',
@@ -71,7 +72,10 @@ describe('ClearcutLogger', () => {
         schema: {},
         success: true,
         latencyMs: 123,
-        isDevToolsOpen: true,
+        context: {
+          is_devtools_open: true,
+          is_localhost: false,
+        },
       });
 
       assert(mockWatchdogClient.send.calledOnce);
@@ -79,36 +83,8 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.deepStrictEqual(msg.payload.tool_invocation?.context, {
         is_devtools_open: true,
+        is_localhost: false,
       });
-    });
-    it('sends context with correct is_localhost based on the URL', async () => {
-      const logger = ClearcutLogger.initialize({
-        persistence: mockPersistence,
-        appVersion: '1.0.0',
-        watchdogClient: mockWatchdogClient,
-      });
-
-      for (const {pageUrl, isLocalhost} of [
-        {pageUrl: 'http://localhost:9222/test', isLocalhost: true},
-        {pageUrl: 'https://example.com/test', isLocalhost: false},
-      ]) {
-        mockWatchdogClient.send.resetHistory();
-        await logger.logToolInvocation({
-          toolName: 'test_tool',
-          params: {},
-          schema: {},
-          success: true,
-          latencyMs: 123,
-          pageUrl,
-        });
-
-        assert(mockWatchdogClient.send.calledOnce);
-        const msg = mockWatchdogClient.send.firstCall.args[0];
-        assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-        assert.deepStrictEqual(msg.payload.tool_invocation?.context, {
-          is_localhost: isLocalhost,
-        });
-      }
     });
     it('sends sanitized params', async () => {
       const logger = ClearcutLogger.initialize({
@@ -133,6 +109,7 @@ describe('ClearcutLogger', () => {
         schema,
         success: true,
         latencyMs: 123,
+        context: {},
       });
 
       assert(mockWatchdogClient.send.calledOnce);
