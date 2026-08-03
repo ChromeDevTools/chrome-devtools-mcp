@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 
@@ -23,7 +24,13 @@ interface Measurement extends HeapUsage {
 
 interface ProfileOptions {
   iterations: number;
+  sourceMapScriptCount: number;
   warmupIterations: number;
+}
+
+interface SourceMapTestServer {
+  close(): Promise<void>;
+  url: string;
 }
 
 interface PendingRequest {
@@ -48,6 +55,118 @@ function parsePositiveInteger(value: string | undefined, name: string): number {
     throw new Error(`${name} must be a positive integer`);
   }
   return parsed;
+}
+
+function sourceMapFor(index: number): string {
+  return JSON.stringify({
+    version: 3,
+    file: `script-${index}.js`,
+    sources: [`source-${index}.ts`],
+    sourcesContent: [
+      `export function profileFunction${index}(value: number): number {\n  return value + ${index};\n}\n`,
+    ],
+    names: [],
+    mappings: 'AAAA;AACA;AACA',
+  });
+}
+
+function scriptFor(index: number): string {
+  return [
+    `function profileFunction${index}(value) {`,
+    `  return value + ${index};`,
+    '}',
+    'globalThis.profileScriptResults ??= [];',
+    `globalThis.profileScriptResults.push(profileFunction${index}(${index}));`,
+    `//# sourceMappingURL=/maps/script-${index}.js.map`,
+    '',
+  ].join('\n');
+}
+
+async function startSourceMapTestServer(
+  scriptCount: number,
+): Promise<SourceMapTestServer> {
+  const scriptTags = Array.from(
+    {length: scriptCount},
+    (_, index) => `<script src="/scripts/script-${index}.js"></script>`,
+  ).join('\n');
+  const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Source map profiler fixture</title>
+  </head>
+  <body>
+    <h1>Source map profiler fixture</h1>
+    <p>${scriptCount} scripts, each with a distinct source map.</p>
+    ${scriptTags}
+  </body>
+</html>`;
+
+  const server = http.createServer((request, response) => {
+    const requestUrl = new URL(request.url ?? '/', 'http://127.0.0.1');
+    if (requestUrl.pathname === '/') {
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-type': 'text/html; charset=utf-8',
+      });
+      response.end(html);
+      return;
+    }
+
+    const scriptMatch = /^\/scripts\/script-(\d+)\.js$/.exec(
+      requestUrl.pathname,
+    );
+    const mapMatch = /^\/maps\/script-(\d+)\.js\.map$/.exec(
+      requestUrl.pathname,
+    );
+    const match = scriptMatch ?? mapMatch;
+    const indexText = match?.[1];
+    const index = indexText === undefined ? -1 : Number(indexText);
+    if (!Number.isInteger(index) || index < 0 || index >= scriptCount) {
+      response.writeHead(404);
+      response.end('Not found');
+      return;
+    }
+
+    if (scriptMatch) {
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-type': 'text/javascript; charset=utf-8',
+      });
+      response.end(scriptFor(index));
+      return;
+    }
+
+    response.writeHead(200, {
+      'cache-control': 'no-store',
+      'content-type': 'application/json; charset=utf-8',
+    });
+    response.end(sourceMapFor(index));
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    server.close();
+    throw new Error('Source map test server did not expose a TCP port');
+  }
+
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close(error => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      }),
+  };
 }
 
 class InspectorClient {
@@ -191,11 +310,17 @@ async function main(): Promise<void> {
       url: {type: 'string', default: 'https://developers.google.com'},
       'output-dir': {type: 'string'},
       iterations: {type: 'string', default: '10'},
+      'source-map-test-page': {type: 'boolean', default: false},
+      'source-map-script-count': {type: 'string', default: '100'},
       'warmup-iterations': {type: 'string', default: '10'},
     },
   });
   const options: ProfileOptions = {
     iterations: parsePositiveInteger(values.iterations, '--iterations'),
+    sourceMapScriptCount: parsePositiveInteger(
+      values['source-map-script-count'],
+      '--source-map-script-count',
+    ),
     warmupIterations: parsePositiveInteger(
       values['warmup-iterations'],
       '--warmup-iterations',
@@ -207,6 +332,11 @@ async function main(): Promise<void> {
     values['output-dir'] ?? path.join(rootDir, 'mcp-heap-profiles', timestamp),
   );
   fs.mkdirSync(outputDir, {recursive: true});
+
+  const sourceMapTestServer = values['source-map-test-page']
+    ? await startSourceMapTestServer(options.sourceMapScriptCount)
+    : undefined;
+  const targetUrl = sourceMapTestServer?.url ?? values.url;
 
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
@@ -238,19 +368,19 @@ async function main(): Promise<void> {
   const runIteration = async (): Promise<void> => {
     await client.callTool({
       name: 'navigate_page',
-      arguments: {type: 'url', url: values.url},
+      arguments: {type: 'url', url: targetUrl},
     });
     await client.callTool({
       name: 'navigate_page',
-      arguments: {type: 'url', url: values.url},
+      arguments: {type: 'url', url: targetUrl},
     });
     await client.callTool({
       name: 'navigate_page',
-      arguments: {type: 'url', url: values.url},
+      arguments: {type: 'url', url: targetUrl},
     });
     await client.callTool({
       name: 'navigate_page',
-      arguments: {type: 'url', url: values.url},
+      arguments: {type: 'url', url: targetUrl},
     });
     await client.callTool({name: 'take_snapshot', arguments: {}});
     await client.callTool({
@@ -291,7 +421,12 @@ async function main(): Promise<void> {
     await client.connect(transport);
     inspector = await InspectorClient.connect(await inspectorUrlPromise);
     console.log(`MCP server PID: ${transport.pid}`);
-    console.log(`Target URL: ${values.url}`);
+    console.log(`Target URL: ${targetUrl}`);
+    if (sourceMapTestServer) {
+      console.log(
+        `Source map test page: ${options.sourceMapScriptCount} scripts`,
+      );
+    }
     console.log(`Output directory: ${outputDir}`);
 
     await record('connected', false);
@@ -340,12 +475,13 @@ async function main(): Promise<void> {
     const reportPath = path.join(outputDir, 'heap-usage.json');
     fs.writeFileSync(
       reportPath,
-      `${JSON.stringify({pid: transport.pid, url: values.url, options, measurements}, null, 2)}\n`,
+      `${JSON.stringify({pid: transport.pid, url: targetUrl, options, measurements}, null, 2)}\n`,
     );
     console.log(`Report: ${reportPath}`);
   } finally {
     inspector?.close();
     await client.close();
+    await sourceMapTestServer?.close();
   }
 }
 
