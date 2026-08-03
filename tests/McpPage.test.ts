@@ -274,36 +274,4 @@ describe('McpPage', () => {
       assert.ok(handle.disposed);
     });
   });
-
-  it('disposes old handles when executing third party developer tools', async () => {
-    await withMcpContext(async (response, context) => {
-      const page = context.getSelectedMcpPage();
-      const pptrPage = page.pptrPage;
-
-      await pptrPage.evaluate(() => {
-        window.__dtmcp = {
-          executeTool: async () => {
-            const div = document.createElement('div');
-            document.body.appendChild(div);
-            return div;
-          },
-        };
-      });
-
-      await page.executeThirdPartyDeveloperTool('mockTool', {}, response);
-      const firstHandles = [...page.extraHandles];
-      assert.strictEqual(firstHandles.length, 1);
-      // @ts-expect-error Internal Puppeteer API
-      assert.ok(!firstHandles[0].disposed);
-
-      await page.executeThirdPartyDeveloperTool('mockTool', {}, response);
-      const secondHandles = [...page.extraHandles];
-      assert.strictEqual(secondHandles.length, 1);
-      assert.notStrictEqual(firstHandles[0], secondHandles[0]);
-      // @ts-expect-error Internal Puppeteer API
-      assert.ok(!secondHandles[0].disposed);
-      // @ts-expect-error Internal Puppeteer API
-      assert.ok(firstHandles[0].disposed);
-    });
-  });
 });

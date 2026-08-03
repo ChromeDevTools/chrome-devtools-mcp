@@ -471,6 +471,10 @@ export class McpPage implements ContextPage {
         if (!window.__dtmcp?.executeTool) {
           throw new Error('No tools found on the page');
         }
+
+        // Clear previously stashed elements so we only stash new ones from this execution
+        window.__dtmcp.stashedElements = [];
+
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
         const stashDOMElement = (el: Element) => {
