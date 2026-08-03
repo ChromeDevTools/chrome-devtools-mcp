@@ -56,6 +56,25 @@ async function main() {
   console.log('Clean up of chrome-devtools-frontend complete.');
 
   removeConflictingGlobalDeclaration();
+  mockAiAssistanceFiles();
+}
+
+function mockAiAssistanceFiles(): void {
+  const patchAgentPath = resolve(
+    projectRoot,
+    'node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/agents/PatchAgent.ts',
+  );
+  writeFileSync(patchAgentPath, 'export class PatchAgent {}', 'utf-8');
+
+  const skillRegistryPath = resolve(
+    projectRoot,
+    'node_modules/chrome-devtools-frontend/front_end/models/ai_assistance/skills/SkillRegistry.ts',
+  );
+  const skillRegistryContent = `export class SkillRegistry {}
+export const SKILLS: any = { styling: {}, network: {}, accessibility: {} };
+`;
+  writeFileSync(skillRegistryPath, skillRegistryContent, 'utf-8');
+  console.log('Successfully mocked AI assistance files.');
 }
 
 void main();

@@ -155,7 +155,7 @@ describe('input', () => {
           response,
           context,
         );
-        const result = await response.handle('click', context);
+        const result = await response.handle(context);
         const textContent = getTextContent(result.content[0]);
         const expectedUrl = server.getRoute('/after-click');
         assert.ok(
@@ -184,7 +184,7 @@ describe('input', () => {
           response,
           context,
         );
-        const result = await response.handle('click', context);
+        const result = await response.handle(context);
         const textContent = getTextContent(result.content[0]);
         assert.ok(
           !textContent.includes('Page navigated to '),

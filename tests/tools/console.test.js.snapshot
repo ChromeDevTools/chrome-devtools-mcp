@@ -100,9 +100,9 @@ Note: line and column numbers use 1-based indexing
 
 exports[`console > get_console_message > issues type > gets issue details with node id parsing 1`] = `
 ID: 1
-Message: issue> An element doesn't have an autocomplete attribute
+Message: issue> An element doesn’t have an autocomplete attribute
 
-A form field has an \`id\` or \`name\` attribute that the browser's autofill recognizes. However, it doesn't have an \`autocomplete\` attribute assigned. This might prevent the browser from correctly autofilling the form.
+A form field has an \`id\` or \`name\` attribute that the browser’s autofill recognizes. However, it doesn’t have an \`autocomplete\` attribute assigned. This might stop the browser from correctly autofilling the form.
 
 To fix this issue, provide an \`autocomplete\` attribute.
 Learn more:
@@ -115,11 +115,11 @@ exports[`console > get_console_message > issues type > gets issue details with r
 ID: <ID>
 Message: issue> Ensure CORS response header values are valid
 
-A cross-origin resource sharing (CORS) request was blocked because of invalid or missing response headers of the request or the associated [preflight request](issueCorsPreflightRequest).
+A Cross-Origin Resource Sharing (CORS) request was blocked because of invalid or missing response headers of the request or the associated [preflight request](issueCorsPreflightRequest).
 
-To fix this issue, ensure the response to the CORS request and/or the associated [preflight request](issueCorsPreflightRequest) are not missing headers and use valid header values.
+To fix this issue, ensure the response to the CORS request and/or the associated [preflight request](issueCorsPreflightRequest) aren’t missing headers and use valid header values.
 
-Note that if an opaque response is sufficient, the request's mode can be set to \`no-cors\` to fetch the resource with CORS disabled; that way CORS headers are not required but the response content is inaccessible (opaque).
+Note that if an opaque response is sufficient, the request’s mode can be set to \`no-cors\` to fetch the resource with CORS disabled; that way CORS headers aren’t required but the response content is inaccessible (opaque).
 Learn more:
 [Cross-Origin Resource Sharing (CORS)](https://web.dev/cross-origin-resource-sharing)
 ### Affected resources

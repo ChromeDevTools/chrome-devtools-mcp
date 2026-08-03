@@ -358,6 +358,7 @@ export class HeapSnapshotManager {
         () => {
           /* noop */
         },
+        DevTools.Common.Console.Console.instance(),
         import.meta.resolve('./third_party/devtools-heap-snapshot-worker.js'),
       );
 
@@ -392,7 +393,7 @@ export class HeapSnapshotManager {
     return this.#snapshots.size > 0;
   }
 
-  dispose(filePath: string): boolean {
+  disposeSnapshot(filePath: string): boolean {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {
@@ -401,5 +402,12 @@ export class HeapSnapshotManager {
       return true;
     }
     return false;
+  }
+
+  dispose(): void {
+    for (const cached of this.#snapshots.values()) {
+      cached.worker.dispose();
+    }
+    this.#snapshots.clear();
   }
 }

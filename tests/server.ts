@@ -87,10 +87,32 @@ export class TestServer {
     this.#routes = {};
   }
 
-  start(): Promise<void> {
-    return new Promise(res => {
-      this.#server.listen(this.#port, res);
-    });
+  async start(): Promise<void> {
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        await new Promise<void>((res, rej) => {
+          this.#server.once('error', rej);
+          this.#server.listen(this.#port, () => {
+            this.#server.off('error', rej);
+            res();
+          });
+        });
+        return;
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          'code' in err &&
+          err.code === 'EADDRINUSE'
+        ) {
+          retries--;
+          this.#port = TestServer.randomPort();
+        } else {
+          throw err;
+        }
+      }
+    }
+    throw new Error('Failed to bind to a port after 5 retries');
   }
 
   stop(): Promise<void> {

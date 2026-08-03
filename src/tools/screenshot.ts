@@ -43,10 +43,20 @@ async function getSourceBox(
     return {x: 0, y: 0, width: dims.width, height: dims.height};
   }
   const viewport = page.viewport();
-  if (!viewport) {
+  if (viewport) {
+    return {x: 0, y: 0, width: viewport.width, height: viewport.height};
+  }
+  // The browser is launched and connected with `defaultViewport: null`, so
+  // `page.viewport()` stays null until something emulates one. Fall back to the
+  // window's own dimensions, which is the area a viewport screenshot captures.
+  const dims = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+  if (dims.width <= 0 || dims.height <= 0) {
     return undefined;
   }
-  return {x: 0, y: 0, width: viewport.width, height: viewport.height};
+  return {x: 0, y: 0, width: dims.width, height: dims.height};
 }
 
 function computeDownscaleClip(
@@ -135,7 +145,7 @@ export const screenshot = definePageTool(args => {
       }
 
       const page = request.page.pptrPage;
-      const element = request.params.uid
+      using element = request.params.uid
         ? await request.page.getElementByUid(request.params.uid)
         : undefined;
 
@@ -145,6 +155,11 @@ export const screenshot = definePageTool(args => {
           ? undefined
           : (request.params.quality ?? screenshotQuality);
       const fullPage = request.params.fullPage ?? false;
+
+      // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
+      // once the capture is done to avoid leaking a remote object for the life
+      // of the page's execution context.
+      let screenshot: Uint8Array;
 
       // Compute a downscale clip when --screenshot-max-width or
       // --screenshot-max-height is set and the source exceeds either bound.
@@ -165,7 +180,6 @@ export const screenshot = definePageTool(args => {
         }
       }
 
-      let screenshot: Uint8Array;
       if (clip) {
         // page.screenshot with clip lets the CDP scale param downscale the
         // capture for viewport, full-page and element shots alike. We rely on

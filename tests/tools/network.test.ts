@@ -54,7 +54,7 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('list_request', context);
+        const responseData = await response.handle(context);
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
@@ -82,7 +82,7 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('list_request', context);
+        const responseData = await response.handle(context);
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
@@ -125,7 +125,7 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('list_request', context);
+        const responseData = await response.handle(context);
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),
         );
@@ -179,7 +179,7 @@ describe('network', () => {
           response,
           context,
         );
-        const responseData = await response.handle('get_request', context);
+        const responseData = await response.handle(context);
 
         t.assert.snapshot(
           stabilizeResponseOutput(getTextContent(responseData.content[0])),

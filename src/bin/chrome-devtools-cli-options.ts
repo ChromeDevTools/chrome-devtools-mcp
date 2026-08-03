@@ -781,7 +781,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'List all requests for the currently selected page since the last navigation.',
+      'Lists the most recent requests for the currently selected page since the last navigation.',
     category: 'Network',
     args: {
       pageSize: {

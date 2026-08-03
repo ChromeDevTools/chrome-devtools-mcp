@@ -67,7 +67,7 @@ Objects: 4589
 Total shallow size: 350 kB
 Showing 1-10 of 150 (Page 1 of 15).
 Next page: 1
-id,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,retainedSize
 1,(system),1739,115 kB,350 kB
 7,Function,1095,34.9 kB,72.2 kB
 11,(object shape),769,52.6 kB,53.3 kB
@@ -85,7 +85,7 @@ exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 Objects: 11940
 Total shallow size: 802 kB
 Showing 1-157 of 157 (Page 1 of 1).
-id,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,retainedSize
 2,(system),3205,199 kB,655 kB
 11,Function,3581,111 kB,237 kB
 16,(object shape),2878,181 kB,184 kB
@@ -250,7 +250,7 @@ exports[`memory > get_heapsnapshot_details > with objectsRetainedByContexts filt
 Objects: 148
 Total shallow size: 3.5 kB
 Showing 1-4 of 4 (Page 1 of 1).
-id,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,retainedSize
 1,system / Context,116,2.5 kB,3.5 kB
 3,Function,6,0.2 kB,0.7 kB
 2,(compiled code),22,0.5 kB,0.5 kB
@@ -262,7 +262,7 @@ exports[`memory > get_heapsnapshot_details > with sharedNativeContext filterName
 Objects: 558
 Total shallow size: 22.9 kB
 Showing 1-5 of 5 (Page 1 of 1).
-id,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,retainedSize
 3,(string),443,16.6 kB,16.6 kB
 1,(compiled code),85,5.9 kB,9.8 kB
 4,(system),12,0.2 kB,0.6 kB

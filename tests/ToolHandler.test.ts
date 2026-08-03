@@ -12,6 +12,7 @@ import sinon from 'sinon';
 import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
+import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
@@ -19,11 +20,12 @@ import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
-import {Mutex} from '../src/utils/Mutex.js';
+import {Mutex} from '../src/third_party/index.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {
     sinon.restore();
+    ClearcutLogger.resetForTesting();
   });
 
   it('calls page getter for page scoped tools', async () => {
@@ -67,7 +69,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, true);
   });
 
-  it('does not call page getter for non-page scoped tools', async () => {
+  it('does not pass page to handler for non-page scoped tools', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'global_tool',
@@ -101,10 +103,55 @@ describe('ToolHandler', () => {
     assert.strictEqual(toolHandler.shouldRegister, true);
     const result = await toolHandler.handle({});
 
+    assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
     assert.strictEqual(mockContext.getSelectedMcpPage.called, false);
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
+  });
+
+  it('logs isDevToolsOpen telemetry based on getDevToolsData', async () => {
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'global_tool',
+      description: 'A global tool',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: [],
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.getDevToolsData.resolves({cdpBackendNodeId: 1});
+
+    const logSpy = sinon.spy();
+    sinon.stub(ClearcutLogger, 'get').returns({
+      logToolInvocation: logSpy,
+    } as unknown as ClearcutLogger);
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    await toolHandler.handle({});
+
+    assert.strictEqual(logSpy.calledOnce, true);
+    assert.strictEqual(logSpy.firstCall.args[0].isDevToolsOpen, true);
+    assert.strictEqual(handlerCalled, true);
   });
 
   it('reports unknown registered tool arguments clearly', async () => {

@@ -49,7 +49,11 @@ export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
-
+export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {
+  DisposableStack,
+  AsyncDisposableStack,
+} from 'puppeteer-core/internal/util/disposable.js';
 export {
   resolveDefaultUserDataDir,
   detectBrowserPlatform,

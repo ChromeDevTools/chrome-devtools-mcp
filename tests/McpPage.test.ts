@@ -9,6 +9,7 @@ import {describe, it} from 'node:test';
 
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
+import {withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -255,5 +256,22 @@ describe('replaceHtmlElementsWithUids', () => {
     } else {
       assert.fail('Unexpected schema structure');
     }
+  });
+});
+
+describe('McpPage', () => {
+  it('creates a handle on the page and disposes it as such', async () => {
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage().pptrPage;
+
+      using handle = await page.evaluateHandle('new Set()');
+
+      {
+        using _ = handle;
+      }
+
+      // @ts-expect-error Internal Puppeteer API
+      assert.ok(handle.disposed);
+    });
   });
 });

@@ -69,6 +69,11 @@ export default defineConfig([
       '@local/check-license': 'error',
       curly: ['error', 'all'],
 
+      // ESLint 10 newly recommends these rules. Disable them explicitly so this
+      // dependency upgrade does not require unrelated source changes.
+      'no-useless-assignment': 'off',
+      'preserve-caught-error': 'off',
+
       'no-undef': 'off',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
@@ -98,17 +103,18 @@ export default defineConfig([
       ],
       '@typescript-eslint/no-floating-promises': 'error',
 
-      'import/order': [
-        'error',
-        {
-          'newlines-between': 'always',
+      // Incompatible with ESLint 10
+      // 'import/order': [
+      //   'error',
+      //   {
+      //     'newlines-between': 'always',
 
-          alphabetize: {
-            order: 'asc',
-            caseInsensitive: true,
-          },
-        },
-      ],
+      //     alphabetize: {
+      //       order: 'asc',
+      //       caseInsensitive: true,
+      //     },
+      //   },
+      // ],
 
       'import/no-cycle': [
         'error',

@@ -78,37 +78,79 @@ export async function withBrowser(
     allowedUrlPattern?: string[];
   } = {},
 ) {
-  const launchOptions: LaunchOptions = {
-    executablePath:
-      options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
-    headless: !options.debug,
-    defaultViewport: null,
-    devtools: options.autoOpenDevTools ?? false,
-    pipe: true,
-    handleDevToolsAsPage: true,
-    args: [...(options.args || []), '--screen-info={3840x2160}'],
-    enableExtensions: true,
-    blocklist: options.blockedUrlPattern,
-    allowlist: options.allowedUrlPattern,
-  };
-  const key = JSON.stringify(launchOptions);
+  let attempt = 1;
+  while (attempt <= 3) {
+    const launchOptions: LaunchOptions = {
+      executablePath:
+        options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: !options.debug,
+      defaultViewport: null,
+      devtools: options.autoOpenDevTools ?? false,
+      pipe: true,
+      handleDevToolsAsPage: true,
+      args: [...(options.args || []), '--screen-info={3840x2160}'],
+      enableExtensions: true,
+      blocklist: options.blockedUrlPattern,
+      allowlist: options.allowedUrlPattern,
+    };
+    const key = JSON.stringify(launchOptions);
 
-  let browser = browsers.get(key);
-  if (!browser) {
-    browser = await puppeteer.launch(launchOptions);
-    browsers.set(key, browser);
-  }
-  const newPage = await browser.newPage();
-  // Close other pages.
-  await Promise.all(
-    (await browser.pages()).map(async page => {
-      if (page !== newPage) {
-        await page.close();
+    let browser = browsers.get(key);
+    if (!browser) {
+      browser = await puppeteer.launch(launchOptions);
+      browsers.set(key, browser);
+    }
+
+    try {
+      await Promise.race([
+        (async () => {
+          const newPage = await browser.newPage();
+          // Close other pages.
+          await Promise.all(
+            (await browser.pages()).map(async page => {
+              if (page !== newPage) {
+                await page.close();
+              }
+            }),
+          );
+
+          await cb(browser, newPage);
+        })(),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('withBrowser timeout exceeded')),
+            60000,
+          ),
+        ),
+      ]);
+      return;
+    } catch (error) {
+      browsers.delete(key);
+      try {
+        await Promise.race([
+          browser.close(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('browser.close timeout')), 2000),
+          ),
+        ]);
+      } catch {
+        browser.process()?.kill('SIGKILL');
       }
-    }),
-  );
 
-  await cb(browser, newPage);
+      const isRetryable =
+        error instanceof Error &&
+        (error.message === 'withBrowser timeout exceeded' ||
+          error.message.includes('closed') ||
+          error.message.includes('crash') ||
+          error.message.includes('hang'));
+
+      if (attempt === 3 || !isRetryable) {
+        throw error;
+      }
+      attempt++;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
 }
 
 export async function withMcpContext(
