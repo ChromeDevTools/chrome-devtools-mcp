@@ -19,6 +19,7 @@ import {
   handleResponse,
   verifyDaemonVersion,
 } from '../daemon/client.js';
+import type {DaemonStatusResult} from '../daemon/types.js';
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
@@ -160,13 +161,7 @@ y.command(
         argv.sessionId,
       );
       if (response.success) {
-        const data = JSON.parse(response.result) as {
-          pid: number | null;
-          socketPath: string;
-          startDate: string;
-          version: string;
-          args: string[];
-        };
+        const data: DaemonStatusResult = JSON.parse(response.result);
         console.log(
           `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
         );
@@ -268,10 +263,12 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     async argv => {
       const sessionId = argv.sessionId as string;
       try {
+        const versionWarningPromise = isDaemonRunning(sessionId)
+          ? verifyDaemonVersion(sessionId, VERSION)
+          : Promise.resolve(undefined);
+
         if (!isDaemonRunning(sessionId)) {
           await start(serializeArgs(cliOptions, argv), sessionId);
-        } else {
-          await verifyDaemonVersion(sessionId, VERSION);
         }
 
         const commandArgs: Record<string, unknown> = {};
@@ -299,6 +296,14 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           );
         } else {
           console.error('Error:', response.error);
+        }
+
+        const versionWarning = await versionWarningPromise;
+        if (versionWarning) {
+          console.warn(versionWarning);
+        }
+
+        if (!response.success) {
           process.exit(1);
         }
       } catch (error) {

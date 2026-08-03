@@ -20,18 +20,18 @@ import {isDaemonRunning} from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
 
 describe('daemon client', () => {
+  let sessionId: string;
+
+  beforeEach(async () => {
+    sessionId = crypto.randomUUID();
+    await stopDaemon(sessionId);
+  });
+
+  afterEach(async () => {
+    await stopDaemon(sessionId);
+  });
+
   describe('start/stop', () => {
-    let sessionId: string;
-
-    beforeEach(async () => {
-      sessionId = crypto.randomUUID();
-      await stopDaemon(sessionId);
-    });
-
-    afterEach(async () => {
-      await stopDaemon(sessionId);
-    });
-
     it('should start and stop daemon', async () => {
       assert.ok(
         !isDaemonRunning(sessionId),
@@ -76,70 +76,33 @@ describe('daemon client', () => {
   });
 
   describe('verifyDaemonVersion', () => {
-    let sessionId: string;
-
-    beforeEach(async () => {
-      sessionId = crypto.randomUUID();
-      await stopDaemon(sessionId);
-    });
-
-    afterEach(async () => {
-      await stopDaemon(sessionId);
-    });
-
     it('warns when daemon version does not match CLI version', async () => {
       await startDaemon([], sessionId);
-      let warnedMessage = '';
-      const originalWarn = console.warn;
-      console.warn = (...args: unknown[]) => {
-        warnedMessage = args.map(String).join(' ');
-      };
-      try {
-        await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
-        assert.ok(
-          warnedMessage.includes('does not match CLI version (0.0.0-mismatch)'),
-          `Expected warning message about version mismatch, got: ${warnedMessage}`,
-        );
-      } finally {
-        console.warn = originalWarn;
-      }
+      const warning = await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+      assert.ok(
+        warning &&
+          warning.includes('does not match CLI version (0.0.0-mismatch)'),
+        `Expected warning message about version mismatch, got: ${warning}`,
+      );
     });
 
     it('does not warn when daemon version matches CLI version', async () => {
       await startDaemon([], sessionId);
-      let warned = false;
-      const originalWarn = console.warn;
-      console.warn = () => {
-        warned = true;
-      };
-      try {
-        await verifyDaemonVersion(sessionId, VERSION);
-        assert.strictEqual(
-          warned,
-          false,
-          'Should not warn when version matches',
-        );
-      } finally {
-        console.warn = originalWarn;
-      }
+      const warning = await verifyDaemonVersion(sessionId, VERSION);
+      assert.strictEqual(
+        warning,
+        undefined,
+        'Should not return warning when version matches',
+      );
     });
 
     it('does nothing when daemon is not running', async () => {
-      let warned = false;
-      const originalWarn = console.warn;
-      console.warn = () => {
-        warned = true;
-      };
-      try {
-        await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
-        assert.strictEqual(
-          warned,
-          false,
-          'Should not warn when daemon is stopped',
-        );
-      } finally {
-        console.warn = originalWarn;
-      }
+      const warning = await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+      assert.strictEqual(
+        warning,
+        undefined,
+        'Should not return warning when daemon is stopped',
+      );
     });
   });
 
