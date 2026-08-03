@@ -563,7 +563,7 @@ export class McpPage implements ContextPage {
 
     if (elementHandles.length) {
       using stack = new DisposableStack();
-      for (const handle of elementHandles) {
+      for (const handle of this.extraHandles) {
         stack.use(handle);
       }
       this.textSnapshot = await TextSnapshot.create(this, {
