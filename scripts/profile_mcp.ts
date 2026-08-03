@@ -24,6 +24,7 @@ interface Measurement extends HeapUsage {
 
 interface ProfileOptions {
   iterations: number;
+  pageChurn: boolean;
   sourceMapScriptCount: number;
   warmupIterations: number;
 }
@@ -55,6 +56,40 @@ function parsePositiveInteger(value: string | undefined, name: string): number {
     throw new Error(`${name} must be a positive integer`);
   }
   return parsed;
+}
+
+function selectedPageIdFromToolResult(result: unknown): number {
+  if (isObject(result) && isObject(result.structuredContent)) {
+    const pages = result.structuredContent.pages;
+    if (Array.isArray(pages)) {
+      for (const page of pages) {
+        if (
+          isObject(page) &&
+          page.selected === true &&
+          typeof page.id === 'number'
+        ) {
+          return page.id;
+        }
+      }
+    }
+  }
+
+  if (isObject(result) && Array.isArray(result.content)) {
+    for (const content of result.content) {
+      if (!isObject(content) || typeof content.text !== 'string') {
+        continue;
+      }
+      const match = /^(\d+): .*\[selected\](?:\s|$)/m.exec(content.text);
+      const pageId = match?.[1];
+      if (pageId !== undefined) {
+        return Number(pageId);
+      }
+    }
+  }
+
+  throw new Error(
+    'new_page did not identify the selected page in its response',
+  );
 }
 
 function sourceMapFor(index: number): string {
@@ -310,6 +345,7 @@ async function main(): Promise<void> {
       url: {type: 'string', default: 'https://developers.google.com'},
       'output-dir': {type: 'string'},
       iterations: {type: 'string', default: '10'},
+      'page-churn': {type: 'boolean', default: false},
       'source-map-test-page': {type: 'boolean', default: false},
       'source-map-script-count': {type: 'string', default: '100'},
       'warmup-iterations': {type: 'string', default: '10'},
@@ -317,6 +353,7 @@ async function main(): Promise<void> {
   });
   const options: ProfileOptions = {
     iterations: parsePositiveInteger(values.iterations, '--iterations'),
+    pageChurn: values['page-churn'],
     sourceMapScriptCount: parsePositiveInteger(
       values['source-map-script-count'],
       '--source-map-script-count',
@@ -333,9 +370,10 @@ async function main(): Promise<void> {
   );
   fs.mkdirSync(outputDir, {recursive: true});
 
-  const sourceMapTestServer = values['source-map-test-page']
-    ? await startSourceMapTestServer(options.sourceMapScriptCount)
-    : undefined;
+  const sourceMapTestServer =
+    values['source-map-test-page'] || options.pageChurn
+      ? await startSourceMapTestServer(options.sourceMapScriptCount)
+      : undefined;
   const targetUrl = sourceMapTestServer?.url ?? values.url;
 
   const env: Record<string, string> = {};
@@ -365,7 +403,7 @@ async function main(): Promise<void> {
   let inspector: InspectorClient | undefined;
   const measurements: Measurement[] = [];
 
-  const runIteration = async (): Promise<void> => {
+  const runNavigationIteration = async (): Promise<void> => {
     await client.callTool({
       name: 'navigate_page',
       arguments: {type: 'url', url: targetUrl},
@@ -391,6 +429,31 @@ async function main(): Promise<void> {
     });
     await client.callTool({name: 'list_network_requests', arguments: {}});
   };
+
+  const runPageChurnIteration = async (): Promise<void> => {
+    const result = await client.callTool({
+      name: 'new_page',
+      arguments: {url: targetUrl},
+    });
+    const pageId = selectedPageIdFromToolResult(result);
+
+    // Exercise the per-page collectors after its DevTools Universe has loaded
+    // all scripts and source maps.
+    await client.callTool({name: 'take_snapshot', arguments: {}});
+    await client.callTool({name: 'list_network_requests', arguments: {}});
+
+    await client.callTool({
+      name: 'close_page',
+      arguments: {pageId},
+    });
+    // Force the MCP context to reconcile its page list before measuring. This
+    // prevents target-destruction event latency from looking like retention.
+    await client.callTool({name: 'list_pages', arguments: {}});
+  };
+
+  const runIteration = options.pageChurn
+    ? runPageChurnIteration
+    : runNavigationIteration;
 
   const record = async (
     label: string,
@@ -427,6 +490,9 @@ async function main(): Promise<void> {
         `Source map test page: ${options.sourceMapScriptCount} scripts`,
       );
     }
+    console.log(
+      `Workload: ${options.pageChurn ? 'create and close mapped-script pages' : 'repeated navigation'}`,
+    );
     console.log(`Output directory: ${outputDir}`);
 
     await record('connected', false);
