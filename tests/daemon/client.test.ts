@@ -14,8 +14,10 @@ import {
   handleResponse,
   startDaemon,
   stopDaemon,
+  verifyDaemonVersion,
 } from '../../src/daemon/client.js';
 import {isDaemonRunning} from '../../src/daemon/utils.js';
+import {VERSION} from '../../src/version.js';
 
 describe('daemon client', () => {
   describe('start/stop', () => {
@@ -70,6 +72,74 @@ describe('daemon client', () => {
         !isDaemonRunning(sessionId),
         'Daemon should still not be running',
       );
+    });
+  });
+
+  describe('verifyDaemonVersion', () => {
+    let sessionId: string;
+
+    beforeEach(async () => {
+      sessionId = crypto.randomUUID();
+      await stopDaemon(sessionId);
+    });
+
+    afterEach(async () => {
+      await stopDaemon(sessionId);
+    });
+
+    it('warns when daemon version does not match CLI version', async () => {
+      await startDaemon([], sessionId);
+      let warnedMessage = '';
+      const originalWarn = console.warn;
+      console.warn = (...args: unknown[]) => {
+        warnedMessage = args.map(String).join(' ');
+      };
+      try {
+        await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+        assert.ok(
+          warnedMessage.includes('does not match CLI version (0.0.0-mismatch)'),
+          `Expected warning message about version mismatch, got: ${warnedMessage}`,
+        );
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
+
+    it('does not warn when daemon version matches CLI version', async () => {
+      await startDaemon([], sessionId);
+      let warned = false;
+      const originalWarn = console.warn;
+      console.warn = () => {
+        warned = true;
+      };
+      try {
+        await verifyDaemonVersion(sessionId, VERSION);
+        assert.strictEqual(
+          warned,
+          false,
+          'Should not warn when version matches',
+        );
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
+
+    it('does nothing when daemon is not running', async () => {
+      let warned = false;
+      const originalWarn = console.warn;
+      console.warn = () => {
+        warned = true;
+      };
+      try {
+        await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+        assert.strictEqual(
+          warned,
+          false,
+          'Should not warn when daemon is stopped',
+        );
+      } finally {
+        console.warn = originalWarn;
+      }
     });
   });
 

@@ -17,6 +17,7 @@ import {
   stopDaemon,
   sendCommand,
   handleResponse,
+  verifyDaemonVersion,
 } from '../daemon/client.js';
 import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
@@ -170,6 +171,11 @@ y.command(
           `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
         );
         console.log(`args=${JSON.stringify(data.args)}`);
+        if (data.version !== VERSION) {
+          console.warn(
+            `Warning: Daemon server version (${data.version}) does not match CLI version (${VERSION}). Run 'chrome-devtools start' to update and restart the daemon.`,
+          );
+        }
       } else {
         console.error('Error:', response.error);
         process.exit(1);
@@ -264,6 +270,8 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
       try {
         if (!isDaemonRunning(sessionId)) {
           await start(serializeArgs(cliOptions, argv), sessionId);
+        } else {
+          await verifyDaemonVersion(sessionId, VERSION);
         }
 
         const commandArgs: Record<string, unknown> = {};

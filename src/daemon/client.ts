@@ -194,6 +194,34 @@ export async function stopDaemon(sessionId: string) {
   await waitForFile(pidFilePath, /*removed=*/ true);
 }
 
+export async function verifyDaemonVersion(
+  sessionId: string,
+  cliVersion: string,
+): Promise<void> {
+  if (!isDaemonRunning(sessionId)) {
+    return;
+  }
+  try {
+    const response = await sendCommand({method: 'status'}, sessionId);
+    if (response.success) {
+      const data: unknown = JSON.parse(response.result);
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'version' in data &&
+        typeof data.version === 'string' &&
+        data.version !== cliVersion
+      ) {
+        console.warn(
+          `Warning: Daemon server version (${data.version}) does not match CLI version (${cliVersion}). Run 'chrome-devtools start' to update and restart the daemon.`,
+        );
+      }
+    }
+  } catch {
+    // Suppress communication failures during check; command execution handles unreachable daemon errors.
+  }
+}
+
 export async function handleResponse(
   response: CallToolResult,
   format: 'json' | 'md',
