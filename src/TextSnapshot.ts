@@ -112,6 +112,7 @@ export class TextSnapshot {
 
     const rootNodeWithId = assignIds(rootNode);
 
+    const extraHandles = options.extraHandles ?? page.extraHandles;
     await TextSnapshot.insertExtraNodes(
       page,
       idToNode,
@@ -120,7 +121,7 @@ export class TextSnapshot {
       idCounter,
       rootNodeWithId,
       seenBackendNodeIds,
-      options.extraHandles ?? [],
+      extraHandles,
     );
 
     const snapshot = new TextSnapshot({
@@ -206,14 +207,15 @@ export class TextSnapshot {
       }
       seenUniqueIds.add(uniqueBackendId);
 
-      const tagHandle = await handle.getProperty('localName');
+      using tagHandle = await handle.getProperty('localName');
       const tagValue = await tagHandle.jsonValue();
       const extraNode: TextSnapshotNode = {
         role: tagValue,
         id,
         backendNodeId,
         children: [],
-        elementHandle: async () => handle,
+        elementHandle: async () =>
+          await handle.evaluateHandle((element: Element) => element),
       };
       return extraNode;
     };
@@ -317,16 +319,13 @@ export class TextSnapshot {
           : 0;
     };
 
-    if (extraHandles.length) {
-      page.extraHandles = extraHandles;
-    }
     const reorgInfo: Array<{
       extraNode: TextSnapshotNode;
       attachTarget: TextSnapshotNode;
       descendantIds: Set<number>;
     }> = [];
 
-    for (const handle of page.extraHandles) {
+    for (const handle of extraHandles) {
       const extraNode = await createExtraNode(handle);
       if (!extraNode) {
         continue;

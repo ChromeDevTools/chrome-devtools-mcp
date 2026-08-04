@@ -77,6 +77,7 @@ import {
   type WebMCPTool,
   type Protocol,
   type Page,
+  type Frame,
   type ConsoleMessage,
   type HTTPRequest,
   type DevTools,
@@ -103,6 +104,7 @@ import {
   type WaitForEventsResult,
   type DialogAction,
 } from './WaitForHelper.js';
+type DisposableStackInstance = InstanceType<typeof DisposableStack>;
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
@@ -120,6 +122,9 @@ export class McpPage implements ContextPage {
   textSnapshot: TextSnapshot | null = null;
   uniqueBackendNodeIdToMcpId = new Map<string, string>();
   extraHandles: ElementHandle[] = [];
+  #extraHandleResources = new DisposableStack();
+  #extraHandleGeneration = 0;
+  #disposed = false;
 
   // Emulation
   emulationSettings: EmulationSettings = {};
@@ -131,6 +136,7 @@ export class McpPage implements ContextPage {
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
+  #frameNavigatedHandler: (frame: Frame) => void;
 
   thirdPartyDeveloperTools: ToolGroups = [];
 
@@ -157,7 +163,13 @@ export class McpPage implements ContextPage {
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+    this.#frameNavigatedHandler = (frame: Frame): void => {
+      if (frame === page.mainFrame()) {
+        this.#invalidateExtraHandles();
+      }
+    };
     page.on('dialog', this.#dialogHandler);
+    page.on('framenavigated', this.#frameNavigatedHandler);
 
     this.networkCollector = new NetworkCollector(page);
     this.consoleCollector = new ConsoleCollector(page, collect => {
@@ -428,9 +440,57 @@ export class McpPage implements ContextPage {
   }
 
   dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
     this.pptrPage.off('dialog', this.#dialogHandler);
+    this.pptrPage.off('framenavigated', this.#frameNavigatedHandler);
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
+    this.#invalidateExtraHandles();
+  }
+
+  #invalidateExtraHandles(): void {
+    this.#extraHandleGeneration++;
+    this.#clearExtraHandles();
+  }
+
+  #clearExtraHandles(): void {
+    this.#extraHandleResources.dispose();
+    this.#extraHandleResources = new DisposableStack();
+    this.extraHandles = [];
+  }
+
+  #replaceExtraHandles(
+    handles: ElementHandle[],
+    resources: DisposableStackInstance,
+    generation: number,
+  ): void {
+    if (this.#disposed) {
+      resources.dispose();
+      throw new Error(
+        `Page ${this.id} was disposed before retaining element handles.`,
+      );
+    }
+    if (generation !== this.#extraHandleGeneration) {
+      resources.dispose();
+      throw new Error(
+        `Page ${this.id} changed before retaining element handles.`,
+      );
+    }
+    const previousResources = this.#extraHandleResources;
+    this.#extraHandleResources = resources;
+    this.extraHandles = handles;
+    previousResources.dispose();
+  }
+
+  async #clearStashedElements(): Promise<void> {
+    await this.pptrPage.evaluate(() => {
+      if (window.__dtmcp) {
+        window.__dtmcp.stashedElements = [];
+      }
+    });
   }
 
   async executeThirdPartyDeveloperTool(
@@ -438,10 +498,12 @@ export class McpPage implements ContextPage {
     params: Record<string, unknown>,
     response: Response,
   ): Promise<void> {
+    const extraHandleGeneration = this.#extraHandleGeneration;
     // Creates array of ElementHandles from the UIDs in the params.
     // We do not replace the uids with the ElementsHandles yet, because
     // the `evaluate` function only turns them into DOM elements if they
     // are passed as non-nested arguments.
+    using inputHandleResources = new DisposableStack();
     const handles: ElementHandle[] = [];
     for (const value of Object.values(params)) {
       if (
@@ -450,11 +512,13 @@ export class McpPage implements ContextPage {
         typeof value.uid === 'string' &&
         Object.keys(value).length === 1
       ) {
-        handles.push(await this.getElementByUid(value.uid));
+        handles.push(
+          inputHandleResources.use(await this.getElementByUid(value.uid)),
+        );
       }
     }
 
-    const result = await this.pptrPage.evaluate(
+    const toolExecution = this.pptrPage.evaluate(
       async (name, args, ...elements) => {
         // Replace the UIDs with DOM elements.
         for (const [key, value] of Object.entries(args)) {
@@ -471,6 +535,7 @@ export class McpPage implements ContextPage {
         if (!window.__dtmcp?.executeTool) {
           throw new Error('No tools found on the page');
         }
+        window.__dtmcp.stashedElements = [];
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
         const stashDOMElement = (el: Element) => {
@@ -548,27 +613,51 @@ export class McpPage implements ContextPage {
       params,
       ...handles,
     );
-
-    const elementHandles: ElementHandle[] = [];
-    for (let i = 0; i < (result.stashed ?? 0); i++) {
-      const elementHandle = await this.pptrPage.evaluateHandle(index => {
-        const el = window.__dtmcp?.stashedElements?.[index];
-        if (!el) {
-          throw new Error(`Stashed element at index ${index} not found`);
-        }
-        return el;
-      }, i);
-      elementHandles.push(elementHandle);
+    let result: Awaited<typeof toolExecution>;
+    try {
+      result = await toolExecution;
+    } catch (error) {
+      try {
+        await this.#clearStashedElements();
+      } catch (clearError) {
+        logger?.('Failed to clear stashed elements', clearError);
+      }
+      throw error;
     }
 
-    if (elementHandles.length) {
-      using stack = new DisposableStack();
-      for (const handle of elementHandles) {
-        stack.use(handle);
+    using extraHandleResources = new DisposableStack();
+    const elementHandles: ElementHandle[] = [];
+    try {
+      for (let i = 0; i < (result.stashed ?? 0); i++) {
+        const elementHandle = await this.pptrPage.evaluateHandle(index => {
+          const el = window.__dtmcp?.stashedElements?.[index];
+          if (!el) {
+            throw new Error(`Stashed element at index ${index} not found`);
+          }
+          return el;
+        }, i);
+        elementHandles.push(extraHandleResources.use(elementHandle));
       }
-      this.textSnapshot = await TextSnapshot.create(this, {
+    } catch (error) {
+      try {
+        await this.#clearStashedElements();
+      } catch (clearError) {
+        logger?.('Failed to clear stashed elements', clearError);
+      }
+      throw error;
+    }
+    await this.#clearStashedElements();
+
+    if (elementHandles.length) {
+      const textSnapshot = await TextSnapshot.create(this, {
         extraHandles: elementHandles,
       });
+      this.#replaceExtraHandles(
+        elementHandles,
+        extraHandleResources.move(),
+        extraHandleGeneration,
+      );
+      this.textSnapshot = textSnapshot;
       response.includeSnapshot();
     }
 

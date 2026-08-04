@@ -88,10 +88,17 @@ describe('TextSnapshot', () => {
       );
 
       // Now take snapshot with extra handle
+      const getPropertySpy = sinon.spy(middleHandle, 'getProperty');
       const snapshot = await TextSnapshot.create(page, {
         verbose: false,
         extraHandles: [middleHandle],
       });
+      assert.strictEqual(getPropertySpy.callCount, 1);
+      const tagHandle = await getPropertySpy.firstCall.returnValue;
+      await assert.rejects(
+        tagHandle.evaluate(value => value),
+        /disposed/,
+      );
 
       // Find the extra node in idToNode
       let extraNode: TextSnapshotNode | undefined;
