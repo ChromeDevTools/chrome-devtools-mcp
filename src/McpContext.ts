@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs/promises';
-import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -35,7 +34,11 @@ import {
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
+import type {
+  Context,
+  DevToolsData,
+  SupportedExtensions,
+} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
@@ -249,7 +252,7 @@ export class McpContext implements Context {
       roots.map(async root => {
         const rootPathUri = root.uri;
         const rootPath = path.resolve(fileURLToPath(rootPathUri));
-        return await fsPromises.realpath(rootPath);
+        return await fs.realpath(rootPath);
       }),
     );
 
@@ -371,6 +374,25 @@ export class McpContext implements Context {
       );
     }
     return page;
+  }
+
+  async getDevToolsData(page?: McpPage): Promise<DevToolsData | undefined> {
+    const targetPage = page ?? this.#selectedPage;
+    if (!targetPage) {
+      return undefined;
+    }
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<undefined>(resolve => {
+      timeoutId = setTimeout(() => resolve(undefined), 500);
+    });
+    const dataPromise = targetPage.getDevToolsData();
+    try {
+      return await Promise.race([dataPromise, timeoutPromise]);
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timeoutId!);
+    }
   }
 
   /**
@@ -573,17 +595,39 @@ export class McpContext implements Context {
     return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
   }
 
+  async #writeFile(
+    filepath: string,
+    data: Uint8Array<ArrayBufferLike>,
+  ): Promise<void> {
+    await this.validatePath(filepath);
+
+    try {
+      await fs.mkdir(path.dirname(filepath), {recursive: true});
+      // Open the file with flags to:
+      // - O_WRONLY: Write-only
+      // - O_CREAT: Create if it doesn't exist
+      // - O_TRUNC: Truncate to zero length if it exists
+      // - O_NOFOLLOW: DO NOT follow symlinks.
+      // - 0o600: Permissions: read/write for owner, no permissions for others.
+      await fs.writeFile(filepath, data, {
+        flag:
+          fs.constants.O_WRONLY |
+          fs.constants.O_CREAT |
+          fs.constants.O_TRUNC |
+          fs.constants.O_NOFOLLOW,
+        mode: 0o600,
+      });
+    } catch (err) {
+      throw new Error(`Could not write ${filepath}`, {cause: err});
+    }
+  }
+
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filepath: string}> {
     const filepath = await getTempFilePath(filename);
-    await this.validatePath(filepath);
-    try {
-      await fs.writeFile(filepath, data);
-    } catch (err) {
-      throw new Error('Could not save a file', {cause: err});
-    }
+    await this.#writeFile(filepath, data);
     return {filepath};
   }
 
@@ -596,14 +640,8 @@ export class McpContext implements Context {
       clientProvidedFilePath,
       extension,
     );
-    try {
-      await fs.mkdir(path.dirname(filePath), {recursive: true});
-      await fs.writeFile(filePath, data);
-      return {filename: filePath};
-    } catch (err) {
-      this.logger?.(err);
-      throw new Error('Could not save a file', {cause: err});
-    }
+    await this.#writeFile(filePath, data);
+    return {filename: filePath};
   }
 
   storeTraceRecording(result: TraceResult): void {
@@ -796,7 +834,7 @@ export class McpContext implements Context {
 
       case 'file:': {
         await this.validatePath(fileURLToPath(url));
-        return await fsPromises.readFile(url, 'utf-8');
+        return await fs.readFile(url, 'utf-8');
       }
 
       default:

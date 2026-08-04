@@ -5,6 +5,10 @@
  */
 
 import type {zod, ShapeOutput} from '../third_party/index.js';
+import type {DevToolsData} from '../tools/ToolDefinition.js';
+import {isLocalhost} from '../utils/url.js';
+
+import type {LoggedDevToolsData, ToolInvocationContext} from './types.js';
 
 const LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2500, 5000, 10000];
 
@@ -181,4 +185,40 @@ export function sanitizeParams(
     transformed[transformedName] = transformedValue;
   }
   return transformed;
+}
+
+function transformDevToolsData(devToolsData: DevToolsData): LoggedDevToolsData {
+  const logged: LoggedDevToolsData = {};
+  if (devToolsData.cdpBackendNodeId !== undefined) {
+    logged.is_dom_element_selected = true;
+  }
+  if (devToolsData.cdpRequestId !== undefined) {
+    logged.is_network_request_selected = true;
+  }
+  return logged;
+}
+
+export function buildContext(
+  devToolsData?: DevToolsData,
+  pageUrl?: string,
+): ToolInvocationContext {
+  let context: ToolInvocationContext;
+  if (devToolsData === undefined) {
+    context = {is_devtools_open: false};
+  } else {
+    context = {
+      is_devtools_open: Object.keys(devToolsData).length > 0,
+    };
+
+    const loggedDevtoolsData = transformDevToolsData(devToolsData);
+    if (Object.keys(loggedDevtoolsData).length > 0) {
+      context.devtools_data = loggedDevtoolsData;
+    }
+  }
+
+  if (pageUrl !== undefined) {
+    context.is_localhost = isLocalhost(pageUrl);
+  }
+
+  return context;
 }

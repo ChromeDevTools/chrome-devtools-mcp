@@ -937,15 +937,19 @@ export class McpPage implements ContextPage {
    */
   async setUpNetworkCollectorForTesting() {
     this.networkCollector.dispose();
-    this.networkCollector = new NetworkCollector(this.pptrPage, collect => {
-      return {
-        request: req => {
-          if (req.url().includes('favicon.ico')) {
-            return;
-          }
-          collect(req);
-        },
-      } as ListenerMap;
-    });
+    this.networkCollector = new NetworkCollector(
+      this.pptrPage,
+      undefined,
+      collect => {
+        return {
+          request: req => {
+            if (req.url().includes('favicon.ico')) {
+              return;
+            }
+            collect(req);
+          },
+        } as ListenerMap;
+      },
+    );
   }
 }
