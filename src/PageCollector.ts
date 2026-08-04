@@ -60,6 +60,7 @@ export class PageCollector<T> {
   constructor(
     page: Page,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
+    maxResourcesPerNavigation?: number,
   ) {
     this.pptrPage = page;
 
@@ -69,6 +70,15 @@ export class PageCollector<T> {
       const withId = value as WithSymbolId<T>;
       withId[stableIdSymbol] = idGenerator();
       this.storage[0].push(withId);
+      if (
+        maxResourcesPerNavigation !== undefined &&
+        this.storage[0].length > maxResourcesPerNavigation
+      ) {
+        this.storage[0].splice(
+          0,
+          this.storage[0].length - maxResourcesPerNavigation,
+        );
+      }
     });
 
     listenerMap['framenavigated'] = (frame: Frame) => {
@@ -283,8 +293,11 @@ class PageEventSubscriber {
 }
 
 export class NetworkCollector extends PageCollector<HTTPRequest> {
+  static readonly MAX_REQUESTS_PER_NAVIGATION = 1_000;
+
   constructor(
     page: Page,
+    maxRequestsPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
     listeners: (
       collector: (item: HTTPRequest) => void,
     ) => ListenerMap<PageEvents> = collect => {
@@ -295,7 +308,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
       } as ListenerMap;
     },
   ) {
-    super(page, listeners);
+    super(page, listeners, maxRequestsPerNavigation);
   }
   override splitAfterNavigation() {
     const requests = this.storage[0];

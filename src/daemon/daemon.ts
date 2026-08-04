@@ -20,7 +20,7 @@ import {
 import {logger} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
-import type {DaemonMessage} from './types.js';
+import type {DaemonMessage, DaemonStatusResult} from './types.js';
 import {
   DAEMON_CLIENT_NAME,
   getPidFilePath,
@@ -186,15 +186,16 @@ async function handleRequest(msg: DaemonMessage) {
       };
     } else if (msg.method === 'status') {
       await started;
+      const statusResult: DaemonStatusResult = {
+        pid: process.pid,
+        socketPath,
+        startDate: startDate.toISOString(),
+        version: VERSION,
+        args: mcpServerArgs,
+      };
       return {
         success: true,
-        result: JSON.stringify({
-          pid: process.pid,
-          socketPath,
-          startDate: startDate.toISOString(),
-          version: VERSION,
-          args: mcpServerArgs,
-        }),
+        result: JSON.stringify(statusResult),
       };
     }
     {

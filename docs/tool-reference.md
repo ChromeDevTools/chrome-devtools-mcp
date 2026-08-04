@@ -333,7 +333,7 @@
 
 ### `list_network_requests`
 
-**Description:** List all requests for the currently selected page since the last navigation.
+**Description:** Lists the most recent requests for the currently selected page since the last navigation.
 
 **Parameters:**
 
