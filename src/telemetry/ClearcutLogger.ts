@@ -19,6 +19,7 @@ import {
   WatchdogMessageType,
   OsType,
   type ToolInvocation,
+  type ToolInvocationContext,
 } from './types.js';
 import {WatchdogClient} from './WatchdogClient.js';
 
@@ -112,7 +113,7 @@ export class ClearcutLogger {
     schema: zod.ZodRawShape;
     success: boolean;
     latencyMs: number;
-    isDevToolsOpen?: boolean;
+    context: ToolInvocationContext;
   }): Promise<void> {
     const sanitizedToolName = stripUnderscoreBeforeNumber(args.toolName);
     const tool_invocation: ToolInvocation = {
@@ -120,10 +121,8 @@ export class ClearcutLogger {
       success: args.success,
       latency_ms: args.latencyMs,
     };
-    if (args.isDevToolsOpen !== undefined) {
-      tool_invocation.context = {
-        is_devtools_open: args.isDevToolsOpen,
-      };
+    if (Object.keys(args.context).length > 0) {
+      tool_invocation.context = args.context;
     }
     if (Object.keys(args.params).length > 0) {
       tool_invocation.tool_params = {

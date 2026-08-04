@@ -104,17 +104,16 @@ describe('ToolHandler', () => {
     const result = await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
-    assert.strictEqual(mockContext.getSelectedMcpPage.called, false);
+    assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
   });
 
-  it('logs isDevToolsOpen telemetry based on getDevToolsData', async () => {
-    let handlerCalled = false;
-    const tool: ToolDefinition = {
-      name: 'global_tool',
-      description: 'A global tool',
+  it('appends correct context to tool call logs', async () => {
+    const baseTool: ToolDefinition = {
+      name: 'test_tool',
+      description: 'A test tool',
       annotations: {
         category: ToolCategory.NAVIGATION,
         readOnlyHint: true,
@@ -123,35 +122,92 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: [],
       handler: async () => {
-        handlerCalled = true;
+        return;
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.getDevToolsData.resolves({cdpBackendNodeId: 1});
+    const testCases: Array<{
+      tool: ToolDefinition | DefinedPageTool;
+      devToolsData: Record<string, unknown>;
+      pageUrl?: string;
+      expectedContext: Record<string, unknown>;
+    }> = [
+      {
+        tool: {
+          ...baseTool,
+          name: 'page_tool',
+          pageScoped: true,
+        },
+        devToolsData: {cdpBackendNodeId: 1},
+        pageUrl: 'http://localhost:9222/',
+        expectedContext: {
+          is_devtools_open: true,
+          is_localhost: true,
+          devtools_data: {
+            is_dom_element_selected: true,
+          },
+        },
+      },
+      {
+        tool: {
+          ...baseTool,
+          name: 'global_tool',
+        },
+        devToolsData: {},
+        pageUrl: undefined,
+        expectedContext: {
+          is_devtools_open: false,
+        },
+      },
+    ];
 
-    const logSpy = sinon.spy();
-    sinon.stub(ClearcutLogger, 'get').returns({
-      logToolInvocation: logSpy,
-    } as unknown as ClearcutLogger);
+    for (const testCase of testCases) {
+      let handlerCalled = false;
+      testCase.tool.handler = async () => {
+        handlerCalled = true;
+      };
 
-    const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
+      const mockContext = sinon.createStubInstance(McpContext);
+      mockContext.getDevToolsData.resolves(testCase.devToolsData);
+      if (testCase.pageUrl) {
+        const mockPage = {
+          pptrPage: {
+            isClosed: () => false,
+            url: () => testCase.pageUrl,
+          },
+        } as unknown as McpPage;
+        mockContext.getSelectedMcpPage.returns(mockPage);
+      }
 
-    const toolHandler = new ToolHandler(
-      tool,
-      serverArgs,
-      async () => mockContext,
-      toolMutex,
-    );
+      const logSpy = sinon.spy();
+      sinon.stub(ClearcutLogger, 'get').returns({
+        logToolInvocation: logSpy,
+      } as unknown as ClearcutLogger);
 
-    await toolHandler.handle({});
+      const toolMutex = new Mutex();
+      const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      });
 
-    assert.strictEqual(logSpy.calledOnce, true);
-    assert.strictEqual(logSpy.firstCall.args[0].isDevToolsOpen, true);
-    assert.strictEqual(handlerCalled, true);
+      const toolHandler = new ToolHandler(
+        testCase.tool,
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+      );
+
+      await toolHandler.handle({});
+
+      assert.strictEqual(logSpy.calledOnce, true);
+      assert.deepStrictEqual(
+        logSpy.firstCall.args[0].context,
+        testCase.expectedContext,
+      );
+      assert.strictEqual(handlerCalled, true);
+
+      sinon.restore();
+      ClearcutLogger.resetForTesting();
+    }
   });
 
   it('reports unknown registered tool arguments clearly', async () => {

@@ -80,7 +80,10 @@
     "node_modules/chrome-devtools-frontend/front_end/third_party/third-party-web",
     "node_modules/chrome-devtools-frontend/mcp"
   ],
-  "exclude": ["node_modules/chrome-devtools-frontend/**/*.test.ts"],
+  "exclude": [
+    "node_modules/chrome-devtools-frontend/**/*.test.ts",
+    "node_modules/chrome-devtools-frontend/**/*.test.api.ts"
+  ],
   "files": [
     "node_modules/chrome-devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
   ]

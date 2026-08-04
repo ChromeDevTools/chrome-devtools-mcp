@@ -11,7 +11,7 @@ import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/transformation.js';
+import {bucketizeLatency, buildContext} from './telemetry/transformation.js';
 import type {CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
@@ -214,6 +214,7 @@ export class ToolHandler {
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
+    let pageUrl: string | undefined;
     try {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
@@ -270,6 +271,10 @@ export class ToolHandler {
         response.setError(err);
       }
       devToolsData = await context.getDevToolsData(page);
+      const targetPage = page ?? context.getSelectedMcpPage();
+      if (targetPage?.pptrPage?.isClosed() === false) {
+        pageUrl = targetPage.pptrPage.url();
+      }
       // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
       let dataFormat: DataFormat = 'default';
       if (this.serverArgs.experimentalDataFormat) {
@@ -311,16 +316,14 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
-      const isDevToolsOpen = devToolsData
-        ? Object.keys(devToolsData).length > 0
-        : undefined;
+      const context = buildContext(devToolsData, pageUrl);
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: this.tool.name,
         params,
         schema: this.inputSchema,
         success,
         latencyMs: bucketizeLatency(Date.now() - startTime),
-        isDevToolsOpen,
+        context,
       });
       guard[Symbol.dispose]();
     }

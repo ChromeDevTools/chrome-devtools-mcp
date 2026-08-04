@@ -471,6 +471,7 @@ export class McpPage implements ContextPage {
         if (!window.__dtmcp?.executeTool) {
           throw new Error('No tools found on the page');
         }
+
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
         const stashDOMElement = (el: Element) => {
@@ -561,9 +562,15 @@ export class McpPage implements ContextPage {
       elementHandles.push(elementHandle);
     }
 
+    await this.pptrPage.evaluate(() => {
+      if (window.__dtmcp) {
+        window.__dtmcp.stashedElements = undefined;
+      }
+    });
+
     if (elementHandles.length) {
       using stack = new DisposableStack();
-      for (const handle of elementHandles) {
+      for (const handle of this.extraHandles) {
         stack.use(handle);
       }
       this.textSnapshot = await TextSnapshot.create(this, {
