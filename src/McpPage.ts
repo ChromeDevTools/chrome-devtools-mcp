@@ -472,9 +472,6 @@ export class McpPage implements ContextPage {
           throw new Error('No tools found on the page');
         }
 
-        // Clear previously stashed elements so we only stash new ones from this execution
-        window.__dtmcp.stashedElements = [];
-
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
         const stashDOMElement = (el: Element) => {
@@ -564,6 +561,12 @@ export class McpPage implements ContextPage {
       }, i);
       elementHandles.push(elementHandle);
     }
+
+    await this.pptrPage.evaluate(() => {
+      if (window.__dtmcp) {
+        window.__dtmcp.stashedElements = undefined;
+      }
+    });
 
     if (elementHandles.length) {
       using stack = new DisposableStack();
