@@ -13,7 +13,7 @@ import type {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageRequest} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
 
@@ -95,6 +95,41 @@ export const screenshot = definePageTool(args => {
 
   const defaultFormat: ScreenshotFormat = screenshotFormat ?? 'png';
 
+  const schema = {
+    format: zod
+      .enum(['png', 'jpeg', 'webp'])
+      .default(defaultFormat)
+      .describe(
+        `Type of format to save the screenshot as. Default is "${defaultFormat}"`,
+      ),
+    quality: zod
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+      ),
+    uid: zod
+      .string()
+      .optional()
+      .describe(
+        'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
+      ),
+    fullPage: zod
+      .boolean()
+      .optional()
+      .describe(
+        'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
+      ),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
+      ),
+  };
+
   return {
     name: 'take_screenshot',
     description: `Take a screenshot of the page or element.`,
@@ -103,43 +138,10 @@ export const screenshot = definePageTool(args => {
       // Not read-only due to filePath param.
       readOnlyHint: false,
     },
-    schema: {
-      format: zod
-        .enum(['png', 'jpeg', 'webp'])
-        .default(defaultFormat)
-        .describe(
-          `Type of format to save the screenshot as. Default is "${defaultFormat}"`,
-        ),
-      quality: zod
-        .number()
-        .min(0)
-        .max(100)
-        .optional()
-        .describe(
-          'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
-        ),
-      uid: zod
-        .string()
-        .optional()
-        .describe(
-          'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
-        ),
-      fullPage: zod
-        .boolean()
-        .optional()
-        .describe(
-          'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
-        ),
-      filePath: zod
-        .string()
-        .optional()
-        .describe(
-          'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
-        ),
-    },
+    schema,
     blockedByDialog: true,
     verifyFilesSchema: ['filePath'],
-    handler: async (request, response, context) => {
+    handler: async (request: PageRequest<typeof schema>, response, context) => {
       if (request.params.uid && request.params.fullPage) {
         throw new Error('Providing both "uid" and "fullPage" is not allowed.');
       }

@@ -12,7 +12,7 @@ import type {
   DuplicateStringGroup,
 } from '../HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
-import {zod} from '../third_party/index.js';
+import {zod, type ShapeOutput} from '../third_party/index.js';
 import type {
   Dialog,
   ElementHandle,
@@ -36,7 +36,7 @@ import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
 
 export interface BaseToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends Record<string, unknown> = Record<string, unknown>,
 > {
   name: string;
   description: string;
@@ -51,11 +51,11 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Array<keyof Schema>;
+  verifyFilesSchema: string[];
 }
 
 export interface ToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends Record<string, unknown> = Record<string, unknown>,
 > extends BaseToolDefinition<Schema> {
   schema: Schema;
   handler: (
@@ -65,9 +65,15 @@ export interface ToolDefinition<
   ) => Promise<void>;
 }
 
-export interface Request<Schema extends zod.ZodRawShape> {
-  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
+export interface Request<
+  Schema extends Record<string, unknown> = Record<string, unknown>,
+> {
+  params: ShapeOutput<Schema>;
 }
+
+export type PageRequest<
+  Schema extends Record<string, unknown> = Record<string, unknown>,
+> = Request<Schema> & {page: ContextPage};
 
 export interface ImageContentData {
   data: string;
@@ -338,19 +344,19 @@ export type ContextPage = Readonly<{
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
 }>;
 
-export function defineTool<Schema extends zod.ZodRawShape>(
+export function defineTool<Schema extends Record<string, unknown>>(
   definition: ToolDefinition<Schema>,
 ): ToolDefinition<Schema>;
 
 export function defineTool<
-  Schema extends zod.ZodRawShape,
+  Schema extends Record<string, unknown>,
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition: (args?: Args) => ToolDefinition<Schema>,
-): (args?: Args) => ToolDefinition<Schema>;
+): ToolDefinition<Schema> & ((args?: Args) => ToolDefinition<Schema>);
 
 export function defineTool<
-  Schema extends zod.ZodRawShape,
+  Schema extends Record<string, unknown>,
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition:
@@ -358,65 +364,68 @@ export function defineTool<
 ) {
   if (typeof definition === 'function') {
     const factory = definition;
-    return (args: Args) => {
-      return factory(args);
-    };
+    const defaultTool = factory();
+    const fn = (args?: Args) => factory(args);
+    Object.defineProperty(fn, 'name', {writable: true, configurable: true});
+    return Object.assign(fn, defaultTool);
   }
   return definition;
 }
 
-interface PageToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+export interface PageToolDefinition<
+  Schema extends Record<string, unknown> = Record<string, unknown>,
 > extends BaseToolDefinition<Schema> {
   handler: (
-    request: Request<Schema> & {page: ContextPage},
+    request: PageRequest<Schema>,
     response: Response,
     context: Context,
   ) => Promise<void>;
 }
 
-export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
-  PageToolDefinition<Schema> & {
-    pageScoped: true;
-    handler: (
-      request: Request<Schema> & {page: ContextPage},
-      response: Response,
-      context: Context,
-    ) => Promise<void>;
-  };
+export type DefinedPageTool<
+  Schema extends Record<string, unknown> = Record<string, unknown>,
+> = PageToolDefinition<Schema> & {
+  pageScoped: true;
+  handler: (
+    request: PageRequest<Schema>,
+    response: Response,
+    context: Context,
+  ) => Promise<void>;
+};
 
-export function definePageTool<Schema extends zod.ZodRawShape>(
+export function definePageTool<Schema extends Record<string, unknown>>(
   definition: PageToolDefinition<Schema>,
 ): DefinedPageTool<Schema>;
 
 export function definePageTool<
-  Schema extends zod.ZodRawShape,
+  Schema extends Record<string, unknown>,
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition: (args?: Args) => PageToolDefinition<Schema>,
-): (args?: Args) => DefinedPageTool<Schema>;
+): DefinedPageTool<Schema> & ((args?: Args) => DefinedPageTool<Schema>);
 
 export function definePageTool<
-  Schema extends zod.ZodRawShape,
+  Schema extends Record<string, unknown>,
   Args extends ParsedArguments = ParsedArguments,
 >(
   definition:
     PageToolDefinition<Schema> | ((args?: Args) => PageToolDefinition<Schema>),
-): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
+) {
   if (typeof definition === 'function') {
-    return (args?: Args): DefinedPageTool<Schema> => {
-      const tool = definition(args);
-      return {
-        ...tool,
-        pageScoped: true,
-      };
+    const factory = definition;
+    const defaultTool: DefinedPageTool<Schema> = {
+      ...factory(),
+      pageScoped: true,
     };
+    const fn = (args?: Args): DefinedPageTool<Schema> => ({
+      ...factory(args),
+      pageScoped: true,
+    });
+    Object.defineProperty(fn, 'name', {writable: true, configurable: true});
+    return Object.assign(fn, defaultTool);
   }
 
-  return {
-    ...definition,
-    pageScoped: true,
-  } as DefinedPageTool<Schema>;
+  return Object.assign(definition, {pageScoped: true as const});
 }
 
 export const CLOSE_PAGE_ERROR =
