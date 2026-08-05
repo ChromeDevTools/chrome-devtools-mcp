@@ -17,14 +17,27 @@ describe('assertValidSessionId', () => {
   });
 
   it('should not throw for valid UUID', () => {
-    assert.doesNotThrow(() => assertValidSessionId('123e4567-e89b-12d3-a456-426614174000'));
-    assert.doesNotThrow(() => assertValidSessionId('aabbccdd-1122-3344-5566-77889900aabb'));
+    assert.doesNotThrow(() =>
+      assertValidSessionId('123e4567-e89b-12d3-a456-426614174000'),
+    );
+    assert.doesNotThrow(() =>
+      assertValidSessionId('aabbccdd-1122-3344-5566-77889900aabb'),
+    );
   });
 
   it('should throw for invalid sessionId formats', () => {
-    assert.throws(() => assertValidSessionId('../../../etc/passwd'), /Invalid sessionId/);
-    assert.throws(() => assertValidSessionId('sessionId_with_underscore'), /Invalid sessionId/);
-    assert.throws(() => assertValidSessionId('session@id'), /Invalid sessionId/);
+    assert.throws(
+      () => assertValidSessionId('../../../etc/passwd'),
+      /Invalid sessionId/,
+    );
+    assert.throws(
+      () => assertValidSessionId('sessionId_with_underscore'),
+      /Invalid sessionId/,
+    );
+    assert.throws(
+      () => assertValidSessionId('session@id'),
+      /Invalid sessionId/,
+    );
   });
 });
 

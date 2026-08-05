@@ -20,7 +20,11 @@ import {
   verifyDaemonVersion,
 } from '../daemon/client.js';
 import type {DaemonStatusResult} from '../daemon/types.js';
-import {isDaemonRunning, serializeArgs, assertValidSessionId} from '../daemon/utils.js';
+import {
+  isDaemonRunning,
+  serializeArgs,
+  assertValidSessionId,
+} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
