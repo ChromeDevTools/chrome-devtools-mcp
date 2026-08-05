@@ -20,7 +20,7 @@ import {
   verifyDaemonVersion,
 } from '../daemon/client.js';
 import type {DaemonStatusResult} from '../daemon/types.js';
-import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
+import {isDaemonRunning, serializeArgs, assertValidSessionId} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
@@ -76,6 +76,10 @@ const y = yargs(hideBin(process.argv))
     description: 'Session ID for daemon scoping',
     default: '',
     hidden: true,
+    coerce: (sessionId: string) => {
+      assertValidSessionId(sessionId);
+      return sessionId;
+    },
   })
   .demandCommand()
   .version(VERSION)

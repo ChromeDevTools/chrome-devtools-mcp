@@ -28,9 +28,11 @@ import {
   INDEX_SCRIPT_PATH,
   IS_WINDOWS,
   isDaemonRunning,
+  assertValidSessionId,
 } from './utils.js';
 
 const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
+assertValidSessionId(sessionId);
 logger?.(`Daemon sessionId: ${sessionId}`);
 if (isDaemonRunning(sessionId)) {
   logger?.('Another daemon process is running.');
