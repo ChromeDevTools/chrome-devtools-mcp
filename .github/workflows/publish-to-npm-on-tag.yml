@@ -5,24 +5,16 @@ on:
     tags:
       - 'chrome-devtools-mcp-v*'
   workflow_dispatch:
-    inputs:
-      npm-publish:
-        description: 'Try to publish to npm'
-        default: false
-        type: boolean
-      mcp-publish:
-        description: 'Try to publish to MCP registry'
-        default: true
-        type: boolean
 
 permissions:
-  id-token: write # Required for OIDC
   contents: read
 
 jobs:
   publish-to-npm:
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name != 'workflow_dispatch') || (inputs.npm-publish && always()) }}
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,43 +51,3 @@ jobs:
           '
           echo 'This is the **Chrome DevTools for agents** package. Docs: https://github.com/ChromeDevTools/chrome-devtools-mcp' > README.md
           npm publish --provenance --access public
-
-  publish-to-mcp-registry:
-    runs-on: ubuntu-latest
-    needs: publish-to-npm
-    if: ${{ (github.event_name != 'workflow_dispatch' && needs.publish-to-npm.result == 'success') || (inputs.mcp-publish && always()) }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 2
-
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          cache: npm
-          node-version-file: '.nvmrc'
-          registry-url: 'https://registry.npmjs.org'
-
-      # Ensure npm 11.5.1 or later is installed
-      - name: Update npm
-        run: npm install -g npm@latest
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build and bundle
-        run: npm run bundle
-        env:
-          NODE_ENV: 'production'
-
-      - name: Install MCP Publisher
-        run: |
-          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}.tar.gz" | tar xz mcp-publisher
-
-      - name: Login to MCP Registry
-        run: ./mcp-publisher login github-oidc
-
-      - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
