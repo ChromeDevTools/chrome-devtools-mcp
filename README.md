@@ -848,16 +848,19 @@ server instances.
 
 ### User data directory
 
-`chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
+By default, `chrome-devtools-mcp` starts a stable Chrome instance using the following user
 data directory:
 
-- Linux / macOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
-- Windows: `%HOMEPATH%/.cache/chrome-devtools-mcp/chrome-profile-$CHANNEL`
+- Linux / macOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile`
+- Windows: `%USERPROFILE%\.cache\chrome-devtools-mcp\chrome-profile`
 
-The user data directory is not cleared between runs and shared across
-all instances of `chrome-devtools-mcp`. Set the `isolated` option to `true`
-to use a temporary user data dir instead which will be cleared automatically after
-the browser is closed.
+For non-stable channels, the channel name is appended to the directory name, for example
+`chrome-profile-canary`.
+
+The default user data directory is not cleared between runs and is reused for subsequent
+runs with the same channel. Only one browser can use it at a time. Set the `isolated`
+option to `true` to use a temporary user data directory instead which will be cleared
+automatically after the browser is closed.
 
 ### Connecting to a running Chrome instance
 
