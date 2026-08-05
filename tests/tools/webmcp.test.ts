@@ -65,10 +65,13 @@ describe('webmcp', () => {
       await withMcpContext(
         async (response, context) => {
           const page = context.getSelectedMcpPage();
+          const toolsAddedPromise = new Promise(resolve => {
+            page.pptrPage.webmcp.once('toolsadded', resolve);
+          });
           await setupWebMcpTool(page);
 
           // Wait for WebMCP tools to be registered and detected by Puppeteer
-          await new Promise(r => setTimeout(r, 100));
+          await toolsAddedPromise;
 
           await executeWebMcpTool.handler(
             {params: {toolName: 'test_tool', input: JSON.stringify({})}, page},
