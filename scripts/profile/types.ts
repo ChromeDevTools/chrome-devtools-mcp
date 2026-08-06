@@ -25,8 +25,14 @@ export interface ToolCall {
   arguments?: ToolArguments;
 }
 
+export interface ScenarioIterations {
+  iterations?: number;
+  warmupIterations?: number;
+}
+
 export interface ProfileScenario {
   name?: string;
   description?: string;
+  getNumIterations?: () => ScenarioIterations;
   get: (args: ScenarioArgs) => ToolCall[] | Promise<ToolCall[]>;
 }

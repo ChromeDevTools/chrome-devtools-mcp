@@ -19,7 +19,11 @@ import {
 } from './inspector.ts';
 import {startSourceMapTestServer} from './source_map_server.ts';
 import type {ProfileScenario, ScenarioArgs} from './types.ts';
-import {formatBytes, isScenarioModule, parsePositiveInteger} from './utils.ts';
+import {
+  formatBytes,
+  isScenarioModule,
+  parseNonNegativeInteger,
+} from './utils.ts';
 
 interface ProfileOptions {
   iterations: number;
@@ -244,20 +248,24 @@ async function main(): Promise<void> {
   const {values} = parseArgs({
     options: {
       'output-dir': {type: 'string'},
-      iterations: {type: 'string', default: '10'},
-      'warmup-iterations': {type: 'string', default: '10'},
+      iterations: {type: 'string'},
+      'warmup-iterations': {type: 'string'},
       scenario: {type: 'string'},
       url: {type: 'string'},
     },
   });
 
-  const options: ProfileOptions = {
-    iterations: parsePositiveInteger(values.iterations, '--iterations'),
-    warmupIterations: parsePositiveInteger(
-      values['warmup-iterations'],
-      '--warmup-iterations',
-    ),
-  };
+  const cliIterations =
+    values.iterations !== undefined
+      ? parseNonNegativeInteger(values.iterations, '--iterations')
+      : undefined;
+  const cliWarmupIterations =
+    values['warmup-iterations'] !== undefined
+      ? parseNonNegativeInteger(
+          values['warmup-iterations'],
+          '--warmup-iterations',
+        )
+      : undefined;
 
   const rootDir = path.resolve(import.meta.dirname, '../..');
   const scenariosDir = path.join(import.meta.dirname, 'scenarios');
@@ -283,6 +291,23 @@ async function main(): Promise<void> {
 
     const results: ScenarioResult[] = [];
     for (const scenarioEntry of scenarios) {
+      const scenarioDefaults =
+        scenarioEntry.scenario.getNumIterations?.() ?? {};
+      const iterations = cliIterations ?? scenarioDefaults.iterations ?? 10;
+      const warmupIterations =
+        cliWarmupIterations ?? scenarioDefaults.warmupIterations ?? 10;
+
+      if (iterations === 0 && warmupIterations === 0) {
+        throw new Error(
+          `--iterations and --warmup-iterations cannot both be 0 for scenario "${scenarioEntry.name}"`,
+        );
+      }
+
+      const options: ProfileOptions = {
+        iterations,
+        warmupIterations,
+      };
+
       const scenarioOutputDir =
         scenarios.length === 1 && values['output-dir'] !== undefined
           ? baseOutputDir

@@ -11,22 +11,26 @@ export interface SourceMapTestServer {
   url: string;
 }
 
-export function sourceMapFor(index: number): string {
+export function sourceMapFor(index: number, sizeBytes = 1_000_000): string {
+  const padding = '// Large source map payload padding line\n'.repeat(
+    Math.ceil(sizeBytes / 42),
+  );
   return JSON.stringify({
     version: 3,
     file: `script-${index}.js`,
     sources: [`source-${index}.ts`],
     sourcesContent: [
-      `export function profileFunction${index}(value: number): number {\n  return value + ${index};\n}\n`,
+      `export function profileFunction${index}(value: number): number {\n  console.error(new Error('Profile error from script ${index}'));\n  return value + ${index};\n}\n${padding}`,
     ],
     names: [],
-    mappings: 'AAAA;AACA;AACA',
+    mappings: 'AAAA;AACA;AACA;AACA',
   });
 }
 
 export function scriptFor(index: number): string {
   return [
     `function profileFunction${index}(value) {`,
+    `  console.error(new Error('Profile error from script ' + ${index}));`,
     `  return value + ${index};`,
     '}',
     'globalThis.profileScriptResults ??= [];',

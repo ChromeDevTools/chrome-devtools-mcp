@@ -14,16 +14,16 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
 }
 
-export function parsePositiveInteger(
+export function parseNonNegativeInteger(
   value: string | undefined,
   name: string,
 ): number {
   if (value === undefined || !/^\d+$/.test(value)) {
-    throw new Error(`${name} must be a positive integer`);
+    throw new Error(`${name} must be a non-negative integer`);
   }
   const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 1) {
-    throw new Error(`${name} must be a positive integer`);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative integer`);
   }
   return parsed;
 }
