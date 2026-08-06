@@ -6,8 +6,7 @@
       "DOM",
       "ES2024.Promise",
       "ESNext.Iterator",
-      "ESNext.Collection",
-      "ESNext.Disposable"
+      "ESNext.Collection"
     ],
     "typeRoots": ["./node_modules/@types"],
     "types": ["node", "filesystem"],

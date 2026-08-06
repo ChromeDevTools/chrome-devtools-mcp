@@ -50,3 +50,13 @@ updates:
       all:
         patterns:
           - '*'
+  - package-ecosystem: 'gitsubmodule'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+      time: '06:00'
+      timezone: 'Europe/Berlin'
+    cooldown:
+      default-days: 7
+      exclude:
+        - 'devtools-frontend'
