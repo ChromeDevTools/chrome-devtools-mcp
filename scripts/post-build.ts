@@ -19,10 +19,17 @@ function writeFile(filePath: string, content: string): void {
 }
 
 function main(): void {
-  const devtoolsThirdPartyPath =
-    'node_modules/chrome-devtools-frontend/front_end/third_party';
-  const devtoolsFrontEndCorePath =
-    'node_modules/chrome-devtools-frontend/front_end/core';
+  const devtoolsTs = path.join(
+    process.cwd(),
+    'src',
+    'third_party',
+    'devtools.ts',
+  );
+  if (fs.existsSync(devtoolsTs)) {
+    fs.unlinkSync(devtoolsTs);
+  }
+  const devtoolsThirdPartyPath = 'devtools-frontend/front_end/third_party';
+  const devtoolsFrontEndCorePath = 'devtools-frontend/front_end/core';
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
@@ -59,6 +66,30 @@ export class StringStream { constructor() {} }
 export const css = { cssLanguage: { parser: { parse: () => ({ topNode: { getChild: () => null } }) } } };
 `;
   writeFile(codeMirrorFile, codeMirrorContent);
+
+  // Create skills mocks
+  const skillsDir = path.join(
+    BUILD_DIR,
+    'devtools-frontend',
+    'front_end',
+    'models',
+    'ai_assistance',
+    'skills',
+  );
+  fs.mkdirSync(skillsDir, {recursive: true});
+  const skillMockContent = `
+export const skill = {
+  name: '',
+  description: '',
+  tools: [],
+  systemPrompt: '',
+};
+export default skill;
+`;
+  writeFile(path.join(skillsDir, 'accessibility.skill.js'), skillMockContent);
+  writeFile(path.join(skillsDir, 'network.skill.js'), skillMockContent);
+  writeFile(path.join(skillsDir, 'performance.skill.js'), skillMockContent);
+  writeFile(path.join(skillsDir, 'styling.skill.js'), skillMockContent);
 
   // Create root mock
   const rootDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'root');
@@ -113,8 +144,7 @@ export const ExperimentName = {
   );
   const codemirrorSrcDir = path.join(
     process.cwd(),
-    'node_modules',
-    'chrome-devtools-frontend',
+    'devtools-frontend',
     'front_end',
     'third_party',
     'codemirror',
@@ -135,9 +165,9 @@ export const ExperimentName = {
   copyDevToolsDescriptionFiles();
 }
 
-function copyDevToolsDescriptionFiles() {
+function copyDevToolsDescriptionFiles(): void {
   const devtoolsIssuesDescriptionPath =
-    'node_modules/chrome-devtools-frontend/front_end/models/issues_manager/descriptions';
+    'devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
   const destDir = path.join(
     BUILD_DIR,

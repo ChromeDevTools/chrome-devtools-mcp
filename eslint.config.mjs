@@ -17,6 +17,7 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
+    'devtools-frontend/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
@@ -133,9 +134,9 @@ export default defineConfig([
         {
           patterns: [
             {
-              regex: '.*chrome-devtools-frontend/(?!mcp/mcp.js$).*',
+              regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
               message:
-                'Import only the devtools-frontend code exported via node_modules/chrome-devtools-frontend/mcp/mcp.js',
+                'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
             },
           ],
         },
