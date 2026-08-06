@@ -52,8 +52,3 @@ Use built-in MCP memory tools and filters to pinpoint specific leak categories d
   - `objectsRetainedByEventHandlers`: Identifies objects kept alive by unremoved event listeners.
   - `objectsRetainedByContexts`: Identifies objects trapped in closures or execution contexts.
   - `objectsRetainedByConsole`: Identifies objects retained by console logging.
-- If standalone script comparisons are needed, run:
-
-```bash
-node skills/memory-leak-debugging/references/compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>
-```
