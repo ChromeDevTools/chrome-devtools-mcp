@@ -5,6 +5,7 @@
       "ES2023",
       "DOM",
       "ES2024.Promise",
+      "ESNext.Disposable",
       "ESNext.Iterator",
       "ESNext.Collection"
     ],
