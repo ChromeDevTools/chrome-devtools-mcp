@@ -716,7 +716,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `install_pwa`
 
-**Description:** Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)
+**Description:** Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)
 
 **Parameters:**
 
@@ -728,7 +728,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `launch_pwa`
 
-**Description:** Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. This operation is unavailable when URL restrictions are configured. (requires flag: --categoryPwa=true)
+**Description:** Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)
 
 **Parameters:**
 

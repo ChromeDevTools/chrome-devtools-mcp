@@ -9,16 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context} from './ToolDefinition.js';
 import {defineTool} from './ToolDefinition.js';
-
-function ensureNoNetworkRestrictions(context: Context): void {
-  if (context.hasNetworkRestrictions()) {
-    throw new Error(
-      'PWA install and launch operations are not supported when URL restrictions are configured.',
-    );
-  }
-}
 
 const manifestIdSchema = zod
   .string()
@@ -43,8 +34,7 @@ export const installPwa = defineTool({
   description:
     'Installs a Progressive Web App (PWA) identified by its manifest ID. ' +
     'This installs through the PWA CDP domain without a user gesture or install ' +
-    'dialog. DevTools installs default to browser display mode. This operation ' +
-    'is unavailable when URL restrictions are configured.',
+    'dialog. DevTools installs default to browser display mode.',
   annotations: {
     category: ToolCategory.PWA,
     readOnlyHint: false,
@@ -64,7 +54,6 @@ export const installPwa = defineTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const {manifestId, installUrlOrBundleUrl, displayMode} = request.params;
-    ensureNoNetworkRestrictions(context);
     const installUrl = new URL(installUrlOrBundleUrl);
     if (installUrl.protocol === 'file:') {
       await context.validatePath(fileURLToPath(installUrl));
@@ -112,8 +101,7 @@ export const launchPwa = defineTool({
   description:
     'Launches an installed Progressive Web App using its saved display mode. ' +
     'Optionally opens a specific URL within the same app instead of the default ' +
-    'start URL. This operation is unavailable when URL restrictions are ' +
-    'configured.',
+    'start URL.',
   annotations: {
     category: ToolCategory.PWA,
     readOnlyHint: false,
@@ -131,7 +119,6 @@ export const launchPwa = defineTool({
   verifyFilesSchema: [],
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
-    ensureNoNetworkRestrictions(context);
     const page = await context.launchPWA({manifestId, url});
     response.appendResponseLine(
       `Launched PWA with manifest ID: ${manifestId} (${page.url()})`,
