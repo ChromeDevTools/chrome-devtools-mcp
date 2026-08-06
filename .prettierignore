@@ -1,6 +1,7 @@
 # Prettier-only ignores.
 CHANGELOG.md
 src/third_party/lighthouse-devtools-mcp-bundle.js
+devtools-frontend
 
 # Release-please formatting brakes CI checks
 .claude-plugin/plugin.json

@@ -10,7 +10,6 @@ updates:
     cooldown:
       default-days: 7
       exclude:
-        - 'chrome-devtools-frontend'
         - 'puppeteer*'
         - 'lighthouse'
         - '@google/genai'
@@ -23,17 +22,12 @@ updates:
         dependency-type: development
         exclude-patterns:
           - 'puppeteer*'
-          - 'chrome-devtools-frontend'
           - '@modelcontextprotocol/sdk'
           - 'yargs'
           - 'debug'
           - 'core-js'
         patterns:
           - '*'
-      # breaks often so better to roll separetely.
-      bundled-devtools:
-        patterns:
-          - 'chrome-devtools-frontend'
       bundled:
         patterns:
           - 'puppeteer*'
@@ -56,3 +50,13 @@ updates:
       all:
         patterns:
           - '*'
+  - package-ecosystem: 'gitsubmodule'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+      time: '06:00'
+      timezone: 'Europe/Berlin'
+    cooldown:
+      default-days: 7
+      exclude:
+        - 'devtools-frontend'

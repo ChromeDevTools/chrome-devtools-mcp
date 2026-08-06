@@ -1,0 +1,3 @@
+[submodule "devtools-frontend"]
+	path = devtools-frontend
+	url = https://github.com/ChromeDevTools/devtools-frontend.git

@@ -193,7 +193,7 @@ const bundleDependency = (
               return arr.join('\n');
             });
 
-            // Manual license handling for chrome-devtools-frontend third_party
+            // Manual license handling for devtools-frontend third_party
             const tsConfig = JSON.parse(
               fs.readFileSync(
                 path.join(process.cwd(), 'tsconfig.json'),
@@ -201,16 +201,14 @@ const bundleDependency = (
               ),
             );
             const thirdPartyDirectories = tsConfig.include.filter(location =>
-              location.includes(
-                'node_modules/chrome-devtools-frontend/front_end/third_party',
-              ),
+              location.includes('devtools-frontend/front_end/third_party'),
             );
 
             const manualLicenses = [];
-            // Add chrome-devtools-frontend main license
+            // Add devtools-frontend main license
             const cdtfLicensePath = path.join(
               process.cwd(),
-              'node_modules/chrome-devtools-frontend/LICENSE',
+              'devtools-frontend/LICENSE',
             );
             if (fs.existsSync(cdtfLicensePath)) {
               manualLicenses.push(
