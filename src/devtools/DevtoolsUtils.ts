@@ -150,6 +150,11 @@ export async function createTargetUniverse(
     supportsEmulation: false,
   });
 
+  const setting = universe.settings.resolve(
+    DevTools.SourceMapManager.lazyLoadingSettingDescriptor,
+  );
+  setting.set(true);
+
   // @ts-expect-error devtools-frontend has diffrent types.
   const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
