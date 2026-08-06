@@ -228,6 +228,11 @@ class BaseMcpHostBindingAdapter
   ): void {}
 }
 
+import {
+  isResourceUrlAllowed,
+  recordRefusedResourceUrl,
+} from './sourceMapGate.js';
+
 export class McpHostBindingAdapter extends BaseMcpHostBindingAdapter {
   #loadResource: (path: string) => Promise<string>;
 
@@ -276,6 +281,15 @@ export class McpHostBindingAdapter extends BaseMcpHostBindingAdapter {
         statusCode: 404,
         urlValid: false,
       });
+      return;
+    }
+
+    // Second half of the on-demand gate, see sourceMapGate.ts. This is the
+    // fallback `PageResourceLoader` uses when the CDP loader fails, so leaving
+    // it open would just reroute every source map download through here.
+    if (!isResourceUrlAllowed(urlString)) {
+      recordRefusedResourceUrl(urlString);
+      callback({statusCode: 404});
       return;
     }
 

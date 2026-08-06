@@ -8,6 +8,11 @@ import type * as puppeteer from '../third_party/index.js';
 import type {DevTools} from '../third_party/index.js';
 import {CDPSessionEvent} from '../third_party/index.js';
 
+import {
+  isResourceUrlAllowed,
+  recordRefusedResourceUrl,
+} from './sourceMapGate.js';
+
 /**
  * This class makes a puppeteer connection look like DevTools CDPConnection.
  *
@@ -67,6 +72,22 @@ export class PuppeteerDevToolsConnection
           message: 'Unknown session ' + sessionId,
         } as DevTools.CDPConnection.CDPError,
       });
+    }
+    // The DevTools frontend loads developer resources (in practice: source
+    // maps) for every script it sees. We only want the ones we are about to
+    // use, so refuse the rest before they reach the browser. Answering with a
+    // protocol error is the path `PageResourceLoader` already handles.
+    if (method === 'Network.loadNetworkResource') {
+      const url = (params as {url?: string})?.url;
+      if (url !== undefined && !isResourceUrlAllowed(url)) {
+        recordRefusedResourceUrl(url);
+        return Promise.resolve({
+          error: {
+            code: -32000,
+            message: 'Developer resources are loaded on demand',
+          } as DevTools.CDPConnection.CDPError,
+        });
+      }
     }
     // Rolled protocol version between puppeteer and DevTools doesn't necessarily match
     /* eslint-disable @typescript-eslint/no-explicit-any */

@@ -13,6 +13,8 @@ import type {
 
 import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
+import {allowResourceUrl} from './sourceMapGate.js';
+import {logger} from '../utils/logger.js';
 
 /**
  * A mock implementation of an issues manager that only implements the methods
@@ -429,9 +431,14 @@ export async function createStackTrace(
   await Promise.all(
     [...scriptIds].map(id =>
       waitForScript(model, id, signal)
+        .then(script => attachSourceMapOnDemand(model, script))
         .then(script =>
           model.sourceMapManager().sourceMapForClientPromise(script),
         )
+        // A map loaded on demand is brand new, so its scope info can still be
+        // pending. Without this the frames resolve to positions but not to
+        // function names.
+        .then(sourceMap => sourceMap?.waitForScopeInfo())
         .catch(),
     ),
   );
@@ -446,6 +453,60 @@ export async function createStackTrace(
     >[0],
     target,
   );
+}
+
+type DevToolsScript = NonNullable<
+  ReturnType<DevTools.DebuggerModel['scriptForId']>
+>;
+
+/**
+ * Loads the source map for a single script, now that we know we need it.
+ *
+ * Every script is attached to the source map manager when it is parsed, but the
+ * download is refused by the gate (see sourceMapGate.ts), so the client sits
+ * there with no source map. Allowing the URL and re-attaching makes the manager
+ * run the load it skipped, for this one script.
+ */
+const attemptedSourceMaps = new WeakSet<object>();
+
+async function attachSourceMapOnDemand(
+  model: DevTools.DebuggerModel,
+  script: DevToolsScript,
+): Promise<DevToolsScript> {
+  const sourceMapManager = model.sourceMapManager();
+  if (!script.sourceMapURL || sourceMapManager.sourceMapForClient(script)) {
+    return script;
+  }
+  // A map that already failed to load stays failed. Without this, every stack
+  // trace naming the script would retry the download.
+  if (attemptedSourceMaps.has(script)) {
+    return script;
+  }
+  attemptedSourceMaps.add(script);
+
+  // Inline source maps never reach the resource loader.
+  if (!script.sourceMapURL.startsWith('data:')) {
+    let resolved = script.sourceMapURL;
+    try {
+      resolved = new URL(script.sourceMapURL, script.sourceURL).href;
+    } catch {
+      // Not resolvable against the script URL; allow the raw value instead.
+    }
+    allowResourceUrl(resolved);
+    allowResourceUrl(script.sourceMapURL);
+  }
+
+  try {
+    sourceMapManager.detachSourceMap(script);
+    sourceMapManager.attachSourceMap(
+      script,
+      script.sourceURL,
+      script.sourceMapURL,
+    );
+  } catch (error) {
+    logger?.('Failed to attach a source map on demand', error);
+  }
+  return script;
 }
 
 // Waits indefinitely for the script so pair it with Promise.race.
