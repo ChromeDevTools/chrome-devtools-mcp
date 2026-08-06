@@ -371,5 +371,13 @@
   {
     "name": "allow_unrestricted_paths",
     "flagType": "boolean"
+  },
+  {
+    "name": "emulate_focused_pages_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "emulate_focused_pages",
+    "flagType": "boolean"
   }
 ]
