@@ -17,8 +17,14 @@ import {
   stopDaemon,
   sendCommand,
   handleResponse,
+  verifyDaemonVersion,
 } from '../daemon/client.js';
-import {isDaemonRunning, serializeArgs} from '../daemon/utils.js';
+import type {DaemonStatusResult} from '../daemon/types.js';
+import {
+  isDaemonRunning,
+  serializeArgs,
+  assertValidSessionId,
+} from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
 import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
@@ -74,6 +80,10 @@ const y = yargs(hideBin(process.argv))
     description: 'Session ID for daemon scoping',
     default: '',
     hidden: true,
+    coerce: (sessionId: string) => {
+      assertValidSessionId(sessionId);
+      return sessionId;
+    },
   })
   .demandCommand()
   .version(VERSION)
@@ -159,17 +169,16 @@ y.command(
         argv.sessionId,
       );
       if (response.success) {
-        const data = JSON.parse(response.result) as {
-          pid: number | null;
-          socketPath: string;
-          startDate: string;
-          version: string;
-          args: string[];
-        };
+        const data: DaemonStatusResult = JSON.parse(response.result);
         console.log(
           `pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`,
         );
         console.log(`args=${JSON.stringify(data.args)}`);
+        if (data.version !== VERSION) {
+          console.warn(
+            `Warning: Daemon server version (${data.version}) does not match CLI version (${VERSION}). Run 'chrome-devtools start' to update and restart the daemon.`,
+          );
+        }
       } else {
         console.error('Error:', response.error);
         process.exit(1);
@@ -262,6 +271,10 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     async argv => {
       const sessionId = argv.sessionId as string;
       try {
+        const versionWarningPromise = isDaemonRunning(sessionId)
+          ? verifyDaemonVersion(sessionId, VERSION)
+          : Promise.resolve(undefined);
+
         if (!isDaemonRunning(sessionId)) {
           await start(serializeArgs(cliOptions, argv), sessionId);
         }
@@ -291,6 +304,14 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           );
         } else {
           console.error('Error:', response.error);
+        }
+
+        const versionWarning = await versionWarningPromise;
+        if (versionWarning) {
+          console.warn(versionWarning);
+        }
+
+        if (!response.success) {
           process.exit(1);
         }
       } catch (error) {

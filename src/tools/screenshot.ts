@@ -145,7 +145,7 @@ export const screenshot = definePageTool(args => {
       }
 
       const page = request.page.pptrPage;
-      const element = request.params.uid
+      using element = request.params.uid
         ? await request.page.getElementByUid(request.params.uid)
         : undefined;
 
@@ -160,53 +160,50 @@ export const screenshot = definePageTool(args => {
       // once the capture is done to avoid leaking a remote object for the life
       // of the page's execution context.
       let screenshot: Uint8Array;
-      try {
-        // Compute a downscale clip when --screenshot-max-width or
-        // --screenshot-max-height is set and the source exceeds either bound.
-        // The smaller scale factor wins so both bounds are respected while
-        // preserving aspect ratio.
-        let clip: ScreenshotClip | undefined;
-        if (
-          screenshotMaxWidth !== undefined ||
-          screenshotMaxHeight !== undefined
-        ) {
-          const box = await getSourceBox(page, element, fullPage);
-          if (box) {
-            clip = computeDownscaleClip(
-              box,
-              screenshotMaxWidth,
-              screenshotMaxHeight,
-            );
-          }
-        }
 
-        if (clip) {
-          // page.screenshot with clip lets the CDP scale param downscale the
-          // capture for viewport, full-page and element shots alike. We rely on
-          // Puppeteer's default of captureBeyondViewport=true when a clip is
-          // present so element/full-page captures below the fold still work.
-          screenshot = await page.screenshot({
-            type: format,
-            quality,
-            optimizeForSpeed: true,
-            clip,
-          });
-        } else if (element) {
-          screenshot = await element.screenshot({
-            type: format,
-            quality,
-            optimizeForSpeed: true,
-          });
-        } else {
-          screenshot = await page.screenshot({
-            type: format,
-            fullPage,
-            quality,
-            optimizeForSpeed: true,
-          });
+      // Compute a downscale clip when --screenshot-max-width or
+      // --screenshot-max-height is set and the source exceeds either bound.
+      // The smaller scale factor wins so both bounds are respected while
+      // preserving aspect ratio.
+      let clip: ScreenshotClip | undefined;
+      if (
+        screenshotMaxWidth !== undefined ||
+        screenshotMaxHeight !== undefined
+      ) {
+        const box = await getSourceBox(page, element, fullPage);
+        if (box) {
+          clip = computeDownscaleClip(
+            box,
+            screenshotMaxWidth,
+            screenshotMaxHeight,
+          );
         }
-      } finally {
-        void element?.dispose();
+      }
+
+      if (clip) {
+        // page.screenshot with clip lets the CDP scale param downscale the
+        // capture for viewport, full-page and element shots alike. We rely on
+        // Puppeteer's default of captureBeyondViewport=true when a clip is
+        // present so element/full-page captures below the fold still work.
+        screenshot = await page.screenshot({
+          type: format,
+          quality,
+          optimizeForSpeed: true,
+          clip,
+        });
+      } else if (element) {
+        screenshot = await element.screenshot({
+          type: format,
+          quality,
+          optimizeForSpeed: true,
+        });
+      } else {
+        screenshot = await page.screenshot({
+          type: format,
+          fullPage,
+          quality,
+          optimizeForSpeed: true,
+        });
       }
 
       if (request.params.uid) {

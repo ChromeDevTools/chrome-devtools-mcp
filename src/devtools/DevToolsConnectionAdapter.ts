@@ -56,7 +56,17 @@ export class PuppeteerDevToolsConnection
     }
     const session = this.#connection.session(sessionId);
     if (!session) {
-      throw new Error('Unknown session ' + sessionId);
+      // A session can go away while commands for it are still in flight, for
+      // example when a page is closed while its source maps are loading. That
+      // is normal, so report it the same way a failed command is reported.
+      // Throwing here would escape synchronously out of a method declared to
+      // return a promise, past the generated agent code, and end the process.
+      return Promise.resolve({
+        error: {
+          code: -32000,
+          message: 'Unknown session ' + sessionId,
+        } as DevTools.CDPConnection.CDPError,
+      });
     }
     // Rolled protocol version between puppeteer and DevTools doesn't necessarily match
     /* eslint-disable @typescript-eslint/no-explicit-any */
