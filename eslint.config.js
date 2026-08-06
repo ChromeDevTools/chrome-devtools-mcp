@@ -35,10 +35,10 @@ export default defineConfig([
       parserOptions: {
         projectService: {
           allowDefaultProject: [
-            '.prettierrc.cjs',
-            'puppeteer.config.cjs',
-            'eslint.config.mjs',
-            'rollup.config.mjs',
+            'prettier.config.js',
+            'puppeteer.config.js',
+            'eslint.config.js',
+            'rollup.config.js',
           ],
         },
       },
