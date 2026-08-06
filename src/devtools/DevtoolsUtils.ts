@@ -11,7 +11,6 @@ import type {
   Protocol,
 } from '../third_party/index.js';
 
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
 /**
@@ -151,7 +150,8 @@ export async function createTargetUniverse(
     supportsEmulation: false,
   });
 
-  const connection = new PuppeteerDevToolsConnection(session);
+  // @ts-expect-error devtools-frontend has diffrent types.
+  const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
 
