@@ -53,7 +53,7 @@
     "@blackwell-systems/gcf": "^2.2.2",
     "@eslint/js": "^10.0.1",
     "@google/genai": "^2.0.1",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -75,7 +75,7 @@
     "globals": "^17.0.0",
     "lighthouse": "13.4.0",
     "prettier": "^3.6.2",
-    "puppeteer": "25.4.0",
+    "puppeteer": "25.5.0",
     "rollup": "4.62.2",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
@@ -83,7 +83,7 @@
     "sinon": "^22.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
-    "yargs": "18.0.0"
+    "yargs": "18.1.0"
   },
   "peerDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
