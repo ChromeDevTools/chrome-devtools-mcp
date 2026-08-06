@@ -200,47 +200,6 @@ describe('pwa', () => {
     );
   });
 
-  it('enforces URL restrictions for install and launch', async () => {
-    const {manifestId, startUrl} = setupPwaRoutes();
-    const blockedUrlPattern = [`${server.baseUrl}/pwa/*`];
-    await withMcpContext(
-      async (response, context) => {
-        await assert.rejects(
-          installPwa.handler(
-            {params: {manifestId, installUrlOrBundleUrl: startUrl}},
-            response,
-            context,
-          ),
-          /PWA install and launch operations are not supported when URL restrictions are configured/,
-        );
-        await assert.rejects(
-          launchPwa.handler(
-            {params: {manifestId, url: startUrl}},
-            response,
-            context,
-          ),
-          /PWA install and launch operations are not supported when URL restrictions are configured/,
-        );
-      },
-      {blockedUrlPattern},
-      {categoryPwa: true},
-    );
-  });
-
-  it('rejects launch when URL restrictions are active', async () => {
-    const {manifestId} = setupPwaRoutes();
-    await withMcpContext(
-      async (response, context) => {
-        await assert.rejects(
-          launchPwa.handler({params: {manifestId}}, response, context),
-          /PWA install and launch operations are not supported when URL restrictions are configured/,
-        );
-      },
-      {blockedUrlPattern: ['https://blocked.example/*']},
-      {categoryPwa: true},
-    );
-  });
-
   it('launches an installed PWA in a standalone window', async () => {
     const {manifestId, startUrl} = setupPwaRoutes();
     await withMcpContext(

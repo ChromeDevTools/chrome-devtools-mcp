@@ -342,10 +342,6 @@ export class McpContext implements Context {
     return !!(this.#options.allowList || this.#options.blocklist);
   }
 
-  hasNetworkRestrictions(): boolean {
-    return this.#hasNetworkBlockOrAllowlist;
-  }
-
   installPWA(options: InstallPWAOptions): Promise<string> {
     return this.browser.installPWA(options);
   }

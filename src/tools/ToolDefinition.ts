@@ -199,7 +199,6 @@ export type SupportedExtensions =
  */
 export type Context = Readonly<{
   validatePath(filePath?: string): Promise<void>;
-  hasNetworkRestrictions(): boolean;
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
   launchPWA(options: LaunchPWAOptions): Promise<Page>;
