@@ -7,6 +7,7 @@ This repository contains an MCP server and CLI for Chrome DevTools.
 - Use `npm run test` to build and run tests, run all tests to verify correctness.
 - Use `npm run test path-to-test.ts` to build and run a single test file, for example, `npm run test tests/McpContext.test.ts`.
 - Use `npm run format` to fix formatting and get linting errors.
+- Never modify `devtools-frontend` except for experimentation: it is a git submodule, a mirror of the actual codebase.
 
 ## Rules for TypeScript
 
