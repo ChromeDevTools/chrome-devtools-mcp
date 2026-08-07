@@ -145,6 +145,7 @@ export class WaitForHelper {
     action: () => Promise<unknown>,
     options?: {
       timeout?: number;
+      waitForStableDom?: boolean;
       handleDialog?:
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
@@ -214,7 +215,9 @@ export class WaitForHelper {
 
       // Wait for stable dom after navigation so we execute in
       // the correct context
-      await this.waitForStableDom();
+      if (options?.waitForStableDom !== false) {
+        await this.waitForStableDom();
+      }
     } catch (error) {
       logger?.(error);
     } finally {
