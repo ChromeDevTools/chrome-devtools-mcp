@@ -80,7 +80,6 @@ export const startTrace = definePageTool({
         'devtools.timeline',
         'disabled-by-default-devtools.screenshot',
         'disabled-by-default-devtools.timeline',
-        'disabled-by-default-devtools.timeline.invalidationTracking',
         'disabled-by-default-devtools.timeline.frame',
         'disabled-by-default-devtools.timeline.stack',
         'disabled-by-default-v8.cpu_profiler',
