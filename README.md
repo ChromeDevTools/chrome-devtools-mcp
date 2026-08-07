@@ -677,6 +677,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
   - **Default:** `false`
 
+- **`--experimentalScreencastFps`/ `--experimental-screencast-fps`**
+  Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.
+  - **Type:** number
+  - **Default:** Uses Puppeteer's screencast default.
+
 - **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
   Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
   - **Type:** boolean

@@ -371,5 +371,9 @@
   {
     "name": "allow_unrestricted_paths",
     "flagType": "boolean"
+  },
+  {
+    "name": "experimental_screencast_fps_present",
+    "flagType": "boolean"
   }
 ]
