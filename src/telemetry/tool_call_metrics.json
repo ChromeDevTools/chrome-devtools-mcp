@@ -894,6 +894,10 @@
     ]
   },
   {
+    "name": "list_dedicated_workers",
+    "args": []
+  },
+  {
     "name": "get_heapsnapshot_object_details",
     "args": [
       {

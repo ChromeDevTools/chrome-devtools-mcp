@@ -10,8 +10,9 @@ import {describe, it} from 'node:test';
 
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import type {Page} from '../../src/third_party/index.js';
 import {installExtension} from '../../src/tools/extensions.js';
-import {evaluateScript} from '../../src/tools/script.js';
+import {evaluateScript, listDedicatedWorkers} from '../../src/tools/script.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
@@ -415,5 +416,150 @@ describe('script', () => {
         {categoryExtensions: true},
       );
     });
+
+    it('evaluates inside a dedicated worker', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          await spawnDedicatedWorker(page);
+
+          const workers = context.createDedicatedWorkersSnapshot();
+          assert.strictEqual(workers.length, 1);
+          const workerId = context.getDedicatedWorkerId(workers[0]!);
+
+          await evaluateScript({
+            experimentalWorkers: true,
+          } as ParsedArguments).handler(
+            {
+              params: {
+                function: String(() => self.constructor.name),
+                workerId,
+              },
+            },
+            response,
+            context,
+          );
+
+          const lineEvaluation = response.responseLines.at(2)!;
+          assert.strictEqual(
+            JSON.parse(lineEvaluation),
+            'DedicatedWorkerGlobalScope',
+          );
+        },
+        {},
+        {experimentalWorkers: true},
+      );
+    });
+
+    it('throws error when both pageId and workerId are provided', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await assert.rejects(
+            evaluateScript({
+              experimentalWorkers: true,
+            } as ParsedArguments).handler(
+              {
+                params: {
+                  function: String(() => 'test'),
+                  workerId: 'worker-1',
+                  pageId: '1',
+                },
+              },
+              response,
+              context,
+            ),
+            {
+              message: 'specify either a pageId or a workerId.',
+            },
+          );
+        },
+        {},
+        {experimentalWorkers: true},
+      );
+    });
+
+    it('throws error when args are provided with workerId', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await assert.rejects(
+            evaluateScript({
+              experimentalWorkers: true,
+            } as ParsedArguments).handler(
+              {
+                params: {
+                  function: String(() => 'test'),
+                  workerId: 'worker-1',
+                  args: ['1_1'],
+                },
+              },
+              response,
+              context,
+            ),
+            {
+              message:
+                'args (element uids) cannot be used when evaluating in a worker.',
+            },
+          );
+        },
+        {},
+        {experimentalWorkers: true},
+      );
+    });
+  });
+
+  describe('list_dedicated_workers', () => {
+    it('lists dedicated workers of the selected page', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          await spawnDedicatedWorker(page);
+
+          await listDedicatedWorkers.handler({params: {}}, response, context);
+
+          assert.strictEqual(
+            response.responseLines.at(0),
+            '## Dedicated Workers',
+          );
+          assert.match(response.responseLines.at(1)!, /^worker-\d+: blob:/);
+        },
+        {},
+        {experimentalWorkers: true},
+      );
+    });
+
+    it('reports when there are no dedicated workers', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await listDedicatedWorkers.handler({params: {}}, response, context);
+
+          assert.strictEqual(
+            response.responseLines.at(0),
+            'No dedicated workers found in the selected page.',
+          );
+        },
+        {},
+        {experimentalWorkers: true},
+      );
+    });
   });
 });
+
+/**
+ * Spawns a dedicated worker in the page and resolves once Puppeteer has
+ * attached to it.
+ */
+async function spawnDedicatedWorker(page: Page): Promise<void> {
+  const workerAttached = new Promise<void>(resolve => {
+    page.once('workercreated', () => resolve());
+  });
+  await page.evaluate(() => {
+    const blob = new Blob(['self.onmessage = () => {};'], {
+      type: 'application/javascript',
+    });
+    // Keep a reference so the worker is not garbage collected.
+    (globalThis as unknown as {__worker?: Worker}).__worker = new Worker(
+      URL.createObjectURL(blob),
+    );
+  });
+  await workerAttached;
+}

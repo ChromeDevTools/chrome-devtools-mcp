@@ -193,6 +193,11 @@ export const cliOptions = {
     describe: 'Whether to enable interoperability tools',
     hidden: true,
   },
+  experimentalWorkers: {
+    type: 'boolean',
+    describe:
+      'Whether to expose tools for enumerating dedicated Web Workers of the selected page and evaluating scripts inside them. Off by default so that worker execution contexts do not add to the baseline token usage.',
+  },
   experimentalScreencast: {
     type: 'boolean',
     describe:
