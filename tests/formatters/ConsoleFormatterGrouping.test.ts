@@ -26,6 +26,7 @@ const createMockMessage = (
     type: () => type,
     text: () => text,
     args: () => args,
+    location: () => ({}),
   } as unknown as ConsoleMessage;
 };
 
