@@ -64,6 +64,11 @@
 - **[WebMCP](#webmcp)** (2 tools)
   - [`execute_webmcp_tool`](#execute_webmcp_tool)
   - [`list_webmcp_tools`](#list_webmcp_tools)
+- **[Progressive Web Apps](#progressive-web-apps)** (4 tools)
+  - [`get_os_app_state`](#get_os_app_state)
+  - [`install_pwa`](#install_pwa)
+  - [`launch_pwa`](#launch_pwa)
+  - [`uninstall_pwa`](#uninstall_pwa)
 
 ## Input automation
 
@@ -691,5 +696,52 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Description:** Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)
 
 **Parameters:** None
+
+---
+
+## Progressive Web Apps
+
+> NOTE: The Progressive Web Apps category is not active by default. Use the '--categoryPwa' flag.
+
+### `get_os_app_state`
+
+**Description:** Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+
+---
+
+### `install_pwa`
+
+**Description:** Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **installUrlOrBundleUrl** (string) **(required)**: The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.
+- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+- **displayMode** (enum: "standalone", "browser") _(optional)_: Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.
+
+---
+
+### `launch_pwa`
+
+**Description:** Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+- **url** (string) _(optional)_: Optional URL within the app to open instead of the default start URL.
+
+---
+
+### `uninstall_pwa`
+
+**Description:** Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
 
 ---

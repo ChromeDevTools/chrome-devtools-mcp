@@ -25,9 +25,14 @@ import {
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
+  type GetPWAStateOptions,
+  type InstallPWAOptions,
+  type LaunchPWAOptions,
   type Page,
+  type PWAState,
   type ScreenRecorder,
   type Target,
+  type UninstallPWAOptions,
   type Extension,
   type Root,
   type DevTools,
@@ -335,6 +340,22 @@ export class McpContext implements Context {
 
   get #hasNetworkBlockOrAllowlist(): boolean {
     return !!(this.#options.allowList || this.#options.blocklist);
+  }
+
+  installPWA(options: InstallPWAOptions): Promise<string> {
+    return this.browser.installPWA(options);
+  }
+
+  uninstallPWA(options: UninstallPWAOptions): Promise<void> {
+    return this.browser.uninstallPWA(options);
+  }
+
+  launchPWA(options: LaunchPWAOptions): Promise<Page> {
+    return this.browser.launchPWA(options);
+  }
+
+  getPWAState(options: GetPWAStateOptions): Promise<PWAState> {
+    return this.browser.getPWAState(options);
   }
 
   setIsRunningPerformanceTrace(x: boolean): void {
