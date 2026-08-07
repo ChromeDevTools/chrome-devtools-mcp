@@ -57,6 +57,6 @@ updates:
       time: '06:00'
       timezone: 'Europe/Berlin'
     cooldown:
-      default-days: 7
+      default-days: 0
       exclude:
         - 'devtools-frontend'
