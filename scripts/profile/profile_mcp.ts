@@ -247,6 +247,7 @@ async function main(): Promise<void> {
       iterations: {type: 'string', default: '10'},
       'warmup-iterations': {type: 'string', default: '10'},
       scenario: {type: 'string'},
+      url: {type: 'string'},
     },
   });
 
@@ -269,11 +270,15 @@ async function main(): Promise<void> {
   fs.mkdirSync(baseOutputDir, {recursive: true});
 
   const sourceMapTestServer = await startSourceMapTestServer();
+  const targetUrl = values.url ?? sourceMapTestServer.url;
 
   try {
     console.log(
       `Source map test server listening at: ${sourceMapTestServer.url}`,
     );
+    if (values.url !== undefined) {
+      console.log(`Using custom target URL: ${targetUrl}`);
+    }
     console.log(`Scenarios to run: ${scenarios.map(s => s.name).join(', ')}`);
 
     const results: ScenarioResult[] = [];
@@ -284,7 +289,7 @@ async function main(): Promise<void> {
           : path.join(baseOutputDir, scenarioEntry.name);
 
       const scenarioArgs: ScenarioArgs = {
-        targetUrl: sourceMapTestServer.url,
+        targetUrl,
         outputDir: scenarioOutputDir,
       };
 
