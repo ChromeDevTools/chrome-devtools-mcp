@@ -53,6 +53,7 @@ export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
 export {
   DisposableStack,
   AsyncDisposableStack,
+  SuppressedError,
 } from 'puppeteer-core/internal/util/disposable.js';
 export {
   resolveDefaultUserDataDir,
