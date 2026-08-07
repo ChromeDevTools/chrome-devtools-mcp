@@ -188,6 +188,12 @@ export const cliOptions = {
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
   },
+  emulateFocusedPages: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Whether to emulate pages as focused and active. Disable only when visible-browser focus behavior is problematic; keeping it enabled preserves existing behavior for multi-agent workflows where pages should behave as focused/active.',
+  },
   experimentalInteropTools: {
     type: 'boolean',
     describe: 'Whether to enable interoperability tools',
