@@ -36,6 +36,7 @@
     "devtools-frontend/front_end/core/protocol_client/ConnectionTransport.ts",
     "devtools-frontend/front_end/core/protocol_client/DevToolsCDPConnection.ts",
     "devtools-frontend/front_end/core/protocol_client/InspectorBackend.ts",
+    "devtools-frontend/front_end/core/protocol_client/PuppeteerDevToolsConnection.ts",
     "devtools-frontend/front_end/core/protocol_client/protocol_client.ts",
     "devtools-frontend/front_end/core/root",
     "devtools-frontend/front_end/core/sdk",
@@ -99,8 +100,7 @@
     "devtools-frontend/front_end/third_party/puppeteer/**",
     "devtools-frontend/front_end/third_party/puppeteer-legacy/**",
     "devtools-frontend/front_end/panels/recorder/**",
-    "devtools-frontend/front_end/services/puppeteer/**",
-    "devtools-frontend/front_end/core/protocol_client/PuppeteerDevToolsConnection.ts"
+    "devtools-frontend/front_end/services/puppeteer/**"
   ],
   "files": [
     "devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
