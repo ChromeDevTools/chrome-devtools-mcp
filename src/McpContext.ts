@@ -815,6 +815,34 @@ export class McpContext implements Context {
     throw new Error(`Not allowed by allowlist: ${url}`);
   }
 
+  static #MAX_REDIRECTS = 20;
+
+  // Follows redirects manually so that every hop is re-validated against the
+  // allow/block list, not just the initial request URL. `fetch`'s built-in
+  // `redirect: 'follow'` only exposes the final URL after the fact, which
+  // would let an allowed origin redirect to a blocked one undetected.
+  async #fetchWithPolicyCheck(url: URL): Promise<Response> {
+    let currentUrl = url;
+    for (
+      let redirects = 0;
+      redirects <= McpContext.#MAX_REDIRECTS;
+      redirects++
+    ) {
+      const response = await fetch(currentUrl, {redirect: 'manual'});
+      const location =
+        response.status >= 300 && response.status < 400
+          ? response.headers.get('location')
+          : null;
+      if (!location) {
+        return response;
+      }
+      currentUrl = new URL(location, currentUrl);
+      this.#validateUrlNotBlocked(currentUrl);
+      this.#validateUrlAllowed(currentUrl);
+    }
+    throw new Error(`Too many redirects for: ${url}`);
+  }
+
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
 
@@ -825,7 +853,7 @@ export class McpContext implements Context {
       case 'http:': {
         this.#validateUrlAllowed(url);
 
-        const response = await fetch(url);
+        const response = await this.#fetchWithPolicyCheck(url);
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${url}`);
         }

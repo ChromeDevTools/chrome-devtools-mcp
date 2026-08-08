@@ -688,6 +688,80 @@ describe('McpContext', () => {
       });
     });
 
+    describe('redirects', () => {
+      it('re-validates the redirect target against the blocklist', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            const fetchStub = sinon.stub(globalThis, 'fetch');
+            fetchStub.onCall(0).resolves({
+              status: 302,
+              headers: new Headers({
+                location: 'https://blocked.example/final',
+              }),
+            } as Response);
+
+            await assert.rejects(() =>
+              context.loadResource('https://example.com/redirect'),
+            );
+            sinon.assert.calledOnce(fetchStub);
+          },
+          {
+            blockedUrlPattern: ['https://blocked.example/*'],
+          },
+        );
+      });
+
+      it('re-validates the redirect target against the allowlist', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            const fetchStub = sinon.stub(globalThis, 'fetch');
+            fetchStub.onCall(0).resolves({
+              status: 302,
+              headers: new Headers({
+                location: 'https://not-allowed.example/final',
+              }),
+            } as Response);
+
+            await assert.rejects(() =>
+              context.loadResource('https://allowed.example/redirect'),
+            );
+            sinon.assert.calledOnce(fetchStub);
+          },
+          {
+            allowedUrlPattern: ['https://allowed.example/*'],
+          },
+        );
+      });
+
+      it('follows an allowed redirect chain and returns the final content', async () => {
+        await withMcpContext(
+          async (_response, context) => {
+            const fetchStub = sinon.stub(globalThis, 'fetch');
+            fetchStub.onCall(0).resolves({
+              status: 302,
+              headers: new Headers({
+                location: 'https://allowed.example/final',
+              }),
+            } as Response);
+            fetchStub.onCall(1).resolves({
+              ok: true,
+              status: 200,
+              text: async () => 'redirected content',
+            } as Response);
+
+            const content = await context.loadResource(
+              'https://allowed.example/redirect',
+            );
+            assert.strictEqual(content, 'redirected content');
+            sinon.assert.calledTwice(fetchStub);
+          },
+          {
+            allowedUrlPattern: ['https://allowed.example/*'],
+          },
+        );
+      });
+    });
+
     describe('getDevToolsData', () => {
       it('returns devtools data from passed page', async () => {
         await withMcpContext(async (_response, context) => {
