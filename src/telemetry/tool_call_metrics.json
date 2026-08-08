@@ -905,5 +905,18 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "set_download_behavior",
+    "args": [
+      {
+        "name": "behavior",
+        "argType": "string"
+      },
+      {
+        "name": "download_path_length",
+        "argType": "number"
+      }
+    ]
   }
 ]

@@ -1060,6 +1060,28 @@ export const commands: Commands = {
       },
     },
   },
+  set_download_behavior: {
+    description:
+      'Configures how the browser handles file downloads for the browser context of the selected page. Applies to all pages in the same browser context and persists until changed. Set the behavior to "default" to restore the default download behavior of the browser.',
+    category: 'Emulation',
+    args: {
+      behavior: {
+        name: 'behavior',
+        type: 'string',
+        description:
+          '"allow" saves downloads to downloadPath without prompting, "deny" cancels all downloads and "default" restores the default download behavior of the browser.',
+        required: true,
+        enum: ['allow', 'deny', 'default'],
+      },
+      downloadPath: {
+        name: 'downloadPath',
+        type: 'string',
+        description:
+          'Directory to save downloads in. Required when behavior is "allow". The directory is created if it does not exist.',
+        required: false,
+      },
+    },
+  },
   take_heapsnapshot: {
     description:
       'Capture a heap snapshot of the currently selected page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',

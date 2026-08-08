@@ -5,6 +5,10 @@
  *
  */
 
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+import type {CdpBrowserContext} from '../third_party/index.js';
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -105,5 +109,73 @@ export const emulate = definePageTool({
     const page = request.page;
     await page.emulate(request.params);
     response.appendResponseLine('Emulation configured successfully');
+  },
+});
+
+export const setDownloadBehavior = definePageTool({
+  name: 'set_download_behavior',
+  description: `Configures how the browser handles file downloads for the browser context of the selected page. Applies to all pages in the same browser context and persists until changed. Set the behavior to "default" to restore the default download behavior of the browser.`,
+  annotations: {
+    category: ToolCategory.EMULATION,
+    readOnlyHint: false,
+  },
+  schema: {
+    behavior: zod
+      .enum(['allow', 'deny', 'default'])
+      .describe(
+        `"allow" saves downloads to downloadPath without prompting, "deny" cancels all downloads and "default" restores the default download behavior of the browser.`,
+      ),
+    downloadPath: zod
+      .string()
+      .optional()
+      .describe(
+        'Directory to save downloads in. Required when behavior is "allow". The directory is created if it does not exist.',
+      ),
+  },
+  blockedByDialog: true,
+  verifyFilesSchema: ['downloadPath'],
+  handler: async (request, response) => {
+    const {behavior, downloadPath} = request.params;
+    const browserContext =
+      request.page.pptrPage.browserContext() as unknown as CdpBrowserContext;
+    switch (behavior) {
+      case 'allow': {
+        if (!downloadPath) {
+          throw new Error('downloadPath is required when behavior is "allow".');
+        }
+        const resolvedPath = path.resolve(downloadPath);
+        await fs.mkdir(resolvedPath, {recursive: true});
+        await browserContext.setDownloadBehavior({
+          policy: 'allow',
+          downloadPath: resolvedPath,
+        });
+        response.appendResponseLine(
+          `Downloads are saved to ${resolvedPath} without prompting.`,
+        );
+        break;
+      }
+      case 'deny': {
+        if (downloadPath !== undefined) {
+          throw new Error(
+            'downloadPath can only be provided when behavior is "allow".',
+          );
+        }
+        await browserContext.setDownloadBehavior({policy: 'deny'});
+        response.appendResponseLine('Downloads are denied.');
+        break;
+      }
+      case 'default': {
+        if (downloadPath !== undefined) {
+          throw new Error(
+            'downloadPath can only be provided when behavior is "allow".',
+          );
+        }
+        await browserContext.setDownloadBehavior({policy: 'default'});
+        response.appendResponseLine(
+          'Restored the default download behavior of the browser.',
+        );
+        break;
+      }
+    }
   },
 });

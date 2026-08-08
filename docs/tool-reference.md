@@ -20,9 +20,10 @@
   - [`new_page`](#new_page)
   - [`select_page`](#select_page)
   - [`wait_for`](#wait_for)
-- **[Emulation](#emulation)** (2 tools)
+- **[Emulation](#emulation)** (3 tools)
   - [`emulate`](#emulate)
   - [`resize_page`](#resize_page)
+  - [`set_download_behavior`](#set_download_behavior)
 - **[Performance](#performance)** (3 tools)
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
@@ -279,6 +280,17 @@
 
 - **height** (number) **(required)**: Page height
 - **width** (number) **(required)**: Page width
+
+---
+
+### `set_download_behavior`
+
+**Description:** Configures how the browser handles file downloads for the browser context of the selected page. Applies to all pages in the same browser context and persists until changed. Set the behavior to "default" to restore the default download behavior of the browser.
+
+**Parameters:**
+
+- **behavior** (enum: "allow", "deny", "default") **(required)**: "allow" saves downloads to downloadPath without prompting, "deny" cancels all downloads and "default" restores the default download behavior of the browser.
+- **downloadPath** (string) _(optional)_: Directory to save downloads in. Required when behavior is "allow". The directory is created if it does not exist.
 
 ---
 

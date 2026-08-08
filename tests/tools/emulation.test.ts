@@ -5,16 +5,19 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
 import type {IncomingHttpHeaders} from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
 import {beforeEach, describe, it, mock} from 'node:test';
 
-import {emulate} from '../../src/tools/emulation.js';
+import {emulate, setDownloadBehavior} from '../../src/tools/emulation.js';
 import {
   geolocationTransform,
   viewportTransform,
 } from '../../src/tools/ToolDefinition.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext} from '../utils.js';
+import {html, waitExecutionFor, withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
   const server = serverHooks();
@@ -874,6 +877,146 @@ describe('emulation', () => {
           ),
           initial,
         );
+      });
+    });
+  });
+
+  describe('set_download_behavior', () => {
+    function addDownloadRoutes() {
+      server.addRoute('/download-file', (_req, res) => {
+        res.writeHead(200, {
+          'Content-Type': 'text/plain',
+          'Content-Disposition': 'attachment; filename="download-test.txt"',
+        });
+        res.end('downloaded content');
+      });
+      server.addHtmlRoute(
+        '/download-page',
+        html`<a
+          href="/download-file"
+          download
+          >Download</a
+        >`,
+      );
+    }
+
+    it('saves downloads into the configured directory', async () => {
+      addDownloadRoutes();
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-download-'));
+      // Use a directory that does not exist yet to verify it gets created.
+      const downloadDir = path.join(tmpDir, 'nested');
+      try {
+        await withMcpContext(async (response, context) => {
+          const page = context.getSelectedMcpPage();
+          try {
+            await page.pptrPage.goto(server.getRoute('/download-page'));
+            await setDownloadBehavior.handler(
+              {
+                params: {behavior: 'allow', downloadPath: downloadDir},
+                page,
+              },
+              response,
+              context,
+            );
+            assert.ok(
+              response.responseLines.some(line => line.includes(downloadDir)),
+            );
+            await page.pptrPage.click('a');
+
+            const filePath = path.join(downloadDir, 'download-test.txt');
+            await waitExecutionFor(async () => {
+              await fs.access(filePath);
+            }, 5000);
+            assert.strictEqual(
+              await fs.readFile(filePath, 'utf8'),
+              'downloaded content',
+            );
+          } finally {
+            await setDownloadBehavior.handler(
+              {params: {behavior: 'default'}, page},
+              response,
+              context,
+            );
+          }
+        });
+      } finally {
+        await fs.rm(tmpDir, {recursive: true, force: true});
+      }
+    });
+
+    it('cancels downloads when behavior is "deny"', async () => {
+      addDownloadRoutes();
+      const downloadDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'mcp-download-'),
+      );
+      try {
+        await withMcpContext(async (response, context) => {
+          const page = context.getSelectedMcpPage();
+          try {
+            await page.pptrPage.goto(server.getRoute('/download-page'));
+            await setDownloadBehavior.handler(
+              {
+                params: {behavior: 'allow', downloadPath: downloadDir},
+                page,
+              },
+              response,
+              context,
+            );
+            await page.pptrPage.click('a');
+            await waitExecutionFor(async () => {
+              const files = await fs.readdir(downloadDir);
+              assert.ok(files.includes('download-test.txt'));
+            }, 5000);
+
+            await setDownloadBehavior.handler(
+              {params: {behavior: 'deny'}, page},
+              response,
+              context,
+            );
+            await page.pptrPage.click('a');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const files = await fs.readdir(downloadDir);
+            assert.deepStrictEqual(files, ['download-test.txt']);
+          } finally {
+            await setDownloadBehavior.handler(
+              {params: {behavior: 'default'}, page},
+              response,
+              context,
+            );
+          }
+        });
+      } finally {
+        await fs.rm(downloadDir, {recursive: true, force: true});
+      }
+    });
+
+    it('requires downloadPath when behavior is "allow"', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await assert.rejects(
+          setDownloadBehavior.handler(
+            {params: {behavior: 'allow'}, page},
+            response,
+            context,
+          ),
+          /downloadPath is required/,
+        );
+      });
+    });
+
+    it('rejects downloadPath unless behavior is "allow"', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        for (const behavior of ['deny', 'default'] as const) {
+          await assert.rejects(
+            setDownloadBehavior.handler(
+              {params: {behavior, downloadPath: os.tmpdir()}, page},
+              response,
+              context,
+            ),
+            /downloadPath can only be provided/,
+          );
+        }
       });
     });
   });
