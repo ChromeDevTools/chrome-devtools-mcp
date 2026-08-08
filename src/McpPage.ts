@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DisposableStack} from './third_party/index.js';
-
 export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   if (typeof schema === 'boolean') {
     return;
@@ -431,6 +429,12 @@ export class McpPage implements ContextPage {
     this.pptrPage.off('dialog', this.#dialogHandler);
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
+    const devtoolsUniverse = this.#devtoolsUniverse;
+    this.#devtoolsUniverse = undefined;
+    devtoolsUniverse?.universe.dispose();
+    void devtoolsUniverse?.session.detach().catch(e => {
+      logger?.('Failed to detach DevTools session', e);
+    });
   }
 
   async executeThirdPartyDeveloperTool(

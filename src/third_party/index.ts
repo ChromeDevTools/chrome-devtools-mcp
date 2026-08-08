@@ -53,6 +53,7 @@ export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
 export {
   DisposableStack,
   AsyncDisposableStack,
+  SuppressedError,
 } from 'puppeteer-core/internal/util/disposable.js';
 export {
   resolveDefaultUserDataDir,
@@ -89,4 +90,4 @@ export const generateReport = generateReportImpl as (
   format: string,
 ) => string;
 
-export * as DevTools from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+export * as DevTools from '../../devtools-frontend/mcp/mcp.js';
