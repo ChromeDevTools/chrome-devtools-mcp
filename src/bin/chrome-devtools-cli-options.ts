@@ -758,6 +758,14 @@ export const commands: Commands = {
         required: false,
         default: false,
       },
+      includeStackTraces: {
+        name: 'includeStackTraces',
+        type: 'boolean',
+        description:
+          'Set to true to include the stack trace for each message when available. Increases the response size.',
+        required: false,
+        default: false,
+      },
       serviceWorkerId: {
         name: 'serviceWorkerId',
         type: 'string',

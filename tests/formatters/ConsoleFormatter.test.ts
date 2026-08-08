@@ -125,6 +125,118 @@ describe('ConsoleFormatter', () => {
       );
       return await ConsoleFormatter.from(error, {id: 1});
     });
+
+    formatterTestConcise(
+      'omits the stack trace when fetchStackTrace is not set',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'log',
+          text: () => 'Hello stack trace!',
+        });
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+                url: 'foo.ts',
+                name: 'foo',
+              },
+            ],
+          },
+          asyncFragments: [],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+        return await ConsoleFormatter.from(message, {
+          id: 1,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
+
+    formatterTestConcise(
+      'formats a console message with a stack trace when fetchStackTrace is set',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'log',
+          text: () => 'Hello stack trace!',
+        });
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+                url: 'foo.ts',
+                name: 'foo',
+              },
+              {
+                line: 20,
+                column: 2,
+                url: 'foo.ts',
+                name: 'bar',
+              },
+            ],
+          },
+          asyncFragments: [
+            {
+              description: 'setTimeout',
+              frames: [
+                {
+                  line: 5,
+                  column: 2,
+                  url: 'util.ts',
+                  name: 'schedule',
+                },
+              ],
+            },
+          ],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+        return await ConsoleFormatter.from(message, {
+          id: 1,
+          fetchStackTrace: true,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
+
+    formatterTestConcise(
+      'formats an UncaughtError with a stack trace when fetchStackTrace is set',
+      async () => {
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+                url: 'foo.ts',
+                name: 'foo',
+              },
+            ],
+          },
+          asyncFragments: [],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+        const error = new UncaughtError(
+          {
+            exceptionId: 1,
+            lineNumber: 0,
+            columnNumber: 5,
+            exception: {
+              type: 'object',
+              description: 'TypeError: Cannot read properties of undefined',
+            },
+            text: 'Uncaught',
+          },
+          '<mock target ID>',
+        );
+        return await ConsoleFormatter.from(error, {
+          id: 2,
+          fetchStackTrace: true,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
   });
 
   describe('toStringDetailed/toJSONDetailed', () => {
