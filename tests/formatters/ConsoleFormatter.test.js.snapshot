@@ -275,6 +275,53 @@ at schedule (util.ts:5:2)
 Note: line and column numbers use 1-based indexing
 `;
 
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats frames without a name or url and unnamed async fragments toJSONDetailed 1`] = `
+{
+  "id": 16,
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at <anonymous>\\nat bar (foo.ts:20:2)\\n--- async ------------------------------\\nat schedule (util.ts:5:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats frames without a name or url and unnamed async fragments toStringDetailed 1`] = `
+ID: 16
+Message: log> Hello stack trace!
+### Stack trace
+at <anonymous>
+at bar (foo.ts:20:2)
+--- async ------------------------------
+at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats object and primitive arguments toJSONDetailed 1`] = `
+{
+  "id": 15,
+  "type": "log",
+  "text": "Mixed args:",
+  "argsCount": 4,
+  "args": [
+    "{\\"user\\":\\"alice\\",\\"roles\\":[\\"admin\\"]}",
+    "42",
+    "null",
+    "true"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats object and primitive arguments toStringDetailed 1`] = `
+ID: 15
+Message: log> Mixed args:
+### Arguments
+Arg #0: {"user":"alice","roles":["admin"]}
+Arg #1: 42
+Arg #2: null
+Arg #3: true
+`;
+
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > handles \"Execution context is not available\" error in args toJSONDetailed 1`] = `
 {
   "id": 6,
@@ -361,4 +408,23 @@ at fn48 (main.js:48:48)
 at fn49 (main.js:49:49)
 ... and 50 more frames
 Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first argument as text when the message text is empty toJSONDetailed 1`] = `
+{
+  "id": 14,
+  "type": "log",
+  "text": "",
+  "argsCount": 2,
+  "args": [
+    "extra-arg"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first argument as text when the message text is empty toStringDetailed 1`] = `
+ID: 14
+Message: log> 
+### Arguments
+Arg #0: extra-arg
 `;

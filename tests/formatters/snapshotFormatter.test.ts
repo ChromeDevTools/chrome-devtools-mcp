@@ -272,6 +272,59 @@ describe('snapshotFormatter', () => {
     t.assert.snapshot(formatted);
   });
 
+  it('formats a node with role "none" as ignored', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'none',
+      name: '',
+      children: [
+        {
+          id: '1_2',
+          role: 'statictext',
+          name: 'text',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatted = formatter.toString();
+    assert.strictEqual(
+      formatted,
+      `uid=1_1 ignored
+  uid=1_2 statictext "text"
+`,
+    );
+  });
+
+  it('formats a snapshot with numeric properties', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'slider',
+      name: 'volume',
+      valuemin: 0,
+      valuemax: 100,
+      children: [],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatted = formatter.toString();
+    assert.strictEqual(
+      formatted,
+      `uid=1_1 slider "volume" valuemax="100" valuemin="0"
+`,
+    );
+  });
+
   it('toJSON returns expected structure', () => {
     const node: TextSnapshotNode = {
       id: '1_1',

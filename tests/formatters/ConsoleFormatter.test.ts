@@ -615,5 +615,81 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+
+    formatterTestDetailed(
+      'uses the first argument as text when the message text is empty',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'log',
+          text: () => '',
+        });
+        return await ConsoleFormatter.from(message, {
+          id: 14,
+          resolvedArgsForTesting: ['Actual message', 'extra-arg'],
+        });
+      },
+    );
+
+    formatterTestDetailed(
+      'formats object and primitive arguments',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'log',
+          text: () => 'Mixed args:',
+        });
+        return await ConsoleFormatter.from(message, {
+          id: 15,
+          resolvedArgsForTesting: [
+            {user: 'alice', roles: ['admin']},
+            42,
+            null,
+            true,
+          ],
+        });
+      },
+    );
+
+    formatterTestDetailed(
+      'formats frames without a name or url and unnamed async fragments',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'log',
+          text: () => 'Hello stack trace!',
+        });
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+              },
+              {
+                line: 20,
+                column: 2,
+                url: 'foo.ts',
+                name: 'bar',
+              },
+            ],
+          },
+          asyncFragments: [
+            {
+              frames: [
+                {
+                  line: 5,
+                  column: 2,
+                  url: 'util.ts',
+                  name: 'schedule',
+                },
+              ],
+            },
+          ],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+        return await ConsoleFormatter.from(message, {
+          id: 16,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
   });
 });
