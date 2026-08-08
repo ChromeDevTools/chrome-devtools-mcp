@@ -1296,6 +1296,71 @@ describe('input', () => {
         await fs.unlink(testFilePath);
       });
     });
+
+    it('does not probe a chooser-opening element with uploadFile', async () => {
+      const testFilePath = path.join(process.cwd(), 'test.txt');
+      await fs.writeFile(testFilePath, 'test file content');
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedPptrPage();
+        await page.setContent(
+          html`<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`,
+        );
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+
+        // Real headful Chrome doesn't throw when uploadFile is called on a
+        // chooser-opening element — it kills the renderer, and the file is
+        // never set. The in-process test browser instead throws, which lets
+        // the old code recover via the chooser and masks the bug. Stub
+        // uploadFile to a silent no-op so the button behaves like it does in
+        // production: if the tool probes it with uploadFile, the file is lost.
+        const buttonHandle = await mcpPage.getElementByUid('1_1');
+        const uploadFileStub = sinon
+          .stub(buttonHandle, 'uploadFile')
+          .resolves();
+        sinon.stub(mcpPage, 'getElementByUid').resolves(buttonHandle);
+
+        try {
+          await uploadFile.handler(
+            {
+              params: {
+                uid: '1_1',
+                filePath: testFilePath,
+              },
+              page: mcpPage,
+            },
+            response,
+            context,
+          );
+
+          // The element isn't a file input, so it must never be probed with
+          // uploadFile — it has to go straight to the chooser...
+          assert.strictEqual(uploadFileStub.called, false);
+          // ...and the chooser path must actually deliver the file.
+          const uploadedFileName = await page.$eval('#file-input', el => {
+            return (el as HTMLInputElement).files?.[0]?.name;
+          });
+          assert.strictEqual(uploadedFileName, 'test.txt');
+        } finally {
+          sinon.restore();
+        }
+
+        await fs.unlink(testFilePath);
+      });
+    });
   });
 
   describe('press_key', () => {
