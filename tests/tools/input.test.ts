@@ -90,6 +90,36 @@ describe('input', () => {
         assert.ok(await page.$('text/dblclicked'));
       });
     });
+    it('reports newly opened pages', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<button onclick="window.open('about:blank');">open</button>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully clicked on the element',
+        );
+        assert.ok(response.includePages);
+        const result = await response.handle(context);
+        const text = getTextContent(result.content[0]);
+        assert.ok(text.includes('The action opened a new page'));
+        assert.ok(text.includes('## Pages'));
+      });
+    });
     it('waits for navigation', async () => {
       const resolveNavigation = Promise.withResolvers<void>();
       server.addHtmlRoute(
