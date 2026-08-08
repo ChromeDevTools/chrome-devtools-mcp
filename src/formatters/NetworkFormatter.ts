@@ -86,7 +86,9 @@ export class NetworkFormatter {
         '<Request body not available anymore>';
       if (this.#options.requestFilePath) {
         if (!this.#options.saveFile) {
-          throw new Error('saveFile is not provided');
+          throw new Error(
+            'Unable to save the request body to a file: no saveFile callback was configured.',
+          );
         }
         if (data) {
           const result = await this.#options.saveFile(
@@ -119,7 +121,9 @@ export class NetworkFormatter {
         try {
           const buffer = await response.buffer();
           if (!this.#options.saveFile) {
-            throw new Error('saveFile is not provided');
+            throw new Error(
+              'Unable to save the response body to a file: no saveFile callback was configured.',
+            );
           }
           const result = await this.#options.saveFile(
             buffer,
