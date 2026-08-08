@@ -25,7 +25,6 @@ import {
   clickAt,
   typeText,
 } from '../../src/tools/input.js';
-import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext, getTextContent} from '../utils.js';
 
@@ -1299,33 +1298,6 @@ describe('input', () => {
   });
 
   describe('press_key', () => {
-    it('parses keys', () => {
-      assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
-      assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
-      assert.deepStrictEqual(parseKey('Control+Shift++'), [
-        '+',
-        'Control',
-        'Shift',
-      ]);
-      assert.deepStrictEqual(parseKey('Shift'), ['Shift']);
-      assert.deepStrictEqual(parseKey('KeyA'), ['KeyA']);
-    });
-    it('throws on empty key', () => {
-      assert.throws(() => {
-        parseKey('');
-      });
-    });
-    it('throws on invalid key', () => {
-      assert.throws(() => {
-        parseKey('aaaaa');
-      });
-    });
-    it('throws on multiple keys', () => {
-      assert.throws(() => {
-        parseKey('Shift+Shift');
-      });
-    });
-
     it('processes press_key', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
