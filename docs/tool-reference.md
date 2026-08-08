@@ -487,8 +487,8 @@ in the DevTools Elements panel (if any).
 - **id** (number) **(required)**: The ID for the class, obtained from details.
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the nodes.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (integer) _(optional)_: Maximum number of items to return. When omitted, returns all items.
 
 ---
 
@@ -501,8 +501,8 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the aggregates.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
-- **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
-- **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
+- **pageIdx** (integer) _(optional)_: Page number of aggregates to return (0-based). When omitted, returns the first page.
+- **pageSize** (integer) _(optional)_: Maximum number of aggregates to return. When omitted, returns all aggregates.
 
 ---
 
@@ -524,8 +524,8 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (integer) _(optional)_: Maximum number of items to return. When omitted, returns all items.
 
 ---
 
@@ -537,8 +537,8 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (integer) _(optional)_: Maximum number of items to return. When omitted, returns all items.
 
 ---
 
@@ -561,8 +561,8 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get retainers for.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageSize** (integer) _(optional)_: Maximum number of items to return. When omitted, returns all items.
 
 ---
 

@@ -373,14 +373,16 @@ export const commands: Commands = {
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
+        type: 'integer',
+        description:
+          'Page number to return (0-based). When omitted, returns the first page.',
         required: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
+        type: 'integer',
+        description:
+          'Maximum number of items to return. When omitted, returns all items.',
         required: false,
       },
     },
@@ -420,14 +422,16 @@ export const commands: Commands = {
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination of aggregates.',
+        type: 'integer',
+        description:
+          'Page number of aggregates to return (0-based). When omitted, returns the first page.',
         required: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination of aggregates.',
+        type: 'integer',
+        description:
+          'Maximum number of aggregates to return. When omitted, returns all aggregates.',
         required: false,
       },
     },
@@ -464,14 +468,16 @@ export const commands: Commands = {
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
+        type: 'integer',
+        description:
+          'Page number to return (0-based). When omitted, returns the first page.',
         required: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
+        type: 'integer',
+        description:
+          'Maximum number of items to return. When omitted, returns all items.',
         required: false,
       },
     },
@@ -495,14 +501,16 @@ export const commands: Commands = {
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
+        type: 'integer',
+        description:
+          'Page number to return (0-based). When omitted, returns the first page.',
         required: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
+        type: 'integer',
+        description:
+          'Maximum number of items to return. When omitted, returns all items.',
         required: false,
       },
     },
@@ -545,14 +553,16 @@ export const commands: Commands = {
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
-        description: 'The page index for pagination.',
+        type: 'integer',
+        description:
+          'Page number to return (0-based). When omitted, returns the first page.',
         required: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
-        description: 'The page size for pagination.',
+        type: 'integer',
+        description:
+          'Maximum number of items to return. When omitted, returns all items.',
         required: false,
       },
     },
