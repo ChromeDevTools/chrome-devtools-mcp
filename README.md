@@ -137,6 +137,19 @@ Chrome DevTools MCP will not start the browser instance automatically using this
 </details>
 
 <details>
+  <summary>Autohand Code</summary>
+
+Use the [Autohand Code CLI](https://github.com/autohandai/code-cli/) to add the Chrome DevTools MCP server:
+
+```bash
+autohand mcp add chrome-devtools npx -y chrome-devtools-mcp@latest
+```
+
+Add `--scope project` before `chrome-devtools` to save the server in the current project's `.autohand` configuration instead of your user configuration.
+
+</details>
+
+<details>
   <summary>Claude Code</summary>
 
 **Install via CLI (MCP only)**
