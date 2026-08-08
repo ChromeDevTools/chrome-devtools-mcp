@@ -148,7 +148,7 @@ export class NetworkFormatter {
   }
 
   toStringDetailed(): string {
-    return converNetworkRequestDetailedToStringDetailed(this.toJSONDetailed());
+    return convertNetworkRequestDetailedToStringDetailed(this.toJSONDetailed());
   }
 
   toJSON(): NetworkRequestConcise {
@@ -263,7 +263,7 @@ function convertNetworkRequestConciseToString(
   return `reqid=${data.requestId} ${data.method} ${data.url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 
-function formatHeadlers(headers: Record<string, string>): string[] {
+function formatHeaders(headers: Record<string, string>): string[] {
   const response: string[] = [];
   for (const [name, value] of Object.entries(headers)) {
     response.push(`- ${name}:${value}`);
@@ -271,14 +271,14 @@ function formatHeadlers(headers: Record<string, string>): string[] {
   return response;
 }
 
-function converNetworkRequestDetailedToStringDetailed(
+function convertNetworkRequestDetailedToStringDetailed(
   data: NetworkRequestDetailed,
 ): string {
   const response: string[] = [];
   response.push(`## Request ${data.url}`);
   response.push(`Status: ${data.status}`);
   response.push(`### Request Headers`);
-  for (const line of formatHeadlers(data.requestHeaders)) {
+  for (const line of formatHeaders(data.requestHeaders)) {
     response.push(line);
   }
 
@@ -292,7 +292,7 @@ function converNetworkRequestDetailedToStringDetailed(
 
   if (data.responseHeaders) {
     response.push(`### Response Headers`);
-    for (const line of formatHeadlers(data.responseHeaders)) {
+    for (const line of formatHeaders(data.responseHeaders)) {
       response.push(line);
     }
   }
