@@ -20,7 +20,7 @@ import {
   ListRootsResultSchema,
   RootsListChangedNotificationSchema,
 } from './third_party/index.js';
-import {ToolHandler} from './ToolHandler.js';
+import {getDisabledToolNames, ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logger} from './utils/logger.js';
@@ -191,6 +191,17 @@ export async function createMcpServer(
   }
 
   const tools = createTools(serverArgs);
+  // Fail fast on typos so that a misspelled --disabled-tool value does not
+  // silently leave the tool enabled.
+  const toolNames = new Set(tools.map(tool => tool.name));
+  const unknownDisabledTools = [...getDisabledToolNames(serverArgs)].filter(
+    name => !toolNames.has(name),
+  );
+  if (unknownDisabledTools.length) {
+    throw new Error(
+      `Unknown tool name(s) passed to --disabled-tool: ${unknownDisabledTools.join(', ')}.`,
+    );
+  }
   for (const tool of tools) {
     registerTool(tool);
   }

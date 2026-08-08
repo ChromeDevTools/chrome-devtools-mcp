@@ -697,6 +697,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** array
   - **Default:** `false`
 
+- **`--disabledTool`/ `--disabled-tool`**
+  Disables the tool with the given name so that it is not exposed to the MCP client. Accepts an array of tool names. Useful as a security guardrail when MCP clients process untrusted content, e.g. --disabled-tool=evaluate_script prevents arbitrary JavaScript execution in the browser.
+  - **Type:** array
+  - **Default:** `false`
+
 - **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
   Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array

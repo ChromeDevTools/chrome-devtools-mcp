@@ -301,4 +301,104 @@ describe('ToolHandler', () => {
     );
     assert.strictEqual(handlerCalled, false);
   });
+
+  describe('disabledTool', () => {
+    function createTool(name: string): {
+      tool: ToolDefinition;
+      wasCalled: () => boolean;
+    } {
+      let handlerCalled = false;
+      const tool: ToolDefinition = {
+        name,
+        description: 'A test tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: [],
+        handler: async () => {
+          handlerCalled = true;
+        },
+      };
+      return {
+        tool,
+        wasCalled: () => handlerCalled,
+      };
+    }
+
+    function createToolHandler(tool: ToolDefinition, argv: string[]) {
+      const mockContext = sinon.createStubInstance(McpContext);
+      const serverArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', ...argv],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+      return new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        new Mutex(),
+      );
+    }
+
+    it('does not register tools disabled via --disabled-tool', async () => {
+      const {tool, wasCalled} = createTool('dangerous_tool');
+      const toolHandler = createToolHandler(tool, [
+        '--disabled-tool=dangerous_tool',
+      ]);
+
+      assert.strictEqual(toolHandler.shouldRegister, false);
+
+      const result = await toolHandler.handle({});
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /Tool dangerous_tool has been disabled via the --disabled-tool option/,
+      );
+      assert.strictEqual(wasCalled(), false);
+    });
+
+    it('supports disabling multiple tools', () => {
+      const first = createTool('first_tool');
+      const second = createTool('second_tool');
+      const argv = [
+        '--disabled-tool=first_tool',
+        '--disabled-tool=second_tool',
+      ];
+
+      assert.strictEqual(
+        createToolHandler(first.tool, argv).shouldRegister,
+        false,
+      );
+      assert.strictEqual(
+        createToolHandler(second.tool, argv).shouldRegister,
+        false,
+      );
+    });
+
+    it('does not register tools disabled via --disabled-tool when running via the CLI', () => {
+      const {tool} = createTool('dangerous_tool');
+      const toolHandler = createToolHandler(tool, [
+        '--disabled-tool=dangerous_tool',
+        '--viaCli',
+      ]);
+
+      assert.strictEqual(toolHandler.shouldRegister, false);
+    });
+
+    it('does not affect tools with other names', async () => {
+      const {tool, wasCalled} = createTool('other_tool');
+      const toolHandler = createToolHandler(tool, [
+        '--disabled-tool=dangerous_tool',
+      ]);
+
+      assert.strictEqual(toolHandler.shouldRegister, true);
+
+      const result = await toolHandler.handle({});
+      assert.strictEqual(result.isError, undefined);
+      assert.strictEqual(wasCalled(), true);
+    });
+  });
 });

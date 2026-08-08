@@ -371,5 +371,9 @@
   {
     "name": "allow_unrestricted_paths",
     "flagType": "boolean"
+  },
+  {
+    "name": "disabled_tool_present",
+    "flagType": "boolean"
   }
 ]

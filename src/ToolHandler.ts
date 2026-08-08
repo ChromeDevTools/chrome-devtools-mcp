@@ -76,10 +76,24 @@ function getConditionStatus(
   return {disabled: false};
 }
 
+export function getDisabledToolNames(
+  serverArgs: Pick<ReturnType<typeof parseArguments>, 'disabledTool'>,
+): Set<string> {
+  return new Set((serverArgs.disabledTool ?? []).map(String));
+}
+
 function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ReturnType<typeof parseArguments>,
-): {disabled: boolean; reason?: string} {
+): {disabled: boolean; reason?: string; disabledByName?: boolean} {
+  if (getDisabledToolNames(serverArgs).has(tool.name)) {
+    return {
+      disabled: true,
+      disabledByName: true,
+      reason: `Tool ${tool.name} has been disabled via the --disabled-tool option by the operator of this MCP server.`,
+    };
+  }
+
   const category = tool.annotations.category;
   const categoryCheck = getCategoryStatus(category, serverArgs);
 
@@ -160,9 +174,16 @@ export class ToolHandler {
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
   ) {
-    const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
+    const {disabled, reason, disabledByName} = getToolStatusInfo(
+      tool,
+      serverArgs,
+    );
     this.disabledReason = reason;
-    this.shouldRegister = !(disabled && !serverArgs.viaCli);
+    // Tools disabled by category or condition are still registered when
+    // running via the CLI so that a helpful message can be shown. Tools
+    // explicitly disabled by name via --disabled-tool are never registered
+    // since the operator opted out of them entirely.
+    this.shouldRegister = !disabled || (!!serverArgs.viaCli && !disabledByName);
 
     this.inputSchema =
       'pageScoped' in tool &&

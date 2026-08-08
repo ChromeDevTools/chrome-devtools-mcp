@@ -225,6 +225,11 @@ export const cliOptions = {
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['blockedUrlPattern'],
   },
+  disabledTool: {
+    type: 'array',
+    describe:
+      'Disables the tool with the given name so that it is not exposed to the MCP client. Accepts an array of tool names. Useful as a security guardrail when MCP clients process untrusted content, e.g. --disabled-tool=evaluate_script prevents arbitrary JavaScript execution in the browser.',
+  },
   ignoreDefaultChromeArg: {
     type: 'array',
     describe:
@@ -432,6 +437,10 @@ export function parseArguments(
         'Disable tools in the performance category',
       ],
       ['$0 --no-category-network', 'Disable tools in the network category'],
+      [
+        '$0 --disabled-tool=evaluate_script',
+        'Do not expose the evaluate_script tool to the MCP client',
+      ],
       [
         '$0 --user-data-dir=/tmp/user-data-dir',
         'Use a custom user data directory',
