@@ -848,7 +848,7 @@ server instances.
 
 ### User data directory
 
-By default, `chrome-devtools-mcp` starts a stable Chrome instance using the following user
+By default, `chrome-devtools-mcp` starts a Chrome's stable channel instance using the following user
 data directory:
 
 - Linux / macOS: `$HOME/.cache/chrome-devtools-mcp/chrome-profile`
