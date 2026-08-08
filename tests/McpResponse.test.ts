@@ -14,7 +14,7 @@ import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from '../src/McpContext.js';
-import type {McpResponse} from '../src/McpResponse.js';
+import {McpResponse} from '../src/McpResponse.js';
 import type {Extension} from '../src/third_party/index.js';
 import {
   closePage,
@@ -871,6 +871,237 @@ describe('McpResponse network pagination', () => {
           ),
         );
       });
+    });
+  });
+});
+
+describe('McpResponse console pagination', () => {
+  async function emitConsoleMessages(
+    context: McpContext,
+    count: number,
+  ): Promise<void> {
+    const page = context.getSelectedMcpPage().pptrPage;
+    let received = 0;
+    const allMessagesReceived = new Promise<void>(resolve => {
+      page.on('console', () => {
+        received++;
+        if (received === count) {
+          resolve();
+        }
+      });
+    });
+    await page.evaluate(total => {
+      for (let i = 0; i < total; i++) {
+        console.log(`message ${i}`);
+      }
+    }, count);
+    await allMessagesReceived;
+  }
+
+  it('paginates console messages when pageIdx is provided', async () => {
+    await withMcpContext(async (response, context) => {
+      await emitConsoleMessages(context, 5);
+      response.setIncludeConsoleData(true, {pageSize: 2, pageIdx: 1});
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('## Console messages'));
+      assert.ok(text.includes('Showing 3-4 of 5 (Page 2 of 3).'));
+      assert.ok(text.includes('Next page: 2'));
+      assert.ok(text.includes('Previous page: 0'));
+      const typedStructuredContent = structuredContent as {
+        consoleMessages?: object[];
+        pagination?: {
+          currentPage: number;
+          totalPages: number;
+          hasNextPage: boolean;
+          hasPreviousPage: boolean;
+        };
+      };
+      assert.strictEqual(typedStructuredContent.consoleMessages?.length, 2);
+      assert.strictEqual(typedStructuredContent.pagination?.currentPage, 1);
+      assert.strictEqual(typedStructuredContent.pagination?.totalPages, 3);
+      assert.strictEqual(typedStructuredContent.pagination?.hasNextPage, true);
+      assert.strictEqual(
+        typedStructuredContent.pagination?.hasPreviousPage,
+        true,
+      );
+    });
+  });
+
+  it('handles invalid console page number by showing first page', async () => {
+    await withMcpContext(async (response, context) => {
+      await emitConsoleMessages(context, 3);
+      response.setIncludeConsoleData(true, {
+        pageSize: 2,
+        pageIdx: 10, // Invalid page number
+      });
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(
+        text.includes('Invalid page number provided. Showing first page.'),
+      );
+      assert.ok(text.includes('Showing 1-2 of 3 (Page 1 of 2).'));
+      const typedStructuredContent = structuredContent as {
+        pagination?: {invalidPage?: boolean};
+      };
+      assert.strictEqual(typedStructuredContent.pagination?.invalidPage, true);
+    });
+  });
+
+  it('reflects the last paginated section when network and console pagination are combined', async () => {
+    await withMcpContext(async (response, context) => {
+      await emitConsoleMessages(context, 3);
+      const requests = Array.from({length: 5}, () => getMockRequest());
+      context.getSelectedMcpPage().getNetworkRequests = () => requests;
+      response.setIncludeNetworkRequests(true, {pageSize: 2});
+      response.setIncludeConsoleData(true, {pageSize: 3});
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      // Each section reports its own pagination in the text output.
+      assert.ok(text.includes('Showing 1-2 of 5 (Page 1 of 3).'));
+      assert.ok(text.includes('Showing 1-3 of 3 (Page 1 of 1).'));
+      // The shared structured pagination field holds the values of the
+      // section that is formatted last (console messages).
+      const typedStructuredContent = structuredContent as {
+        pagination?: {totalPages: number};
+      };
+      assert.strictEqual(typedStructuredContent.pagination?.totalPages, 1);
+    });
+  });
+});
+
+describe('McpResponse composition', () => {
+  it('includes an error message in text and structured content', async () => {
+    await withMcpContext(async (response, context) => {
+      response.setError(new Error('Something went wrong'));
+      assert.strictEqual(response.error?.message, 'Something went wrong');
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('Error: Something went wrong'));
+      assert.strictEqual(
+        (structuredContent as {errorMessage?: string}).errorMessage,
+        'Something went wrong',
+      );
+    });
+  });
+
+  it('includes the tab id in structured content', async () => {
+    await withMcpContext(async (response, context) => {
+      response.setTabId('tab-42');
+      const {structuredContent} = await response.handle(context);
+      assert.strictEqual(
+        (structuredContent as {tabId?: string}).tabId,
+        'tab-42',
+      );
+    });
+  });
+
+  it('appends images after the text content in attachment order', async () => {
+    await withMcpContext(async (response, context) => {
+      response.attachImage({data: 'firstImage', mimeType: 'image/png'});
+      response.attachImage({data: 'secondImage', mimeType: 'image/jpeg'});
+      const {content} = await response.handle(context);
+      assert.strictEqual(content.length, 3);
+      assert.strictEqual(content[0].type, 'text');
+      assert.strictEqual(content[1].type, 'image');
+      assert.strictEqual(getImageContent(content[1]).data, 'firstImage');
+      assert.strictEqual(getImageContent(content[1]).mimeType, 'image/png');
+      assert.strictEqual(content[2].type, 'image');
+      assert.strictEqual(getImageContent(content[2]).data, 'secondImage');
+      assert.strictEqual(getImageContent(content[2]).mimeType, 'image/jpeg');
+    });
+  });
+
+  it('clears network request options when include is reset to false', async () => {
+    await withMcpContext(async (response, context) => {
+      response.setIncludeNetworkRequests(true, {pageSize: 2, pageIdx: 1});
+      response.setIncludeNetworkRequests(false);
+      assert.strictEqual(response.includeNetworkRequests, false);
+      assert.strictEqual(response.networkRequestsPageIdx, undefined);
+      context.getSelectedMcpPage().getNetworkRequests = () => {
+        return [getMockRequest()];
+      };
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(!text.includes('## Network requests'));
+      assert.strictEqual(
+        (structuredContent as {networkRequests?: object[]}).networkRequests,
+        undefined,
+      );
+    });
+  });
+
+  it('clears console data options when include is reset to false', async () => {
+    await withMcpContext(async (response, context) => {
+      response.setIncludeConsoleData(true, {
+        pageSize: 2,
+        pageIdx: 1,
+        types: ['error'],
+      });
+      response.setIncludeConsoleData(false);
+      assert.strictEqual(response.includeConsoleData, false);
+      assert.strictEqual(response.consoleMessagesPageIdx, undefined);
+      assert.strictEqual(response.consoleMessagesTypes, undefined);
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(!text.includes('## Console messages'));
+      assert.strictEqual(
+        (structuredContent as {consoleMessages?: object[]}).consoleMessages,
+        undefined,
+      );
+    });
+  });
+
+  it('orders response lines, network requests, console messages, and errors', async () => {
+    await withMcpContext(async (response, context) => {
+      response.appendResponseLine('First response line');
+      response.setIncludeNetworkRequests(true);
+      context.getSelectedMcpPage().getNetworkRequests = () => {
+        return [getMockRequest()];
+      };
+      response.setIncludeConsoleData(true);
+      response.setError(new Error('composition failed'));
+      const {content} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      const lineIdx = text.indexOf('First response line');
+      const networkIdx = text.indexOf('## Network requests');
+      const consoleIdx = text.indexOf('## Console messages');
+      const errorIdx = text.indexOf('Error: composition failed');
+      assert.ok(lineIdx !== -1, 'response line is included');
+      assert.ok(networkIdx !== -1, 'network requests section is included');
+      assert.ok(consoleIdx !== -1, 'console messages section is included');
+      assert.ok(errorIdx !== -1, 'error message is included');
+      assert.ok(
+        lineIdx < networkIdx,
+        'response lines come before network requests',
+      );
+      assert.ok(
+        networkIdx < consoleIdx,
+        'network requests come before console messages',
+      );
+      assert.ok(consoleIdx < errorIdx, 'the error message comes last');
+    });
+  });
+
+  it('rejects when a snapshot is requested without a page', async () => {
+    await withMcpContext(async (_response, context) => {
+      const response = new McpResponse({} as ParsedArguments);
+      response.includeSnapshot();
+      await assert.rejects(
+        response.handle(context),
+        /Response must have a page/,
+      );
+    });
+  });
+
+  it('rejects when a network request is attached without a page', async () => {
+    await withMcpContext(async (_response, context) => {
+      const response = new McpResponse({} as ParsedArguments);
+      response.attachNetworkRequest(1);
+      await assert.rejects(
+        response.handle(context),
+        /Response must have an McpPage/,
+      );
     });
   });
 });
