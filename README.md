@@ -857,7 +857,7 @@ data directory:
 For non-stable channels, the channel name is appended to the directory name, for example
 `chrome-profile-canary`.
 
-The default user data directory is not cleared between runs and is reused for subsequent
+The user data directory is not cleared between runs and is reused for subsequent
 runs with the same channel. Only one browser can use it at a time. Set the `isolated`
 option to `true` to use a temporary user data directory instead which will be cleared
 automatically after the browser is closed.
