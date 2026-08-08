@@ -7,7 +7,11 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.js';
+import {
+  HeapSnapshotFormatter,
+  isNodeLike,
+  isEdgeLike,
+} from '../../src/formatters/HeapSnapshotFormatter.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 
@@ -78,6 +82,117 @@ describe('HeapSnapshotFormatter', () => {
     });
   });
 
+  describe('isNodeLike', () => {
+    it('returns true for objects with id and name', () => {
+      assert.strictEqual(isNodeLike({id: 1, name: 'NodeA'}), true);
+    });
+
+    it('returns true for a full node shape', () => {
+      assert.strictEqual(
+        isNodeLike({
+          id: 1,
+          name: 'NodeA',
+          distance: 0,
+          nodeIndex: 0,
+          retainedSize: 0,
+          selfSize: 0,
+          type: 'object',
+          canBeQueried: false,
+          detachedDOMTreeNode: false,
+          ignored: false,
+          isAddedNotRemoved: null,
+        }),
+        true,
+      );
+    });
+
+    it('returns false for null and undefined', () => {
+      assert.strictEqual(isNodeLike(null), false);
+      assert.strictEqual(isNodeLike(undefined), false);
+    });
+
+    it('returns false for primitives', () => {
+      assert.strictEqual(isNodeLike(42), false);
+      assert.strictEqual(isNodeLike('node'), false);
+    });
+
+    it('returns false for an empty object', () => {
+      assert.strictEqual(isNodeLike({}), false);
+    });
+
+    it('returns false when id or name is missing', () => {
+      assert.strictEqual(isNodeLike({id: 1}), false);
+      assert.strictEqual(isNodeLike({name: 'NodeA'}), false);
+    });
+
+    it('returns false for an edge shape', () => {
+      assert.strictEqual(
+        isNodeLike({
+          name: 'edge1',
+          type: 'property',
+          node: {id: 1, name: 'NodeA'},
+        }),
+        false,
+      );
+    });
+  });
+
+  describe('isEdgeLike', () => {
+    const validEdge = {
+      name: 'edge1',
+      type: 'property',
+      node: {id: 1, name: 'NodeA'},
+    };
+
+    it('returns true for objects with name, type and a node-like node', () => {
+      assert.strictEqual(isEdgeLike(validEdge), true);
+    });
+
+    it('returns false for null and undefined', () => {
+      assert.strictEqual(isEdgeLike(null), false);
+      assert.strictEqual(isEdgeLike(undefined), false);
+    });
+
+    it('returns false for an empty object', () => {
+      assert.strictEqual(isEdgeLike({}), false);
+    });
+
+    it('returns false when a top-level property is missing', () => {
+      assert.strictEqual(
+        isEdgeLike({type: validEdge.type, node: validEdge.node}),
+        false,
+      );
+      assert.strictEqual(
+        isEdgeLike({name: validEdge.name, node: validEdge.node}),
+        false,
+      );
+      assert.strictEqual(
+        isEdgeLike({name: validEdge.name, type: validEdge.type}),
+        false,
+      );
+    });
+
+    it('returns false when node is not an object', () => {
+      assert.strictEqual(isEdgeLike({...validEdge, node: null}), false);
+      assert.strictEqual(isEdgeLike({...validEdge, node: 42}), false);
+    });
+
+    it('returns false when node is missing id or name', () => {
+      assert.strictEqual(
+        isEdgeLike({...validEdge, node: {name: 'NodeA'}}),
+        false,
+      );
+      assert.strictEqual(isEdgeLike({...validEdge, node: {id: 1}}), false);
+    });
+
+    it('returns false for a node shape', () => {
+      assert.strictEqual(
+        isEdgeLike({id: 1, name: 'NodeA', type: 'object'}),
+        false,
+      );
+    });
+  });
+
   describe('formatNodes', () => {
     it('formats edges correctly', () => {
       const mockEdges = [
@@ -129,6 +244,50 @@ describe('HeapSnapshotFormatter', () => {
       ].join('\n');
 
       assert.strictEqual(result, expected);
+    });
+
+    it('formats nodes correctly', () => {
+      const mockNodes = [
+        {
+          id: 1,
+          name: 'NodeA',
+          distance: 2,
+          nodeIndex: 0,
+          retainedSize: 2048,
+          selfSize: 1024,
+          type: 'object',
+          canBeQueried: false,
+          detachedDOMTreeNode: false,
+          ignored: false,
+          isAddedNotRemoved: null,
+        },
+        {
+          id: 2,
+          name: 'NodeB',
+          distance: 3,
+          nodeIndex: 1,
+          retainedSize: 512,
+          selfSize: 256,
+          type: 'closure',
+          canBeQueried: false,
+          detachedDOMTreeNode: false,
+          ignored: false,
+          isAddedNotRemoved: null,
+        },
+      ];
+
+      const result = HeapSnapshotFormatter.formatNodes(mockNodes);
+      const expected = [
+        'nodeId,nodeName,type,distance,selfSize,retainedSize',
+        `1,NodeA,object,2,${formatBytesToKb(1024)},${formatBytesToKb(2048)}`,
+        `2,NodeB,closure,3,${formatBytesToKb(256)},${formatBytesToKb(512)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+
+    it('returns an empty string for an empty array', () => {
+      assert.strictEqual(HeapSnapshotFormatter.formatNodes([]), '');
     });
   });
 
