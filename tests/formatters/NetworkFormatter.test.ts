@@ -132,6 +132,51 @@ describe('NetworkFormatter', () => {
         'reqid=1 GET http://example.com [pending] [selected in the DevTools Network panel]',
       );
     });
+
+    it('truncates long urls', async () => {
+      const longUrl = `http://example.com/${'a'.repeat(200)}`;
+      const request = getMockRequest({url: longUrl});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      assert.equal(
+        formatter.toString(),
+        `reqid=1 GET ${longUrl.substring(0, 150)}... <truncated> [pending]`,
+      );
+      // The structured data keeps the full URL.
+      assert.equal(formatter.toJSON().url, longUrl);
+    });
+
+    it('truncates data: urls', async () => {
+      const dataUrl = `data:image/png;base64,${'A'.repeat(5000)}`;
+      const request = getMockRequest({url: dataUrl});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      assert.equal(
+        formatter.toString(),
+        `reqid=1 GET ${dataUrl.substring(0, 150)}... <truncated> [pending]`,
+      );
+    });
+
+    it('does not truncate urls within the size limit', async () => {
+      // Exactly at the 150 character limit.
+      const url = `http://example.com/${'a'.repeat(131)}`;
+      const request = getMockRequest({url});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      assert.equal(formatter.toString(), `reqid=1 GET ${url} [pending]`);
+    });
   });
 
   describe('toStringDetailed', () => {

@@ -13,6 +13,7 @@ import {
 } from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
+const URL_CONTEXT_SIZE_LIMIT = 150;
 
 export interface NetworkFormatterOptions {
   requestId?: number | string;
@@ -259,8 +260,10 @@ function getSizeLimitedString(text: string, sizeLimit: number) {
 function convertNetworkRequestConciseToString(
   data: NetworkRequestConcise,
 ): string {
-  // TODO truncate the URL
-  return `reqid=${data.requestId} ${data.method} ${data.url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
+  // Long URLs (e.g., data: URLs) bloat the concise list output. The full URL
+  // remains available via the detailed view and the structured content.
+  const url = getSizeLimitedString(data.url, URL_CONTEXT_SIZE_LIMIT);
+  return `reqid=${data.requestId} ${data.method} ${url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 
 function formatHeadlers(headers: Record<string, string>): string[] {
