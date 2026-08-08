@@ -14,6 +14,7 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import type {KeyInput} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -1376,11 +1377,17 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
 
-        // Simulate the main key press failing mid-sequence (e.g. a CDP
-        // hiccup) after the modifiers have already been pressed down.
+        // Simulate the main key's key down failing (e.g. a CDP hiccup) after
+        // the modifiers have already been pressed down.
+        const realDown = page.keyboard.down.bind(page.keyboard);
         sinon
-          .stub(page.keyboard, 'press')
-          .throws(new Error('injected press failure'));
+          .stub(page.keyboard, 'down')
+          .callsFake(async (key: KeyInput): Promise<void> => {
+            if (key === 'C') {
+              throw new Error('injected key down failure');
+            }
+            return await realDown(key);
+          });
 
         try {
           await assert.rejects(
@@ -1399,15 +1406,67 @@ describe('input', () => {
           sinon.restore();
         }
 
-        // The modifiers were pressed down; both must be released even though
-        // the main key press threw, otherwise the browser is left with the
-        // modifiers logically stuck down.
+        // The modifiers must be released even though the main key failed,
+        // otherwise they stay logically held down in the browser. "C" is not
+        // released: its key down never landed, so there is no key up to send.
         assert.deepStrictEqual(await page.evaluate('logs'), [
           'dControl',
           'dShift',
           'uShift',
           'uControl',
         ]);
+      });
+    });
+
+    it('retries releasing the main key when its key up fails', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<script>
+            logs = [];
+            document.addEventListener('keydown', e => logs.push('d' + e.key));
+            document.addEventListener('keyup', e => logs.push('u' + e.key));
+          </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        // A transient CDP failure on the main key's key up. The key down for
+        // "C" already reached the renderer, so if nothing retries the key up
+        // the browser is left with "C" logically held down.
+        const realUp = page.keyboard.up.bind(page.keyboard);
+        let failedOnce = false;
+        sinon
+          .stub(page.keyboard, 'up')
+          .callsFake(async (key: KeyInput): Promise<void> => {
+            if (key === 'C' && !failedOnce) {
+              failedOnce = true;
+              throw new Error('transient CDP failure');
+            }
+            return await realUp(key);
+          });
+
+        try {
+          await assert.rejects(
+            pressKey.handler(
+              {
+                params: {key: 'Control+Shift+C'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            ),
+          );
+        } finally {
+          sinon.restore();
+        }
+
+        const logs = (await page.evaluate('logs')) as string[];
+        assert.ok(
+          logs.includes('uC'),
+          `expected "C" to be released, got ${JSON.stringify(logs)}`,
+        );
       });
     });
   });
