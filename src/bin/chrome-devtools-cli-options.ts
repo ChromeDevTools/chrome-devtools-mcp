@@ -644,7 +644,7 @@ export const commands: Commands = {
         name: 'manifestId',
         type: 'string',
         description:
-          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
       },
     },
@@ -711,7 +711,7 @@ export const commands: Commands = {
         name: 'manifestId',
         type: 'string',
         description:
-          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
       },
       installUrlOrBundleUrl: {
@@ -740,7 +740,7 @@ export const commands: Commands = {
         name: 'manifestId',
         type: 'string',
         description:
-          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
       },
       url: {
@@ -1264,7 +1264,7 @@ export const commands: Commands = {
         name: 'manifestId',
         type: 'string',
         description:
-          'The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
       },
     },

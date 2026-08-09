@@ -14,8 +14,9 @@ import {defineTool} from './ToolDefinition.js';
 const manifestIdSchema = zod
   .string()
   .describe(
-    'The manifest ID of the web app, commonly the start URL of the site ' +
-      '(e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.',
+    'The manifest ID of the web app: the resolved `id` member of its manifest. ' +
+      'If `id` is omitted, it defaults to the resolved `start_url` ' +
+      '(e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
   );
 
 const displayModeSchema = zod

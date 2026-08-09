@@ -710,7 +710,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 **Parameters:**
 
-- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
 
 ---
 
@@ -721,7 +721,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Parameters:**
 
 - **installUrlOrBundleUrl** (string) **(required)**: The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.
-- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
 - **displayMode** (enum: "standalone", "browser") _(optional)_: Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.
 
 ---
@@ -732,7 +732,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 **Parameters:**
 
-- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
 - **url** (string) _(optional)_: Optional URL within the app to open instead of the default start URL.
 
 ---
@@ -743,6 +743,6 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 **Parameters:**
 
-- **manifestId** (string) **(required)**: The manifest ID of the web app, commonly the start URL of the site (e.g. "https://example.com/"). See https://web.dev/learn/pwa/web-app-manifest.
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
 
 ---
