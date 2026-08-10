@@ -61,6 +61,8 @@ interface McpContextOptions {
   // Whether this context replaces a previous one after a browser reconnect.
   // Surfaces a one-time note in the next response.
   reconnected?: boolean;
+  // Custom navigation timeout in milliseconds to override default.
+  navigationTimeout?: number;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -503,6 +505,7 @@ export class McpContext implements Context {
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           page.browserContext(),
         ),
+        navigationTimeout: this.#options.navigationTimeout,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();

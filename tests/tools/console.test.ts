@@ -188,6 +188,59 @@ describe('console', () => {
       });
     });
 
+    it('includes stack traces when includeStackTraces is set', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          '<script>function failingFn() { console.error("This is an error"); } failingFn();</script>',
+        );
+        await listConsoleMessages().handler(
+          {
+            params: {includeStackTraces: true},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('msgid=1 [error] This is an error'));
+        assert.match(textContent, /at failingFn/);
+        const structuredContent = formattedResponse.structuredContent as {
+          consoleMessages: Array<{stackTrace?: string}>;
+        };
+        assert.match(
+          structuredContent.consoleMessages[0].stackTrace ?? '',
+          /at failingFn/,
+        );
+      });
+    });
+
+    it('omits stack traces by default', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          '<script>function failingFn() { console.error("This is an error"); } failingFn();</script>',
+        );
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('msgid=1 [error] This is an error'));
+        assert.ok(!textContent.includes('at failingFn'));
+        const structuredContent = formattedResponse.structuredContent as {
+          consoleMessages: Array<{stackTrace?: string}>;
+        };
+        assert.strictEqual(
+          structuredContent.consoleMessages[0].stackTrace,
+          undefined,
+        );
+      });
+    });
+
     it('work with primitive unhandled errors', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage();

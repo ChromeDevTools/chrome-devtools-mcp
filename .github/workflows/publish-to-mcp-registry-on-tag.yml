@@ -21,7 +21,6 @@ jobs:
         with:
           fetch-depth: 2
           submodules: true
-          submodule-depth: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -65,6 +64,25 @@ jobs:
           rm mcp-publisher.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for npm package availability
+        run: |
+          PKG=$(node -p "require('./package.json').name + '@' + require('./package.json').version")
+          echo "Waiting for $PKG to be available on npm..."
+          for i in {1..5}; do
+            if npm view "$PKG" version --prefer-online > /dev/null 2>&1; then
+              echo "$PKG is available on npm."
+              exit 0
+            fi
+            echo "Attempt $i: $PKG is not yet available. Waiting 60s..."
+            sleep 60
+          done
+          if npm view "$PKG" version --prefer-online > /dev/null 2>&1; then
+            echo "$PKG is available on npm."
+            exit 0
+          fi
+          echo "Timed out waiting for $PKG to be available on npm."
+          exit 1
 
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc

@@ -123,9 +123,9 @@ describe('HeapSnapshotFormatter', () => {
 
       const result = HeapSnapshotFormatter.formatNodes(mockEdges);
       const expected = [
-        'name,type,nodeId,nodeName',
-        'edge1,property,1,NodeA',
-        'edge2,element,2,NodeB',
+        'name,type,nodeId,nodeName,selfSize,retainedSize',
+        'edge1,property,1,NodeA,0.0 kB,0.0 kB',
+        'edge2,element,2,NodeB,0.0 kB,0.0 kB',
       ].join('\n');
 
       assert.strictEqual(result, expected);
