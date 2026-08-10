@@ -2,3 +2,4 @@
 	path = devtools-frontend
 	url = https://github.com/ChromeDevTools/devtools-frontend.git
 	branch = main
+	shallow = true
