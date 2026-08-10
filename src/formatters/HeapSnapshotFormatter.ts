@@ -67,7 +67,7 @@ export class HeapSnapshotFormatter {
       if (isNodeLike(firstItem)) {
         lines.push('nodeId,nodeName,type,distance,selfSize,retainedSize');
       } else if (isEdgeLike(firstItem)) {
-        lines.push('name,type,nodeId,nodeName');
+        lines.push('name,type,nodeId,nodeName,selfSize,retainedSize');
       }
     }
 
@@ -78,7 +78,7 @@ export class HeapSnapshotFormatter {
         );
       } else if (isEdgeLike(item)) {
         lines.push(
-          `${item.name},${item.type},${item.node.id},${item.node.name}`,
+          `${item.name},${item.type},${item.node.id},${item.node.name},${formatBytesToKb(item.node.selfSize)},${formatBytesToKb(item.node.retainedSize)}`,
         );
       }
     }
