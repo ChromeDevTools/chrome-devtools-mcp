@@ -164,6 +164,7 @@ export async function withMcpContext(
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
     allowUnrestrictedPaths?: boolean;
+    navigationTimeout?: number;
   } = {},
   args: Partial<ParsedArguments> = {},
 ) {
@@ -183,7 +184,9 @@ export async function withMcpContext(
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
         allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
-        navigationTimeout: process.platform === 'win32' ? 20000 : undefined
+        navigationTimeout:
+          options.navigationTimeout ??
+          (process.platform === 'win32' ? 20000 : undefined),
       },
       Locator,
     );
