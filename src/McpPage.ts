@@ -410,14 +410,7 @@ export class McpPage implements ContextPage {
     cpuMultiplier: number,
     networkMultiplier: number,
   ): WaitForHelper {
-    const navigationTimeout =
-      this.#navigationTimeout * networkMultiplier * cpuMultiplier;
-    return new WaitForHelper(
-      this.pptrPage,
-      cpuMultiplier,
-      networkMultiplier,
-      navigationTimeout,
-    );
+    return new WaitForHelper(this.pptrPage, cpuMultiplier, networkMultiplier);
   }
 
   waitForEventsAfterAction(
