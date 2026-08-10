@@ -27,6 +27,7 @@
     "test:only": "npm run build && node scripts/test.js --test-only",
     "test:update-snapshots": "npm run build && node scripts/test.js --test-update-snapshots",
     "prepare": "node scripts/prepare.ts",
+    "sync": "npm ci && git submodule update --init",
     "verify-server-json-version": "node scripts/verify-server-json-version.ts",
     "update-lighthouse": "node scripts/update-lighthouse.ts",
     "update-metrics": "node scripts/update_metrics.ts",
