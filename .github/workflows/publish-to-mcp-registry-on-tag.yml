@@ -66,6 +66,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Wait for npm package availability
+        run: |
+          PKG=$(node -p "require('./package.json').name + '@' + require('./package.json').version")
+          echo "Waiting for $PKG to be available on npm..."
+          for i in {1..5}; do
+            if npm view "$PKG" version > /dev/null 2>&1; then
+              echo "$PKG is available on npm."
+              exit 0
+            fi
+            echo "Attempt $i: $PKG is not yet available. Waiting 60s..."
+            sleep 60
+          done
+          if npm view "$PKG" version > /dev/null 2>&1; then
+            echo "$PKG is available on npm."
+            exit 0
+          fi
+          echo "Timed out waiting for $PKG to be available on npm."
+          exit 1
+
       - name: Login to MCP Registry
         run: ./mcp-publisher login github-oidc
 
