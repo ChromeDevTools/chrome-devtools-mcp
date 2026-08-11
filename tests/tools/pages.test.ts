@@ -491,6 +491,26 @@ describe('pages', () => {
     });
   });
 
+  it('navigate_page succeeds on a page with debugger statement', async () => {
+    await withMcpContext(async (response, context) => {
+      await navigatePage().handler(
+        {
+          params: {
+            url: 'data:text/html,<script>debugger;</script><h1>Page with debugger</h1>',
+          },
+          page: context.getSelectedMcpPage(),
+        },
+        response,
+        context,
+      );
+
+      const content = await context
+        .getSelectedMcpPage()
+        .pptrPage.evaluate(() => document.querySelector('h1')?.textContent);
+      assert.strictEqual(content, 'Page with debugger');
+    });
+  });
+
   describe('close_page', () => {
     it('closes a page', async () => {
       await withMcpContext(async (response, context) => {

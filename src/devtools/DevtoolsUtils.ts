@@ -29,6 +29,14 @@ export function overrideDevToolsGlobals({
 }: {
   loadResource: (url: string) => Promise<string>;
 }): void {
+  if (!('window' in globalThis)) {
+    Object.defineProperty(globalThis, 'window', {
+      value: new EventTarget(),
+      writable: true,
+      configurable: true,
+    });
+  }
+
   DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
     new McpHostBindingAdapter(loadResource),
   );
@@ -178,14 +186,30 @@ export async function createTargetUniverse(
   return {target, universe, session};
 }
 
-// We don't want to pause any DevTools universe session ever on the MCP side.
-//
-// Note that calling `setSkipAllPauses` only affects the session on which it was
-// sent. This means DevTools can still pause, step and do whatever. We just won't
-// see the `Debugger.paused`/`Debugger.resumed` events on the MCP side.
+type DebuggerEventType = Parameters<
+  DevTools.DebuggerModel['addEventListener']
+>[0];
+
+function isDebuggerEventType(_event: string): _event is DebuggerEventType {
+  return true;
+}
+
+function toDebuggerEventType(event: string): DebuggerEventType {
+  if (isDebuggerEventType(event)) {
+    return event;
+  }
+  throw new Error(`Invalid debugger event: ${event}`);
+}
+
 const SKIP_ALL_PAUSES = {
   modelAdded(model: DevTools.DebuggerModel): void {
     void model.agent.invoke_setSkipAllPauses({skip: true});
+    model.addEventListener(toDebuggerEventType('GlobalObjectCleared'), () => {
+      void model.agent.invoke_setSkipAllPauses({skip: true});
+    });
+    model.addEventListener(toDebuggerEventType('DebuggerPaused'), () => {
+      model.resume();
+    });
   },
 
   modelRemoved(): void {
@@ -473,11 +497,7 @@ async function waitForScript(
       signal.addEventListener('abort', () => reject(signal.reason), {
         once: true,
       });
-      void model
-        .once(
-          'ParsedScriptSource' as Parameters<DevTools.DebuggerModel['once']>[0],
-        )
-        .then(resolve);
+      void model.once(toDebuggerEventType('ParsedScriptSource')).then(resolve);
     });
   }
 }
