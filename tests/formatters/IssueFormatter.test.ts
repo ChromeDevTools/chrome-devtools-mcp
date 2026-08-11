@@ -201,7 +201,6 @@ describe('IssueFormatter', () => {
   });
 
   describe('affected resources', () => {
-
     it('resolves nodeId with the element id resolver', () => {
       const formatter = new IssueFormatter(
         getMockIssueWithDetails({nodeId: 42, extra: 'info'}),
