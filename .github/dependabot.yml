@@ -58,3 +58,8 @@ updates:
       timezone: 'Europe/Berlin'
     cooldown:
       default-days: 0
+    ignore:
+      # Ignore tagged releases to fall back to branch commits.
+      # Untagged commits get versions like `0.0.0-0.<index>`.
+      - dependency-name: 'devtools-frontend'
+        versions: ['>= 0.0.0']
