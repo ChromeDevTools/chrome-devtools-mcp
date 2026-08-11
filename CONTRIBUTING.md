@@ -93,7 +93,9 @@ Add the MCP server to your client's config.
   "mcpServers": {
     "chrome-devtools": {
       "command": "node",
-      "args": ["/<path-to-chrome-devtools-mcp>/build/src/bin/chrome-devtools-mcp.js"]
+      "args": [
+        "/<path-to-chrome-devtools-mcp>/build/src/bin/chrome-devtools-mcp.js"
+      ]
     }
   }
 }
