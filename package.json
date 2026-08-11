@@ -59,7 +59,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
-    "@toon-format/toon": "^2.2.0",
+    "@toon-format/toon": "^4.1.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
     "@types/node": "^26.0.0",
@@ -74,21 +74,21 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "globals": "^17.0.0",
-    "lighthouse": "13.4.0",
+    "lighthouse": "13.4.1",
     "prettier": "^3.6.2",
     "puppeteer": "25.5.0",
-    "rollup": "4.62.2",
+    "rollup": "4.62.4",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
     "sinon": "^22.0.0",
-    "typescript": "^6.0.2",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.43.0",
     "yargs": "18.1.0"
   },
   "peerDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
-    "@toon-format/toon": "^2.2.0"
+    "@toon-format/toon": "^4.1.0"
   },
   "peerDependenciesMeta": {
     "@toon-format/toon": {
