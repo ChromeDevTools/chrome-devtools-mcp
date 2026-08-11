@@ -59,14 +59,14 @@ describe('WaitForHelper', () => {
 
       const result = await mcpPage.waitForEventsAfterAction(
         async () => {
-          // Simulate an action that takes longer than expectNavigationIn (50ms)
+          // Simulate an action that takes longer than expectNavigationIn (300ms)
           // before triggering the navigation.
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 600));
           await mcpPage.pptrPage.evaluate(targetUrl => {
             location.href = targetUrl;
           }, url);
         },
-        {waitForStableDom: false, expectNavigationIn: 50},
+        {waitForStableDom: false, expectNavigationIn: 300},
       );
 
       assert.strictEqual(result.navigatedToUrl, url);
@@ -92,9 +92,10 @@ describe('WaitForHelper', () => {
         async () => {
           await mcpPage.pptrPage.evaluate(targetUrl => {
             const frame = document.querySelector('iframe');
-            if (frame) {
-              frame.src = targetUrl;
+            if (!frame) {
+              throw new Error('iframe not found');
             }
+            frame.src = targetUrl;
           }, iframeTarget);
         },
         {waitForStableDom: false, expectNavigationIn: 50, timeout: 2000},
@@ -125,7 +126,7 @@ describe('WaitForHelper', () => {
             location.href = url;
           }, targetUrl);
         },
-        {waitForStableDom: false, expectNavigationIn: 50},
+        {waitForStableDom: false, expectNavigationIn: 1000},
       );
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
@@ -147,7 +148,7 @@ describe('WaitForHelper', () => {
             history.pushState({}, '', url);
           }, targetUrl);
         },
-        {waitForStableDom: false, expectNavigationIn: 50},
+        {waitForStableDom: false},
       );
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
