@@ -457,9 +457,6 @@ export const uploadFile = definePageTool({
       uid,
     )) as ElementHandle<HTMLInputElement>;
 
-    // Some sites use a proxy element to trigger file upload instead of
-    // a type=file element. In this case, we want to default to
-    // Page.waitForFileChooser() and upload the file this way.
     try {
       await handle.uploadFile(...filePaths);
     } catch {
