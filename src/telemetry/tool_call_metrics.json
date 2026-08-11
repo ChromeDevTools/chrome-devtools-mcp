@@ -824,6 +824,18 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "sort_by",
+        "argType": "string"
+      },
+      {
+        "name": "min_retained_size",
+        "argType": "number"
+      },
+      {
+        "name": "exclude_primitives",
+        "argType": "boolean"
       }
     ]
   },

@@ -276,6 +276,18 @@ export const getHeapSnapshotEdges = defineTool({
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
     nodeId: zod.number().describe('The node ID to get outgoing edges for.'),
+    sortBy: zod
+      .enum(['retainedSize', 'selfSize', 'name'])
+      .optional()
+      .describe('Sort order for edges. Default is retainedSize.'),
+    minRetainedSize: zod
+      .number()
+      .optional()
+      .describe('Minimum retained size in bytes for target nodes.'),
+    excludePrimitives: zod
+      .boolean()
+      .optional()
+      .describe('Whether to exclude primitive target nodes. Default is true.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
@@ -283,6 +295,11 @@ export const getHeapSnapshotEdges = defineTool({
     const edges = await context.getHeapSnapshotEdges(
       request.params.filePath,
       request.params.nodeId,
+      {
+        sortBy: request.params.sortBy ?? 'retainedSize',
+        minRetainedSize: request.params.minRetainedSize,
+        excludePrimitives: request.params.excludePrimitives ?? true,
+      },
     );
 
     response.setHeapSnapshotNodes(edges, {

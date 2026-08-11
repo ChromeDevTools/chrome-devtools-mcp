@@ -500,6 +500,26 @@ export const commands: Commands = {
         description: 'The node ID to get outgoing edges for.',
         required: true,
       },
+      sortBy: {
+        name: 'sortBy',
+        type: 'string',
+        description: 'Sort order for edges. Default is retainedSize.',
+        required: false,
+        enum: ['retainedSize', 'selfSize', 'name'],
+      },
+      minRetainedSize: {
+        name: 'minRetainedSize',
+        type: 'number',
+        description: 'Minimum retained size in bytes for target nodes.',
+        required: false,
+      },
+      excludePrimitives: {
+        name: 'excludePrimitives',
+        type: 'boolean',
+        description:
+          'Whether to exclude primitive target nodes. Default is true.',
+        required: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'number',

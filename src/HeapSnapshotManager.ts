@@ -43,6 +43,12 @@ export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
 export type DuplicateStringGroup =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.DuplicateStringGroup;
 
+export type HeapQueryOptions =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapQueryOptions;
+
+export type HeapEdgesQueryOptions =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
+
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
   #snapshots = new Map<
@@ -241,13 +247,14 @@ export class HeapSnapshotManager {
   async getEdges(
     filePath: string,
     nodeId: number,
+    options?: HeapEdgesQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
       throw new Error(`Node with ID ${nodeId} not found`);
     }
-    const provider = snapshot.createEdgesProvider(nodeIndex);
+    const provider = snapshot.createEdgesProvider(nodeIndex, options);
     return await provider.serializeItemsRange(0, Infinity);
   }
 
