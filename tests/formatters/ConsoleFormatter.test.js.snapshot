@@ -460,7 +460,7 @@ exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first arg
 {
   "id": 14,
   "type": "log",
-  "text": "",
+  "text": "Actual message",
   "argsCount": 2,
   "args": [
     "extra-arg"
@@ -470,7 +470,7 @@ exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first arg
 
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first argument as text when the message text is empty toStringDetailed 1`] = `
 ID: 14
-Message: log> 
+Message: log> Actual message
 ### Arguments
 Arg #0: extra-arg
 `;

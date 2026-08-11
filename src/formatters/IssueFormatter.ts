@@ -214,7 +214,7 @@ export class IssueFormatter {
 }
 
 function convertIssueConciseToString(issue: IssueConcise): string {
-  return `msgid=${issue.id} [issue] ${issue.title} (count: ${issue.count})`;
+  return `msgid=${issue.id} [issue] ${issue.title ?? 'Unknown Issue'} (count: ${issue.count})`;
 }
 
 function convertIssueDetailedToString(issue: IssueDetailed): string {

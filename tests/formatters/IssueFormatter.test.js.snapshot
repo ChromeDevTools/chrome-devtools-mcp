@@ -61,7 +61,7 @@ This is a mock issue description
 reqid=42 data={"request":{"url":"http://example.com/data.json"}}
 `;
 
-exports[`IssueFormatter > formats a detailed issue with an unresolved request toJSONDetailed 1`] = `
+exports[`IssueFormatter > formats a detailed issue with an unresolved request id toJSONDetailed 1`] = `
 {
   "id": 7,
   "type": "issue",
@@ -82,7 +82,7 @@ exports[`IssueFormatter > formats a detailed issue with an unresolved request to
 }
 `;
 
-exports[`IssueFormatter > formats a detailed issue with an unresolved request toStringDetailed 1`] = `
+exports[`IssueFormatter > formats a detailed issue with an unresolved request id toStringDetailed 1`] = `
 ID: 7
 Message: issue> Mock Issue Title
 

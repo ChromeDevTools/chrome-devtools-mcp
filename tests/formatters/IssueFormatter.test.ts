@@ -52,6 +52,20 @@ describe('IssueFormatter', () => {
     });
   }
 
+  function getMockIssueWithDetails(details: object | null) {
+    const mockAggregatedIssue = getMockAggregatedIssue();
+    mockAggregatedIssue.getDescription.returns({
+      file: 'mock.md',
+      links: [],
+    });
+    getIssueDescriptionStub
+      .withArgs('mock.md')
+      .returns('# Mock Issue Title\n\nThis is a mock issue description');
+    // @ts-expect-error stubbed issue does not match the complete type.
+    mockAggregatedIssue.getAllIssues.returns([{details: () => details}]);
+    return mockAggregatedIssue;
+  }
+
   formatterTestConcise('formats an issue message', async () => {
     const testGenericIssue = {
       details: () => {
@@ -137,29 +151,14 @@ describe('IssueFormatter', () => {
   formatterTestDetailed(
     'formats a detailed issue with a resolved request id',
     async () => {
-      const testIssue = {
-        details: () => {
-          return {
-            request: {
-              url: 'http://example.com/data.json',
-              requestId: 'REQUEST-1',
-            },
-            errorType: 'MockError',
-            frameId: 'FRAME-1',
-          };
+      const mockAggregatedIssue = getMockIssueWithDetails({
+        request: {
+          url: 'http://example.com/data.json',
+          requestId: 'REQUEST-1',
         },
-      };
-      const mockAggregatedIssue = getMockAggregatedIssue();
-      mockAggregatedIssue.getDescription.returns({
-        file: 'mock.md',
-        links: [],
+        errorType: 'MockError',
+        frameId: 'FRAME-1',
       });
-      // @ts-expect-error stubbed issue does not match the complete type.
-      mockAggregatedIssue.getAllIssues.returns([testIssue]);
-
-      getIssueDescriptionStub
-        .withArgs('mock.md')
-        .returns('# Mock Issue Title\n\nThis is a mock issue description');
 
       return new IssueFormatter(mockAggregatedIssue, {
         id: 6,
@@ -170,29 +169,14 @@ describe('IssueFormatter', () => {
   );
 
   formatterTestDetailed(
-    'formats a detailed issue with an unresolved request',
+    'formats a detailed issue with an unresolved request id',
     async () => {
-      const testIssue = {
-        details: () => {
-          return {
-            request: {
-              url: 'http://example.com/data.json',
-              requestId: 'REQUEST-1',
-            },
-          };
+      const mockAggregatedIssue = getMockIssueWithDetails({
+        request: {
+          url: 'http://example.com/data.json',
+          requestId: 'REQUEST-1',
         },
-      };
-      const mockAggregatedIssue = getMockAggregatedIssue();
-      mockAggregatedIssue.getDescription.returns({
-        file: 'mock.md',
-        links: [],
       });
-      // @ts-expect-error stubbed issue does not match the complete type.
-      mockAggregatedIssue.getAllIssues.returns([testIssue]);
-
-      getIssueDescriptionStub
-        .withArgs('mock.md')
-        .returns('# Mock Issue Title\n\nThis is a mock issue description');
 
       return new IssueFormatter(mockAggregatedIssue, {
         id: 7,
@@ -200,11 +184,16 @@ describe('IssueFormatter', () => {
     },
   );
 
-  it('falls back to "Unknown Issue" when there is no description', () => {
+  it('falls back to "Unknown Issue" when there is no description metadata', () => {
     const mockAggregatedIssue = getMockAggregatedIssue();
     mockAggregatedIssue.getDescription.returns(null);
+    mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
 
     const formatter = new IssueFormatter(mockAggregatedIssue, {id: 3});
+    assert.strictEqual(
+      formatter.toString(),
+      'msgid=3 [issue] Unknown Issue (count: 1)',
+    );
     assert.strictEqual(
       formatter.toStringDetailed(),
       'ID: 3\nMessage: issue> Unknown Issue',
@@ -212,19 +201,6 @@ describe('IssueFormatter', () => {
   });
 
   describe('affected resources', () => {
-    function getMockIssueWithDetails(details: object | null) {
-      const mockAggregatedIssue = getMockAggregatedIssue();
-      mockAggregatedIssue.getDescription.returns({
-        file: 'mock.md',
-        links: [],
-      });
-      getIssueDescriptionStub
-        .withArgs('mock.md')
-        .returns('# Mock Issue Title\n\nThis is a mock issue description');
-      // @ts-expect-error stubbed issue does not match the complete type.
-      mockAggregatedIssue.getAllIssues.returns([{details: () => details}]);
-      return mockAggregatedIssue;
-    }
 
     it('resolves nodeId with the element id resolver', () => {
       const formatter = new IssueFormatter(

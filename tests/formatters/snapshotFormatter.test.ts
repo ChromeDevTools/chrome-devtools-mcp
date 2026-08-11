@@ -143,6 +143,17 @@ describe('snapshotFormatter', () => {
             return null;
           },
         },
+        {
+          id: '1_4',
+          role: 'slider',
+          name: 'volume',
+          valuemin: 0,
+          valuemax: 100,
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
       ],
       elementHandle: async (): Promise<ElementHandle<Element> | null> => {
         return null;
@@ -156,6 +167,7 @@ describe('snapshotFormatter', () => {
       `uid=1_1 root "root"
   uid=1_2 button "button" disableable disabled focusable focused
   uid=1_3 textbox "textbox" value="value"
+  uid=1_4 slider "volume" valuemax="100" valuemin="0"
 `,
     );
   });
@@ -299,28 +311,6 @@ describe('snapshotFormatter', () => {
       formatted,
       `uid=1_1 ignored
   uid=1_2 statictext "text"
-`,
-    );
-  });
-
-  it('formats a snapshot with numeric properties', () => {
-    const node: TextSnapshotNode = {
-      id: '1_1',
-      role: 'slider',
-      name: 'volume',
-      valuemin: 0,
-      valuemax: 100,
-      children: [],
-      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
-        return null;
-      },
-    };
-
-    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
-    const formatted = formatter.toString();
-    assert.strictEqual(
-      formatted,
-      `uid=1_1 slider "volume" valuemax="100" valuemin="0"
 `,
     );
   });

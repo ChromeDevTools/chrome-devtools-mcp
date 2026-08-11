@@ -186,6 +186,16 @@ export class ConsoleFormatter {
     });
   }
 
+  get text(): string {
+    if (this.#text) {
+      return this.#text;
+    }
+    if (this.#resolvedArgs.length > 0) {
+      return formatArg(this.#resolvedArgs[0], this);
+    }
+    return '';
+  }
+
   // The short format for a console message.
   toString(): string {
     return convertConsoleMessageConciseToString(this.toJSON());
@@ -211,7 +221,7 @@ export class ConsoleFormatter {
   toJSON(): ConsoleMessageConcise {
     const json: ConsoleMessageConcise = {
       type: this.#type,
-      text: this.#text,
+      text: this.text,
       argsCount: this.#argCount,
       id: this.#id,
     };
@@ -241,7 +251,7 @@ export class ConsoleFormatter {
         prev.message instanceof ConsoleFormatter &&
         msg instanceof ConsoleFormatter &&
         prev.message.#type === msg.#type &&
-        prev.message.#text === msg.#text &&
+        prev.message.text === msg.text &&
         prev.message.#argCount === msg.#argCount
       ) {
         prev.count++;
@@ -272,7 +282,7 @@ export class ConsoleFormatter {
     return {
       id: this.#id,
       type: this.#type,
-      text: this.#text,
+      text: this.text,
       argsCount: this.#argCount,
       args: this.#getArgs().map(arg => formatArg(arg, this)),
       stackTrace: this.#stack
