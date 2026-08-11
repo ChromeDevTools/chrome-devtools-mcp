@@ -29,6 +29,7 @@ import {
   extractExtensionId,
   assertNoServiceWorkerReported,
   waitExecutionFor,
+  stabilizeResponseOutput,
 } from '../utils.js';
 
 const EXTENSION_LOGGING_PATH = path.join(
@@ -478,11 +479,13 @@ describe('console', () => {
           );
           const formattedResponse = await response2.handle(context);
           const rawText = getTextContent(formattedResponse.content[0]);
-          const sanitizedText = rawText
-            .replaceAll(/ID: \d+/g, 'ID: <ID>')
-            .replaceAll(/reqid=\d+/g, 'reqid=<reqid>')
-            .replaceAll(/localhost:\d+/g, 'hostname:port');
-          t.assert.snapshot(sanitizedText);
+          t.assert.snapshot(
+            stabilizeResponseOutput(
+              rawText
+                .replaceAll(/ID: \d+/g, 'ID: <ID>')
+                .replaceAll(/reqid=\d+/g, 'reqid=<reqid>'),
+            ),
+          );
         });
       });
     });

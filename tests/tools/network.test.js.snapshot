@@ -1,5 +1,5 @@
 exports[`network > network_get_request > should get request from previous navigations 1`] = `
-## Request http://localhost:<port>/one
+## Request http://127.0.0.1:<port>/one
 Status: 200
 ### Request Headers
 - accept-language:<lang>
@@ -11,7 +11,7 @@ Status: 200
 - accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
 - accept-encoding:gzip, deflate, br, zstd
 - connection:keep-alive
-- host:localhost:<port>
+- host:127.0.0.1:<port>
 - sec-fetch-dest:<redacted>
 - sec-fetch-mode:<redacted>
 - sec-fetch-site:<redacted>
@@ -29,21 +29,21 @@ Status: 200
 exports[`network > network_list_requests > list requests form current navigations only 1`] = `
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
-reqid=3 GET http://localhost:<port>/three [200]
+reqid=3 GET http://127.0.0.1:<port>/three [200]
 `;
 
 exports[`network > network_list_requests > list requests from previous navigations 1`] = `
 ## Network requests
 Showing 1-3 of 3 (Page 1 of 1).
-reqid=1 GET http://localhost:<port>/one [200]
-reqid=2 GET http://localhost:<port>/two [200]
-reqid=3 GET http://localhost:<port>/three [200]
+reqid=1 GET http://127.0.0.1:<port>/one [200]
+reqid=2 GET http://127.0.0.1:<port>/two [200]
+reqid=3 GET http://127.0.0.1:<port>/three [200]
 `;
 
 exports[`network > network_list_requests > list requests from previous navigations from redirects 1`] = `
 ## Network requests
 Showing 1-3 of 3 (Page 1 of 1).
-reqid=1 GET http://localhost:<port>/redirect [302]
-reqid=2 GET http://localhost:<port>/redirected [200]
-reqid=3 GET http://localhost:<port>/redirected-page [200]
+reqid=1 GET http://127.0.0.1:<port>/redirect [302]
+reqid=2 GET http://127.0.0.1:<port>/redirected [200]
+reqid=3 GET http://127.0.0.1:<port>/redirected-page [200]
 `;

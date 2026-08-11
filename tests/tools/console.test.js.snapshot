@@ -123,7 +123,7 @@ Note that if an opaque response is sufficient, the request’s mode can be set t
 Learn more:
 [Cross-Origin Resource Sharing (CORS)](https://web.dev/cross-origin-resource-sharing)
 ### Affected resources
-reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://hostname:port/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","localNetworkAccessRequestPolicy":"BlockFromInsecureToMorePrivate"}}
+reqid=<reqid> data={"corsErrorStatus":{"corsError":"PreflightMissingAllowOriginHeader","failedParameter":""},"isWarning":false,"request":{"url":"http://127.0.0.1:<port>/data.json"},"initiatorOrigin":"","clientSecurityState":{"initiatorIsSecureContext":false,"initiatorIPAddressSpace":"Loopback","localNetworkAccessRequestPolicy":"BlockFromInsecureToMorePrivate"}}
 `;
 
 exports[`console > get_console_message > when dialog is open 1`] = `

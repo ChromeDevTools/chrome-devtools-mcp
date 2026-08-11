@@ -331,6 +331,9 @@ export function stabilizeResponseOutput(text: unknown) {
   const localhostRegEx = /localhost:\d{5}/g;
   output = output.replaceAll(localhostRegEx, 'localhost:<port>');
 
+  const loopbackAddress = /127.0.0.1:\d{5}/g;
+  output = output.replaceAll(loopbackAddress, '127.0.0.1:<port>');
+
   const userAgentRegEx = /user-agent:.*\n/g;
   output = output.replaceAll(userAgentRegEx, 'user-agent:<user-agent>\n');
 
