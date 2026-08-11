@@ -418,6 +418,7 @@ export class McpPage implements ContextPage {
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;
+      expectNavigationIn?: number;
       handleDialog?:
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
