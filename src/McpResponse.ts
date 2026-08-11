@@ -36,7 +36,7 @@ import type {
   Extension,
   HTTPRequest,
 } from './third_party/index.js';
-import {handleDialog, listPages} from './tools/pages.js';
+import {handleDialog, listPages, selectPage} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
   DevToolsData,
@@ -320,6 +320,12 @@ export class McpResponse implements Response {
 
   attachWaitForResult(result: WaitForEventsResult): void {
     this.#attachedWaitForResult = result;
+    if (result.newPagesOpened) {
+      // The action opened a new page (e.g., a click on a link with
+      // target=_blank). Include the page list so that the client can
+      // perceive the new page without calling list_pages.
+      this.setIncludePages(true);
+    }
   }
 
   setHeapSnapshotAggregates(
@@ -796,6 +802,7 @@ export class McpResponse implements Response {
       extensionPages?: object[];
       errorMessage?: string;
       navigatedToUrl?: string;
+      newPagesOpened?: boolean;
       geolocation?: {latitude: number; longitude: number};
     } = {};
 
@@ -844,6 +851,12 @@ export class McpResponse implements Response {
         );
         structuredContent.navigatedToUrl =
           this.#attachedWaitForResult.navigatedToUrl;
+      }
+      if (this.#attachedWaitForResult.newPagesOpened) {
+        response.push(
+          `The action opened a new page. See the list of pages below and call ${selectPage.name} to switch to a page.`,
+        );
+        structuredContent.newPagesOpened = true;
       }
     }
 

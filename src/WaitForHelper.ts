@@ -21,6 +21,8 @@ export class WaitForHelper {
   #dialogHandled = false;
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
+  /** Whether the action opened one or more new pages. */
+  #newPagesOpened = false;
   #initialUrl: string;
 
   constructor(
@@ -186,6 +188,16 @@ export class WaitForHelper {
       this.#page.off('dialog', dialogHandler);
     });
 
+    // Detect pages opened by the action (e.g., a click on a link with
+    // target=_blank or a window.open() call) so the response can report them.
+    const popupHandler = () => {
+      this.#newPagesOpened = true;
+    };
+    this.#page.on('popup', popupHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      this.#page.off('popup', popupHandler);
+    });
+
     const navigationFinished = this.waitForNavigationStarted()
       .then(navigationStated => {
         if (navigationStated) {
@@ -233,6 +245,7 @@ export class WaitForHelper {
       ...(urlAfterAction !== this.#initialUrl
         ? {navigatedToUrl: urlAfterAction}
         : {}),
+      ...(this.#newPagesOpened ? {newPagesOpened: true} : {}),
       dialogHandled: this.#dialogHandled,
     };
   }
@@ -244,6 +257,11 @@ export interface WaitForEventsResult {
    * occurred.
    */
   navigatedToUrl?: string;
+  /**
+   * Whether the action opened one or more new pages (e.g., a click on a
+   * link with target=_blank or a window.open() call).
+   */
+  newPagesOpened?: boolean;
   /**
    * Whether a dialog was automatically handled during the action.
    */
