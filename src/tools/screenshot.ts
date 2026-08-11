@@ -63,17 +63,25 @@ function computeDownscaleClip(
   box: BoundingBox,
   maxWidth: number | undefined,
   maxHeight: number | undefined,
+  devicePixelRatio: number,
 ): ScreenshotClip | undefined {
   const widthScale =
-    maxWidth !== undefined ? Math.min(1, maxWidth / box.width) : 1;
+    maxWidth !== undefined
+      ? Math.min(1, maxWidth / (box.width * devicePixelRatio))
+      : 1;
   const heightScale =
-    maxHeight !== undefined ? Math.min(1, maxHeight / box.height) : 1;
+    maxHeight !== undefined
+      ? Math.min(1, maxHeight / (box.height * devicePixelRatio))
+      : 1;
   const scale = Math.min(widthScale, heightScale);
   if (scale >= 1) {
     return undefined;
   }
   // Skip degenerate sub-pixel results.
-  if (Math.round(box.width * scale) < 1 || Math.round(box.height * scale) < 1) {
+  if (
+    Math.round(box.width * devicePixelRatio * scale) < 1 ||
+    Math.round(box.height * devicePixelRatio * scale) < 1
+  ) {
     return undefined;
   }
   return {
@@ -174,10 +182,14 @@ export const screenshot = definePageTool(args => {
       ) {
         const box = await getSourceBox(page, element, fullPage);
         if (box) {
+          const devicePixelRatio = await page.evaluate(
+            () => window.devicePixelRatio,
+          );
           clip = computeDownscaleClip(
             box,
             screenshotMaxWidth,
             screenshotMaxHeight,
+            devicePixelRatio,
           );
         }
       }

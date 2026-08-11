@@ -403,6 +403,45 @@ describe('screenshot', () => {
       });
     });
 
+    it('honors screenshotMaxWidth at device scale factors above 1', async () => {
+      const tool = screenshot({
+        screenshotMaxWidth: 100,
+      } as ParsedArguments);
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          assert.equal(page.viewport(), null);
+          await page.setContent(
+            html`<div style="width:100vw;height:100vh;background:red"></div>`,
+          );
+          const source = await page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+          }));
+          assert.equal(source.devicePixelRatio, 2);
+
+          await tool.handler(
+            {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          const buf = Buffer.from(response.images[0].data, 'base64');
+          assert.equal(pngWidth(buf), 100);
+          const expectedHeight = Math.round(
+            source.height * (100 / source.width),
+          );
+          assert.ok(
+            Math.abs(pngHeight(buf) - expectedHeight) <= 1,
+            `expected height ~${expectedHeight}, got ${pngHeight(buf)}`,
+          );
+        },
+        {args: ['--force-device-scale-factor=2']},
+      );
+    });
+
     it('downscales viewport screenshot when no viewport is emulated', async () => {
       const tool = screenshot({
         screenshotMaxWidth: 100,
