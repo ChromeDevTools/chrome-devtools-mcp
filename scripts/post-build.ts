@@ -89,6 +89,8 @@ export default skill;
   writeFile(path.join(skillsDir, 'accessibility.skill.js'), skillMockContent);
   writeFile(path.join(skillsDir, 'network.skill.js'), skillMockContent);
   writeFile(path.join(skillsDir, 'performance.skill.js'), skillMockContent);
+  writeFile(path.join(skillsDir, 'sources.skill.js'), skillMockContent);
+  writeFile(path.join(skillsDir, 'storage.skill.js'), skillMockContent);
   writeFile(path.join(skillsDir, 'styling.skill.js'), skillMockContent);
 
   // Create root mock
@@ -99,6 +101,16 @@ export default skill;
 export function getChromeVersion() { return ''; };
 export function getRemoteBase() { return null; };
 export const hostConfig = {};
+export const GenAiEnterprisePolicyValue = {
+  ALLOW: 0,
+  ALLOW_WITHOUT_LOGGING: 1,
+  DISABLE: 2,
+};
+export const HostConfigFreestylerExecutionMode = {
+  ALL_SCRIPTS: 'ALL_SCRIPTS',
+  SIDE_EFFECT_FREE_SCRIPTS_ONLY: 'SIDE_EFFECT_FREE_SCRIPTS_ONLY',
+  NO_SCRIPTS: 'NO_SCRIPTS',
+};
 export const GdpProfilesEnterprisePolicyValue = {
   ENABLED: 0,
   ENABLED_WITHOUT_BADGES: 1,
