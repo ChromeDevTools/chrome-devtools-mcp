@@ -258,6 +258,13 @@ export const cliOptions = {
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',
   },
+  categoryPwa: {
+    type: 'boolean',
+    hidden: false,
+    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
+    describe:
+      'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
+  },
   performanceCrux: {
     type: 'boolean',
     default: true,

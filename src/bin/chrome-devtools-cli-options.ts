@@ -249,6 +249,13 @@ export const commands: Commands = {
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         required: false,
       },
+      waitForStableDom: {
+        name: 'waitForStableDom',
+        type: 'boolean',
+        description:
+          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        required: false,
+      },
     },
   },
   execute_3p_developer_tool: {
@@ -635,6 +642,20 @@ export const commands: Commands = {
       },
     },
   },
+  get_os_app_state: {
+    description:
+      'Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+    },
+  },
   handle_dialog: {
     description:
       'If a browser dialog was opened, use this command to handle it',
@@ -685,6 +706,56 @@ export const commands: Commands = {
         type: 'string',
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
+      },
+    },
+  },
+  install_pwa: {
+    description:
+      'Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+      installUrlOrBundleUrl: {
+        name: 'installUrlOrBundleUrl',
+        type: 'string',
+        description:
+          'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
+        required: true,
+      },
+      displayMode: {
+        name: 'displayMode',
+        type: 'string',
+        description:
+          'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
+        required: false,
+        enum: ['standalone', 'browser'],
+      },
+    },
+  },
+  launch_pwa: {
+    description:
+      'Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+      url: {
+        name: 'url',
+        type: 'string',
+        description:
+          'Optional URL within the app to open instead of the default start URL.',
+        required: false,
       },
     },
   },
@@ -755,6 +826,14 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Set to true to return the preserved messages over the last 3 navigations.',
+        required: false,
+        default: false,
+      },
+      includeStackTraces: {
+        name: 'includeStackTraces',
+        type: 'boolean',
+        description:
+          'Set to true to include the stack trace for each message when available. Increases the response size.',
         required: false,
         default: false,
       },
@@ -1179,6 +1258,20 @@ export const commands: Commands = {
         name: 'id',
         type: 'string',
         description: 'ID of the extension to uninstall.',
+        required: true,
+      },
+    },
+  },
+  uninstall_pwa: {
+    description:
+      'Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
       },
     },

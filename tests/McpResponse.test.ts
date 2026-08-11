@@ -296,17 +296,24 @@ describe('McpResponse', () => {
   });
 
   it('adds throttling setting when it is not null', async t => {
-    await withMcpContext(async (response, context) => {
-      await context
-        .getSelectedMcpPage()
-        .emulate({networkConditions: 'Slow 3G'});
-      const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
-      t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
-    });
+    await withMcpContext(
+      async (response, context) => {
+        await context
+          .getSelectedMcpPage()
+          .emulate({networkConditions: 'Slow 3G'});
+        const {content, structuredContent} = await response.handle(context);
+        assert.equal(content[0].type, 'text');
+        t.assert.snapshot(getTextContent(content[0]));
+        t.assert.snapshot(
+          JSON.stringify(
+            stabilizeStructuredContent(structuredContent),
+            null,
+            2,
+          ),
+        );
+      },
+      {navigationTimeout: 10000},
+    );
   });
 
   it('does not include throttling setting when it is null', async t => {

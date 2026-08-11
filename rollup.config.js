@@ -20,6 +20,7 @@
  * and modified to specific requirement.
  */
 
+import {execSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -57,6 +58,17 @@ const packageLock = JSON.parse(
 function getResolvedVersion(packageName) {
   const packageEntry = packageLock.packages?.[`node_modules/${packageName}`];
   return packageEntry?.version || null;
+}
+
+function getDevToolsFrontendCommit() {
+  try {
+    return execSync('git rev-parse HEAD', {
+      cwd: path.join(process.cwd(), 'devtools-frontend'),
+      encoding: 'utf-8',
+    }).trim();
+  } catch {
+    return null;
+  }
 }
 
 const aggregatedStats = {
@@ -116,12 +128,18 @@ function listBundledDeps() {
         for (const [name, versionRange] of Object.entries(devDependencies)) {
           if (
             aggregatedStats.bundledPackages.has(name) ||
-            name === 'chrome-devtools-frontend' ||
             name === 'lighthouse'
           ) {
             const resolvedVersion = getResolvedVersion(name);
             bundledDevDeps[name] = resolvedVersion || versionRange;
           }
+        }
+
+        const devtoolsFrontendCommit = getDevToolsFrontendCommit();
+        if (devtoolsFrontendCommit) {
+          bundledDevDeps[
+            'https://github.com/ChromeDevTools/devtools-frontend'
+          ] = devtoolsFrontendCommit;
         }
 
         fs.writeFileSync(outputPath, JSON.stringify(bundledDevDeps, null, 2));
@@ -211,17 +229,23 @@ const bundleDependency = (
               'devtools-frontend/LICENSE',
             );
             if (fs.existsSync(cdtfLicensePath)) {
-              manualLicenses.push(
-                [
-                  'Name: chrome-devtools-frontend',
-                  'License: Apache-2.0',
-                  '',
-                  fs.readFileSync(cdtfLicensePath, 'utf-8'),
-                ].join('\n'),
+              const devtoolsFrontendCommit = getDevToolsFrontendCommit();
+              const licenseLines = [
+                'Name: devtools-frontend',
+                'URL: https://github.com/ChromeDevTools/devtools-frontend',
+              ];
+              if (devtoolsFrontendCommit) {
+                licenseLines.push(`Version: ${devtoolsFrontendCommit}`);
+              }
+              licenseLines.push(
+                'License: Apache-2.0',
+                '',
+                fs.readFileSync(cdtfLicensePath, 'utf-8'),
               );
+              manualLicenses.push(licenseLines.join('\n'));
             }
 
-            // Add chrome-devtools-frontend main license
+            // Add lighthouse main license
             const lighthouseLicensePath = path.join(
               process.cwd(),
               'node_modules/lighthouse/LICENSE',

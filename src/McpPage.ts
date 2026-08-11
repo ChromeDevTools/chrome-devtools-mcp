@@ -137,6 +137,7 @@ export class McpPage implements ContextPage {
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
+  #navigationTimeout: number;
 
   constructor(
     page: Page,
@@ -145,10 +146,12 @@ export class McpPage implements ContextPage {
       hasNetworkBlockOrAllowlist: boolean;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
+      navigationTimeout?: number;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
+    this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -414,6 +417,7 @@ export class McpPage implements ContextPage {
     action: () => Promise<unknown>,
     options?: {
       timeout?: number;
+      waitForStableDom?: boolean;
       handleDialog?:
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
@@ -831,7 +835,7 @@ export class McpPage implements ContextPage {
       this.networkConditions,
     );
     this.pptrPage.setDefaultNavigationTimeout(
-      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
+      this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }
 

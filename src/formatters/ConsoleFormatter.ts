@@ -17,6 +17,8 @@ import type {IssueFormatter} from './IssueFormatter.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
+  // Fetches the stack trace and includes it in the concise output.
+  fetchStackTrace?: boolean;
   id: number;
   devTools?: TargetUniverse;
   resolvedArgsForTesting?: unknown[];
@@ -35,6 +37,8 @@ interface ConsoleMessageConcise {
   argsCount: number;
   id: number;
   count?: number;
+  // pre-formatted stacktrace.
+  stackTrace?: string;
 }
 
 interface ConsoleMessageDetailed extends ConsoleMessageConcise {
@@ -54,6 +58,7 @@ export class ConsoleFormatter {
 
   readonly #stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
   readonly #cause?: SymbolizedError;
+  readonly #includeStackInConcise: boolean;
 
   readonly isIgnored: IgnoreCheck;
 
@@ -65,6 +70,7 @@ export class ConsoleFormatter {
     resolvedArgs?: unknown[];
     stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
     cause?: SymbolizedError;
+    includeStackInConcise?: boolean;
     isIgnored: IgnoreCheck;
   }) {
     this.#id = params.id;
@@ -74,6 +80,7 @@ export class ConsoleFormatter {
     this.#resolvedArgs = params.resolvedArgs ?? [];
     this.#stack = params.stack;
     this.#cause = params.cause;
+    this.#includeStackInConcise = params.includeStackInConcise ?? false;
     this.isIgnored = params.isIgnored;
   }
 
@@ -110,7 +117,8 @@ export class ConsoleFormatter {
         devTools: options?.devTools,
         details: msg.details,
         targetId: msg.targetId,
-        includeStackAndCause: options?.fetchDetailedData,
+        includeStackAndCause:
+          options?.fetchDetailedData || options?.fetchStackTrace,
         resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
         resolvedCauseForTesting: options?.resolvedCauseForTesting,
       });
@@ -120,6 +128,7 @@ export class ConsoleFormatter {
         text: error.message,
         stack: error.stackTrace,
         cause: error.cause,
+        includeStackInConcise: options.fetchStackTrace,
         isIgnored,
       });
     }
@@ -154,7 +163,10 @@ export class ConsoleFormatter {
     let stack: DevTools.DevTools.StackTrace.StackTrace.StackTrace | undefined;
     if (options.resolvedStackTraceForTesting) {
       stack = options.resolvedStackTraceForTesting;
-    } else if (options.fetchDetailedData && options.devTools) {
+    } else if (
+      (options.fetchDetailedData || options.fetchStackTrace) &&
+      options.devTools
+    ) {
       try {
         stack = await createStackTraceForConsoleMessage(options.devTools, msg);
       } catch {
@@ -169,6 +181,7 @@ export class ConsoleFormatter {
       argCount: resolvedArgs.length || msg.args().length,
       resolvedArgs,
       stack,
+      includeStackInConcise: options.fetchStackTrace,
       isIgnored,
     });
   }
@@ -196,12 +209,18 @@ export class ConsoleFormatter {
   }
 
   toJSON(): ConsoleMessageConcise {
-    return {
+    const json: ConsoleMessageConcise = {
       type: this.#type,
       text: this.#text,
       argsCount: this.#argCount,
       id: this.#id,
     };
+    if (this.#includeStackInConcise && this.#stack) {
+      json.stackTrace = formatStackTrace(this.#stack, this.#cause, this, {
+        includeNote: false,
+      });
+    }
+    return json;
   }
 
   /**
@@ -238,6 +257,9 @@ export class ConsoleFormatter {
               type: message.#type,
               text: message.#text,
               argCount: message.#argCount,
+              stack: message.#stack,
+              cause: message.#cause,
+              includeStackInConcise: message.#includeStackInConcise,
               isIgnored: message.isIgnored,
             },
             count,
@@ -269,6 +291,9 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
       type: string;
       text: string;
       argCount: number;
+      stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
+      cause?: SymbolizedError;
+      includeStackInConcise?: boolean;
       isIgnored: IgnoreCheck;
     },
     count: number,
@@ -290,7 +315,15 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
 
 function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
   const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
-  return `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
+  const messageLine = `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
+  if (!msg.stackTrace) {
+    return messageLine;
+  }
+  const indentedStackTrace = msg.stackTrace
+    .split('\n')
+    .map(line => `  ${line}`)
+    .join('\n');
+  return `${messageLine}\n${indentedStackTrace}`;
 }
 
 function convertConsoleMessageConciseDetailedToString(
@@ -341,6 +374,7 @@ function formatStackTrace(
   stackTrace: DevTools.DevTools.StackTrace.StackTrace.StackTrace,
   cause: SymbolizedError | undefined,
   formatter: {isIgnored: IgnoreCheck},
+  options?: {includeNote?: boolean},
 ): string {
   const lines = formatStackTraceInner(stackTrace, cause, formatter);
   const includedLines = lines.slice(0, STACK_TRACE_MAX_LINES);
@@ -349,7 +383,9 @@ function formatStackTrace(
   return [
     ...includedLines,
     reminderCount > 0 ? `... and ${reminderCount} more frames` : '',
-    'Note: line and column numbers use 1-based indexing',
+    options?.includeNote === false
+      ? ''
+      : 'Note: line and column numbers use 1-based indexing',
   ]
     .filter(line => !!line)
     .join('\n');

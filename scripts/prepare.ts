@@ -49,7 +49,7 @@ function ensureSubmodule(): void {
 
   console.log('Initializing devtools-frontend submodule...');
   try {
-    execSync('git submodule update --init --recursive --depth 1', {
+    execSync('git submodule update --init --depth 1', {
       cwd: projectRoot,
       stdio: 'inherit',
     });

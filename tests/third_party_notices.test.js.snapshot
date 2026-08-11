@@ -853,7 +853,9 @@ License: MIT
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
-Name: chrome-devtools-frontend
+Name: devtools-frontend
+URL: https://github.com/ChromeDevTools/devtools-frontend
+Version: <VERSION>
 License: Apache-2.0
 
 // Copyright 2014 The Chromium Authors

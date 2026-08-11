@@ -258,9 +258,9 @@ class PageEventSubscriber {
 
   #onIssueAdded = (inspectorIssue: Issue) => {
     try {
-      // DevTools currently defines this protocol issue code but has no
-      // IssuesManager handler for it, so calling into the mapper only warns.
-      if (String(inspectorIssue.code) === 'PerformanceIssue') {
+      // @ts-expect-error The types are missmatched but they
+      // are coming from CDP
+      if (!DevTools.isIssueCodeSupported(inspectorIssue.code)) {
         return;
       }
       const issue = DevTools.createIssuesFromProtocolIssue(

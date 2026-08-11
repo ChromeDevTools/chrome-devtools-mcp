@@ -106,6 +106,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     types?: string[];
     includePreservedMessages?: boolean;
+    includeStackTraces?: boolean;
     serviceWorkerId?: string;
   };
   #listExtensions?: boolean;
@@ -212,6 +213,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      includeStackTraces?: boolean;
       serviceWorkerId?: string;
     },
   ): void {
@@ -231,6 +233,7 @@ export class McpResponse implements Response {
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
+      includeStackTraces: options?.includeStackTraces,
       serviceWorkerId: options?.serviceWorkerId,
     };
   }
@@ -598,6 +601,7 @@ export class McpResponse implements Response {
               return await ConsoleFormatter.from(consoleMessage, {
                 id: consoleMessageStableId,
                 fetchDetailedData: false,
+                fetchStackTrace: this.#consoleDataOptions?.includeStackTraces,
                 devTools: page ? page.devtoolsUniverse : undefined,
               });
             }
@@ -1344,6 +1348,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
           response.push(compactEncode(structuredContent.consoleMessages));
         } else {
           response.push(...paginationData.items.map(item => item.toString()));
+        }
+        if (
+          structuredContent.consoleMessages.some(
+            message => 'stackTrace' in message,
+          )
+        ) {
+          response.push(
+            'Note: stack trace line and column numbers use 1-based indexing',
+          );
         }
       } else {
         response.push('<no console messages found>');

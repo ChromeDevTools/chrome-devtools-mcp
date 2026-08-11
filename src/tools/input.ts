@@ -221,8 +221,8 @@ async function selectOption(
         using childValueHandle = await childHandle.getProperty('value');
 
         const childValue = await childValueHandle.jsonValue();
-        if (childValue) {
-          await handle.asLocator().fill(childValue.toString());
+        if (typeof childValue === 'string') {
+          await handle.asLocator().fill(childValue);
         }
 
         break;

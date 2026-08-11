@@ -25,9 +25,14 @@ import {
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
+  type GetPWAStateOptions,
+  type InstallPWAOptions,
+  type LaunchPWAOptions,
   type Page,
+  type PWAState,
   type ScreenRecorder,
   type Target,
+  type UninstallPWAOptions,
   type Extension,
   type Root,
   type DevTools,
@@ -61,6 +66,8 @@ interface McpContextOptions {
   // Whether this context replaces a previous one after a browser reconnect.
   // Surfaces a one-time note in the next response.
   reconnected?: boolean;
+  // Custom navigation timeout in milliseconds to override default.
+  navigationTimeout?: number;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -337,6 +344,22 @@ export class McpContext implements Context {
     return !!(this.#options.allowList || this.#options.blocklist);
   }
 
+  installPWA(options: InstallPWAOptions): Promise<string> {
+    return this.browser.installPWA(options);
+  }
+
+  uninstallPWA(options: UninstallPWAOptions): Promise<void> {
+    return this.browser.uninstallPWA(options);
+  }
+
+  launchPWA(options: LaunchPWAOptions): Promise<Page> {
+    return this.browser.launchPWA(options);
+  }
+
+  getPWAState(options: GetPWAStateOptions): Promise<PWAState> {
+    return this.browser.getPWAState(options);
+  }
+
   setIsRunningPerformanceTrace(x: boolean): void {
     this.#isRunningTrace = x;
   }
@@ -503,6 +526,7 @@ export class McpContext implements Context {
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           page.browserContext(),
         ),
+        navigationTimeout: this.#options.navigationTimeout,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();

@@ -119,6 +119,10 @@
       {
         "name": "file_path_length",
         "argType": "number"
+      },
+      {
+        "name": "wait_for_stable_dom",
+        "argType": "boolean"
       }
     ]
   },
@@ -258,6 +262,10 @@
       {
         "name": "service_worker_id_length",
         "argType": "number"
+      },
+      {
+        "name": "include_stack_traces",
+        "argType": "boolean"
       }
     ]
   },
@@ -902,6 +910,54 @@
       },
       {
         "name": "node_id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_os_app_state",
+    "args": [
+      {
+        "name": "manifest_id_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "install_pwa",
+    "args": [
+      {
+        "name": "manifest_id_length",
+        "argType": "number"
+      },
+      {
+        "name": "install_url_or_bundle_url_length",
+        "argType": "number"
+      },
+      {
+        "name": "display_mode",
+        "argType": "string"
+      }
+    ]
+  },
+  {
+    "name": "launch_pwa",
+    "args": [
+      {
+        "name": "manifest_id_length",
+        "argType": "number"
+      },
+      {
+        "name": "url_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "uninstall_pwa",
+    "args": [
+      {
+        "name": "manifest_id_length",
         "argType": "number"
       }
     ]
