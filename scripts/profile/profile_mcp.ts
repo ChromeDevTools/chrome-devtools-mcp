@@ -28,6 +28,7 @@ import {
 interface ProfileOptions {
   iterations: number;
   warmupIterations: number;
+  thresholdPercentage?: number;
 }
 
 interface ScenarioEntry {
@@ -90,6 +91,7 @@ interface ScenarioResult {
   name: string;
   summary: string;
   isGrowth: boolean;
+  exceededThreshold: boolean;
 }
 
 async function profileScenario(
@@ -211,6 +213,7 @@ async function profileScenario(
 
     let summary = `[${scenarioName}] Unable to compute heap comparison.`;
     let isGrowth = false;
+    let exceededThreshold = false;
     const baseline = measurements.find(
       measurement => measurement.label === 'baseline',
     );
@@ -222,8 +225,17 @@ async function profileScenario(
       if (growth > 0) {
         isGrowth = true;
         const percentage = (growth / baseline.usedSize) * 100;
-        summary = `[${scenarioName}] The MCP heap grew by ${formatBytes(growth)} (${percentage.toFixed(2)}%) across ${options.iterations} measured iterations. Compare baseline.heapsnapshot with final.heapsnapshot to determine whether retained workload objects accumulated.`;
-        console.warn(summary);
+        if (
+          options.thresholdPercentage !== undefined &&
+          percentage > options.thresholdPercentage
+        ) {
+          exceededThreshold = true;
+          summary = `[${scenarioName}] FAIL: The MCP heap grew by ${formatBytes(growth)} (${percentage.toFixed(2)}%) across ${options.iterations} measured iterations, exceeding the threshold of ${options.thresholdPercentage}%. Compare baseline.heapsnapshot with final.heapsnapshot to determine whether retained workload objects accumulated.`;
+          console.error(summary);
+        } else {
+          summary = `[${scenarioName}] The MCP heap grew by ${formatBytes(growth)} (${percentage.toFixed(2)}%) across ${options.iterations} measured iterations. Compare baseline.heapsnapshot with final.heapsnapshot to determine whether retained workload objects accumulated.`;
+          console.warn(summary);
+        }
       } else {
         summary = `[${scenarioName}] The MCP heap did not grow across the measured iterations (${formatBytes(growth)}).`;
         console.log(summary);
@@ -237,7 +249,7 @@ async function profileScenario(
     );
     console.log(`Report: ${reportPath}`);
 
-    return {name: scenarioName, summary, isGrowth};
+    return {name: scenarioName, summary, isGrowth, exceededThreshold};
   } finally {
     inspector?.close();
     await client.close();
@@ -252,6 +264,7 @@ async function main(): Promise<void> {
       'warmup-iterations': {type: 'string'},
       scenario: {type: 'string'},
       url: {type: 'string'},
+      'threshold-percentage': {type: 'string'},
     },
   });
 
@@ -265,6 +278,10 @@ async function main(): Promise<void> {
           values['warmup-iterations'],
           '--warmup-iterations',
         )
+      : undefined;
+  const thresholdPercentage =
+    values['threshold-percentage'] !== undefined
+      ? Number(values['threshold-percentage'])
       : undefined;
 
   const rootDir = path.resolve(import.meta.dirname, '../..');
@@ -280,6 +297,7 @@ async function main(): Promise<void> {
   const sourceMapTestServer = await startSourceMapTestServer();
   const targetUrl = values.url ?? sourceMapTestServer.url;
 
+  const results: ScenarioResult[] = [];
   try {
     console.log(
       `Source map test server listening at: ${sourceMapTestServer.url}`,
@@ -289,7 +307,6 @@ async function main(): Promise<void> {
     }
     console.log(`Scenarios to run: ${scenarios.map(s => s.name).join(', ')}`);
 
-    const results: ScenarioResult[] = [];
     for (const scenarioEntry of scenarios) {
       const scenarioDefaults =
         scenarioEntry.scenario.getNumIterations?.() ?? {};
@@ -306,6 +323,7 @@ async function main(): Promise<void> {
       const options: ProfileOptions = {
         iterations,
         warmupIterations,
+        thresholdPercentage,
       };
 
       const scenarioOutputDir =
@@ -326,17 +344,28 @@ async function main(): Promise<void> {
       );
       results.push(result);
     }
-
-    console.log('\n=== Summary ===');
-    for (const result of results) {
-      if (result.isGrowth) {
-        console.warn(result.summary);
-      } else {
-        console.log(result.summary);
-      }
-    }
   } finally {
     await sourceMapTestServer.close();
+  }
+
+  console.log('\n=== Summary ===');
+  let hasFailures = false;
+  for (const result of results) {
+    if (result.exceededThreshold) {
+      hasFailures = true;
+      console.error(result.summary);
+    } else if (result.isGrowth) {
+      console.warn(result.summary);
+    } else {
+      console.log(result.summary);
+    }
+  }
+
+  if (hasFailures) {
+    console.error(
+      '\nMemory growth threshold exceeded for one or more scenarios.',
+    );
+    process.exit(1);
   }
 }
 

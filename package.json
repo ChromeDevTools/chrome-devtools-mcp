@@ -33,7 +33,9 @@
     "update-metrics": "node scripts/update_metrics.ts",
     "verify-npm-package": "node scripts/verify-npm-package.js",
     "eval": "npm run build && node scripts/eval_gemini.ts",
-    "count-tokens": "node scripts/count_tokens.ts"
+    "count-tokens": "node scripts/count_tokens.ts",
+    "profile": "npm run build && node scripts/profile/profile_mcp.ts",
+    "test:memory": "npm run build && node scripts/profile/profile_mcp.ts --threshold-percentage 1"
   },
   "files": [
     "build/src",

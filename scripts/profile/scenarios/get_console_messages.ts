@@ -8,8 +8,8 @@ import type {ScenarioArgs, ScenarioIterations, ToolCall} from '../types.ts';
 
 export function getNumIterations(): ScenarioIterations {
   return {
-    iterations: 1,
-    warmupIterations: 0,
+    iterations: 3,
+    warmupIterations: 3,
   };
 }
 
