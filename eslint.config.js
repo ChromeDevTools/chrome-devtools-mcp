@@ -17,6 +17,7 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
+    'devtools-frontend/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
@@ -34,11 +35,10 @@ export default defineConfig([
       parserOptions: {
         projectService: {
           allowDefaultProject: [
-            '.prettierrc.cjs',
-            'puppeteer.config.cjs',
-            'eslint.config.mjs',
-            'rollup.config.mjs',
-            'skills/memory-leak-debugging/references/compare_snapshots.js',
+            'prettier.config.js',
+            'puppeteer.config.js',
+            'eslint.config.js',
+            'rollup.config.js',
           ],
         },
       },
@@ -69,6 +69,11 @@ export default defineConfig([
       '@local/check-license': 'error',
       curly: ['error', 'all'],
 
+      // ESLint 10 newly recommends these rules. Disable them explicitly so this
+      // dependency upgrade does not require unrelated source changes.
+      'no-useless-assignment': 'off',
+      'preserve-caught-error': 'off',
+
       'no-undef': 'off',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
@@ -98,17 +103,18 @@ export default defineConfig([
       ],
       '@typescript-eslint/no-floating-promises': 'error',
 
-      'import/order': [
-        'error',
-        {
-          'newlines-between': 'always',
+      // Incompatible with ESLint 10
+      // 'import/order': [
+      //   'error',
+      //   {
+      //     'newlines-between': 'always',
 
-          alphabetize: {
-            order: 'asc',
-            caseInsensitive: true,
-          },
-        },
-      ],
+      //     alphabetize: {
+      //       order: 'asc',
+      //       caseInsensitive: true,
+      //     },
+      //   },
+      // ],
 
       'import/no-cycle': [
         'error',
@@ -127,9 +133,9 @@ export default defineConfig([
         {
           patterns: [
             {
-              regex: '.*chrome-devtools-frontend/(?!mcp/mcp.js$).*',
+              regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
               message:
-                'Import only the devtools-frontend code exported via node_modules/chrome-devtools-frontend/mcp/mcp.js',
+                'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
             },
           ],
         },

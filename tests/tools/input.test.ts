@@ -25,7 +25,6 @@ import {
   clickAt,
   typeText,
 } from '../../src/tools/input.js';
-import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext, getTextContent} from '../utils.js';
 
@@ -155,7 +154,7 @@ describe('input', () => {
           response,
           context,
         );
-        const result = await response.handle('click', context);
+        const result = await response.handle(context);
         const textContent = getTextContent(result.content[0]);
         const expectedUrl = server.getRoute('/after-click');
         assert.ok(
@@ -184,7 +183,7 @@ describe('input', () => {
           response,
           context,
         );
-        const result = await response.handle('click', context);
+        const result = await response.handle(context);
         const textContent = getTextContent(result.content[0]);
         assert.ok(
           !textContent.includes('Page navigated to '),
@@ -587,6 +586,44 @@ describe('input', () => {
           () => document.querySelector('select')!.value,
         );
         assert.strictEqual(selectedValue, 'v2');
+      });
+    });
+
+    it('fills out a select option with an empty value by text', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<select
+            ><option value="">none</option
+            ><option
+              value="v2"
+              selected
+              >two</option
+            ></select
+          >`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'none',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        const selectedValue = await page.evaluate(
+          () => document.querySelector('select')!.value,
+        );
+        assert.strictEqual(selectedValue, '');
       });
     });
 
@@ -1345,33 +1382,6 @@ describe('input', () => {
   });
 
   describe('press_key', () => {
-    it('parses keys', () => {
-      assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
-      assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
-      assert.deepStrictEqual(parseKey('Control+Shift++'), [
-        '+',
-        'Control',
-        'Shift',
-      ]);
-      assert.deepStrictEqual(parseKey('Shift'), ['Shift']);
-      assert.deepStrictEqual(parseKey('KeyA'), ['KeyA']);
-    });
-    it('throws on empty key', () => {
-      assert.throws(() => {
-        parseKey('');
-      });
-    });
-    it('throws on invalid key', () => {
-      assert.throws(() => {
-        parseKey('aaaaa');
-      });
-    });
-    it('throws on multiple keys', () => {
-      assert.throws(() => {
-        parseKey('Shift+Shift');
-      });
-    });
-
     it('processes press_key', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;

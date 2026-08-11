@@ -206,7 +206,7 @@ export const cliOptions = {
   categoryExperimentalWebmcp: {
     type: 'boolean',
     describe:
-      'Set to true to enable debugging WebMCP tools. Requires Chrome 149+ with the following flags: `--enable-features=WebMCP,DevToolsWebMCPSupport`',
+      'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
   },
   chromeArg: {
     type: 'array',
@@ -257,6 +257,13 @@ export const cliOptions = {
     default: false,
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',
+  },
+  categoryPwa: {
+    type: 'boolean',
+    hidden: false,
+    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
+    describe:
+      'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
   },
   performanceCrux: {
     type: 'boolean',

@@ -1,3 +1,21 @@
+exports[`ConsoleFormatter > toString/toJSON > formats a console message with a stack trace when fetchStackTrace is set toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "id": 1,
+  "stackTrace": "at foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\n--- setTimeout -------------------------\\nat schedule (util.ts:5:2)"
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats a console message with a stack trace when fetchStackTrace is set toString 1`] = `
+msgid=1 [log] Hello stack trace! (0 args)
+  at foo (foo.ts:10:2)
+  at bar (foo.ts:20:2)
+  --- setTimeout -------------------------
+  at schedule (util.ts:5:2)
+`;
+
 exports[`ConsoleFormatter > toString/toJSON > formats a console.log message toJSON 1`] = `
 {
   "type": "log",
@@ -48,6 +66,34 @@ exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError toJSON 1`
 
 exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError toString 1`] = `
 msgid=1 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError with a stack trace when fetchStackTrace is set toJSON 1`] = `
+{
+  "type": "error",
+  "text": "Uncaught TypeError: Cannot read properties of undefined",
+  "argsCount": 0,
+  "id": 2,
+  "stackTrace": "at foo (foo.ts:10:2)"
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError with a stack trace when fetchStackTrace is set toString 1`] = `
+msgid=2 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+  at foo (foo.ts:10:2)
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > omits the stack trace when fetchStackTrace is not set toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "id": 1
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > omits the stack trace when fetchStackTrace is not set toString 1`] = `
+msgid=1 [log] Hello stack trace! (0 args)
 `;
 
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > does not show call frames with ignore listed scripts toJSONDetailed 1`] = `

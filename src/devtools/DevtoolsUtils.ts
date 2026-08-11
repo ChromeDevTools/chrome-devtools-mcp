@@ -11,7 +11,6 @@ import type {
   Protocol,
 } from '../third_party/index.js';
 
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
 /**
@@ -145,9 +144,19 @@ export async function createTargetUniverse(
         DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
+    hostConfig: {},
+    inspectorFrontendHost:
+      DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
+    supportsEmulation: false,
   });
 
-  const connection = new PuppeteerDevToolsConnection(session);
+  const setting = universe.settings.resolve(
+    DevTools.SourceMapManager.lazyLoadingSettingDescriptor,
+  );
+  setting.set(true);
+
+  // @ts-expect-error devtools-frontend has diffrent types.
+  const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
 

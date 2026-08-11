@@ -8,6 +8,14 @@ In general, it is the expectation that the AI agent or client using this MCP ser
 
 Several tools in this project have the ability to perform actions such as writing files to disk (e.g., via browser downloads or screenshots) or dynamically loading Chrome extensions. These are intentional, documented features and are not vulnerabilities.
 
+The server returns web content to the client as text (Markdown-like) or
+structured data (`--experimentalStructuredContent`). The web content is returned
+as-is to facilitate debugging and we do not consider changes in the output
+text/Markdown structure based on the web content to be vulnerabilities. If
+structure is important for your use case, use structured output
+(`--experimentalStructuredContent`). Prefer using this server with trusted web
+content or make sure your client takes precautions against prompt injections.
+
 We appreciate feedback and suggestions from developers on how this tool can make it easier for them to build a more secure user experience, but will treat these exclusively as feature requests, and not vulnerabilities in chrome-devtools-mcp itself.
 
 ### MCP roots

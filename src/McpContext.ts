@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs/promises';
-import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -26,16 +25,25 @@ import {
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
+  type GetPWAStateOptions,
+  type InstallPWAOptions,
+  type LaunchPWAOptions,
   type Page,
+  type PWAState,
   type ScreenRecorder,
   type Target,
+  type UninstallPWAOptions,
   type Extension,
   type Root,
   type DevTools,
 } from './third_party/index.js';
 import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {Context, SupportedExtensions} from './tools/ToolDefinition.js';
+import type {
+  Context,
+  DevToolsData,
+  SupportedExtensions,
+} from './tools/ToolDefinition.js';
 import type {TraceResult} from './trace-processing/parse.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
@@ -58,6 +66,8 @@ interface McpContextOptions {
   // Whether this context replaces a previous one after a browser reconnect.
   // Surfaces a one-time note in the next response.
   reconnected?: boolean;
+  // Custom navigation timeout in milliseconds to override default.
+  navigationTimeout?: number;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -139,6 +149,7 @@ export class McpContext implements Context {
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
     this.#serviceWorkerConsoleCollector.dispose();
+    this.#heapSnapshotManager.dispose();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
@@ -248,7 +259,7 @@ export class McpContext implements Context {
       roots.map(async root => {
         const rootPathUri = root.uri;
         const rootPath = path.resolve(fileURLToPath(rootPathUri));
-        return await fsPromises.realpath(rootPath);
+        return await fs.realpath(rootPath);
       }),
     );
 
@@ -333,6 +344,22 @@ export class McpContext implements Context {
     return !!(this.#options.allowList || this.#options.blocklist);
   }
 
+  installPWA(options: InstallPWAOptions): Promise<string> {
+    return this.browser.installPWA(options);
+  }
+
+  uninstallPWA(options: UninstallPWAOptions): Promise<void> {
+    return this.browser.uninstallPWA(options);
+  }
+
+  launchPWA(options: LaunchPWAOptions): Promise<Page> {
+    return this.browser.launchPWA(options);
+  }
+
+  getPWAState(options: GetPWAStateOptions): Promise<PWAState> {
+    return this.browser.getPWAState(options);
+  }
+
   setIsRunningPerformanceTrace(x: boolean): void {
     this.#isRunningTrace = x;
   }
@@ -370,6 +397,25 @@ export class McpContext implements Context {
       );
     }
     return page;
+  }
+
+  async getDevToolsData(page?: McpPage): Promise<DevToolsData | undefined> {
+    const targetPage = page ?? this.#selectedPage;
+    if (!targetPage) {
+      return undefined;
+    }
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<undefined>(resolve => {
+      timeoutId = setTimeout(() => resolve(undefined), 500);
+    });
+    const dataPromise = targetPage.getDevToolsData();
+    try {
+      return await Promise.race([dataPromise, timeoutPromise]);
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timeoutId!);
+    }
   }
 
   /**
@@ -480,6 +526,7 @@ export class McpContext implements Context {
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           page.browserContext(),
         ),
+        navigationTimeout: this.#options.navigationTimeout,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();
@@ -572,17 +619,39 @@ export class McpContext implements Context {
     return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
   }
 
+  async #writeFile(
+    filepath: string,
+    data: Uint8Array<ArrayBufferLike>,
+  ): Promise<void> {
+    await this.validatePath(filepath);
+
+    try {
+      await fs.mkdir(path.dirname(filepath), {recursive: true});
+      // Open the file with flags to:
+      // - O_WRONLY: Write-only
+      // - O_CREAT: Create if it doesn't exist
+      // - O_TRUNC: Truncate to zero length if it exists
+      // - O_NOFOLLOW: DO NOT follow symlinks.
+      // - 0o600: Permissions: read/write for owner, no permissions for others.
+      await fs.writeFile(filepath, data, {
+        flag:
+          fs.constants.O_WRONLY |
+          fs.constants.O_CREAT |
+          fs.constants.O_TRUNC |
+          fs.constants.O_NOFOLLOW,
+        mode: 0o600,
+      });
+    } catch (err) {
+      throw new Error(`Could not write ${filepath}`, {cause: err});
+    }
+  }
+
   async saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
   ): Promise<{filepath: string}> {
     const filepath = await getTempFilePath(filename);
-    await this.validatePath(filepath);
-    try {
-      await fs.writeFile(filepath, data);
-    } catch (err) {
-      throw new Error('Could not save a file', {cause: err});
-    }
+    await this.#writeFile(filepath, data);
     return {filepath};
   }
 
@@ -595,14 +664,8 @@ export class McpContext implements Context {
       clientProvidedFilePath,
       extension,
     );
-    try {
-      await fs.mkdir(path.dirname(filePath), {recursive: true});
-      await fs.writeFile(filePath, data);
-      return {filename: filePath};
-    } catch (err) {
-      this.logger?.(err);
-      throw new Error('Could not save a file', {cause: err});
-    }
+    await this.#writeFile(filePath, data);
+    return {filename: filePath};
   }
 
   storeTraceRecording(result: TraceResult): void {
@@ -616,12 +679,25 @@ export class McpContext implements Context {
   }
 
   async installExtension(extensionPath: string): Promise<string> {
-    const id = await this.browser.installExtension(extensionPath);
+    const id = await Promise.race([
+      this.browser.installExtension(extensionPath),
+      new Promise<string>((_, rej) =>
+        setTimeout(() => rej(new Error('Timeout installing extension')), 30000),
+      ),
+    ]);
     return id;
   }
 
   async uninstallExtension(id: string): Promise<void> {
-    await this.browser.uninstallExtension(id);
+    await Promise.race([
+      this.browser.uninstallExtension(id),
+      new Promise<void>((_, rej) =>
+        setTimeout(
+          () => rej(new Error('Timeout uninstalling extension')),
+          30000,
+        ),
+      ),
+    ]);
   }
 
   async triggerExtensionAction(id: string): Promise<void> {
@@ -646,8 +722,13 @@ export class McpContext implements Context {
   async getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
+    objectId?: number,
   ): Promise<HeapSnapshotAggregateData> {
-    return await this.#heapSnapshotManager.getAggregates(filePath, filterName);
+    return await this.#heapSnapshotManager.getAggregates(
+      filePath,
+      filterName,
+      objectId,
+    );
   }
 
   async getHeapSnapshotDuplicateStrings(
@@ -668,15 +749,23 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getStaticData(filePath);
   }
 
+  async getHeapSnapshotNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    return await this.#heapSnapshotManager.getNativeContextSizes(filePath);
+  }
+
   async getHeapSnapshotNodesById(
     filePath: string,
     id: number,
     filterName?: string,
+    objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     return await this.#heapSnapshotManager.getNodesById(
       filePath,
       id,
       filterName,
+      objectId,
     );
   }
 
@@ -687,8 +776,15 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getRetainers(filePath, nodeId);
   }
 
+  async getHeapSnapshotObjectDetails(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    return await this.#heapSnapshotManager.getObjectInfo(filePath, nodeId);
+  }
+
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
-    return this.#heapSnapshotManager.dispose(filePath);
+    return this.#heapSnapshotManager.disposeSnapshot(filePath);
   }
 
   hasHeapSnapshots(): boolean {
@@ -762,7 +858,7 @@ export class McpContext implements Context {
 
       case 'file:': {
         await this.validatePath(fileURLToPath(url));
-        return await fsPromises.readFile(url, 'utf-8');
+        return await fs.readFile(url, 'utf-8');
       }
 
       default:

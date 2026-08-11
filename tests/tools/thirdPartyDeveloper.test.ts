@@ -57,10 +57,7 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
-            'list_3p_developer_tools',
-            context,
-          );
+          const result = await response.handle(context);
           // @ts-expect-error `structuredContent` has `thirdPartyDeveloperTools`
           const groups = result.structuredContent.thirdPartyDeveloperTools;
           assert.strictEqual(groups.length, 1);
@@ -103,10 +100,7 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
-            'list_3p_developer_tools',
-            context,
-          );
+          const result = await response.handle(context);
           assert.ok(result.structuredContent);
           assert.deepStrictEqual(
             (
@@ -139,10 +133,7 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
-            'list_3p_developer_tools',
-            context,
-          );
+          const result = await response.handle(context);
           assert.ok(result.structuredContent);
           assert.deepStrictEqual(
             (
@@ -169,10 +160,7 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
-            'list_3p_developer_tools',
-            context,
-          );
+          const result = await response.handle(context);
           assert.ok(result.structuredContent);
           assert.deepStrictEqual(
             (
@@ -233,10 +221,7 @@ describe('thirdPartyDeveloperTools', () => {
             context,
           );
 
-          const result = await response.handle(
-            'list_3p_developer_tools',
-            context,
-          );
+          const result = await response.handle(context);
           const actualGroups =
             // @ts-expect-error structuredContent has `thirdPartyDeveloperTools`
             result.structuredContent.thirdPartyDeveloperTools;
@@ -280,7 +265,7 @@ describe('thirdPartyDeveloperTools', () => {
             response,
             context,
           );
-          await response.handle('list_3p_developer_tools', context);
+          await response.handle(context);
 
           let groupsLength = await page.pptrPage.evaluate(
             () => window.__dtmcp?.toolGroups?.length,
@@ -292,7 +277,7 @@ describe('thirdPartyDeveloperTools', () => {
             response,
             context,
           );
-          await response.handle('list_3p_developer_tools', context);
+          await response.handle(context);
 
           groupsLength = await page.pptrPage.evaluate(
             () => window.__dtmcp?.toolGroups?.length,
@@ -319,7 +304,7 @@ describe('thirdPartyDeveloperTools', () => {
         response,
         context,
       );
-      await response.handle('list_3p_developer_tools', context);
+      await response.handle(context);
     }
 
     it('executes a tool', async () => {
@@ -896,6 +881,79 @@ describe('thirdPartyDeveloperTools', () => {
           );
 
           stubSnapshot.restore();
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
+    it('disposes old handles when executing third party developer tools', async () => {
+      await withMcpContext(
+        async (response, context) => {
+          await setupThirdPartyDeveloperTools(response, context, () => {
+            const mockToolGroup = {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                  execute: () => {
+                    const div = document.createElement('div');
+                    document.body.appendChild(div);
+                    return div;
+                  },
+                },
+              ],
+            };
+            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
+              // @ts-expect-error Event has `respondWith`
+              e.respondWith(mockToolGroup);
+            });
+          });
+
+          const page = context.getSelectedMcpPage();
+          if (!page) {
+            assert.fail('No page found');
+          }
+
+          await executeThirdPartyDeveloperTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page,
+            },
+            response,
+            context,
+          );
+
+          const firstHandles = [...page.extraHandles];
+          assert.strictEqual(firstHandles.length, 1);
+          // @ts-expect-error Internal Puppeteer API
+          assert.ok(!firstHandles[0].disposed);
+
+          await executeThirdPartyDeveloperTool.handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page,
+            },
+            response,
+            context,
+          );
+
+          const secondHandles = [...page.extraHandles];
+          assert.strictEqual(secondHandles.length, 1);
+          assert.notStrictEqual(firstHandles[0], secondHandles[0]);
+          // @ts-expect-error Internal Puppeteer API
+          assert.ok(!secondHandles[0].disposed);
+          // @ts-expect-error Internal Puppeteer API
+          assert.ok(firstHandles[0].disposed);
         },
         undefined,
         {categoryExperimentalThirdParty: true},

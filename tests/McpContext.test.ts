@@ -17,8 +17,9 @@ import sinon from 'sinon';
 
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
+import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import type {HTTPResponse} from '../src/third_party/index.js';
+import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
 import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
@@ -285,6 +286,24 @@ describe('McpContext', () => {
     });
   });
 
+  it('disposes loaded heap snapshots on teardown', async () => {
+    await withMcpContext(async (_response, context) => {
+      const filePath = path.join(
+        process.cwd(),
+        'tests/fixtures/example.heapsnapshot',
+      );
+      await context.getHeapSnapshotStats(filePath);
+      assert.ok(context.hasHeapSnapshots(), 'snapshot loaded before teardown');
+
+      context.dispose();
+
+      assert.ok(
+        !context.hasHeapSnapshots(),
+        'heap snapshots freed on teardown',
+      );
+    });
+  });
+
   it('should include network requests in structured content', async t => {
     await withMcpContext(async (response, context) => {
       const mockRequest = getMockRequest({
@@ -297,7 +316,7 @@ describe('McpContext', () => {
         .returns([mockRequest]);
 
       response.setIncludeNetworkRequests(true);
-      const result = await response.handle('test', context);
+      const result = await response.handle(context);
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
   });
@@ -314,7 +333,7 @@ describe('McpContext', () => {
         .returns(mockRequest);
 
       response.attachNetworkRequest(456);
-      const result = await response.handle('test', context);
+      const result = await response.handle(context);
 
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
     });
@@ -365,7 +384,7 @@ describe('McpContext', () => {
         requestFilePath: reqFilePath,
         responseFilePath: resFilePath,
       });
-      const result = await response.handle('test', context);
+      const result = await response.handle(context);
 
       t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
 
@@ -464,6 +483,101 @@ describe('McpContext', () => {
         context.validatePath(path.resolve(os.homedir(), 'anywhere.txt')),
         /Access denied/,
       );
+    });
+  });
+
+  describe('symlink security checks', () => {
+    // Symlinks are not followed on Windows by default.
+    if (os.platform() === 'win32') {
+      return;
+    }
+
+    it('saveFile refuses to write through a symlink to an existing file', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        );
+        try {
+          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+
+          const targetPath = path.join(tmpDir, 'target.txt');
+          await fs.writeFile(targetPath, 'original content', 'utf-8');
+
+          const symlinkPath = path.join(tmpDir, 'symlink.txt');
+          await fs.symlink(targetPath, symlinkPath);
+
+          const data = new TextEncoder().encode('malicious content');
+          await assert.rejects(
+            context.saveFile(data, symlinkPath, '.txt'),
+            /Could not write/,
+          );
+
+          const content = await fs.readFile(targetPath, 'utf-8');
+          assert.strictEqual(content, 'original content');
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+        }
+      });
+    });
+
+    it('saveFile refuses to write through a dangling symlink to a non-existent file', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        );
+        const outsideDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-outside-test-'),
+        );
+        try {
+          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+
+          const outsideTarget = path.join(outsideDir, 'target.txt');
+          const symlinkPath = path.join(tmpDir, 'symlink.txt');
+          await fs.symlink(outsideTarget, symlinkPath);
+
+          const data = new TextEncoder().encode('malicious content');
+          await assert.rejects(
+            context.saveFile(data, symlinkPath, '.txt'),
+            /Could not write/,
+          );
+
+          await assert.rejects(fs.stat(outsideTarget));
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+          await fs.rm(outsideDir, {recursive: true, force: true});
+        }
+      });
+    });
+
+    it('saveFile allows writing to a file within an allowed symlinked directory', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        );
+        try {
+          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+
+          const realDir = path.join(tmpDir, 'real_dir');
+          await fs.mkdir(realDir, {recursive: true});
+
+          const symlinkedDir = path.join(tmpDir, 'symlinked_dir');
+          await fs.symlink(realDir, symlinkedDir);
+
+          const targetFilePath = path.join(symlinkedDir, 'test.txt');
+          const data = new TextEncoder().encode('allowed content');
+
+          const result = await context.saveFile(data, targetFilePath, '.txt');
+          assert.strictEqual(result.filename, targetFilePath);
+
+          const content = await fs.readFile(
+            path.join(realDir, 'test.txt'),
+            'utf-8',
+          );
+          assert.strictEqual(content, 'allowed content');
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+        }
+      });
     });
   });
 
@@ -571,6 +685,37 @@ describe('McpContext', () => {
             allowedUrlPattern: ['https://example.com/allowed*'],
           },
         );
+      });
+    });
+
+    describe('getDevToolsData', () => {
+      it('returns devtools data from passed page', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mockPage = sinon.createStubInstance(McpPage);
+          mockPage.getDevToolsData.resolves({cdpBackendNodeId: 42});
+          const result = await context.getDevToolsData(mockPage);
+          assert.deepStrictEqual(result, {cdpBackendNodeId: 42});
+        });
+      });
+
+      it('returns undefined when getDevToolsData times out', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mockPage = sinon.createStubInstance(McpPage);
+          mockPage.getDevToolsData.returns(
+            new Promise(resolve => {
+              setTimeout(() => resolve({cdpBackendNodeId: 100}), 600);
+            }),
+          );
+          const result = await context.getDevToolsData(mockPage);
+          assert.strictEqual(result, undefined);
+        });
+      });
+
+      it('returns empty object from selected page when devtools is closed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const result = await context.getDevToolsData();
+          assert.deepStrictEqual(result, {});
+        });
       });
     });
   });

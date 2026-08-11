@@ -61,56 +61,74 @@ export const startTrace = definePageTool({
     const page = request.page;
     const pageUrlForTracing = page.pptrPage.url();
 
-    if (request.params.reload) {
-      // Before starting the recording, navigate to about:blank to clear out any state.
-      await page.pptrPage.goto('about:blank', {
-        waitUntil: ['networkidle0'],
+    try {
+      if (request.params.reload) {
+        // Before starting the recording, navigate to about:blank to clear out any state.
+        // We use `load` because `networkidle0` is known to be flaky for about:blank in Puppeteer.
+        await page.pptrPage.goto('about:blank', {
+          waitUntil: 'load',
+        });
+      }
+
+      // Keep in sync with the categories arrays in:
+      // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
+      // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
+      const categories = [
+        '-*',
+        'blink.console',
+        'blink.user_timing',
+        'devtools.timeline',
+        'disabled-by-default-devtools.screenshot',
+        'disabled-by-default-devtools.timeline',
+        'disabled-by-default-devtools.timeline.frame',
+        'disabled-by-default-devtools.timeline.stack',
+        'disabled-by-default-v8.cpu_profiler',
+        'disabled-by-default-v8.cpu_profiler.hires',
+        'latencyInfo',
+        'loading',
+        'disabled-by-default-lighthouse',
+        'v8.execute',
+        'v8',
+      ];
+      await page.pptrPage.tracing.start({
+        categories,
       });
-    }
 
-    // Keep in sync with the categories arrays in:
-    // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
-    // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
-    const categories = [
-      '-*',
-      'blink.console',
-      'blink.user_timing',
-      'devtools.timeline',
-      'disabled-by-default-devtools.screenshot',
-      'disabled-by-default-devtools.timeline',
-      'disabled-by-default-devtools.timeline.invalidationTracking',
-      'disabled-by-default-devtools.timeline.frame',
-      'disabled-by-default-devtools.timeline.stack',
-      'disabled-by-default-v8.cpu_profiler',
-      'disabled-by-default-v8.cpu_profiler.hires',
-      'latencyInfo',
-      'loading',
-      'disabled-by-default-lighthouse',
-      'v8.execute',
-      'v8',
-    ];
-    await page.pptrPage.tracing.start({
-      categories,
-    });
+      if (request.params.reload) {
+        await page.pptrPage.goto(pageUrlForTracing, {
+          waitUntil: ['load'],
+        });
+      }
 
-    if (request.params.reload) {
-      await page.pptrPage.goto(pageUrlForTracing, {
-        waitUntil: ['load'],
-      });
-    }
-
-    if (request.params.autoStop) {
-      await new Promise(resolve => setTimeout(resolve, 5_000));
-      await stopTracingAndAppendOutput(
-        page,
-        response,
-        context,
-        request.params.filePath,
-      );
-    } else {
-      response.appendResponseLine(
-        `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
-      );
+      if (request.params.autoStop) {
+        await new Promise(resolve => setTimeout(resolve, 5_000));
+        await stopTracingAndAppendOutput(
+          page,
+          response,
+          context,
+          request.params.filePath,
+        );
+      } else {
+        response.appendResponseLine(
+          `The performance trace is being recorded. Use performance_stop_trace to stop it.`,
+        );
+      }
+    } catch (error) {
+      // If a setup step (navigation, tracing.start) throws before
+      // stopTracingAndAppendOutput runs, the running flag would otherwise stay
+      // stuck `true` for the rest of the session, blocking all future traces.
+      // Unwind here: stop tracing if it was started and clear the flag. When
+      // autoStop already ran stopTracingAndAppendOutput the flag is already
+      // false and this is a no-op.
+      if (context.isRunningPerformanceTrace()) {
+        try {
+          await page.pptrPage.tracing.stop();
+        } catch {
+          // Tracing may not have started yet; ignore.
+        }
+        context.setIsRunningPerformanceTrace(false);
+      }
+      throw error;
     }
   },
 });

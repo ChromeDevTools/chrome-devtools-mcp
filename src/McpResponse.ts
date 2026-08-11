@@ -26,19 +26,13 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {
-  DevTools,
-  getToonEncode,
-  getGcfEncode,
-  type Protocol,
-} from './third_party/index.js';
+import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
   Page,
   ResourceType,
   TextContent,
-  JSONSchema7Definition,
   Extension,
   HTTPRequest,
 } from './third_party/index.js';
@@ -59,161 +53,14 @@ import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import type {WaitForEventsResult} from './WaitForHelper.js';
 
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
+
 export type DataFormat = 'default' | 'toon' | 'gcf';
 
 interface TraceInsightData {
   trace: TraceResult;
   insightSetId: string;
   insightName: InsightName;
-}
-
-export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
-  if (typeof schema === 'boolean') {
-    return;
-  }
-
-  let isHtmlElement = false;
-  for (const [key, value] of Object.entries(schema)) {
-    if (key === 'x-mcp-type' && value === 'HTMLElement') {
-      isHtmlElement = true;
-      break;
-    }
-  }
-
-  if (isHtmlElement) {
-    schema.properties = {uid: {type: 'string'}};
-    schema.required = ['uid'];
-  }
-
-  if (schema.properties) {
-    for (const key of Object.keys(schema.properties)) {
-      replaceHtmlElementsWithUids(schema.properties[key]);
-    }
-  }
-
-  if (schema.items) {
-    if (Array.isArray(schema.items)) {
-      for (const item of schema.items) {
-        replaceHtmlElementsWithUids(item);
-      }
-    } else {
-      replaceHtmlElementsWithUids(schema.items);
-    }
-  }
-
-  if (schema.anyOf) {
-    for (const s of schema.anyOf) {
-      replaceHtmlElementsWithUids(s);
-    }
-  }
-  if (schema.allOf) {
-    for (const s of schema.allOf) {
-      replaceHtmlElementsWithUids(s);
-    }
-  }
-  if (schema.oneOf) {
-    for (const s of schema.oneOf) {
-      replaceHtmlElementsWithUids(s);
-    }
-  }
-}
-
-async function getToolGroups(page: McpPage): Promise<ToolGroups> {
-  // Check if there is a `devtoolstooldiscovery` event listener
-  const windowHandle = await page.pptrPage.evaluateHandle(() => window);
-  // @ts-expect-error internal API
-  const client = page.pptrPage._client();
-  const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
-    await client.send('DOMDebugger.getEventListeners', {
-      objectId: windowHandle.remoteObject().objectId,
-    });
-  if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-    return [];
-  }
-
-  const toolGroups = await page.pptrPage.evaluate(() => {
-    if (window.__dtmcp) {
-      window.__dtmcp.toolGroups = [];
-    }
-    return new Promise<ToolGroups>(resolve => {
-      const event = new CustomEvent('devtoolstooldiscovery');
-      const groups: ToolGroups = [];
-      // @ts-expect-error Adding custom property
-      event.respondWith = toolGroup => {
-        if (!window.__dtmcp) {
-          window.__dtmcp = {};
-        }
-        if (!window.__dtmcp.toolGroups) {
-          window.__dtmcp.toolGroups = [];
-        }
-
-        if (
-          typeof toolGroup.name !== 'string' ||
-          (toolGroup.description &&
-            typeof toolGroup.description !== 'string') ||
-          !Array.isArray(toolGroup.tools)
-        ) {
-          console.error('Invalid toolGroup:', toolGroup);
-          return;
-        }
-        for (const tool of toolGroup.tools) {
-          if (
-            typeof tool.name !== 'string' ||
-            typeof tool.description !== 'string' ||
-            typeof tool.inputSchema !== 'object' ||
-            typeof tool.execute !== 'function'
-          ) {
-            console.error('Invalid tool:', tool);
-            return;
-          }
-        }
-
-        window.__dtmcp.toolGroups.push(toolGroup);
-
-        // When receiving a toolGroup for the first time, expose a simple execution helper
-        if (!window.__dtmcp.executeTool) {
-          window.__dtmcp.executeTool = async (toolName, args) => {
-            if (
-              !window.__dtmcp?.toolGroups ||
-              window.__dtmcp.toolGroups.length === 0
-            ) {
-              throw new Error('No tools found on the page');
-            }
-            for (const group of window.__dtmcp.toolGroups) {
-              const tool = group.tools?.find(t => t.name === toolName);
-              if (tool) {
-                return await tool.execute(args);
-              }
-            }
-            throw new Error(`Tool ${toolName} not found`);
-          };
-        }
-
-        groups.push(toolGroup);
-      };
-      window.dispatchEvent(event);
-      // If at least one toolGroup was added synchronously, resolve with the array.
-      // Otherwise, use setTimeout to allow for any microtask/asynchronous respondWith calls, or resolve with an empty array.
-      if (groups.length > 0) {
-        resolve(groups);
-      } else {
-        setTimeout(() => {
-          if (groups.length > 0) {
-            resolve(groups);
-          } else {
-            resolve([]);
-          }
-        }, 0);
-      }
-    });
-  });
-
-  for (const group of toolGroups) {
-    for (const tool of group.tools ?? []) {
-      replaceHtmlElementsWithUids(tool.inputSchema);
-    }
-  }
-  return toolGroups;
 }
 
 export class McpResponse implements Response {
@@ -238,12 +85,14 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
+    nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
     classDiffs?: HeapSnapshotClassDiff[];
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
+    objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -257,6 +106,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     types?: string[];
     includePreservedMessages?: boolean;
+    includeStackTraces?: boolean;
     serviceWorkerId?: string;
   };
   #listExtensions?: boolean;
@@ -346,7 +196,7 @@ export class McpResponse implements Response {
     this.#networkRequestsOptions = {
       include: value,
       pagination:
-        options?.pageSize || options?.pageIdx
+        options?.pageSize !== undefined || options?.pageIdx !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -363,6 +213,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      includeStackTraces?: boolean;
       serviceWorkerId?: string;
     },
   ): void {
@@ -374,7 +225,7 @@ export class McpResponse implements Response {
     this.#consoleDataOptions = {
       include: value,
       pagination:
-        options?.pageSize || options?.pageIdx
+        options?.pageSize !== undefined || options?.pageIdx !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -382,6 +233,7 @@ export class McpResponse implements Response {
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
+      includeStackTraces: options?.includeStackTraces,
       serviceWorkerId: options?.serviceWorkerId,
     };
   }
@@ -485,12 +337,14 @@ export class McpResponse implements Response {
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+    nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       stats,
       staticData,
+      nativeContextSizes,
     };
   }
 
@@ -556,6 +410,16 @@ export class McpResponse implements Response {
     };
   }
 
+  setHeapSnapshotObjectDetails(
+    objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      objectInfo,
+    };
+  }
+
   attachImage(value: ImageContentData): void {
     this.#images.push(value);
   }
@@ -576,102 +440,254 @@ export class McpResponse implements Response {
     return this.#listWebMcpTools;
   }
 
+  async #handleSnapshot(
+    context: McpContext,
+  ): Promise<SnapshotFormatter | string | undefined> {
+    if (this.#includePages) {
+      await context.createPagesSnapshot();
+    }
+    if (!this.#snapshotParams) {
+      return undefined;
+    }
+    if (!this.#page) {
+      throw new Error('Response must have a page');
+    }
+    this.#page.textSnapshot = await TextSnapshot.create(this.#page, {
+      verbose: this.#snapshotParams.verbose,
+      devtoolsData: this.#devToolsData,
+    });
+    const formatter = new SnapshotFormatter(this.#page.textSnapshot);
+    if (this.#snapshotParams.filePath) {
+      const result = await context.saveFile(
+        new TextEncoder().encode(formatter.toString()),
+        this.#snapshotParams.filePath,
+        '.txt',
+      );
+      return result.filename;
+    } else {
+      return formatter;
+    }
+  }
+
+  async #handleAttachedNetworkRequest(
+    context: McpContext,
+  ): Promise<NetworkFormatter | undefined> {
+    if (!this.#attachedNetworkRequestId) {
+      return undefined;
+    }
+    if (!this.#page) {
+      throw new Error(`Response must have an McpPage`);
+    }
+    const request = this.#page.getNetworkRequestById(
+      this.#attachedNetworkRequestId,
+    );
+    return await NetworkFormatter.from(request, {
+      requestId: this.#attachedNetworkRequestId,
+      requestIdResolver: req => this.getNetworkRequestStableId(req),
+      fetchData: true,
+      requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
+      responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
+      saveFile: (data, filename, extension) =>
+        context.saveFile(data, filename, extension),
+      redactNetworkHeaders: this.#redactNetworkHeaders,
+    });
+  }
+
+  async #handleAttachedConsoleMessage(): Promise<
+    ConsoleFormatter | IssueFormatter | undefined
+  > {
+    if (!this.#attachedConsoleMessageId) {
+      return undefined;
+    }
+    if (!this.#page) {
+      throw new Error(`Response must have an McpPage`);
+    }
+    const message = this.#page.getConsoleMessageById(
+      this.#attachedConsoleMessageId,
+    );
+    const consoleMessageStableId = this.#attachedConsoleMessageId;
+    if ('args' in message || message instanceof UncaughtError) {
+      const consoleMessage = message as ConsoleMessage | UncaughtError;
+      return await ConsoleFormatter.from(consoleMessage, {
+        id: consoleMessageStableId,
+        fetchDetailedData: true,
+        devTools: this.#page.devtoolsUniverse,
+      });
+    } else if (message instanceof DevTools.AggregatedIssue) {
+      const formatter = new IssueFormatter(message, {
+        id: consoleMessageStableId,
+        requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
+        elementIdResolver: this.#page.textSnapshot?.resolveCdpElementId.bind(
+          this.#page.textSnapshot,
+        ),
+      });
+      if (!formatter.isValid()) {
+        throw new Error(
+          "Can't provide details for the msgid " + consoleMessageStableId,
+        );
+      }
+      return formatter;
+    } else {
+      return undefined;
+    }
+  }
+
+  async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
+    if (
+      this.#args.categoryExperimentalThirdParty &&
+      this.#listThirdPartyDeveloperTools &&
+      this.#page
+    ) {
+      return await this.#page.getToolGroups();
+    }
+    return undefined;
+  }
+
+  async #handleWebMCP(): Promise<WebMCPTool[] | undefined> {
+    if (
+      this.#args.categoryExperimentalWebmcp &&
+      this.#listWebMcpTools &&
+      this.#page
+    ) {
+      return this.#page.getWebMcpTools();
+    }
+    return undefined;
+  }
+
+  async #handleConsoleList(
+    context: McpContext,
+  ): Promise<Array<ConsoleFormatter | IssueFormatter> | undefined> {
+    if (!this.#consoleDataOptions?.include) {
+      return undefined;
+    }
+
+    let messages;
+    let page: McpPage | undefined;
+
+    if (this.#consoleDataOptions.serviceWorkerId) {
+      messages = context.getServiceWorkerConsoleData(
+        this.#consoleDataOptions.serviceWorkerId,
+      );
+    } else {
+      page = this.#page;
+      if (!page) {
+        throw new Error(`Response must have an McpPage`);
+      }
+      messages = page.getConsoleData(
+        this.#consoleDataOptions.includePreservedMessages,
+      );
+    }
+
+    if (this.#consoleDataOptions.types?.length) {
+      const normalizedTypes = new Set(this.#consoleDataOptions.types);
+      messages = messages.filter(message => {
+        if ('type' in message) {
+          return normalizedTypes.has(message.type());
+        }
+        if (message instanceof DevTools.AggregatedIssue) {
+          return normalizedTypes.has('issue');
+        }
+        return normalizedTypes.has('error');
+      });
+    }
+
+    return (
+      await Promise.all(
+        messages.map(
+          async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
+            const consoleMessageStableId = this.getConsoleMessageStableId(item);
+            if ('args' in item || item instanceof UncaughtError) {
+              const consoleMessage = item as ConsoleMessage | UncaughtError;
+              return await ConsoleFormatter.from(consoleMessage, {
+                id: consoleMessageStableId,
+                fetchDetailedData: false,
+                fetchStackTrace: this.#consoleDataOptions?.includeStackTraces,
+                devTools: page ? page.devtoolsUniverse : undefined,
+              });
+            }
+            if (item instanceof DevTools.AggregatedIssue) {
+              const formatter = new IssueFormatter(item, {
+                id: consoleMessageStableId,
+              });
+              if (!formatter.isValid()) {
+                return null;
+              }
+              return formatter;
+            }
+            return null;
+          },
+        ),
+      )
+    ).filter(item => item !== null);
+  }
+
+  async #handleNetworkRequestList(
+    context: McpContext,
+  ): Promise<NetworkFormatter[] | undefined> {
+    if (!this.#networkRequestsOptions?.include) {
+      return undefined;
+    }
+    if (!this.#page) {
+      throw new Error(`Response must have an McpPage`);
+    }
+    let requests = this.#page.getNetworkRequests(
+      this.#networkRequestsOptions?.includePreservedRequests,
+    );
+
+    // Apply resource type filtering if specified
+    if (this.#networkRequestsOptions.resourceTypes?.length) {
+      const normalizedTypes = new Set(
+        this.#networkRequestsOptions.resourceTypes,
+      );
+      requests = requests.filter(request => {
+        const type = request.resourceType();
+        return normalizedTypes.has(type);
+      });
+    }
+
+    return await Promise.all(
+      requests.map(request =>
+        NetworkFormatter.from(request, {
+          requestId: this.getNetworkRequestStableId(request),
+          selectedInDevToolsUI:
+            this.getNetworkRequestStableId(request) ===
+            this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
+          fetchData: false,
+          saveFile: (data, filename, extension) =>
+            context.saveFile(data, filename, extension),
+          redactNetworkHeaders: this.#redactNetworkHeaders,
+        }),
+      ),
+    );
+  }
+
   async handle(
-    toolName: string,
     context: McpContext,
     dataFormat: DataFormat = 'default',
   ): Promise<{
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
   }> {
-    if (this.#includePages) {
-      await context.createPagesSnapshot();
-    }
+    const [
+      snapshot,
+      detailedNetworkRequest,
+      detailedConsoleMessage,
+      thirdPartyDeveloperTools,
+      webmcpTools,
+      consoleMessages,
+      networkRequests,
+    ] = await Promise.all([
+      this.#handleSnapshot(context),
+      this.#handleAttachedNetworkRequest(context),
+      this.#handleAttachedConsoleMessage(),
+      this.#handleThirdPartyDevelopeTools(),
+      this.#handleWebMCP(),
+      this.#handleConsoleList(context),
+      this.#handleNetworkRequestList(context),
+    ]);
 
     if (this.#includeExtensionServiceWorkers) {
       await context.createExtensionServiceWorkersSnapshot();
-    }
-
-    let snapshot: SnapshotFormatter | string | undefined;
-    if (this.#snapshotParams) {
-      if (!this.#page) {
-        throw new Error('Response must have a page');
-      }
-      this.#page.textSnapshot = await TextSnapshot.create(this.#page, {
-        verbose: this.#snapshotParams.verbose,
-        devtoolsData: this.#devToolsData,
-      });
-      const textSnapshot = this.#page.textSnapshot;
-      if (textSnapshot) {
-        const formatter = new SnapshotFormatter(textSnapshot);
-        if (this.#snapshotParams.filePath) {
-          const result = await context.saveFile(
-            new TextEncoder().encode(formatter.toString()),
-            this.#snapshotParams.filePath,
-            '.txt',
-          );
-          snapshot = result.filename;
-        } else {
-          snapshot = formatter;
-        }
-      }
-    }
-
-    let detailedNetworkRequest: NetworkFormatter | undefined;
-    if (this.#attachedNetworkRequestId) {
-      if (!this.#page) {
-        throw new Error(`Response must have an McpPage`);
-      }
-      const request = this.#page.getNetworkRequestById(
-        this.#attachedNetworkRequestId,
-      );
-      const formatter = await NetworkFormatter.from(request, {
-        requestId: this.#attachedNetworkRequestId,
-        requestIdResolver: req => this.getNetworkRequestStableId(req),
-        fetchData: true,
-        requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
-        responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
-        saveFile: (data, filename, extension) =>
-          context.saveFile(data, filename, extension),
-        redactNetworkHeaders: this.#redactNetworkHeaders,
-      });
-      detailedNetworkRequest = formatter;
-    }
-
-    let detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
-
-    if (this.#attachedConsoleMessageId) {
-      if (!this.#page) {
-        throw new Error(`Response must have an McpPage`);
-      }
-
-      const message = this.#page.getConsoleMessageById(
-        this.#attachedConsoleMessageId,
-      );
-      const consoleMessageStableId = this.#attachedConsoleMessageId;
-      if ('args' in message || message instanceof UncaughtError) {
-        const consoleMessage = message as ConsoleMessage | UncaughtError;
-        const devTools = this.#page.devtoolsUniverse;
-        detailedConsoleMessage = await ConsoleFormatter.from(consoleMessage, {
-          id: consoleMessageStableId,
-          fetchDetailedData: true,
-          devTools: devTools ?? undefined,
-        });
-      } else if (message instanceof DevTools.AggregatedIssue) {
-        const formatter = new IssueFormatter(message, {
-          id: consoleMessageStableId,
-          requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
-          elementIdResolver: this.#page.textSnapshot?.resolveCdpElementId.bind(
-            this.#page.textSnapshot,
-          ),
-        });
-        if (!formatter.isValid()) {
-          throw new Error(
-            "Can't provide details for the msgid " + consoleMessageStableId,
-          );
-        }
-        detailedConsoleMessage = formatter;
-      }
     }
 
     let extensions: Map<string, Extension> | undefined;
@@ -679,129 +695,7 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    let thirdPartyDeveloperTools: ToolGroups = [];
-    if (
-      this.#args.categoryExperimentalThirdParty &&
-      this.#listThirdPartyDeveloperTools &&
-      this.#page
-    ) {
-      thirdPartyDeveloperTools = await getToolGroups(this.#page);
-      if (thirdPartyDeveloperTools) {
-        this.#page.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
-      }
-    }
-
-    let webmcpTools: WebMCPTool[] | undefined;
-    if (
-      this.#args.categoryExperimentalWebmcp &&
-      this.#listWebMcpTools &&
-      this.#page
-    ) {
-      webmcpTools = this.#page.getWebMcpTools();
-    }
-
-    let consoleMessages: Array<ConsoleFormatter | IssueFormatter> | undefined;
-    if (this.#consoleDataOptions?.include) {
-      let messages;
-      let page: McpPage | undefined;
-
-      if (this.#consoleDataOptions.serviceWorkerId) {
-        messages = context.getServiceWorkerConsoleData(
-          this.#consoleDataOptions.serviceWorkerId,
-        );
-      } else {
-        page = this.#page;
-        if (!page) {
-          throw new Error(`Response must have an McpPage`);
-        }
-        messages = page.getConsoleData(
-          this.#consoleDataOptions.includePreservedMessages,
-        );
-      }
-
-      if (this.#consoleDataOptions.types?.length) {
-        const normalizedTypes = new Set(this.#consoleDataOptions.types);
-        messages = messages.filter(message => {
-          if ('type' in message) {
-            return normalizedTypes.has(message.type());
-          }
-          if (message instanceof DevTools.AggregatedIssue) {
-            return normalizedTypes.has('issue');
-          }
-          return normalizedTypes.has('error');
-        });
-      }
-
-      consoleMessages = (
-        await Promise.all(
-          messages.map(
-            async (item): Promise<ConsoleFormatter | IssueFormatter | null> => {
-              const consoleMessageStableId =
-                this.getConsoleMessageStableId(item);
-              if ('args' in item || item instanceof UncaughtError) {
-                const consoleMessage = item as ConsoleMessage | UncaughtError;
-                return await ConsoleFormatter.from(consoleMessage, {
-                  id: consoleMessageStableId,
-                  fetchDetailedData: false,
-                  devTools: page ? page.devtoolsUniverse : undefined,
-                });
-              }
-              if (item instanceof DevTools.AggregatedIssue) {
-                const formatter = new IssueFormatter(item, {
-                  id: consoleMessageStableId,
-                });
-                if (!formatter.isValid()) {
-                  return null;
-                }
-                return formatter;
-              }
-              return null;
-            },
-          ),
-        )
-      ).filter(item => item !== null);
-    }
-
-    let networkRequests: NetworkFormatter[] | undefined;
-    if (this.#networkRequestsOptions?.include) {
-      if (!this.#page) {
-        throw new Error(`Response must have an McpPage`);
-      }
-      let requests = this.#page.getNetworkRequests(
-        this.#networkRequestsOptions?.includePreservedRequests,
-      );
-
-      // Apply resource type filtering if specified
-      if (this.#networkRequestsOptions.resourceTypes?.length) {
-        const normalizedTypes = new Set(
-          this.#networkRequestsOptions.resourceTypes,
-        );
-        requests = requests.filter(request => {
-          const type = request.resourceType();
-          return normalizedTypes.has(type);
-        });
-      }
-
-      if (requests.length) {
-        networkRequests = await Promise.all(
-          requests.map(request =>
-            NetworkFormatter.from(request, {
-              requestId: this.getNetworkRequestStableId(request),
-              selectedInDevToolsUI:
-                this.getNetworkRequestStableId(request) ===
-                this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
-              fetchData: false,
-              saveFile: (data, filename, extension) =>
-                context.saveFile(data, filename, extension),
-              redactNetworkHeaders: this.#redactNetworkHeaders,
-            }),
-          ),
-        );
-      }
-    }
-
     return this.format(
-      toolName,
       context,
       {
         detailedConsoleMessage,
@@ -832,7 +726,6 @@ export class McpResponse implements Response {
   }
 
   async format(
-    toolName: string,
     context: McpContext,
     data: {
       detailedConsoleMessage: ConsoleFormatter | IssueFormatter | undefined;
@@ -844,7 +737,7 @@ export class McpResponse implements Response {
       traceInsight?: TraceInsightData;
       extensions?: Map<string, Extension>;
       lighthouseResult?: LighthouseData;
-      thirdPartyDeveloperTools: ToolGroups;
+      thirdPartyDeveloperTools?: ToolGroups;
       webmcpTools?: WebMCPTool[];
       errorMessage?: string;
     },
@@ -885,6 +778,7 @@ export class McpResponse implements Response {
       heapSnapshot?: {
         stats?: object;
         staticData?: object;
+        nativeContextSizes?: object;
         aggregateStats?: {
           objectCount: number;
           totalSelfSize: number;
@@ -897,6 +791,7 @@ export class McpResponse implements Response {
       heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
+      heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       errorMessage?: string;
@@ -1190,6 +1085,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
       }
+      const nativeContextSizes = this.#heapSnapshotOptions.nativeContextSizes;
+      if (nativeContextSizes) {
+        response.push('### Native Contexts');
+        response.push(
+          HeapSnapshotFormatter.formatNativeContextSizes(nativeContextSizes),
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
+      }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {
         const sortedEntries = HeapSnapshotFormatter.sort(
@@ -1203,9 +1107,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         response.push(`Objects: ${aggregateData.objectCount}`);
         response.push(
-          `Total shallow size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(
-            aggregateData.totalSelfSize,
-          )}`,
+          `Total shallow size: ${formatBytesToKb(aggregateData.totalSelfSize)}`,
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.aggregateStats = {
@@ -1319,6 +1221,16 @@ Call ${handleDialog.name} to handle it before continuing.`);
 
         structuredContent.heapSnapshotDuplicateStrings = paginationData.items;
       }
+      const objectInfo = this.#heapSnapshotOptions.objectInfo;
+      if (objectInfo) {
+        response.push('### Object Details');
+        response.push(
+          compactEncode
+            ? compactEncode(objectInfo)
+            : HeapSnapshotFormatter.formatObjectInfo(objectInfo),
+        );
+        structuredContent.heapSnapshotObjectDetails = objectInfo;
+      }
     }
 
     if (data.detailedNetworkRequest) {
@@ -1349,11 +1261,11 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
-    if (data.thirdPartyDeveloperTools.length) {
-      structuredContent.thirdPartyDeveloperTools =
-        data.thirdPartyDeveloperTools;
+    const thirdPartyDeveloperTools = data.thirdPartyDeveloperTools;
+    if (thirdPartyDeveloperTools?.length) {
+      structuredContent.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
       response.push('## Third-party developer tools');
-      for (const toolGroup of data.thirdPartyDeveloperTools) {
+      for (const toolGroup of thirdPartyDeveloperTools) {
         response.push(`${toolGroup.name}: ${toolGroup.description}`);
         response.push('Available tools:');
         const toolDefinitionsMessage = toolGroup.tools
@@ -1436,6 +1348,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
           response.push(compactEncode(structuredContent.consoleMessages));
         } else {
           response.push(...paginationData.items.map(item => item.toString()));
+        }
+        if (
+          structuredContent.consoleMessages.some(
+            message => 'stackTrace' in message,
+          )
+        ) {
+          response.push(
+            'Note: stack trace line and column numbers use 1-based indexing',
+          );
         }
       } else {
         response.push('<no console messages found>');

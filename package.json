@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -11,7 +11,7 @@
   "scripts": {
     "cli:generate": "node scripts/generate-cli.ts",
     "clean": "node -e \"require('fs').rmSync('build', {recursive: true, force: true})\"",
-    "bundle": "npm run clean && npm run build && rollup -c rollup.config.mjs && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\" && node scripts/append-lighthouse-notices.ts",
+    "bundle": "npm run clean && npm run build && rollup -c rollup.config.js && node -e \"require('fs').rmSync('build/node_modules', {recursive: true, force: true})\" && node scripts/append-lighthouse-notices.ts",
     "build": "tsc && node scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
@@ -20,15 +20,18 @@
     "docs:generate": "node scripts/generate-docs.ts",
     "start": "npm run build && node build/src/bin/chrome-devtools-mcp.js",
     "start-debug": "DEBUG=mcp:* DEBUG_COLORS=false npm run build && node build/src/bin/chrome-devtools-mcp.js",
-    "test": "npm run build && node scripts/test.mjs",
-    "test:no-build": "node scripts/test.mjs",
-    "test:only": "npm run build && node scripts/test.mjs --test-only",
-    "test:update-snapshots": "npm run build && node scripts/test.mjs --test-update-snapshots",
+    "test": "npm run build && node scripts/test.js --test-skip-pattern=THIRD_PARTY_NOTICES",
+    "test:no-build": "node scripts/test.js --test-skip-pattern=THIRD_PARTY_NOTICES",
+    "test:notices": "npm run bundle && node scripts/test.js tests/third_party_notices.test.ts",
+    "test:notices:no-build": "node scripts/test.js tests/third_party_notices.test.ts",
+    "test:only": "npm run build && node scripts/test.js --test-only",
+    "test:update-snapshots": "npm run build && node scripts/test.js --test-update-snapshots",
     "prepare": "node scripts/prepare.ts",
+    "sync": "npm ci && git submodule update --init",
     "verify-server-json-version": "node scripts/verify-server-json-version.ts",
     "update-lighthouse": "node scripts/update-lighthouse.ts",
     "update-metrics": "node scripts/update_metrics.ts",
-    "verify-npm-package": "node scripts/verify-npm-package.mjs",
+    "verify-npm-package": "node scripts/verify-npm-package.js",
     "eval": "npm run build && node scripts/eval_gemini.ts",
     "count-tokens": "node scripts/count_tokens.ts"
   },
@@ -48,15 +51,15 @@
   "homepage": "https://github.com/ChromeDevTools/chrome-devtools-mcp#readme",
   "mcpName": "io.github.ChromeDevTools/chrome-devtools-mcp",
   "devDependencies": {
-    "@eslint/js": "^9.35.0",
+    "@blackwell-systems/gcf": "^2.2.2",
+    "@eslint/js": "^10.0.1",
     "@google/genai": "^2.0.1",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stylistic/eslint-plugin": "^5.4.0",
-    "@blackwell-systems/gcf": "^2.2.2",
-    "@toon-format/toon": "^2.2.0",
+    "@toon-format/toon": "^4.1.0",
     "@types/debug": "^4.1.12",
     "@types/filesystem": "^0.0.36",
     "@types/node": "^26.0.0",
@@ -65,28 +68,27 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
-    "chrome-devtools-frontend": "1.0.1652307",
     "core-js": "3.49.0",
     "debug": "4.4.3",
-    "eslint": "^9.35.0",
+    "eslint": "^10.7.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "globals": "^17.0.0",
-    "lighthouse": "13.4.0",
+    "lighthouse": "13.4.1",
     "prettier": "^3.6.2",
-    "puppeteer": "25.3.0",
-    "rollup": "4.62.2",
+    "puppeteer": "25.5.0",
+    "rollup": "4.62.4",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
     "sinon": "^22.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
-    "yargs": "18.0.0"
+    "yargs": "18.1.0"
   },
   "peerDependencies": {
-    "@toon-format/toon": "^2.2.0",
-    "@blackwell-systems/gcf": "^2.2.2"
+    "@blackwell-systems/gcf": "^2.2.2",
+    "@toon-format/toon": "^4.1.0"
   },
   "peerDependenciesMeta": {
     "@toon-format/toon": {
@@ -100,6 +102,9 @@
     "node": "^20.19.0 || ^22.12.0 || >=23"
   },
   "overrides": {
+    "eslint-plugin-import": {
+      "eslint": "$eslint"
+    },
     "puppeteer-core": "$puppeteer"
   }
 }

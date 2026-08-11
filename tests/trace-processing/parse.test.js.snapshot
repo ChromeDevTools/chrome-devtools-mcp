@@ -27,7 +27,7 @@ Available insights:
     description: Each [subpart has specific improvement strategies](https://developer.chrome.com/docs/performance/insights/lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.
     relevant trace bounds: {min: 122410996889µs, max: 122411126100µs}
     example question: Help me optimize my LCP score
-    example question: Which LCP phase was most problematic?
+    example question: Which LCP subpart was most problematic?
     example question: What can I do to reduce the LCP time for this page load?
   - insight name: LCPDiscovery
     description: [Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading
@@ -36,7 +36,7 @@ Available insights:
     example question: What can I do to reduce my LCP discovery time?
     example question: Why is LCP discovery time important?
   - insight name: RenderBlocking
-    description: Requests are blocking the page's initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.
+    description: Requests are blocking the page’s initial render, which may delay LCP. [Deferring or inlining](https://developer.chrome.com/docs/performance/insights/render-blocking) can move these network requests out of the critical path.
     relevant trace bounds: {min: 122411037528µs, max: 122411053852µs}
     example question: Show me the most impactful render-blocking requests that I should focus on
     example question: How can I reduce the number of render-blocking requests?
@@ -48,7 +48,7 @@ Available insights:
     example question: How do I decrease the initial loading time of my page?
     example question: Did anything slow down the request for this document?
   - insight name: ThirdParties
-    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page's content.
+    description: 3rd party code can significantly impact load performance. [Reduce and defer loading of 3rd party code](https://developer.chrome.com/docs/performance/insights/third-parties) to prioritize your page’s content.
     relevant trace bounds: {min: 122411037881µs, max: 122416229595µs}
     example question: Which third parties are having the largest impact on my page performance?
   - insight name: CharacterSet

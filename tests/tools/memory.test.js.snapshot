@@ -61,12 +61,31 @@ nodeId,nodeName,type,distance,selfSize,retainedSize
 Showing 1-6 of 6 (Page 1 of 1).
 `;
 
+exports[`memory > get_heapsnapshot_details > with attributedToSpecificNativeContext filterName and objectId 1`] = `
+## Heap Snapshot Data
+Objects: 4589
+Total shallow size: 350 kB
+Showing 1-10 of 150 (Page 1 of 15).
+Next page: 1
+id,name,count,selfSize,retainedSize
+1,(system),1739,115 kB,350 kB
+7,Function,1095,34.9 kB,72.2 kB
+11,(object shape),769,52.6 kB,53.3 kB
+10,Window (global*) / https://example.com,1,40.5 kB,51.0 kB
+36,(array),6,9.1 kB,46.0 kB
+17,Window (prototype) / https://example.com,2,26.7 kB,26.9 kB
+4,(compiled code),323,19.3 kB,19.4 kB
+3,(string),376,10.5 kB,10.5 kB
+19,Window (internal cache) / https://example.com,2,0.2 kB,10.1 kB
+72,Document,1,8.4 kB,8.7 kB
+`;
+
 exports[`memory > get_heapsnapshot_details > with default options 1`] = `
 ## Heap Snapshot Data
 Objects: 11940
 Total shallow size: 802 kB
 Showing 1-157 of 157 (Page 1 of 1).
-id,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,retainedSize
 2,(system),3205,199 kB,655 kB
 11,Function,3581,111 kB,237 kB
 16,(object shape),2878,181 kB,184 kB
@@ -231,11 +250,24 @@ exports[`memory > get_heapsnapshot_details > with objectsRetainedByContexts filt
 Objects: 148
 Total shallow size: 3.5 kB
 Showing 1-4 of 4 (Page 1 of 1).
-id,name,count,selfSize,maxRetainedSize
+id,name,count,selfSize,retainedSize
 1,system / Context,116,2.5 kB,3.5 kB
 3,Function,6,0.2 kB,0.7 kB
 2,(compiled code),22,0.5 kB,0.5 kB
 4,Array,4,0.3 kB,0.3 kB
+`;
+
+exports[`memory > get_heapsnapshot_details > with sharedNativeContext filterName 1`] = `
+## Heap Snapshot Data
+Objects: 558
+Total shallow size: 22.9 kB
+Showing 1-5 of 5 (Page 1 of 1).
+id,name,count,selfSize,retainedSize
+3,(string),443,16.6 kB,16.6 kB
+1,(compiled code),85,5.9 kB,9.8 kB
+4,(system),12,0.2 kB,0.6 kB
+2,(number),16,0.2 kB,0.2 kB
+5,(concatenated string),2,0.0 kB,0.1 kB
 `;
 
 exports[`memory > get_heapsnapshot_dominators > with valid nodeId 1`] = `
@@ -250,100 +282,108 @@ nodeId,nodeName,selfSize,retainedSize
 exports[`memory > get_heapsnapshot_duplicate_strings > with default options 1`] = `
 ## Heap Snapshot Data
 ### Duplicate Strings
-Showing 1-13 of 13 (Page 1 of 1).
+Showing 1-7 of 7 (Page 1 of 1).
 value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds
 "get disposed",8,0.2 kB,0.2 kB,false,@30685 @30731 @33713 @33781 @42891 @42947 @45203 @45233
 "WebAssembly.Suspending",4,0.1 kB,0.1 kB,false,@44967 @45473 @46069 @46195
 "extensions::SafeBuiltins",2,0.1 kB,0.1 kB,false,@25155 @26209
 "WebAssembly",2,0.0 kB,0.0 kB,false,@7495 @15037
-"EventTarget",3,0.0 kB,0.0 kB,false,@13309 @25089 @26185
+"EventTarget",2,0.0 kB,0.0 kB,false,@25089 @26185
 "v8/LoadTimes",2,0.0 kB,0.0 kB,false,@25159 @26365
-"Document",3,0.0 kB,0.0 kB,false,@12341 @25969 @26603
-"WebAssembly.Exception",2,0.0 kB,0.0 kB,false,@1855 @7473
-"WebAssembly.Module",2,0.0 kB,0.0 kB,false,@1857 @7429
-"HTMLBodyElement",2,0.0 kB,0.0 kB,false,@13679 @44753
-"MutationObserver",2,0.0 kB,0.0 kB,false,@14347 @32179
-"HTMLElement",2,0.0 kB,0.0 kB,false,@11557 @43899
-" ",2,0.0 kB,0.0 kB,false,@725 @789
+"Document",2,0.0 kB,0.0 kB,false,@25969 @26603
 `;
 
 exports[`memory > get_heapsnapshot_edges > with pagination 1`] = `
 ## Heap Snapshot Data
-name,type,nodeId,nodeName
-constructor,property,25575,String
-anchor,property,29295,anchor
+name,type,nodeId,nodeName,selfSize,retainedSize
+constructor,property,25575,String,0.1 kB,0.4 kB
+anchor,property,29295,anchor,0.0 kB,0.0 kB
 Showing 1-2 of 56 (Page 1 of 28).
 Next page: 1
 `;
 
 exports[`memory > get_heapsnapshot_edges > with valid nodeId 1`] = `
 ## Heap Snapshot Data
-name,type,nodeId,nodeName
-constructor,property,25575,String
-anchor,property,29295,anchor
-at,property,29297,at
-big,property,29299,big
-blink,property,29301,blink
-bold,property,29303,bold
-charAt,property,29305,charAt
-charCodeAt,property,29307,charCodeAt
-codePointAt,property,29309,codePointAt
-concat,property,29311,concat
-endsWith,property,29313,endsWith
-fontcolor,property,29315,fontcolor
-fontsize,property,29317,fontsize
-fixed,property,29319,fixed
-includes,property,29321,includes
-indexOf,property,29323,indexOf
-isWellFormed,property,29325,isWellFormed
-italics,property,29327,italics
-lastIndexOf,property,29329,lastIndexOf
-link,property,29331,link
-localeCompare,property,29333,localeCompare
-match,property,29335,match
-matchAll,property,29337,matchAll
-normalize,property,29339,normalize
-padEnd,property,29341,padEnd
-padStart,property,29343,padStart
-repeat,property,29345,repeat
-replace,property,29347,replace
-replaceAll,property,29349,replaceAll
-search,property,29351,search
-slice,property,29353,slice
-small,property,29355,small
-split,property,29357,split
-strike,property,29359,strike
-sub,property,29361,sub
-substr,property,29363,substr
-substring,property,29365,substring
-sup,property,29367,sup
-startsWith,property,29369,startsWith
-toString,property,29371,toString
-toWellFormed,property,29373,toWellFormed
-trim,property,29375,trim
-trimStart,property,29377,trimStart
-trimLeft,property,29377,trimStart
-trimEnd,property,29379,trimEnd
-trimRight,property,29379,trimEnd
-toLocaleLowerCase,property,29381,toLocaleLowerCase
-toLocaleUpperCase,property,29383,toLocaleUpperCase
-toLowerCase,property,29385,toLowerCase
-toUpperCase,property,29387,toUpperCase
-valueOf,property,29389,valueOf
-<symbol Symbol.iterator>,property,29391,[Symbol.iterator]
-__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString}
-properties,internal,29393,system / PropertyArray
-map,internal,25577,system / Map
-1,hidden,71,
+name,type,nodeId,nodeName,selfSize,retainedSize
+constructor,property,25575,String,0.1 kB,0.4 kB
+anchor,property,29295,anchor,0.0 kB,0.0 kB
+at,property,29297,at,0.0 kB,0.0 kB
+big,property,29299,big,0.0 kB,0.0 kB
+blink,property,29301,blink,0.0 kB,0.0 kB
+bold,property,29303,bold,0.0 kB,0.0 kB
+charAt,property,29305,charAt,0.0 kB,0.0 kB
+charCodeAt,property,29307,charCodeAt,0.0 kB,0.0 kB
+codePointAt,property,29309,codePointAt,0.0 kB,0.0 kB
+concat,property,29311,concat,0.0 kB,0.0 kB
+endsWith,property,29313,endsWith,0.0 kB,0.0 kB
+fontcolor,property,29315,fontcolor,0.0 kB,0.0 kB
+fontsize,property,29317,fontsize,0.0 kB,0.0 kB
+fixed,property,29319,fixed,0.0 kB,0.0 kB
+includes,property,29321,includes,0.0 kB,0.0 kB
+indexOf,property,29323,indexOf,0.0 kB,0.0 kB
+isWellFormed,property,29325,isWellFormed,0.0 kB,0.0 kB
+italics,property,29327,italics,0.0 kB,0.0 kB
+lastIndexOf,property,29329,lastIndexOf,0.0 kB,0.0 kB
+link,property,29331,link,0.0 kB,0.0 kB
+localeCompare,property,29333,localeCompare,0.0 kB,0.0 kB
+match,property,29335,match,0.0 kB,0.0 kB
+matchAll,property,29337,matchAll,0.0 kB,0.0 kB
+normalize,property,29339,normalize,0.0 kB,0.0 kB
+padEnd,property,29341,padEnd,0.0 kB,0.0 kB
+padStart,property,29343,padStart,0.0 kB,0.0 kB
+repeat,property,29345,repeat,0.0 kB,0.0 kB
+replace,property,29347,replace,0.0 kB,0.0 kB
+replaceAll,property,29349,replaceAll,0.0 kB,0.0 kB
+search,property,29351,search,0.0 kB,0.0 kB
+slice,property,29353,slice,0.0 kB,0.0 kB
+small,property,29355,small,0.0 kB,0.0 kB
+split,property,29357,split,0.0 kB,0.0 kB
+strike,property,29359,strike,0.0 kB,0.0 kB
+sub,property,29361,sub,0.0 kB,0.0 kB
+substr,property,29363,substr,0.0 kB,0.0 kB
+substring,property,29365,substring,0.0 kB,0.0 kB
+sup,property,29367,sup,0.0 kB,0.0 kB
+startsWith,property,29369,startsWith,0.0 kB,0.0 kB
+toString,property,29371,toString,0.0 kB,0.0 kB
+toWellFormed,property,29373,toWellFormed,0.0 kB,0.0 kB
+trim,property,29375,trim,0.0 kB,0.0 kB
+trimStart,property,29377,trimStart,0.0 kB,0.0 kB
+trimLeft,property,29377,trimStart,0.0 kB,0.0 kB
+trimEnd,property,29379,trimEnd,0.0 kB,0.0 kB
+trimRight,property,29379,trimEnd,0.0 kB,0.0 kB
+toLocaleLowerCase,property,29381,toLocaleLowerCase,0.0 kB,0.0 kB
+toLocaleUpperCase,property,29383,toLocaleUpperCase,0.0 kB,0.0 kB
+toLowerCase,property,29385,toLowerCase,0.0 kB,0.0 kB
+toUpperCase,property,29387,toUpperCase,0.0 kB,0.0 kB
+valueOf,property,29389,valueOf,0.0 kB,0.0 kB
+<symbol Symbol.iterator>,property,29391,[Symbol.iterator],0.0 kB,0.0 kB
+__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString},0.1 kB,0.3 kB
+properties,internal,29393,system / PropertyArray,0.0 kB,0.0 kB
+map,internal,25577,system / Map,0.0 kB,0.7 kB
+1,hidden,71,,0.0 kB,0.0 kB
 Showing 1-56 of 56 (Page 1 of 1).
+`;
+
+exports[`memory > get_heapsnapshot_object_details > with valid nodeId 1`] = `
+## Heap Snapshot Data
+### Object Details
+id: @25341
+name: String
+type: object
+detachedness: unknown
+selfSize: 0.2 kB
+retainedSize: 1.6 kB
+distance: 2
+edgeCount: 56
+retainerCount: 3
 `;
 
 exports[`memory > get_heapsnapshot_retainers > with valid nodeId 1`] = `
 ## Heap Snapshot Data
-name,type,nodeId,nodeName
-prototype,internal,29287,system / Map
-prototype,property,25575,String
-initial_string_prototype,internal,7199,system / NativeContext
+name,type,nodeId,nodeName,selfSize,retainedSize
+prototype,internal,29287,system / Map,0.0 kB,0.1 kB
+prototype,property,25575,String,0.1 kB,0.4 kB
+initial_string_prototype,internal,7199,system / NativeContext,1.2 kB,84.4 kB
 Showing 1-3 of 3 (Page 1 of 1).
 `;
 
@@ -395,4 +435,12 @@ Static Data: {
   "totalSize": 1121496,
   "maxJSObjectId": 54005
 }
+### Native Contexts
+nodeId,nodeName,selfSize,retainedSize,attributedSize
+7249,system / NativeContext / https://example.com,1.2 kB,350 kB,350 kB
+7195,system / NativeContext / https://example.com,1.2 kB,60.1 kB,215 kB
+7307,system / NativeContext,1.2 kB,84.4 kB,84.6 kB
+7199,system / NativeContext,1.2 kB,84.4 kB,84.4 kB
+Shared Size: 22.9 kB
+Unattributed Size: 44.8 kB
 `;

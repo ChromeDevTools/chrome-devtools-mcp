@@ -17,7 +17,10 @@ describe('webmcp', () => {
     it('list webmcp tools in navigate_page response', async () => {
       await withMcpContext(async (response, context) => {
         await navigatePage().handler(
-          {params: {url: 'about:blank'}, page: context.getSelectedMcpPage()},
+          {
+            params: {url: 'data:text/html,<html></html>'},
+            page: context.getSelectedMcpPage(),
+          },
           response,
           context,
         );
@@ -58,12 +61,17 @@ describe('webmcp', () => {
       );
     }
 
-    // TODO: Remove `.skip` once Chrome 149 reaches stable channel.
-    it.skip('executes a tool successfully', async () => {
+    it('executes a tool successfully', async () => {
       await withMcpContext(
         async (response, context) => {
           const page = context.getSelectedMcpPage();
+          const toolsAddedPromise = new Promise(resolve => {
+            page.pptrPage.webmcp.once('toolsadded', resolve);
+          });
           await setupWebMcpTool(page);
+
+          // Wait for WebMCP tools to be registered and detected by Puppeteer
+          await toolsAddedPromise;
 
           await executeWebMcpTool.handler(
             {params: {toolName: 'test_tool', input: JSON.stringify({})}, page},

@@ -23,6 +23,7 @@ import {
   getHeapSnapshotDominators,
   compareHeapSnapshots,
   getHeapSnapshotDuplicateStrings,
+  getHeapSnapshotObjectDetails,
 } from '../../src/tools/memory.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {withMcpContext} from '../utils.js';
@@ -67,10 +68,7 @@ describe('memory', () => {
         );
 
         // Call handle to trigger formatting (similar to network tests)
-        const responseData = await response.handle(
-          getHeapSnapshotSummary.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -94,10 +92,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDetails.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -119,10 +114,58 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDetails.name,
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with sharedNativeContext filterName', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDetails.handler(
+          {params: {filePath, filterName: 'sharedNativeContext'}},
+          response,
           context,
         );
+
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with attributedToSpecificNativeContext filterName and objectId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotDetails.handler(
+          {
+            params: {
+              filePath,
+              filterName: 'attributedToSpecificNativeContext',
+              objectId: 7249,
+              pageSize: 10,
+            },
+          },
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -148,10 +191,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotClassNodes.name,
-          context,
-        );
+        const responseData = await response.handle(context);
 
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
@@ -185,10 +225,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotClassNodes.name,
-          context,
-        );
+        const responseData = await response.handle(context);
 
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
@@ -233,10 +270,31 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotRetainers.name,
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('get_heapsnapshot_object_details', () => {
+    it('with valid nodeId', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotObjectDetails.handler(
+          {params: {filePath, nodeId: 25341}},
+          response,
           context,
         );
+
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -306,10 +364,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotRetainingPaths.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -331,10 +386,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotRetainingPaths.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -362,10 +414,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotEdges.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -387,10 +436,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotEdges.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -414,10 +460,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDominators.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -445,10 +488,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          compareHeapSnapshots.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -474,10 +514,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          compareHeapSnapshots.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -509,10 +546,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          compareHeapSnapshots.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');
@@ -605,10 +639,7 @@ describe('memory', () => {
           context,
         );
 
-        const responseData = await response.handle(
-          getHeapSnapshotDuplicateStrings.name,
-          context,
-        );
+        const responseData = await response.handle(context);
         const output = responseData.content
           .map(c => (c.type === 'text' ? c.text : ''))
           .join('\n');

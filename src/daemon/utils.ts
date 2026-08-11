@@ -23,16 +23,28 @@ export const INDEX_SCRIPT_PATH = path.join(
 const APP_NAME = 'chrome-devtools-mcp';
 export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
 
+export function assertValidSessionId(sessionId: string): void {
+  if (!sessionId) {
+    return;
+  }
+  if (!/^[a-fA-F0-9-]+$/.test(sessionId)) {
+    throw new Error(`Invalid sessionId: ${sessionId}`);
+  }
+}
+
 // Using these paths due to strict limits on the POSIX socket path length.
 export function getSocketPath(sessionId: string): string {
+  assertValidSessionId(sessionId);
   const uid = os.userInfo().uid;
+  const username = os.userInfo().username;
   const suffix = sessionId ? `-${sessionId}` : '';
   const appName = APP_NAME + suffix;
 
   if (IS_WINDOWS) {
     // Windows uses Named Pipes, not file paths.
     // This format is required for server.listen()
-    return path.join('\\\\.\\pipe', appName, 'server.sock');
+    // Append username to prevent cross-user named pipe squatting
+    return path.join('\\\\.\\pipe', `${appName}-${username}`, 'server.sock');
   }
 
   // 1. Try XDG_RUNTIME_DIR (Linux standard, sometimes macOS)
@@ -47,6 +59,7 @@ export function getSocketPath(sessionId: string): string {
 }
 
 export function getRuntimeHome(sessionId: string): string {
+  assertValidSessionId(sessionId);
   const platform = os.platform();
   const uid = os.userInfo().uid;
   const suffix = sessionId ? `-${sessionId}` : '';
@@ -70,11 +83,13 @@ export function getRuntimeHome(sessionId: string): string {
 export const IS_WINDOWS = os.platform() === 'win32';
 
 export function getPidFilePath(sessionId: string) {
+  assertValidSessionId(sessionId);
   const runtimeDir = getRuntimeHome(sessionId);
   return path.join(runtimeDir, 'daemon.pid');
 }
 
 export function getDaemonPid(sessionId: string) {
+  assertValidSessionId(sessionId);
   try {
     const pidFile = getPidFilePath(sessionId);
     logger?.(`Daemon pid file ${pidFile} sessionId=${sessionId}`);
@@ -94,6 +109,7 @@ export function getDaemonPid(sessionId: string) {
 }
 
 export function isDaemonRunning(sessionId: string): boolean {
+  assertValidSessionId(sessionId);
   const pid = getDaemonPid(sessionId);
   if (pid) {
     try {
@@ -126,10 +142,10 @@ export function serializeArgs(
       }
     } else if (Array.isArray(value)) {
       for (const item of value) {
-        args.push(`--${kebabKey}`, String(item));
+        args.push(`--${kebabKey}=${String(item)}`);
       }
     } else {
-      args.push(`--${kebabKey}`, String(value));
+      args.push(`--${kebabKey}=${String(value)}`);
     }
   }
   return args;

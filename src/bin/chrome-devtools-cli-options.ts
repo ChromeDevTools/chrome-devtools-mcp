@@ -249,6 +249,13 @@ export const commands: Commands = {
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         required: false,
       },
+      waitForStableDom: {
+        name: 'waitForStableDom',
+        type: 'boolean',
+        description:
+          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        required: false,
+      },
     },
   },
   execute_3p_developer_tool: {
@@ -359,7 +366,17 @@ export const commands: Commands = {
           'objectsRetainedByConsole',
           'objectsRetainedByEventHandlers',
           'objectsRetainedByContexts',
+          'sharedNativeContext',
+          'noNativeContext',
+          'attributedToSpecificNativeContext',
         ],
+      },
+      objectId: {
+        name: 'objectId',
+        type: 'number',
+        description:
+          'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -396,7 +413,17 @@ export const commands: Commands = {
           'objectsRetainedByConsole',
           'objectsRetainedByEventHandlers',
           'objectsRetainedByContexts',
+          'sharedNativeContext',
+          'noNativeContext',
+          'attributedToSpecificNativeContext',
         ],
+      },
+      objectId: {
+        name: 'objectId',
+        type: 'number',
+        description:
+          'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -487,6 +514,25 @@ export const commands: Commands = {
       },
     },
   },
+  get_heapsnapshot_object_details: {
+    description:
+      'Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      nodeId: {
+        name: 'nodeId',
+        type: 'number',
+        description: 'The node ID to get object details for.',
+        required: true,
+      },
+    },
+  },
   get_heapsnapshot_retainers: {
     description:
       'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
@@ -557,7 +603,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_summary: {
     description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats. (requires flag: --memoryDebugging=true)',
+      'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -593,6 +639,20 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
+      },
+    },
+  },
+  get_os_app_state: {
+    description:
+      'Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
       },
     },
   },
@@ -646,6 +706,56 @@ export const commands: Commands = {
         type: 'string',
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
+      },
+    },
+  },
+  install_pwa: {
+    description:
+      'Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+      installUrlOrBundleUrl: {
+        name: 'installUrlOrBundleUrl',
+        type: 'string',
+        description:
+          'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
+        required: true,
+      },
+      displayMode: {
+        name: 'displayMode',
+        type: 'string',
+        description:
+          'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
+        required: false,
+        enum: ['standalone', 'browser'],
+      },
+    },
+  },
+  launch_pwa: {
+    description:
+      'Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+      url: {
+        name: 'url',
+        type: 'string',
+        description:
+          'Optional URL within the app to open instead of the default start URL.',
+        required: false,
       },
     },
   },
@@ -719,6 +829,14 @@ export const commands: Commands = {
         required: false,
         default: false,
       },
+      includeStackTraces: {
+        name: 'includeStackTraces',
+        type: 'boolean',
+        description:
+          'Set to true to include the stack trace for each message when available. Increases the response size.',
+        required: false,
+        default: false,
+      },
       serviceWorkerId: {
         name: 'serviceWorkerId',
         type: 'string',
@@ -736,7 +854,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'List all requests for the currently selected page since the last navigation.',
+      'Lists the most recent requests for the currently selected page since the last navigation.',
     category: 'Network',
     args: {
       pageSize: {
@@ -1140,6 +1258,20 @@ export const commands: Commands = {
         name: 'id',
         type: 'string',
         description: 'ID of the extension to uninstall.',
+        required: true,
+      },
+    },
+  },
+  uninstall_pwa: {
+    description:
+      'Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
       },
     },

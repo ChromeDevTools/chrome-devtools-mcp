@@ -49,7 +49,12 @@ export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
-
+export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {
+  DisposableStack,
+  AsyncDisposableStack,
+  SuppressedError,
+} from 'puppeteer-core/internal/util/disposable.js';
 export {
   resolveDefaultUserDataDir,
   detectBrowserPlatform,
@@ -85,4 +90,4 @@ export const generateReport = generateReportImpl as (
   format: string,
 ) => string;
 
-export * as DevTools from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+export * as DevTools from '../../devtools-frontend/mcp/mcp.js';

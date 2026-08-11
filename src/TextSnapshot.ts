@@ -221,11 +221,13 @@ export class TextSnapshot {
       handle: ElementHandle,
     ): Promise<TextSnapshotNode | null> => {
       let ancestorHandle = await handle.evaluateHandle(el => el.parentElement);
+      using stack = new DisposableStack();
 
       while (ancestorHandle) {
+        stack.use(ancestorHandle);
+
         const ancestorElement = ancestorHandle.asElement();
         if (!ancestorElement) {
-          await ancestorHandle.dispose();
           return null;
         }
 
@@ -235,7 +237,6 @@ export class TextSnapshot {
             .values()
             .find(node => node.backendNodeId === ancestorBackendId);
           if (ancestorNode) {
-            await ancestorHandle.dispose();
             return ancestorNode;
           }
         }
@@ -243,7 +244,6 @@ export class TextSnapshot {
         const nextHandle = await ancestorElement.evaluateHandle(
           el => el.parentElement,
         );
-        await ancestorHandle.dispose();
         ancestorHandle = nextHandle;
       }
       return null;

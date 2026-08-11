@@ -20,7 +20,7 @@ import {
 import {logger} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
-import type {DaemonMessage} from './types.js';
+import type {DaemonMessage, DaemonStatusResult} from './types.js';
 import {
   DAEMON_CLIENT_NAME,
   getPidFilePath,
@@ -28,9 +28,11 @@ import {
   INDEX_SCRIPT_PATH,
   IS_WINDOWS,
   isDaemonRunning,
+  assertValidSessionId,
 } from './utils.js';
 
 const sessionId = process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '';
+assertValidSessionId(sessionId);
 logger?.(`Daemon sessionId: ${sessionId}`);
 if (isDaemonRunning(sessionId)) {
   logger?.('Another daemon process is running.');
@@ -186,15 +188,16 @@ async function handleRequest(msg: DaemonMessage) {
       };
     } else if (msg.method === 'status') {
       await started;
+      const statusResult: DaemonStatusResult = {
+        pid: process.pid,
+        socketPath,
+        startDate: startDate.toISOString(),
+        version: VERSION,
+        args: mcpServerArgs,
+      };
       return {
         success: true,
-        result: JSON.stringify({
-          pid: process.pid,
-          socketPath,
-          startDate: startDate.toISOString(),
-          version: VERSION,
-          args: mcpServerArgs,
-        }),
+        result: JSON.stringify(statusResult),
       };
     }
     {
@@ -262,7 +265,7 @@ async function startSocketServer() {
   });
 }
 
-async function cleanup() {
+async function cleanup(exitCode = 0) {
   console.log('Cleaning up daemon...');
 
   try {
@@ -291,7 +294,7 @@ async function cleanup() {
   if (fs.existsSync(pidFilePath)) {
     fs.unlinkSync(pidFilePath);
   }
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 // Handle shutdown signals
@@ -308,13 +311,15 @@ process.on('SIGHUP', () => {
 // Handle uncaught errors
 process.on('uncaughtException', error => {
   logger?.('Uncaught exception:', error);
+  void cleanup(1);
 });
 process.on('unhandledRejection', error => {
   logger?.('Unhandled rejection:', error);
+  void cleanup(1);
 });
 
 // Start the server
 const started = startSocketServer().catch(error => {
   logger?.('Failed to start daemon server:', error);
-  process.exit(1);
+  void cleanup(1);
 });

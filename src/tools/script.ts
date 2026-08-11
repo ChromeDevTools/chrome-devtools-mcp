@@ -52,6 +52,12 @@ Example with arguments: \`(el) => el.innerText\`
         .describe(
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         ),
+      waitForStableDom: zod
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        ),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -73,6 +79,7 @@ Example with arguments: \`(el) => el.innerText\`
         pageId,
         dialogAction,
         filePath,
+        waitForStableDom,
       } = request.params;
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
@@ -95,7 +102,8 @@ Example with arguments: \`(el) => el.innerText\`
                 context,
               });
             },
-            {handleDialog: dialogAction ?? 'accept'},
+            // Service workers cannot interact with the DOM, so never wait for it.
+            {handleDialog: dialogAction ?? 'accept', waitForStableDom: false},
           );
         if (result.dialogHandled) {
           context.getSelectedMcpPage().clearDialog();
@@ -110,29 +118,28 @@ Example with arguments: \`(el) => el.innerText\`
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
-      try {
-        const frames = new Set<Frame>();
-        for (const uid of uidArgs ?? []) {
-          const handle = await mcpPage.getElementByUid(uid);
-          frames.add(handle.frame);
-          args.push(handle);
-        }
+      using stack = new DisposableStack();
 
-        const evaluatable = await getPageOrFrame(page, frames);
-
-        const result = await mcpPage.waitForEventsAfterAction(
-          async () => {
-            await performEvaluation(evaluatable, fnString, args, response, {
-              filePath,
-              context,
-            });
-          },
-          {handleDialog: dialogAction ?? 'accept'},
-        );
-        response.attachWaitForResult(result);
-      } finally {
-        void Promise.allSettled(args.map(arg => arg.dispose()));
+      const frames = new Set<Frame>();
+      for (const uid of uidArgs ?? []) {
+        const handle = await mcpPage.getElementByUid(uid);
+        frames.add(handle.frame);
+        stack.use(handle);
+        args.push(handle);
       }
+
+      const evaluatable = await getPageOrFrame(page, frames);
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await performEvaluation(evaluatable, fnString, args, response, {
+            filePath,
+            context,
+          });
+        },
+        {handleDialog: dialogAction ?? 'accept', waitForStableDom},
+      );
+      response.attachWaitForResult(result);
     },
   };
 });
@@ -144,34 +151,31 @@ const performEvaluation = async (
   response: Response,
   options?: {filePath: string; context: Context},
 ) => {
-  const fn = await evaluatable.evaluateHandle(`(${fnString})`);
-  try {
-    const result = await evaluatable.evaluate(
-      async (fn, ...args) => {
-        // @ts-expect-error no types for function fn
-        return JSON.stringify(await fn(...args));
-      },
-      fn,
-      ...args,
+  using fn = await evaluatable.evaluateHandle(`(${fnString})`);
+
+  const result = await evaluatable.evaluate(
+    async (fn, ...args) => {
+      // @ts-expect-error no types for function fn
+      return JSON.stringify(await fn(...args));
+    },
+    fn,
+    ...args,
+  );
+  if (options?.filePath) {
+    const data = new TextEncoder().encode(result ?? 'undefined');
+    const {filename} = await options.context.saveFile(
+      data,
+      options.filePath,
+      '.json',
     );
-    if (options?.filePath) {
-      const data = new TextEncoder().encode(result ?? 'undefined');
-      const {filename} = await options.context.saveFile(
-        data,
-        options.filePath,
-        '.json',
-      );
-      response.appendResponseLine(
-        `Script ran on page. Output saved to ${filename}.`,
-      );
-    } else {
-      response.appendResponseLine('Script ran on page and returned:');
-      response.appendResponseLine('```json');
-      response.appendResponseLine(`${result}`);
-      response.appendResponseLine('```');
-    }
-  } finally {
-    void fn.dispose();
+    response.appendResponseLine(
+      `Script ran on page. Output saved to ${filename}.`,
+    );
+  } else {
+    response.appendResponseLine('Script ran on page and returned:');
+    response.appendResponseLine('```json');
+    response.appendResponseLine(`${result}`);
+    response.appendResponseLine('```');
   }
 };
 
