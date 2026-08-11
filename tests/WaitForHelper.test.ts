@@ -72,4 +72,85 @@ describe('WaitForHelper', () => {
       assert.strictEqual(result.navigatedToUrl, url);
     });
   });
+
+  it('does not hang when an iframe navigates', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/iframe-src', html`<p>iframe</p>`);
+      server.addHtmlRoute('/iframe-target', html`<p>iframe navigated</p>`);
+      const iframeSrc = server.getRoute('/iframe-src');
+      const iframeTarget = server.getRoute('/iframe-target');
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.setContent(
+        html`<iframe
+          id="subframe"
+          src="${iframeSrc}"
+        ></iframe>`,
+      );
+
+      const startTime = Date.now();
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(targetUrl => {
+            const frame = document.querySelector('iframe');
+            if (frame) {
+              frame.src = targetUrl;
+            }
+          }, iframeTarget);
+        },
+        {waitForStableDom: false, expectNavigationIn: 50, timeout: 2000},
+      );
+
+      const elapsed = Date.now() - startTime;
+      assert(
+        elapsed < 1500,
+        `Took ${elapsed}ms; should not hang waiting for iframe`,
+      );
+      assert.strictEqual(result.navigatedToUrl, undefined);
+    });
+  });
+
+  it('awaits navigation when preceded by same-document navigation', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-start', html`<main>start</main>`);
+      server.addHtmlRoute('/nav-target-2', html`<main>navigated 2</main>`);
+      const startUrl = server.getRoute('/nav-start');
+      const targetUrl = server.getRoute('/nav-target-2');
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(startUrl);
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(url => {
+            history.pushState({}, '', '/intermediate-state');
+            location.href = url;
+          }, targetUrl);
+        },
+        {waitForStableDom: false, expectNavigationIn: 50},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, targetUrl);
+    });
+  });
+
+  it('captures navigatedToUrl for same-document navigation alone', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-start-push', html`<main>start push</main>`);
+      server.addHtmlRoute('/same-doc-target', html`<main>target</main>`);
+      const startUrl = server.getRoute('/nav-start-push');
+      const targetUrl = server.getRoute('/same-doc-target');
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(startUrl);
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(url => {
+            history.pushState({}, '', url);
+          }, targetUrl);
+        },
+        {waitForStableDom: false, expectNavigationIn: 50},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, targetUrl);
+    });
+  });
 });

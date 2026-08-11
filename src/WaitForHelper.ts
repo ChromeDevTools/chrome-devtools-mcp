@@ -165,14 +165,13 @@ export class WaitForHelper {
     const navigationListener = (
       event: Protocol.Page.FrameStartedNavigatingEvent,
     ) => {
+      if (event.frameId !== this.#page.mainFrame()._id) {
+        return;
+      }
       if (
-        [
-          'historySameDocument',
-          'historyDifferentDocument',
-          'sameDocument',
-        ].includes(event.navigationType)
+        event.navigationType === 'sameDocument' ||
+        event.navigationType === 'historySameDocument'
       ) {
-        navigationStartedResolvers.resolve(false);
         return;
       }
 
@@ -202,12 +201,21 @@ export class WaitForHelper {
       .waitForNavigation({
         timeout: options?.timeout ?? this.#navigationTimeout,
         signal: this.#abortController.signal,
+        ignoreSameDocumentNavigation: true,
       })
       .then(result => {
         navigationStartedResolvers.resolve(true);
         return result;
       })
-      .catch(error => logger?.(error));
+      .catch(error => {
+        if (
+          this.#abortController.signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        ) {
+          return;
+        }
+        logger?.(error);
+      });
 
     try {
       await action();
