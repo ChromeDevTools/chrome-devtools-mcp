@@ -381,9 +381,23 @@ export function parseArguments(
   argv = process.argv,
   env = process.env,
 ) {
+  // Preserve yargs' mixed camel/kebab-case expansion under strict validation.
+  const kebabCaseAliases: Record<string, string> = {};
+  for (const option of Object.keys(cliOptions)) {
+    const alias = option.replace(
+      /[A-Z]/g,
+      letter => `-${letter.toLowerCase()}`,
+    );
+    if (alias !== option) {
+      kebabCaseAliases[option] = alias;
+    }
+  }
+
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
+    .alias(kebabCaseAliases)
+    .strictOptions()
     .middleware(args => {
       // We can't set default in the options else
       // Yargs will complain

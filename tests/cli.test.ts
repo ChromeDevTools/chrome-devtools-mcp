@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import {spawnSync} from 'node:child_process';
 import {describe, it} from 'node:test';
 
 import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
@@ -59,6 +60,35 @@ describe('cli args parsing', () => {
       browserUrl: 'http://localhost:3000',
       u: 'http://localhost:3000',
     });
+  });
+
+  it('rejects unknown options', async () => {
+    const moduleUrl = new URL(
+      '../src/bin/chrome-devtools-mcp-cli-options.js',
+      import.meta.url,
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        `import {parseArguments} from ${JSON.stringify(moduleUrl.href)}; parseArguments('1.0.0', ['node', 'main.js', '--browserURL', 'http://localhost:3000'], {});`,
+      ],
+      {encoding: 'utf8'},
+    );
+
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /Unknown argument: browserURL/);
+  });
+
+  it('parses mixed-form option names', async () => {
+    const args = parseArguments(
+      '1.0.0',
+      ['node', 'main.js', '--category-experimentalWebmcp'],
+      {},
+    );
+
+    assert.strictEqual(args.categoryExperimentalWebmcp, true);
   });
 
   it('parses with user data dir', async () => {
