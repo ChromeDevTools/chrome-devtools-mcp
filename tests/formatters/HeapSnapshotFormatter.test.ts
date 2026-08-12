@@ -334,4 +334,28 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(result, expected);
     });
   });
+
+  describe('formatRetainedByContextSummary', () => {
+    it('formats retained by context summary correctly', () => {
+      const mockSummary = {
+        contextCount: 2,
+        retainedByContextSize: 5000,
+        retainedByContextCount: 10,
+        notRetainedByContextSize: 1000,
+        notRetainedByContextCount: 5,
+        totalSize: 6000,
+      };
+
+      const result =
+        HeapSnapshotFormatter.formatRetainedByContextSummary(mockSummary);
+      const expected = [
+        'Context count: 2',
+        `Retained by context size: ${formatBytesToKb(5000)} (10 objects)`,
+        `Not retained by context size: ${formatBytesToKb(1000)} (5 objects)`,
+        `Total size: ${formatBytesToKb(6000)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+  });
 });

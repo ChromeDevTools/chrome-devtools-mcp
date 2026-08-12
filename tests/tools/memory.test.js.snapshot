@@ -443,4 +443,9 @@ nodeId,nodeName,selfSize,retainedSize,attributedSize
 7199,system / NativeContext,1.2 kB,84.4 kB,84.4 kB
 Shared Size: 22.9 kB
 Unattributed Size: 44.8 kB
+### Retained by Context Summary
+Context count: 116
+Retained by context size: 3.5 kB (148 objects)
+Not retained by context size: 798 kB (11792 objects)
+Total size: 802 kB
 `;

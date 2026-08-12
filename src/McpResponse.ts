@@ -90,6 +90,7 @@ export class McpResponse implements Response {
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
     nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
+    retainedByContextSummary?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
@@ -342,6 +343,7 @@ export class McpResponse implements Response {
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+    retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
@@ -349,6 +351,7 @@ export class McpResponse implements Response {
       stats,
       staticData,
       nativeContextSizes,
+      retainedByContextSummary,
     };
   }
 
@@ -786,6 +789,7 @@ export class McpResponse implements Response {
         stats?: object;
         staticData?: object;
         nativeContextSizes?: object;
+        retainedByContextSummary?: object;
         aggregateStats?: {
           objectCount: number;
           totalSelfSize: number;
@@ -1105,6 +1109,19 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
+      }
+      const retainedByContextSummary =
+        this.#heapSnapshotOptions.retainedByContextSummary;
+      if (retainedByContextSummary) {
+        response.push('### Retained by Context Summary');
+        response.push(
+          HeapSnapshotFormatter.formatRetainedByContextSummary(
+            retainedByContextSummary,
+          ),
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.retainedByContextSummary =
+          retainedByContextSummary;
       }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {

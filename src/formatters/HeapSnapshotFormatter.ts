@@ -159,6 +159,21 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
+  static formatRetainedByContextSummary(
+    summary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
+  ): string {
+    const lines: string[] = [];
+    lines.push(`Context count: ${summary.contextCount}`);
+    lines.push(
+      `Retained by context size: ${formatBytesToKb(summary.retainedByContextSize)} (${summary.retainedByContextCount} objects)`,
+    );
+    lines.push(
+      `Not retained by context size: ${formatBytesToKb(summary.notRetainedByContextSize)} (${summary.notRetainedByContextCount} objects)`,
+    );
+    lines.push(`Total size: ${formatBytesToKb(summary.totalSize)}`);
+    return lines.join('\n');
+  }
+
   #getSortedAggregates(): AggregatedInfoWithId[] {
     return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
   }

@@ -124,6 +124,7 @@ export interface Response {
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+    retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
@@ -265,6 +266,9 @@ export type Context = Readonly<{
   getHeapSnapshotNativeContextSizes(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes>;
+  getHeapSnapshotRetainedByContextSummary(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary>;
   getHeapSnapshotNodesById(
     filePath: string,
     id: number,
