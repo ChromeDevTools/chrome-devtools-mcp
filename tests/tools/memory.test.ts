@@ -648,4 +648,48 @@ describe('memory', () => {
       });
     });
   });
+
+  describe('pagination schemas', () => {
+    const paginatedTools = [
+      getHeapSnapshotDetails,
+      getHeapSnapshotClassNodes,
+      getHeapSnapshotRetainers,
+      getHeapSnapshotEdges,
+      getHeapSnapshotDuplicateStrings,
+    ];
+
+    it('rejects a non-positive pageSize', () => {
+      for (const tool of paginatedTools) {
+        for (const pageSize of [0, -1, 1.5]) {
+          assert.strictEqual(
+            tool.schema.pageSize.safeParse(pageSize).success,
+            false,
+            `${tool.name} should reject pageSize ${pageSize}`,
+          );
+        }
+        assert.strictEqual(tool.schema.pageSize.safeParse(1).success, true);
+        assert.strictEqual(
+          tool.schema.pageSize.safeParse(undefined).success,
+          true,
+        );
+      }
+    });
+
+    it('rejects a negative or non-integer pageIdx', () => {
+      for (const tool of paginatedTools) {
+        for (const pageIdx of [-1, 0.5]) {
+          assert.strictEqual(
+            tool.schema.pageIdx.safeParse(pageIdx).success,
+            false,
+            `${tool.name} should reject pageIdx ${pageIdx}`,
+          );
+        }
+        assert.strictEqual(tool.schema.pageIdx.safeParse(0).success, true);
+        assert.strictEqual(
+          tool.schema.pageIdx.safeParse(undefined).success,
+          true,
+        );
+      }
+    });
+  });
 });

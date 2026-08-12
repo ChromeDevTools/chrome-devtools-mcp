@@ -98,12 +98,20 @@ export const getHeapSnapshotDetails = defineTool({
       ),
     pageIdx: zod
       .number()
+      .int()
+      .min(0)
       .optional()
-      .describe('The page index for pagination of aggregates.'),
+      .describe(
+        'Page number of aggregates to return (0-based). When omitted, returns the first page.',
+      ),
     pageSize: zod
       .number()
+      .int()
+      .positive()
       .optional()
-      .describe('The page size for pagination of aggregates.'),
+      .describe(
+        'Maximum number of aggregates to return. When omitted, returns all aggregates.',
+      ),
   },
   blockedByDialog: false,
   verifyFilesSchema: ['filePath'],
@@ -143,8 +151,22 @@ export const getHeapSnapshotClassNodes = defineTool({
       .describe(
         'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
       ),
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Page number to return (0-based). When omitted, returns the first page.',
+      ),
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum number of items to return. When omitted, returns all items.',
+      ),
   },
   blockedByDialog: false,
   verifyFilesSchema: ['filePath'],
@@ -177,8 +199,22 @@ export const getHeapSnapshotRetainers = defineTool({
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
     nodeId: zod.number().describe('The node ID to get retainers for.'),
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Page number to return (0-based). When omitted, returns the first page.',
+      ),
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum number of items to return. When omitted, returns all items.',
+      ),
   },
   handler: async (request, response, context) => {
     const retainers = await context.getHeapSnapshotRetainers(
@@ -276,8 +312,22 @@ export const getHeapSnapshotEdges = defineTool({
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
     nodeId: zod.number().describe('The node ID to get outgoing edges for.'),
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Page number to return (0-based). When omitted, returns the first page.',
+      ),
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum number of items to return. When omitted, returns all items.',
+      ),
   },
   handler: async (request, response, context) => {
     const edges = await context.getHeapSnapshotEdges(
@@ -375,8 +425,22 @@ export const getHeapSnapshotDuplicateStrings = defineTool({
   verifyFilesSchema: ['filePath'],
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: zod
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe(
+        'Page number to return (0-based). When omitted, returns the first page.',
+      ),
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Maximum number of items to return. When omitted, returns all items.',
+      ),
   },
   handler: async (request, response, context) => {
     const duplicateStrings = await context.getHeapSnapshotDuplicateStrings(
