@@ -299,25 +299,30 @@ export function html(
 </html>`;
 }
 
-export function stabilizeStructuredContent(content: unknown): unknown {
-  if (typeof content === 'string') {
-    return stabilizeResponseOutput(content);
-  }
-  if (Array.isArray(content)) {
-    return content.map(item => stabilizeStructuredContent(item));
-  }
-  if (typeof content === 'object' && content !== null) {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(content)) {
-      if (key === 'snapshotFilePath' && typeof value === 'string') {
-        result[key] = '<file>';
-      } else {
-        result[key] = stabilizeStructuredContent(value);
-      }
+export function stabilizeStructuredContent(content: unknown): unknown;
+export function stabilizeStructuredContent(content: unknown): string {
+  const stabilize = (c: unknown): unknown => {
+    if (typeof c === 'string') {
+      return stabilizeResponseOutput(c);
     }
-    return result;
-  }
-  return content;
+    if (Array.isArray(c)) {
+      return c.map(item => stabilize(item));
+    }
+    if (typeof c === 'object' && c !== null) {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(c)) {
+        if (key === 'snapshotFilePath' && typeof value === 'string') {
+          result[key] = '<file>';
+        } else {
+          result[key] = stabilize(value);
+        }
+      }
+      return result;
+    }
+    return c;
+  };
+
+  return JSON.stringify(stabilize(content), null, 2);
 }
 
 export function stabilizeResponseOutput(text: unknown) {

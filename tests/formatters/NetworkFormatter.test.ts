@@ -335,8 +335,7 @@ describe('NetworkFormatter', () => {
       assert.deepStrictEqual(
         textOrder,
         jsonOrder,
-        `redirect chain order differs between text (${JSON.stringify(textOrder)}) ` +
-          `and JSON (${JSON.stringify(jsonOrder)})`,
+        `redirect chain order differs between text and JSON`,
       );
     });
     it('shows saved to file message in toStringDetailed', async () => {

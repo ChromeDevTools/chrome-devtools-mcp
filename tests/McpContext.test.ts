@@ -22,7 +22,13 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/trace-processing/parse.js';
 
-import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
+import {
+  getMockRequest,
+  html,
+  withBrowser,
+  withMcpContext,
+  stabilizeStructuredContent,
+} from './utils.js';
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -317,7 +323,7 @@ describe('McpContext', () => {
 
       response.setIncludeNetworkRequests(true);
       const result = await response.handle(context);
-      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
     });
   });
 
@@ -335,7 +341,7 @@ describe('McpContext', () => {
       response.attachNetworkRequest(456);
       const result = await response.handle(context);
 
-      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
     });
   });
 
@@ -386,7 +392,7 @@ describe('McpContext', () => {
       });
       const result = await response.handle(context);
 
-      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
 
       fromStub.restore();
     });

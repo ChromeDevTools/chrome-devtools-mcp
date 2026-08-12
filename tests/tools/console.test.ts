@@ -706,13 +706,7 @@ describe('console', () => {
         );
 
         const result = await response.handle(context);
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(result.structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
         await dialog.dismiss();
       });
     });
