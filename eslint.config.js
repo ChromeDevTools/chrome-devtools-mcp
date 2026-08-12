@@ -17,7 +17,7 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
-    'devtools-frontend/**',
+    'third_party/devtools-frontend/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',

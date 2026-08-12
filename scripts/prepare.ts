@@ -39,7 +39,11 @@ function removeConflictingGlobalDeclaration(): void {
 }
 
 function ensureSubmodule(): void {
-  const devtoolsFrontendDir = resolve(projectRoot, 'devtools-frontend');
+  const devtoolsFrontendDir = resolve(
+    projectRoot,
+    'third_party',
+    'devtools-frontend',
+  );
   const mcpEntry = resolve(devtoolsFrontendDir, 'mcp', 'mcp.ts');
 
   if (existsSync(mcpEntry)) {
@@ -61,7 +65,7 @@ function ensureSubmodule(): void {
     console.log('Fetching devtools-frontend...');
     try {
       execSync(
-        'git clone --depth 1 https://github.com/ChromeDevTools/devtools-frontend.git devtools-frontend',
+        'git clone --depth 1 https://github.com/ChromeDevTools/devtools-frontend.git third_party/devtools-frontend',
         {
           cwd: projectRoot,
           stdio: 'inherit',

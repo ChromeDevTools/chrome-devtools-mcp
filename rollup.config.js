@@ -63,7 +63,7 @@ function getResolvedVersion(packageName) {
 function getDevToolsFrontendCommit() {
   try {
     return execSync('git rev-parse HEAD', {
-      cwd: path.join(process.cwd(), 'devtools-frontend'),
+      cwd: path.join(process.cwd(), 'third_party/devtools-frontend'),
       encoding: 'utf-8',
     }).trim();
   } catch {
@@ -219,14 +219,16 @@ const bundleDependency = (
               ),
             );
             const thirdPartyDirectories = tsConfig.include.filter(location =>
-              location.includes('devtools-frontend/front_end/third_party'),
+              location.includes(
+                'third_party/devtools-frontend/front_end/third_party',
+              ),
             );
 
             const manualLicenses = [];
             // Add devtools-frontend main license
             const cdtfLicensePath = path.join(
               process.cwd(),
-              'devtools-frontend/LICENSE',
+              'third_party/devtools-frontend/LICENSE',
             );
             if (fs.existsSync(cdtfLicensePath)) {
               const devtoolsFrontendCommit = getDevToolsFrontendCommit();

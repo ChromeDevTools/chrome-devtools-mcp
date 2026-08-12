@@ -28,8 +28,10 @@ function main(): void {
   if (fs.existsSync(devtoolsTs)) {
     fs.unlinkSync(devtoolsTs);
   }
-  const devtoolsThirdPartyPath = 'devtools-frontend/front_end/third_party';
-  const devtoolsFrontEndCorePath = 'devtools-frontend/front_end/core';
+  const devtoolsThirdPartyPath =
+    'third_party/devtools-frontend/front_end/third_party';
+  const devtoolsFrontEndCorePath =
+    'third_party/devtools-frontend/front_end/core';
 
   // Create i18n mock
   const i18nDir = path.join(BUILD_DIR, devtoolsFrontEndCorePath, 'i18n');
@@ -70,6 +72,7 @@ export const css = { cssLanguage: { parser: { parse: () => ({ topNode: { getChil
   // Create skills mocks
   const skillsDir = path.join(
     BUILD_DIR,
+    'third_party',
     'devtools-frontend',
     'front_end',
     'models',
@@ -156,6 +159,7 @@ export const ExperimentName = {
   );
   const codemirrorSrcDir = path.join(
     process.cwd(),
+    'third_party',
     'devtools-frontend',
     'front_end',
     'third_party',
@@ -179,7 +183,7 @@ export const ExperimentName = {
 
 function copyDevToolsDescriptionFiles(): void {
   const devtoolsIssuesDescriptionPath =
-    'devtools-frontend/front_end/models/issues_manager/descriptions';
+    'third_party/devtools-frontend/front_end/models/issues_manager/descriptions';
   const sourceDir = path.join(process.cwd(), devtoolsIssuesDescriptionPath);
   const destDir = path.join(
     BUILD_DIR,
