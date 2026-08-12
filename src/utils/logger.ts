@@ -45,7 +45,7 @@ export const logger: Logger = (...args: unknown[]) => {
       `${new Date().toISOString()} ${mcpDebugNamespace} ${util.format(...args)}\n`,
     );
   } else if (_debugLog.enabled) {
-    _debugLog('%s', util.format(...args));
+    _debugLog('%s %s', new Date().toISOString(), util.format(...args));
   }
 };
 
@@ -61,7 +61,7 @@ export const puppeteerLogger = (prefix: string) => {
   const dbg = util.debuglog(prefix);
   return dbg.enabled
     ? (...args: unknown[]) => {
-        dbg('%s', util.format(...args));
+        dbg('%s %s', new Date().toISOString(), util.format(...args));
       }
     : undefined;
 };
