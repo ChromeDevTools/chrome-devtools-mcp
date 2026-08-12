@@ -366,7 +366,7 @@ export class HeapSnapshotManager {
           /* noop */
         },
         DevTools.Common.Console.Console.instance(),
-        import.meta.resolve('./third_party/devtools-heap-snapshot-worker.js'),
+        import.meta.resolve('../third_party/devtools-heap-snapshot-worker.js'),
       );
 
     try {
