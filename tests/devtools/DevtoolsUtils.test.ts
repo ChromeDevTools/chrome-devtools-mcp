@@ -54,6 +54,27 @@ describe('createTargetUniverse', () => {
     });
   });
 
+  it('ignores pauses during navigation', async () => {
+    server.addHtmlRoute(
+      '/debugger',
+      html`<script>
+          debugger;
+        </script>
+        <h1>Loaded</h1>`,
+    );
+
+    await withBrowser(async (browser, page) => {
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+      );
+      assert.ok(targetUniverse);
+
+      await page.goto(server.getRoute('/debugger'));
+      const text = await page.$eval('h1', el => el.textContent);
+      assert.strictEqual(text, 'Loaded');
+    });
+  });
+
   it('disables network domain', async () => {
     server.addHtmlRoute('/test', html`<div>Test</div>`);
 
