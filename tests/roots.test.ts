@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -150,6 +151,52 @@ describe('McpContext Roots', () => {
         );
       } finally {
         await fs.rm(workspacePath, {recursive: true, force: true});
+      }
+    });
+  });
+
+  it('should deny a dangling symlink inside the root that points outside of it', async () => {
+    // Regression test for an arbitrary-file-write bypass: a workspace
+    // (e.g. an untrusted repository checked out for automated browser
+    // testing) can contain a dangling symlink whose target does not yet
+    // exist and points outside the configured root. Tools such as
+    // heap-snapshot capture and screencast recording delegate their actual
+    // file writes to third-party code (Puppeteer/ffmpeg) that follows
+    // symlinks with no O_NOFOLLOW protection, so validatePath /
+    // ensureExtension must reject such a path based on where the symlink
+    // actually resolves to, not where the symlink itself sits.
+    await withMcpContext(async (_response, context) => {
+      const workspacePath = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'workspace-root-'),
+      );
+      const outsideTarget = path.resolve(
+        os.homedir(),
+        `outside-target-${crypto.randomUUID()}`,
+      );
+      try {
+        context.setRoots([
+          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
+        ]);
+
+        await fs.rm(outsideTarget, {force: true});
+        const danglingLink = path.join(workspacePath, 'snapshot.heapsnapshot');
+        await fs.symlink(outsideTarget, danglingLink);
+
+        await assert.rejects(
+          context.validatePath(danglingLink),
+          /Access denied/,
+        );
+        await assert.rejects(
+          context.ensureExtension(danglingLink, '.heapsnapshot'),
+          /Access denied/,
+        );
+
+        // The outside target must never actually get created by this
+        // rejected validation.
+        await assert.rejects(fs.access(outsideTarget));
+      } finally {
+        await fs.rm(workspacePath, {recursive: true, force: true});
+        await fs.rm(outsideTarget, {force: true});
       }
     });
   });
