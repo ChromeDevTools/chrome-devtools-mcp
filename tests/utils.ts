@@ -299,7 +299,6 @@ export function html(
 </html>`;
 }
 
-export function stabilizeStructuredContent(content: unknown): unknown;
 export function stabilizeStructuredContent(content: unknown): string {
   const stabilize = (c: unknown): unknown => {
     if (typeof c === 'string') {
