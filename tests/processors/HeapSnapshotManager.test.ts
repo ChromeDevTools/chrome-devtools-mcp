@@ -9,8 +9,8 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import {HeapSnapshotManager} from '../src/HeapSnapshotManager.js';
-import {DevTools} from '../src/third_party/index.js';
+import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
+import {DevTools} from '../../src/third_party/index.js';
 
 describe('HeapSnapshotManager', () => {
   afterEach(() => {

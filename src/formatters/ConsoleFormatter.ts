@@ -9,7 +9,7 @@ import {
   type TargetUniverse,
   SymbolizedError,
 } from '../devtools/DevtoolsUtils.js';
-import {UncaughtError} from '../PageCollector.js';
+import {UncaughtError} from '../collectors/PageCollector.js';
 import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 

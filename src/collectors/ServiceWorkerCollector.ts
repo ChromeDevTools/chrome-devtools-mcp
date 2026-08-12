@@ -12,10 +12,10 @@ import type {
   CDPSession,
   Protocol,
   Browser,
-} from './third_party/index.js';
-import type {ExtensionServiceWorker} from './types.js';
-import type {WithSymbolId} from './utils/id.js';
-import {createIdGenerator, stableIdSymbol} from './utils/id.js';
+} from '../third_party/index.js';
+import type {ExtensionServiceWorker} from '../types.js';
+import type {WithSymbolId} from '../utils/id.js';
+import {createIdGenerator, stableIdSymbol} from '../utils/id.js';
 
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
 

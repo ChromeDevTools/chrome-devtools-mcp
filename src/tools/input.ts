@@ -10,7 +10,7 @@ import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
-import type {WaitForEventsResult} from '../WaitForHelper.js';
+import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import type {ContextPage} from './ToolDefinition.js';

@@ -14,7 +14,7 @@ import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-option
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
-import {WaitForHelper} from '../../src/WaitForHelper.js';
+import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,

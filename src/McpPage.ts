@@ -64,7 +64,7 @@ import {
   NetworkCollector,
   type ListenerMap,
   type UncaughtError,
-} from './PageCollector.js';
+} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import type {Locator} from './third_party/index.js';
 import {
@@ -100,7 +100,7 @@ import {
   WaitForHelper,
   type WaitForEventsResult,
   type DialogAction,
-} from './WaitForHelper.js';
+} from './utils/WaitForHelper.js';
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,

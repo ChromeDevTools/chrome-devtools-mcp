@@ -10,15 +10,15 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 import type {Frame, HTTPRequest, Protocol} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ListenerMap} from '../src/PageCollector.js';
+import type {ListenerMap} from '../../src/collectors/PageCollector.js';
 import {
   ConsoleCollector,
   NetworkCollector,
   PageCollector,
-} from '../src/PageCollector.js';
-import {DevTools} from '../src/third_party/index.js';
+} from '../../src/collectors/PageCollector.js';
+import {DevTools} from '../../src/third_party/index.js';
 
-import {getMockRequest, getMockBrowser} from './utils.js';
+import {getMockRequest, getMockBrowser} from '../utils.js';
 
 describe('PageCollector', () => {
   it('works', async () => {

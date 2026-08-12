@@ -9,7 +9,7 @@ import type {
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
-} from '../HeapSnapshotManager.js';
+} from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import {stableIdSymbol} from '../utils/id.js';
 

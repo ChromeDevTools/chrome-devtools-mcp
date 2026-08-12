@@ -16,8 +16,8 @@ import sinon from 'sinon';
 import {
   checkForUpdates,
   resetUpdateCheckFlagForTesting,
-} from '../src/utils/check-for-updates.js';
-import {VERSION} from '../src/version.js';
+} from '../../src/utils/check-for-updates.js';
+import {VERSION} from '../../src/version.js';
 
 describe('checkForUpdates', () => {
   beforeEach(() => {

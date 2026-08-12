@@ -10,17 +10,17 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
-import {HeapSnapshotManager} from './HeapSnapshotManager.js';
+import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
-} from './HeapSnapshotManager.js';
+} from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import {type UncaughtError} from './PageCollector.js';
-import {ServiceWorkerConsoleCollector} from './ServiceWorkerCollector.js';
+import {type UncaughtError} from './collectors/PageCollector.js';
+import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
   type Browser,
@@ -45,7 +45,7 @@ import type {
   DevToolsData,
   SupportedExtensions,
 } from './tools/ToolDefinition.js';
-import type {TraceResult} from './trace-processing/parse.js';
+import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';

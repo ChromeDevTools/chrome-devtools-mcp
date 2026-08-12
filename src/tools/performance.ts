@@ -7,11 +7,11 @@
 import zlib from 'node:zlib';
 
 import {zod, DevTools} from '../third_party/index.js';
-import type {InsightName, TraceResult} from '../trace-processing/parse.js';
+import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
-} from '../trace-processing/parse.js';
+} from '../processors/PerformanceTrace.js';
 import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';

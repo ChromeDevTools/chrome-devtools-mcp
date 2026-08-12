@@ -15,11 +15,11 @@ import {
   startTrace,
   stopTrace,
 } from '../../src/tools/performance.js';
-import type {TraceResult} from '../../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
+  type TraceResult,
   traceResultIsSuccess,
-} from '../../src/trace-processing/parse.js';
+} from '../../src/processors/PerformanceTrace.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withMcpContext} from '../utils.js';
 

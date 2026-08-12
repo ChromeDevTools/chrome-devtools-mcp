@@ -23,11 +23,11 @@ import {
   newPage,
   selectPage,
 } from '../src/tools/pages.js';
-import type {InsightName} from '../src/trace-processing/parse.js';
+import type {InsightName} from '../src/processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
-} from '../src/trace-processing/parse.js';
+} from '../src/processors/PerformanceTrace.js';
 
 import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';

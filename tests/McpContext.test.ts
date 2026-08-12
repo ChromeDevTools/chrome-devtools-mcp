@@ -20,7 +20,7 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
-import type {TraceResult} from '../src/trace-processing/parse.js';
+import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 
 import {
   getMockRequest,

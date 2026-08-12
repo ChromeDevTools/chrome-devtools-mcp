@@ -21,10 +21,10 @@ import type {
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
-} from './HeapSnapshotManager.js';
+} from './processors/HeapSnapshotManager.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
-import {UncaughtError} from './PageCollector.js';
+import {UncaughtError} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
@@ -45,13 +45,17 @@ import type {
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
-import type {InsightName, TraceResult} from './trace-processing/parse.js';
-import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import {
+  type InsightName,
+  type TraceResult,
+  getInsightOutput,
+  getTraceSummary,
+} from './processors/PerformanceTrace.js';
 import type {PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
-import type {WaitForEventsResult} from './WaitForHelper.js';
+import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -755,7 +759,10 @@ export class McpResponse implements Response {
       consoleMessage?: object;
       consoleMessages?: object[];
       traceSummary?: string;
-      traceInsights?: Array<{insightName: string; insightKey: string}>;
+      traceInsights?: Array<{
+        insightName: string;
+        insightKey: string | undefined;
+      }>;
       lighthouseResult?: object;
       extensions?: object[];
       thirdPartyDeveloperTools?: object[];
@@ -1013,7 +1020,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
         for (const [insightName, model] of Object.entries(insightSet.model)) {
           structuredContent.traceInsights.push({
             insightName,
-            insightKey: model.insightKey,
+            insightKey:
+              typeof model === 'object' &&
+              model !== null &&
+              'insightKey' in model
+                ? model.insightKey
+                : undefined,
           });
         }
       }

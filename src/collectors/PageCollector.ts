@@ -4,27 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
+import {FakeIssuesManager} from '../devtools/DevtoolsUtils.js';
 import type {
   CDPSession,
   ConsoleMessage,
   Protocol,
   Issue,
-} from './third_party/index.js';
-import {DevTools} from './third_party/index.js';
+} from '../third_party/index.js';
+import {DevTools} from '../third_party/index.js';
 import {
   type Frame,
   type Handler,
   type HTTPRequest,
   type Page,
   type PageEvents as PuppeteerPageEvents,
-} from './third_party/index.js';
+} from '../third_party/index.js';
 import {
   createIdGenerator,
   stableIdSymbol,
   type WithSymbolId,
-} from './utils/id.js';
-import {logger} from './utils/logger.js';
+} from '../utils/id.js';
+import {logger} from '../utils/logger.js';
 
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
