@@ -41,7 +41,9 @@ export function flushLogs(
 
 export const logger: Logger = (...args: unknown[]) => {
   if (logFileStream) {
-    logFileStream.write(`[mcp:log] ${util.format(...args)}\n`);
+    logFileStream.write(
+      `${new Date().toISOString()} ${mcpDebugNamespace} ${util.format(...args)}\n`,
+    );
   } else if (_debugLog.enabled) {
     _debugLog('%s', util.format(...args));
   }
@@ -50,7 +52,9 @@ export const logger: Logger = (...args: unknown[]) => {
 export const puppeteerLogger = (prefix: string) => {
   if (logFileStream) {
     return (...args: unknown[]) => {
-      logFileStream!.write(`[${prefix}] ${util.format(...args)}\n`);
+      logFileStream!.write(
+        `${new Date().toISOString()} ${prefix} ${util.format(...args)}\n`,
+      );
     };
   }
 
