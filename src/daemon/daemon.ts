@@ -17,7 +17,7 @@ import {
   PipeTransport,
   StdioClientTransport,
 } from '../third_party/index.js';
-import {logger} from '../utils/logger.js';
+import {logger, puppeteerLogger} from '../utils/logger.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
@@ -227,7 +227,7 @@ async function startSocketServer() {
 
   return await new Promise<void>((resolve, reject) => {
     server = createServer(socket => {
-      const transport = new PipeTransport(socket, socket);
+      const transport = new PipeTransport(socket, socket, puppeteerLogger);
       transport.onmessage = async (message: string) => {
         logger?.('onmessage', message);
         const response = await handleRequest(JSON.parse(message));

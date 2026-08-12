@@ -5,30 +5,24 @@
  */
 
 import fs from 'node:fs';
+import util from 'node:util';
 
-import {debug} from '../third_party/index.js';
 import type {Logger} from '../types.js';
 
 const mcpDebugNamespace = 'mcp:log';
 
-const namespacesToEnable = [
-  mcpDebugNamespace,
-  ...(process.env['DEBUG'] ? [process.env['DEBUG']] : []),
-];
+let logFileStream: fs.WriteStream | undefined;
+
+const _debugLog = util.debuglog(mcpDebugNamespace);
 
 export function saveLogsToFile(fileName: string): fs.WriteStream {
-  // Enable overrides everything so we need to add them
-  debug.enable(namespacesToEnable.join(','));
-
   const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
-  debug.log = function (...chunks: any[]) {
-    logFile.write(`${chunks.join(' ')}\n`);
-  };
   logFile.on('error', function (error) {
     console.error(`Error when opening/writing to log file: ${error.message}`);
     logFile.end();
     process.exit(1);
   });
+  logFileStream = logFile;
   return logFile;
 }
 
@@ -45,4 +39,21 @@ export function flushLogs(
   });
 }
 
-export const logger: Logger = debug(mcpDebugNamespace) as Logger;
+export const logger: Logger = (...args: unknown[]) => {
+  if (logFileStream) {
+    logFileStream.write(`[mcp:log] ${util.format(...args)}\n`);
+  } else if (_debugLog.enabled) {
+    _debugLog('%s', util.format(...args));
+  }
+};
+
+export const puppeteerLogger = (prefix: string) => {
+  if (logFileStream) {
+    return (...args: unknown[]) => {
+      logFileStream!.write(`[${prefix}] ${util.format(...args)}\n`);
+    };
+  }
+
+  const dbg = util.debuglog(prefix);
+  return dbg.enabled ? dbg : undefined;
+};
