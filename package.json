@@ -106,5 +106,12 @@
       "eslint": "$eslint"
     },
     "puppeteer-core": "$puppeteer"
+  },
+  "allowScripts": {
+    "core-js": false,
+    "@google/genai": false,
+    "protobufjs": false,
+    "unrs-resolver": false,
+    "puppeteer@25.5.0": true
   }
 }
