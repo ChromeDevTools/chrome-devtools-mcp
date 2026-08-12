@@ -55,5 +55,9 @@ export const puppeteerLogger = (prefix: string) => {
   }
 
   const dbg = util.debuglog(prefix);
-  return dbg.enabled ? dbg : undefined;
+  return dbg.enabled
+    ? (...args: unknown[]) => {
+        dbg('%s', util.format(...args));
+      }
+    : undefined;
 };
