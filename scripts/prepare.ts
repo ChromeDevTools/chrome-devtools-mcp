@@ -65,10 +65,13 @@ function ensureSubmodule(): void {
     );
 
     // 2. Set the sparse checkout configuration
-    execSync('git sparse-checkout set front_end mcp extension-api', {
-      cwd: devtoolsFrontendDir,
-      stdio: 'inherit',
-    });
+    execSync(
+      'git sparse-checkout set --no-cone "/*" "!/*/" "/front_end/" "!/front_end/panels/" "!/front_end/ui/" "/mcp/" "/extension-api/"',
+      {
+        cwd: devtoolsFrontendDir,
+        stdio: 'inherit',
+      },
+    );
 
     // 3. Move the submodule's .git directory to the superproject's .git/modules
     execSync('git submodule absorbgitdirs third_party/devtools-frontend', {
