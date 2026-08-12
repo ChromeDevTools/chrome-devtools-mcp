@@ -76,7 +76,6 @@
     "third_party/devtools-frontend/front_end/services/tracing",
     "third_party/devtools-frontend/front_end/models/workspace",
     "third_party/devtools-frontend/front_end/models/workspace_diff",
-    "third_party/devtools-frontend/front_end/panels/issues/IssueAggregator.ts",
     "third_party/devtools-frontend/front_end/third_party/acorn",
     "third_party/devtools-frontend/front_end/third_party/codemirror",
     "third_party/devtools-frontend/front_end/third_party/diff",
