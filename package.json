@@ -112,6 +112,6 @@
     "@google/genai": false,
     "protobufjs": false,
     "unrs-resolver": false,
-    "puppeteer@25.5.0": true
+    "puppeteer": true
   }
 }
