@@ -156,19 +156,16 @@ function extractPaths(value: unknown): string[] {
     return [value];
   }
   if (Array.isArray(value)) {
-    return values.filter(item => typeof item === 'string');
+    return value.filter(item => typeof item === 'string');
   }
   return [];
 }
 
 function isLocalBrowser(context: McpContext): boolean {
-  if (!context.browser) {
-    return false;
-  }
-  if (context.browser.process?.()) {
+  if (context.browser.process()) {
     return true;
   }
-  const wsEndpoint = context.browser.wsEndpoint?.();
+  const wsEndpoint = context.browser.wsEndpoint();
   if (wsEndpoint && isLocalhost(wsEndpoint)) {
     return true;
   }

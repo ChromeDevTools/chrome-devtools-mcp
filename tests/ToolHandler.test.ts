@@ -51,6 +51,8 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getSelectedMcpPage.returns(mockPage);
 
@@ -91,6 +93,8 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
 
     const toolMutex = new Mutex();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
@@ -172,6 +176,8 @@ describe('ToolHandler', () => {
       };
 
       const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.browser = getMockBrowser({process: mockProcess});
       mockContext.getDevToolsData.resolves(testCase.devToolsData);
       if (testCase.pageUrl) {
         const mockPage = {
@@ -330,6 +336,8 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
     mockContext.validatePath.resolves();
 
     const toolMutex = new Mutex();
@@ -394,6 +402,8 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
     mockContext.validatePath.rejects(
       new Error('Access denied: path is outside roots'),
     );
@@ -578,7 +588,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(mockContext.validatePath.called, false);
   });
 
-  it('skips local-only verifyFilesSchema when context has no browser', async () => {
+  it('skips local-only verifyFilesSchema when browser has no process', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'upload_tool',
@@ -602,6 +612,7 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.browser = getMockBrowser();
 
     const toolMutex = new Mutex();
     const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
