@@ -1,3 +1,21 @@
+exports[`ConsoleFormatter > toString/toJSON > formats a console message with a stack trace when fetchStackTrace is set toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "id": 1,
+  "stackTrace": "at foo (foo.ts:10:2)\\nat bar (foo.ts:20:2)\\n--- setTimeout -------------------------\\nat schedule (util.ts:5:2)"
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats a console message with a stack trace when fetchStackTrace is set toString 1`] = `
+msgid=1 [log] Hello stack trace! (0 args)
+  at foo (foo.ts:10:2)
+  at bar (foo.ts:20:2)
+  --- setTimeout -------------------------
+  at schedule (util.ts:5:2)
+`;
+
 exports[`ConsoleFormatter > toString/toJSON > formats a console.log message toJSON 1`] = `
 {
   "type": "log",
@@ -48,6 +66,34 @@ exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError toJSON 1`
 
 exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError toString 1`] = `
 msgid=1 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError with a stack trace when fetchStackTrace is set toJSON 1`] = `
+{
+  "type": "error",
+  "text": "Uncaught TypeError: Cannot read properties of undefined",
+  "argsCount": 0,
+  "id": 2,
+  "stackTrace": "at foo (foo.ts:10:2)"
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > formats an UncaughtError with a stack trace when fetchStackTrace is set toString 1`] = `
+msgid=2 [error] Uncaught TypeError: Cannot read properties of undefined (0 args)
+  at foo (foo.ts:10:2)
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > omits the stack trace when fetchStackTrace is not set toJSON 1`] = `
+{
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "id": 1
+}
+`;
+
+exports[`ConsoleFormatter > toString/toJSON > omits the stack trace when fetchStackTrace is not set toString 1`] = `
+msgid=1 [log] Hello stack trace! (0 args)
 `;
 
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > does not show call frames with ignore listed scripts toJSONDetailed 1`] = `
@@ -275,6 +321,53 @@ at schedule (util.ts:5:2)
 Note: line and column numbers use 1-based indexing
 `;
 
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats frames without a name or url and unnamed async fragments toJSONDetailed 1`] = `
+{
+  "id": 16,
+  "type": "log",
+  "text": "Hello stack trace!",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at <anonymous>\\nat bar (foo.ts:20:2)\\n--- async ------------------------------\\nat schedule (util.ts:5:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats frames without a name or url and unnamed async fragments toStringDetailed 1`] = `
+ID: 16
+Message: log> Hello stack trace!
+### Stack trace
+at <anonymous>
+at bar (foo.ts:20:2)
+--- async ------------------------------
+at schedule (util.ts:5:2)
+Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats object and primitive arguments toJSONDetailed 1`] = `
+{
+  "id": 15,
+  "type": "log",
+  "text": "Mixed args:",
+  "argsCount": 4,
+  "args": [
+    "{\\"user\\":\\"alice\\",\\"roles\\":[\\"admin\\"]}",
+    "42",
+    "null",
+    "true"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats object and primitive arguments toStringDetailed 1`] = `
+ID: 15
+Message: log> Mixed args:
+### Arguments
+Arg #0: {"user":"alice","roles":["admin"]}
+Arg #1: 42
+Arg #2: null
+Arg #3: true
+`;
+
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > handles \"Execution context is not available\" error in args toJSONDetailed 1`] = `
 {
   "id": 6,
@@ -361,4 +454,23 @@ at fn48 (main.js:48:48)
 at fn49 (main.js:49:49)
 ... and 50 more frames
 Note: line and column numbers use 1-based indexing
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first argument as text when the message text is empty toJSONDetailed 1`] = `
+{
+  "id": 14,
+  "type": "log",
+  "text": "Actual message",
+  "argsCount": 2,
+  "args": [
+    "extra-arg"
+  ]
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > uses the first argument as text when the message text is empty toStringDetailed 1`] = `
+ID: 14
+Message: log> Actual message
+### Arguments
+Arg #0: extra-arg
 `;

@@ -5,7 +5,7 @@ description: Diagnoses and resolves memory leaks in JavaScript/Node.js applicati
 
 # Memory Leak Debugging
 
-This skill provides expert guidance and workflows for finding, diagnosing, and fixing memory leaks in JavaScript and Node.js applications using Chrome DevTools MCP.
+This skill provides expert guidance and workflows for finding, diagnosing, and fixing memory leaks in JavaScript and Node.js applications using Chrome DevTools MCP tools.
 
 ## Core Principles
 
@@ -30,29 +30,25 @@ When investigating a frontend web application memory leak, utilize the `chrome-d
 Once you have generated `.heapsnapshot` files using `take_heapsnapshot`, compare them with Chrome DevTools MCP memory tools.
 
 - Start with `get_heapsnapshot_summary` for each snapshot to confirm that the files load and to compare high-level totals.
-- Use `compare_heapsnapshots` to compare baseline and target snapshots. Start without `classIndex` for the summary diff, then request detailed class diffs only for suspicious growth.
+- Use `compare_heapsnapshots` to compare baseline and target snapshots. Start without `classIndex` for the summary diff, then request detailed class diffs only for suspicious growth by specifying `classIndex`.
 - Use the summary output from `compare_heapsnapshots` before drilling into specific node IDs.
 
-### 3. Inspecting Retainers
+### 3. Inspecting Retainers and Dominator Chains
 
-When a class or object type grows unexpectedly, inspect the retaining chain with the MCP tools before changing code.
+When a class or object type grows unexpectedly, inspect the retaining chain and dominators with the MCP tools before changing code.
 
 - Use `get_heapsnapshot_class_nodes` to list instances of the suspicious class.
 - Use `get_heapsnapshot_retainers`, `get_heapsnapshot_retaining_paths`, `get_heapsnapshot_dominators`, and `get_heapsnapshot_edges` to understand why representative nodes are still reachable.
+- Use `get_heapsnapshot_object_details` with a specific `nodeId` to retrieve detailed object metadata (size, type, distance, and DOM detachedness).
 - Use `get_heapsnapshot_duplicate_strings` when string growth dominates the diff.
 - Read [references/common-leaks.md](references/common-leaks.md) for examples of common memory leaks and how to fix them after the retaining path points at application code.
 
-### 4. External Tool Fallback
+### 4. Advanced Analysis and Categorized Filters
 
-If the built-in MCP memory tools are not enough, use external tools as a fallback rather than reading raw snapshots directly.
+Use built-in MCP memory tools and filters to pinpoint specific leak categories directly without external tools.
 
-- Read [references/memlab.md](references/memlab.md) for how to use `memlab` to analyze generated heap snapshots.
-- If `memlab` is not available, use the fallback script in the references directory to compare two `.heapsnapshot` files and identify the top growing objects and common leak types.
-
-Run the fallback script using Node.js:
-
-```bash
-node skills/memory-leak-debugging/references/compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>
-```
-
-The script will analyze and output the top growing objects by size and highlight the 3 most common types of memory leaks (for example, detached DOM nodes, closures, and contexts) if they are present.
+- Use `get_heapsnapshot_details` or `get_heapsnapshot_class_nodes` with `filterName` to target common leak causes:
+  - `objectsRetainedByDetachedDomNodes`: Identifies detached DOM elements retained in memory.
+  - `objectsRetainedByEventHandlers`: Identifies objects kept alive by unremoved event listeners.
+  - `objectsRetainedByContexts`: Identifies objects trapped in closures or execution contexts.
+  - `objectsRetainedByConsole`: Identifies objects retained by console logging.

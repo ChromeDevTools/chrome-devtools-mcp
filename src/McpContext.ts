@@ -10,24 +10,30 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
-import {HeapSnapshotManager} from './HeapSnapshotManager.js';
+import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
-} from './HeapSnapshotManager.js';
+  HeapEdgesQueryOptions,
+} from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import {type UncaughtError} from './PageCollector.js';
-import {ServiceWorkerConsoleCollector} from './ServiceWorkerCollector.js';
+import {type UncaughtError} from './collectors/PageCollector.js';
+import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
   type Browser,
   type BrowserContext,
   type ConsoleMessage,
+  type GetPWAStateOptions,
+  type InstallPWAOptions,
+  type LaunchPWAOptions,
   type Page,
+  type PWAState,
   type ScreenRecorder,
   type Target,
+  type UninstallPWAOptions,
   type Extension,
   type Root,
   type DevTools,
@@ -40,7 +46,7 @@ import type {
   DevToolsData,
   SupportedExtensions,
 } from './tools/ToolDefinition.js';
-import type {TraceResult} from './trace-processing/parse.js';
+import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import type {DedicatedWorker, ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
@@ -62,6 +68,8 @@ interface McpContextOptions {
   // Whether this context replaces a previous one after a browser reconnect.
   // Surfaces a one-time note in the next response.
   reconnected?: boolean;
+  // Custom navigation timeout in milliseconds to override default.
+  navigationTimeout?: number;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -342,6 +350,22 @@ export class McpContext implements Context {
     return !!(this.#options.allowList || this.#options.blocklist);
   }
 
+  installPWA(options: InstallPWAOptions): Promise<string> {
+    return this.browser.installPWA(options);
+  }
+
+  uninstallPWA(options: UninstallPWAOptions): Promise<void> {
+    return this.browser.uninstallPWA(options);
+  }
+
+  launchPWA(options: LaunchPWAOptions): Promise<Page> {
+    return this.browser.launchPWA(options);
+  }
+
+  getPWAState(options: GetPWAStateOptions): Promise<PWAState> {
+    return this.browser.getPWAState(options);
+  }
+
   setIsRunningPerformanceTrace(x: boolean): void {
     this.#isRunningTrace = x;
   }
@@ -508,6 +532,7 @@ export class McpContext implements Context {
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           page.browserContext(),
         ),
+        navigationTimeout: this.#options.navigationTimeout,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();
@@ -773,6 +798,14 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getNativeContextSizes(filePath);
   }
 
+  async getHeapSnapshotRetainedByContextSummary(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary> {
+    return await this.#heapSnapshotManager.getRetainedByContextSummary(
+      filePath,
+    );
+  }
+
   async getHeapSnapshotNodesById(
     filePath: string,
     id: number,
@@ -887,8 +920,9 @@ export class McpContext implements Context {
   async getHeapSnapshotEdges(
     filePath: string,
     nodeId: number,
+    options?: HeapEdgesQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
-    return await this.#heapSnapshotManager.getEdges(filePath, nodeId);
+    return await this.#heapSnapshotManager.getEdges(filePath, nodeId, options);
   }
 
   async getHeapSnapshotClassDiffs(

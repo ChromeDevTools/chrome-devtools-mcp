@@ -65,6 +65,11 @@
 - **[WebMCP](#webmcp)** (2 tools)
   - [`execute_webmcp_tool`](#execute_webmcp_tool)
   - [`list_webmcp_tools`](#list_webmcp_tools)
+- **[Progressive Web Apps](#progressive-web-apps)** (4 tools)
+  - [`get_os_app_state`](#get_os_app_state)
+  - [`install_pwa`](#install_pwa)
+  - [`launch_pwa`](#launch_pwa)
+  - [`uninstall_pwa`](#uninstall_pwa)
 
 ## Input automation
 
@@ -165,7 +170,7 @@
 
 **Parameters:**
 
-- **filePath** (string) **(required)**: The local path of the file to upload
+- **filePaths** (array) **(required)**: One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 
@@ -360,6 +365,7 @@
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
+- **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
 ---
 
@@ -392,6 +398,7 @@
 **Parameters:**
 
 - **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations.
+- **includeStackTraces** (boolean) _(optional)_: Set to true to include the stack trace for each message when available. Increases the response size.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
 - **serviceWorkerId** (string) _(optional)_: Filter messages to only return messages of the specified service worker.
@@ -546,8 +553,11 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
+- **excludePrimitives** (boolean) _(optional)_: Whether to exclude primitive target nodes. Default is true.
+- **minRetainedSize** (number) _(optional)_: Minimum retained size in bytes for target nodes.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
+- **sortBy** (enum: "retainedSize", "selfSize", "name") _(optional)_: Sort order for edges. Default is retainedSize.
 
 ---
 
@@ -591,7 +601,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)
+**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -700,5 +710,52 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Description:** Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)
 
 **Parameters:** None
+
+---
+
+## Progressive Web Apps
+
+> NOTE: The Progressive Web Apps category is not active by default. Use the '--categoryPwa' flag.
+
+### `get_os_app_state`
+
+**Description:** Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
+
+---
+
+### `install_pwa`
+
+**Description:** Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **installUrlOrBundleUrl** (string) **(required)**: The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
+- **displayMode** (enum: "standalone", "browser") _(optional)_: Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.
+
+---
+
+### `launch_pwa`
+
+**Description:** Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
+- **url** (string) _(optional)_: Optional URL within the app to open instead of the default start URL.
+
+---
+
+### `uninstall_pwa`
+
+**Description:** Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)
+
+**Parameters:**
+
+- **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
 
 ---

@@ -17,6 +17,7 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
+    'third_party/devtools-frontend/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',
     'src/third_party/lighthouse-devtools-mcp-bundle.js',
@@ -34,11 +35,10 @@ export default defineConfig([
       parserOptions: {
         projectService: {
           allowDefaultProject: [
-            '.prettierrc.cjs',
-            'puppeteer.config.cjs',
-            'eslint.config.mjs',
-            'rollup.config.mjs',
-            'skills/memory-leak-debugging/references/compare_snapshots.js',
+            'prettier.config.js',
+            'puppeteer.config.js',
+            'eslint.config.js',
+            'rollup.config.js',
           ],
         },
       },
@@ -133,9 +133,9 @@ export default defineConfig([
         {
           patterns: [
             {
-              regex: '.*chrome-devtools-frontend/(?!mcp/mcp.js$).*',
+              regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
               message:
-                'Import only the devtools-frontend code exported via node_modules/chrome-devtools-frontend/mcp/mcp.js',
+                'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
             },
           ],
         },

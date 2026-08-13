@@ -138,7 +138,9 @@ export const screenshot = definePageTool(args => {
         ),
     },
     blockedByDialog: true,
-    verifyFilesSchema: ['filePath'],
+    verifyFilesSchema: {
+      filePath: true,
+    },
     handler: async (request, response, context) => {
       if (request.params.uid && request.params.fullPage) {
         throw new Error('Providing both "uid" and "fullPage" is not allowed.');

@@ -15,11 +15,12 @@ import {
   startTrace,
   stopTrace,
 } from '../../src/tools/performance.js';
-import type {TraceResult} from '../../src/trace-processing/parse.js';
 import {
   parseRawTraceBuffer,
+  type TraceResult,
   traceResultIsSuccess,
-} from '../../src/trace-processing/parse.js';
+} from '../../src/processors/PerformanceTrace.js';
+import {DevTools} from '../../src/third_party/index.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withMcpContext} from '../utils.js';
 
@@ -59,6 +60,14 @@ describe('performance', () => {
           context,
         );
         sinon.assert.calledOnce(startTracingStub);
+        sinon.assert.calledWithExactly(startTracingStub, {
+          categories: [
+            '-*',
+            ...DevTools.TracingDefaultCategories,
+            ...DevTools.TracingOptionalCategories.JsSampling,
+            ...DevTools.TracingOptionalCategories.Screenshot,
+          ],
+        });
         assert.ok(context.isRunningPerformanceTrace());
         assert.ok(
           response.responseLines

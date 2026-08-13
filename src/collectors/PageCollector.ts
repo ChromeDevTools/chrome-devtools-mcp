@@ -4,27 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {FakeIssuesManager} from './devtools/DevtoolsUtils.js';
+import {FakeIssuesManager} from '../devtools/DevtoolsUtils.js';
 import type {
   CDPSession,
   ConsoleMessage,
   Protocol,
   Issue,
-} from './third_party/index.js';
-import {DevTools} from './third_party/index.js';
+} from '../third_party/index.js';
+import {DevTools} from '../third_party/index.js';
 import {
   type Frame,
   type Handler,
   type HTTPRequest,
   type Page,
   type PageEvents as PuppeteerPageEvents,
-} from './third_party/index.js';
+} from '../third_party/index.js';
 import {
   createIdGenerator,
   stableIdSymbol,
   type WithSymbolId,
-} from './utils/id.js';
-import {logger} from './utils/logger.js';
+} from '../utils/id.js';
+import {logger} from '../utils/logger.js';
 
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
@@ -258,9 +258,9 @@ class PageEventSubscriber {
 
   #onIssueAdded = (inspectorIssue: Issue) => {
     try {
-      // DevTools currently defines this protocol issue code but has no
-      // IssuesManager handler for it, so calling into the mapper only warns.
-      if (String(inspectorIssue.code) === 'PerformanceIssue') {
+      // @ts-expect-error The types are missmatched but they
+      // are coming from CDP
+      if (!DevTools.isIssueCodeSupported(inspectorIssue.code)) {
         return;
       }
       const issue = DevTools.createIssuesFromProtocolIssue(

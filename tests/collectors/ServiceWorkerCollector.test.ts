@@ -7,10 +7,10 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {UncaughtError} from '../src/PageCollector.js';
-import {ServiceWorkerConsoleCollector} from '../src/ServiceWorkerCollector.js';
-import type {Protocol} from '../src/third_party/index.js';
-import {stableIdSymbol} from '../src/utils/id.js';
+import {UncaughtError} from '../../src/collectors/PageCollector.js';
+import {ServiceWorkerConsoleCollector} from '../../src/collectors/ServiceWorkerCollector.js';
+import type {Protocol} from '../../src/third_party/index.js';
+import {stableIdSymbol} from '../../src/utils/id.js';
 
 describe('ServiceWorkerConsoleCollector', () => {
   it('limits logs to 1000 per extension', () => {

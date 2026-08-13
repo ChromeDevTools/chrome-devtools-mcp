@@ -249,6 +249,13 @@ export const commands: Commands = {
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         required: false,
       },
+      waitForStableDom: {
+        name: 'waitForStableDom',
+        type: 'boolean',
+        description:
+          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        required: false,
+      },
     },
   },
   execute_3p_developer_tool: {
@@ -493,6 +500,26 @@ export const commands: Commands = {
         description: 'The node ID to get outgoing edges for.',
         required: true,
       },
+      sortBy: {
+        name: 'sortBy',
+        type: 'string',
+        description: 'Sort order for edges. Default is retainedSize.',
+        required: false,
+        enum: ['retainedSize', 'selfSize', 'name'],
+      },
+      minRetainedSize: {
+        name: 'minRetainedSize',
+        type: 'number',
+        description: 'Minimum retained size in bytes for target nodes.',
+        required: false,
+      },
+      excludePrimitives: {
+        name: 'excludePrimitives',
+        type: 'boolean',
+        description:
+          'Whether to exclude primitive target nodes. Default is true.',
+        required: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'number',
@@ -596,7 +623,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_summary: {
     description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes. (requires flag: --memoryDebugging=true)',
+      'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -632,6 +659,20 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
+      },
+    },
+  },
+  get_os_app_state: {
+    description:
+      'Returns the OS integration state (badge count and registered file handlers) for an installed web app, identified by its manifest ID. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
       },
     },
   },
@@ -685,6 +726,56 @@ export const commands: Commands = {
         type: 'string',
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
+      },
+    },
+  },
+  install_pwa: {
+    description:
+      'Installs a Progressive Web App (PWA) identified by its manifest ID. This installs through the PWA CDP domain without a user gesture or install dialog. DevTools installs default to browser display mode. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+      installUrlOrBundleUrl: {
+        name: 'installUrlOrBundleUrl',
+        type: 'string',
+        description:
+          'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
+        required: true,
+      },
+      displayMode: {
+        name: 'displayMode',
+        type: 'string',
+        description:
+          'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
+        required: false,
+        enum: ['standalone', 'browser'],
+      },
+    },
+  },
+  launch_pwa: {
+    description:
+      'Launches an installed Progressive Web App using its saved display mode. Optionally opens a specific URL within the same app instead of the default start URL. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+      url: {
+        name: 'url',
+        type: 'string',
+        description:
+          'Optional URL within the app to open instead of the default start URL.',
+        required: false,
       },
     },
   },
@@ -755,6 +846,14 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Set to true to return the preserved messages over the last 3 navigations.',
+        required: false,
+        default: false,
+      },
+      includeStackTraces: {
+        name: 'includeStackTraces',
+        type: 'boolean',
+        description:
+          'Set to true to include the stack trace for each message when available. Increases the response size.',
         required: false,
         default: false,
       },
@@ -1189,6 +1288,20 @@ export const commands: Commands = {
       },
     },
   },
+  uninstall_pwa: {
+    description:
+      'Uninstalls a Progressive Web App identified by its manifest ID and closes any open app windows. (requires flag: --categoryPwa=true)',
+    category: 'Progressive Web Apps',
+    args: {
+      manifestId: {
+        name: 'manifestId',
+        type: 'string',
+        description:
+          'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
+        required: true,
+      },
+    },
+  },
   upload_file: {
     description: 'Upload a file through a provided element.',
     category: 'Input automation',
@@ -1200,10 +1313,11 @@ export const commands: Commands = {
           'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
         required: true,
       },
-      filePath: {
-        name: 'filePath',
-        type: 'string',
-        description: 'The local path of the file to upload',
+      filePaths: {
+        name: 'filePaths',
+        type: 'array',
+        description:
+          'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
         required: true,
       },
       includeSnapshot: {

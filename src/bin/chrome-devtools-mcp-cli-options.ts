@@ -263,6 +263,13 @@ export const cliOptions = {
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',
   },
+  categoryPwa: {
+    type: 'boolean',
+    hidden: false,
+    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
+    describe:
+      'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
+  },
   performanceCrux: {
     type: 'boolean',
     default: true,
@@ -379,9 +386,23 @@ export function parseArguments(
   argv = process.argv,
   env = process.env,
 ) {
+  // Preserve yargs' mixed camel/kebab-case expansion under strict validation.
+  const kebabCaseAliases: Record<string, string> = {};
+  for (const option of Object.keys(cliOptions)) {
+    const alias = option.replace(
+      /[A-Z]/g,
+      letter => `-${letter.toLowerCase()}`,
+    );
+    if (alias !== option) {
+      kebabCaseAliases[option] = alias;
+    }
+  }
+
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
     .options(cliOptions)
+    .alias(kebabCaseAliases)
+    .strictOptions()
     .middleware(args => {
       // We can't set default in the options else
       // Yargs will complain

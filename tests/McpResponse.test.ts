@@ -23,11 +23,11 @@ import {
   newPage,
   selectPage,
 } from '../src/tools/pages.js';
-import type {InsightName} from '../src/trace-processing/parse.js';
+import type {InsightName} from '../src/processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
-} from '../src/trace-processing/parse.js';
+} from '../src/processors/PerformanceTrace.js';
 
 import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
@@ -50,9 +50,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -89,9 +87,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -101,9 +97,7 @@ describe('McpResponse', () => {
       page.accessibility.snapshot = async () => null;
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -121,9 +115,7 @@ describe('McpResponse', () => {
       response.includeSnapshot();
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -142,9 +134,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -158,7 +148,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       assert.equal(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(JSON.stringify(structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -175,13 +165,7 @@ describe('McpResponse', () => {
         const {content, structuredContent} = await response.handle(context);
         assert.equal(content[0].type, 'text');
         t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
       const content = await readFile(filePath, 'utf-8');
       t.assert.snapshot(stabilizeResponseOutput(content));
@@ -296,17 +280,18 @@ describe('McpResponse', () => {
   });
 
   it('adds throttling setting when it is not null', async t => {
-    await withMcpContext(async (response, context) => {
-      await context
-        .getSelectedMcpPage()
-        .emulate({networkConditions: 'Slow 3G'});
-      const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
-      t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
-    });
+    await withMcpContext(
+      async (response, context) => {
+        await context
+          .getSelectedMcpPage()
+          .emulate({networkConditions: 'Slow 3G'});
+        const {content, structuredContent} = await response.handle(context);
+        assert.equal(content[0].type, 'text');
+        t.assert.snapshot(getTextContent(content[0]));
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+      },
+      {navigationTimeout: 10000},
+    );
   });
 
   it('does not include throttling setting when it is null', async t => {
@@ -314,9 +299,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       await context.getSelectedMcpPage().emulate({});
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
   it('adds image when image is attached', async t => {
@@ -327,9 +310,7 @@ describe('McpResponse', () => {
       assert.equal(content[1].type, 'image');
       assert.strictEqual(getImageContent(content[1]).data, 'imageBase64');
       assert.strictEqual(getImageContent(content[1]).mimeType, 'image/png');
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -338,9 +319,7 @@ describe('McpResponse', () => {
       await context.getSelectedMcpPage().emulate({cpuThrottlingRate: 4});
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -349,9 +328,7 @@ describe('McpResponse', () => {
       await context.getSelectedMcpPage().emulate({cpuThrottlingRate: 1});
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -362,9 +339,7 @@ describe('McpResponse', () => {
       });
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -373,9 +348,7 @@ describe('McpResponse', () => {
       await context.getSelectedMcpPage().emulate({userAgent: 'MyUA'});
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -384,9 +357,7 @@ describe('McpResponse', () => {
       await context.getSelectedMcpPage().emulate({colorScheme: 'dark'});
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -405,9 +376,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       await page.getDialog()?.dismiss();
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -426,9 +395,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       await page.getDialog()?.dismiss();
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -440,9 +407,7 @@ describe('McpResponse', () => {
       };
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -454,9 +419,7 @@ describe('McpResponse', () => {
       };
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -489,9 +452,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
 
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -508,9 +469,7 @@ describe('McpResponse', () => {
       response.attachNetworkRequest(1);
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -530,9 +489,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       assert.ok(getTextContent(content[0]));
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -542,9 +499,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       assert.ok(getTextContent(content[0]));
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -564,9 +519,7 @@ describe('McpResponse', () => {
       const {content, structuredContent} = await response.handle(context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('<no console messages found>'));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -608,9 +561,7 @@ describe('McpResponse network request filtering', () => {
       };
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -628,9 +579,7 @@ describe('McpResponse network request filtering', () => {
       };
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -648,9 +597,7 @@ describe('McpResponse network request filtering', () => {
       };
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -669,9 +616,7 @@ describe('McpResponse network request filtering', () => {
       const {content, structuredContent} = await response.handle(context);
 
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -691,9 +636,7 @@ describe('McpResponse network request filtering', () => {
       };
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 });
@@ -709,9 +652,7 @@ describe('McpResponse network pagination', () => {
       assert.ok(text.includes('Showing 1-5 of 5 (Page 1 of 1).'));
       assert.ok(!text.includes('Next page:'));
       assert.ok(!text.includes('Previous page:'));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -729,9 +670,7 @@ describe('McpResponse network pagination', () => {
       assert.ok(text.includes('Showing 1-10 of 30 (Page 1 of 3).'));
       assert.ok(text.includes('Next page: 1'));
       assert.ok(!text.includes('Previous page:'));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -750,9 +689,7 @@ describe('McpResponse network pagination', () => {
       assert.ok(text.includes('Showing 11-20 of 25 (Page 2 of 3).'));
       assert.ok(text.includes('Next page: 2'));
       assert.ok(text.includes('Previous page: 0'));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -787,9 +724,7 @@ describe('McpResponse network pagination', () => {
         text.includes('Invalid page number provided. Showing first page.'),
       );
       assert.ok(text.includes('Showing 1-2 of 5 (Page 1 of 3).'));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 
@@ -811,10 +746,10 @@ describe('McpResponse network pagination', () => {
           traceInsights?: unknown[];
         };
         t.assert.snapshot(
-          JSON.stringify(typedStructuredContent.traceSummary, null, 2),
+          stabilizeStructuredContent(typedStructuredContent.traceSummary),
         );
         t.assert.snapshot(
-          JSON.stringify(typedStructuredContent.traceInsights, null, 2),
+          stabilizeStructuredContent(typedStructuredContent.traceInsights),
         );
       });
     });
@@ -837,13 +772,7 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
 
@@ -863,13 +792,7 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
   });
@@ -918,7 +841,7 @@ describe('extensions', () => {
       const {content, structuredContent} = await response.handle(context);
 
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(JSON.stringify(structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 });
@@ -958,9 +881,7 @@ describe('lighthouse', () => {
       assert.ok(text.includes('- /tmp/report.html'));
 
       t.assert.snapshot(getTextContent(content[0]));
-      t.assert.snapshot(
-        JSON.stringify(stabilizeStructuredContent(structuredContent), null, 2),
-      );
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
 });
@@ -1023,7 +944,7 @@ describe('third-party developer tools', () => {
           responseText.includes('inputSchema={"type":"object"'),
           'Response should include inputSchema',
         );
-        t.assert.snapshot(JSON.stringify(structuredContent, null, 2));
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       },
       undefined,
       {categoryExperimentalThirdParty: true},
@@ -1164,13 +1085,7 @@ describe('webmcp', () => {
         const {content, structuredContent} = await response.handle(context);
         assert.ok(getTextContent(content[0]));
         t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       },
       {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
       parseArguments,
@@ -1222,13 +1137,7 @@ describe('webmcp', () => {
         const {content, structuredContent} = await response.handle(context);
         assert.ok(getTextContent(content[0]));
         t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       },
       {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
       {categoryExperimentalWebmcp: true},

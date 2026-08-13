@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import {
   getTraceSummary,
   parseRawTraceBuffer,
-} from '../../src/trace-processing/parse.js';
+} from '../../src/processors/PerformanceTrace.js';
 
 import {loadTraceAsBuffer} from './fixtures/load.js';
 

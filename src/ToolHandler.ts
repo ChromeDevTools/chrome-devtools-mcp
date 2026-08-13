@@ -11,7 +11,7 @@ import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/transformation.js';
+import {bucketizeLatency, buildContext} from './telemetry/transformation.js';
 import type {CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
@@ -19,11 +19,14 @@ import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {
   DefinedPageTool,
   DevToolsData,
+  FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
+import {fileURLToPath} from 'node:url';
+import {isLocalhost} from './utils/url.js';
 
 export function buildFlag(category: ToolCategory) {
   return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
@@ -148,6 +151,71 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
+function extractPaths(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    return value.filter(item => typeof item === 'string');
+  }
+  return [];
+}
+
+function isLocalBrowser(context: McpContext): boolean {
+  if (context.browser.process()) {
+    return true;
+  }
+  const wsEndpoint = context.browser.wsEndpoint();
+  if (wsEndpoint && isLocalhost(wsEndpoint)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldValidateFile(
+  option: FileVerificationOption | undefined,
+  isLocal: boolean,
+): boolean {
+  if (option === true) {
+    return true;
+  }
+  if (typeof option === 'object' && option !== null) {
+    if (isLocal) {
+      return Boolean(option.local);
+    }
+    return Boolean(option.remote);
+  }
+  return false;
+}
+
+async function validateToolFiles(
+  tool: ToolDefinition | DefinedPageTool,
+  params: Record<string, unknown>,
+  context: McpContext,
+): Promise<void> {
+  const isLocal = isLocalBrowser(context);
+  const pathsOrUrlsToValidate: string[] = [];
+  for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
+    if (shouldValidateFile(option, isLocal)) {
+      pathsOrUrlsToValidate.push(...extractPaths(params[key]));
+    }
+  }
+  for (const filePathOrUrl of pathsOrUrlsToValidate) {
+    let filePath = filePathOrUrl;
+    try {
+      const url = new URL(filePathOrUrl);
+      if (url.protocol === 'file:') {
+        filePath = fileURLToPath(url);
+      } else if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
+        continue;
+      }
+    } catch {
+      // Suppress parsing errors for regular file paths.
+    }
+    await context.validatePath(filePath);
+  }
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
@@ -214,6 +282,7 @@ export class ToolHandler {
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
+    let pageUrl: string | undefined;
     try {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
@@ -230,12 +299,7 @@ export class ToolHandler {
       }
       let page: McpPage | undefined;
       try {
-        if (this.tool.verifyFilesSchema) {
-          for (const key of this.tool.verifyFilesSchema) {
-            const filePath = params[key];
-            await context.validatePath(filePath as string);
-          }
-        }
+        await validateToolFiles(this.tool, params, context);
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
@@ -270,6 +334,10 @@ export class ToolHandler {
         response.setError(err);
       }
       devToolsData = await context.getDevToolsData(page);
+      const targetPage = page ?? context.getSelectedMcpPage();
+      if (targetPage?.pptrPage?.isClosed() === false) {
+        pageUrl = targetPage.pptrPage.url();
+      }
       // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
       let dataFormat: DataFormat = 'default';
       if (this.serverArgs.experimentalDataFormat) {
@@ -311,16 +379,14 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
-      const isDevToolsOpen = devToolsData
-        ? Object.keys(devToolsData).length > 0
-        : undefined;
+      const context = buildContext(devToolsData, pageUrl);
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: this.tool.name,
         params,
         schema: this.inputSchema,
         success,
         latencyMs: bucketizeLatency(Date.now() - startTime),
-        isDevToolsOpen,
+        context,
       });
       guard[Symbol.dispose]();
     }

@@ -10,7 +10,7 @@ import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
-import type {WaitForEventsResult} from '../WaitForHelper.js';
+import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import type {ContextPage} from './ToolDefinition.js';
@@ -98,7 +98,7 @@ export const click = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
     using handle = await request.page.getElementByUid(uid);
@@ -148,7 +148,7 @@ export const clickAt = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
@@ -184,7 +184,7 @@ export const hover = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
     using handle = await request.page.getElementByUid(uid);
@@ -221,8 +221,8 @@ async function selectOption(
         using childValueHandle = await childHandle.getProperty('value');
 
         const childValue = await childValueHandle.jsonValue();
-        if (childValue) {
-          await handle.asLocator().fill(childValue.toString());
+        if (typeof childValue === 'string') {
+          await handle.asLocator().fill(childValue);
         }
 
         break;
@@ -302,7 +302,7 @@ export const fill = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
@@ -333,7 +333,7 @@ export const typeText = definePageTool({
     submitKey: submitKeySchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     const result = await page.waitForEventsAfterAction(async () => {
@@ -364,7 +364,7 @@ export const drag = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     using fromHandle = await request.page.getElementByUid(
       request.params.from_uid,
@@ -408,7 +408,7 @@ export const fillForm = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = request.page;
     let lastResult: WaitForEventsResult = {};
@@ -443,19 +443,31 @@ export const uploadFile = definePageTool({
       .describe(
         'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
       ),
-    filePath: zod.string().describe('The local path of the file to upload'),
+    filePaths: zod
+      .array(zod.string())
+      .min(1)
+      .describe(
+        'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
+      ),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: ['filePath'],
+  // We do not validate file paths for remote browser instances
+  // because they are on the remote host and not accessed by the MCP server.
+  verifyFilesSchema: {
+    filePaths: {
+      local: true,
+      remote: false,
+    },
+  },
   handler: async (request, response) => {
-    const {uid, filePath} = request.params;
+    const {uid, filePaths} = request.params;
     using handle = (await request.page.getElementByUid(
       uid,
     )) as ElementHandle<HTMLInputElement>;
 
     try {
-      await handle.uploadFile(filePath);
+      await handle.uploadFile(...filePaths);
     } catch {
       // Some sites use a proxy element to trigger file upload instead of
       // a type=file element. In this case, we want to default to
@@ -465,7 +477,7 @@ export const uploadFile = definePageTool({
           request.page.pptrPage.waitForFileChooser({timeout: 3000}),
           handle.asLocator().click(),
         ]);
-        await fileChooser.accept([filePath]);
+        await fileChooser.accept(filePaths);
       } catch {
         throw new Error(
           `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
@@ -475,7 +487,7 @@ export const uploadFile = definePageTool({
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
-    response.appendResponseLine(`File uploaded from ${filePath}.`);
+    response.appendResponseLine(`File uploaded from ${filePaths.join(', ')}.`);
   },
 });
 
@@ -495,7 +507,7 @@ export const pressKey = definePageTool({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     const tokens = parseKey(request.params.key);

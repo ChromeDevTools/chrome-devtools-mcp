@@ -9,3 +9,15 @@ declare module '*.css.js' {
   const styles: CSSInJS;
   export default styles;
 }
+
+declare module '*.skill.js' {
+  interface Skill {
+    name: 'styling' | 'network' | 'accessibility' | 'performance';
+    description: string;
+    allowedTools: string[];
+    instructions: string;
+  }
+  const skill: Skill;
+  export {skill};
+  export default skill;
+}

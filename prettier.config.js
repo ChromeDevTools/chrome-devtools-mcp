@@ -7,7 +7,7 @@
 /**
  * @type {import('prettier').Config}
  */
-module.exports = {
+export default {
   bracketSpacing: false,
   singleQuote: true,
   trailingComma: 'all',

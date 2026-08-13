@@ -22,30 +22,40 @@ uid=1_0 RootWebArea "Example Domain" url="https://example.com/"
   uid=1_1 heading "Example Domain" level="1"
 ```
 
+## Permissions & File Access
+
+By default, the server only has access to the **OS temp directory** (as defined by Node APIs, `os.tmpdir()`). File-saving parameters (`--filePath`, `--outputDirPath`) and `upload_file` outside the temp directory require unrestricted filesystem access:
+
+```bash
+# Start daemon with full filesystem access
+chrome-devtools start --allowUnrestrictedPaths=true
+```
+
 ## Command Usage
 
 ```sh
 chrome-devtools <tool> [arguments] [flags]
 ```
 
-Use `--help` on any command. Output defaults to Markdown, use `--output-format=json` for JSON.
+- Required arguments are passed positionally; optional arguments use flags.
+- Use `--help` on any command for usage details.
+- Output defaults to plain Markdown-like text; pass `--output-format=json` for JSON.
 
 ## Input Automation (<uid> from snapshot)
 
 ```bash
-chrome-devtools take_snapshot --help # Help message for commands, works for any command.
 chrome-devtools take_snapshot # Take a text snapshot of the page to get UIDs for elements
 chrome-devtools click "id" # Clicks on the provided element
 chrome-devtools click "id" --dblClick true --includeSnapshot true # Double clicks and returns a snapshot
 chrome-devtools drag "src" "dst" # Drag an element onto another element
 chrome-devtools drag "src" "dst" --includeSnapshot true # Drag an element and return a snapshot
-chrome-devtools fill "id" "text" # Type text into an input or select an option
+chrome-devtools fill "id" "text" # Type text into an input, textarea, or select an option
 chrome-devtools fill "id" "text" --includeSnapshot true # Fill an element and return a snapshot
-chrome-devtools handle_dialog accept # Handle a browser dialog
+chrome-devtools handle_dialog accept # Handle a browser dialog (accept/dismiss)
 chrome-devtools handle_dialog dismiss --promptText "hi" # Dismiss a dialog with prompt text
 chrome-devtools hover "id" # Hover over the provided element
 chrome-devtools hover "id" --includeSnapshot true # Hover over an element and return a snapshot
-chrome-devtools press_key "Enter" # Press a key or key combination
+chrome-devtools press_key "Enter" # Press a key or key combination ("Control+A", "Escape")
 chrome-devtools press_key "Control+A" --includeSnapshot true # Press a key and return a snapshot
 chrome-devtools type_text "hello" # Type text using keyboard into a focused input
 chrome-devtools type_text "hello" --submitKey "Enter" # Type text and press a submit key
@@ -84,19 +94,40 @@ chrome-devtools resize_page 1920 1080 # Resizes the selected page's window
 
 ```bash
 chrome-devtools performance_analyze_insight "1" "LCPBreakdown" # Get more details on a specific Performance Insight
-chrome-devtools performance_start_trace true false # Starts a performance trace recording
-chrome-devtools performance_start_trace true true --filePath t.gz # Start trace and save to a file
+chrome-devtools performance_start_trace true false # Starts a performance trace recording (reload, autoStop)
+chrome-devtools performance_start_trace true true --filePath "t.json.gz" # Start trace and save to a file
 chrome-devtools performance_stop_trace # Stops the active performance trace
-chrome-devtools performance_stop_trace --filePath "t.json" # Stop trace and save to a file
-chrome-devtools take_memory_snapshot "./snap.heapsnapshot" # Capture a memory heapsnapshot
+chrome-devtools performance_stop_trace --filePath "t.json.gz" # Stop trace and save to a file
+```
+
+## Memory
+
+```bash
+chrome-devtools take_heapsnapshot "./snap.heapsnapshot" # Capture a memory heap snapshot
+```
+
+### Memory Debugging (requires `--memoryDebugging=true`)
+
+```bash
+chrome-devtools get_heapsnapshot_summary "./snap.heapsnapshot" # Get snapshot summary stats
+chrome-devtools compare_heapsnapshots "./base.heapsnapshot" "./target.heapsnapshot" # Compare two snapshots
+chrome-devtools get_heapsnapshot_class_nodes "./snap.heapsnapshot" "Array" # Inspect class instances
+chrome-devtools get_heapsnapshot_details "./snap.heapsnapshot" 123 # Detailed object properties
+chrome-devtools get_heapsnapshot_dominators "./snap.heapsnapshot" 123 # Dominator tree for node
+chrome-devtools get_heapsnapshot_duplicate_strings "./snap.heapsnapshot" # Find duplicated strings
+chrome-devtools get_heapsnapshot_edges "./snap.heapsnapshot" 123 # Node edges/references
+chrome-devtools get_heapsnapshot_object_details "./snap.heapsnapshot" 123 # Object details by node ID
+chrome-devtools get_heapsnapshot_retainers "./snap.heapsnapshot" 123 # Retaining objects
+chrome-devtools get_heapsnapshot_retaining_paths "./snap.heapsnapshot" 123 # Shortest retaining paths
+chrome-devtools close_heapsnapshot "./snap.heapsnapshot" # Free memory from loaded snapshot
 ```
 
 ## Network
 
 ```bash
 chrome-devtools get_network_request # Get the currently selected network request
-chrome-devtools get_network_request --reqid 1 --requestFilePath req.md # Get request by id and save to file
-chrome-devtools get_network_request --responseFilePath res.md # Save response body to file
+chrome-devtools get_network_request --reqid 1 --requestFilePath "req.md" # Get request by id and save to file
+chrome-devtools get_network_request --responseFilePath "res.md" # Save response body to file
 chrome-devtools list_network_requests # List all network requests
 chrome-devtools list_network_requests --pageSize 50 --pageIdx 0 # List network requests with pagination
 chrome-devtools list_network_requests --resourceTypes Fetch # Filter requests by resource type
@@ -133,21 +164,35 @@ chrome-devtools reload_extension "extension_id" # Reloads an unpacked Chrome ext
 chrome-devtools trigger_extension_action "extension_id" # Triggers the default action of an extension by its ID
 ```
 
+## Progressive Web Apps (requires `--categoryPwa=true`)
+
+```bash
+chrome-devtools install_pwa "https://example.com/" # Install PWA by manifest ID or URL
+chrome-devtools launch_pwa "https://example.com/" # Launch installed PWA
+chrome-devtools get_os_app_state "https://example.com/" # Get OS app installation state
+chrome-devtools uninstall_pwa "https://example.com/" # Uninstall PWA and close windows
+```
+
 ## Experimental Features
 
 Experimental tools are disabled by default. Enable them with the corresponding flag during `start`.
 
 ```bash
 chrome-devtools click_at 100 200 # Clicks at the provided coordinates (requires --experimentalVision=true)
-chrome-devtools screencast_start # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
+chrome-devtools screencast_start --filePath "screen.mp4" # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
 chrome-devtools screencast_stop # Stops the active screencast
 chrome-devtools list_webmcp_tools # List all WebMCP tools (requires --categoryExperimentalWebmcp=true)
+chrome-devtools execute_webmcp_tool "tool_name" '{"arg":"val"}' # Execute a WebMCP tool (requires --categoryExperimentalWebmcp=true)
+chrome-devtools list_3p_developer_tools # List third-party developer tools (requires --categoryExperimentalThirdParty=true)
+chrome-devtools execute_3p_developer_tool "tool_name" '{"arg":"val"}' # Execute third-party developer tool (requires --categoryExperimentalThirdParty=true)
 ```
 
 ## Service Management
 
 ```bash
 chrome-devtools start   # Start or restart chrome-devtools-mcp
+chrome-devtools start --allowUnrestrictedPaths=true # Start with full filesystem access
+chrome-devtools start --headless=false # Start with visible browser window
 chrome-devtools status  # Checks if chrome-devtools-mcp is running
 chrome-devtools stop    # Stop chrome-devtools-mcp if any
 ```

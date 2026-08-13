@@ -29,6 +29,7 @@ import {
   extractExtensionId,
   assertNoServiceWorkerReported,
   waitExecutionFor,
+  stabilizeResponseOutput,
 } from '../utils.js';
 
 const EXTENSION_LOGGING_PATH = path.join(
@@ -185,6 +186,59 @@ describe('console', () => {
         const formattedResponse = await response.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
         t.assert.snapshot(textContent);
+      });
+    });
+
+    it('includes stack traces when includeStackTraces is set', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          '<script>function failingFn() { console.error("This is an error"); } failingFn();</script>',
+        );
+        await listConsoleMessages().handler(
+          {
+            params: {includeStackTraces: true},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('msgid=1 [error] This is an error'));
+        assert.match(textContent, /at failingFn/);
+        const structuredContent = formattedResponse.structuredContent as {
+          consoleMessages: Array<{stackTrace?: string}>;
+        };
+        assert.match(
+          structuredContent.consoleMessages[0].stackTrace ?? '',
+          /at failingFn/,
+        );
+      });
+    });
+
+    it('omits stack traces by default', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          '<script>function failingFn() { console.error("This is an error"); } failingFn();</script>',
+        );
+        await listConsoleMessages().handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('msgid=1 [error] This is an error'));
+        assert.ok(!textContent.includes('at failingFn'));
+        const structuredContent = formattedResponse.structuredContent as {
+          consoleMessages: Array<{stackTrace?: string}>;
+        };
+        assert.strictEqual(
+          structuredContent.consoleMessages[0].stackTrace,
+          undefined,
+        );
       });
     });
 
@@ -425,11 +479,13 @@ describe('console', () => {
           );
           const formattedResponse = await response2.handle(context);
           const rawText = getTextContent(formattedResponse.content[0]);
-          const sanitizedText = rawText
-            .replaceAll(/ID: \d+/g, 'ID: <ID>')
-            .replaceAll(/reqid=\d+/g, 'reqid=<reqid>')
-            .replaceAll(/localhost:\d+/g, 'hostname:port');
-          t.assert.snapshot(sanitizedText);
+          t.assert.snapshot(
+            stabilizeResponseOutput(
+              rawText
+                .replaceAll(/ID: \d+/g, 'ID: <ID>')
+                .replaceAll(/reqid=\d+/g, 'reqid=<reqid>'),
+            ),
+          );
         });
       });
     });
@@ -650,13 +706,7 @@ describe('console', () => {
         );
 
         const result = await response.handle(context);
-        t.assert.snapshot(
-          JSON.stringify(
-            stabilizeStructuredContent(result.structuredContent),
-            null,
-            2,
-          ),
-        );
+        t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
         await dialog.dismiss();
       });
     });

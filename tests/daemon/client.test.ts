@@ -14,22 +14,24 @@ import {
   handleResponse,
   startDaemon,
   stopDaemon,
+  verifyDaemonVersion,
 } from '../../src/daemon/client.js';
 import {isDaemonRunning} from '../../src/daemon/utils.js';
+import {VERSION} from '../../src/version.js';
 
 describe('daemon client', () => {
+  let sessionId: string;
+
+  beforeEach(async () => {
+    sessionId = crypto.randomUUID();
+    await stopDaemon(sessionId);
+  });
+
+  afterEach(async () => {
+    await stopDaemon(sessionId);
+  });
+
   describe('start/stop', () => {
-    let sessionId: string;
-
-    beforeEach(async () => {
-      sessionId = crypto.randomUUID();
-      await stopDaemon(sessionId);
-    });
-
-    afterEach(async () => {
-      await stopDaemon(sessionId);
-    });
-
     it('should start and stop daemon', async () => {
       assert.ok(
         !isDaemonRunning(sessionId),
@@ -69,6 +71,37 @@ describe('daemon client', () => {
       assert.ok(
         !isDaemonRunning(sessionId),
         'Daemon should still not be running',
+      );
+    });
+  });
+
+  describe('verifyDaemonVersion', () => {
+    it('warns when daemon version does not match CLI version', async () => {
+      await startDaemon([], sessionId);
+      const warning = await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+      assert.ok(
+        warning &&
+          warning.includes('does not match CLI version (0.0.0-mismatch)'),
+        `Expected warning message about version mismatch, got: ${warning}`,
+      );
+    });
+
+    it('does not warn when daemon version matches CLI version', async () => {
+      await startDaemon([], sessionId);
+      const warning = await verifyDaemonVersion(sessionId, VERSION);
+      assert.strictEqual(
+        warning,
+        undefined,
+        'Should not return warning when version matches',
+      );
+    });
+
+    it('does nothing when daemon is not running', async () => {
+      const warning = await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+      assert.strictEqual(
+        warning,
+        undefined,
+        'Should not return warning when daemon is stopped',
       );
     });
   });

@@ -11,7 +11,6 @@ import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import logger from 'debug';
 import {Locator} from 'puppeteer';
 import sinon from 'sinon';
 
@@ -20,9 +19,15 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
-import type {TraceResult} from '../src/trace-processing/parse.js';
+import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 
-import {getMockRequest, html, withBrowser, withMcpContext} from './utils.js';
+import {
+  getMockRequest,
+  html,
+  withBrowser,
+  withMcpContext,
+  stabilizeStructuredContent,
+} from './utils.js';
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -232,12 +237,7 @@ describe('McpContext', () => {
         experimentalDevToolsDebugging: false,
         performanceCrux: false,
       };
-      const first = await McpContext.from(
-        browser,
-        logger('test'),
-        options,
-        Locator,
-      );
+      const first = await McpContext.from(browser, undefined, options, Locator);
       const idBeforeReconnect = (await first.newPage()).id;
       first.dispose();
 
@@ -246,7 +246,7 @@ describe('McpContext', () => {
       // the next page keeps counting up rather than colliding with it.
       const second = await McpContext.from(
         browser,
-        logger('test'),
+        undefined,
         options,
         Locator,
       );
@@ -269,7 +269,7 @@ describe('McpContext', () => {
     await withBrowser(async browser => {
       const context = await McpContext.from(
         browser,
-        logger('test'),
+        undefined,
         {
           experimentalDevToolsDebugging: false,
           performanceCrux: false,
@@ -317,7 +317,7 @@ describe('McpContext', () => {
 
       response.setIncludeNetworkRequests(true);
       const result = await response.handle(context);
-      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
     });
   });
 
@@ -335,7 +335,7 @@ describe('McpContext', () => {
       response.attachNetworkRequest(456);
       const result = await response.handle(context);
 
-      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
     });
   });
 
@@ -386,7 +386,7 @@ describe('McpContext', () => {
       });
       const result = await response.handle(context);
 
-      t.assert.snapshot(JSON.stringify(result.structuredContent, null, 2));
+      t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
 
       fromStub.restore();
     });

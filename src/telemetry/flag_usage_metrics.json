@@ -373,6 +373,14 @@
     "flagType": "boolean"
   },
   {
+    "name": "category_pwa_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_pwa",
+    "flagType": "boolean"
+  },
+  {
     "name": "experimental_workers_present",
     "flagType": "boolean"
   },

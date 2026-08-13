@@ -5,4 +5,4 @@
  */
 
 // eslint-disable-next-line no-restricted-imports
-import '../../node_modules/chrome-devtools-frontend/front_end/entrypoints/heap_snapshot_worker/heap_snapshot_worker-entrypoint.js';
+import '../../third_party/devtools-frontend/front_end/entrypoints/heap_snapshot_worker/heap_snapshot_worker-entrypoint.js';

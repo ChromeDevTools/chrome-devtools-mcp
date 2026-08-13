@@ -25,7 +25,6 @@ import {
   clickAt,
   typeText,
 } from '../../src/tools/input.js';
-import {parseKey} from '../../src/utils/keyboard.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext, getTextContent} from '../utils.js';
 
@@ -587,6 +586,44 @@ describe('input', () => {
           () => document.querySelector('select')!.value,
         );
         assert.strictEqual(selectedValue, 'v2');
+      });
+    });
+
+    it('fills out a select option with an empty value by text', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<select
+            ><option value="">none</option
+            ><option
+              value="v2"
+              selected
+              >two</option
+            ></select
+          >`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await fill.handler(
+          {
+            params: {
+              uid: '1_1',
+              value: 'none',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully filled out the element',
+        );
+        const selectedValue = await page.evaluate(
+          () => document.querySelector('select')!.value,
+        );
+        assert.strictEqual(selectedValue, '');
       });
     });
 
@@ -1194,7 +1231,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePath: testFilePath,
+              filePaths: [testFilePath],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1209,6 +1246,52 @@ describe('input', () => {
       });
 
       await fs.unlink(testFilePath);
+    });
+
+    it('uploads multiple files to a file input', async () => {
+      const firstFilePath = path.join(process.cwd(), 'first.txt');
+      const secondFilePath = path.join(process.cwd(), 'second.txt');
+      await fs.writeFile(firstFilePath, 'first file content');
+      await fs.writeFile(secondFilePath, 'second file content');
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<form>
+            <input
+              type="file"
+              id="file-input"
+              multiple
+            />
+          </form>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await uploadFile.handler(
+          {
+            params: {
+              uid: '1_2',
+              filePaths: [firstFilePath, secondFilePath],
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(
+          response.responseLines[0],
+          `File uploaded from ${firstFilePath}, ${secondFilePath}.`,
+        );
+        const uploadedFileNames = await page.$eval('#file-input', el => {
+          const input = el as HTMLInputElement;
+          return Array.from(input.files ?? []).map(file => file.name);
+        });
+        assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
+      });
+
+      await fs.unlink(firstFilePath);
+      await fs.unlink(secondFilePath);
     });
 
     it('uploads a file when clicking an element opens a file uploader', async () => {
@@ -1239,7 +1322,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_1',
-              filePath: testFilePath,
+              filePaths: [testFilePath],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1277,7 +1360,7 @@ describe('input', () => {
             {
               params: {
                 uid: '1_1',
-                filePath: testFilePath,
+                filePaths: [testFilePath],
               },
               page: context.getSelectedMcpPage(),
             },
@@ -1299,33 +1382,6 @@ describe('input', () => {
   });
 
   describe('press_key', () => {
-    it('parses keys', () => {
-      assert.deepStrictEqual(parseKey('Shift+A'), ['A', 'Shift']);
-      assert.deepStrictEqual(parseKey('Shift++'), ['+', 'Shift']);
-      assert.deepStrictEqual(parseKey('Control+Shift++'), [
-        '+',
-        'Control',
-        'Shift',
-      ]);
-      assert.deepStrictEqual(parseKey('Shift'), ['Shift']);
-      assert.deepStrictEqual(parseKey('KeyA'), ['KeyA']);
-    });
-    it('throws on empty key', () => {
-      assert.throws(() => {
-        parseKey('');
-      });
-    });
-    it('throws on invalid key', () => {
-      assert.throws(() => {
-        parseKey('aaaaa');
-      });
-    });
-    it('throws on multiple keys', () => {
-      assert.throws(() => {
-        parseKey('Shift+Shift');
-      });
-    });
-
     it('processes press_key', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;

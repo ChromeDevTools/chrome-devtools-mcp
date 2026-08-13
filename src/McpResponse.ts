@@ -21,10 +21,10 @@ import type {
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
-} from './HeapSnapshotManager.js';
+} from './processors/HeapSnapshotManager.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
-import {UncaughtError} from './PageCollector.js';
+import {UncaughtError} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
@@ -45,13 +45,17 @@ import type {
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
-import type {InsightName, TraceResult} from './trace-processing/parse.js';
-import {getInsightOutput, getTraceSummary} from './trace-processing/parse.js';
+import {
+  type InsightName,
+  type TraceResult,
+  getInsightOutput,
+  getTraceSummary,
+} from './processors/PerformanceTrace.js';
 import type {PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
-import type {WaitForEventsResult} from './WaitForHelper.js';
+import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -86,6 +90,7 @@ export class McpResponse implements Response {
     stats?: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics;
     staticData?: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null;
     nativeContextSizes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes;
+    retainedByContextSummary?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary;
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
@@ -106,6 +111,7 @@ export class McpResponse implements Response {
     pagination?: PaginationOptions;
     types?: string[];
     includePreservedMessages?: boolean;
+    includeStackTraces?: boolean;
     serviceWorkerId?: string;
   };
   #listExtensions?: boolean;
@@ -212,6 +218,7 @@ export class McpResponse implements Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      includeStackTraces?: boolean;
       serviceWorkerId?: string;
     },
   ): void {
@@ -231,6 +238,7 @@ export class McpResponse implements Response {
           : undefined,
       types: options?.types,
       includePreservedMessages: options?.includePreservedMessages,
+      includeStackTraces: options?.includeStackTraces,
       serviceWorkerId: options?.serviceWorkerId,
     };
   }
@@ -335,6 +343,7 @@ export class McpResponse implements Response {
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+    retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
@@ -342,6 +351,7 @@ export class McpResponse implements Response {
       stats,
       staticData,
       nativeContextSizes,
+      retainedByContextSummary,
     };
   }
 
@@ -598,6 +608,7 @@ export class McpResponse implements Response {
               return await ConsoleFormatter.from(consoleMessage, {
                 id: consoleMessageStableId,
                 fetchDetailedData: false,
+                fetchStackTrace: this.#consoleDataOptions?.includeStackTraces,
                 devTools: page ? page.devtoolsUniverse : undefined,
               });
             }
@@ -751,7 +762,10 @@ export class McpResponse implements Response {
       consoleMessage?: object;
       consoleMessages?: object[];
       traceSummary?: string;
-      traceInsights?: Array<{insightName: string; insightKey: string}>;
+      traceInsights?: Array<{
+        insightName: string;
+        insightKey: string | undefined;
+      }>;
       lighthouseResult?: object;
       extensions?: object[];
       thirdPartyDeveloperTools?: object[];
@@ -775,6 +789,7 @@ export class McpResponse implements Response {
         stats?: object;
         staticData?: object;
         nativeContextSizes?: object;
+        retainedByContextSummary?: object;
         aggregateStats?: {
           objectCount: number;
           totalSelfSize: number;
@@ -1009,7 +1024,12 @@ Call ${handleDialog.name} to handle it before continuing.`);
         for (const [insightName, model] of Object.entries(insightSet.model)) {
           structuredContent.traceInsights.push({
             insightName,
-            insightKey: model.insightKey,
+            insightKey:
+              typeof model === 'object' &&
+              model !== null &&
+              'insightKey' in model
+                ? model.insightKey
+                : undefined,
           });
         }
       }
@@ -1089,6 +1109,19 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
+      }
+      const retainedByContextSummary =
+        this.#heapSnapshotOptions.retainedByContextSummary;
+      if (retainedByContextSummary) {
+        response.push('### Retained by Context Summary');
+        response.push(
+          HeapSnapshotFormatter.formatRetainedByContextSummary(
+            retainedByContextSummary,
+          ),
+        );
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.retainedByContextSummary =
+          retainedByContextSummary;
       }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {
@@ -1344,6 +1377,15 @@ Call ${handleDialog.name} to handle it before continuing.`);
           response.push(compactEncode(structuredContent.consoleMessages));
         } else {
           response.push(...paginationData.items.map(item => item.toString()));
+        }
+        if (
+          structuredContent.consoleMessages.some(
+            message => 'stackTrace' in message,
+          )
+        ) {
+          response.push(
+            'Note: stack trace line and column numbers use 1-based indexing',
+          );
         }
       } else {
         response.push('<no console messages found>');

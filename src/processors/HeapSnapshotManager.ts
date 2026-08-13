@@ -7,12 +7,12 @@
 import fsSync from 'node:fs';
 import path from 'node:path';
 
-import {DevTools} from './third_party/index.js';
+import {DevTools} from '../third_party/index.js';
 import {
   createIdGenerator,
   stableIdSymbol,
   type WithSymbolId,
-} from './utils/id.js';
+} from '../utils/id.js';
 
 export type AggregatedInfoWithId =
   WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
@@ -42,6 +42,12 @@ export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
 
 export type DuplicateStringGroup =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.DuplicateStringGroup;
+
+export type HeapQueryOptions =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapQueryOptions;
+
+export type HeapEdgesQueryOptions =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
 
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
@@ -148,6 +154,13 @@ export class HeapSnapshotManager {
     return await snapshot.getNativeContextSizes();
   }
 
+  async getRetainedByContextSummary(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getRetainedByContextSummary();
+  }
+
   async getOrCreateIdForClassKey(
     filePath: string,
     classKey: string,
@@ -241,13 +254,14 @@ export class HeapSnapshotManager {
   async getEdges(
     filePath: string,
     nodeId: number,
+    options?: HeapEdgesQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
       throw new Error(`Node with ID ${nodeId} not found`);
     }
-    const provider = snapshot.createEdgesProvider(nodeIndex);
+    const provider = snapshot.createEdgesProvider(nodeIndex, options);
     return await provider.serializeItemsRange(0, Infinity);
   }
 
@@ -359,29 +373,38 @@ export class HeapSnapshotManager {
           /* noop */
         },
         DevTools.Common.Console.Console.instance(),
-        import.meta.resolve('./third_party/devtools-heap-snapshot-worker.js'),
+        import.meta.resolve('../third_party/devtools-heap-snapshot-worker.js'),
       );
 
-    const {promise: snapshotPromise, resolve: resolveSnapshot} =
-      Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
+    try {
+      const {promise: snapshotPromise, resolve: resolveSnapshot} =
+        Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
 
-    const loaderProxy = workerProxy.createLoader(uid, snapshotProxy => {
-      resolveSnapshot(snapshotProxy);
-    });
+      const loaderProxy = workerProxy.createLoader(uid, snapshotProxy => {
+        resolveSnapshot(snapshotProxy);
+      });
 
-    const fileStream = fsSync.createReadStream(absolutePath, {
-      encoding: 'utf-8',
-      highWaterMark: 1024 * 1024,
-    });
+      const fileStream = fsSync.createReadStream(absolutePath, {
+        encoding: 'utf-8',
+        highWaterMark: 1024 * 1024,
+      });
 
-    for await (const chunk of fileStream) {
-      await loaderProxy.write(chunk);
+      for await (const chunk of fileStream) {
+        await loaderProxy.write(chunk);
+      }
+
+      await loaderProxy.close();
+
+      const snapshot = await snapshotPromise;
+      return {snapshot, worker: workerProxy};
+    } catch (error) {
+      // The worker is created before the read, and a failed load never reaches
+      // the #snapshots map, so dispose()/disposeAll() can never clean it up.
+      // Dispose it here to avoid leaking a worker on every failed load (e.g. a
+      // missing or invalid .heapsnapshot path).
+      workerProxy.dispose();
+      throw error;
     }
-
-    await loaderProxy.close();
-
-    const snapshot = await snapshotPromise;
-    return {snapshot, worker: workerProxy};
   }
 
   async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {

@@ -11,7 +11,6 @@ import type {
   Protocol,
 } from '../third_party/index.js';
 
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
 /**
@@ -151,11 +150,21 @@ export async function createTargetUniverse(
     supportsEmulation: false,
   });
 
-  const connection = new PuppeteerDevToolsConnection(session);
+  const setting = universe.settings.resolve(
+    DevTools.SourceMapManager.lazyLoadingSettingDescriptor,
+  );
+  setting.set(true);
+
+  const skipAllPausesSetting = universe.settings.resolve(
+    DevTools.skipAllPausesSettingDescriptor,
+  );
+  skipAllPausesSetting.set(true);
+
+  // @ts-expect-error devtools-frontend has diffrent types.
+  const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
 
-  targetManager.observeModels(DevTools.DebuggerModel, SKIP_ALL_PAUSES);
   targetManager.observeModels(
     DevTools.NetworkManager.NetworkManager,
     DISABLE_NETWORK,
@@ -170,23 +179,9 @@ export async function createTargetUniverse(
     undefined,
     connection,
   );
+
   return {target, universe, session};
 }
-
-// We don't want to pause any DevTools universe session ever on the MCP side.
-//
-// Note that calling `setSkipAllPauses` only affects the session on which it was
-// sent. This means DevTools can still pause, step and do whatever. We just won't
-// see the `Debugger.paused`/`Debugger.resumed` events on the MCP side.
-const SKIP_ALL_PAUSES = {
-  modelAdded(model: DevTools.DebuggerModel): void {
-    void model.agent.invoke_setSkipAllPauses({skip: true});
-  },
-
-  modelRemoved(): void {
-    // Do nothing.
-  },
-};
 
 // Not recording network requests in the DevTools universe.
 //

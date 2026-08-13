@@ -11,9 +11,13 @@ import net from 'node:net';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
-import {logger} from '../utils/logger.js';
+import {logger, puppeteerLogger} from '../utils/logger.js';
 
-import type {DaemonMessage, DaemonResponse} from './types.js';
+import type {
+  DaemonMessage,
+  DaemonResponse,
+  DaemonStatusResult,
+} from './types.js';
 import {
   DAEMON_SCRIPT_PATH,
   getSocketPath,
@@ -160,7 +164,7 @@ export async function sendCommand(
       reject(new Error('Timeout waiting for daemon response'));
     }, timeout);
 
-    const transport = new PipeTransport(socket, socket);
+    const transport = new PipeTransport(socket, socket, puppeteerLogger);
     transport.onmessage = async (message: string) => {
       clearTimeout(timer);
       logger?.('onmessage', message);
@@ -192,6 +196,27 @@ export async function stopDaemon(sessionId: string) {
   await sendCommand({method: 'stop'}, sessionId);
 
   await waitForFile(pidFilePath, /*removed=*/ true);
+}
+
+export async function verifyDaemonVersion(
+  sessionId: string,
+  cliVersion: string,
+): Promise<string | undefined> {
+  if (!isDaemonRunning(sessionId)) {
+    return undefined;
+  }
+  try {
+    const response = await sendCommand({method: 'status'}, sessionId);
+    if (response.success) {
+      const data: DaemonStatusResult = JSON.parse(response.result);
+      if (data?.version && data.version !== cliVersion) {
+        return `Warning: Daemon server version (${data.version}) does not match CLI version (${cliVersion}). Run 'chrome-devtools start' to update and restart the daemon.`;
+      }
+    }
+  } catch {
+    // Suppress communication failures during check; command execution handles unreachable daemon errors.
+  }
+  return undefined;
 }
 
 export async function handleResponse(

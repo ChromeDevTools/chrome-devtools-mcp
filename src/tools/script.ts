@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DisposableStack, zod} from '../third_party/index.js';
+import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
 
@@ -52,6 +52,12 @@ Example with arguments: \`(el) => el.innerText\`
         .describe(
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         ),
+      waitForStableDom: zod
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        ),
       ...(cliArgs?.categoryExtensions
         ? {
             serviceWorkerId: zod
@@ -74,7 +80,9 @@ Example with arguments: \`(el) => el.innerText\`
         : {}),
     },
     blockedByDialog: true,
-    verifyFilesSchema: ['filePath'],
+    verifyFilesSchema: {
+      filePath: true,
+    },
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,
@@ -84,6 +92,7 @@ Example with arguments: \`(el) => el.innerText\`
         pageId,
         dialogAction,
         filePath,
+        waitForStableDom,
       } = request.params;
 
       if (cliArgs?.experimentalWorkers && workerId) {
@@ -135,7 +144,8 @@ Example with arguments: \`(el) => el.innerText\`
                 context,
               });
             },
-            {handleDialog: dialogAction ?? 'accept'},
+            // Service workers cannot interact with the DOM, so never wait for it.
+            {handleDialog: dialogAction ?? 'accept', waitForStableDom: false},
           );
         if (result.dialogHandled) {
           context.getSelectedMcpPage().clearDialog();
@@ -169,7 +179,7 @@ Example with arguments: \`(el) => el.innerText\`
             context,
           });
         },
-        {handleDialog: dialogAction ?? 'accept'},
+        {handleDialog: dialogAction ?? 'accept', waitForStableDom},
       );
       response.attachWaitForResult(result);
     },

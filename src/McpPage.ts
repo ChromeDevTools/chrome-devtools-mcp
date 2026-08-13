@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DisposableStack} from './third_party/index.js';
-
 export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   if (typeof schema === 'boolean') {
     return;
@@ -66,7 +64,7 @@ import {
   NetworkCollector,
   type ListenerMap,
   type UncaughtError,
-} from './PageCollector.js';
+} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import type {Locator} from './third_party/index.js';
 import {
@@ -102,7 +100,7 @@ import {
   WaitForHelper,
   type WaitForEventsResult,
   type DialogAction,
-} from './WaitForHelper.js';
+} from './utils/WaitForHelper.js';
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
@@ -139,6 +137,7 @@ export class McpPage implements ContextPage {
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
+  #navigationTimeout: number;
 
   constructor(
     page: Page,
@@ -147,10 +146,12 @@ export class McpPage implements ContextPage {
       hasNetworkBlockOrAllowlist: boolean;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
+      navigationTimeout?: number;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
+    this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -416,6 +417,8 @@ export class McpPage implements ContextPage {
     action: () => Promise<unknown>,
     options?: {
       timeout?: number;
+      waitForStableDom?: boolean;
+      expectNavigationIn?: number;
       handleDialog?:
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
@@ -431,6 +434,12 @@ export class McpPage implements ContextPage {
     this.pptrPage.off('dialog', this.#dialogHandler);
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
+    const devtoolsUniverse = this.#devtoolsUniverse;
+    this.#devtoolsUniverse = undefined;
+    devtoolsUniverse?.universe.dispose();
+    void devtoolsUniverse?.session.detach().catch(e => {
+      logger?.('Failed to detach DevTools session', e);
+    });
   }
 
   async executeThirdPartyDeveloperTool(
@@ -471,6 +480,7 @@ export class McpPage implements ContextPage {
         if (!window.__dtmcp?.executeTool) {
           throw new Error('No tools found on the page');
         }
+
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
         const stashDOMElement = (el: Element) => {
@@ -561,9 +571,15 @@ export class McpPage implements ContextPage {
       elementHandles.push(elementHandle);
     }
 
+    await this.pptrPage.evaluate(() => {
+      if (window.__dtmcp) {
+        window.__dtmcp.stashedElements = undefined;
+      }
+    });
+
     if (elementHandles.length) {
       using stack = new DisposableStack();
-      for (const handle of elementHandles) {
+      for (const handle of this.extraHandles) {
         stack.use(handle);
       }
       this.textSnapshot = await TextSnapshot.create(this, {
@@ -820,7 +836,7 @@ export class McpPage implements ContextPage {
       this.networkConditions,
     );
     this.pptrPage.setDefaultNavigationTimeout(
-      NAVIGATION_TIMEOUT * networkMultiplier * cpuMultiplier,
+      this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }
 

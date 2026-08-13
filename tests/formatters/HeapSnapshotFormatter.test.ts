@@ -123,9 +123,9 @@ describe('HeapSnapshotFormatter', () => {
 
       const result = HeapSnapshotFormatter.formatNodes(mockEdges);
       const expected = [
-        'name,type,nodeId,nodeName',
-        'edge1,property,1,NodeA',
-        'edge2,element,2,NodeB',
+        'name,type,nodeId,nodeName,selfSize,retainedSize',
+        'edge1,property,1,NodeA,0.0 kB,0.0 kB',
+        'edge2,element,2,NodeB,0.0 kB,0.0 kB',
       ].join('\n');
 
       assert.strictEqual(result, expected);
@@ -329,6 +329,30 @@ describe('HeapSnapshotFormatter', () => {
         `10,system / NativeContext,${formatBytesToKb(100)},${formatBytesToKb(1000)},${formatBytesToKb(500)}`,
         `Shared Size: ${formatBytesToKb(300)}`,
         `Unattributed Size: ${formatBytesToKb(400)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+  });
+
+  describe('formatRetainedByContextSummary', () => {
+    it('formats retained by context summary correctly', () => {
+      const mockSummary = {
+        contextCount: 2,
+        retainedByContextSize: 5000,
+        retainedByContextCount: 10,
+        notRetainedByContextSize: 1000,
+        notRetainedByContextCount: 5,
+        totalSize: 6000,
+      };
+
+      const result =
+        HeapSnapshotFormatter.formatRetainedByContextSummary(mockSummary);
+      const expected = [
+        'Context count: 2',
+        `Retained by context size: ${formatBytesToKb(5000)} (10 objects)`,
+        `Not retained by context size: ${formatBytesToKb(1000)} (5 objects)`,
+        `Total size: ${formatBytesToKb(6000)}`,
       ].join('\n');
 
       assert.strictEqual(result, expected);
