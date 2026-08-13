@@ -70,25 +70,12 @@ export const startTrace = definePageTool({
         });
       }
 
-      // Keep in sync with the categories arrays in:
-      // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/timeline/TimelineController.ts
-      // https://github.com/GoogleChrome/lighthouse/blob/master/lighthouse-core/gather/gatherers/trace.js
       const categories = [
         '-*',
-        'blink.console',
-        'blink.user_timing',
-        'devtools.timeline',
-        'disabled-by-default-devtools.screenshot',
-        'disabled-by-default-devtools.timeline',
-        'disabled-by-default-devtools.timeline.frame',
-        'disabled-by-default-devtools.timeline.stack',
-        'disabled-by-default-v8.cpu_profiler',
-        'disabled-by-default-v8.cpu_profiler.hires',
-        'latencyInfo',
-        'loading',
-        'disabled-by-default-lighthouse',
-        'v8.execute',
-        'v8',
+        ...DevTools.TracingDefaultCategories,
+        // These categories are optional in DevTools, but enabled by default in the DevTools UI, so we enable them here too.
+        ...DevTools.TracingOptionalCategories.JsSampling,
+        ...DevTools.TracingOptionalCategories.Screenshot,
       ];
       await page.pptrPage.tracing.start({
         categories,
