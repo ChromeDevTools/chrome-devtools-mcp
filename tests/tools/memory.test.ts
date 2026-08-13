@@ -26,6 +26,7 @@ import {
   getHeapSnapshotObjectDetails,
 } from '../../src/tools/memory.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
+import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
@@ -39,9 +40,10 @@ describe('memory', () => {
             response,
             context,
           );
+          const canonicalFilePath = await resolveCanonicalPath(filePath);
           assert.equal(
             response.responseLines.at(0),
-            `Heap snapshot saved to ${filePath}`,
+            `Heap snapshot saved to ${canonicalFilePath}`,
           );
           assert.ok(existsSync(filePath));
         } finally {
