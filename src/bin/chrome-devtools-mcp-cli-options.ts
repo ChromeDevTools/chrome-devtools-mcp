@@ -376,7 +376,7 @@ export const cliOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
-/** 
+/**
  * Exported only for testing to not trigger process exit.
  */
 export function parser(
