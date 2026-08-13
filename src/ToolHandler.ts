@@ -156,13 +156,7 @@ function extractPaths(value: unknown): string[] {
     return [value];
   }
   if (Array.isArray(value)) {
-    const paths: string[] = [];
-    for (const item of value) {
-      if (typeof item === 'string') {
-        paths.push(item);
-      }
-    }
-    return paths;
+    return values.filter(item => typeof item === 'string');
   }
   return [];
 }
