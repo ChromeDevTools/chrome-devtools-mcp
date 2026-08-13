@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import {spawn, type ChildProcess} from 'node:child_process';
 import path from 'node:path';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
@@ -411,9 +411,18 @@ export function getMockPage(): Page {
   } satisfies Page;
 }
 
-export function getMockBrowser(): Browser {
+export function getMockBrowser(options?: {
+  process?: ChildProcess | null;
+  wsEndpoint?: string;
+}): Browser {
   const pages = [getMockPage()];
   return {
+    process() {
+      return options?.process ?? null;
+    },
+    wsEndpoint() {
+      return options?.wsEndpoint ?? '';
+    },
     pages() {
       return Promise.resolve(pages);
     },

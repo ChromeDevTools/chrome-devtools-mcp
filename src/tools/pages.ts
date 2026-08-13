@@ -26,7 +26,7 @@ export const listPages = defineTool(args => {
     },
     schema: {},
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (_request, response) => {
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();
@@ -54,7 +54,7 @@ export const selectPage = defineTool({
       .describe('Whether to focus the page and bring it to the top.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
@@ -80,7 +80,7 @@ export const closePage = defineTool({
       .describe('The ID of the page to close. Call list_pages to list pages.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     try {
       await context.closePage(request.params.pageId);
@@ -123,7 +123,7 @@ export const newPage = defineTool(() => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (request, response, context) => {
       const page = await context.newPage(
         request.params.background,
@@ -180,7 +180,7 @@ export const navigatePage = definePageTool(() => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (request, response) => {
       const page = request.page;
       const options = {
@@ -306,7 +306,7 @@ export const resizePage = definePageTool({
     height: zod.number().describe('Page height'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
 
@@ -352,7 +352,7 @@ export const handleDialog = definePageTool({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     const dialog = page.getDialog();
@@ -404,7 +404,7 @@ export const getTabId = definePageTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;

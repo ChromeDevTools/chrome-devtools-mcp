@@ -44,6 +44,13 @@ import type {
 import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
 
+export type FileVerificationOption =
+  | true
+  | {
+      local?: boolean;
+      remote?: boolean;
+    };
+
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > {
@@ -60,7 +67,7 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Array<keyof Schema>;
+  verifyFilesSchema: Partial<Record<keyof Schema, FileVerificationOption>>;
 }
 
 export interface ToolDefinition<
@@ -203,7 +210,6 @@ export type SupportedExtensions =
  * Only add methods used by tools/*.
  */
 export type Context = Readonly<{
-  validatePath(filePath?: string): Promise<void>;
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
   launchPWA(options: LaunchPWAOptions): Promise<Page>;

@@ -92,7 +92,7 @@ export const listConsoleMessages = definePageTool(cliArgs => {
         ),
     },
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (request, response) => {
       response.setIncludeConsoleData(true, {
         pageSize: request.params.pageSize,
@@ -121,7 +121,7 @@ export const getConsoleMessage = definePageTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);
   },

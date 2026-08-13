@@ -169,7 +169,7 @@
 
 **Parameters:**
 
-- **filePaths** (array) **(required)**: One or more local paths of files to upload.
+- **filePaths** (array) **(required)**: One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).
 - **uid** (string) **(required)**: The uid of the file input element or an element that will open file chooser on the page from the page content snapshot
 - **includeSnapshot** (boolean) _(optional)_: Whether to include a snapshot in the response. Default is false.
 

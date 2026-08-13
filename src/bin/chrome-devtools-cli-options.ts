@@ -1310,7 +1310,8 @@ export const commands: Commands = {
       filePaths: {
         name: 'filePaths',
         type: 'array',
-        description: 'One or more local paths of files to upload.',
+        description:
+          'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
         required: true,
       },
       includeSnapshot: {

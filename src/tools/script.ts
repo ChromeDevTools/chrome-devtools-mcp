@@ -70,7 +70,9 @@ Example with arguments: \`(el) => el.innerText\`
         : {}),
     },
     blockedByDialog: true,
-    verifyFilesSchema: ['filePath'],
+    verifyFilesSchema: {
+      filePath: true,
+    },
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,

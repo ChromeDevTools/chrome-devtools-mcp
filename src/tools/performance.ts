@@ -48,7 +48,9 @@ export const startTrace = definePageTool({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: ['filePath'],
+  verifyFilesSchema: {
+    filePath: true,
+  },
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
       response.appendResponseLine(
@@ -145,7 +147,9 @@ export const stopTrace = definePageTool({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: ['filePath'],
+  verifyFilesSchema: {
+    filePath: true,
+  },
   handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
       return;
@@ -181,7 +185,7 @@ export const analyzeInsight = definePageTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {

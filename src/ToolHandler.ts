@@ -19,11 +19,14 @@ import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {
   DefinedPageTool,
   DevToolsData,
+  FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
+import {fileURLToPath} from 'node:url';
+import {isLocalhost} from './utils/url.js';
 
 export function buildFlag(category: ToolCategory) {
   return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
@@ -148,6 +151,83 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
+function extractPaths(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    const paths: string[] = [];
+    for (const item of value) {
+      if (typeof item === 'string') {
+        paths.push(item);
+      }
+    }
+    return paths;
+  }
+  return [];
+}
+
+function isLocalBrowser(context: McpContext): boolean {
+  if (!context.browser) {
+    return false;
+  }
+  if (context.browser.process?.()) {
+    return true;
+  }
+  const wsEndpoint = context.browser.wsEndpoint?.();
+  if (wsEndpoint && isLocalhost(wsEndpoint)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldValidateFile(
+  option: FileVerificationOption | undefined,
+  isLocal: boolean,
+): boolean {
+  if (option === true) {
+    return true;
+  }
+  if (typeof option === 'object' && option !== null) {
+    if (isLocal) {
+      return Boolean(option.local);
+    }
+    return Boolean(option.remote);
+  }
+  return false;
+}
+
+async function validateToolFiles(
+  tool: ToolDefinition | DefinedPageTool,
+  params: Record<string, unknown>,
+  context: McpContext,
+): Promise<void> {
+  if (!tool.verifyFilesSchema) {
+    return;
+  }
+  const isLocal = isLocalBrowser(context);
+  const pathsOrUrlsToValidate: string[] = [];
+  for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
+    if (shouldValidateFile(option, isLocal)) {
+      pathsOrUrlsToValidate.push(...extractPaths(params[key]));
+    }
+  }
+  for (const filePathOrUrl of pathsOrUrlsToValidate) {
+    let filePath = filePathOrUrl;
+    try {
+      const url = new URL(filePathOrUrl);
+      if (url.protocol === 'file:') {
+        filePath = fileURLToPath(url);
+      } else if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
+        continue;
+      }
+    } catch {
+      // Suppress parsing errors for regular file paths.
+    }
+    await context.validatePath(filePath);
+  }
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
@@ -231,15 +311,7 @@ export class ToolHandler {
       }
       let page: McpPage | undefined;
       try {
-        if (this.tool.verifyFilesSchema) {
-          for (const key of this.tool.verifyFilesSchema) {
-            const filePath = params[key];
-            const paths = Array.isArray(filePath) ? filePath : [filePath];
-            for (const path of paths) {
-              await context.validatePath(path as string);
-            }
-          }
-        }
+        await validateToolFiles(this.tool, params, context);
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;

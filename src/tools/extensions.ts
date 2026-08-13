@@ -22,7 +22,9 @@ export const installExtension = defineTool({
       .describe('Absolute path to the unpacked extension folder.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: ['path'],
+  verifyFilesSchema: {
+    path: true,
+  },
   handler: async (request, response, context) => {
     const {path} = request.params;
     const id = await context.installExtension(path);
@@ -41,7 +43,7 @@ export const uninstallExtension = defineTool({
     id: zod.string().describe('ID of the extension to uninstall.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {id} = request.params;
     await context.uninstallExtension(id);
@@ -59,7 +61,7 @@ export const listExtensions = defineTool({
   },
   schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (_request, response) => {
     response.setListExtensions();
   },
@@ -76,7 +78,7 @@ export const reloadExtension = defineTool({
     id: zod.string().describe('ID of the extension to reload.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {id} = request.params;
     const extension = await context.getExtension(id);
@@ -99,7 +101,7 @@ export const triggerExtensionAction = defineTool({
     id: zod.string().describe('ID of the extension to trigger the action for.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {id} = request.params;
     await context.triggerExtensionAction(id);

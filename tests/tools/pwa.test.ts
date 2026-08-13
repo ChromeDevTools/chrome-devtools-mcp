@@ -5,9 +5,7 @@
  */
 
 import assert from 'node:assert';
-import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
-import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
 
@@ -124,42 +122,6 @@ describe('pwa', () => {
         await assert.rejects(
           getOsAppState.handler({params: {manifestId}}, response, context),
         );
-      },
-      PWA_BROWSER_OPTIONS,
-      {categoryPwa: true},
-    );
-  });
-
-  it('validates file bundle paths before installation', async () => {
-    await withMcpContext(
-      async (response, context) => {
-        const manifestId = 'isolated-app://example/';
-        const filePath = path.resolve('test-app.swbn');
-        const installUrlOrBundleUrl = pathToFileURL(filePath).href;
-        const validatePath = sinon.stub(context, 'validatePath').resolves();
-        const install = sinon.stub(context, 'installPWA').resolves(manifestId);
-
-        await installPwa.handler(
-          {params: {manifestId, installUrlOrBundleUrl}},
-          response,
-          context,
-        );
-
-        assert.ok(validatePath.calledOnceWithExactly(filePath));
-        assert.ok(install.calledOnce);
-
-        validatePath.reset();
-        validatePath.rejects(new Error('Path is outside configured roots'));
-        install.resetHistory();
-        await assert.rejects(
-          installPwa.handler(
-            {params: {manifestId, installUrlOrBundleUrl}},
-            response,
-            context,
-          ),
-          /Path is outside configured roots/,
-        );
-        assert.ok(install.notCalled);
       },
       PWA_BROWSER_OPTIONS,
       {categoryPwa: true},

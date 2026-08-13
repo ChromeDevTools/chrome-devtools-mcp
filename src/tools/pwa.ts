@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {fileURLToPath} from 'node:url';
-
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
@@ -52,13 +50,16 @@ export const installPwa = defineTool({
     displayMode: displayModeSchema,
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  // We do not validate file paths for remote browser instances
+  // because they are on the remote host and not accessed by the MCP server.
+  verifyFilesSchema: {
+    installUrlOrBundleUrl: {
+      local: true,
+      remote: false,
+    },
+  },
   handler: async (request, response, context) => {
     const {manifestId, installUrlOrBundleUrl, displayMode} = request.params;
-    const installUrl = new URL(installUrlOrBundleUrl);
-    if (installUrl.protocol === 'file:') {
-      await context.validatePath(fileURLToPath(installUrl));
-    }
     await context.installPWA({
       manifestId,
       installUrlOrBundleUrl,
@@ -86,7 +87,7 @@ export const uninstallPwa = defineTool({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
     await context.uninstallPWA({manifestId});
@@ -117,7 +118,7 @@ export const launchPwa = defineTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
     const page = await context.launchPWA({manifestId, url});
@@ -141,7 +142,7 @@ export const getOsAppState = defineTool({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
     const state = await context.getPWAState({manifestId});

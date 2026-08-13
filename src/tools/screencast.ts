@@ -40,7 +40,9 @@ export const startScreencast = definePageTool(args => ({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: ['filePath'],
+  verifyFilesSchema: {
+    filePath: true,
+  },
   handler: async (request, response, context) => {
     if (context.getScreenRecorder() !== null) {
       response.appendResponseLine(
@@ -129,7 +131,7 @@ export const stopScreencast = definePageTool({
   },
   schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (_request, response, context) => {
     const data = context.getScreenRecorder();
     if (!data) {
