@@ -196,9 +196,6 @@ async function validateToolFiles(
   params: Record<string, unknown>,
   context: McpContext,
 ): Promise<void> {
-  if (!tool.verifyFilesSchema) {
-    return;
-  }
   const isLocal = isLocalBrowser(context);
   const pathsOrUrlsToValidate: string[] = [];
   for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
