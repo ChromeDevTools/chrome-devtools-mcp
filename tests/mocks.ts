@@ -877,6 +877,98 @@ export function createMockObjectInfo(): DevTools.HeapSnapshotModel.HeapSnapshotM
   };
 }
 
+export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult {
+  return {
+    scopes: [
+      {
+        scopeInfoNodeIndex: 30,
+        scopeInfoNodeId: 303,
+        scriptNodeIndex: 7,
+        scriptNodeId: 301,
+        scriptName: 'test.js',
+        scopeName: 'createClosure',
+        scopeStart: 14,
+        scopeEnd: 104,
+        contextFieldCount: 2,
+        contexts: [
+          {
+            contextNodeIndex: 10,
+            contextNodeId: 101,
+            retainedSize: 5000,
+            deadFieldsRetainedSizeSum: 2000,
+            deadFields: [
+              {
+                name: 'dead',
+                valueNodeIndex: 50,
+                valueNodeId: 202,
+                valueName: 'Object',
+                valueType: 'object',
+                selfSize: 200,
+                retainedSize: 2000,
+              },
+            ],
+          },
+          {
+            contextNodeIndex: 11,
+            contextNodeId: 102,
+            retainedSize: 1000,
+            deadFieldsRetainedSizeSum: 500,
+            deadFields: [
+              {
+                name: 'alsoDead',
+                valueNodeIndex: 60,
+                valueNodeId: 204,
+                valueName: 'Array',
+                valueType: 'object',
+                selfSize: 100,
+                retainedSize: 500,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        scopeInfoNodeIndex: 40,
+        scopeInfoNodeId: 313,
+        scriptNodeIndex: 8,
+        scriptNodeId: 311,
+        scriptName: 'other-scope.js',
+        scopeName: 'createOtherClosure',
+        scopeStart: 20,
+        scopeEnd: 60,
+        contextFieldCount: 1,
+        contexts: [
+          {
+            contextNodeIndex: 12,
+            contextNodeId: 111,
+            retainedSize: 3000,
+            deadFieldsRetainedSizeSum: 1500,
+            deadFields: [
+              {
+                name: 'captured',
+                valueNodeIndex: 70,
+                valueNodeId: 206,
+                valueName: 'Map',
+                valueType: 'object',
+                selfSize: 150,
+                retainedSize: 1500,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    scriptsWithoutScopes: [
+      {
+        scriptNodeIndex: 9,
+        scriptNodeId: 401,
+        scriptName: 'other.js',
+        contextCount: 2,
+      },
+    ],
+  };
+}
+
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {

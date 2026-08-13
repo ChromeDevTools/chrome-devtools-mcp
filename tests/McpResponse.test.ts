@@ -15,6 +15,7 @@ import type {ParsedArguments} from '../src/config/mcp-options.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
+import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
@@ -39,6 +40,7 @@ import {
   createMockCSSStyleDeclaration,
   createMockCSSStyleRule,
   createMockClassDiffs,
+  createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
@@ -1573,5 +1575,23 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(objectText.includes('### Object Details'));
     assert.ok(objectText.includes('id: @1'));
     assert.ok(objectText.includes('name: Object'));
+  });
+
+  it('renders the context field usage section for the filtered contexts', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    response.setHeapSnapshotContextAnalysis(createMockContextAnalysisResult(), {
+      retainedSize: parseByteSizeRange('1000'),
+    });
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Context Analysis'));
+    assert.ok(text.includes('Showing 1-2 of 2 (Page 1 of 1).'));
+    assert.ok(text.includes('Context @101'));
+    assert.ok(text.includes('Context @111'));
+    assert.ok(!text.includes('Context @102'));
+    assert.ok('heapSnapshotContextAnalysis' in structuredContent);
   });
 });

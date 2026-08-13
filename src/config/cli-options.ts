@@ -27,6 +27,46 @@ export type Commands = Record<
   }
 >;
 export const commands: Commands = {
+  analyze_heapsnapshot_contexts: {
+    description:
+      'Loads a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      retainedSize: {
+        name: 'retainedSize',
+        type: 'string',
+        description:
+          'Inclusive range for the dead-field score of a context (e.g. "10KB", "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+        required: false,
+      },
+      scopeInfoNodeId: {
+        name: 'scopeInfoNodeId',
+        type: 'integer',
+        description:
+          'Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.',
+        required: false,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'integer',
+        description: 'The zero-based page index. Defaults to 0.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'integer',
+        description:
+          'The number of contexts to return per page. Defaults to 20.',
+        required: false,
+      },
+    },
+  },
   click: {
     description: 'Clicks on the provided element',
     category: 'Input automation',

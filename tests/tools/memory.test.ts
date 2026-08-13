@@ -25,12 +25,14 @@ import {
   getHeapSnapshotDuplicateStrings,
   getHeapSnapshotObjectDetails,
   queryHeapSnapshotObjects,
+  analyzeHeapSnapshotContexts,
 } from '../../src/tools/memory.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {
   createHandlerMocks,
   createMockClassDiffs,
+  createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockDominatorChain,
   createMockDuplicateStrings,
@@ -334,6 +336,43 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotObjectDetails,
         objectInfo,
+      );
+    });
+  });
+
+  describe('analyze_heapsnapshot_contexts', () => {
+    it('delegates to analyzeHeapSnapshotContexts and forwards options', async () => {
+      const {context, response, args} = createHandlerMocks();
+      const analysis = createMockContextAnalysisResult();
+      context.analyzeHeapSnapshotContexts.resolves(analysis);
+
+      await analyzeHeapSnapshotContexts(args).handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            retainedSize: parseByteSizeRange('10KB'),
+            scopeInfoNodeId: 303,
+            pageIdx: 1,
+            pageSize: 5,
+          },
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        context.analyzeHeapSnapshotContexts,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotContextAnalysis,
+        analysis,
+        {
+          retainedSize: {min: 10000, max: undefined},
+          scopeInfoNodeId: 303,
+          pageIdx: 1,
+          pageSize: 5,
+        },
       );
     });
   });

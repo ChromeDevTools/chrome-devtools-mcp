@@ -8,11 +8,16 @@ import assert from 'node:assert';
 import {join} from 'node:path';
 import {describe, it, before, after} from 'node:test';
 
-import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.js';
+import {
+  collectRankedContexts,
+  type ContextAnalysisReport,
+  HeapSnapshotFormatter,
+} from '../../src/formatters/HeapSnapshotFormatter.js';
 import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
+import {createMockContextAnalysisResult} from '../mocks.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -596,5 +601,88 @@ describe('HeapSnapshotFormatter', () => {
         );
       });
     });
+  });
+
+  describe('formatContextAnalysis', () => {
+    it('formats contexts in ranked order with their scope', t => {
+      const analysis = createMockContextAnalysisResult();
+      const report: ContextAnalysisReport = {
+        contexts: collectRankedContexts(analysis),
+        scriptsWithoutScopes: analysis.scriptsWithoutScopes,
+      };
+
+      t.assert.snapshot(HeapSnapshotFormatter.formatContextAnalysis(report));
+    });
+
+    it('reports when there are no contexts with dead fields', () => {
+      const report: ContextAnalysisReport = {
+        contexts: [],
+        scriptsWithoutScopes: [],
+      };
+
+      const result = HeapSnapshotFormatter.formatContextAnalysis(report);
+
+      assert.strictEqual(
+        result,
+        'No live contexts with dead fields were found.',
+      );
+    });
+  });
+});
+
+describe('context analysis report', () => {
+  it('ranks contexts by dead-field score across scopes', () => {
+    const analysis = createMockContextAnalysisResult();
+    const [firstScope, secondScope] = analysis.scopes;
+
+    assert.deepStrictEqual(collectRankedContexts(analysis), [
+      {scope: firstScope, context: firstScope.contexts[0]},
+      {scope: secondScope, context: secondScope.contexts[0]},
+      {scope: firstScope, context: firstScope.contexts[1]},
+    ]);
+  });
+
+  it('drops contexts outside the dead-field retained size range', () => {
+    const analysis = createMockContextAnalysisResult();
+    const [firstScope, secondScope] = analysis.scopes;
+
+    assert.deepStrictEqual(
+      collectRankedContexts(analysis, {
+        retainedSize: parseByteSizeRange('1500'),
+      }),
+      [
+        {scope: firstScope, context: firstScope.contexts[0]},
+        {scope: secondScope, context: secondScope.contexts[0]},
+      ],
+    );
+    assert.deepStrictEqual(
+      collectRankedContexts(analysis, {
+        retainedSize: parseByteSizeRange('600-1900'),
+      }),
+      [{scope: secondScope, context: secondScope.contexts[0]}],
+    );
+    assert.deepStrictEqual(
+      collectRankedContexts(analysis, {
+        retainedSize: parseByteSizeRange('2001'),
+      }),
+      [],
+    );
+  });
+
+  it('restricts contexts to the requested scope', () => {
+    const analysis = createMockContextAnalysisResult();
+    const [firstScope] = analysis.scopes;
+
+    assert.deepStrictEqual(
+      collectRankedContexts(analysis, {scopeInfoNodeId: 303}),
+      [
+        {scope: firstScope, context: firstScope.contexts[0]},
+        {scope: firstScope, context: firstScope.contexts[1]},
+      ],
+    );
+    assert.deepStrictEqual(
+      collectRankedContexts(analysis, {scopeInfoNodeId: 999}),
+      [],
+    );
   });
 });
