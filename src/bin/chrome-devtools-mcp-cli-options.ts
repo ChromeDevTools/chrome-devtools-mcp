@@ -376,7 +376,10 @@ export const cliOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
-export function parseArguments(
+/** 
+ * Exported only for testing to not trigger process exit.
+ */
+export function parser(
   version: string,
   argv = process.argv,
   env = process.env,
@@ -482,6 +485,13 @@ export function parseArguments(
   return yargsInstance
     .wrap(Math.min(120, yargsInstance.terminalWidth()))
     .help()
-    .version(version)
-    .parseSync();
+    .version(version);
+}
+
+export function parseArguments(
+  version: string,
+  argv = process.argv,
+  env = process.env,
+) {
+  return parser(version, argv, env).parseSync();
 }
