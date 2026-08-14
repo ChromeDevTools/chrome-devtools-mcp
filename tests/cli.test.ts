@@ -51,7 +51,7 @@ describe('cli args parsing', () => {
     });
   });
 
-  it.only('rejects unknown options', async () => {
+  it('rejects unknown options', async () => {
     let output = '';
     const originalError = console.error;
     console.error = (msg: string) => {
