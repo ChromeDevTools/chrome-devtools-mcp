@@ -7,7 +7,7 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
-export const cliOptions = {
+export const mcpOptions = {
   autoConnect: {
     type: 'boolean',
     description:
@@ -390,7 +390,7 @@ export function parser(
       'strip-aliased': true,
       'strip-dashed': true,
     })
-    .options(cliOptions)
+    .options(mcpOptions)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
       // We can't set default in the options else
@@ -411,7 +411,7 @@ export function parser(
       }
 
       const cliOptionsAllowedArgs = [
-        ...Object.keys(cliOptions),
+        ...Object.keys(mcpOptions),
         // Yargs populated with positional args
         '_',
         '$0',
