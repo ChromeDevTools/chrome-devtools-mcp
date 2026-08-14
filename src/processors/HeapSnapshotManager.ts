@@ -49,6 +49,12 @@ export type HeapQueryOptions =
 export type HeapEdgesQueryOptions =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
 
+const VALID_EXTENSIONS: readonly string[] = ['.heapsnapshot', '.heaptimeline'];
+
+function hasValidHeapSnapshotExtension(filePath: string): boolean {
+  return VALID_EXTENSIONS.some(ext => filePath.endsWith(ext));
+}
+
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
   #snapshots = new Map<
@@ -65,6 +71,11 @@ export class HeapSnapshotManager {
   async getSnapshot(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy> {
+    if (!hasValidHeapSnapshotExtension(filePath)) {
+      throw new Error(
+        `File ${filePath} must have a .heapsnapshot or .heaptimeline extension.`,
+      );
+    }
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {
