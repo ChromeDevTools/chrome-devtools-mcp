@@ -224,6 +224,15 @@ export async function handleResponse(
   format: 'json' | 'md',
 ): Promise<string> {
   if (response.isError) {
+    if (format === 'md') {
+      const chunks = [];
+      for (const content of response.content) {
+        if (content.type === 'text') {
+          chunks.push(content.text);
+        }
+      }
+      return chunks.join(' ');
+    }
     return JSON.stringify(response.content);
   }
   const chunks = [];
