@@ -10,14 +10,14 @@ import path from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import {parseArguments} from '../src/config/arguments-options.ts';
-import {buildFlag} from '../src/index.ts';
+import {parseArguments} from '../build/src/config/mcp-options.js';
+import {buildFlag} from '../build/src/index.js';
 import {
   labels,
   ToolCategory,
   OFF_BY_DEFAULT_CATEGORIES,
-} from '../src/tools/categories.ts';
-import {createTools} from '../src/tools/tools.ts';
+} from '../build/src/tools/categories.js';
+import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = path.join(
   import.meta.dirname,
@@ -108,7 +108,7 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 async function generateCli() {
   const tools = await fetchTools();
 
-  const staticTools = createTools(parseArguments());
+  const staticTools = createTools(parseArguments('0.0.0', [], {}));
   const toolNameToCategoryEnum = new Map<string, string>();
   const toolNameToConditions = new Map<string, string[]>();
 

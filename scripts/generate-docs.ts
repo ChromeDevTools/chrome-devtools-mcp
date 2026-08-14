@@ -8,15 +8,17 @@ import fs from 'node:fs';
 
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 
-import {cliOptions} from '../src/arguments-options.ts';
-import type {ParsedArguments} from '../src/arguments-options.ts';
-import {buildFlag} from '../src/index.ts';
+import {
+  mcpOptions,
+  type ParsedArguments,
+} from '../build/src/config/mcp-options.js';
+import {buildFlag} from '../build/src/ToolHandler.js';
 import {
   ToolCategory,
   OFF_BY_DEFAULT_CATEGORIES,
   labels,
-} from '../src/tools/categories.ts';
-import {createTools} from '../src/tools/tools.ts';
+} from '../build/src/tools/categories.js';
+import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
@@ -154,7 +156,7 @@ function updateReadmeWithToolsTOC(toolsTOC: string): void {
 function generateConfigOptionsMarkdown(): string {
   let markdown = '';
 
-  for (const [optionName, optionConfig] of Object.entries(cliOptions)) {
+  for (const [optionName, optionConfig] of Object.entries(mcpOptions)) {
     // Skip hidden options
     if (optionConfig.hidden) {
       continue;

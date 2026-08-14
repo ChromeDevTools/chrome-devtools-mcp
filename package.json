@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .;",
-    "gen": "npm run cli:generate && npm run build && npm run docs:generate && npm run update-metrics && npm run format",
+    "gen": "npm run build && npm run cli:generate && npm run docs:generate && npm run update-metrics && npm run format",
     "docs:generate": "node scripts/generate-docs.ts",
     "start": "npm run build && node build/src/bin/chrome-devtools-mcp.js",
     "start-debug": "NODE_DEBUG=mcp:* npm run build && node build/src/bin/chrome-devtools-mcp.js",

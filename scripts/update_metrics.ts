@@ -7,19 +7,19 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import {cliOptions, parseArguments} from '../src/config/arguments-options.ts';
-import {ErrorCode} from '../src/telemetry/errors.ts';
+import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
+import {ErrorCode} from '../build/src/telemetry/errors.js';
 import {
   getPossibleFlagMetrics,
   type FlagMetric,
-} from '../src/telemetry/flagUtils.ts';
+} from '../build/src/telemetry/flagUtils.js';
 import {
   applyToExisting,
   applyToExistingMetrics,
   generateToolMetrics,
   type ToolMetric,
-} from '../src/telemetry/metricsRegistry.ts';
-import {createTools} from '../src/tools/tools.ts';
+} from '../build/src/telemetry/metricsRegistry.js';
+import {createTools} from '../build/src/tools/tools.js';
 
 export function HaveUniqueNames(tools: Array<{name: string}>): boolean {
   const toolNames = tools.map(tool => tool.name);
@@ -89,7 +89,7 @@ function writeFlagUsageMetrics() {
     }
   }
 
-  const newMetrics = getPossibleFlagMetrics(cliOptions);
+  const newMetrics = getPossibleFlagMetrics(mcpOptions);
   const mergedMetrics = applyToExisting<FlagMetric>(
     existingMetrics,
     newMetrics,
