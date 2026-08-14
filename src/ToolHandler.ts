@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import type {DataFormat} from './McpResponse.js';
@@ -46,7 +46,7 @@ function buildDisabledMessage(
 
 function getCategoryStatus(
   category: ToolCategory,
-  serverArgs: ReturnType<typeof parseArguments>,
+  serverArgs: ParsedArguments,
 ): {categoryFlag?: string; disabled: boolean} {
   const categoryFlag = buildFlag(category);
 
@@ -70,7 +70,7 @@ function getCategoryStatus(
 
 function getConditionStatus(
   condition: string,
-  serverArgs: ReturnType<typeof parseArguments>,
+  serverArgs: ParsedArguments,
 ): {conditionFlag?: string; disabled: boolean} {
   if (condition && !serverArgs[condition]) {
     return {conditionFlag: condition, disabled: true};
@@ -81,7 +81,7 @@ function getConditionStatus(
 
 function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
-  serverArgs: ReturnType<typeof parseArguments>,
+  serverArgs: ParsedArguments,
 ): {disabled: boolean; reason?: string} {
   const category = tool.annotations.category;
   const categoryCheck = getCategoryStatus(category, serverArgs);
@@ -224,7 +224,7 @@ export class ToolHandler {
 
   constructor(
     private readonly tool: ToolDefinition | DefinedPageTool,
-    private readonly serverArgs: ReturnType<typeof parseArguments>,
+    private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
   ) {

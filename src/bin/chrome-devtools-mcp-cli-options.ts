@@ -384,23 +384,14 @@ export function parser(
   argv = process.argv,
   env = process.env,
 ) {
-  // Preserve yargs' mixed camel/kebab-case expansion under strict validation.
-  const kebabCaseAliases: Record<string, string> = {};
-  for (const option of Object.keys(cliOptions)) {
-    const alias = option.replace(
-      /[A-Z]/g,
-      letter => `-${letter.toLowerCase()}`,
-    );
-    if (alias !== option) {
-      kebabCaseAliases[option] = alias;
-    }
-  }
-
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
+    .parserConfiguration({
+      'strip-aliased': true,
+      'strip-dashed': true,
+    })
     .options(cliOptions)
-    .alias(kebabCaseAliases)
-    .strictOptions()
+    .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
       // We can't set default in the options else
       // Yargs will complain
@@ -417,6 +408,23 @@ export function parser(
           "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
         );
         args.usageStatistics = false;
+      }
+
+      const cliOptionsAlloweArgs = [
+        ...Object.keys(cliOptions),
+        // Yargs populated with positional args
+        '_',
+        '$0',
+      ];
+
+      const unknownArgs = Object.keys(args).filter(
+        arg => !cliOptionsAlloweArgs.includes(arg),
+      );
+
+      if (unknownArgs.length > 0) {
+        console.error(
+          `Unknown arguments: ${unknownArgs.map(arg => `--${arg}`)}`,
+        );
       }
     })
     .example([
