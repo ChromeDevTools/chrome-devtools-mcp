@@ -410,7 +410,7 @@ export function parser(
         args.usageStatistics = false;
       }
 
-      const cliOptionsAlloweArgs = [
+      const cliOptionsAllowedArgs = [
         ...Object.keys(cliOptions),
         // Yargs populated with positional args
         '_',
@@ -418,7 +418,7 @@ export function parser(
       ];
 
       const unknownArgs = Object.keys(args).filter(
-        arg => !cliOptionsAlloweArgs.includes(arg),
+        arg => !cliOptionsAllowedArgs.includes(arg),
       );
 
       if (unknownArgs.length > 0) {
