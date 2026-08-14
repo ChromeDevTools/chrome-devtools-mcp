@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {cliOptions} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {mcpOptions} from '../config/mcp-options.js';
 import {DevTools} from '../third_party/index.js';
 
 import {stripUnderscoreBeforeNumber} from './transformation.js';
@@ -12,7 +12,7 @@ import type {FlagUsage} from './types.js';
 
 const {StringUtilities} = DevTools.Platform;
 
-type CliOptions = typeof cliOptions;
+type CliOptions = typeof mcpOptions;
 
 /**
  * For enums, log the value as uppercase.

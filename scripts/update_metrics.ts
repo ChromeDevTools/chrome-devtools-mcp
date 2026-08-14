@@ -7,10 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import {
-  cliOptions,
-  parseArguments,
-} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
+import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
 import {ErrorCode} from '../build/src/telemetry/errors.js';
 import {
   getPossibleFlagMetrics,
@@ -92,7 +89,7 @@ function writeFlagUsageMetrics() {
     }
   }
 
-  const newMetrics = getPossibleFlagMetrics(cliOptions);
+  const newMetrics = getPossibleFlagMetrics(mcpOptions);
   const mergedMetrics = applyToExisting<FlagMetric>(
     existingMetrics,
     newMetrics,

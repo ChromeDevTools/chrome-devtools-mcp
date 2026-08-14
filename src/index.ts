@@ -6,7 +6,7 @@
 
 import type fs from 'node:fs';
 
-import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
+import {type ParsedArguments} from './config/mcp-options.js';
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
@@ -41,7 +41,7 @@ export {buildFlag} from './ToolHandler.js';
 const ROOTS_REQUEST_TIMEOUT = 5_000;
 
 export async function createMcpServer(
-  serverArgs: ReturnType<typeof parseArguments>,
+  serverArgs: ParsedArguments,
   options: {
     logFile?: fs.WriteStream;
   },
@@ -230,7 +230,7 @@ export async function createMcpServer(
   return {server};
 }
 
-export const logDisclaimers = (args: ReturnType<typeof parseArguments>) => {
+export const logDisclaimers = (args: ParsedArguments) => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.

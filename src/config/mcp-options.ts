@@ -7,7 +7,7 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 
-export const cliOptions = {
+export const mcpOptions = {
   autoConnect: {
     type: 'boolean',
     description:
@@ -381,28 +381,22 @@ export const cliOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
-export function parseArguments(
+/**
+ * Exported only for testing to not trigger process exit.
+ */
+export function parser(
   version: string,
   argv = process.argv,
   env = process.env,
 ) {
-  // Preserve yargs' mixed camel/kebab-case expansion under strict validation.
-  const kebabCaseAliases: Record<string, string> = {};
-  for (const option of Object.keys(cliOptions)) {
-    const alias = option.replace(
-      /[A-Z]/g,
-      letter => `-${letter.toLowerCase()}`,
-    );
-    if (alias !== option) {
-      kebabCaseAliases[option] = alias;
-    }
-  }
-
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
-    .options(cliOptions)
-    .alias(kebabCaseAliases)
-    .strictOptions()
+    .parserConfiguration({
+      'strip-aliased': true,
+      'strip-dashed': true,
+    })
+    .options(mcpOptions)
+    .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
       // We can't set default in the options else
       // Yargs will complain
@@ -419,6 +413,23 @@ export function parseArguments(
           "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
         );
         args.usageStatistics = false;
+      }
+
+      const cliOptionsAllowedArgs = [
+        ...Object.keys(mcpOptions),
+        // Yargs populated with positional args
+        '_',
+        '$0',
+      ];
+
+      const unknownArgs = Object.keys(args).filter(
+        arg => !cliOptionsAllowedArgs.includes(arg),
+      );
+
+      if (unknownArgs.length > 0) {
+        console.error(
+          `Unknown arguments: ${unknownArgs.map(arg => `--${arg}`)}`,
+        );
       }
     })
     .example([
@@ -487,6 +498,13 @@ export function parseArguments(
   return yargsInstance
     .wrap(Math.min(120, yargsInstance.terminalWidth()))
     .help()
-    .version(version)
-    .parseSync();
+    .version(version);
+}
+
+export function parseArguments(
+  version: string,
+  argv = process.argv,
+  env = process.env,
+) {
+  return parser(version, argv, env).parseSync();
 }
