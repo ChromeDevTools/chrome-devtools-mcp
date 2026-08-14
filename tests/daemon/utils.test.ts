@@ -13,7 +13,7 @@ import path from 'node:path';
 import process from 'node:process';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {
   serializeArgs,
   assertValidSessionId,

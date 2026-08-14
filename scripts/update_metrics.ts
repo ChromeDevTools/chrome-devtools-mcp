@@ -7,22 +7,19 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import {
-  cliOptions,
-  parseArguments,
-} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {ErrorCode} from '../build/src/telemetry/errors.js';
+import {cliOptions, parseArguments} from '../src/config/arguments-options.ts';
+import {ErrorCode} from '../src/telemetry/errors.ts';
 import {
   getPossibleFlagMetrics,
   type FlagMetric,
-} from '../build/src/telemetry/flagUtils.js';
+} from '../src/telemetry/flagUtils.ts';
 import {
   applyToExisting,
   applyToExistingMetrics,
   generateToolMetrics,
   type ToolMetric,
-} from '../build/src/telemetry/metricsRegistry.js';
-import {createTools} from '../build/src/tools/tools.js';
+} from '../src/telemetry/metricsRegistry.ts';
+import {createTools} from '../src/tools/tools.ts';
 
 export function HaveUniqueNames(tools: Array<{name: string}>): boolean {
   const toolNames = tools.map(tool => tool.name);

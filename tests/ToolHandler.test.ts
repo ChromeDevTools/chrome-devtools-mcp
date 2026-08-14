@@ -12,7 +12,7 @@ import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
 
-import {parseArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import {parseArguments} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';

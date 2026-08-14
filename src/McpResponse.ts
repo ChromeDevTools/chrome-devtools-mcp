@@ -6,7 +6,7 @@
 
 import type {WebMCPTool} from 'puppeteer-core';
 
-import type {ParsedArguments} from './bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from './config/mcp-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {
   HeapSnapshotFormatter,

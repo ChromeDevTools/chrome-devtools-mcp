@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {parser} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import {parser} from '../src/config/mcp-options.js';
 
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return parser('0.0.0', ['node', 'main.js', ...argv], env)

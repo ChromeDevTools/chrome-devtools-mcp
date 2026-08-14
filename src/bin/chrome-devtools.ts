@@ -30,8 +30,8 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {commands} from './chrome-devtools-cli-options.js';
-import {cliOptions, parseArguments} from './chrome-devtools-mcp-cli-options.js';
+import {commands} from '../config/cli-options.js';
+import {mcpOptions, parseArguments} from '../config/mcp-options.js';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
@@ -46,8 +46,8 @@ async function start(args: string[], sessionId: string) {
 const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
 
 const startCliOptions = {
-  ...cliOptions,
-} as Partial<typeof cliOptions>;
+  ...mcpOptions,
+} as Partial<typeof mcpOptions>;
 
 // Missing CLI serialization.
 delete startCliOptions.viewport;
@@ -56,10 +56,10 @@ delete startCliOptions.viewport;
 delete startCliOptions.experimentalStructuredContent;
 delete startCliOptions.experimentalInteropTools;
 delete startCliOptions.experimentalPageIdRouting;
-if (!('default' in cliOptions.headless)) {
+if (!('default' in mcpOptions.headless)) {
   throw new Error('headless cli option unexpectedly does not have a default');
 }
-if ('default' in cliOptions.isolated) {
+if ('default' in mcpOptions.isolated) {
   throw new Error('isolated cli option unexpectedly has a default');
 }
 startCliOptions.headless!.default = true;
@@ -149,7 +149,7 @@ y.command(
     if (argv.headless === undefined) {
       argv.headless = true;
     }
-    const args = serializeArgs(cliOptions, argv);
+    const args = serializeArgs(mcpOptions, argv);
     await start(args, argv.sessionId);
     process.exit(0);
   },
@@ -276,7 +276,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           : Promise.resolve(undefined);
 
         if (!isDaemonRunning(sessionId)) {
-          await start(serializeArgs(cliOptions, argv), sessionId);
+          await start(serializeArgs(mcpOptions, argv), sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};

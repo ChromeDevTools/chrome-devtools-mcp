@@ -8,15 +8,15 @@ import fs from 'node:fs';
 
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
 
-import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {buildFlag} from '../build/src/index.js';
+import {cliOptions} from '../src/arguments-options.ts';
+import type {ParsedArguments} from '../src/arguments-options.ts';
+import {buildFlag} from '../src/index.ts';
 import {
   ToolCategory,
   OFF_BY_DEFAULT_CATEGORIES,
   labels,
-} from '../build/src/tools/categories.js';
-import {createTools} from '../build/src/tools/tools.js';
+} from '../src/tools/categories.ts';
+import {createTools} from '../src/tools/tools.ts';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
