@@ -51,10 +51,7 @@ export async function resolveCanonicalPath(
           throw err;
         }
         const target = await fs.readlink(absolutePath);
-        const resolvedTarget = path.resolve(
-          path.dirname(absolutePath),
-          target,
-        );
+        const resolvedTarget = path.resolve(path.dirname(absolutePath), target);
         if (resolvedTarget === absolutePath) {
           throw err;
         }
