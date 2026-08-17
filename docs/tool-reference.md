@@ -546,7 +546,7 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
 - **excludePrimitives** (boolean) _(optional)_: Whether to exclude primitive target nodes. Default is true.
-- **minRetainedSize** (number) _(optional)_: Minimum retained size in bytes for target nodes.
+- **minRetainedSize** (string | number) _(optional)_: Minimum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB") for target nodes.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 - **sortBy** (enum: "retainedSize", "selfSize", "name") _(optional)_: Sort order for edges. Default is retainedSize.
@@ -610,10 +610,10 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **className** (string) _(optional)_: Optional regex or text matching object class name.
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
-- **maxRetainedSize** (number) _(optional)_: Maximum retained size in bytes.
-- **maxSelfSize** (number) _(optional)_: Maximum self size in bytes.
-- **minRetainedSize** (number) _(optional)_: Minimum retained size in bytes.
-- **minSelfSize** (number) _(optional)_: Minimum self size in bytes.
+- **maxRetainedSize** (string | number) _(optional)_: Maximum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").
+- **maxSelfSize** (string | number) _(optional)_: Maximum self size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").
+- **minRetainedSize** (string | number) _(optional)_: Minimum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").
+- **minSelfSize** (string | number) _(optional)_: Minimum self size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.

@@ -78,6 +78,22 @@ interface JsonSchema {
   required?: string[];
   default?: unknown;
   enum?: unknown[];
+  anyOf?: JsonSchema[];
+}
+
+function getCliType(name: string, schema: JsonSchema): string {
+  if (typeof schema.type === 'string') {
+    return schema.type;
+  }
+  const unionTypes = schema.anyOf?.map(option => option.type);
+  if (
+    unionTypes?.length === 2 &&
+    unionTypes.includes('string') &&
+    unionTypes.includes('number')
+  ) {
+    return 'string';
+  }
+  throw new Error(`Property ${name} has a complex type not supported by CLI.`);
 }
 
 function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
@@ -89,14 +105,9 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
   return Object.entries(properties).map(([name, prop]) => {
     const isRequired = required.includes(name);
     const description = prop.description || '';
-    if (typeof prop.type !== 'string') {
-      throw new Error(
-        `Property ${name} has a complex type not supported by CLI.`,
-      );
-    }
     return {
       name,
-      type: prop.type,
+      type: getCliType(name, prop),
       description,
       required: isRequired,
       default: prop.default,

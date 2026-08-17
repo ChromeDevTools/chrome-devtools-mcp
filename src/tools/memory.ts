@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../third_party/index.js';
+import {parseByteSize} from '../utils/bytes.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
@@ -18,6 +19,27 @@ const HEAP_SNAPSHOT_FILTERS: readonly [string, ...string[]] = [
   'noNativeContext',
   'attributedToSpecificNativeContext',
 ];
+
+function byteSizeSchema(description: string) {
+  return zod
+    .union([zod.string(), zod.number().finite().nonnegative()])
+    .transform((value, context) => {
+      if (typeof value === 'number') {
+        return Math.round(value);
+      }
+      try {
+        return parseByteSize(value);
+      } catch (error) {
+        context.addIssue({
+          code: zod.ZodIssueCode.custom,
+          message: error instanceof Error ? error.message : 'Invalid byte size',
+        });
+        return zod.NEVER;
+      }
+    })
+    .pipe(zod.number())
+    .describe(description);
+}
 
 export const takeHeapSnapshot = definePageTool({
   name: 'take_heapsnapshot',
@@ -305,10 +327,9 @@ export const getHeapSnapshotEdges = defineTool({
       .enum(['retainedSize', 'selfSize', 'name'])
       .optional()
       .describe('Sort order for edges. Default is retainedSize.'),
-    minRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Minimum retained size in bytes for target nodes.'),
+    minRetainedSize: byteSizeSchema(
+      'Minimum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB") for target nodes.',
+    ).optional(),
     excludePrimitives: zod
       .boolean()
       .optional()
@@ -493,22 +514,18 @@ export const queryHeapSnapshotObjects = defineTool({
       .describe(
         'Optional V8 node type filter (e.g. object, closure, string, array, code).',
       ),
-    minRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Minimum retained size in bytes.'),
-    maxRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Maximum retained size in bytes.'),
-    minSelfSize: zod
-      .number()
-      .optional()
-      .describe('Minimum self size in bytes.'),
-    maxSelfSize: zod
-      .number()
-      .optional()
-      .describe('Maximum self size in bytes.'),
+    minRetainedSize: byteSizeSchema(
+      'Minimum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
+    ).optional(),
+    maxRetainedSize: byteSizeSchema(
+      'Maximum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
+    ).optional(),
+    minSelfSize: byteSizeSchema(
+      'Minimum self size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
+    ).optional(),
+    maxSelfSize: byteSizeSchema(
+      'Maximum self size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
+    ).optional(),
     isDetached: zod
       .boolean()
       .optional()

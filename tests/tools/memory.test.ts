@@ -31,6 +31,31 @@ import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
+  it('normalizes byte-size parameters to numbers', () => {
+    const schemas = [
+      getHeapSnapshotEdges.schema.minRetainedSize,
+      queryHeapSnapshotObjects.schema.minRetainedSize,
+      queryHeapSnapshotObjects.schema.maxRetainedSize,
+      queryHeapSnapshotObjects.schema.minSelfSize,
+      queryHeapSnapshotObjects.schema.maxSelfSize,
+    ];
+
+    for (const schema of schemas) {
+      const result = schema.safeParse('1KB');
+      assert.strictEqual(result.success, true);
+      if (result.success) {
+        assert.strictEqual(result.data, 1000);
+      }
+      const numericResult = schema.safeParse(1024);
+      assert.strictEqual(numericResult.success, true);
+      if (numericResult.success) {
+        assert.strictEqual(numericResult.data, 1024);
+      }
+      assert.strictEqual(schema.safeParse(-1).success, false);
+      assert.strictEqual(schema.safeParse('invalid').success, false);
+    }
+  });
+
   describe('take_heapsnapshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {

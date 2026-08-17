@@ -42,8 +42,10 @@ interface ZodDef {
   checks?: ZodCheck[];
   values?: string[];
   type?: ZodSchema;
+  in?: ZodSchema;
   innerType?: ZodSchema;
   schema?: ZodSchema;
+  options?: ZodSchema[];
   defaultValue?: () => unknown;
 }
 
@@ -224,16 +226,17 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
   let def = schema._def;
   let defaultValue: unknown;
 
-  // Unwrap optional/default/effects
+  // Unwrap optional/default/effects and the input side of pipelines.
   while (
     def.typeName === 'ZodOptional' ||
     def.typeName === 'ZodDefault' ||
-    def.typeName === 'ZodEffects'
+    def.typeName === 'ZodEffects' ||
+    def.typeName === 'ZodPipeline'
   ) {
     if (def.typeName === 'ZodDefault' && def.defaultValue) {
       defaultValue = def.defaultValue();
     }
-    const next = def.innerType || def.schema;
+    const next = def.innerType || def.schema || def.in;
     if (!next) {
       break;
     }
@@ -272,6 +275,13 @@ function getZodTypeInfo(schema: ZodSchema): TypeInfo {
       result.type = 'array';
       if (def.type) {
         result.items = getZodTypeInfo(def.type);
+      }
+      break;
+    case 'ZodUnion':
+      if (def.options) {
+        result.type = def.options
+          .map(option => getZodTypeInfo(option).type)
+          .join(' | ');
       }
       break;
     default:

@@ -50,6 +50,9 @@ export function getZodType(zodType: zod.ZodTypeAny): ZodType {
   if (typeName === 'ZodEffects') {
     return getZodType(def.schema);
   }
+  if (typeName === 'ZodPipeline') {
+    return getZodType(def.out);
+  }
 
   if (isZodType(typeName)) {
     return typeName;

@@ -520,8 +520,9 @@ export const commands: Commands = {
       },
       minRetainedSize: {
         name: 'minRetainedSize',
-        type: 'number',
-        description: 'Minimum retained size in bytes for target nodes.',
+        type: 'string',
+        description:
+          'Minimum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB") for target nodes.',
         required: false,
       },
       excludePrimitives: {
@@ -1133,26 +1134,30 @@ export const commands: Commands = {
       },
       minRetainedSize: {
         name: 'minRetainedSize',
-        type: 'number',
-        description: 'Minimum retained size in bytes.',
+        type: 'string',
+        description:
+          'Minimum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
         required: false,
       },
       maxRetainedSize: {
         name: 'maxRetainedSize',
-        type: 'number',
-        description: 'Maximum retained size in bytes.',
+        type: 'string',
+        description:
+          'Maximum retained size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
         required: false,
       },
       minSelfSize: {
         name: 'minSelfSize',
-        type: 'number',
-        description: 'Minimum self size in bytes.',
+        type: 'string',
+        description:
+          'Minimum self size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
         required: false,
       },
       maxSelfSize: {
         name: 'maxSelfSize',
-        type: 'number',
-        description: 'Maximum self size in bytes.',
+        type: 'string',
+        description:
+          'Maximum self size in bytes as a number or byte-size string (e.g. 1024, "1MB", "1GiB").',
         required: false,
       },
       isDetached: {
