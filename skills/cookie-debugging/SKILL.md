@@ -9,7 +9,7 @@ description: Uses Chrome DevTools MCP for inspecting, debugging, and testing coo
 
 Cookies marked `HttpOnly` cannot be accessed or modified by client-side JavaScript (`cookieStore` or `document.cookie`). However, the browser **automatically attaches active HttpOnly cookies to outgoing HTTP request headers (`Cookie`)**.
 
-- To inspect current `HttpOnly` values: Look at the `Cookie` request header of any outgoing HTTP request via `get_network_request`.
+- To inspect current `HttpOnly` values: Use `get_cookies`, which reads them via CDP and is not subject to the JavaScript restriction. Alternatively, look at the `Cookie` request header of any outgoing HTTP request via `get_network_request`.
 - To inspect how cookies were created or configured: Look at the `Set-Cookie` response header of login/auth responses.
 - To inspect non-`HttpOnly` cookies: Use `evaluate_script` with the modern `cookieStore` API (`async () => await cookieStore.getAll()`).
 
@@ -24,16 +24,16 @@ Choose the right session environment to avoid state contamination (e.g., residua
 
 ### Client-Side Capabilities & Limitations
 
-| Action                                                           | Client JavaScript (`cookieStore` / `document.cookie`) | DevTools Network & Context Tools                        |
-| :--------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------------------------ |
-| **Read Non-HttpOnly**                                            | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Request `Cookie`)             |
-| **Read HttpOnly**                                                | ❌ Blocked by browser security                        | ✅ `get_network_request` (Request `Cookie`)             |
-| **Inspect Attributes** (`Domain`, `Path`, `SameSite`, `Expires`) | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Response `Set-Cookie`)        |
-| **Modify / Delete Non-HttpOnly**                                 | ✅ `async () => await cookieStore.set(...)`           | N/A                                                     |
-| **Modify / Delete HttpOnly**                                     | ❌ **Silent failure** in JavaScript                   | ✅ Use `new_page(isolatedContext: ...)` for clean state |
+| Action                                                           | Client JavaScript (`cookieStore` / `document.cookie`) | DevTools Network & Context Tools                                                       |
+| :--------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------------------------------------------------------- |
+| **Read Non-HttpOnly**                                            | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Request `Cookie`)                                            |
+| **Read HttpOnly**                                                | ❌ Blocked by browser security                        | ✅ `get_cookies`, or `get_network_request` (Request `Cookie`)                          |
+| **Inspect Attributes** (`Domain`, `Path`, `SameSite`, `Expires`) | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Response `Set-Cookie`)                                       |
+| **Modify / Delete Non-HttpOnly**                                 | ✅ `async () => await cookieStore.set(...)`           | ✅ `set_cookie` / `clear_cookies`                                                      |
+| **Modify / Delete HttpOnly**                                     | ❌ **Silent failure** in JavaScript                   | ✅ `set_cookie` / `clear_cookies`, or `new_page(isolatedContext: ...)` for clean state |
 
 > [!WARNING]
-> Attempting to clear an `HttpOnly` cookie via JavaScript (`cookieStore.delete` or `document.cookie = "...; max-age=0"`) will silently fail. To test in an unauthenticated or fresh state, always spawn a new isolated context using `new_page` with `isolatedContext`.
+> Attempting to clear an `HttpOnly` cookie via JavaScript (`cookieStore.delete` or `document.cookie = "...; max-age=0"`) will silently fail. Use `clear_cookies`, which deletes via CDP, or spawn a new isolated context with `new_page` and `isolatedContext` for a guaranteed clean slate. Note that `get_cookies`, `set_cookie` and `clear_cookies` act on the default browser context, not on an isolated one.
 
 ---
 
@@ -140,8 +140,8 @@ For client-accessible, non-`HttpOnly` cookies (e.g., UI preferences, non-sensiti
 
 - **`cookieStore` is undefined**: `cookieStore` requires a Secure Context (`https://`, `localhost`, or `127.0.0.1`). On non-secure HTTP origins, use `() => document.cookie` or test over HTTPS.
 - **`evaluate_script` returns empty / unresolved Promise**: `cookieStore` methods are asynchronous. Always wrap calls with `async () => await cookieStore.getAll()`.
-- **Cookie not visible in JavaScript**: The cookie is marked `HttpOnly`. Trigger a network request and call `get_network_request` to view it in the `Cookie` request header.
-- **JavaScript deletion did not remove cookie**: The cookie is `HttpOnly` or requires matching `Path` and `Domain` parameters. Use a fresh `isolatedContext` with `new_page` for a clean slate.
+- **Cookie not visible in JavaScript**: The cookie is marked `HttpOnly`. Call `get_cookies`, or trigger a network request and call `get_network_request` to view it in the `Cookie` request header.
+- **JavaScript deletion did not remove cookie**: The cookie is `HttpOnly` or requires matching `Path` and `Domain` parameters. Use `clear_cookies`, or a fresh `isolatedContext` with `new_page` for a clean slate.
 - **Cookie set in response but not sent in requests**:
   - Verify if page is `http://` while cookie specifies `Secure`.
   - Check if `Domain` restricts subdomains.
