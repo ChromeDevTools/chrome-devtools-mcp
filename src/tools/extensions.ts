@@ -23,7 +23,7 @@ export const installExtension = defineTool({
   },
   blockedByDialog: false,
   verifyFilesSchema: {
-    path: true,
+    path: {local: true},
   },
   handler: async (request, response, context) => {
     const {path} = request.params;
