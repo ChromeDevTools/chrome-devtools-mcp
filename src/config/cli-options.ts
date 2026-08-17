@@ -223,7 +223,7 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page or service worker. Returns the response as JSON, so returned values have to be JSON-serializable.',
     category: 'Debugging',
     args: {
       function: {
@@ -258,6 +258,13 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        required: false,
+      },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          "The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.",
         required: false,
       },
     },
@@ -821,7 +828,7 @@ export const commands: Commands = {
   },
   list_console_messages: {
     description:
-      'List all console messages for the currently selected page since the last navigation.',
+      'List all console messages for the currently selected page since the last navigation. This includes console messages originating from extensions content scripts.',
     category: 'Debugging',
     args: {
       pageSize: {
@@ -913,7 +920,8 @@ export const commands: Commands = {
     },
   },
   list_pages: {
-    description: 'Get a list of pages open in the browser.',
+    description:
+      'Get a list of pages including extension service workers open in the browser.',
     category: 'Navigation automation',
     args: {},
   },
