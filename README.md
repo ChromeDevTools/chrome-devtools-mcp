@@ -140,7 +140,8 @@ Then point your MCP config at the built CLI with an **absolute path**:
 
 This works with **Claude Code** (`~/.mcp.json`), **Cursor** (Settings → MCP → New MCP Server, or `mcp.json`), **VS Code Copilot**, and any other MCP client.
 
-If 1Browser is not detected automatically, pass `--executablePath`:
+If 1Browser is not detected automatically, set `ONEBROWSER_PATH` or pass
+`--executablePath`:
 
 ```json
 {
@@ -760,7 +761,7 @@ The 1Browser MCP server supports the following configuration option:
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
 - **`--autoConnect`/ `--auto-connect`**
-  If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
+  If specified, automatically connects to a running local 1Browser instance using its default user data directory. Requires the remote debugging server to be started via chrome://inspect/#remote-debugging.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -785,7 +786,7 @@ The 1Browser MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--executablePath`/ `--executable-path`, `-e`**
-  Path to custom Chrome executable.
+  Path to a custom 1Browser executable. Can also be set via ONEBROWSER_PATH.
   - **Type:** string
   - **Default:** `false`
 
@@ -795,7 +796,7 @@ The 1Browser MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--userDataDir`/ `--user-data-dir`**
-  Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
+  Path to the user data directory. With --auto-connect, the default is the platform-specific 1Browser user data directory.
   - **Type:** string
   - **Default:** `false`
 

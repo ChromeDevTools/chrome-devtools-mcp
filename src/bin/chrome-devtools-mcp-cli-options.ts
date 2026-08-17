@@ -11,7 +11,7 @@ export const cliOptions = {
   autoConnect: {
     type: 'boolean',
     description:
-      'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
+      'If specified, automatically connects to a running local 1Browser instance using its default user data directory. Requires the remote debugging server to be started via chrome://inspect/#remote-debugging.',
     conflicts: ['isolated', 'executablePath'],
     default: false,
     coerce: (value: boolean | undefined) => {
@@ -94,7 +94,8 @@ export const cliOptions = {
   },
   executablePath: {
     type: 'string',
-    description: 'Path to custom Chrome executable.',
+    description:
+      'Path to a custom 1Browser executable. Can also be set via ONEBROWSER_PATH.',
     conflicts: ['browserUrl', 'wsEndpoint'],
     alias: 'e',
   },
@@ -106,13 +107,13 @@ export const cliOptions = {
   userDataDir: {
     type: 'string',
     description:
-      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
+      'Path to the user data directory. With --auto-connect, the default is the platform-specific 1Browser user data directory.',
     conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
   },
   channel: {
     type: 'string',
     description:
-      'Specify a different Chrome channel that should be used. The default is the stable channel version.',
+      'Select the profile namespace used by the server. Retained for compatibility; executable selection uses --executable-path, ONEBROWSER_PATH, or 1Browser auto-detection.',
     choices: ['canary', 'dev', 'beta', 'stable'] as const,
     conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
   },
@@ -404,15 +405,11 @@ export function parseArguments(
         `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
         'Connect via WebSocket with custom headers',
       ],
-      ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-      ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-      ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-      ['$0 --channel stable', 'Use stable Chrome installed on this system'],
       ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
       ['$0 --help', 'Print CLI options'],
       [
         '$0 --viewport 1280x720',
-        'Launch Chrome with the initial viewport size of 1280x720px',
+        'Launch 1Browser with the initial viewport size of 1280x720px',
       ],
       [
         `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
@@ -434,11 +431,7 @@ export function parseArguments(
       ],
       [
         '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
+        'Connect to a running 1Browser instance instead of launching a new instance',
       ],
       [
         '$0 --no-usage-statistics',

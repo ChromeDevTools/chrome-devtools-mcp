@@ -9,7 +9,11 @@ import '../src/polyfill.js';
 import path from 'node:path';
 import {before, it} from 'node:test';
 
+import {executablePath} from 'puppeteer';
+
 import {overrideDevToolsGlobals} from '../src/devtools/DevtoolsUtils.js';
+
+process.env['ONEBROWSER_PATH'] ??= await executablePath();
 
 before(() => {
   overrideDevToolsGlobals({
