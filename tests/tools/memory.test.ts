@@ -24,8 +24,10 @@ import {
   compareHeapSnapshots,
   getHeapSnapshotDuplicateStrings,
   getHeapSnapshotObjectDetails,
+  queryHeapSnapshotObjects,
 } from '../../src/tools/memory.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
+import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
@@ -39,9 +41,10 @@ describe('memory', () => {
             response,
             context,
           );
+          const canonicalFilePath = await resolveCanonicalPath(filePath);
           assert.equal(
             response.responseLines.at(0),
-            `Heap snapshot saved to ${filePath}`,
+            `Heap snapshot saved to ${canonicalFilePath}`,
           );
           assert.ok(existsSync(filePath));
         } finally {
@@ -635,6 +638,96 @@ describe('memory', () => {
 
         await getHeapSnapshotDuplicateStrings.handler(
           {params: {filePath}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+  });
+
+  describe('query_heapsnapshot_objects', () => {
+    it('with default options', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await queryHeapSnapshotObjects.handler(
+          {params: {filePath, pageSize: 10}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with className filter', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await queryHeapSnapshotObjects.handler(
+          {params: {filePath, className: 'Window', pageSize: 10}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with minRetainedSize filter', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await queryHeapSnapshotObjects.handler(
+          {params: {filePath, minRetainedSize: 1000, pageSize: 10}},
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
+
+    it('with sortBy selfSize and pagination', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await queryHeapSnapshotObjects.handler(
+          {params: {filePath, sortBy: 'selfSize', pageSize: 5, pageIdx: 0}},
           response,
           context,
         );

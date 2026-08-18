@@ -15,6 +15,7 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
+import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {screenshots} from '../snapshot.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -274,9 +275,10 @@ describe('screenshot', () => {
             response.responseLines.at(0),
             "Took a screenshot of the current page's viewport.",
           );
+          const canonicalFilePath = await resolveCanonicalPath(filePath);
           assert.equal(
             response.responseLines.at(1),
-            `Saved screenshot to ${filePath}.`,
+            `Saved screenshot to ${canonicalFilePath}.`,
           );
 
           const stats = await stat(filePath);

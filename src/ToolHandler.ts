@@ -25,7 +25,7 @@ import type {
 import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isLocalhost} from './utils/url.js';
 
 export function buildFlag(category: ToolCategory) {
@@ -151,14 +151,21 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
-function extractPaths(value: unknown): string[] {
-  if (typeof value === 'string') {
-    return [value];
+async function validateAndResolvePathOrUrl(
+  filePathOrUrl: string,
+  context: McpContext,
+): Promise<string> {
+  try {
+    const url = new URL(filePathOrUrl);
+    if (url.protocol === 'file:') {
+      return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
+    } else if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
+      return filePathOrUrl;
+    }
+  } catch {
+    // Suppress parsing errors for regular file paths.
   }
-  if (Array.isArray(value)) {
-    return value.filter(item => typeof item === 'string');
-  }
-  return [];
+  return await context.validatePath(filePathOrUrl);
 }
 
 function isLocalBrowser(context: McpContext): boolean {
@@ -194,25 +201,25 @@ async function validateToolFiles(
   context: McpContext,
 ): Promise<void> {
   const isLocal = isLocalBrowser(context);
-  const pathsOrUrlsToValidate: string[] = [];
   for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
     if (shouldValidateFile(option, isLocal)) {
-      pathsOrUrlsToValidate.push(...extractPaths(params[key]));
-    }
-  }
-  for (const filePathOrUrl of pathsOrUrlsToValidate) {
-    let filePath = filePathOrUrl;
-    try {
-      const url = new URL(filePathOrUrl);
-      if (url.protocol === 'file:') {
-        filePath = fileURLToPath(url);
-      } else if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
-        continue;
+      const val = params[key];
+      if (typeof val === 'string') {
+        params[key] = await validateAndResolvePathOrUrl(val, context);
+      } else if (Array.isArray(val)) {
+        const updated: unknown[] = [];
+        for (const item of val) {
+          if (typeof item === 'string') {
+            updated.push(await validateAndResolvePathOrUrl(item, context));
+          } else {
+            throw new Error(
+              'Unexpected non-string value as a file path or URL',
+            );
+          }
+        }
+        params[key] = updated;
       }
-    } catch {
-      // Suppress parsing errors for regular file paths.
     }
-    await context.validatePath(filePath);
   }
 }
 
