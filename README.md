@@ -855,8 +855,13 @@ Most MCP clients start one Chrome DevTools MCP server per conversation.
 By default, the server runs with `--pageIdRouting` enabled, making `pageId` a
 required parameter on page-scoped tools (such as `click`, `fill`, `navigate_page`,
 `take_snapshot`, etc.) so multiple agents or subagents sharing a server instance can
-route tool calls directly to the specific tab they are working with. To disable
-this behavior and default to the currently selected page, pass
+route tool calls directly to the specific tab they are working with.
+
+For `evaluate_script`, `pageId` is required by default for targeting pages, but
+becomes optional when `--categoryExtensions` is enabled so that `serviceWorkerId`
+can be specified instead to evaluate inside an extension background service worker.
+
+To disable this behavior and default to the currently selected page, pass
 `--no-page-id-routing`.
 
 ```json

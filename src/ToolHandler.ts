@@ -310,7 +310,7 @@ export class ToolHandler {
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
-          const page =
+          page =
             this.serverArgs.pageIdRouting &&
             pageId !== undefined &&
             !this.serverArgs.slim

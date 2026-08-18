@@ -102,13 +102,13 @@ const y = yargs(hideBin(process.argv))
           '1. Required parameters MUST be passed as positional arguments (without flags).',
         );
         console.error(
-          '   - INCORRECT: chrome-devtools evaluate_script --expression "() => document.title"',
+          '   - INCORRECT: chrome-devtools evaluate_script --pageId 1 --expression "() => document.title"',
         );
         console.error(
-          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title"',
+          '   - CORRECT:   chrome-devtools evaluate_script 1 "() => document.title"',
         );
         console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --pageId 1).',
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --filePath output.json).',
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',

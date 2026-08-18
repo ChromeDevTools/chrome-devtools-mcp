@@ -253,8 +253,9 @@ export const commands: Commands = {
       pageId: {
         name: 'pageId',
         type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
+        description:
+          'Targets a specific page by ID. Required when not evaluating in a service worker.',
+        required: false,
       },
       function: {
         name: 'function',

@@ -351,7 +351,10 @@ describe('e2e', () => {
 
           const result = await client.callTool({
             name: 'take_screenshot',
-            arguments: {filePath: path.join(workspace, 'shot.png')},
+            arguments: {
+              pageId: 1,
+              filePath: path.join(workspace, 'shot.png'),
+            },
           });
 
           // Asserted before isError so a denial reports the path it rejected

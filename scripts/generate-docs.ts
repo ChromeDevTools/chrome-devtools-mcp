@@ -525,7 +525,9 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(createTools({slim: false} as ParsedArguments));
+        getToolsAndCategories(
+          createTools({slim: false, pageIdRouting: true} as ParsedArguments),
+        );
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,

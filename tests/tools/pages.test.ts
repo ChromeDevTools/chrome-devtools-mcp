@@ -1338,7 +1338,7 @@ describe('pages', () => {
         // @ts-expect-error _tabId is internal.
         page._tabId = 'test-tab-id';
         await getTabId.handler(
-          {params: {pageId: 1}, page: context.getSelectedMcpPage()},
+          {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
         );

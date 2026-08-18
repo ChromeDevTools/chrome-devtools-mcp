@@ -44,23 +44,23 @@ chrome-devtools <tool> [arguments] [flags]
 ## Input Automation (<uid> from snapshot)
 
 ```bash
-chrome-devtools take_snapshot # Take a text snapshot of the page to get UIDs for elements
-chrome-devtools click "id" # Clicks on the provided element
-chrome-devtools click "id" --dblClick true --includeSnapshot true # Double clicks and returns a snapshot
-chrome-devtools drag "src" "dst" # Drag an element onto another element
-chrome-devtools drag "src" "dst" --includeSnapshot true # Drag an element and return a snapshot
-chrome-devtools fill "id" "text" # Type text into an input, textarea, or select an option
-chrome-devtools fill "id" "text" --includeSnapshot true # Fill an element and return a snapshot
-chrome-devtools handle_dialog accept # Handle a browser dialog (accept/dismiss)
-chrome-devtools handle_dialog dismiss --promptText "hi" # Dismiss a dialog with prompt text
-chrome-devtools hover "id" # Hover over the provided element
-chrome-devtools hover "id" --includeSnapshot true # Hover over an element and return a snapshot
-chrome-devtools press_key "Enter" # Press a key or key combination ("Control+A", "Escape")
-chrome-devtools press_key "Control+A" --includeSnapshot true # Press a key and return a snapshot
-chrome-devtools type_text "hello" # Type text using keyboard into a focused input
-chrome-devtools type_text "hello" --submitKey "Enter" # Type text and press a submit key
-chrome-devtools upload_file "id" "file.txt" # Upload a file through a provided element
-chrome-devtools upload_file "id" "file.txt" --includeSnapshot true # Upload a file and return a snapshot
+chrome-devtools take_snapshot 1 # Take a text snapshot of the page to get UIDs for elements
+chrome-devtools click 1 "id" # Clicks on the provided element
+chrome-devtools click 1 "id" --dblClick true --includeSnapshot true # Double clicks and returns a snapshot
+chrome-devtools drag 1 "src" "dst" # Drag an element onto another element
+chrome-devtools drag 1 "src" "dst" --includeSnapshot true # Drag an element and return a snapshot
+chrome-devtools fill 1 "id" "text" # Type text into an input, textarea, or select an option
+chrome-devtools fill 1 "id" "text" --includeSnapshot true # Fill an element and return a snapshot
+chrome-devtools handle_dialog 1 accept # Handle a browser dialog (accept/dismiss)
+chrome-devtools handle_dialog 1 dismiss --promptText "hi" # Dismiss a dialog with prompt text
+chrome-devtools hover 1 "id" # Hover over the provided element
+chrome-devtools hover 1 "id" --includeSnapshot true # Hover over an element and return a snapshot
+chrome-devtools press_key 1 "Enter" # Press a key or key combination ("Control+A", "Escape")
+chrome-devtools press_key 1 "Control+A" --includeSnapshot true # Press a key and return a snapshot
+chrome-devtools type_text 1 "hello" # Type text using keyboard into a focused input
+chrome-devtools type_text 1 "hello" --submitKey "Enter" # Type text and press a submit key
+chrome-devtools upload_file 1 "id" "file.txt" # Upload a file through a provided element
+chrome-devtools upload_file 1 "id" "file.txt" --includeSnapshot true # Upload a file and return a snapshot
 ```
 
 ## Navigation
@@ -93,17 +93,17 @@ chrome-devtools resize_page 1 1920 1080 # Resizes the selected page's window
 ## Performance
 
 ```bash
-chrome-devtools performance_analyze_insight "1" "LCPBreakdown" # Get more details on a specific Performance Insight
-chrome-devtools performance_start_trace true false # Starts a performance trace recording (reload, autoStop)
-chrome-devtools performance_start_trace true true --filePath "t.json.gz" # Start trace and save to a file
-chrome-devtools performance_stop_trace # Stops the active performance trace
-chrome-devtools performance_stop_trace --filePath "t.json.gz" # Stop trace and save to a file
+chrome-devtools performance_analyze_insight 1 "1" "LCPBreakdown" # Get more details on a specific Performance Insight (pageId, insightSetId, insightName)
+chrome-devtools performance_start_trace 1 --reload true --autoStop false # Starts a performance trace recording (reload, autoStop)
+chrome-devtools performance_start_trace 1 --reload true --autoStop true --filePath "t.json.gz" # Start trace and save to a file
+chrome-devtools performance_stop_trace 1 # Stops the active performance trace
+chrome-devtools performance_stop_trace 1 --filePath "t.json.gz" # Stop trace and save to a file
 ```
 
 ## Memory
 
 ```bash
-chrome-devtools take_heapsnapshot "./snap.heapsnapshot" # Capture a memory heap snapshot
+chrome-devtools take_heapsnapshot 1 "./snap.heapsnapshot" # Capture a memory heap snapshot
 ```
 
 ### Memory Debugging (requires `--memoryDebugging=true`)
@@ -125,13 +125,13 @@ chrome-devtools close_heapsnapshot "./snap.heapsnapshot" # Free memory from load
 ## Network
 
 ```bash
-chrome-devtools get_network_request # Get the currently selected network request
-chrome-devtools get_network_request --reqid 1 --requestFilePath "req.md" # Get request by id and save to file
-chrome-devtools get_network_request --responseFilePath "res.md" # Save response body to file
-chrome-devtools list_network_requests # List all network requests
-chrome-devtools list_network_requests --pageSize 50 --pageIdx 0 # List network requests with pagination
-chrome-devtools list_network_requests --resourceTypes Fetch # Filter requests by resource type
-chrome-devtools list_network_requests --includePreservedRequests true # Include preserved requests
+chrome-devtools get_network_request 1 # Get the currently selected network request for page 1
+chrome-devtools get_network_request 1 --reqid 1 --requestFilePath "req.md" # Get request by id and save to file
+chrome-devtools get_network_request 1 --responseFilePath "res.md" # Save response body to file
+chrome-devtools list_network_requests 1 # List all network requests for page 1
+chrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination
+chrome-devtools list_network_requests 1 --resourceTypes Fetch # Filter requests by resource type
+chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
 ```
 
 ## Debugging & Inspection

@@ -43,7 +43,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: [],
+      verifyFilesSchema: {},
       pageScoped: true,
       handler: async () => {
         handlerCalled = true;
@@ -51,6 +51,8 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getPageById.returns(mockPage);
 

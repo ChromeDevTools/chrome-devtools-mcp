@@ -12,6 +12,7 @@ Addional tooling can be enabled by providing the following flags:
 - For memory tooling, use the `--memoryDebugging` flag.
 
 **Page targeting**: Page-scoped tools require a `pageId` parameter to target a specific page. Use `list_pages` to see available pages and their IDs (e.g. `pageId: 1`), or use the ID returned when creating a page with `new_page`.
+Note: For `evaluate_script`, `pageId` is required when targeting pages. However, when `--categoryExtensions` is enabled, `pageId` is optional so you can pass `serviceWorkerId` instead to evaluate inside an extension background service worker.
 **Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.
 
 ## Workflow Patterns
@@ -59,7 +60,7 @@ You can send multiple tool calls in parallel, but maintain correct order: naviga
 1. **Install**: Use `install_extension` with the path to the unpacked extension.
 2. **Identify**: Get the extension ID from the response or by calling `list_extensions`.
 3. **Trigger Action**: Use `trigger_extension_action` to open the popup or side panel if applicable.
-4. **Verify Service Worker**: Use `evaluate_script` with `serviceWorkerId` to check extension state or trigger background actions.
+4. **Verify Service Worker**: Use `evaluate_script` with `serviceWorkerId` (omitting `pageId` and `args`) to check extension state or trigger background actions. When evaluating in a page, pass `pageId` (omitting `serviceWorkerId`).
 5. **Verify Page Behavior**: Navigate to a page where the extension operates and use `take_snapshot` to check if content scripts injected elements or modified the page correctly.
 
 ## Troubleshooting
