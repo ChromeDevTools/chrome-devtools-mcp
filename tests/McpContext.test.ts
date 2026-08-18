@@ -778,5 +778,52 @@ describe('McpContext', () => {
         });
       });
     });
+
+    describe('getSelectedMcpPageUrl', () => {
+      it('returns url from passed page when open', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = await context.newPage();
+          const result = context.getSelectedMcpPageUrl(page);
+          assert.strictEqual(result, page.pptrPage.url());
+        });
+      });
+
+      it('returns undefined from passed page when closed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = await context.newPage();
+          await page.pptrPage.close();
+          const result = context.getSelectedMcpPageUrl(page);
+          assert.strictEqual(result, undefined);
+        });
+      });
+
+      it('returns url from selected page when no page passed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = context.getSelectedMcpPage();
+          const result = context.getSelectedMcpPageUrl();
+          assert.strictEqual(result, page.pptrPage.url());
+        });
+      });
+
+      it('returns undefined when getSelectedMcpPage throws', async () => {
+        await withMcpContext(async (_response, context) => {
+          sinon
+            .stub(context, 'getSelectedMcpPage')
+            .throws(new Error('No page selected'));
+          const result = context.getSelectedMcpPageUrl();
+          assert.strictEqual(result, undefined);
+        });
+      });
+
+      it('returns undefined when selected page is closed and getSelectedMcpPage throws', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = context.getSelectedMcpPage();
+          await page.pptrPage.close();
+          assert.throws(() => context.getSelectedMcpPage());
+          const result = context.getSelectedMcpPageUrl();
+          assert.strictEqual(result, undefined);
+        });
+      });
+    });
   });
 });

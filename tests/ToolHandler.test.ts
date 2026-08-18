@@ -112,7 +112,7 @@ describe('ToolHandler', () => {
     const result = await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
-    assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+    assert.strictEqual(mockContext.getSelectedMcpPageUrl.calledOnce, true);
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
@@ -180,13 +180,7 @@ describe('ToolHandler', () => {
       mockContext.browser = getMockBrowser({process: mockProcess});
       mockContext.getDevToolsData.resolves(testCase.devToolsData);
       if (testCase.pageUrl) {
-        const mockPage = {
-          pptrPage: {
-            isClosed: () => false,
-            url: () => testCase.pageUrl,
-          },
-        } as unknown as McpPage;
-        mockContext.getSelectedMcpPage.returns(mockPage);
+        mockContext.getSelectedMcpPageUrl.returns(testCase.pageUrl);
       }
 
       const logSpy = sinon.spy();

@@ -413,6 +413,21 @@ export class McpContext implements Context {
     return page;
   }
 
+  getSelectedMcpPageUrl(page?: McpPage): string | undefined {
+    let targetPage = page;
+    if (!targetPage) {
+      try {
+        targetPage = this.getSelectedMcpPage();
+      } catch {
+        return undefined;
+      }
+    }
+    if (targetPage?.pptrPage?.isClosed() === false) {
+      return targetPage.pptrPage.url();
+    }
+    return undefined;
+  }
+
   async getDevToolsData(page?: McpPage): Promise<DevToolsData | undefined> {
     const targetPage = page ?? this.#selectedPage;
     if (!targetPage) {
