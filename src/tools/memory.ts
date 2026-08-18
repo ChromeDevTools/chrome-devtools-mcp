@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../third_party/index.js';
+import {byteSizeRangeSchema} from '../utils/bytes.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
@@ -305,10 +306,9 @@ export const getHeapSnapshotEdges = defineTool({
       .enum(['retainedSize', 'selfSize', 'name'])
       .optional()
       .describe('Sort order for edges. Default is retainedSize.'),
-    minRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Minimum retained size in bytes for target nodes.'),
+    retainedSize: byteSizeRangeSchema(
+      'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.',
+    ).optional(),
     excludePrimitives: zod
       .boolean()
       .optional()
@@ -322,7 +322,8 @@ export const getHeapSnapshotEdges = defineTool({
       request.params.nodeId,
       {
         sortBy: request.params.sortBy ?? 'retainedSize',
-        minRetainedSize: request.params.minRetainedSize,
+        // DevTools currently only supports a lower retained-size bound here.
+        minRetainedSize: request.params.retainedSize?.min,
         excludePrimitives: request.params.excludePrimitives ?? true,
       },
     );
@@ -469,7 +470,7 @@ export const getHeapSnapshotObjectDetails = defineTool({
 export const queryHeapSnapshotObjects = defineTool({
   name: 'query_heapsnapshot_objects',
   description:
-    'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, minRetainedSize, maxRetainedSize, minSelfSize, isDetached, sortBy).',
+    'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy).',
   annotations: {
     category: ToolCategory.MEMORY,
     readOnlyHint: true,
@@ -493,22 +494,12 @@ export const queryHeapSnapshotObjects = defineTool({
       .describe(
         'Optional V8 node type filter (e.g. object, closure, string, array, code).',
       ),
-    minRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Minimum retained size in bytes.'),
-    maxRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Maximum retained size in bytes.'),
-    minSelfSize: zod
-      .number()
-      .optional()
-      .describe('Minimum self size in bytes.'),
-    maxSelfSize: zod
-      .number()
-      .optional()
-      .describe('Maximum self size in bytes.'),
+    retainedSize: byteSizeRangeSchema(
+      'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+    ).optional(),
+    selfSize: byteSizeRangeSchema(
+      'Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+    ).optional(),
     isDetached: zod
       .boolean()
       .optional()
@@ -527,10 +518,10 @@ export const queryHeapSnapshotObjects = defineTool({
         className: request.params.className,
         propertyName: request.params.propertyName,
         nodeType: request.params.nodeType,
-        minRetainedSize: request.params.minRetainedSize,
-        maxRetainedSize: request.params.maxRetainedSize,
-        minSelfSize: request.params.minSelfSize,
-        maxSelfSize: request.params.maxSelfSize,
+        minRetainedSize: request.params.retainedSize?.min,
+        maxRetainedSize: request.params.retainedSize?.max,
+        minSelfSize: request.params.selfSize?.min,
+        maxSelfSize: request.params.selfSize?.max,
         isDetached: request.params.isDetached,
         sortBy: request.params.sortBy,
       },

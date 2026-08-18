@@ -831,11 +831,16 @@
       },
       {
         "name": "min_retained_size",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "exclude_primitives",
         "argType": "boolean"
+      },
+      {
+        "name": "retained_size_length",
+        "argType": "number"
       }
     ]
   },
@@ -1000,19 +1005,23 @@
       },
       {
         "name": "min_retained_size",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "max_retained_size",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "min_self_size",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "max_self_size",
-        "argType": "number"
+        "argType": "number",
+        "isDeprecated": true
       },
       {
         "name": "is_detached",
@@ -1028,6 +1037,14 @@
       },
       {
         "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "retained_size_length",
+        "argType": "number"
+      },
+      {
+        "name": "self_size_length",
         "argType": "number"
       }
     ]

@@ -546,9 +546,9 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
 - **excludePrimitives** (boolean) _(optional)_: Whether to exclude primitive target nodes. Default is true.
-- **minRetainedSize** (number) _(optional)_: Minimum retained size in bytes for target nodes.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
+- **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.
 - **sortBy** (enum: "retainedSize", "selfSize", "name") _(optional)_: Sort order for edges. Default is retainedSize.
 
 ---
@@ -603,21 +603,19 @@ in the DevTools Elements panel (if any).
 
 ### `query_heapsnapshot_objects`
 
-**Description:** Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, minRetainedSize, maxRetainedSize, minSelfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)
+**Description:** Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **className** (string) _(optional)_: Optional regex or text matching object class name.
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
-- **maxRetainedSize** (number) _(optional)_: Maximum retained size in bytes.
-- **maxSelfSize** (number) _(optional)_: Maximum self size in bytes.
-- **minRetainedSize** (number) _(optional)_: Minimum retained size in bytes.
-- **minSelfSize** (number) _(optional)_: Minimum self size in bytes.
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 - **propertyName** (string) _(optional)_: Optional property name filter for outgoing reference edges.
+- **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
+- **selfSize** (string) _(optional)_: Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **sortBy** (enum: "retainedSize", "selfSize", "id") _(optional)_: Sort order for results. Default is retainedSize.
 
 ---

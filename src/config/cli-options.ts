@@ -518,10 +518,11 @@ export const commands: Commands = {
         required: false,
         enum: ['retainedSize', 'selfSize', 'name'],
       },
-      minRetainedSize: {
-        name: 'minRetainedSize',
-        type: 'number',
-        description: 'Minimum retained size in bytes for target nodes.',
+      retainedSize: {
+        name: 'retainedSize',
+        type: 'string',
+        description:
+          'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.',
         required: false,
       },
       excludePrimitives: {
@@ -1102,7 +1103,7 @@ export const commands: Commands = {
   },
   query_heapsnapshot_objects: {
     description:
-      'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, minRetainedSize, maxRetainedSize, minSelfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
+      'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -1131,28 +1132,18 @@ export const commands: Commands = {
           'Optional V8 node type filter (e.g. object, closure, string, array, code).',
         required: false,
       },
-      minRetainedSize: {
-        name: 'minRetainedSize',
-        type: 'number',
-        description: 'Minimum retained size in bytes.',
+      retainedSize: {
+        name: 'retainedSize',
+        type: 'string',
+        description:
+          'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
         required: false,
       },
-      maxRetainedSize: {
-        name: 'maxRetainedSize',
-        type: 'number',
-        description: 'Maximum retained size in bytes.',
-        required: false,
-      },
-      minSelfSize: {
-        name: 'minSelfSize',
-        type: 'number',
-        description: 'Minimum self size in bytes.',
-        required: false,
-      },
-      maxSelfSize: {
-        name: 'maxSelfSize',
-        type: 'number',
-        description: 'Maximum self size in bytes.',
+      selfSize: {
+        name: 'selfSize',
+        type: 'string',
+        description:
+          'Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
         required: false,
       },
       isDetached: {

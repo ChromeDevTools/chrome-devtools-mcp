@@ -302,6 +302,15 @@ Showing 1-2 of 56 (Page 1 of 28).
 Next page: 1
 `;
 
+exports[`memory > get_heapsnapshot_edges > with retainedSize range 1`] = `
+## Heap Snapshot Data
+name,type,nodeId,nodeName,selfSize,retainedSize
+map,internal,25577,system / Map,0.0 kB,0.7 kB
+constructor,property,25575,String,0.1 kB,0.4 kB
+__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString},0.1 kB,0.3 kB
+Showing 1-3 of 3 (Page 1 of 1).
+`;
+
 exports[`memory > get_heapsnapshot_edges > with valid nodeId 1`] = `
 ## Heap Snapshot Data
 name,type,nodeId,nodeName,selfSize,retainedSize
@@ -450,6 +459,23 @@ Not retained by context size: 798 kB (11792 objects)
 Total size: 802 kB
 `;
 
+exports[`memory > query_heapsnapshot_objects > with an unbounded retainedSize filter 1`] = `
+## Heap Snapshot Data
+nodeId,nodeName,type,distance,selfSize,retainedSize
+1,,synthetic,100000000,0.0 kB,802 kB
+7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
+7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+3,(GC roots),synthetic,100000001,0.0 kB,45.6 kB
+49547,,array,2,4.1 kB,41.0 kB
+36241,,array,2,4.1 kB,41.0 kB
+Showing 1-10 of 148 (Page 1 of 15).
+Next page: 1
+`;
+
 exports[`memory > query_heapsnapshot_objects > with className filter 1`] = `
 ## Heap Snapshot Data
 nodeId,nodeName,type,distance,selfSize,retainedSize
@@ -481,23 +507,6 @@ nodeId,nodeName,type,distance,selfSize,retainedSize
 49547,,array,2,4.1 kB,41.0 kB
 36241,,array,2,4.1 kB,41.0 kB
 Showing 1-10 of 27466 (Page 1 of 2747).
-Next page: 1
-`;
-
-exports[`memory > query_heapsnapshot_objects > with minRetainedSize filter 1`] = `
-## Heap Snapshot Data
-nodeId,nodeName,type,distance,selfSize,retainedSize
-1,,synthetic,100000000,0.0 kB,802 kB
-7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
-7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
-7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
-7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
-27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
-30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
-3,(GC roots),synthetic,100000001,0.0 kB,45.6 kB
-49547,,array,2,4.1 kB,41.0 kB
-36241,,array,2,4.1 kB,41.0 kB
-Showing 1-10 of 148 (Page 1 of 15).
 Next page: 1
 `;
 

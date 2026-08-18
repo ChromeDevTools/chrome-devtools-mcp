@@ -26,6 +26,7 @@ import {
   getHeapSnapshotObjectDetails,
   queryHeapSnapshotObjects,
 } from '../../src/tools/memory.js';
+import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {withMcpContext} from '../utils.js';
@@ -447,6 +448,34 @@ describe('memory', () => {
         t.assert.snapshot(output);
       });
     });
+
+    it('with retainedSize range', async t => {
+      await withMcpContext(async (response, context) => {
+        const filePath = join(
+          process.cwd(),
+          'tests/fixtures/example.heapsnapshot',
+        );
+
+        await getHeapSnapshotEdges.handler(
+          {
+            params: {
+              filePath,
+              nodeId: 25341,
+              retainedSize: parseByteSizeRange('100B-100B'),
+            },
+          },
+          response,
+          context,
+        );
+
+        const responseData = await response.handle(context);
+        const output = responseData.content
+          .map(c => (c.type === 'text' ? c.text : ''))
+          .join('\n');
+
+        t.assert.snapshot(output);
+      });
+    });
   });
 
   describe('get_heapsnapshot_dominators', () => {
@@ -697,7 +726,7 @@ describe('memory', () => {
       });
     });
 
-    it('with minRetainedSize filter', async t => {
+    it('with an unbounded retainedSize filter', async t => {
       await withMcpContext(async (response, context) => {
         const filePath = join(
           process.cwd(),
@@ -705,7 +734,13 @@ describe('memory', () => {
         );
 
         await queryHeapSnapshotObjects.handler(
-          {params: {filePath, minRetainedSize: 1000, pageSize: 10}},
+          {
+            params: {
+              filePath,
+              retainedSize: parseByteSizeRange('1KB'),
+              pageSize: 10,
+            },
+          },
           response,
           context,
         );
