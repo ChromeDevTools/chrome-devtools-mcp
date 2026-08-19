@@ -27,6 +27,8 @@ describe('cli args parsing', () => {
     usageStatistics: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
+    memoryDebugging: false,
+    experimentalStructuredContent: false,
   };
 
   it('parses with default args', async () => {
@@ -38,6 +40,15 @@ describe('cli args parsing', () => {
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
     });
+  });
+
+  it('parses with viaCli args', async () => {
+    const args = parseArguments(['--viaCli']);
+    assert.strictEqual(args.headless, true);
+    assert.strictEqual(args.memoryDebugging, true);
+    assert.strictEqual(args.categoryExtensions, true);
+    assert.strictEqual(args.experimentalStructuredContent, true);
+    assert.strictEqual(args.viaCli, true);
   });
 
   it('parses with browser url', async () => {

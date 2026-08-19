@@ -48,7 +48,6 @@ export type HeapQueryOptions =
 
 export type HeapEdgesQueryOptions =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
-
 const VALID_EXTENSIONS: readonly string[] = ['.heapsnapshot', '.heaptimeline'];
 
 function hasValidHeapSnapshotExtension(filePath: string): boolean {
@@ -421,6 +420,15 @@ export class HeapSnapshotManager {
   async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.getDuplicateStrings();
+  }
+
+  async queryObjects(
+    filePath: string,
+    options: HeapQueryOptions,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const provider = snapshot.queryObjects(options);
+    return await provider.serializeItemsRange(0, Infinity);
   }
 
   hasSnapshots(): boolean {

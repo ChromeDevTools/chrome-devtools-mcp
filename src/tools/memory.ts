@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../third_party/index.js';
+import {byteSizeRangeSchema} from '../utils/bytes.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, defineTool} from './ToolDefinition.js';
@@ -305,10 +306,9 @@ export const getHeapSnapshotEdges = defineTool({
       .enum(['retainedSize', 'selfSize', 'name'])
       .optional()
       .describe('Sort order for edges. Default is retainedSize.'),
-    minRetainedSize: zod
-      .number()
-      .optional()
-      .describe('Minimum retained size in bytes for target nodes.'),
+    retainedSize: byteSizeRangeSchema(
+      'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.',
+    ).optional(),
     excludePrimitives: zod
       .boolean()
       .optional()
@@ -322,7 +322,8 @@ export const getHeapSnapshotEdges = defineTool({
       request.params.nodeId,
       {
         sortBy: request.params.sortBy ?? 'retainedSize',
-        minRetainedSize: request.params.minRetainedSize,
+        // DevTools currently only supports a lower retained-size bound here.
+        minRetainedSize: request.params.retainedSize?.min,
         excludePrimitives: request.params.excludePrimitives ?? true,
       },
     );
@@ -463,5 +464,72 @@ export const getHeapSnapshotObjectDetails = defineTool({
     );
 
     response.setHeapSnapshotObjectDetails(objectInfo);
+  },
+});
+
+export const queryHeapSnapshotObjects = defineTool({
+  name: 'query_heapsnapshot_objects',
+  description:
+    'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy).',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  blockedByDialog: false,
+  verifyFilesSchema: {filePath: true},
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    className: zod
+      .string()
+      .optional()
+      .describe('Optional regex or text matching object class name.'),
+    propertyName: zod
+      .string()
+      .optional()
+      .describe('Optional property name filter for outgoing reference edges.'),
+    nodeType: zod
+      .string()
+      .optional()
+      .describe(
+        'Optional V8 node type filter (e.g. object, closure, string, array, code).',
+      ),
+    retainedSize: byteSizeRangeSchema(
+      'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+    ).optional(),
+    selfSize: byteSizeRangeSchema(
+      'Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+    ).optional(),
+    isDetached: zod
+      .boolean()
+      .optional()
+      .describe('Whether to filter for detached DOM nodes.'),
+    sortBy: zod
+      .enum(['retainedSize', 'selfSize', 'id'])
+      .optional()
+      .describe('Sort order for results. Default is retainedSize.'),
+    pageIdx: zod.number().optional().describe('The page index for pagination.'),
+    pageSize: zod.number().optional().describe('The page size for pagination.'),
+  },
+  handler: async (request, response, context) => {
+    const range = await context.queryHeapSnapshotObjects(
+      request.params.filePath,
+      {
+        className: request.params.className,
+        propertyName: request.params.propertyName,
+        nodeType: request.params.nodeType,
+        minRetainedSize: request.params.retainedSize?.min,
+        maxRetainedSize: request.params.retainedSize?.max,
+        minSelfSize: request.params.selfSize?.min,
+        maxSelfSize: request.params.selfSize?.max,
+        isDetached: request.params.isDetached,
+        sortBy: request.params.sortBy,
+      },
+    );
+
+    response.setHeapSnapshotNodes(range, {
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
   },
 });
