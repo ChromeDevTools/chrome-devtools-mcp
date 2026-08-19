@@ -25,10 +25,12 @@ import {ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logger} from './utils/logger.js';
-import {Mutex} from './third_party/index.js';
+import {Mutex, puppeteer} from './third_party/index.js';
 import {VERSION} from './version.js';
 
 export {buildFlag} from './ToolHandler.js';
+
+puppeteer.setFollowSymlinks(false);
 
 /**
  * Timeout for a `roots/list` that a tool call is waiting on, matching the 5s
