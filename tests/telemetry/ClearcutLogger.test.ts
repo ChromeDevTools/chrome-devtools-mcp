@@ -125,12 +125,20 @@ describe('ClearcutLogger', () => {
 
   describe('setClientName', () => {
     const clients = [
+      {name: 'claude-desktop', expected: 10}, // MCP_CLIENT_CLAUDE_DESKTOP
       {name: 'claude-code', expected: 1}, // MCP_CLIENT_CLAUDE_CODE
+      {name: 'claude', expected: 1}, // MCP_CLIENT_CLAUDE_CODE
       {name: 'gemini-cli', expected: 2}, // MCP_CLIENT_GEMINI_CLI
       {name: DAEMON_CLIENT_NAME, expected: 4}, // MCP_CLIENT_DT_MCP_CLI
       {name: 'openclaw-browser', expected: 5}, // MCP_CLIENT_OPENCLAW
+      {name: 'opencode', expected: 9}, // MCP_CLIENT_OPENCODE
       {name: 'codex-mcp-client', expected: 6}, // MCP_CLIENT_CODEX
       {name: 'antigravity-client', expected: 7}, // MCP_CLIENT_ANTIGRAVITY
+      {name: 'grok-build', expected: 8}, // MCP_CLIENT_GROK
+      {name: 'xai-sdk', expected: 8}, // MCP_CLIENT_GROK
+      {name: 'github-copilot-developer', expected: 11}, // MCP_CLIENT_GITHUB_COPILOT
+      {name: 'copilot-intellij', expected: 11}, // MCP_CLIENT_GITHUB_COPILOT
+      {name: 'unknown-client', expected: 3}, // MCP_CLIENT_OTHER
     ];
 
     for (const {name, expected} of clients) {
