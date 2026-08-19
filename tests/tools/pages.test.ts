@@ -1077,7 +1077,10 @@ describe('pages', () => {
       });
     });
 
-    it.only(
+    /*
+     * The following test fails after the release of chrome 152.
+     * */
+    it(
       'resize when window state is fullscreen',
       {skip: process.platform === 'darwin'},
       async () => {
