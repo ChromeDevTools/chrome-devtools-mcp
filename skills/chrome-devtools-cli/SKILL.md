@@ -137,8 +137,8 @@ chrome-devtools list_network_requests 1 --includePreservedRequests true # Includ
 ## Debugging & Inspection
 
 ```bash
-chrome-devtools evaluate_script 1 "() => document.title" # Evaluate a JavaScript function on the page
-chrome-devtools evaluate_script 1 "(a) => a.innerText" --args 1_4 # Evaluate JS with UID arguments
+chrome-devtools evaluate_script "() => document.title" --pageId 1 # Evaluate a JavaScript function on page 1
+chrome-devtools evaluate_script "(a) => a.innerText" --pageId 1 --args 1_4 # Evaluate JS with UID arguments on page 1
 chrome-devtools get_console_message 1 1 # Gets a console message by its ID
 chrome-devtools lighthouse_audit 1 --mode "navigation" # Run Lighthouse audit for navigation
 chrome-devtools lighthouse_audit 1 --mode "snapshot" --device "mobile" # Run Lighthouse audit for a snapshot on mobile
@@ -178,13 +178,13 @@ chrome-devtools uninstall_pwa "https://example.com/" # Uninstall PWA and close w
 Experimental tools are disabled by default. Enable them with the corresponding flag during `start`.
 
 ```bash
-chrome-devtools click_at 100 200 # Clicks at the provided coordinates (requires --experimentalVision=true)
-chrome-devtools screencast_start --filePath "screen.mp4" # Starts a screencast recording (requires --experimentalScreencast=true and ffmpeg)
-chrome-devtools screencast_stop # Stops the active screencast
-chrome-devtools list_webmcp_tools # List all WebMCP tools (requires --categoryExperimentalWebmcp=true)
-chrome-devtools execute_webmcp_tool "tool_name" '{"arg":"val"}' # Execute a WebMCP tool (requires --categoryExperimentalWebmcp=true)
-chrome-devtools list_3p_developer_tools # List third-party developer tools (requires --categoryExperimentalThirdParty=true)
-chrome-devtools execute_3p_developer_tool "tool_name" '{"arg":"val"}' # Execute third-party developer tool (requires --categoryExperimentalThirdParty=true)
+chrome-devtools click_at 1 100 200 # Clicks at the provided coordinates on page 1 (requires --experimentalVision=true)
+chrome-devtools screencast_start 1 --filePath "screen.mp4" # Starts a screencast recording on page 1 (requires --experimentalScreencast=true and ffmpeg)
+chrome-devtools screencast_stop 1 # Stops the active screencast on page 1
+chrome-devtools list_webmcp_tools 1 # List all WebMCP tools on page 1 (requires --categoryExperimentalWebmcp=true)
+chrome-devtools execute_webmcp_tool 1 "tool_name" --input '{"arg":"val"}' # Execute a WebMCP tool on page 1 (requires --categoryExperimentalWebmcp=true)
+chrome-devtools list_3p_developer_tools 1 # List third-party developer tools on page 1 (requires --categoryExperimentalThirdParty=true)
+chrome-devtools execute_3p_developer_tool 1 "tool_name" --params '{"arg":"val"}' # Execute third-party developer tool on page 1 (requires --categoryExperimentalThirdParty=true)
 ```
 
 ## Service Management

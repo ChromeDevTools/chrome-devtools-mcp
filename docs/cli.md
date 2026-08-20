@@ -64,6 +64,20 @@ chrome-devtools click 1 "element-uid-123"
 chrome-devtools fill 1 "input-uid-456" "search query"
 ```
 
+**Script Evaluation:**
+
+- When `--categoryExtensions` and `--pageIdRouting` are enabled:
+  - Target a page using `--pageId <number>`: `chrome-devtools evaluate_script "() => document.title" --pageId 1`
+  - Target an extension service worker using `--serviceWorkerId <string>`: `chrome-devtools evaluate_script "() => self.registration.scope" --serviceWorkerId sw-1`
+
+```sh
+# Evaluate a JavaScript expression on page 1
+chrome-devtools evaluate_script "() => document.title" --pageId 1
+
+# Evaluate inside an extension service worker
+chrome-devtools evaluate_script "() => self.registration.scope" --serviceWorkerId sw-1
+```
+
 **Analysis:**
 
 ```sh
