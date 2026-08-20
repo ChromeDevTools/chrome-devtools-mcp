@@ -132,6 +132,62 @@ describe('network', () => {
       });
     });
   });
+
+  it('captures navigation request in window.open popup', async () => {
+    server.addHtmlRoute(
+      '/opener',
+      html`<script>
+        window.open('/popup-page', '_blank');
+      </script>`,
+    );
+    server.addHtmlRoute('/popup-page', html`<main>Popup</main>`);
+
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage().pptrPage;
+
+      const popupTargetPromise = context.browser.waitForTarget(
+        t => t.type() === 'page' && t.url().includes('/popup-page'),
+        {timeout: 10000},
+      );
+
+      await page.goto(server.getRoute('/opener'), {
+        waitUntil: 'networkidle0',
+      });
+
+      await popupTargetPromise;
+
+      // Allow #onTargetCreated (fire-and-forget) to complete and register
+      // the popup's McpPage in the context.
+      await context.createPagesSnapshot();
+
+      const popupMcpPage = context
+        .getPages()
+        .find(p => p.pptrPage.url().includes('/popup-page'));
+
+      assert.ok(
+        popupMcpPage,
+        'popup McpPage should be registered in the context',
+      );
+
+      // Point the response at the popup page so network data comes from it.
+      response.setPage(popupMcpPage);
+
+      await listNetworkRequests.handler(
+        {params: {}, page: popupMcpPage},
+        response,
+        context,
+      );
+
+      const responseData = await response.handle(context);
+      const text = getTextContent(responseData.content[0]);
+
+      assert.ok(
+        text.includes('/popup-page'),
+        `Navigation request for /popup-page should be captured; got:\n${text}`,
+      );
+    });
+  });
+
   describe('network_get_request', () => {
     it('attaches request', async () => {
       await withMcpContext(async (response, context) => {

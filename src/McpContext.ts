@@ -23,14 +23,17 @@ import {McpPage} from './McpPage.js';
 import {type UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
+  CDPSessionEvent,
   Locator,
   type Browser,
   type BrowserContext,
+  type CDPSession,
   type ConsoleMessage,
   type GetPWAStateOptions,
   type InstallPWAOptions,
   type LaunchPWAOptions,
   type Page,
+  type Protocol,
   type PWAState,
   type ScreenRecorder,
   type Target,
@@ -113,6 +116,44 @@ export class McpContext implements Context {
   #roots: Root[] | undefined = undefined;
   #allowUnrestrictedPaths: boolean;
 
+  // Connection-level listener that enables Network on new page sessions before
+  // Puppeteer releases the debugger pause (Runtime.runIfWaitingForDebugger).
+  // This ensures navigation requests in window.open tabs are captured.
+  #earlyNetworkConnection?: ReturnType<CDPSession['connection']>;
+
+  // Buffers Network.requestWillBeSent events received before Puppeteer's own
+  // NetworkManager is wired up for a new page session.  Keyed by CDPSession so
+  // we can look up the buffer from the Target in #onTargetCreated.
+  #earlyRequestBuffers = new Map<
+    CDPSession,
+    {
+      events: Protocol.Network.RequestWillBeSentEvent[];
+      cleanup: () => void;
+    }
+  >();
+
+  #onSessionAttached = (session: CDPSession) => {
+    // Send Network.enable before Runtime.runIfWaitingForDebugger so Chrome
+    // captures the initial navigation request for popup tabs.
+    void session.send('Network.enable').catch(() => undefined);
+
+    // Buffer any Network.requestWillBeSent events that arrive before
+    // Puppeteer's NetworkManager registers its own listeners.  We replay them
+    // after the McpPage / NetworkManager is fully initialised.
+    const events: Protocol.Network.RequestWillBeSentEvent[] = [];
+    const handler = (
+      event: Protocol.Network.RequestWillBeSentEvent,
+    ): void => {
+      events.push(event);
+    };
+    session.on('Network.requestWillBeSent', handler);
+    const cleanup = () => {
+      session.off('Network.requestWillBeSent', handler);
+      this.#earlyRequestBuffers.delete(session);
+    };
+    this.#earlyRequestBuffers.set(session, {events, cleanup});
+  };
+
   private constructor(
     browser: Browser,
     logger: Logger,
@@ -142,13 +183,61 @@ export class McpContext implements Context {
     const workers = await this.createExtensionServiceWorkersSnapshot();
 
     await this.#serviceWorkerConsoleCollector.init(workers);
+    this.#setupEarlyNetworkEnabler();
     this.browser.on('targetcreated', this.#onTargetCreated);
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
+  }
+
+  // Registers a CDPSessionEvent.SessionAttached listener on the browser's
+  // underlying CDP Connection so that Network.enable is sent to every new page
+  // target before Puppeteer calls Runtime.runIfWaitingForDebugger.  Without
+  // this, window.open tabs start navigating before the collector is wired and
+  // the initial navigation request is never captured.
+  //
+  // CDPSessionEvent.SessionAttached fires synchronously inside the Connection's
+  // message handler, before the Target.attachedToTarget event is dispatched to
+  // Puppeteer's TargetManager.  The TargetManager then sends
+  // Runtime.runIfWaitingForDebugger as part of processing that event, so any
+  // Network.enable we send from our SessionAttached handler arrives at Chrome
+  // first (the underlying transport is ordered).  We also buffer the resulting
+  // Network.requestWillBeSent events and replay them onto the session once the
+  // page's NetworkManager has registered its listeners.
+  #setupEarlyNetworkEnabler(): void {
+    // Use the primary CDPSession of any already-initialised page to reach the
+    // shared Connection.  Every CdpTarget stores the session that was created
+    // during Target.attachedToTarget; _session() is an internal accessor but
+    // is the most direct path to the connection without creating a new session.
+    const mcpPage = Array.from(this.#mcpPages.values())[0];
+    if (!mcpPage) {
+      return;
+    }
+    const session = (
+      mcpPage.pptrPage.target() as unknown as {
+        _session(): CDPSession | undefined;
+      }
+    )._session();
+    if (!session) {
+      return;
+    }
+    const connection = session.connection();
+    if (!connection) {
+      return;
+    }
+    this.#earlyNetworkConnection = connection;
+    connection.on(CDPSessionEvent.SessionAttached, this.#onSessionAttached);
   }
 
   dispose() {
     this.browser.off('targetcreated', this.#onTargetCreated);
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
+    this.#earlyNetworkConnection?.off(
+      CDPSessionEvent.SessionAttached,
+      this.#onSessionAttached,
+    );
+    this.#earlyNetworkConnection = undefined;
+    for (const {cleanup} of this.#earlyRequestBuffers.values()) {
+      cleanup();
+    }
 
     this.#serviceWorkerConsoleCollector.dispose();
     this.#heapSnapshotManager.dispose();
@@ -164,11 +253,41 @@ export class McpContext implements Context {
 
   #onTargetCreated = async (target: Target) => {
     try {
+      // Retrieve the primary CDPSession before awaiting page() so we can look
+      // up any buffered early Network events.  The cast is necessary because
+      // _session() is an internal Puppeteer method not part of the public API.
+      const primarySession = (
+        target as unknown as {_session(): CDPSession | undefined}
+      )._session();
+      const buffer = primarySession
+        ? this.#earlyRequestBuffers.get(primarySession)
+        : undefined;
+
       const page = await target.page();
       if (!page) {
+        buffer?.cleanup();
         return;
       }
-      void this.#createMcpPage(page);
+
+      // Create the McpPage (and its NetworkCollector) first so that event
+      // listeners are in place before we replay the buffered events below.
+      await this.#createMcpPage(page);
+
+      // At this point:
+      //  • Puppeteer's NetworkManager has registered its 'Network.requestWillBeSent'
+      //    listener on primarySession (done inside FrameManager.initialize →
+      //    NetworkManager.addClient, which is awaited by CdpPage._create).
+      //  • McpPage.networkCollector has registered its 'request' listener on the
+      //    Puppeteer Page object.
+      // Emitting the buffered raw CDP events on the session replays the initial
+      // navigation request through the same pipeline as live events: CDPSession →
+      // NetworkManager → HTTPRequest → page 'request' event → NetworkCollector.
+      if (buffer && primarySession) {
+        buffer.cleanup();
+        for (const event of buffer.events) {
+          primarySession.emit('Network.requestWillBeSent', event);
+        }
+      }
     } catch (err) {
       this.logger?.('Error handling targetcreated', err);
     }
