@@ -359,8 +359,8 @@
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the currently selected page.
-  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
-  Example with arguments: `(el) => el.innerText`
+Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
+Example with arguments: `(el) => el.innerText`
 
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
