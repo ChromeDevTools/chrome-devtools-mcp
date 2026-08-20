@@ -17,7 +17,12 @@ import {TestServer} from '../build/tests/server.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
-const SKILL_PATH = path.join(ROOT_DIR, 'skills', 'chrome-devtools', 'SKILL.md');
+const DEFAULT_SKILL_PATH = path.join(
+  ROOT_DIR,
+  'skills',
+  'chrome-devtools',
+  'SKILL.md',
+);
 
 import type {CapturedFunctionCall, TestScenario} from './eval_result.ts';
 import {Result} from './eval_result.ts';
@@ -41,6 +46,7 @@ async function runSingleScenario(
   modelId: string,
   debug: boolean,
   includeSkill: boolean,
+  skillPath: string = DEFAULT_SKILL_PATH,
   extraServerArgs: string[] = [],
 ): Promise<void> {
   const debugLog = (...args: unknown[]) => {
@@ -62,12 +68,12 @@ async function runSingleScenario(
 
     // Prepend skill content if requested
     if (includeSkill) {
-      if (!fs.existsSync(SKILL_PATH)) {
+      if (!fs.existsSync(skillPath)) {
         throw new Error(
-          `Skill file not found at ${SKILL_PATH}. Please ensure the skill file exists.`,
+          `Skill file not found at ${skillPath}. Please ensure the skill file exists.`,
         );
       }
-      const skillContent = fs.readFileSync(SKILL_PATH, 'utf-8');
+      const skillContent = fs.readFileSync(skillPath, 'utf-8');
       scenario.prompt = `${skillContent}\n\n---\n\n${scenario.prompt}`;
     }
 
@@ -200,6 +206,9 @@ async function main() {
         type: 'boolean',
         default: false,
       },
+      'skill-path': {
+        type: 'string',
+      },
       'server-args': {
         type: 'string',
       },
@@ -210,7 +219,10 @@ async function main() {
   const modelId = values.model;
   const debug = values.debug;
   const repeat = values.repeat;
-  const includeSkill = values['include-skill'];
+  const includeSkill = values['include-skill'] || Boolean(values['skill-path']);
+  const skillPath = values['skill-path']
+    ? path.resolve(ROOT_DIR, values['skill-path'])
+    : DEFAULT_SKILL_PATH;
   const extraServerArgs = values['server-args']
     ? values['server-args'].split(/\s+/)
     : [];
@@ -245,6 +257,7 @@ async function main() {
             modelId,
             debug,
             includeSkill,
+            skillPath,
             extraServerArgs,
           );
           console.log(`✔ ${path.relative(ROOT_DIR, scenarioPath)} (Run ${i})`);

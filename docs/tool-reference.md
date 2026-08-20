@@ -232,7 +232,7 @@
 
 - **url** (string) **(required)**: URL to load in a new page.
 - **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
-- **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated.
+- **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated (useful for clean-slate testing of cookies and authentication).
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 
 ---
@@ -327,7 +327,7 @@
 
 ### `get_network_request`
 
-**Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.
+**Description:** Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).
 
 **Parameters:**
 
