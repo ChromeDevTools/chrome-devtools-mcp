@@ -141,10 +141,21 @@ y.command(
       await stopDaemon(argv.sessionId);
     }
     // Defaults but we do not want to affect the yargs conflict resolution.
-    if (argv.isolated === undefined && argv.userDataDir === undefined) {
+    if (
+      argv.isolated === undefined &&
+      argv.userDataDir === undefined &&
+      !argv.autoConnect &&
+      !argv.browserUrl &&
+      !argv.wsEndpoint
+    ) {
       argv.isolated = true;
     }
-    if (argv.headless === undefined) {
+    if (
+      argv.headless === undefined &&
+      !argv.autoConnect &&
+      !argv.browserUrl &&
+      !argv.wsEndpoint
+    ) {
       argv.headless = true;
     }
     const args = serializeArgs(mcpOptions, argv);
