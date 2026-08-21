@@ -16,6 +16,8 @@ import {
   type OutputMode,
 } from '../third_party/index.js';
 
+import {installGuardedNetworkFetch} from '../utils/guardedNetworkFetch.js';
+
 import {ToolCategory} from './categories.js';
 import {startTrace} from './performance.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -90,6 +92,7 @@ export const lighthouseAudit = definePageTool({
     }
 
     let result: RunnerResult | undefined;
+    const restoreNetworkFetch = installGuardedNetworkFetch(context);
     try {
       if (mode === 'navigation') {
         result = await navigation(page.pptrPage, page.pptrPage.url(), {
@@ -105,6 +108,7 @@ export const lighthouseAudit = definePageTool({
         throw new Error('Lighthouse audit failed.');
       }
     } finally {
+      restoreNetworkFetch();
       await page.restoreEmulation();
     }
 
