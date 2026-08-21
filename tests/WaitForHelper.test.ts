@@ -150,8 +150,6 @@ describe('WaitForHelper', () => {
         `expected the wait to be bounded by the internal timeouts, took ${elapsed}ms`,
       );
 
-      // Note: no in-page cleanup here. Evaluations do not settle while the
-      // navigation is pending; the harness closes the page during teardown.
     });
   });
 
@@ -168,8 +166,6 @@ describe('WaitForHelper', () => {
         });
       });
 
-      // Same-document navigations skip the full navigation wait but are still
-      // surfaced through the before/after URL comparison.
       assert.strictEqual(result.navigatedToUrl, `${pageUrl}#section`);
       assert.strictEqual(result.dialogHandled, false);
     });
