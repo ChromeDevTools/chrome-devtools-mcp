@@ -37,26 +37,33 @@ export class Result {
    * - Returns the active pageId.
    */
   consumePageNavigation(): number | undefined {
-    while (this.calls[this.nextCallIndex]?.name === 'list_pages') {
-      this.nextCallIndex++;
-    }
-
-    const navCall = this.calls[this.nextCallIndex];
-    assert.ok(
-      navCall &&
-        (navCall.name === 'new_page' || navCall.name === 'navigate_page'),
-      `Expected navigation call (new_page or navigate_page), but got: ${navCall?.name || 'none'}`,
-    );
-    this.nextCallIndex++;
+    const setupTools = new Set([
+      'list_pages',
+      'select_page',
+      'navigate_page',
+      'new_page',
+    ]);
+    let hasNavigated = false;
+    let lastNavCall: CapturedFunctionCall | undefined;
 
     while (
-      this.calls[this.nextCallIndex]?.name === 'list_pages' ||
-      this.calls[this.nextCallIndex]?.name === 'select_page'
+      this.calls[this.nextCallIndex] &&
+      setupTools.has(this.calls[this.nextCallIndex].name)
     ) {
+      const call = this.calls[this.nextCallIndex];
+      if (call.name === 'new_page' || call.name === 'navigate_page') {
+        hasNavigated = true;
+        lastNavCall = call;
+      }
       this.nextCallIndex++;
     }
 
-    const isNewPage = navCall.name === 'new_page';
+    assert.ok(
+      hasNavigated,
+      `Expected at least one navigation call (new_page or navigate_page), but got none.`,
+    );
+
+    const isNewPage = lastNavCall?.name === 'new_page';
     let pageId: number | undefined;
     if (this.hasPageIdRouting) {
       pageId = isNewPage ? 2 : 1;

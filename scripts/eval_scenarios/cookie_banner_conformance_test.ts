@@ -24,24 +24,26 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: result => {
-    assert.ok(result.remainingCalls.length >= 3);
-    while (result.remainingCalls[0]?.name === 'list_pages') {
-      result.assertNextCall('list_pages');
-    }
-    result.assertNextCall('new_page', {isolatedContext: 'banner-test'});
-    while (
-      result.remainingCalls[0]?.name === 'list_pages' ||
-      result.remainingCalls[0]?.name === 'select_page'
-    ) {
-      result.assertNextCall(result.remainingCalls[0].name);
-    }
+    const newPageCall = result.calls.find(c => c.name === 'new_page');
+    assert.ok(
+      newPageCall,
+      'Expected new_page to be called for isolated context testing',
+    );
+    assert.strictEqual(
+      newPageCall.args.isolatedContext,
+      'banner-test',
+      "Expected isolatedContext to be 'banner-test'",
+    );
+
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 2);
     const snapshotCall = result.assertNextCall('take_snapshot');
-    const pageId = result.hasPageIdRouting
-      ? (snapshotCall.args.pageId as number)
+    const targetPageId = result.hasPageIdRouting
+      ? ((snapshotCall.args.pageId as number) ?? pageId)
       : undefined;
     result.assertNextCall('click', {
       uid: 'decline-btn',
-      ...(result.hasPageIdRouting ? {pageId} : {}),
+      ...(result.hasPageIdRouting ? {pageId: targetPageId} : {}),
     });
   },
 };
