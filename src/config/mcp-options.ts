@@ -374,6 +374,13 @@ export const mcpOptions = {
       'no roots are configured. Use this only when connecting a trusted local client that does not implement ' +
       'MCP roots and requires access to paths outside the temp directory.',
   },
+  filesystemRoot: {
+    type: 'array',
+    alias: 'workspace',
+    describe:
+      'A directory that filesystem tools are allowed to access. May be specified more than once. ' +
+      'The OS temp directory is always allowed.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;

@@ -379,5 +379,9 @@
   {
     "name": "category_pwa",
     "flagType": "boolean"
+  },
+  {
+    "name": "filesystem_root_present",
+    "flagType": "boolean"
   }
 ]
