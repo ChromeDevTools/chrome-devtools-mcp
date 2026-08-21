@@ -60,7 +60,6 @@ function getCliOptions() {
   // Change the defaults for the CLI.
   delete options.experimentalStructuredContent;
   delete options.experimentalInteropTools;
-  delete options.experimentalPageIdRouting;
 
   return options;
 }
@@ -103,13 +102,11 @@ const y = yargs(hideBin(process.argv))
           '1. Required parameters MUST be passed as positional arguments (without flags).',
         );
         console.error(
-          '   - INCORRECT: chrome-devtools evaluate_script --expression "() => document.title"',
+          '   - INCORRECT: chrome-devtools click --pageId 1 --uid "1_2"',
         );
+        console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
         console.error(
-          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title"',
-        );
-        console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --pageId 1).',
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true).',
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',

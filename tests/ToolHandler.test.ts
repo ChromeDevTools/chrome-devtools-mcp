@@ -32,7 +32,51 @@ describe('ToolHandler', () => {
     ClearcutLogger.resetForTesting();
   });
 
-  it('calls page getter for page scoped tools', async () => {
+  it('calls getPageById for page scoped tools when pageId is provided', async () => {
+    let handlerCalled = false;
+    const tool: DefinedPageTool = {
+      name: 'page_tool',
+      description: 'A page scoped tool',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      pageScoped: true,
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const mockPage = sinon.createStubInstance(McpPage);
+    mockContext.getPageById.returns(mockPage);
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    assert.strictEqual(toolHandler.shouldRegister, true);
+    await toolHandler.handle({pageId: 1});
+
+    assert.strictEqual(mockContext.getPageById.calledOnce, true);
+    assert.strictEqual(mockContext.getPageById.calledWith(1), true);
+    assert.strictEqual(handlerCalled, true);
+  });
+
+  it('calls getSelectedMcpPage for page scoped tools when pageIdRouting is disabled', async () => {
     let handlerCalled = false;
     const tool: DefinedPageTool = {
       name: 'page_tool',
@@ -57,9 +101,11 @@ describe('ToolHandler', () => {
     mockContext.getSelectedMcpPage.returns(mockPage);
 
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
+    const serverArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--no-page-id-routing'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
 
     const toolHandler = new ToolHandler(
       tool,

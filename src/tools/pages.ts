@@ -296,7 +296,7 @@ export const navigatePage = definePageTool(() => {
 
 export const resizePage = definePageTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description: `Resizes the page's window so that the page has specified dimension`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -396,17 +396,11 @@ export const getTabId = definePageTool({
     readOnlyHint: true,
     conditions: ['experimentalInteropTools'],
   },
-  schema: {
-    pageId: zod
-      .number()
-      .describe(
-        `The ID of the page to get the tab ID for. Call ${listPages().name} to get available pages.`,
-      ),
-  },
+  schema: {},
   blockedByDialog: false,
   verifyFilesSchema: {},
-  handler: async (request, response, context) => {
-    const page = context.getPageById(request.params.pageId);
+  handler: async (request, response) => {
+    const page = request.page;
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
     response.setTabId(tabId);
     response.appendResponseLine(`Tab ID: ${tabId}`);

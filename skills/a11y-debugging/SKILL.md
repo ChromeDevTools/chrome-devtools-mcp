@@ -5,6 +5,8 @@ description: Uses Chrome DevTools MCP for accessibility (a11y) debugging and aud
 
 ## Core Concepts
 
+**Page Targeting**: Page-scoped tools (`take_snapshot`, `list_console_messages`, `evaluate_script`, `press_key`, `take_screenshot`, `lighthouse_audit`, etc.) require a `pageId` parameter. Retrieve available page IDs using `list_pages` or from `new_page`.
+
 **Accessibility Tree vs DOM**: Visually hiding an element (e.g., `CSS opacity: 0`) behaves differently for screen readers than `display: none` or `aria-hidden="true"`. The `take_snapshot` tool returns the accessibility tree of the page, which represents what assistive technologies "see", making it the most reliable source of truth for semantic structure.
 
 **Reading web.dev documentation**: If you need to research specific accessibility guidelines (like `https://web.dev/articles/accessible-tap-targets`), you can append `.md.txt` to the URL (e.g., `https://web.dev/articles/accessible-tap-targets.md.txt`) to fetch the clean, raw markdown version. This is much easier to read!

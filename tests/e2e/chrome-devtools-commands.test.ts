@@ -60,7 +60,7 @@ describe('chrome-devtools', () => {
       `start command failed: ${startResult.stderr}`,
     );
 
-    const result = await runCli(['take_screenshot'], sessionId);
+    const result = await runCli(['take_screenshot', '1'], sessionId);
     assert.strictEqual(
       result.status,
       0,
@@ -75,7 +75,7 @@ describe('chrome-devtools', () => {
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {
     await runCli(['start', '--categoryNetwork=false'], sessionId);
 
-    const result = await runCli(['list_network_requests'], sessionId);
+    const result = await runCli(['list_network_requests', '1'], sessionId);
     assert.strictEqual(result.status, 0);
 
     assert(
@@ -93,7 +93,7 @@ describe('chrome-devtools', () => {
   it('fails to invoke click_at when experimentalVision is disabled (default)', async () => {
     await runCli(['start'], sessionId);
 
-    const result = await runCli(['click_at', '100', '100'], sessionId);
+    const result = await runCli(['click_at', '1', '100', '100'], sessionId);
     assert.strictEqual(result.status, 0);
     assert(
       result.stdout.includes(
@@ -119,7 +119,7 @@ describe('chrome-devtools', () => {
     );
 
     const emulateResult = await runCli(
-      ['emulate', '--cpuThrottlingRate', '2'],
+      ['emulate', '1', '--cpuThrottlingRate', '2'],
       sessionId,
     );
     assert.strictEqual(
@@ -128,7 +128,7 @@ describe('chrome-devtools', () => {
       `emulate command failed: ${emulateResult.stderr}`,
     );
 
-    const result = await runCli(['performance_start_trace'], sessionId);
+    const result = await runCli(['performance_start_trace', '1'], sessionId);
     assert.strictEqual(
       result.status,
       0,

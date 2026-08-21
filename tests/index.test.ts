@@ -244,6 +244,7 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
+            pageId: 1,
             filePath: path.resolve(os.homedir(), 'test.png'),
           },
         });
@@ -271,6 +272,7 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
+            pageId: 1,
             filePath: path.join(os.tmpdir(), 'test.png'),
           },
         });
@@ -349,7 +351,10 @@ describe('e2e', () => {
 
           const result = await client.callTool({
             name: 'take_screenshot',
-            arguments: {filePath: path.join(workspace, 'shot.png')},
+            arguments: {
+              pageId: 1,
+              filePath: path.join(workspace, 'shot.png'),
+            },
           });
 
           // Asserted before isError so a denial reports the path it rejected
@@ -381,7 +386,9 @@ describe('e2e', () => {
 
       const snapshotResult = await client.callTool({
         name: 'take_snapshot',
-        arguments: {},
+        arguments: {
+          pageId: 2,
+        },
       });
 
       const snapshotText = (snapshotResult.content as TextContent[])[0].text;
@@ -392,6 +399,7 @@ describe('e2e', () => {
       const result = await client.callTool({
         name: 'click',
         arguments: {
+          pageId: 2,
           uid,
         },
       });
@@ -412,6 +420,7 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
+            pageId: 2,
             // Use os.tmpdir() so validatePath passes on macOS/Windows before
             // reaching the dialog-blocked check.
             filePath: path.join(os.tmpdir(), 'test.png'),
