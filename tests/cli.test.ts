@@ -147,6 +147,22 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('parses filesystem roots', async () => {
+    const args = parseArguments([
+      '--filesystem-root=/tmp/one',
+      '--filesystem-root=/tmp/two',
+    ]);
+    assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+  });
+
+  it('parses workspace as an alias for filesystem roots', async () => {
+    const args = parseArguments([
+      '--workspace=/tmp/one',
+      '--workspace=/tmp/two',
+    ]);
+    assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+  });
+
   it('parses ignore chrome args', async () => {
     const args = parseArguments([
       `--ignore-default-chrome-arg='--disable-extensions'`,

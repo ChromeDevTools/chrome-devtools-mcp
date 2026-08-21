@@ -11,6 +11,14 @@ npm i chrome-devtools-mcp@latest -g
 chrome-devtools status # check if install worked.
 ```
 
+Use `--workspace` when starting the CLI to allow file tools to access a
+directory outside the OS temp directory. Repeat the flag to allow more than one
+directory.
+
+```sh
+chrome-devtools start --workspace=/path/to/project --workspace=/path/to/output
+```
+
 ## How it works
 
 The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).

@@ -678,7 +678,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
-- **`--memoryDebugging`/ `--memory-debugging`, `-experimentalMemory`**
+- **`--memoryDebugging`/ `--memory-debugging`, `--experimentalMemory`**
   Whether to enable memory debugging tools.
   - **Type:** boolean
   - **Default:** `false`
@@ -802,6 +802,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--allowUnrestrictedPaths`/ `--allow-unrestricted-paths`**
   If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, file-writing tools are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
   - **Type:** boolean
+  - **Default:** `false`
+
+- **`--filesystemRoot`/ `--filesystem-root`, `--workspace`**
+  A directory that filesystem tools are allowed to access. May be specified more than once. The OS temp directory is always allowed.
+  - **Type:** array
   - **Default:** `false`
 
 <!-- END AUTO GENERATED OPTIONS -->

@@ -5,6 +5,8 @@
  */
 
 import type fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 import {type ParsedArguments} from './config/mcp-options.js';
 import type {Channel} from './browser.js';
@@ -71,10 +73,25 @@ export async function createMcpServer(
     return {};
   });
 
-  // Roots are client state rather than browser state, so the last listing stays
-  // valid across browser reconnects and only the client can invalidate it, via
-  // the `roots/list_changed` notification handled below
-  let lastRoots: Root[] | undefined;
+  const configuredRoots = (serverArgs.filesystemRoot ?? []).map(root => {
+    const rootPath = path.resolve(String(root));
+    return {
+      uri: pathToFileURL(rootPath).href,
+      name: path.basename(rootPath) || rootPath,
+    };
+  });
+
+  // Client roots stay valid across browser reconnects and only the client can
+  // invalidate them through a `roots/list_changed` notification. Explicitly
+  // configured roots are process state and are always included.
+  let lastClientRoots: Root[] | undefined;
+
+  const combinedRoots = (): Root[] | undefined => {
+    if (configuredRoots.length === 0 && lastClientRoots === undefined) {
+      return undefined;
+    }
+    return [...configuredRoots, ...(lastClientRoots ?? [])];
+  };
 
   // `timeout` is only passed where a tool call is waiting on the result – the
   // background refreshes below block nobody, so bounding them would just discard
@@ -89,8 +106,8 @@ export async function createMcpServer(
         ListRootsResultSchema,
         timeout === undefined ? undefined : {timeout},
       );
-      lastRoots = roots.roots;
-      context?.setRoots(lastRoots);
+      lastClientRoots = roots.roots;
+      context?.setRoots(combinedRoots());
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
@@ -109,7 +126,10 @@ export async function createMcpServer(
           void updateRoots();
         },
       );
-    } else if (!serverArgs.allowUnrestrictedPaths) {
+    } else if (
+      !serverArgs.allowUnrestrictedPaths &&
+      configuredRoots.length === 0
+    ) {
       console.warn(
         '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
           'capability. File-writing tools will be restricted to the OS temp directory. ' +
@@ -181,14 +201,14 @@ export async function createMcpServer(
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: context !== undefined,
       });
-      if (lastRoots === undefined) {
+      context.setRoots(combinedRoots());
+      if (lastClientRoots === undefined) {
         // Nothing listed yet, so this call has to wait – bounded, since it is
         // holding the tool mutex, and a later background refresh still lands
         await updateRoots(ROOTS_REQUEST_TIMEOUT);
       } else {
         // Carry the known roots over and refresh out of band, so a reconnect
         // never pays for a client round-trip
-        context.setRoots(lastRoots);
         void updateRoots();
       }
     }
