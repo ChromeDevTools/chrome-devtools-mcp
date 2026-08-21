@@ -41,7 +41,7 @@ async function runSingleScenario(
   modelId: string,
   debug: boolean,
   includeSkill: boolean,
-  skillPath: string = DEFAULT_SKILL_PATH,
+  skillPath: string = SKILL_PATH,
   extraServerArgs: string[] = [],
 ): Promise<void> {
   const debugLog = (...args: unknown[]) => {
