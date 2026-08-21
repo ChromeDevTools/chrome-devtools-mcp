@@ -252,6 +252,8 @@ export type Context = Readonly<{
   listExtensions(): Promise<Map<string, Extension>>;
   getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
+  hasNetworkBlockOrAllowlist(): boolean;
+  validateUrlForGuardedFetch(url: URL): void;
   getExtensionServiceWorkers(): ExtensionServiceWorker[];
   getExtensionServiceWorkerId(
     extensionServiceWorker: ExtensionServiceWorker,

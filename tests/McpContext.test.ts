@@ -826,4 +826,87 @@ describe('McpContext', () => {
       });
     });
   });
+
+  describe('validateUrlForGuardedFetch / hasNetworkBlockOrAllowlist', () => {
+    it('reports no guardrail configured by default', async () => {
+      await withMcpContext(async (_response, context) => {
+        assert.strictEqual(context.hasNetworkBlockOrAllowlist(), false);
+        assert.doesNotThrow(() =>
+          context.validateUrlForGuardedFetch(
+            new URL('https://example.com/anything'),
+          ),
+        );
+      });
+    });
+
+    it('reports a guardrail configured when a blocklist is set', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          assert.strictEqual(context.hasNetworkBlockOrAllowlist(), true);
+        },
+        {blockedUrlPattern: ['https://example.com/blocked*']},
+      );
+    });
+
+    it('reports a guardrail configured when an allowlist is set', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          assert.strictEqual(context.hasNetworkBlockOrAllowlist(), true);
+        },
+        {allowedUrlPattern: ['https://example.com/allowed*']},
+      );
+    });
+
+    it('throws for a URL matching the blocklist', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          assert.throws(() =>
+            context.validateUrlForGuardedFetch(
+              new URL('https://example.com/blocked/path'),
+            ),
+          );
+        },
+        {blockedUrlPattern: ['https://example.com/blocked*']},
+      );
+    });
+
+    it('does not throw for a URL not matching the blocklist', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          assert.doesNotThrow(() =>
+            context.validateUrlForGuardedFetch(
+              new URL('https://example.com/safe/path'),
+            ),
+          );
+        },
+        {blockedUrlPattern: ['https://example.com/blocked*']},
+      );
+    });
+
+    it('throws for a URL not matching the allowlist', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          assert.throws(() =>
+            context.validateUrlForGuardedFetch(
+              new URL('https://example.com/not-allowed'),
+            ),
+          );
+        },
+        {allowedUrlPattern: ['https://example.com/allowed*']},
+      );
+    });
+
+    it('does not throw for a URL matching the allowlist', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          assert.doesNotThrow(() =>
+            context.validateUrlForGuardedFetch(
+              new URL('https://example.com/allowed/path'),
+            ),
+          );
+        },
+        {allowedUrlPattern: ['https://example.com/allowed*']},
+      );
+    });
+  });
 });

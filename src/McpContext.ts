@@ -883,6 +883,27 @@ export class McpContext implements Context {
     throw new Error(`Not allowed by allowlist: ${url}`);
   }
 
+  /**
+   * Whether a --blockedUrlPattern or --allowedUrlPattern guardrail is
+   * configured for this context.
+   */
+  hasNetworkBlockOrAllowlist(): boolean {
+    return this.#hasNetworkBlockOrAllowlist;
+  }
+
+  /**
+   * Validates a single URL (e.g. a redirect hop) against the configured
+   * --blockedUrlPattern / --allowedUrlPattern guardrail. Throws when the URL
+   * is disallowed. Used to validate fetches that don't go through the
+   * browser's own request pipeline and therefore aren't covered by
+   * Puppeteer's allowlist/blocklist network-condition emulation (e.g.
+   * Lighthouse's out-of-band robots.txt/llms.txt/source-map fetches).
+   */
+  validateUrlForGuardedFetch(url: URL): void {
+    this.#validateUrlNotBlocked(url);
+    this.#validateUrlAllowed(url);
+  }
+
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
 
