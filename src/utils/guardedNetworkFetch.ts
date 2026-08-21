@@ -5,8 +5,8 @@
  */
 
 import {CdpCDPSession} from '../third_party/index.js';
-
 import type {Context} from '../tools/ToolDefinition.js';
+import {createIdGenerator} from './id.js';
 
 /**
  * @fileoverview Lighthouse's `Fetcher` utility (used by the robots-txt,
@@ -63,7 +63,7 @@ export function installGuardedNetworkFetch(context: Context): () => void {
   };
   const originalSend = CdpCDPSessionPrototype.send;
   const mintedStreams = new Map<string, string>();
-  let nextHandle = 1;
+  const nextHandleId = createIdGenerator();
 
   CdpCDPSessionPrototype.send = async function (
     this: unknown,
@@ -73,9 +73,9 @@ export function installGuardedNetworkFetch(context: Context): () => void {
   ): Promise<unknown> {
     if (method === 'IO.read') {
       const handle = (params as IoReadParams | undefined)?.handle;
-      if (handle !== undefined && mintedStreams.has(handle)) {
-        const data = mintedStreams.get(handle)!;
-        mintedStreams.delete(handle);
+      const data = handle === undefined ? undefined : mintedStreams.get(handle);
+      if (data !== undefined) {
+        mintedStreams.delete(handle!);
         return {data, eof: true, base64Encoded: false};
       }
       return originalSend.call(this, method, params, options);
@@ -90,12 +90,14 @@ export function installGuardedNetworkFetch(context: Context): () => void {
       const {status, content} = await fetchWithGuardedRedirects(
         context,
         request.url,
-        cookieUrl =>
-          originalSend.call(this, 'Network.getCookies', {
-            urls: [cookieUrl],
-          }) as Promise<{cookies?: Array<{name: string; value: string}>}>,
+        request.options?.includeCredentials
+          ? cookieUrl =>
+              originalSend.call(this, 'Network.getCookies', {
+                urls: [cookieUrl],
+              }) as Promise<{cookies?: Array<{name: string; value: string}>}>
+          : undefined,
       );
-      const handle = `guarded-fetch-${nextHandle++}`;
+      const handle = `guarded-fetch-${nextHandleId()}`;
       mintedStreams.set(handle, content);
       return {
         resource: {success: true, httpStatusCode: status, stream: handle},
@@ -115,9 +117,11 @@ export function installGuardedNetworkFetch(context: Context): () => void {
 async function fetchWithGuardedRedirects(
   context: Context,
   initialUrl: string,
-  getCookiesForUrl: (
-    url: string,
-  ) => Promise<{cookies?: Array<{name: string; value: string}>}>,
+  getCookiesForUrl:
+    | ((
+        url: string,
+      ) => Promise<{cookies?: Array<{name: string; value: string}>}>)
+    | undefined,
 ): Promise<{status: number; content: string}> {
   let currentUrl = initialUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -125,7 +129,7 @@ async function fetchWithGuardedRedirects(
 
     const headers: Record<string, string> = {};
     try {
-      const {cookies} = await getCookiesForUrl(currentUrl);
+      const {cookies} = (await getCookiesForUrl?.(currentUrl)) ?? {};
       if (cookies?.length) {
         headers['Cookie'] = cookies
           .map(cookie => `${cookie.name}=${cookie.value}`)
