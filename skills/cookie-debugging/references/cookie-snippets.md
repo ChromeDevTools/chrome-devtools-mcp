@@ -2,9 +2,14 @@
 
 Use these JavaScript snippets with the `evaluate_script` tool.
 
+> [!NOTE]
+> All JavaScript snippets below execute in the web page's JavaScript context and therefore only have access to non-`HttpOnly` cookies. To inspect `HttpOnly` session tokens, use `get_network_request` on outgoing request (`Cookie`) or incoming response (`Set-Cookie`) headers.
+
+---
+
 ## 1. Parse `document.cookie`
 
-Parses all accessible cookies into a structured key-value JSON object.
+Parses all accessible (non-`HttpOnly`) cookies into a structured key-value JSON object.
 
 ```js
 () => {
@@ -20,9 +25,11 @@ Parses all accessible cookies into a structured key-value JSON object.
 };
 ```
 
+---
+
 ## 2. Query Modern CookieStore API
 
-Retrieves rich cookie metadata (name, value, domain, path, expires, sameSite, partitioned) using the asynchronous `cookieStore` API when available.
+Retrieves rich cookie metadata (name, value, domain, path, expires, sameSite, partitioned) using the asynchronous `cookieStore` API when available in Chromium.
 
 ```js
 async () => {
@@ -48,6 +55,8 @@ async () => {
     });
 };
 ```
+
+---
 
 ## 3. Cookie Diff / Comparison Helper
 
@@ -94,6 +103,8 @@ Takes a baseline cookie map (obtained from snippet 1) and compares it against cu
 };
 ```
 
+---
+
 ## 4. Consent Storage & CMP Detector
 
 Detects popular Consent Management Platforms (OneTrust, Cookiebot, Civic, Complianz, Klaro, Usercentrics) and inspects consent-related keys in `localStorage` and `sessionStorage`.
@@ -123,4 +134,14 @@ Detects popular Consent Management Platforms (OneTrust, Cookiebot, Civic, Compli
     cookieCount: document.cookie ? document.cookie.split(';').length : 0,
   };
 };
+```
+
+---
+
+## 5. Parse Lighthouse Third-Party Cookie Audit (CLI One-Liner)
+
+Use this command in your terminal/Node environment to extract the `third-party-cookies` audit from a Lighthouse JSON report without loading the entire JSON file into the LLM context:
+
+```bash
+node -e "const r=require('/tmp/lh-report/report.json'); const a=r.audits['third-party-cookies']; console.log(JSON.stringify({score: a?.score, displayValue: a?.displayValue, items: a?.details?.items}))"
 ```
