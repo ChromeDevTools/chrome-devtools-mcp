@@ -139,7 +139,9 @@ function generateConfigOptionsMarkdown(): string {
       continue;
     }
 
-    const aliasText = optionConfig.alias ? `, \`-${optionConfig.alias}\`` : '';
+    const aliasText = optionConfig.alias
+      ? `, \`${optionConfig.alias.length === 1 ? '-' : '--'}${optionConfig.alias}\``
+      : '';
     const description = optionConfig.description || optionConfig.describe || '';
 
     // Convert camelCase to dash-case
