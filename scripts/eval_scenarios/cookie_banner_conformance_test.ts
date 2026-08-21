@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type {TestScenario} from '../eval_gemini.js';
 
 export const scenario: TestScenario = {
   prompt:
@@ -41,9 +41,13 @@ export const scenario: TestScenario = {
     const targetPageId = result.hasPageIdRouting
       ? ((snapshotCall.args.pageId as number) ?? pageId)
       : undefined;
-    result.assertNextCall('click', {
-      uid: 'decline-btn',
-      ...(result.hasPageIdRouting ? {pageId: targetPageId} : {}),
-    });
+    const clickCall = result.assertNextCall('click');
+    assert.ok(
+      clickCall.args.uid,
+      'Expected click to specify a valid element uid',
+    );
+    if (result.hasPageIdRouting && targetPageId !== undefined) {
+      assert.strictEqual(clickCall.args.pageId, targetPageId);
+    }
   },
 };

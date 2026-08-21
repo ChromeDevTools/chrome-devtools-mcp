@@ -24,8 +24,8 @@ const DEFAULT_SKILL_PATH = path.join(
   'SKILL.md',
 );
 
-import type {CapturedFunctionCall, TestScenario} from './eval_result.ts';
-import {Result} from './eval_result.ts';
+import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
+import {Result} from './eval_result.js';
 export type {CapturedFunctionCall, TestScenario};
 export {Result};
 
@@ -112,7 +112,7 @@ async function runSingleScenario(
     });
     env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] = 'true';
 
-    const args = [serverPath];
+    const args = [serverPath, '--isolated'];
     if (!debug) {
       args.push('--headless');
     }

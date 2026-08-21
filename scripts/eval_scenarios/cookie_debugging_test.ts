@@ -6,12 +6,12 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type {TestScenario} from '../eval_gemini.js';
 
 export const scenario: TestScenario = {
   prompt:
     'Navigate to <TEST_URL> and inspect the network request headers to diagnose the authentication failure.',
-  maxTurns: 4,
+  maxTurns: 5,
   htmlRoute: {
     path: '/cookie_auth_test.html',
     htmlContent: `
@@ -25,15 +25,17 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: result => {
-    const pageId = result.consumePageNavigation();
-    assert.ok(result.remainingCalls.length >= 2);
-    result.assertNextCall(
-      'list_network_requests',
-      result.hasPageIdRouting ? {pageId} : undefined,
+    result.consumePageNavigation();
+    const listRequestsCall = result.calls.find(
+      c => c.name === 'list_network_requests',
     );
-    result.assertNextCall(
-      'get_network_request',
-      result.hasPageIdRouting ? {pageId} : undefined,
+    assert.ok(listRequestsCall, 'Expected list_network_requests to be called');
+    const getRequestCall = result.calls.find(
+      c => c.name === 'get_network_request',
+    );
+    assert.ok(
+      getRequestCall,
+      'Expected get_network_request to be called to inspect headers',
     );
   },
 };

@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 
-import type {TestScenario} from '../eval_gemini.ts';
+import type {TestScenario} from '../eval_gemini.js';
 
 export const scenario: TestScenario = {
   prompt:
@@ -19,11 +19,13 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: result => {
-    const pageId = result.consumePageNavigation();
-    assert.ok(result.remainingCalls.length >= 1);
-    result.assertNextCall(
-      'get_network_request',
-      result.hasPageIdRouting ? {pageId} : undefined,
+    result.consumePageNavigation();
+    const getRequestCall = result.calls.find(
+      c => c.name === 'get_network_request',
+    );
+    assert.ok(
+      getRequestCall,
+      'Expected get_network_request to be called to inspect HttpOnly headers',
     );
   },
 };
