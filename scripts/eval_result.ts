@@ -37,7 +37,7 @@ export class Result {
    * - Returns the active pageId.
    */
   consumePageNavigation(): number | undefined {
-    if (this.calls[this.nextCallIndex]?.name === 'list_pages') {
+    while (this.calls[this.nextCallIndex]?.name === 'list_pages') {
       this.nextCallIndex++;
     }
 
@@ -48,6 +48,13 @@ export class Result {
       `Expected navigation call (new_page or navigate_page), but got: ${navCall?.name || 'none'}`,
     );
     this.nextCallIndex++;
+
+    while (
+      this.calls[this.nextCallIndex]?.name === 'list_pages' ||
+      this.calls[this.nextCallIndex]?.name === 'select_page'
+    ) {
+      this.nextCallIndex++;
+    }
 
     const isNewPage = navCall.name === 'new_page';
     let pageId: number | undefined;

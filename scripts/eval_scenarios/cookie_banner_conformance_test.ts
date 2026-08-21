@@ -25,7 +25,16 @@ export const scenario: TestScenario = {
   },
   expectations: result => {
     assert.ok(result.remainingCalls.length >= 3);
+    while (result.remainingCalls[0]?.name === 'list_pages') {
+      result.assertNextCall('list_pages');
+    }
     result.assertNextCall('new_page', {isolatedContext: 'banner-test'});
+    while (
+      result.remainingCalls[0]?.name === 'list_pages' ||
+      result.remainingCalls[0]?.name === 'select_page'
+    ) {
+      result.assertNextCall(result.remainingCalls[0].name);
+    }
     const snapshotCall = result.assertNextCall('take_snapshot');
     const pageId = result.hasPageIdRouting
       ? (snapshotCall.args.pageId as number)

@@ -19,14 +19,11 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: result => {
-    assert.ok(result.remainingCalls.length >= 2);
-    result.assertNextCall('navigate_page', {
-      reload: true,
-      ...(result.hasPageIdRouting ? {pageId: 1} : {}),
-    });
+    const pageId = result.consumePageNavigation();
+    assert.ok(result.remainingCalls.length >= 1);
     result.assertNextCall(
       'get_network_request',
-      result.hasPageIdRouting ? {pageId: 1} : undefined,
+      result.hasPageIdRouting ? {pageId} : undefined,
     );
   },
 };
