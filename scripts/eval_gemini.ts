@@ -17,12 +17,7 @@ import {TestServer} from '../build/tests/server.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
-const DEFAULT_SKILL_PATH = path.join(
-  ROOT_DIR,
-  'skills',
-  'chrome-devtools',
-  'SKILL.md',
-);
+const SKILL_PATH = path.join(ROOT_DIR, 'skills', 'chrome-devtools', 'SKILL.md');
 
 import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
 import {Result} from './eval_result.js';
@@ -222,7 +217,7 @@ async function main() {
   const includeSkill = values['include-skill'] || Boolean(values['skill-path']);
   const skillPath = values['skill-path']
     ? path.resolve(ROOT_DIR, values['skill-path'])
-    : DEFAULT_SKILL_PATH;
+    : SKILL_PATH;
   const extraServerArgs = values['server-args']
     ? values['server-args'].split(/\s+/)
     : [];
