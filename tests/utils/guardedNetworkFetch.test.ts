@@ -123,6 +123,145 @@ describe('guardedNetworkFetch', () => {
     }
   });
 
+  it('forwards cookies as a Cookie header when includeCredentials is set', async () => {
+    const preInstallSend = sinon
+      .stub(CdpCDPSession.prototype, 'send')
+      .callsFake(async (method: string) => {
+        assert.strictEqual(method, 'Network.getCookies');
+        return {
+          cookies: [
+            {name: 'session', value: 'abc123'},
+            {name: 'theme', value: 'dark'},
+          ],
+        } as never;
+      });
+    const fetchStub = sinon.stub(globalThis, 'fetch').resolves({
+      status: 200,
+      headers: new Headers(),
+      text: async () => 'robots content',
+    } as Response);
+
+    const restore = installGuardedNetworkFetch(
+      makeContext({hasGuardrail: true}),
+    );
+    try {
+      await CdpCDPSession.prototype.send.call(
+        {},
+        'Network.loadNetworkResource',
+        {
+          url: 'https://example.com/robots.txt',
+          options: {disableCache: true, includeCredentials: true},
+        } as never,
+      );
+
+      sinon.assert.calledOnce(fetchStub);
+      const fetchOptions = fetchStub.firstCall.args[1] as {
+        headers: Record<string, string>;
+      };
+      assert.strictEqual(fetchOptions.headers['Cookie'], 'session=abc123; theme=dark');
+      sinon.assert.calledWith(preInstallSend, 'Network.getCookies', {
+        urls: ['https://example.com/robots.txt'],
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  it('does not forward a Cookie header when includeCredentials is not set', async () => {
+    const preInstallSend = sinon.stub(CdpCDPSession.prototype, 'send');
+    const fetchStub = sinon.stub(globalThis, 'fetch').resolves({
+      status: 200,
+      headers: new Headers(),
+      text: async () => 'robots content',
+    } as Response);
+
+    const restore = installGuardedNetworkFetch(
+      makeContext({hasGuardrail: true}),
+    );
+    try {
+      await CdpCDPSession.prototype.send.call(
+        {},
+        'Network.loadNetworkResource',
+        {url: 'https://example.com/robots.txt', options: {}} as never,
+      );
+
+      sinon.assert.calledOnce(fetchStub);
+      const fetchOptions = fetchStub.firstCall.args[1] as {
+        headers: Record<string, string>;
+      };
+      assert.strictEqual(fetchOptions.headers['Cookie'], undefined);
+      sinon.assert.notCalled(preInstallSend);
+    } finally {
+      restore();
+    }
+  });
+
+  it('stacks overlapping installs safely: only the last restore unpatches the prototype, and every active guardrail is enforced', async () => {
+    const before = CdpCDPSession.prototype.send;
+    sinon.stub(globalThis, 'fetch').resolves({
+      status: 200,
+      headers: new Headers(),
+      text: async () => 'content',
+    } as Response);
+
+    const seenByA: string[] = [];
+    const seenByB: string[] = [];
+    const restoreA = installGuardedNetworkFetch(
+      makeContext({
+        hasGuardrail: true,
+        validate: url => {
+          seenByA.push(url.href);
+        },
+      }),
+    );
+    const patchedSend = CdpCDPSession.prototype.send;
+    const restoreB = installGuardedNetworkFetch(
+      makeContext({
+        hasGuardrail: true,
+        validate: url => {
+          seenByB.push(url.href);
+          if (url.hostname === 'blocked-by-b.example') {
+            throw new Error('blocked by B');
+          }
+        },
+      }),
+    );
+
+    try {
+      // A second overlapping install must not re-patch the prototype.
+      assert.strictEqual(CdpCDPSession.prototype.send, patchedSend);
+
+      // A URL only B's guardrail rejects is still rejected while both are
+      // active -- every active context is consulted, not just the first.
+      const rejected = (await CdpCDPSession.prototype.send.call(
+        {},
+        'Network.loadNetworkResource',
+        {url: 'https://blocked-by-b.example/robots.txt', options: {}} as never,
+      )) as {resource: {success: boolean}};
+      assert.strictEqual(rejected.resource.success, false);
+      assert.deepStrictEqual(seenByA, ['https://blocked-by-b.example/robots.txt']);
+      assert.deepStrictEqual(seenByB, ['https://blocked-by-b.example/robots.txt']);
+
+      // Restoring the earlier (A) install first must not disturb the still-
+      // active later (B) install.
+      restoreA();
+      assert.strictEqual(CdpCDPSession.prototype.send, patchedSend);
+
+      const stillGuarded = (await CdpCDPSession.prototype.send.call(
+        {},
+        'Network.loadNetworkResource',
+        {url: 'https://blocked-by-b.example/robots.txt', options: {}} as never,
+      )) as {resource: {success: boolean}};
+      assert.strictEqual(stillGuarded.resource.success, false);
+
+      restoreB();
+      assert.strictEqual(CdpCDPSession.prototype.send, before);
+    } finally {
+      restoreA();
+      restoreB();
+    }
+  });
+
   it('passes every non-intercepted call through to the pre-install implementation', async () => {
     // Stub the prototype first so installGuardedNetworkFetch captures this
     // stub as "original" -- proves the shim forwards, rather than swallows,

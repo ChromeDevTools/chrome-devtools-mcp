@@ -262,8 +262,10 @@ describe('Network Blocking Integration', () => {
     const excludedRobotsUrl = `http://127.0.0.1:${excludedPort}/robots.txt`;
 
     try {
+      let allowedRobotsHit = false;
       server.addHtmlRoute('/', '<html><body>Allowed</body></html>');
       server.addRoute('/robots.txt', (_req, res) => {
+        allowedRobotsHit = true;
         res.writeHead(302, {Location: excludedRobotsUrl});
         res.end();
       });
@@ -329,6 +331,11 @@ describe('Network Blocking Integration', () => {
             excludedOriginHit,
             false,
             'Lighthouse must not reach the excluded origin at all',
+          );
+          assert.strictEqual(
+            allowedRobotsHit,
+            true,
+            'Lighthouse must have actually requested the redirecting robots.txt -- otherwise this test would pass even if the redirect were never followed',
           );
 
           const reportPaths = response.attachedLighthouseResult?.reports;

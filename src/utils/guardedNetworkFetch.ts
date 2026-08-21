@@ -30,6 +30,7 @@ import {createIdGenerator} from './id.js';
  */
 
 const MAX_REDIRECTS = 20;
+const FETCH_TIMEOUT_MS = 10_000;
 
 interface LoadNetworkResourceParams {
   frameId?: string;
@@ -41,11 +42,35 @@ interface IoReadParams {
   handle?: string;
 }
 
+type SendFn = (
+  method: string,
+  params?: unknown,
+  options?: unknown,
+) => Promise<unknown>;
+
+const CdpCDPSessionPrototype = CdpCDPSession.prototype as unknown as {
+  send: SendFn;
+};
+
+// Module-level so overlapping installs (e.g. two concurrent lighthouse_audit
+// calls, should the caller's serialization ever be relaxed) stack safely
+// instead of racing on the shared class prototype: only the first install
+// patches `send`, only the last matching restore unpatches it, and every
+// currently-active install's guardrail is consulted on each intercepted
+// call rather than just whichever one happened to patch the prototype.
+let installCount = 0;
+let originalSend: SendFn | undefined;
+const activeContexts = new Set<Context>();
+const mintedStreams = new Map<string, string>();
+const nextHandleId = createIdGenerator();
+
 /**
  * Installs the guarded-fetch interception for the lifetime of the returned
  * restore function's caller. Returns a no-op restore function, without
  * touching the shared prototype at all, when no guardrail is configured --
- * behavior is then byte-for-byte unchanged.
+ * behavior is then byte-for-byte unchanged. Safe to call while another
+ * install from a different context is still active; the returned restore
+ * function is idempotent.
  */
 export function installGuardedNetworkFetch(context: Context): () => void {
   if (!context.hasNetworkBlockOrAllowlist()) {
@@ -54,68 +79,82 @@ export function installGuardedNetworkFetch(context: Context): () => void {
     };
   }
 
-  const CdpCDPSessionPrototype = CdpCDPSession.prototype as unknown as {
-    send: (
-      method: string,
-      params?: unknown,
-      options?: unknown,
-    ) => Promise<unknown>;
-  };
-  const originalSend = CdpCDPSessionPrototype.send;
-  const mintedStreams = new Map<string, string>();
-  const nextHandleId = createIdGenerator();
+  activeContexts.add(context);
+  if (installCount === 0) {
+    originalSend = CdpCDPSessionPrototype.send;
+    CdpCDPSessionPrototype.send = guardedSend;
+  }
+  installCount++;
 
-  CdpCDPSessionPrototype.send = async function (
-    this: unknown,
-    method: string,
-    params?: unknown,
-    options?: unknown,
-  ): Promise<unknown> {
-    if (method === 'IO.read') {
-      const handle = (params as IoReadParams | undefined)?.handle;
-      const data = handle === undefined ? undefined : mintedStreams.get(handle);
-      if (data !== undefined) {
-        mintedStreams.delete(handle!);
-        return {data, eof: true, base64Encoded: false};
-      }
-      return originalSend.call(this, method, params, options);
-    }
-
-    if (method !== 'Network.loadNetworkResource') {
-      return originalSend.call(this, method, params, options);
-    }
-
-    const request = params as LoadNetworkResourceParams;
-    try {
-      const {status, content} = await fetchWithGuardedRedirects(
-        context,
-        request.url,
-        request.options?.includeCredentials
-          ? cookieUrl =>
-              originalSend.call(this, 'Network.getCookies', {
-                urls: [cookieUrl],
-              }) as Promise<{cookies?: Array<{name: string; value: string}>}>
-          : undefined,
-      );
-      const handle = `guarded-fetch-${nextHandleId()}`;
-      mintedStreams.set(handle, content);
-      return {
-        resource: {success: true, httpStatusCode: status, stream: handle},
-      };
-    } catch {
-      return {
-        resource: {success: false},
-      };
-    }
-  };
-
+  let restored = false;
   return () => {
-    CdpCDPSessionPrototype.send = originalSend;
+    if (restored) {
+      return;
+    }
+    restored = true;
+    activeContexts.delete(context);
+    installCount--;
+    if (installCount === 0) {
+      CdpCDPSessionPrototype.send = originalSend!;
+      originalSend = undefined;
+    }
   };
 }
 
+function validateAgainstEveryActiveGuardrail(url: URL): void {
+  for (const context of activeContexts) {
+    context.validateUrlForGuardedFetch(url);
+  }
+}
+
+const guardedSend: SendFn = async function (
+  this: unknown,
+  method: string,
+  params?: unknown,
+  options?: unknown,
+): Promise<unknown> {
+  const original = originalSend;
+
+  if (method === 'IO.read') {
+    const handle = (params as IoReadParams | undefined)?.handle;
+    if (handle !== undefined) {
+      const data = mintedStreams.get(handle);
+      if (data !== undefined) {
+        mintedStreams.delete(handle);
+        return {data, eof: true, base64Encoded: false};
+      }
+    }
+    return original!.call(this, method, params, options);
+  }
+
+  if (method !== 'Network.loadNetworkResource') {
+    return original!.call(this, method, params, options);
+  }
+
+  const request = params as LoadNetworkResourceParams;
+  try {
+    const {status, content} = await fetchWithGuardedRedirects(
+      request.url,
+      request.options?.includeCredentials
+        ? cookieUrl =>
+            original!.call(this, 'Network.getCookies', {
+              urls: [cookieUrl],
+            }) as Promise<{cookies?: Array<{name: string; value: string}>}>
+        : undefined,
+    );
+    const handle = `guarded-fetch-${nextHandleId()}`;
+    mintedStreams.set(handle, content);
+    return {
+      resource: {success: true, httpStatusCode: status, stream: handle},
+    };
+  } catch {
+    return {
+      resource: {success: false},
+    };
+  }
+};
+
 async function fetchWithGuardedRedirects(
-  context: Context,
   initialUrl: string,
   getCookiesForUrl:
     | ((
@@ -125,7 +164,7 @@ async function fetchWithGuardedRedirects(
 ): Promise<{status: number; content: string}> {
   let currentUrl = initialUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    context.validateUrlForGuardedFetch(new URL(currentUrl));
+    validateAgainstEveryActiveGuardrail(new URL(currentUrl));
 
     const headers: Record<string, string> = {};
     try {
@@ -143,6 +182,7 @@ async function fetchWithGuardedRedirects(
     const response = await fetch(currentUrl, {
       redirect: 'manual',
       headers,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (response.status >= 300 && response.status < 400) {
