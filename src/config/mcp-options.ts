@@ -149,8 +149,9 @@ export const mcpOptions = {
   },
   experimentalPageIdRouting: {
     type: 'boolean',
+    default: true,
     describe:
-      'Whether to expose pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions).',
+      'Whether to expose pageId on page-scoped tools and route requests by page ID. Enabled by default to keep concurrent agent sessions from racing on the selected page; pass --no-experimentalPageIdRouting to force all page-scoped tools to target the selected page only.',
   },
   experimentalDevtools: {
     type: 'boolean',

@@ -961,4 +961,147 @@ describe('ToolHandler', () => {
       filePath: canonicalFilePath,
     });
   });
+
+  describe('pageId routing default', () => {
+    function makePageScopedTool(): DefinedPageTool {
+      return {
+        name: 'page_id_routing_tool',
+        description: 'A page scoped tool used to test pageId routing',
+        annotations: {
+          category: ToolCategory.INPUT,
+          readOnlyHint: false,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        pageScoped: true,
+        handler: async () => {
+          // no-op: this test tool only exercises page resolution.
+        },
+      };
+    }
+
+    it('exposes pageId and routes by page ID with no flag passed', async () => {
+      const tool = makePageScopedTool();
+      const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.browser = getMockBrowser({process: mockProcess});
+      const mockPage = sinon.createStubInstance(McpPage);
+      mockContext.getPageById.returns(mockPage);
+
+      const toolMutex = new Mutex();
+      const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      });
+
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+      );
+
+      assert.strictEqual(
+        Object.hasOwn(toolHandler.inputSchema, 'pageId'),
+        true,
+      );
+
+      await toolHandler.handle({pageId: 7});
+
+      assert.strictEqual(mockContext.getPageById.calledOnceWith(7), true);
+      assert.strictEqual(mockContext.getSelectedMcpPage.called, false);
+    });
+
+    it('falls back to the selected page when pageId is omitted', async () => {
+      const tool = makePageScopedTool();
+      const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.browser = getMockBrowser({process: mockProcess});
+      const mockPage = sinon.createStubInstance(McpPage);
+      mockContext.getSelectedMcpPage.returns(mockPage);
+
+      const toolMutex = new Mutex();
+      const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      });
+
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+      );
+
+      await toolHandler.handle({});
+
+      assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+      assert.strictEqual(mockContext.getPageById.called, false);
+    });
+
+    it('hides pageId and always uses the selected page when explicitly disabled', async () => {
+      const tool = makePageScopedTool();
+      const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.browser = getMockBrowser({process: mockProcess});
+      const mockPage = sinon.createStubInstance(McpPage);
+      mockContext.getSelectedMcpPage.returns(mockPage);
+
+      const toolMutex = new Mutex();
+      const serverArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', '--no-experimentalPageIdRouting'],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+      );
+
+      assert.strictEqual(
+        Object.hasOwn(toolHandler.inputSchema, 'pageId'),
+        false,
+      );
+
+      await toolHandler.handle({});
+
+      assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+      assert.strictEqual(mockContext.getPageById.called, false);
+    });
+
+    it('hides pageId in slim mode even though routing defaults to on', async () => {
+      const tool = makePageScopedTool();
+      const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.browser = getMockBrowser({process: mockProcess});
+      const mockPage = sinon.createStubInstance(McpPage);
+      mockContext.getSelectedMcpPage.returns(mockPage);
+
+      const toolMutex = new Mutex();
+      const serverArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', '--slim'],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+      );
+
+      assert.strictEqual(
+        Object.hasOwn(toolHandler.inputSchema, 'pageId'),
+        false,
+      );
+
+      await toolHandler.handle({});
+
+      assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+      assert.strictEqual(mockContext.getPageById.called, false);
+    });
+  });
 });

@@ -23,7 +23,9 @@ export const evaluateScript = defineTool(cliArgs => {
       readOnlyHint: false,
     },
     schema: {
-      ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
+      ...(cliArgs?.experimentalPageIdRouting && !cliArgs?.slim
+        ? pageIdSchema
+        : {}),
       function: zod.string().describe(
         `A JavaScript function declaration to be executed by the tool in the currently selected page.
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
@@ -114,9 +116,12 @@ Example with arguments: \`(el) => el.innerText\`
         return;
       }
 
-      const mcpPage = cliArgs?.experimentalPageIdRouting
-        ? context.getPageById(request.params.pageId)
-        : context.getSelectedMcpPage();
+      const mcpPage =
+        cliArgs?.experimentalPageIdRouting &&
+        typeof pageId === 'number' &&
+        !cliArgs?.slim
+          ? context.getPageById(pageId)
+          : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];

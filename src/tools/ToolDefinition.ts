@@ -454,7 +454,12 @@ export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
 export const pageIdSchema = {
-  pageId: zod.number().describe('Targets a specific page by ID.'),
+  pageId: zod
+    .number()
+    .optional()
+    .describe(
+      'Targets a specific page by ID. Omit to target the currently selected page.',
+    ),
 };
 
 export const timeoutSchema = {

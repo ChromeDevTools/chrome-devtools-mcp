@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {parseArguments} from '../../src/config/mcp-options.js';
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {installExtension} from '../../src/tools/extensions.js';
@@ -440,6 +441,120 @@ describe('script', () => {
         {},
         {categoryExtensions: true},
       );
+    });
+
+    it('routes to a non-selected page by pageId with no flag passed', async () => {
+      await withMcpContext(async (response, context) => {
+        const otherPage = await context.newPage();
+        await otherPage.pptrPage.setContent('<title>other page</title>');
+
+        const defaultArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+          CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+        });
+        await evaluateScript(defaultArgs).handler(
+          {
+            params: {
+              function: String(() => document.title),
+              pageId: otherPage.id,
+            },
+          },
+          response,
+          context,
+        );
+
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'other page');
+      });
+    });
+
+    it('falls back to the selected page under real default args when pageId is omitted', async () => {
+      await withMcpContext(async (response, context) => {
+        const selected = context.getSelectedMcpPage();
+        await selected.pptrPage.setContent('<title>selected page</title>');
+        // A second page exists so the default (pageId routing enabled) has
+        // somewhere else it *could* wrongly route to if the omitted-pageId
+        // case weren't handled.
+        await context.newPage();
+        context.selectPage(selected);
+
+        const defaultArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+          CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+        });
+        await evaluateScript(defaultArgs).handler(
+          {
+            params: {function: String(() => document.title)},
+          },
+          response,
+          context,
+        );
+
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'selected page');
+      });
+    });
+
+    it('hides pageId and always uses the selected page in slim mode', async () => {
+      await withMcpContext(async (response, context) => {
+        const selected = context.getSelectedMcpPage();
+        await selected.pptrPage.setContent('<title>selected page</title>');
+        const otherPage = await context.newPage();
+        context.selectPage(selected);
+
+        const slimArgs = parseArguments(
+          '1.0.0',
+          ['node', 'script.js', '--slim'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        );
+        assert.strictEqual(
+          Object.hasOwn(evaluateScript(slimArgs).schema, 'pageId'),
+          false,
+        );
+
+        await evaluateScript(slimArgs).handler(
+          {
+            params: {
+              function: String(() => document.title),
+              pageId: otherPage.id,
+            },
+          },
+          response,
+          context,
+        );
+
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'selected page');
+      });
+    });
+
+    it('ignores pageId and evaluates on the selected page when routing is disabled', async () => {
+      await withMcpContext(async (response, context) => {
+        const selected = context.getSelectedMcpPage();
+        await selected.pptrPage.setContent('<title>selected page</title>');
+        const otherPage = await context.newPage();
+        await otherPage.pptrPage.setContent('<title>other page</title>');
+        // newPage() auto-selects the new page; re-select the original page to
+        // prove pageId is ignored (not that it happens to match selection).
+        context.selectPage(selected);
+
+        const disabledArgs = parseArguments(
+          '1.0.0',
+          ['node', 'script.js', '--no-experimentalPageIdRouting'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        );
+        await evaluateScript(disabledArgs).handler(
+          {
+            params: {
+              function: String(() => document.title),
+              pageId: otherPage.id,
+            },
+          },
+          response,
+          context,
+        );
+
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 'selected page');
+      });
     });
 
     it('throws error when args are provided with serviceWorkerId', async () => {

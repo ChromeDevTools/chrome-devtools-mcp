@@ -29,6 +29,7 @@ describe('cli args parsing', () => {
     allowUnrestrictedPaths: false,
     memoryDebugging: false,
     experimentalStructuredContent: false,
+    experimentalPageIdRouting: true,
   };
 
   it('parses with default args', async () => {

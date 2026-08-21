@@ -102,6 +102,32 @@ describe('McpContext', () => {
     });
   });
 
+  it('uses the target page\'s own emulation settings for a pageId-routed action, not the selected page\'s (regression for #1245)', async () => {
+    await withMcpContext(async (_response, context) => {
+      const pageA = context.getSelectedMcpPage();
+      const pageB = await context.newPage();
+
+      await pageB.emulate({
+        cpuThrottlingRate: 4,
+        networkConditions: 'Slow 3G',
+      });
+      await pageA.emulate({cpuThrottlingRate: 1});
+
+      // Simulate a concurrent agent re-selecting a different page: pageA is
+      // selected again, but the action below is dispatched directly at
+      // pageB, as ToolHandler does when a caller passes pageB's pageId.
+      context.selectPage(pageA);
+      assert.notStrictEqual(context.getSelectedMcpPage(), pageB);
+
+      const stub = sinon.spy(pageB, 'createWaitForHelper');
+      await pageB.waitForEventsAfterAction(async () => {
+        // trigger the waiting only
+      });
+
+      sinon.assert.calledWithExactly(stub, 4, 10);
+    });
+  });
+
   it('should should detect open DevTools pages', async () => {
     await withMcpContext(
       async (_response, context) => {
