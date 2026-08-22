@@ -42,6 +42,7 @@ await checkForUpdates(
 );
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
+const OPTIONAL_POSITIONAL_ARGS = new Set(['evaluate_script:function']);
 
 async function start(args: string[], sessionId: string) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
@@ -109,7 +110,7 @@ const y = yargs(hideBin(process.argv))
           '   - CORRECT:   chrome-devtools evaluate_script "() => document.title"',
         );
         console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --pageId 1).',
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --pageId 1), except optional positional parameters shown in command help.',
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
@@ -220,12 +221,22 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
   );
 
   const optionalArgNames = Object.keys(args).filter(
-    name => !args[name].required,
+    name =>
+      !args[name].required &&
+      !OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${name}`),
+  );
+  const optionalPositionalArgNames = Object.keys(args).filter(
+    name =>
+      !args[name].required &&
+      OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${name}`),
   );
 
   let commandStr = commandName;
   for (const arg of requiredArgNames) {
     commandStr += ` <${arg}>`;
+  }
+  for (const arg of optionalPositionalArgNames) {
+    commandStr += ` [${arg}]`;
   }
 
   for (const arg of optionalArgNames) {
@@ -250,7 +261,10 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required) {
+        if (
+          opt.required ||
+          OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${argName}`)
+        ) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],

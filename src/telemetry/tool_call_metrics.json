@@ -123,6 +123,14 @@
       {
         "name": "wait_for_stable_dom",
         "argType": "boolean"
+      },
+      {
+        "name": "source_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "format",
+        "argType": "string"
       }
     ]
   },
