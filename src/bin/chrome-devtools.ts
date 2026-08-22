@@ -30,7 +30,7 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand} from '../config/cli-commands.js';
+import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {
   mcpOptions,
@@ -107,7 +107,10 @@ const y = yargs(hideBin(process.argv))
         );
         console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
         console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true).',
+          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title" --pageId 1',
+        );
+        console.error(
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except optional positional parameters shown in command help.',
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
@@ -234,7 +237,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required) {
+        if (opt.required || isOptionalPositionalArg(commandName, argName)) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],
