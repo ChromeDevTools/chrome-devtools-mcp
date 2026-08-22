@@ -8,88 +8,113 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 
 describe('resolveCanonicalPath', () => {
-  it('should resolve an existing standard file path', async () => {
-    const tmpDir = await fs.mkdtemp(
+  let tmpDir: string;
+  let canonicalTmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'resolve-canonical-test-'),
     );
-    try {
-      const filePath = path.join(tmpDir, 'test.txt');
-      await fs.writeFile(filePath, 'hello');
+    canonicalTmpDir = await fs.realpath(tmpDir);
+  });
 
-      const resolved = await resolveCanonicalPath(filePath);
-      const canonicalTmpDir = await fs.realpath(tmpDir);
-      assert.strictEqual(resolved, path.join(canonicalTmpDir, 'test.txt'));
-    } finally {
-      await fs.rm(tmpDir, {recursive: true, force: true});
-    }
+  afterEach(async () => {
+    await fs.rm(tmpDir, {recursive: true, force: true});
+  });
+
+  it('should resolve an existing standard file path', async () => {
+    const filePath = path.join(tmpDir, 'test.txt');
+    await fs.writeFile(filePath, 'hello');
+
+    const resolved = await resolveCanonicalPath(filePath);
+    assert.strictEqual(resolved, path.join(canonicalTmpDir, 'test.txt'));
   });
 
   it('should resolve a non-existent file whose parent directory exists', async () => {
-    const tmpDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'resolve-canonical-test-'),
-    );
-    try {
-      const filePath = path.join(tmpDir, 'non-existent.txt');
+    const filePath = path.join(tmpDir, 'non-existent.txt');
 
-      const resolved = await resolveCanonicalPath(filePath);
-      const canonicalTmpDir = await fs.realpath(tmpDir);
-      assert.strictEqual(
-        resolved,
-        path.join(canonicalTmpDir, 'non-existent.txt'),
-      );
-    } finally {
-      await fs.rm(tmpDir, {recursive: true, force: true});
-    }
+    const resolved = await resolveCanonicalPath(filePath);
+    assert.strictEqual(
+      resolved,
+      path.join(canonicalTmpDir, 'non-existent.txt'),
+    );
   });
 
   it('should resolve a non-existent deeply nested file whose parent directories do not exist', async () => {
-    const tmpDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    const filePath = path.join(
+      tmpDir,
+      'nested1',
+      'nested2',
+      'non-existent.txt',
     );
-    try {
-      const filePath = path.join(
-        tmpDir,
-        'nested1',
-        'nested2',
-        'non-existent.txt',
-      );
 
-      const resolved = await resolveCanonicalPath(filePath);
-      const canonicalTmpDir = await fs.realpath(tmpDir);
-      assert.strictEqual(
-        resolved,
-        path.join(canonicalTmpDir, 'nested1', 'nested2', 'non-existent.txt'),
-      );
-    } finally {
-      await fs.rm(tmpDir, {recursive: true, force: true});
-    }
+    const resolved = await resolveCanonicalPath(filePath);
+    assert.strictEqual(
+      resolved,
+      path.join(canonicalTmpDir, 'nested1', 'nested2', 'non-existent.txt'),
+    );
   });
 
   it('should resolve existing files with symlinks in path', async () => {
-    const tmpDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'resolve-canonical-test-'),
+    const targetDir = path.join(tmpDir, 'target');
+    await fs.mkdir(targetDir);
+    const targetFile = path.join(targetDir, 'file.txt');
+    await fs.writeFile(targetFile, 'hello');
+
+    const symlinkDir = path.join(tmpDir, 'symlink_dir');
+    await fs.symlink(targetDir, symlinkDir, 'dir');
+
+    const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
+
+    const resolved = await resolveCanonicalPath(filePathWithSymlink);
+    const canonicalTargetDir = await fs.realpath(targetDir);
+    assert.strictEqual(resolved, path.join(canonicalTargetDir, 'file.txt'));
+  });
+
+  it('should resolve non-existent files with symlinks in path', async () => {
+    const targetDir = path.join(tmpDir, 'target');
+    await fs.mkdir(targetDir);
+
+    const symlinkDir = path.join(tmpDir, 'symlink_dir');
+    await fs.symlink(targetDir, symlinkDir, 'dir');
+
+    const filePathWithSymlink = path.join(symlinkDir, 'non-existent.txt');
+
+    const resolved = await resolveCanonicalPath(filePathWithSymlink);
+    const canonicalTargetDir = await fs.realpath(targetDir);
+    assert.strictEqual(
+      resolved,
+      path.join(canonicalTargetDir, 'non-existent.txt'),
     );
-    try {
-      const targetDir = path.join(tmpDir, 'target');
-      await fs.mkdir(targetDir);
-      const targetFile = path.join(targetDir, 'file.txt');
-      await fs.writeFile(targetFile, 'hello');
+  });
 
-      const symlinkDir = path.join(tmpDir, 'symlink_dir');
-      await fs.symlink(targetDir, symlinkDir, 'dir');
+  it('should resolve dangling symlink at the end of path', async () => {
+    const nonExistentTarget = path.join(tmpDir, 'non-existent-target.txt');
+    const danglingSymlink = path.join(tmpDir, 'dangling-symlink.txt');
+    await fs.symlink(nonExistentTarget, danglingSymlink);
 
-      const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
+    const resolved = await resolveCanonicalPath(danglingSymlink);
+    assert.strictEqual(
+      resolved,
+      path.join(canonicalTmpDir, 'dangling-symlink.txt'),
+    );
+  });
 
-      const resolved = await resolveCanonicalPath(filePathWithSymlink);
-      const canonicalTargetDir = await fs.realpath(targetDir);
-      assert.strictEqual(resolved, path.join(canonicalTargetDir, 'file.txt'));
-    } finally {
-      await fs.rm(tmpDir, {recursive: true, force: true});
-    }
+  it('should resolve path with a dangling symlink directory in the middle', async () => {
+    const nonExistentTargetDir = path.join(tmpDir, 'non-existent-dir');
+    const danglingSymlinkDir = path.join(tmpDir, 'dangling-dir');
+    await fs.symlink(nonExistentTargetDir, danglingSymlinkDir, 'dir');
+
+    const filePath = path.join(danglingSymlinkDir, 'file.txt');
+    const resolved = await resolveCanonicalPath(filePath);
+    assert.strictEqual(
+      resolved,
+      path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
+    );
   });
 });

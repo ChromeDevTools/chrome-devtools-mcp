@@ -20,6 +20,7 @@ import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
+import {resolveCanonicalPath} from '../src/utils/files.js';
 
 import {
   getMockRequest,
@@ -418,8 +419,14 @@ describe('McpContext', () => {
         ];
         context.setRoots(roots);
         // Valid path within root
-        await context.validatePath(path.join(workspacePath, 'test.txt'));
-        await context.validatePath(workspacePath);
+        const targetPath = path.join(workspacePath, 'test.txt');
+        const resolved = await context.validatePath(targetPath);
+        assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
+        const resolvedWorkspace = await context.validatePath(workspacePath);
+        assert.strictEqual(
+          resolvedWorkspace,
+          await resolveCanonicalPath(workspacePath),
+        );
 
         // Invalid path outside root and outside temp dir
         const outsidePath = path.resolve(os.homedir(), 'outside-test.txt');
@@ -443,9 +450,9 @@ describe('McpContext', () => {
         ];
         context.setRoots(roots);
         // Valid path within root with non-existent intermediate directories
-        await context.validatePath(
-          path.join(workspacePath, 'dir1', 'dir2', 'test.txt'),
-        );
+        const targetPath = path.join(workspacePath, 'dir1', 'dir2', 'test.txt');
+        const resolved = await context.validatePath(targetPath);
+        assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
       } finally {
         await fs.rm(workspacePath, {recursive: true, force: true});
       }
@@ -456,10 +463,31 @@ describe('McpContext', () => {
     await withMcpContext(
       async (_response, context) => {
         context.setRoots(undefined);
-        await context.validatePath(path.resolve(os.homedir(), 'anywhere.txt'));
+        const targetPath = path.resolve(os.homedir(), 'anywhere.txt');
+        const resolved = await context.validatePath(targetPath);
+        assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
       },
       {allowUnrestrictedPaths: true},
     );
+  });
+
+  it('validatePath returns undefined if filePath is undefined', async () => {
+    await withMcpContext(async (_response, context) => {
+      const resolved = await context.validatePath(undefined);
+      assert.strictEqual(resolved, undefined);
+    });
+  });
+
+  it('validatePath returns resolved absolute path for relative paths', async () => {
+    await withMcpContext(async (_response, context) => {
+      const tmpDir = os.tmpdir();
+      const relativeTmpPath = path.relative(
+        process.cwd(),
+        path.join(tmpDir, 'test.txt'),
+      );
+      const resolved = await context.validatePath(relativeTmpPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(relativeTmpPath));
+    });
   });
 
   it('validatePath denies paths outside tmpdir if roots are undefined and allowUnrestrictedPaths is not set', async () => {
@@ -468,7 +496,9 @@ describe('McpContext', () => {
       const outsidePath = path.resolve(os.homedir(), 'anywhere.txt');
       await assert.rejects(context.validatePath(outsidePath), /Access denied/);
       // Temp dir must still be reachable.
-      await context.validatePath(path.join(os.tmpdir(), 'test.txt'));
+      const tmpPath = path.join(os.tmpdir(), 'test.txt');
+      const resolved = await context.validatePath(tmpPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(tmpPath));
     });
   });
 
@@ -476,7 +506,9 @@ describe('McpContext', () => {
     await withMcpContext(async (_response, context) => {
       context.setRoots([]);
       // Should allow temp dir
-      await context.validatePath(path.join(os.tmpdir(), 'test.txt'));
+      const tmpPath = path.join(os.tmpdir(), 'test.txt');
+      const resolved = await context.validatePath(tmpPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(tmpPath));
 
       // Should deny outside temp dir
       await assert.rejects(
@@ -492,7 +524,35 @@ describe('McpContext', () => {
       return;
     }
 
-    it('saveFile refuses to write through a symlink to an existing file', async () => {
+    it('validatePath resolves symlinks and returns the canonical path', async () => {
+      await withMcpContext(async (_response, context) => {
+        const tmpDir = await fs.mkdtemp(
+          path.join(os.tmpdir(), 'validate-symlink-test-'),
+        );
+        try {
+          const targetDir = path.join(tmpDir, 'target');
+          await fs.mkdir(targetDir);
+          const targetFile = path.join(targetDir, 'file.txt');
+          await fs.writeFile(targetFile, 'hello');
+
+          const symlinkDir = path.join(tmpDir, 'symlink_dir');
+          await fs.symlink(targetDir, symlinkDir, 'dir');
+
+          const canonicalTarget = await fs.realpath(targetDir);
+          context.setRoots([
+            {uri: pathToFileURL(canonicalTarget).href, name: 'target'},
+          ]);
+
+          const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
+          const resolved = await context.validatePath(filePathWithSymlink);
+          assert.strictEqual(resolved, path.join(canonicalTarget, 'file.txt'));
+        } finally {
+          await fs.rm(tmpDir, {recursive: true, force: true});
+        }
+      });
+    });
+
+    it('saveFile allows writing to a symlinked file if it resolves to an allowed path', async () => {
       await withMcpContext(async (_response, context) => {
         const tmpDir = await fs.mkdtemp(
           path.join(os.tmpdir(), 'mcp-symlink-test-'),
@@ -506,14 +566,12 @@ describe('McpContext', () => {
           const symlinkPath = path.join(tmpDir, 'symlink.txt');
           await fs.symlink(targetPath, symlinkPath);
 
-          const data = new TextEncoder().encode('malicious content');
-          await assert.rejects(
-            context.saveFile(data, symlinkPath, '.txt'),
-            /Could not write/,
-          );
+          const data = new TextEncoder().encode('content');
+          await context.saveFile(data, symlinkPath, '.txt');
+          await context.saveFile(data, targetPath, '.txt');
 
           const content = await fs.readFile(targetPath, 'utf-8');
-          assert.strictEqual(content, 'original content');
+          assert.strictEqual(content, 'content');
         } finally {
           await fs.rm(tmpDir, {recursive: true, force: true});
         }
@@ -567,8 +625,10 @@ describe('McpContext', () => {
           const data = new TextEncoder().encode('allowed content');
 
           const result = await context.saveFile(data, targetFilePath, '.txt');
-          assert.strictEqual(result.filename, targetFilePath);
-
+          assert.strictEqual(
+            result.filename,
+            await resolveCanonicalPath(targetFilePath),
+          );
           const content = await fs.readFile(
             path.join(realDir, 'test.txt'),
             'utf-8',
@@ -715,6 +775,53 @@ describe('McpContext', () => {
         await withMcpContext(async (_response, context) => {
           const result = await context.getDevToolsData();
           assert.deepStrictEqual(result, {});
+        });
+      });
+    });
+
+    describe('getSelectedMcpPageUrl', () => {
+      it('returns url from passed page when open', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = await context.newPage();
+          const result = context.getSelectedMcpPageUrl(page);
+          assert.strictEqual(result, page.pptrPage.url());
+        });
+      });
+
+      it('returns undefined from passed page when closed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = await context.newPage();
+          await page.pptrPage.close();
+          const result = context.getSelectedMcpPageUrl(page);
+          assert.strictEqual(result, undefined);
+        });
+      });
+
+      it('returns url from selected page when no page passed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = context.getSelectedMcpPage();
+          const result = context.getSelectedMcpPageUrl();
+          assert.strictEqual(result, page.pptrPage.url());
+        });
+      });
+
+      it('returns undefined when getSelectedMcpPage throws', async () => {
+        await withMcpContext(async (_response, context) => {
+          sinon
+            .stub(context, 'getSelectedMcpPage')
+            .throws(new Error('No page selected'));
+          const result = context.getSelectedMcpPageUrl();
+          assert.strictEqual(result, undefined);
+        });
+      });
+
+      it('returns undefined when selected page is closed and getSelectedMcpPage throws', async () => {
+        await withMcpContext(async (_response, context) => {
+          const page = context.getSelectedMcpPage();
+          await page.pptrPage.close();
+          assert.throws(() => context.getSelectedMcpPage());
+          const result = context.getSelectedMcpPageUrl();
+          assert.strictEqual(result, undefined);
         });
       });
     });

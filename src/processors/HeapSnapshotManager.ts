@@ -48,6 +48,11 @@ export type HeapQueryOptions =
 
 export type HeapEdgesQueryOptions =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
+const VALID_EXTENSIONS: readonly string[] = ['.heapsnapshot', '.heaptimeline'];
+
+function hasValidHeapSnapshotExtension(filePath: string): boolean {
+  return VALID_EXTENSIONS.some(ext => filePath.endsWith(ext));
+}
 
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
@@ -65,6 +70,11 @@ export class HeapSnapshotManager {
   async getSnapshot(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy> {
+    if (!hasValidHeapSnapshotExtension(filePath)) {
+      throw new Error(
+        `File ${filePath} must have a .heapsnapshot or .heaptimeline extension.`,
+      );
+    }
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {
@@ -410,6 +420,15 @@ export class HeapSnapshotManager {
   async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.getDuplicateStrings();
+  }
+
+  async queryObjects(
+    filePath: string,
+    options: HeapQueryOptions,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const provider = snapshot.queryObjects(options);
+    return await provider.serializeItemsRange(0, Infinity);
   }
 
   hasSnapshots(): boolean {

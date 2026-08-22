@@ -223,7 +223,7 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the currently selected page. Returns the response as JSON, so returned values have to be JSON-serializable.',
+      'Evaluate a JavaScript function inside the currently selected page or service worker. Returns the response as JSON, so returned values have to be JSON-serializable.',
     category: 'Debugging',
     args: {
       function: {
@@ -258,6 +258,13 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+        required: false,
+      },
+      serviceWorkerId: {
+        name: 'serviceWorkerId',
+        type: 'string',
+        description:
+          "The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.",
         required: false,
       },
     },
@@ -511,10 +518,11 @@ export const commands: Commands = {
         required: false,
         enum: ['retainedSize', 'selfSize', 'name'],
       },
-      minRetainedSize: {
-        name: 'minRetainedSize',
-        type: 'number',
-        description: 'Minimum retained size in bytes for target nodes.',
+      retainedSize: {
+        name: 'retainedSize',
+        type: 'string',
+        description:
+          'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.',
         required: false,
       },
       excludePrimitives: {
@@ -821,7 +829,7 @@ export const commands: Commands = {
   },
   list_console_messages: {
     description:
-      'List all console messages for the currently selected page since the last navigation.',
+      'List all console messages for the currently selected page since the last navigation. This includes console messages originating from extensions content scripts.',
     category: 'Debugging',
     args: {
       pageSize: {
@@ -919,7 +927,8 @@ export const commands: Commands = {
     },
   },
   list_pages: {
-    description: 'Get a list of pages open in the browser.',
+    description:
+      'Get a list of pages including extension service workers open in the browser.',
     category: 'Navigation automation',
     args: {},
   },
@@ -1094,6 +1103,78 @@ export const commands: Commands = {
         type: 'boolean',
         description:
           'Whether to include a snapshot in the response. Default is false.',
+        required: false,
+      },
+    },
+  },
+  query_heapsnapshot_objects: {
+    description:
+      'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
+    category: 'Memory',
+    args: {
+      filePath: {
+        name: 'filePath',
+        type: 'string',
+        description: 'A path to a .heapsnapshot file to read.',
+        required: true,
+      },
+      className: {
+        name: 'className',
+        type: 'string',
+        description: 'Optional regex or text matching object class name.',
+        required: false,
+      },
+      propertyName: {
+        name: 'propertyName',
+        type: 'string',
+        description:
+          'Optional property name filter for outgoing reference edges.',
+        required: false,
+      },
+      nodeType: {
+        name: 'nodeType',
+        type: 'string',
+        description:
+          'Optional V8 node type filter (e.g. object, closure, string, array, code).',
+        required: false,
+      },
+      retainedSize: {
+        name: 'retainedSize',
+        type: 'string',
+        description:
+          'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+        required: false,
+      },
+      selfSize: {
+        name: 'selfSize',
+        type: 'string',
+        description:
+          'Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+        required: false,
+      },
+      isDetached: {
+        name: 'isDetached',
+        type: 'boolean',
+        description: 'Whether to filter for detached DOM nodes.',
+        required: false,
+      },
+      sortBy: {
+        name: 'sortBy',
+        type: 'string',
+        description: 'Sort order for results. Default is retainedSize.',
+        required: false,
+        enum: ['retainedSize', 'selfSize', 'id'],
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'number',
+        description: 'The page index for pagination.',
+        required: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'number',
+        description: 'The page size for pagination.',
         required: false,
       },
     },

@@ -163,11 +163,13 @@ export const mcpOptions = {
   },
   memoryDebugging: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable memory debugging tools.',
     alias: 'experimentalMemory',
   },
   experimentalStructuredContent: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to output structured formatted content.',
   },
   experimentalToonFormat: {
@@ -381,6 +383,45 @@ export const mcpOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
+export function getMcpOptionsForViaCli(): typeof mcpOptions {
+  if (!('default' in mcpOptions.headless)) {
+    throw new Error('headless cli option unexpectedly does not have a default');
+  }
+  if (!('default' in mcpOptions.experimentalStructuredContent)) {
+    throw new Error(
+      'experimentalStructuredContent cli option unexpectedly does not have a default',
+    );
+  }
+  if ('default' in mcpOptions.isolated) {
+    throw new Error('isolated cli option unexpectedly has a default');
+  }
+
+  return {
+    ...mcpOptions,
+    headless: {
+      ...mcpOptions.headless,
+      default: true,
+    },
+    memoryDebugging: {
+      ...mcpOptions.memoryDebugging,
+      default: true,
+    },
+    categoryExtensions: {
+      ...mcpOptions.categoryExtensions,
+      default: true,
+    },
+    experimentalStructuredContent: {
+      ...mcpOptions.experimentalStructuredContent,
+      default: true,
+    },
+    isolated: {
+      ...mcpOptions.isolated,
+      description:
+        'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.',
+    },
+  };
+}
+
 /**
  * Exported only for testing to not trigger process exit.
  */
@@ -389,13 +430,16 @@ export function parser(
   argv = process.argv,
   env = process.env,
 ) {
+  const isViaCli = argv.includes('--viaCli') || argv.includes('--via-cli');
+  const options = isViaCli ? getMcpOptionsForViaCli() : mcpOptions;
+
   const yargsInstance = yargs(hideBin(argv))
     .scriptName('npx chrome-devtools-mcp@latest')
     .parserConfiguration({
       'strip-aliased': true,
       'strip-dashed': true,
     })
-    .options(mcpOptions)
+    .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
       // We can't set default in the options else
@@ -416,7 +460,7 @@ export function parser(
       }
 
       const cliOptionsAllowedArgs = [
-        ...Object.keys(mcpOptions),
+        ...Object.keys(options),
         // Yargs populated with positional args
         '_',
         '$0',

@@ -126,13 +126,24 @@ describe('daemon client', () => {
       );
     });
 
-    it('handles error response when isError is true', async () => {
+    it('handles error response when isError is true with md format', async () => {
       const errorResponse = {
         isError: true,
         content: [{type: 'text' as const, text: 'Something went wrong'}],
       };
       assert.strictEqual(
         await handleResponse(errorResponse, 'md'),
+        'Something went wrong',
+      );
+    });
+
+    it('handles error response when isError is true with json format', async () => {
+      const errorResponse = {
+        isError: true,
+        content: [{type: 'text' as const, text: 'Something went wrong'}],
+      };
+      assert.strictEqual(
+        await handleResponse(errorResponse, 'json'),
         JSON.stringify(errorResponse.content),
       );
     });

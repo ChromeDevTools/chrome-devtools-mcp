@@ -90,7 +90,9 @@ export class ClearcutLogger {
 
   setClientName(clientName: string): void {
     const lowerName = clientName.toLowerCase();
-    if (lowerName.includes('claude')) {
+    if (lowerName.includes('claude-desktop')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_DESKTOP;
+    } else if (lowerName.includes('claude')) {
       this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_CODE;
     } else if (lowerName.includes('gemini')) {
       this.#mcpClient = McpClient.MCP_CLIENT_GEMINI_CLI;
@@ -98,10 +100,16 @@ export class ClearcutLogger {
       this.#mcpClient = McpClient.MCP_CLIENT_DT_MCP_CLI;
     } else if (lowerName.includes('openclaw')) {
       this.#mcpClient = McpClient.MCP_CLIENT_OPENCLAW;
+    } else if (lowerName.includes('opencode')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_OPENCODE;
     } else if (lowerName.includes('codex')) {
       this.#mcpClient = McpClient.MCP_CLIENT_CODEX;
     } else if (lowerName.includes('antigravity')) {
       this.#mcpClient = McpClient.MCP_CLIENT_ANTIGRAVITY;
+    } else if (lowerName.includes('grok') || lowerName.includes('xai')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_GROK;
+    } else if (lowerName.includes('copilot')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_GITHUB_COPILOT;
     } else {
       this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
     }

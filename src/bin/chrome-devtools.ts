@@ -31,41 +31,39 @@ import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
 import {commands} from '../config/cli-options.js';
-import {mcpOptions, parseArguments} from '../config/mcp-options.js';
+import {
+  mcpOptions,
+  parseArguments,
+  getMcpOptionsForViaCli,
+} from '../config/mcp-options.js';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
 );
 
+const DEFAULT_CLI_ARGS = ['--viaCli'];
+
 async function start(args: string[], sessionId: string) {
-  const combinedArgs = [...args, ...defaultArgs];
+  const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
   await startDaemon(combinedArgs, sessionId);
   logDisclaimers(parseArguments(VERSION, combinedArgs));
 }
 
-const defaultArgs = ['--viaCli', '--experimentalStructuredContent'];
+function getCliOptions() {
+  const options: Partial<typeof mcpOptions> = {
+    ...getMcpOptionsForViaCli(),
+  };
 
-const startCliOptions = {
-  ...mcpOptions,
-} as Partial<typeof mcpOptions>;
+  // Missing CLI serialization.
+  delete options.viewport;
 
-// Missing CLI serialization.
-delete startCliOptions.viewport;
+  // Change the defaults for the CLI.
+  delete options.experimentalStructuredContent;
+  delete options.experimentalInteropTools;
+  delete options.experimentalPageIdRouting;
 
-// Change the defaults for the CLI.
-delete startCliOptions.experimentalStructuredContent;
-delete startCliOptions.experimentalInteropTools;
-delete startCliOptions.experimentalPageIdRouting;
-if (!('default' in mcpOptions.headless)) {
-  throw new Error('headless cli option unexpectedly does not have a default');
+  return options;
 }
-if ('default' in mcpOptions.isolated) {
-  throw new Error('isolated cli option unexpectedly has a default');
-}
-startCliOptions.headless!.default = true;
-startCliOptions.isolated!.description =
-  'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.';
-startCliOptions.categoryExtensions!.default = true;
 
 const y = yargs(hideBin(process.argv))
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
@@ -132,7 +130,7 @@ y.command(
   'Start or restart chrome-devtools-mcp',
   y =>
     y
-      .options(startCliOptions)
+      .options(getCliOptions())
       .example(
         '$0 start --browserUrl http://localhost:9222',
         'Start the server connecting to an existing browser',
@@ -143,10 +141,21 @@ y.command(
       await stopDaemon(argv.sessionId);
     }
     // Defaults but we do not want to affect the yargs conflict resolution.
-    if (argv.isolated === undefined && argv.userDataDir === undefined) {
+    if (
+      argv.isolated === undefined &&
+      argv.userDataDir === undefined &&
+      !argv.autoConnect &&
+      !argv.browserUrl &&
+      !argv.wsEndpoint
+    ) {
       argv.isolated = true;
     }
-    if (argv.headless === undefined) {
+    if (
+      argv.headless === undefined &&
+      !argv.autoConnect &&
+      !argv.browserUrl &&
+      !argv.wsEndpoint
+    ) {
       argv.headless = true;
     }
     const args = serializeArgs(mcpOptions, argv);

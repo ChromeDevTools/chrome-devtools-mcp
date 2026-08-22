@@ -11,6 +11,8 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import {resolveCanonicalPath} from '../src/utils/files.js';
+
 import {withMcpContext} from './utils.js';
 
 describe('McpContext Roots', () => {
@@ -18,8 +20,8 @@ describe('McpContext Roots', () => {
     await withMcpContext(async (_response, context) => {
       context.setRoots([]);
       const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
-      // This should not throw
-      await context.validatePath(tmpPath);
+      const resolved = await context.validatePath(tmpPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(tmpPath));
     });
   });
 
@@ -36,7 +38,8 @@ describe('McpContext Roots', () => {
       const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
       // The temp directory must remain reachable even with no negotiated
       // roots, matching the existing "empty roots" behavior above.
-      await context.validatePath(tmpPath);
+      const resolved = await context.validatePath(tmpPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(tmpPath));
     });
   });
 
@@ -51,11 +54,16 @@ describe('McpContext Roots', () => {
         context.setRoots([{uri: pathToFileURL(otherRoot).href, name: 'other'}]);
 
         const tmpPath = path.join(os.tmpdir(), 'test-file.txt');
-        // This should not throw.
-        await context.validatePath(tmpPath);
+        const resolvedTmp = await context.validatePath(tmpPath);
+        assert.strictEqual(resolvedTmp, await resolveCanonicalPath(tmpPath));
 
         // Other root should also be allowed.
-        await context.validatePath(path.join(otherRoot, 'file.txt'));
+        const otherFile = path.join(otherRoot, 'file.txt');
+        const resolvedOther = await context.validatePath(otherFile);
+        assert.strictEqual(
+          resolvedOther,
+          await resolveCanonicalPath(otherFile),
+        );
 
         // Outside should still be denied. Use a path that is definitely not a root or temp dir.
         const outsidePath = path.resolve(
@@ -122,7 +130,9 @@ describe('McpContext Roots', () => {
 
           assert.strictEqual(
             resolvedPath,
-            path.join(workspacePath, testCase.expected),
+            await resolveCanonicalPath(
+              path.join(workspacePath, testCase.expected),
+            ),
           );
         }
       } finally {

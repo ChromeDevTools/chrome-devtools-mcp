@@ -11,6 +11,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {lighthouseAudit} from '../../src/tools/lighthouse.js';
+import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -177,8 +178,9 @@ describe('lighthouse', () => {
           assert.equal(data.summary.mode, 'snapshot');
           assert.equal(data.summary.device, 'mobile');
           assert.ok(data.reports.length === 2);
+          const canonicalFolderPath = await resolveCanonicalPath(folderPath);
           for (const report of data.reports) {
-            assert.ok(report.startsWith(folderPath));
+            assert.ok(report.startsWith(canonicalFolderPath));
           }
         });
       } finally {
