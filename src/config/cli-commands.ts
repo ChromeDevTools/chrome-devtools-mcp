@@ -6,12 +6,22 @@
 
 import type {ArgDef} from './cli-options.js';
 
+const OPTIONAL_POSITIONAL_ARGS = new Set(['evaluate_script:function']);
+
+export function isOptionalPositionalArg(
+  commandName: string,
+  argName: string,
+): boolean {
+  return OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${argName}`);
+}
+
 /**
  * Builds the yargs command string and usage line for a CLI command.
  *
- * Optional args are rendered as `[--flag]` in the usage line only: as part of
- * the command string yargs parses each one as a trailing positional, and a
- * variadic positional has to be the last one.
+ * Optional flag args are rendered as `[--flag]` in the usage line only: as
+ * part of the command string yargs parses each one as a trailing positional,
+ * and a variadic positional has to be the last one. A small set of optional
+ * args intentionally remain positional for backwards-compatible CLI syntax.
  */
 export function buildCommand(
   commandName: string,
@@ -22,6 +32,8 @@ export function buildCommand(
   for (const [name, arg] of Object.entries(args)) {
     if (arg.required) {
       command += arg.type === 'array' ? ` <${name}..>` : ` <${name}>`;
+    } else if (isOptionalPositionalArg(commandName, name)) {
+      command += arg.type === 'array' ? ` [${name}..]` : ` [${name}]`;
     } else {
       flags += ` [--${name}]`;
     }

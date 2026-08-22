@@ -1212,6 +1212,16 @@ describe('cli command strings', () => {
     assert.strictEqual(command, 'dummy_cmd <arg1> <arg2>');
   });
 
+  it('keeps evaluate_script function as an optional positional', () => {
+    const {command, usage} = buildCommand(
+      'evaluate_script',
+      commands['evaluate_script'].args,
+    );
+    assert.strictEqual(command, 'evaluate_script [function]');
+    assert.ok(!usage.includes('[--function]'));
+    assert.ok(usage.includes('[--sourcePath]'));
+  });
+
   it('lists optional args in the usage line, not the command', () => {
     const {command, usage} = buildCommand('dummy_cmd', dummyArgsOptional);
     assert.ok(!command.includes('--'));
