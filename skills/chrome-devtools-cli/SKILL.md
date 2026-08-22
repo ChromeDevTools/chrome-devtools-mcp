@@ -139,6 +139,7 @@ chrome-devtools list_network_requests 1 --includePreservedRequests true # Includ
 ```bash
 chrome-devtools evaluate_script "() => document.title" --pageId 1 # Evaluate a JavaScript function on page 1
 chrome-devtools evaluate_script "(a) => a.innerText" --pageId 1 --args 1_4 # Evaluate JS with UID arguments on page 1
+chrome-devtools evaluate_script --pageId 1 --sourcePath ./script.js --format script # Evaluate a local classic JavaScript file on page 1
 chrome-devtools get_console_message 1 1 # Gets a console message by its ID
 chrome-devtools lighthouse_audit 1 --mode "navigation" # Run Lighthouse audit for navigation
 chrome-devtools lighthouse_audit 1 --mode "snapshot" --device "mobile" # Run Lighthouse audit for a snapshot on mobile
