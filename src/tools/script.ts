@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {readFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
@@ -17,19 +20,34 @@ export type Evaluatable = Page | Frame | WebWorker;
 export const evaluateScript = defineTool(cliArgs => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
+    description: `Evaluate JavaScript inside the currently selected page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
     },
     schema: {
       ...(cliArgs?.experimentalPageIdRouting ? pageIdSchema : {}),
-      function: zod.string().describe(
-        `A JavaScript function declaration to be executed by the tool in the currently selected page.
+      function: zod
+        .string()
+        .optional()
+        .describe(
+          `JavaScript source to execute in the currently selected page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
 Example with arguments: \`(el) => el.innerText\`
 `,
-      ),
+        ),
+      sourcePath: zod
+        .string()
+        .optional()
+        .describe(
+          "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
+        ),
+      format: zod
+        .enum(['function', 'script'])
+        .optional()
+        .describe(
+          'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
+        ),
       args: zod
         .array(
           zod
@@ -72,17 +90,25 @@ Example with arguments: \`(el) => el.innerText\`
     blockedByDialog: true,
     verifyFilesSchema: {
       filePath: true,
+      sourcePath: true,
     },
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,
         args: uidArgs,
         function: fnString,
+        sourcePath,
+        format = 'function',
         pageId,
         dialogAction,
         filePath,
         waitForStableDom,
       } = request.params;
+
+      const source = await resolveScriptSource(fnString, sourcePath);
+      if (format === 'script' && uidArgs && uidArgs.length > 0) {
+        throw new Error('args cannot be used when format is "script".');
+      }
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
@@ -99,7 +125,7 @@ Example with arguments: \`(el) => el.innerText\`
           .getSelectedMcpPage()
           .waitForEventsAfterAction(
             async () => {
-              await performEvaluation(worker, fnString, [], response, {
+              await performEvaluation(worker, source, format, [], response, {
                 filePath,
                 context,
               });
@@ -134,7 +160,7 @@ Example with arguments: \`(el) => el.innerText\`
 
       const result = await mcpPage.waitForEventsAfterAction(
         async () => {
-          await performEvaluation(evaluatable, fnString, args, response, {
+          await performEvaluation(evaluatable, source, format, args, response, {
             filePath,
             context,
           });
@@ -146,24 +172,57 @@ Example with arguments: \`(el) => el.innerText\`
   };
 });
 
+const resolveScriptSource = async (
+  inlineSource: string | undefined,
+  sourcePath: string | undefined,
+): Promise<string> => {
+  if (inlineSource !== undefined) {
+    if (sourcePath !== undefined) {
+      throw new Error('Specify exactly one of function or sourcePath.');
+    }
+    return inlineSource;
+  }
+  if (sourcePath === undefined) {
+    throw new Error('Specify exactly one of function or sourcePath.');
+  }
+
+  const resolvedPath = sourcePath.startsWith('file:')
+    ? fileURLToPath(sourcePath)
+    : sourcePath;
+  try {
+    return await readFile(resolvedPath, 'utf8');
+  } catch (error) {
+    throw new Error(`Unable to read script source from ${sourcePath}.`, {
+      cause: error,
+    });
+  }
+};
+
 const performEvaluation = async (
   evaluatable: Evaluatable,
-  fnString: string,
+  source: string,
+  format: 'function' | 'script',
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options?: {filePath: string; context: Context},
+  options: {filePath?: string; context: Context},
 ) => {
-  using fn = await evaluatable.evaluateHandle(`(${fnString})`);
+  let result: string | undefined;
+  if (format === 'function') {
+    using fn = await evaluatable.evaluateHandle(`(${source})`);
+    result = await evaluatable.evaluate(
+      async (fn, ...args) => {
+        // @ts-expect-error no types for function fn
+        return JSON.stringify(await fn(...args));
+      },
+      fn,
+      ...args,
+    );
+  } else {
+    const value = await evaluatable.evaluate(source);
+    result = JSON.stringify(value);
+  }
 
-  const result = await evaluatable.evaluate(
-    async (fn, ...args) => {
-      // @ts-expect-error no types for function fn
-      return JSON.stringify(await fn(...args));
-    },
-    fn,
-    ...args,
-  );
-  if (options?.filePath) {
+  if (options.filePath) {
     const data = new TextEncoder().encode(result ?? 'undefined');
     const {filename} = await options.context.saveFile(
       data,

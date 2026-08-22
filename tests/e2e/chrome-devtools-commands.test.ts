@@ -6,6 +6,9 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -70,6 +73,50 @@ describe('chrome-devtools', () => {
       result.stdout.includes('.png'),
       'take_screenshot output is unexpected',
     );
+  });
+
+  it('can evaluate inline and local JavaScript', async () => {
+    const startResult = await runCli(['start'], sessionId);
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+
+    const inlineResult = await runCli(
+      ['evaluate_script', '() => 6 * 7'],
+      sessionId,
+    );
+    assert.strictEqual(
+      inlineResult.status,
+      0,
+      `inline evaluation failed: ${inlineResult.stderr}`,
+    );
+    assert.match(inlineResult.stdout, /\b42\b/);
+
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'evaluate-script-cli-'),
+    );
+    const sourcePath = path.join(directory, 'script.js');
+    try {
+      await fs.writeFile(
+        sourcePath,
+        'document.title = "Local script"; document.title',
+        'utf8',
+      );
+      const fileResult = await runCli(
+        ['evaluate_script', '--sourcePath', sourcePath, '--format', 'script'],
+        sessionId,
+      );
+      assert.strictEqual(
+        fileResult.status,
+        0,
+        `file evaluation failed: ${fileResult.stderr}`,
+      );
+      assert.match(fileResult.stdout, /Local script/);
+    } finally {
+      await fs.rm(directory, {recursive: true, force: true});
+    }
   });
 
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {
