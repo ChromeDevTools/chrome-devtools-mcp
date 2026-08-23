@@ -35,6 +35,7 @@ import {
   mcpOptions,
   parseArguments,
   getMcpOptionsForViaCli,
+  checkFilesystemRootConflict,
 } from '../config/mcp-options.js';
 
 await checkForUpdates(
@@ -128,6 +129,12 @@ y.command(
   y =>
     y
       .options(getCliOptions())
+      .check(argv => {
+        return checkFilesystemRootConflict(
+          argv.allowUnrestrictedPaths,
+          hideBin(process.argv),
+        );
+      })
       .example(
         '$0 start --browserUrl http://localhost:9222',
         'Start the server connecting to an existing browser',

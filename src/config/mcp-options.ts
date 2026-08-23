@@ -6,6 +6,7 @@
 
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
+import os from 'node:os';
 
 export const mcpOptions = {
   autoConnect: {
@@ -392,6 +393,7 @@ export const mcpOptions = {
   allowUnrestrictedPaths: {
     type: 'boolean',
     default: false,
+    deprecated: 'Use --workspace=/ instead.',
     describe:
       'If set, disables the default path restriction that applies when the MCP client does not negotiate ' +
       'the roots capability. By default, file-writing tools are restricted to the OS temp directory when ' +
@@ -401,6 +403,8 @@ export const mcpOptions = {
   filesystemRoot: {
     type: 'array',
     alias: 'workspace',
+    default: [os.tmpdir()],
+    defaultDescription: 'OS temp directory',
     describe:
       'A directory that filesystem tools are allowed to access. May be specified more than once. ' +
       'The OS temp directory is always allowed.',
@@ -408,6 +412,29 @@ export const mcpOptions = {
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
+
+export function checkFilesystemRootConflict(
+  allowUnrestrictedPaths: unknown,
+  argv: readonly string[],
+): boolean {
+  if (allowUnrestrictedPaths !== true) {
+    return true;
+  }
+
+  const hasExplicitFilesystemRoot = argv.some(arg => {
+    return ['--filesystem-root', '--filesystemRoot', '--workspace'].some(
+      option => arg === option || arg.startsWith(`${option}=`),
+    );
+  });
+
+  if (hasExplicitFilesystemRoot) {
+    throw new Error(
+      'Arguments filesystemRoot and allowUnrestrictedPaths are mutually exclusive',
+    );
+  }
+
+  return true;
+}
 
 export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
@@ -475,6 +502,12 @@ export function parser(
       'strip-dashed': true,
     })
     .options(options)
+    .check(args => {
+      return checkFilesystemRootConflict(
+        args.allowUnrestrictedPaths,
+        hideBin(argv),
+      );
+    })
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
       // We can't set default in the options else

@@ -71,7 +71,9 @@ export class McpServer {
   ) {
     this.#serverArgs = serverArgs;
     this.#options = options;
-    this.#configuredRoots = (serverArgs.filesystemRoot ?? []).map(root => {
+    this.#configuredRoots = (
+      serverArgs.allowUnrestrictedPaths ? [] : (serverArgs.filesystemRoot ?? [])
+    ).map(root => {
       const rootPath = path.resolve(String(root));
       return {
         uri: pathToFileURL(rootPath).href,

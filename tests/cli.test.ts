@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import os from 'node:os';
 import {describe, it} from 'node:test';
 
 import {mcpOptions, parser} from '../src/config/mcp-options.js';
@@ -28,6 +29,7 @@ describe('cli args parsing', () => {
     javascriptEvaluation: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
+    filesystemRoot: [os.tmpdir()],
     memoryDebugging: false,
     experimentalStructuredContent: false,
     pageIdRouting: true,
@@ -164,6 +166,17 @@ describe('cli args parsing', () => {
       '--workspace=/tmp/two',
     ]);
     assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+  });
+
+  it('rejects filesystem roots with unrestricted paths', async () => {
+    assert.throws(() => {
+      parseArguments(['--workspace=/', '--allow-unrestricted-paths']);
+    }, /filesystemRoot and allowUnrestrictedPaths are mutually exclusive/);
+  });
+
+  it('still accepts unrestricted paths without an explicit root', async () => {
+    const args = parseArguments(['--allow-unrestricted-paths']);
+    assert.strictEqual(args.allowUnrestrictedPaths, true);
   });
 
   it('parses ignore chrome args', async () => {
