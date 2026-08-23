@@ -60,6 +60,28 @@ describe('screenshot', () => {
         );
       });
     });
+    it('with omitBackground option', async () => {
+      await withMcpContext(async (response, context) => {
+        const fixture = screenshots.basic;
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(fixture.html);
+        await screenshotTool.handler(
+          {
+            params: {format: 'png', omitBackground: true},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        assert.equal(response.images.length, 1);
+        assert.equal(response.images[0].mimeType, 'image/png');
+        assert.equal(
+          response.responseLines.at(0),
+          "Took a screenshot of the current page's viewport.",
+        );
+      });
+    });
     it('ignores quality', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;

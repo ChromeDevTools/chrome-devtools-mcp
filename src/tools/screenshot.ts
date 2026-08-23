@@ -173,6 +173,12 @@ export const screenshot = definePageTool(args => {
         .describe(
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
         ),
+      omitBackground: zod
+        .boolean()
+        .optional()
+        .describe(
+          'Hides the default white background and allows capturing transparent backgrounds or CSS backgrounds behind transparent elements.',
+        ),
     },
     blockedByDialog: true,
     verifyFilesSchema: {
@@ -194,6 +200,7 @@ export const screenshot = definePageTool(args => {
           ? undefined
           : (request.params.quality ?? screenshotQuality);
       const fullPage = request.params.fullPage ?? false;
+      const omitBackground = request.params.omitBackground;
 
       // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
       // once the capture is done to avoid leaking a remote object for the life
@@ -229,12 +236,14 @@ export const screenshot = definePageTool(args => {
           quality,
           optimizeForSpeed: true,
           clip,
+          omitBackground,
         });
       } else if (element) {
         screenshot = await element.screenshot({
           type: format,
           quality,
           optimizeForSpeed: true,
+          omitBackground,
         });
       } else {
         screenshot = await page.screenshot({
@@ -242,6 +251,7 @@ export const screenshot = definePageTool(args => {
           fullPage,
           quality,
           optimizeForSpeed: true,
+          omitBackground,
         });
       }
 
