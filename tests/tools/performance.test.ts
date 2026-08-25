@@ -67,6 +67,7 @@ describe('performance', () => {
             ...DevTools.TracingOptionalCategories.JsSampling,
             ...DevTools.TracingOptionalCategories.Screenshot,
           ],
+          bufferSize: 1200 * 1000,
         });
         assert.ok(context.isRunningPerformanceTrace());
         assert.ok(
