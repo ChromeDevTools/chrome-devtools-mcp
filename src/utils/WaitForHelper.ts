@@ -157,7 +157,7 @@ export class WaitForHelper {
 
     // A scoped AbortController used to clean up navigation probe listeners.
     // When aborted (either after navigation detection finishes or if this.#abortController
-    // aborts), it removes the CDP Page.frameStartedNavigating listener and automatically
+    // aborts), it removes CDP navigation probe listeners and automatically
     // detaches the abort listener from this.#abortController.signal.
     const navigationAbortController = new AbortController();
     const navigationStartedResolvers = Promise.withResolvers<boolean>();
@@ -177,12 +177,25 @@ export class WaitForHelper {
 
       navigationStartedResolvers.resolve(true);
     };
+    const scheduledNavigationListener = (
+      event: Protocol.Page.FrameScheduledNavigationEvent,
+    ) => {
+      if (event.frameId === this.#page.mainFrame()._id) {
+        navigationStartedResolvers.resolve(true);
+      }
+    };
 
     this.#page._client().on('Page.frameStartedNavigating', navigationListener);
+    this.#page
+      ._client()
+      .on('Page.frameScheduledNavigation', scheduledNavigationListener);
     navigationAbortController.signal.addEventListener('abort', () => {
       this.#page
         ._client()
         .off('Page.frameStartedNavigating', navigationListener);
+      this.#page
+        ._client()
+        .off('Page.frameScheduledNavigation', scheduledNavigationListener);
     });
     this.#abortController.signal.addEventListener(
       'abort',
