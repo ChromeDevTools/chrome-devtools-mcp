@@ -7,6 +7,10 @@ description: Diagnoses and resolves memory leaks in JavaScript/Node.js applicati
 
 This skill provides expert guidance and workflows for finding, diagnosing, and fixing memory leaks in JavaScript and Node.js applications using Chrome DevTools MCP tools.
 
+## Prerequisites
+
+Advanced memory debugging tools (`compare_heapsnapshot`, `get_heapsnapshot_details`, etc.) are only available when the server is started with the `--memoryDebugging` flag.
+
 ## Core Principles
 
 - **Prefer MCP memory tools:** Do NOT attempt to read raw `.heapsnapshot` files directly, as they are extremely large and will consume too many tokens. Use the Chrome DevTools MCP heap snapshot tools to summarize, compare, and inspect snapshots.
