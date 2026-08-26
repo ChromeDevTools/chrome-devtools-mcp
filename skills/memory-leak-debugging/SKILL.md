@@ -9,7 +9,7 @@ This skill provides expert guidance and workflows for finding, diagnosing, and f
 
 ## Prerequisites
 
-Advanced memory debugging tools (`compare_heapsnapshot`, `get_heapsnapshot_details`, etc.) are only available when the server is started with the `--memoryDebugging` flag.
+Advanced memory debugging tools (`compare_heapsnapshots`, `get_heapsnapshot_details`, etc.) are only available when the server is started with the `--memoryDebugging` flag. First check if these tools are available; if not, try to read the MCP configuration file to check if `--memoryDebugging` is enabled.
 
 ## Core Principles
 
