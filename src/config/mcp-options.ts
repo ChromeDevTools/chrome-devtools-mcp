@@ -320,7 +320,7 @@ export const mcpOptions = {
   screenshotFormat: {
     type: 'string',
     description:
-      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which helps reduce context size in AI conversations. Unset preserves the existing default ("png").',
+      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
     choices: ['jpeg', 'png', 'webp'] as const,
   },
   screenshotQuality: {
