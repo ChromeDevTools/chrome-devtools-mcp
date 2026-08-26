@@ -45,6 +45,7 @@ describe('cli args parsing', () => {
 
   it('parses with viaCli args', async () => {
     const args = parseArguments(['--viaCli']);
+    assert.strictEqual(args.allowUnrestrictedPaths, true);
     assert.strictEqual(args.headless, true);
     assert.strictEqual(args.memoryDebugging, true);
     assert.strictEqual(args.categoryExtensions, true);

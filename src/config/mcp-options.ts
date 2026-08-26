@@ -383,6 +383,11 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
     throw new Error('headless cli option unexpectedly does not have a default');
   }
+  if (!('default' in mcpOptions.allowUnrestrictedPaths)) {
+    throw new Error(
+      'allowUnrestrictedPaths cli option unexpectedly does not have a default',
+    );
+  }
   if (!('default' in mcpOptions.experimentalStructuredContent)) {
     throw new Error(
       'experimentalStructuredContent cli option unexpectedly does not have a default',
@@ -394,6 +399,10 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
 
   return {
     ...mcpOptions,
+    allowUnrestrictedPaths: {
+      ...mcpOptions.allowUnrestrictedPaths,
+      default: true,
+    },
     headless: {
       ...mcpOptions.headless,
       default: true,

@@ -24,12 +24,7 @@ uid=1_0 RootWebArea "Example Domain" url="https://example.com/"
 
 ## Permissions & File Access
 
-By default, the server only has access to the **OS temp directory** (as defined by Node APIs, `os.tmpdir()`). File-saving parameters (`--filePath`, `--outputDirPath`) and `upload_file` outside the temp directory require unrestricted filesystem access:
-
-```bash
-# Start daemon with full filesystem access
-chrome-devtools start --allowUnrestrictedPaths=true
-```
+By default, the CLI has full filesystem access (`--allowUnrestrictedPaths=true`), allowing file-saving parameters (`--filePath`, `--outputDirPath`) and `upload_file` to access files anywhere on the system. Pass `--allowUnrestrictedPaths=false` if you want to restrict file access to the OS temp directory.
 
 ## Command Usage
 
@@ -191,7 +186,6 @@ chrome-devtools execute_3p_developer_tool 1 "tool_name" --params '{"arg":"val"}'
 
 ```bash
 chrome-devtools start   # Start or restart chrome-devtools-mcp
-chrome-devtools start --allowUnrestrictedPaths=true # Start with full filesystem access
 chrome-devtools start --headless=false # Start with visible browser window
 chrome-devtools status  # Checks if chrome-devtools-mcp is running
 chrome-devtools stop    # Stop chrome-devtools-mcp if any
