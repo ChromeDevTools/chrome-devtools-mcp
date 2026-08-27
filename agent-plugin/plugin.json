@@ -1,6 +1,6 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "chrome-devtools-mcp",
+  "name": "chrome-devtools",
   "version": "1.8.0",
   "description": "Reliable Chrome automation, debugging, and performance analysis for AI agents.",
   "author": {
