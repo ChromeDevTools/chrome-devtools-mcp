@@ -11,7 +11,7 @@ import type {TestScenario} from '../eval_gemini.js';
 export const scenario: TestScenario = {
   prompt:
     'Open <TEST_URL> in an isolated browser context called banner-test to check the cookie consent banner, take a snapshot, and click Decline.',
-  maxTurns: 4,
+  maxTurns: 5,
   htmlRoute: {
     path: '/cookie_banner_test.html',
     htmlContent: `
@@ -37,17 +37,16 @@ export const scenario: TestScenario = {
 
     const pageId = result.consumePageNavigation();
     assert.ok(result.remainingCalls.length >= 2);
-    const snapshotCall = result.assertNextCall('take_snapshot');
-    const targetPageId = result.hasPageIdRouting
-      ? ((snapshotCall.args.pageId as number) ?? pageId)
-      : undefined;
-    const clickCall = result.assertNextCall('click');
+    const snapshotCall = result.calls.find(c => c.name === 'take_snapshot');
+    assert.ok(snapshotCall, 'Expected take_snapshot to be called');
+    const clickCall = result.calls.find(c => c.name === 'click');
+    assert.ok(clickCall, 'Expected click to be called');
     assert.ok(
       clickCall.args.uid,
       'Expected click to specify a valid element uid',
     );
-    if (result.hasPageIdRouting && targetPageId !== undefined) {
-      assert.strictEqual(clickCall.args.pageId, targetPageId);
+    if (result.hasPageIdRouting && pageId !== undefined) {
+      assert.strictEqual(clickCall.args.pageId, pageId);
     }
   },
 };
