@@ -300,6 +300,9 @@ export function html(
 }
 
 export function stabilizeStructuredContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return stabilizeResponseOutput(content);
+  }
   const stabilize = (c: unknown): unknown => {
     if (typeof c === 'string') {
       return stabilizeResponseOutput(c);
