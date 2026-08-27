@@ -74,6 +74,16 @@
           "type": "json",
           "path": ".github/plugin/plugin.json",
           "jsonpath": "mcpServers['chrome-devtools'].args[0]"
+        },
+        {
+          "type": "json",
+          "path": "agent-plugin/plugin.json",
+          "jsonpath": "version"
+        },
+        {
+          "type": "json",
+          "path": "agent-plugin/mcp.json",
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         }
       ]
     }
