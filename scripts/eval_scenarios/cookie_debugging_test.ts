@@ -11,7 +11,7 @@ import type {TestScenario} from '../eval_gemini.js';
 export const scenario: TestScenario = {
   prompt:
     'Navigate to <TEST_URL> and inspect the network request headers to diagnose the authentication failure.',
-  maxTurns: 5,
+  maxTurns: 6,
   htmlRoute: {
     path: '/cookie_auth_test.html',
     htmlContent: `

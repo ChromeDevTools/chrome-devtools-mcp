@@ -11,7 +11,7 @@ Cookies marked `HttpOnly` cannot be accessed or modified by client-side JavaScri
 
 - To inspect current `HttpOnly` values: Look at the `Cookie` request header of any outgoing HTTP request via `get_network_request`.
 - To inspect how cookies were created or configured: Look at the `Set-Cookie` response header of login/auth responses.
-- To inspect non-`HttpOnly` cookies: Use `evaluate_script` with snippets from [references/cookie-snippets.md](references/cookie-snippets.md).
+- To inspect non-`HttpOnly` cookies: Use `evaluate_script` with `() => document.cookie` or `() => cookieStore.getAll()`.
 
 ### Session Strategy: Live Tab vs Isolated Context
 
@@ -68,7 +68,7 @@ To verify that no non-essential or tracking cookies are set before consent or wh
    ```json
    {"url": "<PAGE_URL>", "isolatedContext": "consent-test-1"}
    ```
-2. **Record Baseline Cookies**: Before interacting with the banner, run `evaluate_script` with the **"Parse document.cookie" snippet** from [references/cookie-snippets.md](references/cookie-snippets.md).
+2. **Record Baseline Cookies**: Before interacting with the banner, run `evaluate_script` with `() => document.cookie` (or `() => cookieStore.getAll()`).
 3. **Inspect Premature Network Requests & Issues**:
    - Call `list_network_requests` to ensure no third-party tracking beacons fired before consent.
    - Call `list_console_messages` with `types: ["issue"]` to check for tracking warnings.
@@ -76,8 +76,7 @@ To verify that no non-essential or tracking cookies are set before consent or wh
    - Capture snapshot with `take_snapshot` to locate the "Decline" or "Reject All" button `uid`.
    - Click the button with `click`.
 5. **Verify Cookie Difference**:
-   - Run `evaluate_script` with the **"Cookie Diff / Comparison Helper" snippet** from [references/cookie-snippets.md](references/cookie-snippets.md), passing the baseline cookie map.
-   - Assert that only strictly necessary or consent-state cookies exist.
+   - Check `document.cookie` after clicking to assert that only strictly necessary or consent-state cookies exist.
 6. **Teardown Context**: Call `close_page` when the audit is complete to prevent leftover cookies from affecting subsequent tasks.
 
 ### 3. Auditing Cookie Security, SameSite & CHIPS (Partitioned Cookies)
@@ -107,8 +106,13 @@ To verify that no non-essential or tracking cookies are set before consent or wh
 For client-accessible, non-`HttpOnly` cookies (e.g., UI preferences, non-sensitive feature flags):
 
 1. **Read Cookies**:
-   - Use `evaluate_script` with the **"Parse document.cookie" snippet** from [references/cookie-snippets.md](references/cookie-snippets.md).
-   - Use the **"Query Modern CookieStore API" snippet** to inspect metadata (paths, domains, expiration) where supported.
+   - Parse `document.cookie` or query `cookieStore`:
+     ```js
+     () => document.cookie;
+     // or modern Chromium metadata:
+     async () =>
+       typeof cookieStore !== 'undefined' ? await cookieStore.getAll() : [];
+     ```
 2. **Set / Modify Cookie**:
    - Update client-accessible cookie via `evaluate_script`:
      ```js
