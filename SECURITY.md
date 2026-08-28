@@ -1,6 +1,6 @@
 ## Security policy
 
-The Chrome DevTools MCP project takes security very seriously. Please use [Google Open Source Software Vulnerability Reward Program](https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules) to report it.
+The Chrome DevTools MCP project takes security very seriously. Please use [Google Open Source Software Vulnerability Reward Program](https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules) to report any security issues.
 
 ### Scope
 
