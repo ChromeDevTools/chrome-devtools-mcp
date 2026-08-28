@@ -100,6 +100,58 @@ describe('createTargetUniverse', () => {
       sinon.assert.notCalled(requestStartedSpy);
     });
   });
+
+  it('does not replay retained Audits issues', async () => {
+    server.addHtmlRoute('/audits', html`<div>Audits</div>`);
+
+    await withBrowser(async (browser, page) => {
+      await page.goto(server.getRoute('/audits'));
+
+      const auditsSession = await page.createCDPSession();
+      await auditsSession.send('Audits.enable');
+
+      const backlogCreated = Promise.withResolvers<void>();
+      let performanceIssueCount = 0;
+      auditsSession.on('Audits.issueAdded', event => {
+        if (
+          event.issue.code === 'PerformanceIssue' &&
+          event.issue.details.performanceIssueDetails?.performanceIssueType ===
+            'DocumentCookie'
+        ) {
+          performanceIssueCount++;
+          if (performanceIssueCount === 500) {
+            backlogCreated.resolve();
+          }
+        }
+      });
+
+      await page.evaluate(() => {
+        document.cookie = 'test=value';
+        for (let i = 0; i < 500; i++) {
+          void document.cookie;
+        }
+      });
+
+      await backlogCreated.promise;
+      assert.strictEqual(performanceIssueCount, 500);
+      await auditsSession.detach();
+
+      const warnStub = sinon.stub(console, 'warn');
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+      );
+
+      assert.ok(targetUniverse.target.model(DevTools.DebuggerModel));
+      assert.strictEqual(await page.evaluate('1 + 1'), 2);
+      await targetUniverse.session.send('Runtime.evaluate', {
+        expression: '1 + 1',
+      });
+      sinon.assert.neverCalledWithMatch(
+        warnStub,
+        'No handler registered for issue code PerformanceIssue',
+      );
+    });
+  });
 });
 
 describe('SymbolizedError', () => {
