@@ -269,6 +269,12 @@ export const mcpOptions = {
     describe:
       'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
   },
+  sourceMaps: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Whether to enable source maps in DevTools. Use --no-source-maps to disable.',
+  },
   clearcutEndpoint: {
     type: 'string',
     hidden: true,
@@ -535,6 +541,7 @@ export function parser(
         '$0 --no-performance-crux',
         'Disable CrUX (field data) integration in performance tools.',
       ],
+      ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
       [
         '$0 --no-javascript-evaluation',
         'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',

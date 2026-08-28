@@ -152,6 +152,51 @@ describe('createTargetUniverse', () => {
       );
     });
   });
+
+  it('enables source maps by default', async () => {
+    await withBrowser(async (browser, page) => {
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+      );
+      assert.ok(targetUniverse);
+
+      assert.strictEqual(
+        targetUniverse.universe.settings
+          .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+          .get(),
+        true,
+      );
+      assert.strictEqual(
+        targetUniverse.universe.settings
+          .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+          .get(),
+        true,
+      );
+    });
+  });
+
+  it('disables source maps when sourceMaps is false', async () => {
+    await withBrowser(async (browser, page) => {
+      const targetUniverse = await createTargetUniverse(
+        await page.createCDPSession(),
+        {sourceMaps: false},
+      );
+      assert.ok(targetUniverse);
+
+      assert.strictEqual(
+        targetUniverse.universe.settings
+          .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+          .get(),
+        false,
+      );
+      assert.strictEqual(
+        targetUniverse.universe.settings
+          .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+          .get(),
+        false,
+      );
+    });
+  });
 });
 
 describe('SymbolizedError', () => {
