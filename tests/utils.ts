@@ -159,6 +159,7 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
+    sourceMaps?: boolean;
     executablePath?: string;
     args?: string[];
     blockedUrlPattern?: string[];
@@ -181,6 +182,7 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        sourceMaps: options.sourceMaps ?? true,
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
         allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,

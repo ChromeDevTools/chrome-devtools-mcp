@@ -259,6 +259,7 @@ export class McpServer {
         experimentalIncludeAllPages:
           this.#serverArgs.experimentalIncludeAllPages,
         performanceCrux: this.#serverArgs.performanceCrux,
+        sourceMaps: this.#serverArgs.sourceMaps,
         allowList: allowlist,
         blocklist: blocklist,
         allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
