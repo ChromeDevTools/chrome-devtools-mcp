@@ -179,6 +179,17 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.allowUnrestrictedPaths, true);
   });
 
+  it('lets an explicit workspace override the CLI unrestricted default', async () => {
+    const args = parseArguments(['--viaCli', '--workspace=/tmp/one']);
+    assert.strictEqual(args.allowUnrestrictedPaths, false);
+    assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
+  });
+
+  it('keeps the CLI unrestricted default when no workspace is set', async () => {
+    const args = parseArguments(['--viaCli']);
+    assert.strictEqual(args.allowUnrestrictedPaths, true);
+  });
+
   it('parses ignore chrome args', async () => {
     const args = parseArguments([
       `--ignore-default-chrome-arg='--disable-extensions'`,

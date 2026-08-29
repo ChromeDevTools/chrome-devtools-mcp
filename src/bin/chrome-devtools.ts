@@ -35,6 +35,7 @@ import {
   mcpOptions,
   parseArguments,
   getMcpOptionsForViaCli,
+  applyFilesystemRootOverrides,
   checkFilesystemRootConflict,
 } from '../config/mcp-options.js';
 
@@ -161,6 +162,13 @@ y.command(
       !argv.wsEndpoint
     ) {
       argv.headless = true;
+    }
+    applyFilesystemRootOverrides(argv, hideBin(process.argv));
+    // CLI defaults unrestricted paths on. Clear the yargs filesystemRoot default
+    // so it is not serialized onto the daemon as an explicit flag that would
+    // then conflict with --allow-unrestricted-paths.
+    if (argv.allowUnrestrictedPaths === true) {
+      argv.filesystemRoot = undefined;
     }
     const args = serializeArgs(mcpOptions, argv);
     await start(args, argv.sessionId);

@@ -11,9 +11,11 @@ npm i chrome-devtools-mcp@latest -g
 chrome-devtools status # check if install worked.
 ```
 
-Use `--workspace` when starting the CLI to allow file tools to access a
-directory outside the OS temp directory. Repeat the flag to allow more than one
-directory.
+The CLI enables unrestricted filesystem access by default. Use `--workspace`
+to limit file tools to specific directories (the OS temp directory stays
+allowed). Repeat the flag for more than one directory.
+`--allow-unrestricted-paths` still works on its own for compatibility, but it
+cannot be combined with `--workspace`.
 
 ```sh
 chrome-devtools start --workspace=/path/to/project --workspace=/path/to/output

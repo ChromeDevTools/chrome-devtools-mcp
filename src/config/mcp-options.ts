@@ -413,21 +413,67 @@ export const mcpOptions = {
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
 
+const FILESYSTEM_ROOT_FLAGS = [
+  '--filesystem-root',
+  '--filesystemRoot',
+  '--workspace',
+] as const;
+
+const UNRESTRICTED_PATHS_FLAGS = [
+  '--allow-unrestricted-paths',
+  '--allowUnrestrictedPaths',
+] as const;
+
+export interface FilesystemAccessFlags {
+  allowUnrestrictedPaths?: unknown;
+  filesystemRoot?: unknown;
+}
+
+function hasExplicitArg(
+  argv: readonly string[],
+  names: readonly string[],
+): boolean {
+  return argv.some(arg =>
+    names.some(name => arg === name || arg.startsWith(`${name}=`)),
+  );
+}
+
+/**
+ * CLI defaults `--allow-unrestricted-paths` to true. An explicit `--workspace`
+ * / `--filesystem-root` should restrict access to those directories instead of
+ * conflicting with that default. Passing both flags explicitly is still an
+ * error.
+ */
+export function applyFilesystemRootOverrides(
+  args: FilesystemAccessFlags,
+  argv: readonly string[],
+): void {
+  const hasExplicitRoot = hasExplicitArg(argv, FILESYSTEM_ROOT_FLAGS);
+  const hasExplicitUnrestricted = hasExplicitArg(
+    argv,
+    UNRESTRICTED_PATHS_FLAGS,
+  );
+
+  if (hasExplicitRoot && !hasExplicitUnrestricted) {
+    args.allowUnrestrictedPaths = false;
+  }
+}
+
 export function checkFilesystemRootConflict(
   allowUnrestrictedPaths: unknown,
   argv: readonly string[],
 ): boolean {
-  if (allowUnrestrictedPaths !== true) {
-    return true;
-  }
+  const hasExplicitFilesystemRoot = hasExplicitArg(argv, FILESYSTEM_ROOT_FLAGS);
+  const hasExplicitUnrestricted = hasExplicitArg(
+    argv,
+    UNRESTRICTED_PATHS_FLAGS,
+  );
 
-  const hasExplicitFilesystemRoot = argv.some(arg => {
-    return ['--filesystem-root', '--filesystemRoot', '--workspace'].some(
-      option => arg === option || arg.startsWith(`${option}=`),
-    );
-  });
-
-  if (hasExplicitFilesystemRoot) {
+  if (
+    allowUnrestrictedPaths === true &&
+    hasExplicitFilesystemRoot &&
+    hasExplicitUnrestricted
+  ) {
     throw new Error(
       'Arguments filesystemRoot and allowUnrestrictedPaths are mutually exclusive',
     );
@@ -510,6 +556,7 @@ export function parser(
     })
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
+      applyFilesystemRootOverrides(args, hideBin(argv));
       // We can't set default in the options else
       // Yargs will complain
       if (
