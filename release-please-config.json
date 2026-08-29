@@ -77,12 +77,12 @@
         },
         {
           "type": "json",
-          "path": "agent-plugin/plugin.json",
+          "path": "plugin.json",
           "jsonpath": "version"
         },
         {
           "type": "json",
-          "path": "agent-plugin/mcp.json",
+          "path": "mcp.json",
           "jsonpath": "mcpServers['chrome-devtools'].args[0]"
         }
       ]
