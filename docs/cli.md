@@ -33,6 +33,27 @@ chrome-devtools take_screenshot 1 --filePath screenshot.png
 chrome-devtools stop
 ```
 
+## Startup defaults
+
+You can persist options used to start the daemon in an XDG-compatible configuration file at `$XDG_CONFIG_HOME/chrome-devtools/config.json`, or `~/.config/chrome-devtools/config.json` when `XDG_CONFIG_HOME` is not set.
+
+The file contains a JSON object whose keys match the options accepted by `chrome-devtools start`. Run `chrome-devtools start --help` for the supported options.
+
+```json
+{
+  "executablePath": "/usr/bin/chromium",
+  "headless": false
+}
+```
+
+These defaults apply both when a tool command automatically starts the daemon and when `chrome-devtools start` is invoked explicitly. Precedence is:
+
+```text
+explicit command-line options > configuration file > built-in defaults
+```
+
+`chrome-devtools status` reports the effective daemon arguments after this merge.
+
 ## Command Usage
 
 The CLI only supports tools available in the MCP server without additional arguments (see [Tool reference](./tool-reference.md)).

@@ -190,3 +190,5 @@ chrome-devtools start --headless=false # Start with visible browser window
 chrome-devtools status  # Checks if chrome-devtools-mcp is running
 chrome-devtools stop    # Stop chrome-devtools-mcp if any
 ```
+
+Persist daemon startup defaults in `$XDG_CONFIG_HOME/chrome-devtools/config.json` (or `~/.config/chrome-devtools/config.json`). Keys match `chrome-devtools start` options. Command-line flags override the file; the file overrides built-in defaults. The same file is used when a tool command auto-starts the daemon.

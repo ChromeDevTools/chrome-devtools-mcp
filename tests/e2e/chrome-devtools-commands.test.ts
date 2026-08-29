@@ -6,6 +6,10 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import process from 'node:process';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -50,6 +54,38 @@ describe('chrome-devtools', () => {
     );
 
     await assertDaemonIsRunning(sessionId);
+  });
+
+  it('uses config defaults when automatically starting the daemon', async () => {
+    const configHome = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'chrome-devtools-cli-config-test-'),
+    );
+    const configDirectory = path.join(configHome, 'chrome-devtools');
+    const userDataDir = path.join(configHome, 'chrome-profile');
+    fs.mkdirSync(configDirectory);
+    fs.mkdirSync(userDataDir);
+    fs.writeFileSync(
+      path.join(configDirectory, 'config.json'),
+      JSON.stringify({userDataDir, categoryNetwork: false}),
+    );
+    const env = {...process.env, XDG_CONFIG_HOME: configHome};
+
+    try {
+      const listPagesResult = await runCli(['list_pages'], sessionId, env);
+      assert.strictEqual(
+        listPagesResult.status,
+        0,
+        `list_pages command failed: ${listPagesResult.stderr}`,
+      );
+
+      const statusResult = await runCli(['status'], sessionId, env);
+      assert.ok(
+        statusResult.stdout.includes(`"--user-data-dir=${userDataDir}"`),
+      );
+      assert.match(statusResult.stdout, /"--no-category-network"/);
+    } finally {
+      fs.rmSync(configHome, {recursive: true, force: true});
+    }
   });
 
   it('can take screenshot', async () => {

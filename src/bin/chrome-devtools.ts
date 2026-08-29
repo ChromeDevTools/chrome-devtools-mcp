@@ -30,12 +30,14 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {commands} from '../config/cli-options.js';
 import {
-  mcpOptions,
-  parseArguments,
-  getMcpOptionsForViaCli,
-} from '../config/mcp-options.js';
+  applyCliStartDefaults,
+  getCliStartOptions,
+  readCliConfig,
+  resolveCliStartArgs,
+} from '../config/cli-config.js';
+import {commands} from '../config/cli-options.js';
+import {mcpOptions, parseArguments} from '../config/mcp-options.js';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
@@ -47,21 +49,6 @@ async function start(args: string[], sessionId: string) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
   await startDaemon(combinedArgs, sessionId);
   logDisclaimers(parseArguments(VERSION, combinedArgs));
-}
-
-function getCliOptions() {
-  const options: Partial<typeof mcpOptions> = {
-    ...getMcpOptionsForViaCli(),
-  };
-
-  // Missing CLI serialization.
-  delete options.viewport;
-
-  // Change the defaults for the CLI.
-  delete options.experimentalStructuredContent;
-  delete options.experimentalInteropTools;
-
-  return options;
 }
 
 const y = yargs(hideBin(process.argv))
@@ -127,7 +114,8 @@ y.command(
   'Start or restart chrome-devtools-mcp',
   y =>
     y
-      .options(getCliOptions())
+      .options(getCliStartOptions())
+      .config(readCliConfig())
       .example(
         '$0 start --browserUrl http://localhost:9222',
         'Start the server connecting to an existing browser',
@@ -137,24 +125,7 @@ y.command(
     if (isDaemonRunning(argv.sessionId)) {
       await stopDaemon(argv.sessionId);
     }
-    // Defaults but we do not want to affect the yargs conflict resolution.
-    if (
-      argv.isolated === undefined &&
-      argv.userDataDir === undefined &&
-      !argv.autoConnect &&
-      !argv.browserUrl &&
-      !argv.wsEndpoint
-    ) {
-      argv.isolated = true;
-    }
-    if (
-      argv.headless === undefined &&
-      !argv.autoConnect &&
-      !argv.browserUrl &&
-      !argv.wsEndpoint
-    ) {
-      argv.headless = true;
-    }
+    applyCliStartDefaults(argv);
     const args = serializeArgs(mcpOptions, argv);
     await start(args, argv.sessionId);
     process.exit(0);
@@ -282,7 +253,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           : Promise.resolve(undefined);
 
         if (!isDaemonRunning(sessionId)) {
-          await start(serializeArgs(mcpOptions, argv), sessionId);
+          await start(resolveCliStartArgs([], readCliConfig()), sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
