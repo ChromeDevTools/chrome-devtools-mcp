@@ -67,6 +67,15 @@ You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDAT
 
 ## Getting started
 
+> [!TIP]
+> Install the [Agent Plugins 1.0](https://agent-plugins.org/specification)
+> package with one command for Claude Code, Codex, Cursor, Copilot CLI/VS Code,
+> Kiro, Gemini CLI, OpenCode, Cline, or Windsurf:
+>
+> ```bash
+> npx universal-agent-plugins add ChromeDevTools/chrome-devtools-mcp
+> ```
+
 Add the following config to your MCP client:
 
 ```json
