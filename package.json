@@ -77,7 +77,7 @@
     "lighthouse": "13.4.1",
     "prettier": "^3.6.2",
     "puppeteer": "25.8.0",
-    "rollup": "4.62.4",
+    "rollup": "4.62.5",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
