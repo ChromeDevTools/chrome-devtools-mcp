@@ -83,7 +83,7 @@
         {
           "type": "json",
           "path": "mcp.json",
-          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
+          "jsonpath": "mcpServers['chrome-devtools'].args[2]"
         }
       ]
     }
