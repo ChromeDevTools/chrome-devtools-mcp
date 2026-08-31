@@ -77,7 +77,13 @@ To verify that no non-essential or tracking cookies are set before consent or wh
    - Click the button with `click`.
 5. **Verify Cookie Difference**:
    - Run `evaluate_script` with `async () => await cookieStore.getAll()` after clicking to assert that only strictly necessary or consent-state cookies exist.
-6. **Teardown Context**: Call `close_page` when the audit is complete to prevent leftover cookies from affecting subsequent tasks.
+6. **Test Consent Revocation (Lifecycle Audit)**:
+   - When auditing consent withdrawal or preference changes:
+     - Locate and click the "Cookie Settings", "Manage Preferences", or footer privacy trigger (`take_snapshot` $\rightarrow$ `click`).
+     - Deselect non-essential categories or click "Revoke All" / "Save Preferences".
+     - Re-query `cookieStore.getAll()` to verify previously accepted non-essential cookies were cleared or expired.
+     - Call `list_network_requests` on subsequent actions to ensure tracking beacons are no longer fired.
+7. **Teardown Context**: Call `close_page` when the audit is complete to prevent leftover cookies from affecting subsequent tasks.
 
 ### 3. Auditing Cookie Security, SameSite & CHIPS (Partitioned Cookies)
 
