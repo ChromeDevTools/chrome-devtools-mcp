@@ -95,9 +95,19 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
   return result;
 }
 
+function hasOffByDefaultConditions(tool: ToolWithAnnotations): boolean {
+  for (const condition of tool.annotations?.conditions || []) {
+    const option = mcpOptions[condition as keyof typeof mcpOptions];
+    if (!option || !('default' in option) || option.default !== true) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
-  const aHasConditions = Boolean(a.annotations?.conditions?.length > 0);
-  const bHasConditions = Boolean(b.annotations?.conditions?.length > 0);
+  const aHasConditions = hasOffByDefaultConditions(a);
+  const bHasConditions = hasOffByDefaultConditions(b);
 
   if (aHasConditions && !bHasConditions) {
     return 1;
@@ -357,7 +367,10 @@ async function generateReference(
 
         const conditions = tool.annotations?.conditions || [];
         for (const condition of conditions) {
-          requiredFlags.push(`--${condition}=true`);
+          const option = mcpOptions[condition as keyof typeof mcpOptions];
+          if (!option || !('default' in option) || option.default !== true) {
+            requiredFlags.push(`--${condition}=true`);
+          }
         }
 
         if (requiredFlags.length > 0) {

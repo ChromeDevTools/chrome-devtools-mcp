@@ -39,7 +39,7 @@ function buildDisabledMessage(
 ): string {
   const reason = categoryLabel
     ? `is in category ${categoryLabel} which`
-    : `requires experimental feature ${flag} and`;
+    : `requires ${flag.startsWith('--experimental') ? 'experimental feature' : 'flag'} ${flag} and`;
 
   return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }

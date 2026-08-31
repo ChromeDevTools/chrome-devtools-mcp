@@ -25,6 +25,7 @@ describe('cli args parsing', () => {
     autoConnect: undefined,
     performanceCrux: true,
     usageStatistics: true,
+    javascriptEvaluation: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
     memoryDebugging: false,
@@ -243,6 +244,20 @@ describe('cli args parsing', () => {
     // Test disabling it
     const disabledArgs = parseArguments(['--no-usage-statistics']);
     assert.strictEqual(disabledArgs.usageStatistics, false);
+  });
+
+  it('parses javascript evaluation flag', async () => {
+    // Test default (should be true).
+    const defaultArgs = parseArguments(['main.js'], {});
+    assert.strictEqual(defaultArgs.javascriptEvaluation, true);
+
+    // Test enabling it
+    const enabledArgs = parseArguments(['--javascript-evaluation']);
+    assert.strictEqual(enabledArgs.javascriptEvaluation, true);
+
+    // Test disabling it
+    const disabledArgs = parseArguments(['--no-javascript-evaluation']);
+    assert.strictEqual(disabledArgs.javascriptEvaluation, false);
   });
 
   it('respects env variable', async () => {

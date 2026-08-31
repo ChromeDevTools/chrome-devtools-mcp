@@ -23,6 +23,7 @@ import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
+import {createTools} from '../src/tools/tools.js';
 import {getMockBrowser} from './utils.js';
 import {Mutex} from '../src/third_party/index.js';
 
@@ -350,6 +351,124 @@ describe('ToolHandler', () => {
       /is currently disabled/,
     );
     assert.strictEqual(handlerCalled, false);
+  });
+
+  it('registers evaluate_script by default and disables it when javascriptEvaluation is false', async () => {
+    const mockContext = sinon.createStubInstance(McpContext);
+    const toolMutex = new Mutex();
+
+    const defaultServerArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+    const defaultTool = createTools(defaultServerArgs).find(
+      t => t.name === 'evaluate_script',
+    );
+    if (!defaultTool) {
+      assert.fail('evaluate_script not found');
+    }
+    const defaultHandler = new ToolHandler(
+      defaultTool,
+      defaultServerArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+    assert.strictEqual(defaultHandler.shouldRegister, true);
+
+    const disabledServerArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--no-javascript-evaluation'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+    const disabledTool = createTools(disabledServerArgs).find(
+      t => t.name === 'evaluate_script',
+    );
+    if (!disabledTool) {
+      assert.fail('evaluate_script not found');
+    }
+    const disabledHandler = new ToolHandler(
+      disabledTool,
+      disabledServerArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+    assert.strictEqual(disabledHandler.shouldRegister, false);
+
+    const disabledResult = await disabledHandler.handle({function: '() => 1'});
+    assert.strictEqual(disabledResult.isError, true);
+    assert.match(
+      disabledResult.content[0].type === 'text'
+        ? disabledResult.content[0].text
+        : '',
+      /Tool evaluate_script requires flag --javascriptEvaluation and is currently disabled/,
+    );
+
+    const cliServerArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--no-javascript-evaluation', '--viaCli'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+    const cliTool = createTools(cliServerArgs).find(
+      t => t.name === 'evaluate_script',
+    );
+    if (!cliTool) {
+      assert.fail('evaluate_script not found');
+    }
+    const cliHandler = new ToolHandler(
+      cliTool,
+      cliServerArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+    assert.strictEqual(cliHandler.shouldRegister, true);
+    const cliResult = await cliHandler.handle({function: '() => 1'});
+    assert.strictEqual(cliResult.isError, true);
+    assert.match(
+      cliResult.content[0].type === 'text' ? cliResult.content[0].text : '',
+      /Tool evaluate_script requires flag --javascriptEvaluation and is currently disabled/,
+    );
+  });
+
+  it('disables slim evaluate tool when javascriptEvaluation is false', async () => {
+    const mockContext = sinon.createStubInstance(McpContext);
+    const toolMutex = new Mutex();
+
+    const defaultServerArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--slim'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+    const defaultTool = createTools(defaultServerArgs).find(
+      t => t.name === 'evaluate',
+    );
+    if (!defaultTool) {
+      assert.fail('evaluate not found');
+    }
+    const defaultHandler = new ToolHandler(
+      defaultTool,
+      defaultServerArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+    assert.strictEqual(defaultHandler.shouldRegister, true);
+
+    const disabledServerArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--slim', '--javascriptEvaluation=false'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+    const disabledTool = createTools(disabledServerArgs).find(
+      t => t.name === 'evaluate',
+    );
+    if (!disabledTool) {
+      assert.fail('evaluate not found');
+    }
+    const disabledHandler = new ToolHandler(
+      disabledTool,
+      disabledServerArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+    assert.strictEqual(disabledHandler.shouldRegister, false);
   });
 
   it('validates files specified in verifyFilesSchema and rewrites input with validated paths/URLs', async () => {

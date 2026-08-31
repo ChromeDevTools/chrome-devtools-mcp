@@ -10,7 +10,7 @@ import path from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import {parseArguments} from '../build/src/config/mcp-options.js';
+import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
 import {buildFlag} from '../build/src/index.js';
 import {
   labels,
@@ -174,7 +174,10 @@ async function generateCli() {
 
     const conditions = toolNameToConditions.get(tool.name) || [];
     for (const condition of conditions) {
-      requiredFlags.push(`--${condition}=true`);
+      const option = mcpOptions[condition as keyof typeof mcpOptions];
+      if (!option || !('default' in option) || option.default !== true) {
+        requiredFlags.push(`--${condition}=true`);
+      }
     }
 
     if (requiredFlags.length > 0) {

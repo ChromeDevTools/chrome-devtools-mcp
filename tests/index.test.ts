@@ -21,6 +21,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import {executablePath} from 'puppeteer';
 
+import {mcpOptions} from '../src/config/mcp-options.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import {OFF_BY_DEFAULT_CATEGORIES} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
@@ -201,6 +202,17 @@ describe('e2e', () => {
         assert.ok(getHeapSnapshotSummary);
       },
       ['--memoryDebugging'],
+    );
+  });
+
+  it('can disable javascript evaluation tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const evaluateScript = tools.find(t => t.name === 'evaluate_script');
+        assert.strictEqual(evaluateScript, undefined);
+      },
+      ['--no-javascript-evaluation'],
     );
   });
 
@@ -490,7 +502,12 @@ function toolShouldBeSkipped(
   filteredOutCategories: ToolCategory[],
 ) {
   if (tool.annotations?.conditions) {
-    return true;
+    for (const condition of tool.annotations.conditions) {
+      const option = mcpOptions[condition as keyof typeof mcpOptions];
+      if (!option || !('default' in option) || option.default !== true) {
+        return true;
+      }
+    }
   }
   if (
     tool.annotations?.category &&
