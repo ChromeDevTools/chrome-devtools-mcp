@@ -5,13 +5,13 @@ description: Uses Chrome DevTools MCP for inspecting, debugging, and testing coo
 
 ## Core Concepts
 
-### HttpOnly vs JavaScript Access
+### HttpOnly vs Client-Side Storage
 
-Cookies marked `HttpOnly` cannot be accessed or modified by client-side JavaScript (`document.cookie` or `cookieStore`). However, the browser **automatically attaches active HttpOnly cookies to outgoing HTTP request headers (`Cookie`)**.
+Cookies marked `HttpOnly` cannot be accessed or modified by client-side JavaScript (`cookieStore` or `document.cookie`). However, the browser **automatically attaches active HttpOnly cookies to outgoing HTTP request headers (`Cookie`)**.
 
 - To inspect current `HttpOnly` values: Look at the `Cookie` request header of any outgoing HTTP request via `get_network_request`.
 - To inspect how cookies were created or configured: Look at the `Set-Cookie` response header of login/auth responses.
-- To inspect non-`HttpOnly` cookies: Use `evaluate_script` with `() => document.cookie` or `() => cookieStore.getAll()`.
+- To inspect non-`HttpOnly` cookies: Use `evaluate_script` with the modern `cookieStore` API (`async () => await cookieStore.getAll()`).
 
 ### Session Strategy: Live Tab vs Isolated Context
 
@@ -24,16 +24,16 @@ Choose the right session environment to avoid state contamination (e.g., residua
 
 ### Client-Side Capabilities & Limitations
 
-| Action                                                           | JavaScript (`document.cookie` / `cookieStore`)        | DevTools Network & Context Tools                        |
+| Action                                                           | Client JavaScript (`cookieStore` / `document.cookie`) | DevTools Network & Context Tools                        |
 | :--------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------------------------ |
-| **Read Non-HttpOnly**                                            | ✅ `document.cookie` / `cookieStore.getAll()`         | ✅ `get_network_request` (Request `Cookie`)             |
+| **Read Non-HttpOnly**                                            | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Request `Cookie`)             |
 | **Read HttpOnly**                                                | ❌ Blocked by browser security                        | ✅ `get_network_request` (Request `Cookie`)             |
-| **Inspect Attributes** (`Domain`, `Path`, `SameSite`, `Expires`) | ⚠️ `cookieStore.getAll()` (Chrome only, non-HttpOnly) | ✅ `get_network_request` (Response `Set-Cookie`)        |
-| **Modify / Delete Non-HttpOnly**                                 | ✅ `document.cookie = "name=; max-age=0"`             | N/A                                                     |
+| **Inspect Attributes** (`Domain`, `Path`, `SameSite`, `Expires`) | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Response `Set-Cookie`)        |
+| **Modify / Delete Non-HttpOnly**                                 | ✅ `async () => await cookieStore.set(...)`           | N/A                                                     |
 | **Modify / Delete HttpOnly**                                     | ❌ **Silent failure** in JavaScript                   | ✅ Use `new_page(isolatedContext: ...)` for clean state |
 
 > [!WARNING]
-> Attempting to clear an `HttpOnly` cookie via `document.cookie = "SESSION_ID=; max-age=0"` will silently fail. To test in an unauthenticated or fresh state, always spawn a new isolated context using `new_page` with `isolatedContext`.
+> Attempting to clear an `HttpOnly` cookie via JavaScript (`cookieStore.delete` or `document.cookie = "...; max-age=0"`) will silently fail. To test in an unauthenticated or fresh state, always spawn a new isolated context using `new_page` with `isolatedContext`.
 
 ---
 
@@ -68,7 +68,7 @@ To verify that no non-essential or tracking cookies are set before consent or wh
    ```json
    {"url": "<PAGE_URL>", "isolatedContext": "consent-test-1"}
    ```
-2. **Record Baseline Cookies**: Before interacting with the banner, run `evaluate_script` with `() => document.cookie` (or `() => cookieStore.getAll()`).
+2. **Record Baseline Cookies**: Before interacting with the banner, run `evaluate_script` with `async () => await cookieStore.getAll()`.
 3. **Inspect Premature Network Requests & Issues**:
    - Call `list_network_requests` to ensure no third-party tracking beacons fired before consent.
    - Call `list_console_messages` with `types: ["issue"]` to check for tracking warnings.
@@ -76,7 +76,7 @@ To verify that no non-essential or tracking cookies are set before consent or wh
    - Capture snapshot with `take_snapshot` to locate the "Decline" or "Reject All" button `uid`.
    - Click the button with `click`.
 5. **Verify Cookie Difference**:
-   - Check `document.cookie` after clicking to assert that only strictly necessary or consent-state cookies exist.
+   - Run `evaluate_script` with `async () => await cookieStore.getAll()` after clicking to assert that only strictly necessary or consent-state cookies exist.
 6. **Teardown Context**: Call `close_page` when the audit is complete to prevent leftover cookies from affecting subsequent tasks.
 
 ### 3. Auditing Cookie Security, SameSite & CHIPS (Partitioned Cookies)
@@ -105,31 +105,37 @@ To verify that no non-essential or tracking cookies are set before consent or wh
 
 For client-accessible, non-`HttpOnly` cookies (e.g., UI preferences, non-sensitive feature flags):
 
-1. **Read Cookies**:
-   - Parse `document.cookie` or query `cookieStore`:
+1. **Read Cookies & Attributes**:
+   - Use the modern asynchronous Cookie Store API:
      ```js
-     () => document.cookie;
-     // or modern Chromium metadata:
-     async () =>
-       typeof cookieStore !== 'undefined' ? await cookieStore.getAll() : [];
+     async () => await cookieStore.getAll();
      ```
+   - _Fallback for insecure HTTP origins_: `() => document.cookie`.
 2. **Set / Modify Cookie**:
-   - Update client-accessible cookie via `evaluate_script`:
+   - Set client cookie via `cookieStore`:
      ```js
-     document.cookie = 'theme=dark; path=/; max-age=86400; SameSite=Lax';
+     async () =>
+       await cookieStore.set({
+         name: 'theme',
+         value: 'dark',
+         expires: Date.now() + 86400000,
+         sameSite: 'lax',
+       });
      ```
 3. **Delete Cookie**:
-   - Clear client cookie by setting max-age to 0:
+   - Clear client cookie:
      ```js
-     document.cookie = 'theme=; path=/; max-age=0';
+     async () => await cookieStore.delete('theme');
      ```
 
 ---
 
 ## Troubleshooting
 
-- **Cookie not visible in `document.cookie`**: The cookie is marked `HttpOnly`. Trigger a network request and call `get_network_request` to view it in the `Cookie` request header.
-- **`document.cookie` deletion did not work**: The cookie is `HttpOnly` or requires matching `Path` and `Domain` parameters. Use a fresh `isolatedContext` with `new_page` for a clean slate.
+- **`cookieStore` is undefined**: `cookieStore` requires a Secure Context (`https://`, `localhost`, or `127.0.0.1`). On non-secure HTTP origins, use `() => document.cookie` or test over HTTPS.
+- **`evaluate_script` returns empty / unresolved Promise**: `cookieStore` methods are asynchronous. Always wrap calls with `async () => await cookieStore.getAll()`.
+- **Cookie not visible in JavaScript**: The cookie is marked `HttpOnly`. Trigger a network request and call `get_network_request` to view it in the `Cookie` request header.
+- **JavaScript deletion did not remove cookie**: The cookie is `HttpOnly` or requires matching `Path` and `Domain` parameters. Use a fresh `isolatedContext` with `new_page` for a clean slate.
 - **Cookie set in response but not sent in requests**:
   - Verify if page is `http://` while cookie specifies `Secure`.
   - Check if `Domain` restricts subdomains.
