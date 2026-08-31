@@ -79,6 +79,7 @@ export const evaluate = definePageTool({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    conditions: ['javascriptEvaluation'],
   },
   schema: {
     script: zod.string().describe(`JS script to run on the page`),
