@@ -94,11 +94,11 @@ function getToolStatusInfo(
     }
 
     return {
-      disabled: true,
+      disabled: !serverArgs.viaCli,
       reason: buildDisabledMessage(
         tool.name,
         `--${categoryCheck.categoryFlag}`,
-        labels[category!],
+        labels[category],
       ),
     };
   }
@@ -113,7 +113,7 @@ function getToolStatusInfo(
       }
 
       return {
-        disabled: true,
+        disabled: !serverArgs.viaCli,
         reason: buildDisabledMessage(
           tool.name,
           `--${conditionCheck.conditionFlag}`,
@@ -226,7 +226,7 @@ async function validateToolFiles(
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
-  readonly shouldRegister: boolean;
+  readonly disabled: boolean;
   private readonly disabledReason?: string;
 
   constructor(
@@ -237,7 +237,7 @@ export class ToolHandler {
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
-    this.shouldRegister = !(disabled && !serverArgs.viaCli);
+    this.disabled = disabled;
 
     this.inputSchema =
       'pageScoped' in tool &&
@@ -256,7 +256,7 @@ export class ToolHandler {
   }
 
   async handle(params: Record<string, unknown>): Promise<CallToolResult> {
-    if (this.disabledReason) {
+    if (this.disabled && this.disabledReason) {
       return {
         content: [
           {
@@ -285,7 +285,7 @@ export class ToolHandler {
       };
     }
 
-    const guard = await this.toolMutex.acquire();
+    using _guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
@@ -392,7 +392,6 @@ export class ToolHandler {
         latencyMs: bucketizeLatency(Date.now() - startTime),
         context,
       });
-      guard[Symbol.dispose]();
     }
   }
 }

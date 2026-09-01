@@ -23,6 +23,7 @@ export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 export {Client} from '@modelcontextprotocol/sdk/client/index.js';
 export type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
+export type {RegisteredTool} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {
   type CallToolResult,
   SetLevelRequestSchema,
