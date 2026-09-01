@@ -81,6 +81,22 @@ either disable sandboxing for `chrome-devtools-mcp` in your MCP client or use
 `--browser-url` to connect to a Chrome instance that you start manually outside
 of the MCP client sandbox.
 
+### Running as root
+
+Chrome does not start as root unless its own sandbox is disabled, which is a
+common issue in containers and CI images that run everything as root. Chrome
+exits immediately and `chrome-devtools-mcp` reports that Chrome failed to start.
+
+The recommended fix is to run `chrome-devtools-mcp` as a non-root user. If that
+is not possible, disable the Chrome sandbox explicitly:
+
+```sh
+npx chrome-devtools-mcp@latest --chrome-arg='--no-sandbox'
+```
+
+Chrome's sandbox is a core security boundary, so only disable it when you trust
+the pages the browser will load. See [crbug.com/638180](https://crbug.com/638180).
+
 ### WSL
 
 By default, `chrome-devtools-mcp` in WSL requires Chrome to be installed within the Linux environment. While it normally attempts to launch Chrome on the Windows side, this currently fails due to a [known WSL issue](https://github.com/microsoft/WSL/issues/14201). Ensure you are using a [Linux distribution compatible with Chrome](https://support.google.com/chrome/a/answer/7100626).

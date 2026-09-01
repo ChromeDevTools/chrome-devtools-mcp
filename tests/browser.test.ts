@@ -11,7 +11,12 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
+import {
+  detectDisplay,
+  ensureBrowserConnected,
+  launch,
+  rootSandboxLaunchError,
+} from '../src/browser.js';
 import type {Browser} from '../src/third_party/index.js';
 
 import {serverHooks} from './server.js';
@@ -54,6 +59,55 @@ async function runWithRetry(fn: () => Promise<void>) {
 describe('browser', () => {
   it('detects display does not crash', () => {
     detectDisplay();
+  });
+
+  describe('rootSandboxLaunchError', () => {
+    const targetClosed = new Error(
+      'Protocol error (Target.setDiscoverTargets): Target closed',
+    );
+
+    it('explains an opaque launch failure when running as root', () => {
+      const error = rootSandboxLaunchError(targetClosed, [], 0);
+      assert.ok(error);
+      assert.match(error.message, /--chrome-arg=--no-sandbox/);
+      // The original failure stays visible so unrelated errors are not masked.
+      assert.match(error.message, /Target closed/);
+      assert.strictEqual(error.cause, targetClosed);
+    });
+
+    it('does not explain failures when not running as root', () => {
+      assert.strictEqual(
+        rootSandboxLaunchError(targetClosed, [], 1000),
+        undefined,
+      );
+    });
+
+    it('does not explain failures on platforms without uids', () => {
+      assert.strictEqual(
+        rootSandboxLaunchError(targetClosed, [], undefined),
+        undefined,
+      );
+    });
+
+    it('does not explain failures when the sandbox is already opted out of', () => {
+      assert.strictEqual(
+        rootSandboxLaunchError(targetClosed, ['--no-sandbox'], 0),
+        undefined,
+      );
+      assert.strictEqual(
+        rootSandboxLaunchError(targetClosed, ['--no-sandbox=true'], 0),
+        undefined,
+      );
+    });
+
+    it('is not fooled by unrelated arguments that start the same', () => {
+      assert.ok(
+        rootSandboxLaunchError(targetClosed, ['--no-sandbox-and-elevated'], 0),
+      );
+      assert.ok(
+        rootSandboxLaunchError(targetClosed, ['--disable-setuid-sandbox'], 0),
+      );
+    });
   });
 
   it('cannot launch multiple times with the same profile', async () => {
