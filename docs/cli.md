@@ -12,8 +12,8 @@ chrome-devtools status # check if install worked.
 ```
 
 The CLI enables unrestricted filesystem access by default. Use `--workspace`
-to limit file tools to specific directories (the OS temp directory stays
-allowed). Repeat the flag for more than one directory.
+to limit file tools to specific directories. Repeat the flag for more than one
+directory.
 `--allow-unrestricted-paths` still works on its own for compatibility, but it
 cannot be combined with `--workspace`.
 

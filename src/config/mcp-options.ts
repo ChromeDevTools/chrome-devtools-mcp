@@ -406,8 +406,7 @@ export const mcpOptions = {
     default: [os.tmpdir()],
     defaultDescription: 'OS temp directory',
     describe:
-      'A directory that filesystem tools are allowed to access. May be specified more than once. ' +
-      'The OS temp directory is always allowed.',
+      'A directory that filesystem tools are allowed to access. May be specified more than once.',
   },
 } satisfies Record<string, YargsOptions>;
 
