@@ -31,7 +31,7 @@ export class Result {
 
   /**
    * Consumes initial page navigation/setup boilerplate.
-   * - Ignores/skips leading list_pages calls.
+   * - Ignores/skips leading or trailing list_pages calls.
    * - Asserts that new_page or navigate_page was called.
    * - Determines the expected pageId.
    * - Returns the active pageId.
@@ -48,6 +48,10 @@ export class Result {
       `Expected navigation call (new_page or navigate_page), but got: ${navCall?.name || 'none'}`,
     );
     this.nextCallIndex++;
+
+    if (this.calls[this.nextCallIndex]?.name === 'list_pages') {
+      this.nextCallIndex++;
+    }
 
     const isNewPage = navCall.name === 'new_page';
     let pageId: number | undefined;

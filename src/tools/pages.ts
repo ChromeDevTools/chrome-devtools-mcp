@@ -118,7 +118,7 @@ export const newPage = defineTool(() => {
         .describe(
           'If specified, the page is created in an isolated browser context with the given name. ' +
             'Pages in the same browser context share cookies and storage. ' +
-            'Pages in different browser contexts are fully isolated.',
+            'Pages in different browser contexts are fully isolated (useful for clean-slate testing of cookies and authentication).',
         ),
       ...timeoutSchema,
     },

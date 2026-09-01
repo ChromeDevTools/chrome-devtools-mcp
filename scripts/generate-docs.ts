@@ -164,10 +164,22 @@ function updateReadmeWithToolsTOC(toolsTOC: string): void {
   console.log('Updated README.md with tools table of contents');
 }
 
+interface OptionConfig {
+  hidden?: boolean;
+  alias?: string;
+  description?: string;
+  describe?: string;
+  type?: string;
+  choices?: string[];
+  default?: unknown;
+}
+
 function generateConfigOptionsMarkdown(): string {
   let markdown = '';
 
-  for (const [optionName, optionConfig] of Object.entries(mcpOptions)) {
+  for (const [optionName, optionConfig] of Object.entries(
+    mcpOptions as Record<string, OptionConfig>,
+  )) {
     // Skip hidden options
     if (optionConfig.hidden) {
       continue;
