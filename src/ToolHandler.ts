@@ -169,7 +169,7 @@ export class ToolHandler {
     zod.ZodRawShape,
     zod.core.$loose
   >;
-  readonly shouldRegister: boolean;
+  readonly disabled: boolean;
   private readonly disabledReason?: string;
 
   constructor(
@@ -180,7 +180,7 @@ export class ToolHandler {
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
-    this.shouldRegister = !(disabled && !serverArgs.viaCli);
+    this.disabled = disabled && !serverArgs.viaCli;
 
     this.inputSchema = tool.schema;
     this.registeredInputSchema = zod.object(this.inputSchema).loose();
@@ -192,7 +192,9 @@ export class ToolHandler {
     );
   }
 
-  async handle(params: Record<string, unknown>): Promise<CallToolResult> {
+  handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
+    using _guard = await this.toolMutex.acquire();
+
     if (this.disabledReason) {
       return {
         content: [
@@ -222,7 +224,6 @@ export class ToolHandler {
       };
     }
 
-    const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
@@ -329,7 +330,6 @@ export class ToolHandler {
         devToolsData,
         pageUrl,
       });
-      guard[Symbol.dispose]();
     }
-  }
+  };
 }

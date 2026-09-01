@@ -18,7 +18,7 @@ export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
-export {McpServer} from '@modelcontextprotocol/server';
+export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
 export {
   StdioServerTransport,
   serveStdio,
