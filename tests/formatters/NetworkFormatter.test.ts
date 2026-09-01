@@ -134,7 +134,7 @@ describe('NetworkFormatter', () => {
     });
 
     it('truncates long urls', async () => {
-      const longUrl = `http://example.com/${'a'.repeat(200)}`;
+      const longUrl = `http://example.com/${'a'.repeat(500)}`;
       const request = getMockRequest({url: longUrl});
       const formatter = await NetworkFormatter.from(request, {
         requestId: 1,
@@ -144,7 +144,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        `reqid=1 GET ${longUrl.substring(0, 150)}... <truncated> [pending]`,
+        `reqid=1 GET ${longUrl.substring(0, 255)}... <truncated> [pending]`,
       );
       // The structured data keeps the full URL.
       assert.equal(formatter.toJSON().url, longUrl);
@@ -161,7 +161,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        `reqid=1 GET ${dataUrl.substring(0, 150)}... <truncated> [pending]`,
+        `reqid=1 GET ${dataUrl.substring(0, 255)}... <truncated> [pending]`,
       );
     });
 

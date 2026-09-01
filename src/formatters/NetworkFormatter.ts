@@ -13,7 +13,7 @@ import {
 } from '../third_party/index.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
-const URL_CONTEXT_SIZE_LIMIT = 150;
+const URL_CONTEXT_SIZE_LIMIT = 255;
 
 export interface NetworkFormatterOptions {
   requestId?: number | string;
