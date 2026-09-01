@@ -53,6 +53,12 @@ export class McpServer {
   #serverArgs: ParsedArguments;
   #options: McpServerOptions;
   #context?: McpContext;
+
+  /**
+   * Roots are client state rather than browser state, so the last listing stays
+   * valid across browser reconnects and only the client can invalidate it, via
+   * the `roots/list_changed` notification handled below
+   */
   #lastRoots?: Root[];
   #toolMutex = new Mutex();
 
@@ -133,6 +139,11 @@ export class McpServer {
     await loadIssueDescriptions();
   }
 
+  /**
+   * `timeout` is only passed where a tool call is waiting on the result – the
+   * background refreshes below block nobody, so bounding them would just discard
+   * roots a slow client was about to send
+   */
   #updateRoots = async (timeout?: number): Promise<void> => {
     if (!this.#server.server.getClientCapabilities()?.roots) {
       return;
