@@ -49,7 +49,7 @@ export interface McpServerOptions {
 }
 
 export class McpServer {
-  #server: SdkMcpServer;
+  readonly server: SdkMcpServer;
   #serverArgs: ParsedArguments;
   #options: McpServerOptions;
   #context?: McpContext;
@@ -81,7 +81,7 @@ export class McpServer {
       });
     }
 
-    this.#server = new SdkMcpServer(
+    this.server = new SdkMcpServer(
       {
         name: 'chrome_devtools',
         title: 'Chrome DevTools MCP server',
@@ -90,18 +90,18 @@ export class McpServer {
       {capabilities: {logging: {}}},
     );
 
-    this.#server.server.setRequestHandler(SetLevelRequestSchema, () => {
+    this.server.server.setRequestHandler(SetLevelRequestSchema, () => {
       return {};
     });
 
-    this.#server.server.oninitialized = () => {
-      const clientName = this.#server.server.getClientVersion()?.name;
+    this.server.server.oninitialized = () => {
+      const clientName = this.server.server.getClientVersion()?.name;
       if (clientName) {
         ClearcutLogger.get()?.setClientName(clientName);
       }
-      if (this.#server.server.getClientCapabilities()?.roots) {
+      if (this.server.server.getClientCapabilities()?.roots) {
         void this.#updateRoots();
-        this.#server.server.setNotificationHandler(
+        this.server.server.setNotificationHandler(
           RootsListChangedNotificationSchema,
           () => {
             void this.#updateRoots();
@@ -119,7 +119,26 @@ export class McpServer {
   }
 
   async connect(transport: Transport): Promise<void> {
-    return await this.#server.connect(transport);
+    return await this.server.connect(transport);
+  }
+
+  /**
+   * Closes the MCP connection and disposes internal context/listeners.
+   */
+  async close(): Promise<void> {
+    this.#context?.dispose();
+    this.#context = undefined;
+    await this.server.close();
+  }
+
+  [Symbol.dispose](): void {
+    this.close().catch(() => {
+      // TODO: wire up the logger
+    });
+  }
+
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.close();
   }
 
   static async from(
@@ -144,12 +163,12 @@ export class McpServer {
    * background refreshes below block nobody, so bounding them would just discard
    * roots a slow client was about to send
    */
-  #updateRoots = async (timeout?: number): Promise<void> => {
-    if (!this.#server.server.getClientCapabilities()?.roots) {
+  async #updateRoots(timeout?: number): Promise<void> {
+    if (!this.server.server.getClientCapabilities()?.roots) {
       return;
     }
     try {
-      const roots = await this.#server.server.request(
+      const roots = await this.server.server.request(
         {method: 'roots/list'},
         ListRootsResultSchema,
         timeout === undefined ? undefined : {timeout},
@@ -159,7 +178,7 @@ export class McpServer {
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
-  };
+  }
 
   async #getContext(): Promise<McpContext> {
     const chromeArgs: string[] = (this.#serverArgs.chromeArg ?? []).map(String);
@@ -251,7 +270,7 @@ export class McpServer {
       return;
     }
 
-    this.#server.registerTool(
+    this.server.registerTool(
       tool.name,
       {
         description: tool.description,
@@ -263,6 +282,21 @@ export class McpServer {
       },
     );
   }
+}
+
+/**
+ * Creates and initializes a Chrome DevTools MCP server instance.
+ *
+ * Maintained as a public API for backwards compatibility because external
+ * consumers and integrations rely on `createMcpServer()`. For new code,
+ * prefer using `McpServer.from(serverArgs, options)`.
+ */
+export async function createMcpServer(
+  serverArgs: ParsedArguments,
+  options: McpServerOptions = {},
+): Promise<{server: SdkMcpServer}> {
+  const server = await McpServer.from(serverArgs, options);
+  return {server: server.server};
 }
 
 export const logDisclaimers = (args: ParsedArguments) => {
