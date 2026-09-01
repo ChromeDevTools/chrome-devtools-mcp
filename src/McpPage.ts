@@ -420,8 +420,7 @@ export class McpPage implements ContextPage {
       waitForStableDom?: boolean;
       expectNavigationIn?: number;
       handleDialog?:
-        | DialogAction
-        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult> {
     const helper = this.createWaitForHelper(

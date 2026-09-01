@@ -116,8 +116,7 @@ export class WaitForHelper {
       waitForStableDom?: boolean;
       expectNavigationIn?: number;
       handleDialog?:
-        | DialogAction
-        | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult> {
     if (this.#abortController.signal.aborted) {
