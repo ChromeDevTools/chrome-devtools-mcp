@@ -36,6 +36,12 @@ export function overrideDevToolsGlobals({
   // DevTools CDP errors can get noisy.
   DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
+  const noopAgentCommand = () => {
+    return Promise.resolve({
+      getError: () => undefined,
+    });
+  };
+
   // Stub out Network emulation commands on the DevTools Agent prototype globally.
   // This prevents the DevTools Frontend from ever resetting/clearing Puppeteer's
   // active network blocking/throttling rules during target setup or session lifetime.
@@ -63,42 +69,42 @@ export function overrideDevToolsGlobals({
       networkAgentPrototype,
       'invoke_overrideNetworkState',
       {
-        value: () => {
-          return Promise.resolve({
-            getError: () => undefined,
-          });
-        },
+        value: noopAgentCommand,
         writable: true,
         configurable: true,
         enumerable: true,
       },
     );
     Object.defineProperty(networkAgentPrototype, 'invoke_enable', {
-      value: () => {
-        return Promise.resolve({
-          getError: () => undefined,
-        });
-      },
+      value: noopAgentCommand,
       writable: true,
       configurable: true,
       enumerable: true,
     });
     Object.defineProperty(networkAgentPrototype, 'invoke_disable', {
-      value: () => {
-        return Promise.resolve({
-          getError: () => undefined,
-        });
-      },
+      value: noopAgentCommand,
       writable: true,
       configurable: true,
       enumerable: true,
     });
     Object.defineProperty(networkAgentPrototype, 'invoke_setBlockedURLs', {
-      value: () => {
-        return Promise.resolve({
-          getError: () => undefined,
-        });
-      },
+      value: noopAgentCommand,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+
+  // Puppeteer already collects issues from its own Audits subscription. Avoid
+  // enabling the DevTools Frontend's redundant subscription, which can replay
+  // a large retained issue backlog and delay unrelated page work.
+  const auditsAgentPrototype =
+    DevTools.ProtocolClient.InspectorBackend.inspectorBackend.agentPrototypes.get(
+      'Audits',
+    );
+  if (auditsAgentPrototype) {
+    Object.defineProperty(auditsAgentPrototype, 'invoke_enable', {
+      value: noopAgentCommand,
       writable: true,
       configurable: true,
       enumerable: true,

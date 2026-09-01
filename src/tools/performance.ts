@@ -81,6 +81,7 @@ export const startTrace = definePageTool({
       ];
       await page.pptrPage.tracing.start({
         categories,
+        bufferSize: 1200 * 1000,
       });
 
       if (request.params.reload) {

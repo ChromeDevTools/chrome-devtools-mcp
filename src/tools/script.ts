@@ -21,6 +21,7 @@ export const evaluateScript = defineTool(cliArgs => {
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
+      conditions: ['javascriptEvaluation'],
     },
     schema: {
       ...(cliArgs?.pageIdRouting

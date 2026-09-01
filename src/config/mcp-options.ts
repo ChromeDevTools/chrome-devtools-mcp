@@ -280,6 +280,11 @@ export const mcpOptions = {
     describe:
       'Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.',
   },
+  javascriptEvaluation: {
+    type: 'boolean',
+    default: true,
+    describe: 'Set to false to disable tools to evaluate JavaScript scripts.',
+  },
   clearcutEndpoint: {
     type: 'string',
     hidden: true,
@@ -537,6 +542,10 @@ export function parser(
       [
         '$0 --no-performance-crux',
         'Disable CrUX (field data) integration in performance tools.',
+      ],
+      [
+        '$0 --no-javascript-evaluation',
+        'Disable tools to evaluate JavaScript scripts.',
       ],
       [
         '$0 --slim',

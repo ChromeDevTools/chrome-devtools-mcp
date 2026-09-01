@@ -9,7 +9,7 @@ import '../utils/polyfill.js';
 import process from 'node:process';
 
 import {closeBrowser} from '../browser.js';
-import {createMcpServer, logDisclaimers} from '../index.js';
+import {McpServer, logDisclaimers} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {StdioServerTransport} from '../third_party/index.js';
@@ -72,7 +72,7 @@ process.on('SIGHUP', () => {
 });
 
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const {server} = await createMcpServer(args, {
+const server = await McpServer.from(args, {
   logFile,
 });
 const transport = new StdioServerTransport();

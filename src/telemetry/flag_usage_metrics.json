@@ -389,5 +389,13 @@
   {
     "name": "page_id_routing",
     "flagType": "boolean"
+  },
+  {
+    "name": "javascript_evaluation_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "javascript_evaluation",
+    "flagType": "boolean"
   }
 ]

@@ -107,6 +107,25 @@ describe('chrome-devtools', () => {
     );
   });
 
+  it('fails to invoke evaluate_script when javascriptEvaluation is disabled', async () => {
+    await runCli(['start', '--no-javascript-evaluation'], sessionId);
+
+    const result = await runCli(['evaluate_script', '() => 1'], sessionId);
+    assert.strictEqual(result.status, 0);
+    assert(
+      result.stdout.includes(
+        'Tool evaluate_script requires flag --javascriptEvaluation and is currently disabled',
+      ),
+      'error message is unexpected: ' + result.stdout,
+    );
+    assert(
+      result.stdout.includes(
+        'chrome-devtools start --javascriptEvaluation=true',
+      ),
+      'restart command suggestion is missing: ' + result.stdout,
+    );
+  });
+
   it('can record a performance trace', async () => {
     const startResult = await runCli(
       ['start', '--performanceCrux=false'],

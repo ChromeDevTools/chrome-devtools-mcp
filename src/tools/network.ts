@@ -90,7 +90,7 @@ export const listNetworkRequests = definePageTool({
 
 export const getNetworkRequest = definePageTool({
   name: 'get_network_request',
-  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
+  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,

@@ -374,6 +374,7 @@ grok mcp add chrome-devtools npx chrome-devtools-mcp@latest
 ```
 
 See the <a href="https://docs.x.ai/build/features/skills-plugins-marketplaces">docs</a> for more options
+
 </details>
 
 <details>
@@ -765,6 +766,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--usageStatistics`/ `--usage-statistics`**
   Set to false to opt-out of usage statistics collection. Google collects usage data to improve the tool, handled under the Google Privacy Policy (https://policies.google.com/privacy). This is independent from Chrome browser metrics. Disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--javascriptEvaluation`/ `--javascript-evaluation`**
+  Set to false to disable tools to evaluate JavaScript scripts.
   - **Type:** boolean
   - **Default:** `true`
 

@@ -1,12 +1,12 @@
 ## Security policy
 
-The Chrome DevTools MCP project takes security very seriously. Please use [Chromium’s process to report security issues](https://www.chromium.org/Home/chromium-security/reporting-security-bugs/).
+The Chrome DevTools MCP project takes security very seriously. Please use [Google Open Source Software Vulnerability Reward Program](https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules) to report any security issues.
 
 ### Scope
 
 In general, it is the expectation that the AI agent or client using this MCP server validates any input (including tool calls and parameters) before sending it. The server provides powerful capabilities for browser automation and inspection, and it is the responsibility of the calling agent to ensure these are used safely and as intended.
 
-Several tools in this project have the ability to perform actions such as writing files to disk (e.g., via browser downloads or screenshots) or dynamically loading Chrome extensions. These are intentional, documented features and are not vulnerabilities.
+Several tools in this project have the ability to perform actions such as writing files to disk (e.g., via browser downloads or screenshots), loading source maps, or dynamically loading Chrome extensions. These are intentional, documented features and are not vulnerabilities.
 
 The server returns web content to the client as text (Markdown-like) or
 structured data (`--experimentalStructuredContent`). The web content is returned
@@ -26,5 +26,5 @@ filesystem sandboxing, we recommend using OS sandbox mechanisms.
 
 ### Network guardrails
 
-Optional `--allowed-url-pattern` and `--blocked-url-pattern` arguments configure the browser to reject access to the identified URLs. Note that this is not a complete network sandbox and it only applies to Chrome DevTools targets while `chrome-devtools-mcp` is attached to them.
+Optional `--allowed-url-pattern` and `--blocked-url-pattern` arguments configure the **browser** to reject access to the identified URLs. Note that this is not a complete network sandbox and it only applies to Chrome DevTools targets while `chrome-devtools-mcp` is attached to them.
 To have a full network sandbox, we recommend using a separate OS/VM sandbox mechanism.
