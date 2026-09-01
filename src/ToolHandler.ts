@@ -256,6 +256,8 @@ export class ToolHandler {
   }
 
   async handle(params: Record<string, unknown>): Promise<CallToolResult> {
+    using _guard = await this.toolMutex.acquire();
+
     if (this.disabled && this.disabledReason) {
       return {
         content: [
@@ -285,7 +287,6 @@ export class ToolHandler {
       };
     }
 
-    using _guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;

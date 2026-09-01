@@ -273,9 +273,7 @@ export class McpServer {
         inputSchema: toolHandler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      async (params): Promise<CallToolResult> => {
-        return await toolHandler.handle(params);
-      },
+      toolHandler.handle,
     );
 
     if (toolHandler.disabled) {
