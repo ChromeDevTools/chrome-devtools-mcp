@@ -35,7 +35,6 @@ import {
   mcpOptions,
   parseArguments,
   getMcpOptionsForViaCli,
-  applyCliFilesystemAccess,
 } from '../config/mcp-options.js';
 
 await checkForUpdates(
@@ -156,7 +155,6 @@ y.command(
     ) {
       argv.headless = true;
     }
-    applyCliFilesystemAccess(argv, hideBin(process.argv));
     const args = serializeArgs(mcpOptions, argv);
     await start(args, argv.sessionId);
     process.exit(0);

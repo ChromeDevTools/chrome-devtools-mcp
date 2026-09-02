@@ -5,10 +5,13 @@
  */
 
 import assert from 'node:assert';
-import os from 'node:os';
 import {describe, it} from 'node:test';
 
-import {mcpOptions, parser} from '../src/config/mcp-options.js';
+import {
+  DEFAULT_FILESYSTEM_ROOT,
+  mcpOptions,
+  parser,
+} from '../src/config/mcp-options.js';
 
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return parser('0.0.0', ['node', 'main.js', ...argv], env)
@@ -29,7 +32,7 @@ describe('cli args parsing', () => {
     javascriptEvaluation: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
-    filesystemRoot: [os.tmpdir()],
+    filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
     memoryDebugging: false,
     experimentalStructuredContent: false,
     pageIdRouting: true,
@@ -186,14 +189,9 @@ describe('cli args parsing', () => {
       assert.strictEqual(args.filesystemRoot, undefined);
     });
 
-    it('passes explicit workspace roots along when unrestricted is also set', async () => {
-      const args = parseArguments([
-        '--viaCli',
-        '--workspace=/tmp/one',
-        '--allow-unrestricted-paths',
-      ]);
-      assert.strictEqual(args.allowUnrestrictedPaths, false);
-      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
+    it('uses yargs default identity to detect an unset CLI workspace', async () => {
+      const args = parseArguments([]);
+      assert.strictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
   });
 

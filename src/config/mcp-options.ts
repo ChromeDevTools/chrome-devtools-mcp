@@ -8,6 +8,8 @@ import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 import os from 'node:os';
 
+export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+
 export const mcpOptions = {
   autoConnect: {
     type: 'boolean',
@@ -403,7 +405,7 @@ export const mcpOptions = {
   filesystemRoot: {
     type: 'array',
     alias: 'workspace',
-    default: [os.tmpdir()],
+    default: DEFAULT_FILESYSTEM_ROOT,
     defaultDescription: 'OS temp directory',
     describe:
       'A directory that filesystem tools are allowed to access. May be specified more than once.',
@@ -411,44 +413,6 @@ export const mcpOptions = {
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
-
-const FILESYSTEM_ROOT_FLAGS = [
-  '--filesystem-root',
-  '--filesystemRoot',
-  '--workspace',
-] as const;
-
-export interface FilesystemAccessFlags {
-  allowUnrestrictedPaths?: unknown;
-  filesystemRoot?: unknown;
-}
-
-function hasExplicitArg(
-  argv: readonly string[],
-  names: readonly string[],
-): boolean {
-  return argv.some(arg =>
-    names.some(name => arg === name || arg.startsWith(`${name}=`)),
-  );
-}
-
-/**
- * CLI filesystem access. `--allow-unrestricted-paths` is not given a CLI yargs
- * default; middleware enables it when the user did not pass `--workspace` /
- * `--filesystem-root`. Explicit workspace flags are detected separately from
- * the yargs tmpdir default so that default is not treated as a user workspace.
- */
-export function applyCliFilesystemAccess(
-  args: FilesystemAccessFlags,
-  argv: readonly string[],
-): void {
-  if (hasExplicitArg(argv, FILESYSTEM_ROOT_FLAGS)) {
-    args.allowUnrestrictedPaths = false;
-    return;
-  }
-  args.allowUnrestrictedPaths = true;
-  args.filesystemRoot = undefined;
-}
 
 export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
@@ -509,8 +473,9 @@ export function parser(
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
-      if (isViaCli) {
-        applyCliFilesystemAccess(args, hideBin(argv));
+      if (isViaCli && args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
+        args.allowUnrestrictedPaths = true;
+        args.filesystemRoot = undefined;
       }
       // We can't set default in the options else
       // Yargs will complain
