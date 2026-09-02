@@ -60,20 +60,13 @@ describe('WaitForHelper', () => {
       const result = await mcpPage.waitForEventsAfterAction(
         async () => {
           // Simulate an action that takes longer than expectNavigationIn (300ms)
-          // before scheduling the navigation. Scheduling it after evaluate
-          // returns avoids racing the execution-context teardown on Windows.
+          // before triggering the navigation.
           await new Promise(resolve => setTimeout(resolve, 600));
           await mcpPage.pptrPage.evaluate(targetUrl => {
-            setTimeout(() => {
-              location.href = targetUrl;
-            }, 50);
+            location.href = targetUrl;
           }, url);
         },
-        {
-          waitForStableDom: false,
-          expectNavigationIn: 300,
-          timeout: 10_000,
-        },
+        {waitForStableDom: false, expectNavigationIn: 300},
       );
 
       assert.strictEqual(result.navigatedToUrl, url);
