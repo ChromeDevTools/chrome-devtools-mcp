@@ -20,6 +20,13 @@ const HEAP_SNAPSHOT_FILTERS: readonly [string, ...string[]] = [
   'attributedToSpecificNativeContext',
 ];
 
+const heapSnapshotPathSchema = zod
+  .string()
+  .describe('A path to a .heapsnapshot file to read.')
+  .meta({
+    verifyFile: true,
+  });
+
 export const takeHeapSnapshot = definePageTool({
   name: 'take_heapsnapshot',
   description: `Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
@@ -30,12 +37,12 @@ export const takeHeapSnapshot = definePageTool({
   schema: {
     filePath: zod
       .string()
-      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.'),
+      .describe('A path to a .heapsnapshot file to save the heapsnapshot to.')
+      .meta({
+        verifyFile: true,
+      }),
   },
   blockedByDialog: true,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     const page = request.page;
     const snapshotPath = await context.ensureExtension(
@@ -61,12 +68,9 @@ export const getHeapSnapshotSummary = defineTool({
     conditions: ['memoryDebugging'],
   },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     const stats = await context.getHeapSnapshotStats(request.params.filePath);
     const staticData = await context.getHeapSnapshotStaticData(
@@ -99,7 +103,7 @@ export const getHeapSnapshotDetails = defineTool({
     conditions: ['memoryDebugging'],
   },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     filterName: zod
       .enum(HEAP_SNAPSHOT_FILTERS)
       .optional()
@@ -120,9 +124,6 @@ export const getHeapSnapshotDetails = defineTool({
       .describe('The page size for pagination of aggregates.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     const aggregates = await context.getHeapSnapshotAggregates(
       request.params.filePath,
@@ -147,7 +148,7 @@ export const getHeapSnapshotClassNodes = defineTool({
     conditions: ['memoryDebugging'],
   },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     id: zod.number().describe('The ID for the class, obtained from details.'),
     filterName: zod
       .enum(HEAP_SNAPSHOT_FILTERS)
@@ -163,9 +164,6 @@ export const getHeapSnapshotClassNodes = defineTool({
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     const nodes = await context.getHeapSnapshotNodesById(
       request.params.filePath,
@@ -191,11 +189,8 @@ export const getHeapSnapshotRetainers = defineTool({
     conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     nodeId: zod.number().describe('The node ID to get retainers for.'),
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
@@ -222,13 +217,13 @@ export const closeHeapSnapshot = defineTool({
     readOnlyHint: false,
     conditions: ['memoryDebugging'],
   },
-  verifyFilesSchema: {
-    filePath: true,
-  },
   schema: {
     filePath: zod
       .string()
-      .describe('A path to the .heapsnapshot file to close.'),
+      .describe('A path to the .heapsnapshot file to close.')
+      .meta({
+        verifyFile: true,
+      }),
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
@@ -253,12 +248,9 @@ export const getHeapSnapshotRetainingPaths = defineTool({
     readOnlyHint: true,
     conditions: ['memoryDebugging'],
   },
-  verifyFilesSchema: {
-    filePath: true,
-  },
   blockedByDialog: false,
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     nodeId: zod.number().describe('The node ID to get retaining paths for.'),
     maxDepth: zod
       .number()
@@ -296,11 +288,8 @@ export const getHeapSnapshotEdges = defineTool({
     conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     nodeId: zod.number().describe('The node ID to get outgoing edges for.'),
     sortBy: zod
       .enum(['retainedSize', 'selfSize', 'name'])
@@ -345,11 +334,8 @@ export const getHeapSnapshotDominators = defineTool({
     conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     nodeId: zod
       .number()
       .describe('The node ID to get the dominator chain for.'),
@@ -373,17 +359,19 @@ export const compareHeapSnapshots = defineTool({
     readOnlyHint: true,
     conditions: ['memoryDebugging'],
   },
-  verifyFilesSchema: {
-    baseFilePath: true,
-    currentFilePath: true,
-  },
   schema: {
     baseFilePath: zod
       .string()
-      .describe('A path to the base .heapsnapshot file (earlier snapshot).'),
+      .describe('A path to the base .heapsnapshot file (earlier snapshot).')
+      .meta({
+        verifyFile: true,
+      }),
     currentFilePath: zod
       .string()
-      .describe('A path to the current .heapsnapshot file (later snapshot).'),
+      .describe('A path to the current .heapsnapshot file (later snapshot).')
+      .meta({
+        verifyFile: true,
+      }),
     classIndex: zod
       .number()
       .optional()
@@ -420,11 +408,8 @@ export const getHeapSnapshotDuplicateStrings = defineTool({
     conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     pageIdx: zod.number().optional().describe('The page index for pagination.'),
     pageSize: zod.number().optional().describe('The page size for pagination.'),
   },
@@ -450,11 +435,8 @@ export const getHeapSnapshotObjectDetails = defineTool({
     conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     nodeId: zod.number().describe('The node ID to get object details for.'),
   },
   handler: async (request, response, context) => {
@@ -477,9 +459,8 @@ export const queryHeapSnapshotObjects = defineTool({
     conditions: ['memoryDebugging'],
   },
   blockedByDialog: false,
-  verifyFilesSchema: {filePath: true},
   schema: {
-    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    filePath: heapSnapshotPathSchema,
     className: zod
       .string()
       .optional()

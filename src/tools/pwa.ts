@@ -46,18 +46,18 @@ export const installPwa = defineTool({
         'The location of the app or bundle. For a normal site this is the page ' +
           'URL; for an Isolated Web App it can be a file:// or http(s):// ' +
           'signed web bundle.',
-      ),
+      )
+      .meta({
+        // We do not validate file paths for remote browser instances
+        // because they are on the remote host and not accessed by the MCP server.
+        verifyFile: {
+          local: true,
+          remote: false,
+        },
+      }),
     displayMode: displayModeSchema,
   },
   blockedByDialog: false,
-  // We do not validate file paths for remote browser instances
-  // because they are on the remote host and not accessed by the MCP server.
-  verifyFilesSchema: {
-    installUrlOrBundleUrl: {
-      local: true,
-      remote: false,
-    },
-  },
   handler: async (request, response, context) => {
     const {manifestId, installUrlOrBundleUrl, displayMode} = request.params;
     await context.installPWA({
@@ -87,7 +87,6 @@ export const uninstallPwa = defineTool({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
     await context.uninstallPWA({manifestId});
@@ -118,7 +117,6 @@ export const launchPwa = defineTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
     const page = await context.launchPWA({manifestId, url});
@@ -142,7 +140,6 @@ export const getOsAppState = defineTool({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
     const state = await context.getPWAState({manifestId});

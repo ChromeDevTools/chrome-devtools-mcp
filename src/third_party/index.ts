@@ -33,7 +33,7 @@ export {
   RootsListChangedNotificationSchema,
   ListRootsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-export {z as zod} from 'zod';
+export * from './zod.js';
 export {default as ajv} from 'ajv';
 export {
   Locator,

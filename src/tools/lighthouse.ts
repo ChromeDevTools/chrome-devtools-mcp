@@ -41,12 +41,12 @@ export const lighthouseAudit = definePageTool({
     outputDirPath: zod
       .string()
       .optional()
-      .describe('Directory for reports. If omitted, uses temporary files.'),
+      .describe('Directory for reports. If omitted, uses temporary files.')
+      .meta({
+        verifyFile: true,
+      }),
   },
   blockedByDialog: true,
-  verifyFilesSchema: {
-    outputDirPath: true,
-  },
   handler: async (request, response, context) => {
     const page = request.page;
     const categories = [

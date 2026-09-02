@@ -57,7 +57,10 @@ Example with arguments: \`(el) => el.innerText\`
         .optional()
         .describe(
           'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
-        ),
+        )
+        .meta({
+          verifyFile: true,
+        }),
       dialogAction: zod
         .string()
         .optional()
@@ -82,9 +85,6 @@ Example with arguments: \`(el) => el.innerText\`
         : {}),
     },
     blockedByDialog: true,
-    verifyFilesSchema: {
-      filePath: true,
-    },
     handler: async (request, response, context) => {
       const {
         serviceWorkerId,

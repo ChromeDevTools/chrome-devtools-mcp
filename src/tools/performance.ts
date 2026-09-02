@@ -23,7 +23,10 @@ const filePathSchema = zod
   .optional()
   .describe(
     'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
-  );
+  )
+  .meta({
+    verifyFile: true,
+  });
 
 export const startTrace = definePageTool({
   name: 'performance_start_trace',
@@ -48,9 +51,6 @@ export const startTrace = definePageTool({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
       response.appendResponseLine(
@@ -135,9 +135,6 @@ export const stopTrace = definePageTool({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
       return;
@@ -173,7 +170,6 @@ export const analyzeInsight = definePageTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
     if (!lastRecording) {

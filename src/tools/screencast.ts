@@ -37,12 +37,12 @@ export const startScreencast = definePageTool(args => ({
       .optional()
       .describe(
         `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
-      ),
+      )
+      .meta({
+        verifyFile: true,
+      }),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {
-    filePath: true,
-  },
   handler: async (request, response, context) => {
     if (context.getScreenRecorder() !== null) {
       response.appendResponseLine(
@@ -132,7 +132,6 @@ export const stopScreencast = definePageTool({
   },
   schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (_request, response, context) => {
     const data = context.getScreenRecorder();
     if (!data) {
