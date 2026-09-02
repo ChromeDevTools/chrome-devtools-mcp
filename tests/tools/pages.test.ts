@@ -11,7 +11,10 @@ import {afterEach, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import {
+  parseArguments,
+  type ParsedArguments,
+} from '../../src/config/mcp-options.js';
 import {
   listPages,
   newPage,
@@ -247,6 +250,73 @@ describe('pages', () => {
           context.getSelectedMcpPage(),
         );
         assert.ok(response.includePages);
+      });
+    });
+    it('throws when navigating to a javascript URL and javascriptEvaluation is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const disabledArgs = parseArguments(
+          '1.0.0',
+          ['node', 'script.js', '--no-javascript-evaluation'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        );
+        const tool = newPage(disabledArgs);
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'javascript:alert(1)'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'data:text/html,<div>test</div>'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to data: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'vbscript:msgbox(1)'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+      });
+    });
+    it('throws when URL does not parse with new URL', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = newPage();
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'not a valid url'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
+          },
+        );
       });
     });
     it('create a page in the background', async () => {
@@ -918,6 +988,108 @@ describe('pages', () => {
         });
 
         assert.ok(response.includePages);
+      });
+    });
+
+    it('omits initScript from schema when javascriptEvaluation is false', () => {
+      const defaultTool = navigatePage();
+      assert.strictEqual('initScript' in defaultTool.schema, true);
+
+      const disabledArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', '--no-javascript-evaluation'],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+      const disabledTool = navigatePage(disabledArgs);
+      assert.strictEqual('initScript' in disabledTool.schema, false);
+    });
+
+    it('throws when navigating to a javascript, data, or vbscript URL and javascriptEvaluation is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const disabledArgs = parseArguments(
+          '1.0.0',
+          ['node', 'script.js', '--no-javascript-evaluation'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        );
+        const tool = navigatePage(disabledArgs);
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {
+                  url: 'javascript:alert(1)',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {
+                  url: 'data:text/html,<div>test</div>',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to data: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {
+                  url: 'vbscript:msgbox(1)',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+      });
+    });
+
+    it('throws when URL does not parse with new URL', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = navigatePage();
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {
+                  url: 'not a valid url',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
+          },
+        );
       });
     });
 

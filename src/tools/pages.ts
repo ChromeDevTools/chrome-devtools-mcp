@@ -7,6 +7,7 @@
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {validateUrl} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -96,7 +97,7 @@ export const closePage = defineTool({
   },
 });
 
-export const newPage = defineTool(() => {
+export const newPage = defineTool(args => {
   return {
     name: 'new_page',
     description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
@@ -125,6 +126,8 @@ export const newPage = defineTool(() => {
     blockedByDialog: false,
     verifyFilesSchema: {},
     handler: async (request, response, context) => {
+      validateUrl(request.params.url, args?.javascriptEvaluation);
+
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
@@ -145,7 +148,7 @@ export const newPage = defineTool(() => {
   };
 });
 
-export const navigatePage = definePageTool(() => {
+export const navigatePage = definePageTool(args => {
   return {
     name: 'navigate_page',
     description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
@@ -171,12 +174,16 @@ export const navigatePage = definePageTool(() => {
         .describe(
           'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
         ),
-      initScript: zod
-        .string()
-        .optional()
-        .describe(
-          'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
-        ),
+      ...(args?.javascriptEvaluation !== false
+        ? {
+            initScript: zod
+              .string()
+              .optional()
+              .describe(
+                'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
+              ),
+          }
+        : {}),
       ...timeoutSchema,
     },
     blockedByDialog: false,
@@ -193,6 +200,10 @@ export const navigatePage = definePageTool(() => {
 
       if (!request.params.type) {
         request.params.type = 'url';
+      }
+
+      if (request.params.url) {
+        validateUrl(request.params.url, args?.javascriptEvaluation);
       }
 
       let initScriptId: string | undefined;
