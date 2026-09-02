@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {isLocalhost} from '../../src/utils/url.js';
+import {isLocalhost, validateUrl} from '../../src/utils/url.js';
 
 describe('isLocalhost', () => {
   it('should return true for valid localhost and loopback URLs', () => {
@@ -85,5 +85,85 @@ describe('isLocalhost', () => {
     assert.strictEqual(isLocalhost(''), false);
     assert.strictEqual(isLocalhost('   '), false);
     assert.strictEqual(isLocalhost('not a url'), false);
+  });
+});
+
+describe('validateUrl', () => {
+  it('should return URL object for valid URLs', () => {
+    assert.strictEqual(
+      validateUrl('https://example.com').href,
+      'https://example.com/',
+    );
+    assert.strictEqual(
+      validateUrl('http://localhost:3000').href,
+      'http://localhost:3000/',
+    );
+    assert.strictEqual(validateUrl('about:blank').href, 'about:blank');
+    assert.strictEqual(
+      validateUrl('data:text/html,<div>test</div>').href,
+      'data:text/html,<div>test</div>',
+    );
+  });
+
+  it('should reject URLs that do not parse with new URL', () => {
+    assert.throws(() => validateUrl('not a url'), /Invalid URL: "not a url"/);
+    assert.throws(() => validateUrl(''), /Invalid URL: ""/);
+    assert.throws(() => validateUrl('http://'), /Invalid URL: "http:\/\/"/);
+    assert.throws(() => validateUrl('://'), /Invalid URL: ":\/\/"/);
+  });
+
+  it('should allow javascript, data, and vbscript URLs when javascriptEvaluation is true or omitted', () => {
+    assert.strictEqual(
+      validateUrl('javascript:alert(1)').protocol,
+      'javascript:',
+    );
+    assert.strictEqual(
+      validateUrl('javascript:alert(1)', true).protocol,
+      'javascript:',
+    );
+    assert.strictEqual(
+      validateUrl('data:text/html,<div>test</div>').protocol,
+      'data:',
+    );
+    assert.strictEqual(
+      validateUrl('data:text/html,<div>test</div>', true).protocol,
+      'data:',
+    );
+    assert.strictEqual(validateUrl('vbscript:msgbox(1)').protocol, 'vbscript:');
+    assert.strictEqual(
+      validateUrl('vbscript:msgbox(1)', true).protocol,
+      'vbscript:',
+    );
+  });
+
+  it('should reject javascript, data, and vbscript URLs when javascriptEvaluation is false', () => {
+    assert.throws(
+      () => validateUrl('javascript:alert(1)', false),
+      /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('JAVASCRIPT:alert(1)', false),
+      /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('javascript:void(0)', false),
+      /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('data:text/html,<div>test</div>', false),
+      /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('DATA:text/html,<div>test</div>', false),
+      /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('vbscript:msgbox(1)', false),
+      /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('VBSCRIPT:msgbox(1)', false),
+      /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
   });
 });

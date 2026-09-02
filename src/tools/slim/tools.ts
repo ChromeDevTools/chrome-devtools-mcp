@@ -8,6 +8,7 @@ import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {definePageTool} from '../ToolDefinition.js';
+import {validateUrl} from '../../utils/url.js';
 
 export const screenshot = definePageTool({
   name: 'screenshot',
@@ -34,43 +35,47 @@ export const screenshot = definePageTool({
   },
 });
 
-export const navigate = definePageTool({
-  name: 'navigate',
-  description: `Loads a URL`,
-  annotations: {
-    category: ToolCategory.NAVIGATION,
-    readOnlyHint: false,
-  },
-  schema: {
-    url: zod.string().describe('URL to navigate to'),
-  },
-  blockedByDialog: false,
-  verifyFilesSchema: {},
-  handler: async (request, response) => {
-    const page = request.page;
+export const navigate = definePageTool(args => {
+  return {
+    name: 'navigate',
+    description: `Loads a URL`,
+    annotations: {
+      category: ToolCategory.NAVIGATION,
+      readOnlyHint: false,
+    },
+    schema: {
+      url: zod.string().describe('URL to navigate to'),
+    },
+    blockedByDialog: false,
+    verifyFilesSchema: {},
+    handler: async (request, response) => {
+      validateUrl(request.params.url, args?.javascriptEvaluation);
 
-    const options = {
-      timeout: 30_000,
-    };
+      const page = request.page;
 
-    const dialogHandler = (dialog: Dialog) => {
-      if (dialog.type() === 'beforeunload') {
-        response.appendResponseLine(`Accepted a beforeunload dialog.`);
-        void dialog.accept();
-        // We are not going to report the dialog like regular dialogs.
-        page.clearDialog();
+      const options = {
+        timeout: 30_000,
+      };
+
+      const dialogHandler = (dialog: Dialog) => {
+        if (dialog.type() === 'beforeunload') {
+          response.appendResponseLine(`Accepted a beforeunload dialog.`);
+          void dialog.accept();
+          // We are not going to report the dialog like regular dialogs.
+          page.clearDialog();
+        }
+      };
+
+      page.pptrPage.on('dialog', dialogHandler);
+
+      try {
+        await page.pptrPage.goto(request.params.url, options);
+        response.appendResponseLine(`Navigated to ${page.pptrPage.url()}.`);
+      } finally {
+        page.pptrPage.off('dialog', dialogHandler);
       }
-    };
-
-    page.pptrPage.on('dialog', dialogHandler);
-
-    try {
-      await page.pptrPage.goto(request.params.url, options);
-      response.appendResponseLine(`Navigated to ${page.pptrPage.url()}.`);
-    } finally {
-      page.pptrPage.off('dialog', dialogHandler);
-    }
-  },
+    },
+  };
 });
 
 export const evaluate = definePageTool({

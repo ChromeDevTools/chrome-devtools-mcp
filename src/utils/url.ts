@@ -48,3 +48,35 @@ export function isLocalhost(url?: string): boolean {
 
   return false;
 }
+
+const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
+
+/**
+ * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols.
+ *
+ * @param url The URL string to validate.
+ * @param javascriptEvaluation Whether JavaScript evaluation is enabled.
+ * @returns The parsed URL.
+ * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed.
+ */
+export function validateUrl(url: string, javascriptEvaluation?: boolean): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(
+      `Invalid URL: "${url}". URLs must be valid according to the URL standard.`,
+    );
+  }
+
+  if (
+    javascriptEvaluation === false &&
+    DISALLOWED_PROTOCOLS.has(parsed.protocol)
+  ) {
+    throw new Error(
+      `Navigating to ${parsed.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
+    );
+  }
+
+  return parsed;
+}

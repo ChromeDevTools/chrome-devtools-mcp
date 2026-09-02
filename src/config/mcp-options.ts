@@ -300,7 +300,8 @@ export const mcpOptions = {
   javascriptEvaluation: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to disable tools to evaluate JavaScript scripts.',
+    describe:
+      'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
   },
   clearcutEndpoint: {
     type: 'string',
@@ -562,7 +563,7 @@ export function parser(
       ],
       [
         '$0 --no-javascript-evaluation',
-        'Disable tools to evaluate JavaScript scripts.',
+        'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
       ],
       [
         '$0 --slim',

@@ -181,7 +181,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--javascriptEvaluation`/ `--javascript-evaluation`**
-  Set to false to disable tools to evaluate JavaScript scripts.
+  Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.
   - **Type:** boolean
   - **Default:** `true`
 
