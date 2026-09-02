@@ -347,21 +347,28 @@ describe('console', () => {
             page.on('dialog', dialog => resolve(dialog));
           });
 
-          const evalPromise = page.evaluate(() => {
-            alert('test dialog');
-          });
+          const evalPromise = page
+            .evaluate(() => {
+              alert('test dialog');
+            })
+            .catch(() => {
+              // Ignore TargetCloseError when page is closed with open dialog
+            });
           const dialog = await dialogPromise;
 
-          await listConsoleMessages().handler(
-            {params: {}, page: context.getSelectedMcpPage()},
-            response,
-            context,
-          );
+          try {
+            await listConsoleMessages().handler(
+              {params: {}, page: context.getSelectedMcpPage()},
+              response,
+              context,
+            );
 
-          const result = await response.handle(context);
-          t.assert.snapshot(JSON.stringify(result));
-          await dialog.dismiss();
-          await evalPromise;
+            const result = await response.handle(context);
+            t.assert.snapshot(JSON.stringify(result));
+          } finally {
+            await dialog.dismiss();
+            await evalPromise;
+          }
         });
       });
     });
@@ -695,21 +702,30 @@ describe('console', () => {
         const dialogPromise = new Promise<Dialog>(resolve => {
           page.on('dialog', dialog => resolve(dialog));
         });
-        const evalPromise = page.evaluate(() => {
-          alert('test dialog');
-        });
+        const evalPromise = page
+          .evaluate(() => {
+            alert('test dialog');
+          })
+          .catch(() => {
+            // Ignore TargetCloseError when page is closed with open dialog
+          });
         const dialog = await dialogPromise;
 
-        await getConsoleMessage.handler(
-          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
+        try {
+          await getConsoleMessage.handler(
+            {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
 
-        const result = await response.handle(context);
-        t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
-        await dialog.dismiss();
-        await evalPromise;
+          const result = await response.handle(context);
+          t.assert.snapshot(
+            stabilizeStructuredContent(result.structuredContent),
+          );
+        } finally {
+          await dialog.dismiss();
+          await evalPromise;
+        }
       });
     });
   });
