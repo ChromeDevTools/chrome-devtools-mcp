@@ -811,6 +811,8 @@ describe('pages', () => {
             });
           </script>`,
         );
+        // Grant user activation so Chrome permits the beforeunload dialog
+        await page.mouse.click(10, 10);
 
         await navigatePage().handler(
           {params: {type: 'reload'}, page: context.getSelectedMcpPage()},
@@ -838,6 +840,8 @@ describe('pages', () => {
             });
           </script>`,
         );
+        // Grant user activation so Chrome permits the beforeunload dialog
+        await page.mouse.click(10, 10);
 
         await navigatePage().handler(
           {
