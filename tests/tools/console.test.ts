@@ -347,7 +347,7 @@ describe('console', () => {
             page.on('dialog', dialog => resolve(dialog));
           });
 
-          page.evaluate(() => {
+          const evalPromise = page.evaluate(() => {
             alert('test dialog');
           });
           const dialog = await dialogPromise;
@@ -361,6 +361,7 @@ describe('console', () => {
           const result = await response.handle(context);
           t.assert.snapshot(JSON.stringify(result));
           await dialog.dismiss();
+          await evalPromise;
         });
       });
     });
@@ -694,7 +695,7 @@ describe('console', () => {
         const dialogPromise = new Promise<Dialog>(resolve => {
           page.on('dialog', dialog => resolve(dialog));
         });
-        page.evaluate(() => {
+        const evalPromise = page.evaluate(() => {
           alert('test dialog');
         });
         const dialog = await dialogPromise;
@@ -708,6 +709,7 @@ describe('console', () => {
         const result = await response.handle(context);
         t.assert.snapshot(stabilizeStructuredContent(result.structuredContent));
         await dialog.dismiss();
+        await evalPromise;
       });
     });
   });
