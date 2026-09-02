@@ -274,4 +274,82 @@ describe('McpPage', () => {
       assert.ok(handle.disposed);
     });
   });
+
+  describe('emulate()', () => {
+    it('stores networkConditions in emulationSettings', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({networkConditions: 'Slow 3G'});
+        assert.strictEqual(page.networkConditions, 'Slow 3G');
+      });
+    });
+
+    it('clears networkConditions when omitted', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({networkConditions: 'Slow 3G'});
+        await page.emulate({});
+        assert.strictEqual(page.networkConditions, null);
+      });
+    });
+
+    it('stores cpuThrottlingRate in emulationSettings', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({cpuThrottlingRate: 4});
+        assert.strictEqual(page.cpuThrottlingRate, 4);
+      });
+    });
+
+    it('resets cpuThrottlingRate to 1 (no throttle)', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({cpuThrottlingRate: 4});
+        await page.emulate({cpuThrottlingRate: 1});
+        assert.strictEqual(page.cpuThrottlingRate, 1);
+      });
+    });
+
+    it('ignores unknown networkConditions values', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({networkConditions: 'Slow 11G'});
+        assert.strictEqual(page.networkConditions, null);
+      });
+    });
+
+    it('stores userAgent in emulationSettings', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({userAgent: 'TestUA/1.0'});
+        assert.strictEqual(page.userAgent, 'TestUA/1.0');
+      });
+    });
+
+    it('clears userAgent when empty string is provided', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({userAgent: 'TestUA/1.0'});
+        await page.emulate({userAgent: ''});
+        assert.strictEqual(page.userAgent, null);
+      });
+    });
+
+    it('stores colorScheme in emulationSettings', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({colorScheme: 'dark'});
+        assert.strictEqual(page.colorScheme, 'dark');
+      });
+    });
+
+    it('clears colorScheme when set to auto', async () => {
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.emulate({colorScheme: 'dark'});
+        await page.emulate({colorScheme: 'auto'});
+        assert.strictEqual(page.colorScheme, null);
+      });
+    });
+  });
 });

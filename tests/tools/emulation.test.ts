@@ -99,7 +99,10 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.strictEqual(page.networkConditions, 'Offline');
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+        networkConditions: 'Offline',
+      });
     });
 
     it('emulates network throttling when the throttling option is valid', async () => {
@@ -111,12 +114,14 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.strictEqual(page.networkConditions, 'Slow 3G');
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+        networkConditions: 'Slow 3G',
+      });
     });
 
-    it('disables network emulation', async () => {
+    it('disables network emulation when networkConditions is omitted', async () => {
       const page = createMockMcpPage();
-      page.emulationSettings.networkConditions = 'Slow 3G';
       const context = createMockMcpContext({selectedPage: page});
       const response = createMockMcpResponse();
       await emulate.handler(
@@ -124,7 +129,8 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.strictEqual(page.networkConditions, null);
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {});
     });
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
@@ -145,19 +151,18 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      const page1 = createMockMcpPage();
-      const page2 = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page1, pages: [page1, page2]});
+      const page = createMockMcpPage();
+      const context = createMockMcpContext({selectedPage: page});
       const response = createMockMcpResponse();
-
       await emulate.handler(
-        {params: {networkConditions: 'Slow 3G'}, page: page1},
+        {params: {networkConditions: 'Slow 3G'}, page},
         response,
         context,
       );
-      assert.strictEqual(page1.networkConditions, 'Slow 3G');
-      // page2 is a separate page — its settings are independent
-      assert.strictEqual(page2.networkConditions, null);
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+        networkConditions: 'Slow 3G',
+      });
     });
   });
 
@@ -171,7 +176,10 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.strictEqual(page.cpuThrottlingRate, 4);
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+        cpuThrottlingRate: 4,
+      });
     });
 
     it('applies cpu throttling to secondary session', async () => {
@@ -204,9 +212,8 @@ describe('emulation', () => {
       });
     });
 
-    it('disables cpu throttling', async () => {
+    it('disables cpu throttling when rate is 1', async () => {
       const page = createMockMcpPage();
-      page.emulationSettings.cpuThrottlingRate = 4;
       const context = createMockMcpContext({selectedPage: page});
       const response = createMockMcpResponse();
       await emulate.handler(
@@ -214,23 +221,25 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.strictEqual(page.cpuThrottlingRate, 1);
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+        cpuThrottlingRate: 1,
+      });
     });
 
     it('report correctly for the currently selected page', async () => {
-      const page1 = createMockMcpPage();
-      const page2 = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page1, pages: [page1, page2]});
+      const page = createMockMcpPage();
+      const context = createMockMcpContext({selectedPage: page});
       const response = createMockMcpResponse();
-
       await emulate.handler(
-        {params: {cpuThrottlingRate: 4}, page: page1},
+        {params: {cpuThrottlingRate: 4}, page},
         response,
         context,
       );
-      assert.strictEqual(page1.cpuThrottlingRate, 4);
-      // page2 is a separate page — its settings are independent
-      assert.strictEqual(page2.cpuThrottlingRate, 1);
+      assert.ok(page.emulate.calledOnce);
+      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+        cpuThrottlingRate: 4,
+      });
     });
   });
 
