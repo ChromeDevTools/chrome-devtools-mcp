@@ -171,6 +171,10 @@ export interface MockMcpContext
   extends Pick<McpContext, 'getSelectedMcpPage' | 'getPages'> {
   getSelectedMcpPage: sinon.SinonStub;
   getPages: sinon.SinonStub;
+  getPageById: sinon.SinonStub;
+  selectPage: sinon.SinonStub;
+  closePage: sinon.SinonStub;
+  newPage: sinon.SinonStub;
   // Allow tests to add extra stub properties.
   [key: string]: unknown;
 }
@@ -179,16 +183,22 @@ export interface MockMcpContext
  * Creates a sinon-stubbed stand-in for `McpContext`.
  *
  * By default `getSelectedMcpPage()` returns the provided `selectedPage` (or a
- * freshly created mock page if none is supplied).
+ * freshly created mock page if none is supplied). `getPageById` also returns
+ * the same page by default.
  */
 export function createMockMcpContext(
-  options: {selectedPage?: MockMcpPage} = {},
+  options: {selectedPage?: MockMcpPage; pages?: MockMcpPage[]} = {},
 ): MockMcpContext {
   const page = options.selectedPage ?? createMockMcpPage();
+  const pages = options.pages ?? [page];
 
   return {
     getSelectedMcpPage: sinon.stub().returns(page),
-    getPages: sinon.stub().returns([page]),
+    getPages: sinon.stub().returns(pages),
+    getPageById: sinon.stub().returns(page),
+    selectPage: sinon.stub(),
+    closePage: sinon.stub().resolves(),
+    newPage: sinon.stub().resolves(page),
   };
 }
 
@@ -200,6 +210,15 @@ export interface MockMcpResponse
   extends Pick<McpResponse, 'appendResponseLine' | 'responseLines'> {
   appendResponseLine: sinon.SinonStub;
   setError: sinon.SinonStub;
+  setIncludeConsoleData: sinon.SinonStub;
+  attachConsoleMessage: sinon.SinonStub;
+  setIncludeNetworkRequests: sinon.SinonStub;
+  attachNetworkRequest: sinon.SinonStub;
+  setIncludePages: sinon.SinonStub;
+  setListThirdPartyDeveloperTools: sinon.SinonStub;
+  setListWebMcpTools: sinon.SinonStub;
+  includeSnapshot: sinon.SinonStub;
+  attachDevToolsData: sinon.SinonStub;
   // Backing store for responseLines
   _lines: string[];
   // Allow extra stubs.
@@ -226,5 +245,35 @@ export function createMockMcpResponse(): MockMcpResponse {
     },
     appendResponseLine,
     setError: sinon.stub(),
+    // Console
+    setIncludeConsoleData: sinon.stub(),
+    attachConsoleMessage: sinon.stub(),
+    get includeConsoleData(): boolean {
+      return false;
+    },
+    // Network
+    setIncludeNetworkRequests: sinon.stub(),
+    attachNetworkRequest: sinon.stub(),
+    get includeNetworkRequests(): boolean {
+      return false;
+    },
+    // Pages / navigation
+    setIncludePages: sinon.stub(),
+    setListThirdPartyDeveloperTools: sinon.stub(),
+    setListWebMcpTools: sinon.stub(),
+    get includePages(): boolean {
+      return false;
+    },
+    // Snapshot
+    includeSnapshot: sinon.stub(),
+    get snapshotParams(): unknown {
+      return undefined;
+    },
+    // DevTools data
+    attachDevToolsData: sinon.stub(),
+    // Images
+    get images(): unknown[] {
+      return [];
+    },
   };
 }
