@@ -177,8 +177,8 @@ export class WaitForHelper {
 
       navigationStartedResolvers.resolve(true);
     };
-    const scheduledNavigationListener = (
-      event: Protocol.Page.FrameScheduledNavigationEvent,
+    const requestedNavigationListener = (
+      event: Protocol.Page.FrameRequestedNavigationEvent,
     ) => {
       if (event.frameId === this.#page.mainFrame()._id) {
         navigationStartedResolvers.resolve(true);
@@ -188,14 +188,14 @@ export class WaitForHelper {
     this.#page._client().on('Page.frameStartedNavigating', navigationListener);
     this.#page
       ._client()
-      .on('Page.frameScheduledNavigation', scheduledNavigationListener);
+      .on('Page.frameRequestedNavigation', requestedNavigationListener);
     navigationAbortController.signal.addEventListener('abort', () => {
       this.#page
         ._client()
         .off('Page.frameStartedNavigating', navigationListener);
       this.#page
         ._client()
-        .off('Page.frameScheduledNavigation', scheduledNavigationListener);
+        .off('Page.frameRequestedNavigation', requestedNavigationListener);
     });
     this.#abortController.signal.addEventListener(
       'abort',
