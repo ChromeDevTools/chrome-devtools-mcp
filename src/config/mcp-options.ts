@@ -24,7 +24,7 @@ export const mcpOptions = {
   browserUrl: {
     type: 'string',
     description:
-      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
+      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.',
     alias: 'u',
     conflicts: ['wsEndpoint'],
     coerce: (url: string | undefined) => {
@@ -206,6 +206,23 @@ export const mcpOptions = {
     describe: 'Path to ffmpeg executable for screencast recording.',
     implies: 'experimentalScreencast',
   },
+  experimentalScreencastFps: {
+    type: 'number',
+    describe:
+      'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
+    implies: 'experimentalScreencast',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(
+          `Invalid experimentalScreencastFps ${value}. Expected a positive integer.`,
+        );
+      }
+      return value;
+    },
+  },
   categoryExperimentalWebmcp: {
     type: 'boolean',
     describe:
@@ -303,7 +320,7 @@ export const mcpOptions = {
   screenshotFormat: {
     type: 'string',
     description:
-      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which helps reduce context size in AI conversations. Unset preserves the existing default ("png").',
+      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
     choices: ['jpeg', 'png', 'webp'] as const,
   },
   screenshotQuality: {

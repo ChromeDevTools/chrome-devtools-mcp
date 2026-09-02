@@ -30,7 +30,7 @@ Available insights:
     example question: Which LCP subpart was most problematic?
     example question: What can I do to reduce the LCP time for this page load?
   - insight name: LCPDiscovery
-    description: [Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading
+    description: [Optimize LCP](https://developer.chrome.com/docs/performance/insights/lcp-discovery) by making the LCP image discoverable from the HTML immediately, and avoiding lazy-loading.
     relevant trace bounds: {min: 122411004828µs, max: 122411055039µs}
     example question: Suggest fixes to reduce my LCP
     example question: What can I do to reduce my LCP discovery time?

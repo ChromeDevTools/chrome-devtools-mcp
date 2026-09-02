@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {parser} from '../src/config/mcp-options.js';
+import {mcpOptions, parser} from '../src/config/mcp-options.js';
 
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return parser('0.0.0', ['node', 'main.js', ...argv], env)
@@ -230,6 +230,21 @@ describe('cli args parsing', () => {
       channel: 'stable',
       autoConnect: true,
     });
+  });
+
+  it('rejects invalid screencast fps values', async () => {
+    const coerce = mcpOptions.experimentalScreencastFps.coerce;
+    assert.ok(coerce);
+
+    assert.strictEqual(coerce(undefined), undefined);
+    assert.strictEqual(coerce(10), 10);
+
+    for (const value of [0, -1, 10.5, Number.NaN]) {
+      assert.throws(
+        () => coerce(value),
+        /Invalid experimentalScreencastFps .* Expected a positive integer\./,
+      );
+    }
   });
 
   it('parses usage statistics flag', async () => {

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["--prefix", "${PLUGIN_DATA}", "chrome-devtools-mcp@1.8.0"]
+    }
+  }
+}
