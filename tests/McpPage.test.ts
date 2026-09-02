@@ -5,11 +5,37 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+import {Locator} from 'puppeteer';
+
+import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
-import {withMcpContext} from './utils.js';
+import {getMockPage, withMcpContext} from './utils.js';
+
+/**
+ * Extends the existing getMockPage() stub with the Puppeteer methods that
+ * McpPage.emulate() and updateTimeouts() call internally. This avoids
+ * any type casts while giving us a fully functional fake Puppeteer Page.
+ */
+function createFakePuppeteerPage() {
+  const page = getMockPage();
+  return Object.assign(page, {
+    emulateNetworkConditions: sinon.stub().resolves(),
+    emulateCPUThrottling: sinon.stub().resolves(),
+    setGeolocation: sinon.stub().resolves(),
+    setUserAgent: sinon.stub().resolves(),
+    emulateMediaFeatures: sinon.stub().resolves(),
+    setViewport: sinon.stub().resolves(),
+    setExtraHTTPHeaders: sinon.stub().resolves(),
+    setDefaultTimeout: sinon.stub(),
+    setDefaultNavigationTimeout: sinon.stub(),
+    createCDPSession: sinon.stub().rejects(new Error('no session in tests')),
+    emulateFocusedPage: sinon.stub().resolves(),
+  });
+}
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -276,80 +302,74 @@ describe('McpPage', () => {
   });
 
   describe('emulate()', () => {
-    it('stores networkConditions in emulationSettings', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({networkConditions: 'Slow 3G'});
-        assert.strictEqual(page.networkConditions, 'Slow 3G');
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    function createMcpPage(): McpPage {
+      const fakePage = createFakePuppeteerPage();
+      return new McpPage(fakePage, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
       });
+    }
+
+    it('stores networkConditions in emulationSettings', async () => {
+      const page = createMcpPage();
+      await page.emulate({networkConditions: 'Slow 3G'});
+      assert.strictEqual(page.networkConditions, 'Slow 3G');
     });
 
     it('clears networkConditions when omitted', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({networkConditions: 'Slow 3G'});
-        await page.emulate({});
-        assert.strictEqual(page.networkConditions, null);
-      });
-    });
-
-    it('stores cpuThrottlingRate in emulationSettings', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({cpuThrottlingRate: 4});
-        assert.strictEqual(page.cpuThrottlingRate, 4);
-      });
-    });
-
-    it('resets cpuThrottlingRate to 1 (no throttle)', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({cpuThrottlingRate: 4});
-        await page.emulate({cpuThrottlingRate: 1});
-        assert.strictEqual(page.cpuThrottlingRate, 1);
-      });
+      const page = createMcpPage();
+      await page.emulate({networkConditions: 'Slow 3G'});
+      await page.emulate({});
+      assert.strictEqual(page.networkConditions, null);
     });
 
     it('ignores unknown networkConditions values', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({networkConditions: 'Slow 11G'});
-        assert.strictEqual(page.networkConditions, null);
-      });
+      const page = createMcpPage();
+      await page.emulate({networkConditions: 'Slow 11G'});
+      assert.strictEqual(page.networkConditions, null);
+    });
+
+    it('stores cpuThrottlingRate in emulationSettings', async () => {
+      const page = createMcpPage();
+      await page.emulate({cpuThrottlingRate: 4});
+      assert.strictEqual(page.cpuThrottlingRate, 4);
+    });
+
+    it('resets cpuThrottlingRate to 1', async () => {
+      const page = createMcpPage();
+      await page.emulate({cpuThrottlingRate: 4});
+      await page.emulate({cpuThrottlingRate: 1});
+      assert.strictEqual(page.cpuThrottlingRate, 1);
     });
 
     it('stores userAgent in emulationSettings', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({userAgent: 'TestUA/1.0'});
-        assert.strictEqual(page.userAgent, 'TestUA/1.0');
-      });
+      const page = createMcpPage();
+      await page.emulate({userAgent: 'TestUA/1.0'});
+      assert.strictEqual(page.userAgent, 'TestUA/1.0');
     });
 
     it('clears userAgent when empty string is provided', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({userAgent: 'TestUA/1.0'});
-        await page.emulate({userAgent: ''});
-        assert.strictEqual(page.userAgent, null);
-      });
+      const page = createMcpPage();
+      await page.emulate({userAgent: 'TestUA/1.0'});
+      await page.emulate({userAgent: ''});
+      assert.strictEqual(page.userAgent, null);
     });
 
     it('stores colorScheme in emulationSettings', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({colorScheme: 'dark'});
-        assert.strictEqual(page.colorScheme, 'dark');
-      });
+      const page = createMcpPage();
+      await page.emulate({colorScheme: 'dark'});
+      assert.strictEqual(page.colorScheme, 'dark');
     });
 
     it('clears colorScheme when set to auto', async () => {
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage();
-        await page.emulate({colorScheme: 'dark'});
-        await page.emulate({colorScheme: 'auto'});
-        assert.strictEqual(page.colorScheme, null);
-      });
+      const page = createMcpPage();
+      await page.emulate({colorScheme: 'dark'});
+      await page.emulate({colorScheme: 'auto'});
+      assert.strictEqual(page.colorScheme, null);
     });
   });
 });
