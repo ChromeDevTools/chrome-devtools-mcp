@@ -474,8 +474,12 @@ export function parser(
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
       if (isViaCli && args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
-        args.allowUnrestrictedPaths = true;
-        args.filesystemRoot = undefined;
+        const cliFilesystemArgs: {
+          allowUnrestrictedPaths?: boolean;
+          filesystemRoot?: unknown;
+        } = args;
+        cliFilesystemArgs.allowUnrestrictedPaths = true;
+        cliFilesystemArgs.filesystemRoot = undefined;
       }
       // We can't set default in the options else
       // Yargs will complain
