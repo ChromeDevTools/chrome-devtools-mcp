@@ -32,6 +32,12 @@ import {
 import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
+  createMockCSSMatchedStyles,
+  createMockCSSProperty,
+  createMockCSSStyleDeclaration,
+  createMockCSSStyleRule,
+} from './mocks.js';
+import {
   getImageContent,
   getMockAggregatedIssue,
   getMockRequest,
@@ -1159,5 +1165,29 @@ describe('webmcp', () => {
         );
       },
     );
+  });
+
+  it('returns pagination info when css styles pagination options are provided', async () => {
+    await withMcpContext(async (response, context) => {
+      const mockStyles = createMockCSSMatchedStyles({
+        node: 'button#btn',
+        nodeStyles: Array.from({length: 5}, (_, idx) =>
+          createMockCSSStyleDeclaration(
+            [createMockCSSProperty('color', `color-${idx}`)],
+            {
+              rule: createMockCSSStyleRule(`.rule-${idx}`),
+            },
+          ),
+        ),
+      });
+      response.setIncludeCssStyles(mockStyles, {
+        uid: '1_1',
+        pageSize: 2,
+        pageIdx: 0,
+      });
+      const {content} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('Showing 1-2 of 5'));
+    });
   });
 });

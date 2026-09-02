@@ -1177,3 +1177,70 @@ export class CssFormatter {
     };
   }
 }
+
+/**
+ * Resolves container element details for all `@container` queries impacting the node.
+ *
+ * Container queries evaluate against an ancestor container element in the DOM tree.
+ * The DevTools SDK performs an asynchronous CDP request (`CSS.getContainerForNode`)
+ * to discover the concrete container node for each query.
+ *
+ * Resolving these upfront in parallel allows `CssFormatter` methods to remain purely
+ * synchronous while providing container selectors and UIDs in headers and comments.
+ */
+export async function resolveContainerQueries(
+  matchedStyles: MatchedStyles,
+  resolveUid?: UidResolver,
+): Promise<Map<ContainerQuery, ResolvedContainerDetails>> {
+  const resolved = new Map<ContainerQuery, ResolvedContainerDetails>();
+  const targetNode = matchedStyles.node?.();
+  if (!targetNode) {
+    return resolved;
+  }
+  const queries = new Set<ContainerQuery>();
+
+  const allStyles = [...(matchedStyles.nodeStyles?.() ?? [])];
+  for (const name of matchedStyles.customHighlightPseudoNames?.() ?? []) {
+    allStyles.push(
+      ...(matchedStyles.customHighlightPseudoStyles?.(name) ?? []),
+    );
+  }
+  for (const type of matchedStyles.pseudoTypes?.() ?? []) {
+    allStyles.push(...(matchedStyles.pseudoStyles?.(type) ?? []));
+  }
+  for (const style of allStyles) {
+    if (
+      style.parentRule instanceof DevTools.CSSRule.CSSStyleRule &&
+      style.parentRule.containerQueries
+    ) {
+      for (const query of style.parentRule.containerQueries) {
+        queries.add(query);
+      }
+    }
+  }
+
+  await Promise.all(
+    [...queries].map(async query => {
+      try {
+        const container = await query.getContainerForNode?.(targetNode.id);
+        if (!container) {
+          return;
+        }
+        const containerNode = container.containerNode;
+        const selector = containerNode.simpleSelector();
+        const uid = resolveUid?.(containerNode.backendNodeId());
+
+        resolved.set(query, {
+          container: {
+            ...(uid ? {uid} : {}),
+            selector,
+          },
+        });
+      } catch {
+        // Ignore container query resolution errors
+      }
+    }),
+  );
+
+  return resolved;
+}
