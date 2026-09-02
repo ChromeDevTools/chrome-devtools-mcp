@@ -361,6 +361,9 @@ export function stabilizeResponseOutput(text: unknown) {
   const fileUriRegEx = /file%3A%2F%2F%2F[^)\n]+/g;
   output = output.replaceAll(fileUriRegEx, '<file-path>');
 
+  const vmRegEx = /VM\d+/g;
+  output = output.replaceAll(vmRegEx, 'VM<id>');
+
   return output;
 }
 

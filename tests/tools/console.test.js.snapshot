@@ -141,7 +141,7 @@ exports[`console > get_console_message > when dialog is open 1`] = `
     "args": [
       "This is an error"
     ],
-    "stackTrace": "at  (VM5:1:9)\\nat  (pptr:;CdpFrame.%3Canonymous%3E%20(<file-path>)\\n--- PendingScript ----------------------\\nat  (pptr:;CdpFrame.%3Canonymous%3E%20(<file-path>)\\nNote: line and column numbers use 1-based indexing"
+    "stackTrace": "at  (VM<id>:1:9)\\nat  (pptr:;CdpFrame.%3Canonymous%3E%20(<file-path>)\\n--- PendingScript ----------------------\\nat  (pptr:;CdpFrame.%3Canonymous%3E%20(<file-path>)\\nNote: line and column numbers use 1-based indexing"
   },
   "pagination": {
     "currentPage": 0,
