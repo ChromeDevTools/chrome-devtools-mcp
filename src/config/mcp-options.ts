@@ -418,11 +418,6 @@ const FILESYSTEM_ROOT_FLAGS = [
   '--workspace',
 ] as const;
 
-const UNRESTRICTED_PATHS_FLAGS = [
-  '--allow-unrestricted-paths',
-  '--allowUnrestrictedPaths',
-] as const;
-
 export interface FilesystemAccessFlags {
   allowUnrestrictedPaths?: unknown;
   filesystemRoot?: unknown;
@@ -438,57 +433,26 @@ function hasExplicitArg(
 }
 
 /**
- * CLI defaults `--allow-unrestricted-paths` to true. An explicit `--workspace`
- * / `--filesystem-root` should restrict access to those directories instead of
- * conflicting with that default. Passing both flags explicitly is still an
- * error.
+ * CLI filesystem access. `--allow-unrestricted-paths` is not given a CLI yargs
+ * default; middleware enables it when the user did not pass `--workspace` /
+ * `--filesystem-root`. Explicit workspace flags are detected separately from
+ * the yargs tmpdir default so that default is not treated as a user workspace.
  */
-export function applyFilesystemRootOverrides(
+export function applyCliFilesystemAccess(
   args: FilesystemAccessFlags,
   argv: readonly string[],
 ): void {
-  const hasExplicitRoot = hasExplicitArg(argv, FILESYSTEM_ROOT_FLAGS);
-  const hasExplicitUnrestricted = hasExplicitArg(
-    argv,
-    UNRESTRICTED_PATHS_FLAGS,
-  );
-
-  if (hasExplicitRoot && !hasExplicitUnrestricted) {
+  if (hasExplicitArg(argv, FILESYSTEM_ROOT_FLAGS)) {
     args.allowUnrestrictedPaths = false;
+    return;
   }
-}
-
-export function checkFilesystemRootConflict(
-  allowUnrestrictedPaths: unknown,
-  argv: readonly string[],
-): boolean {
-  const hasExplicitFilesystemRoot = hasExplicitArg(argv, FILESYSTEM_ROOT_FLAGS);
-  const hasExplicitUnrestricted = hasExplicitArg(
-    argv,
-    UNRESTRICTED_PATHS_FLAGS,
-  );
-
-  if (
-    allowUnrestrictedPaths === true &&
-    hasExplicitFilesystemRoot &&
-    hasExplicitUnrestricted
-  ) {
-    throw new Error(
-      'Arguments filesystemRoot and allowUnrestrictedPaths are mutually exclusive',
-    );
-  }
-
-  return true;
+  args.allowUnrestrictedPaths = true;
+  args.filesystemRoot = undefined;
 }
 
 export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
     throw new Error('headless cli option unexpectedly does not have a default');
-  }
-  if (!('default' in mcpOptions.allowUnrestrictedPaths)) {
-    throw new Error(
-      'allowUnrestrictedPaths cli option unexpectedly does not have a default',
-    );
   }
   if (!('default' in mcpOptions.experimentalStructuredContent)) {
     throw new Error(
@@ -501,10 +465,6 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
 
   return {
     ...mcpOptions,
-    allowUnrestrictedPaths: {
-      ...mcpOptions.allowUnrestrictedPaths,
-      default: true,
-    },
     headless: {
       ...mcpOptions.headless,
       default: true,
@@ -547,15 +507,11 @@ export function parser(
       'strip-dashed': true,
     })
     .options(options)
-    .check(args => {
-      return checkFilesystemRootConflict(
-        args.allowUnrestrictedPaths,
-        hideBin(argv),
-      );
-    })
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
-      applyFilesystemRootOverrides(args, hideBin(argv));
+      if (isViaCli) {
+        applyCliFilesystemAccess(args, hideBin(argv));
+      }
       // We can't set default in the options else
       // Yargs will complain
       if (

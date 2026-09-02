@@ -152,42 +152,49 @@ describe('cli args parsing', () => {
     });
   });
 
-  it('parses filesystem roots', async () => {
-    const args = parseArguments([
-      '--filesystem-root=/tmp/one',
-      '--filesystem-root=/tmp/two',
-    ]);
-    assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
-  });
+  describe('filesystem roots', () => {
+    it('parses filesystem roots', async () => {
+      const args = parseArguments([
+        '--filesystem-root=/tmp/one',
+        '--filesystem-root=/tmp/two',
+      ]);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+    });
 
-  it('parses workspace as an alias for filesystem roots', async () => {
-    const args = parseArguments([
-      '--workspace=/tmp/one',
-      '--workspace=/tmp/two',
-    ]);
-    assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
-  });
+    it('parses workspace as an alias for filesystem roots', async () => {
+      const args = parseArguments([
+        '--workspace=/tmp/one',
+        '--workspace=/tmp/two',
+      ]);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+    });
 
-  it('rejects filesystem roots with unrestricted paths', async () => {
-    assert.throws(() => {
-      parseArguments(['--workspace=/', '--allow-unrestricted-paths']);
-    }, /filesystemRoot and allowUnrestrictedPaths are mutually exclusive/);
-  });
+    it('still accepts unrestricted paths without an explicit root', async () => {
+      const args = parseArguments(['--allow-unrestricted-paths']);
+      assert.strictEqual(args.allowUnrestrictedPaths, true);
+    });
 
-  it('still accepts unrestricted paths without an explicit root', async () => {
-    const args = parseArguments(['--allow-unrestricted-paths']);
-    assert.strictEqual(args.allowUnrestrictedPaths, true);
-  });
+    it('lets an explicit workspace override the CLI unrestricted default', async () => {
+      const args = parseArguments(['--viaCli', '--workspace=/tmp/one']);
+      assert.strictEqual(args.allowUnrestrictedPaths, false);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
+    });
 
-  it('lets an explicit workspace override the CLI unrestricted default', async () => {
-    const args = parseArguments(['--viaCli', '--workspace=/tmp/one']);
-    assert.strictEqual(args.allowUnrestrictedPaths, false);
-    assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
-  });
+    it('keeps the CLI unrestricted default when no workspace is set', async () => {
+      const args = parseArguments(['--viaCli']);
+      assert.strictEqual(args.allowUnrestrictedPaths, true);
+      assert.strictEqual(args.filesystemRoot, undefined);
+    });
 
-  it('keeps the CLI unrestricted default when no workspace is set', async () => {
-    const args = parseArguments(['--viaCli']);
-    assert.strictEqual(args.allowUnrestrictedPaths, true);
+    it('passes explicit workspace roots along when unrestricted is also set', async () => {
+      const args = parseArguments([
+        '--viaCli',
+        '--workspace=/tmp/one',
+        '--allow-unrestricted-paths',
+      ]);
+      assert.strictEqual(args.allowUnrestrictedPaths, false);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
+    });
   });
 
   it('parses ignore chrome args', async () => {

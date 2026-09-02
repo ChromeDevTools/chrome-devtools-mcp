@@ -55,12 +55,11 @@ export class McpServer {
   #serverArgs: ParsedArguments;
   #options: McpServerOptions;
   #context?: McpContext;
-  #configuredRoots: Root[];
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
-   * invalidate them through a `roots/list_changed` notification. Explicitly
-   * configured roots are process state and are always included.
+   * invalidate them through a `roots/list_changed` notification. CLI-configured
+   * roots are read from `#serverArgs` when combining roots.
    */
   #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
@@ -71,15 +70,6 @@ export class McpServer {
   ) {
     this.#serverArgs = serverArgs;
     this.#options = options;
-    this.#configuredRoots = (
-      serverArgs.allowUnrestrictedPaths ? [] : (serverArgs.filesystemRoot ?? [])
-    ).map(root => {
-      const rootPath = path.resolve(String(root));
-      return {
-        uri: pathToFileURL(rootPath).href,
-        name: path.basename(rootPath) || rootPath,
-      };
-    });
 
     if (this.#serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -121,7 +111,7 @@ export class McpServer {
         );
       } else if (
         !this.#serverArgs.allowUnrestrictedPaths &&
-        this.#configuredRoots.length === 0
+        (this.#serverArgs.filesystemRoot ?? []).length === 0
       ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
@@ -174,13 +164,21 @@ export class McpServer {
   }
 
   #combinedRoots(): Root[] | undefined {
-    if (
-      this.#configuredRoots.length === 0 &&
-      this.#lastClientRoots === undefined
-    ) {
+    const configuredRoots = (
+      this.#serverArgs.allowUnrestrictedPaths
+        ? []
+        : (this.#serverArgs.filesystemRoot ?? [])
+    ).map(root => {
+      const rootPath = path.resolve(String(root));
+      return {
+        uri: pathToFileURL(rootPath).href,
+        name: path.basename(rootPath) || rootPath,
+      };
+    });
+    if (configuredRoots.length === 0 && this.#lastClientRoots === undefined) {
       return undefined;
     }
-    return [...this.#configuredRoots, ...(this.#lastClientRoots ?? [])];
+    return [...configuredRoots, ...(this.#lastClientRoots ?? [])];
   }
 
   /**
@@ -279,9 +277,6 @@ export class McpServer {
         // never pays for a client round-trip
         void this.#updateRoots();
       }
-    }
-    if (this.#context === undefined) {
-      throw new Error('MCP context was not initialized');
     }
     return this.#context;
   }
