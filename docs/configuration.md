@@ -4,6 +4,26 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
+- **`--categoryExtensions`/ `--category-extensions`**
+  Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--categoryExperimentalThirdParty`/ `--category-experimental-third-party`**
+  Set to true to enable third-party developer tools exposed by the inspected page itself
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
+  Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--categoryPwa`/ `--category-pwa`**
+  Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--autoConnect`/ `--auto-connect`**
   If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
   - **Type:** boolean
@@ -115,11 +135,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** number
   - **Default:** `false`
 
-- **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
-  Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
-  - **Type:** boolean
-  - **Default:** `false`
-
 - **`--chromeArg`/ `--chrome-arg`**
   Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
@@ -138,36 +153,6 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
   Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
-  - **Default:** `false`
-
-- **`--categoryEmulation`/ `--category-emulation`**
-  Set to false to exclude tools related to emulation.
-  - **Type:** boolean
-  - **Default:** `true`
-
-- **`--categoryPerformance`/ `--category-performance`**
-  Set to false to exclude tools related to performance.
-  - **Type:** boolean
-  - **Default:** `true`
-
-- **`--categoryNetwork`/ `--category-network`**
-  Set to false to exclude tools related to network.
-  - **Type:** boolean
-  - **Default:** `true`
-
-- **`--categoryExtensions`/ `--category-extensions`**
-  Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
-  - **Type:** boolean
-  - **Default:** `false`
-
-- **`--categoryExperimentalThirdParty`/ `--category-experimental-third-party`**
-  Set to true to enable third-party developer tools exposed by the inspected page itself
-  - **Type:** boolean
-  - **Default:** `false`
-
-- **`--categoryPwa`/ `--category-pwa`**
-  Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.
-  - **Type:** boolean
   - **Default:** `false`
 
 - **`--performanceCrux`/ `--performance-crux`**

@@ -12,12 +12,11 @@ import {
   mcpOptions,
   type ParsedArguments,
 } from '../build/src/config/mcp-options.js';
-import {buildFlag} from '../build/src/ToolHandler.js';
 import {
-  ToolCategory,
-  OFF_BY_DEFAULT_CATEGORIES,
-  labels,
-} from '../build/src/tools/categories.js';
+  isCategoryOffByDefault,
+  getCategoryFlag,
+} from '../build/src/config/category-options.js';
+import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import {pageIdSchema} from '../build/src/tools/ToolDefinition.js';
 import {createTools} from '../build/src/tools/tools.js';
 
@@ -312,8 +311,8 @@ async function generateReference(
 
     markdown += `## ${categoryName}\n\n`;
 
-    if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
-      const flagName = `--${buildFlag(category)}`;
+    if (isCategoryOffByDefault(category)) {
+      const flagName = `--${getCategoryFlag(category)}`;
 
       markdown += `> NOTE: The ${categoryName} category is not active by default. Use the '${flagName}' flag.\n\n`;
     }
@@ -330,9 +329,9 @@ async function generateReference(
 
         const requiredFlags: string[] = [];
 
-        const isOffByDefault = OFF_BY_DEFAULT_CATEGORIES.includes(category);
+        const isOffByDefault = isCategoryOffByDefault(category);
         if (isOffByDefault) {
-          const categoryFlag = buildFlag(category);
+          const categoryFlag = getCategoryFlag(category);
           requiredFlags.push(`--${categoryFlag}=true`);
         }
 
@@ -478,8 +477,8 @@ function getToolsAndCategories(tools: any, slim = false) {
   // Sort categories using the enum order
   const categoryOrder = Object.values(ToolCategory);
   const sortedCategories = Object.keys(categories).sort((a, b) => {
-    const aOff = OFF_BY_DEFAULT_CATEGORIES.includes(a as ToolCategory);
-    const bOff = OFF_BY_DEFAULT_CATEGORIES.includes(b as ToolCategory);
+    const aOff = isCategoryOffByDefault(a);
+    const bOff = isCategoryOffByDefault(b);
 
     if (aOff !== bOff) {
       return aOff ? 1 : -1;

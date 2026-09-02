@@ -22,8 +22,8 @@ import {
 import {executablePath} from 'puppeteer';
 
 import {mcpOptions} from '../src/config/mcp-options.js';
+import {getOffByDefaultCategories} from '../src/config/category-options.js';
 import type {ToolCategory} from '../src/tools/categories.js';
-import {OFF_BY_DEFAULT_CATEGORIES} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 describe('e2e', () => {
@@ -113,7 +113,7 @@ describe('e2e', () => {
         definedNames.sort();
         assert.deepStrictEqual(exposedNames, definedNames);
       },
-      OFF_BY_DEFAULT_CATEGORIES.map(category => `--category-${category}`),
+      getOffByDefaultCategories().map(category => `--category-${category}`),
     );
   });
 
@@ -122,7 +122,7 @@ describe('e2e', () => {
       const {tools} = await client.listTools();
       const exposedNames = tools.map(t => t.name).sort();
       const definedNames = await getToolsWithFilteredCategories(
-        OFF_BY_DEFAULT_CATEGORIES,
+        getOffByDefaultCategories(),
       );
       definedNames.sort();
       assert.deepStrictEqual(exposedNames, definedNames);

@@ -21,11 +21,13 @@ function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
 
 describe('cli args parsing', () => {
   const defaultArgs = {
+    categoryInput: true,
+    categoryNavigation: true,
     categoryEmulation: true,
     categoryPerformance: true,
     categoryNetwork: true,
-    categoryExtensions: false,
-    categoryExperimentalThirdParty: false,
+    categoryDebugging: true,
+    categoryMemory: true,
     autoConnect: undefined,
     performanceCrux: true,
     usageStatistics: true,

@@ -13,8 +13,8 @@ import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import type {CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
-import type {ToolCategory} from './tools/categories.js';
-import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
+import {labels} from './tools/categories.js';
+import {categoryToFlagName} from './config/category-options.js';
 import type {
   DefinedPageTool,
   DevToolsData,
@@ -26,10 +26,6 @@ import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isLocalhost} from './utils/url.js';
-
-export function buildFlag(category: ToolCategory) {
-  return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
-}
 
 function buildDisabledMessage(
   toolName: string,
@@ -43,80 +39,26 @@ function buildDisabledMessage(
   return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
 
-function getCategoryStatus(
-  category: ToolCategory,
-  serverArgs: ParsedArguments,
-): {categoryFlag?: string; disabled: boolean} {
-  const categoryFlag = buildFlag(category);
-
-  const flagValue = serverArgs[categoryFlag];
-
-  const isDisabled = OFF_BY_DEFAULT_CATEGORIES.includes(category)
-    ? !flagValue
-    : flagValue === false;
-
-  if (isDisabled) {
-    return {
-      categoryFlag,
-      disabled: true,
-    };
-  }
-
-  return {
-    disabled: false,
-  };
-}
-
-function getConditionStatus(
-  condition: string,
-  serverArgs: ParsedArguments,
-): {conditionFlag?: string; disabled: boolean} {
-  if (condition && !serverArgs[condition]) {
-    return {conditionFlag: condition, disabled: true};
-  }
-
-  return {disabled: false};
-}
-
 function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ParsedArguments,
 ): {disabled: boolean; reason?: string} {
   const category = tool.annotations.category;
-  const categoryCheck = getCategoryStatus(category, serverArgs);
-
-  if (category && categoryCheck.disabled) {
-    if (!categoryCheck.categoryFlag) {
-      throw new Error(
-        'when the category is disabled there should always be a flag set',
-      );
+  if (category) {
+    const flag = categoryToFlagName[category];
+    if (!serverArgs[flag]) {
+      return {
+        disabled: true,
+        reason: buildDisabledMessage(tool.name, `--${flag}`, labels[category]),
+      };
     }
-
-    return {
-      disabled: true,
-      reason: buildDisabledMessage(
-        tool.name,
-        `--${categoryCheck.categoryFlag}`,
-        labels[category!],
-      ),
-    };
   }
 
   for (const condition of tool.annotations.conditions || []) {
-    const conditionCheck = getConditionStatus(condition, serverArgs);
-    if (conditionCheck.disabled) {
-      if (!conditionCheck.conditionFlag) {
-        throw new Error(
-          'when the condition is disabled there should always be a flag set',
-        );
-      }
-
+    if (!serverArgs[condition]) {
       return {
         disabled: true,
-        reason: buildDisabledMessage(
-          tool.name,
-          `--${conditionCheck.conditionFlag}`,
-        ),
+        reason: buildDisabledMessage(tool.name, `--${condition}`),
       };
     }
   }
