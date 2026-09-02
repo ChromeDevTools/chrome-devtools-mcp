@@ -49,7 +49,9 @@ export function createMockMcpContext(
 ): MockMcpContext {
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
-  context.getSelectedMcpPage.returns(page as unknown as McpPage);
+  // SinonStubbedInstance<McpPage> satisfies McpPage structurally; the cast
+  // is expressed via satisfies to avoid the banned `as` keyword.
+  context.getSelectedMcpPage.returns(page satisfies McpPage);
   return context;
 }
 
