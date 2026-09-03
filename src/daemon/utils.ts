@@ -132,6 +132,12 @@ export function serializeArgs(
       continue;
     }
     const value = argv[key];
+    const option = options[key];
+    // Yargs reuses the option `default` object; skip it so the daemon parser
+    // still sees the original default (needed for filesystemRoot identity).
+    if (option !== undefined && value === option.default) {
+      continue;
+    }
     const kebabKey = key.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`);
 
     if (typeof value === 'boolean') {

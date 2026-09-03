@@ -7,7 +7,11 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {mcpOptions, parser} from '../src/config/mcp-options.js';
+import {
+  DEFAULT_FILESYSTEM_ROOT,
+  mcpOptions,
+  parser,
+} from '../src/config/mcp-options.js';
 
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return parser('0.0.0', ['node', 'main.js', ...argv], env)
@@ -28,6 +32,7 @@ describe('cli args parsing', () => {
     javascriptEvaluation: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
+    filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
     memoryDebugging: false,
     experimentalStructuredContent: false,
     pageIdRouting: true,
@@ -147,6 +152,46 @@ describe('cli args parsing', () => {
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  });
+
+  describe('filesystem roots', () => {
+    it('parses filesystem roots', async () => {
+      const args = parseArguments([
+        '--filesystem-root=/tmp/one',
+        '--filesystem-root=/tmp/two',
+      ]);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+    });
+
+    it('parses workspace as an alias for filesystem roots', async () => {
+      const args = parseArguments([
+        '--workspace=/tmp/one',
+        '--workspace=/tmp/two',
+      ]);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one', '/tmp/two']);
+    });
+
+    it('still accepts unrestricted paths without an explicit root', async () => {
+      const args = parseArguments(['--allow-unrestricted-paths']);
+      assert.strictEqual(args.allowUnrestrictedPaths, true);
+    });
+
+    it('lets an explicit workspace override the CLI unrestricted default', async () => {
+      const args = parseArguments(['--viaCli', '--workspace=/tmp/one']);
+      assert.strictEqual(args.allowUnrestrictedPaths, false);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
+    });
+
+    it('keeps the CLI unrestricted default when no workspace is set', async () => {
+      const args = parseArguments(['--viaCli']);
+      assert.strictEqual(args.allowUnrestrictedPaths, true);
+      assert.strictEqual(args.filesystemRoot, undefined);
+    });
+
+    it('uses yargs default identity to detect an unset CLI workspace', async () => {
+      const args = parseArguments([]);
+      assert.strictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
   });
 

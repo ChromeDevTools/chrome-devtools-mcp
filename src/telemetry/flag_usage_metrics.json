@@ -401,5 +401,9 @@
   {
     "name": "experimental_screencast_fps_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "filesystem_root_present",
+    "flagType": "boolean"
   }
 ]

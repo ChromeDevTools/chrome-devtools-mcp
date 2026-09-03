@@ -246,6 +246,51 @@ describe('e2e', () => {
     );
   });
 
+  it('combines configured filesystem roots with client roots', async () => {
+    const configuredRoot = await fs.promises.mkdtemp(
+      path.join(os.homedir(), '.configured-root-'),
+    );
+    const clientRoot = await fs.promises.mkdtemp(
+      path.join(os.homedir(), '.client-root-'),
+    );
+
+    try {
+      await withClient(
+        async client => {
+          client.setRequestHandler(ListRootsRequestSchema, () => {
+            return {
+              roots: [
+                {uri: pathToFileURL(clientRoot).href, name: 'client-root'},
+              ],
+            };
+          });
+
+          for (const outputPath of [
+            path.join(configuredRoot, 'configured.png'),
+            path.join(clientRoot, 'client.png'),
+          ]) {
+            const result = await client.callTool({
+              name: 'take_screenshot',
+              arguments: {pageId: 1, filePath: outputPath},
+            });
+            assert.strictEqual(result.isError, undefined);
+            const content = result.content as TextContent[];
+            assert.match(content[0].text, /Saved screenshot to/);
+          }
+        },
+        [`--filesystem-root=${configuredRoot}`],
+        {
+          capabilities: {
+            roots: {listChanged: true},
+          },
+        },
+      );
+    } finally {
+      await fs.promises.rm(configuredRoot, {recursive: true, force: true});
+      await fs.promises.rm(clientRoot, {recursive: true, force: true});
+    }
+  });
+
   it('denies file access if roots list is empty', async () => {
     await withClient(
       async client => {

@@ -11,6 +11,16 @@ npm i chrome-devtools-mcp@latest -g
 chrome-devtools status # check if install worked.
 ```
 
+The CLI enables unrestricted filesystem access by default. Use `--workspace`
+to limit file tools to specific directories. Repeat the flag for more than one
+directory.
+`--allow-unrestricted-paths` still works on its own for compatibility, but it
+cannot be combined with `--workspace`.
+
+```sh
+chrome-devtools start --workspace=/path/to/project --workspace=/path/to/output
+```
+
 ## How it works
 
 The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).
