@@ -187,7 +187,7 @@ export class ToolHandler {
       !serverArgs.slim
         ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
-    this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
+    this.registeredInputSchema = zod.object(this.inputSchema).loose();
   }
 
   unknownArgumentNames(params: Record<string, unknown>): string[] {

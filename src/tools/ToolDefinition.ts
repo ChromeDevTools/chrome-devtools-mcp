@@ -68,7 +68,9 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Partial<Record<keyof Schema, FileVerificationOption>>;
+  verifyFilesSchema: Partial<
+    Record<keyof SchemaType<Schema>, FileVerificationOption>
+  >;
 }
 
 export interface ToolDefinition<
@@ -82,8 +84,12 @@ export interface ToolDefinition<
   ) => Promise<void>;
 }
 
+export type SchemaType<T extends zod.ZodRawShape> = zod.infer<
+  ReturnType<typeof zod.object<T>>
+>;
+
 export interface Request<Schema extends zod.ZodRawShape> {
-  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
+  params: SchemaType<Schema>;
 }
 
 export interface ImageContentData {
@@ -458,16 +464,16 @@ export const pageIdSchema = {
 };
 
 export const timeoutSchema = {
-  timeout: zod
-    .number()
-    .int()
-    .optional()
-    .describe(
-      `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
-    )
-    .transform(value => {
-      return value && value <= 0 ? undefined : value;
-    }),
+  timeout: zod.preprocess(
+    value => (typeof value === 'number' && value <= 0 ? undefined : value),
+    zod
+      .number()
+      .int()
+      .optional()
+      .describe(
+        `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
+      ),
+  ),
 };
 
 export function viewportTransform(arg: string | undefined):
