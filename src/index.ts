@@ -32,8 +32,6 @@ import {createTools} from './tools/tools.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
 
-export {buildFlag} from './ToolHandler.js';
-
 puppeteer.setFollowSymlinks(false);
 
 /**

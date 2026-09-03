@@ -10,7 +10,10 @@ import os from 'node:os';
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
+import {getCategoryOptions} from './category-options.js';
+
 export const mcpOptions = {
+  ...getCategoryOptions(),
   autoConnect: {
     type: 'boolean',
     description:
@@ -226,11 +229,6 @@ export const mcpOptions = {
       return value;
     },
   },
-  categoryExperimentalWebmcp: {
-    type: 'boolean',
-    describe:
-      'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
-  },
   chromeArg: {
     type: 'array',
     describe:
@@ -252,41 +250,6 @@ export const mcpOptions = {
     type: 'array',
     describe:
       'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-  },
-  categoryEmulation: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to emulation.',
-  },
-  categoryPerformance: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to performance.',
-  },
-  categoryNetwork: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to network.',
-  },
-  categoryExtensions: {
-    type: 'boolean',
-    hidden: false,
-    default: false,
-    describe:
-      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
-  },
-  categoryExperimentalThirdParty: {
-    type: 'boolean',
-    default: false,
-    describe:
-      'Set to true to enable third-party developer tools exposed by the inspected page itself',
-  },
-  categoryPwa: {
-    type: 'boolean',
-    hidden: false,
-    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
-    describe:
-      'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
   },
   performanceCrux: {
     type: 'boolean',
