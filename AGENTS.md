@@ -18,3 +18,4 @@ This repository contains an MCP server and CLI for Chrome DevTools.
 - Do not use `// @ts-nocheck` comments.
 - Do not use `// @ts-expect-error` comments.
 - Prefer `for..of` instead of `forEach`.
+- Never type-check types that are already type safe (e.g. redundant `typeof` checks on statically typed variables).

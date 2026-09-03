@@ -189,6 +189,7 @@ export async function withMcpContext(
         navigationTimeout:
           options.navigationTimeout ??
           (process.platform === 'win32' ? 20000 : undefined),
+        categoryExtensions: args?.categoryExtensions,
       },
       Locator,
     );

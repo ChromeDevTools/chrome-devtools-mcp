@@ -49,7 +49,10 @@ export const navigate = definePageTool(args => {
     blockedByDialog: false,
     verifyFilesSchema: {},
     handler: async (request, response) => {
-      validateUrl(request.params.url, args?.javascriptEvaluation);
+      validateUrl(request.params.url, {
+        javascriptEvaluation: args?.javascriptEvaluation,
+        categoryExtensions: args?.categoryExtensions,
+      });
 
       const page = request.page;
 
