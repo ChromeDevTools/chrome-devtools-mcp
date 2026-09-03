@@ -4,6 +4,21 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
+- **`--categoryEmulation`/ `--category-emulation`**
+  Set to false to exclude tools related to emulation.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryPerformance`/ `--category-performance`**
+  Set to false to exclude tools related to performance.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryNetwork`/ `--category-network`**
+  Set to false to exclude tools related to network.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--categoryExtensions`/ `--category-extensions`**
   Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
   - **Type:** boolean

@@ -32,9 +32,15 @@ const categoryOverrides: Record<
 > = {
   [ToolCategory.INPUT]: {},
   [ToolCategory.NAVIGATION]: {},
-  [ToolCategory.EMULATION]: {},
-  [ToolCategory.PERFORMANCE]: {},
-  [ToolCategory.NETWORK]: {},
+  [ToolCategory.EMULATION]: {
+    hidden: false,
+  },
+  [ToolCategory.PERFORMANCE]: {
+    hidden: false,
+  },
+  [ToolCategory.NETWORK]: {
+    hidden: false,
+  },
   [ToolCategory.DEBUGGING]: {},
   [ToolCategory.MEMORY]: {},
   [ToolCategory.WEBMCP]: {
