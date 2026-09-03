@@ -78,16 +78,19 @@ function createOption(category: ToolCategory): CategoryOption {
   };
 }
 
+export function categoryToFlagName(category: ToolCategory): CategoryFlagName {
+  return `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as CategoryFlagName;
+}
+
+
 export function getCategoryOptions(): CategoryFlags {
-  const options: Record<string, CategoryOption> = {};
+  const options = {} as CategoryFlags;
   for (const category of Object.values(ToolCategory)) {
-    const flagName = toFlagName(category);
+    const flagName = categoryToFlagName(category);
     options[flagName] = createOption(category);
   }
-  if (isCategoryFlags(options)) {
-    return options;
-  }
-  throw new Error('Failed to create category options');
+
+  return options;
 }
 
 function isToolCategory(val: string): val is ToolCategory {
@@ -99,22 +102,13 @@ function isToolCategory(val: string): val is ToolCategory {
   return false;
 }
 
-export function isCategoryOffByDefault(
-  category: ToolCategory | string,
-): boolean {
+export function isCategoryOffByDefault(category: ToolCategory): boolean {
   if (!isToolCategory(category)) {
     return false;
   }
-  const flagName = categoryToFlagName[category];
+  const flagName = categoryToFlagName(category);
   const option = getCategoryOptions()[flagName];
   return !('default' in option) || option.default !== true;
-}
-
-export function getCategoryFlag(category: ToolCategory | string): string {
-  if (!isToolCategory(category)) {
-    return '';
-  }
-  return categoryToFlagName[category];
 }
 
 export function getOffByDefaultCategories(): ToolCategory[] {

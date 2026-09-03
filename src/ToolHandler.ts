@@ -45,7 +45,7 @@ function getToolStatusInfo(
 ): {disabled: boolean; reason?: string} {
   const category = tool.annotations.category;
   if (category) {
-    const flag = categoryToFlagName[category];
+    const flag = categoryToFlagName(category);
     if (!serverArgs[flag]) {
       return {
         disabled: true,
