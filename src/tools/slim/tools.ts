@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../../config/mcp-options.js';
 import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {definePageTool} from '../ToolDefinition.js';
 import {validateUrl} from '../../utils/url.js';
 
-export const screenshot = definePageTool({
+export const screenshot = definePageTool((_args: ParsedArguments) => ({
   name: 'screenshot',
   description: `Takes a screenshot`,
   annotations: {
@@ -33,9 +34,9 @@ export const screenshot = definePageTool({
     );
     response.appendResponseLine(filepath);
   },
-});
+}));
 
-export const navigate = definePageTool(args => {
+export const navigate = definePageTool((args: ParsedArguments) => {
   return {
     name: 'navigate',
     description: `Loads a URL`,
@@ -49,7 +50,7 @@ export const navigate = definePageTool(args => {
     blockedByDialog: false,
     verifyFilesSchema: {},
     handler: async (request, response) => {
-      validateUrl(request.params.url, args?.javascriptEvaluation);
+      validateUrl(request.params.url, args.javascriptEvaluation);
 
       const page = request.page;
 
@@ -78,7 +79,7 @@ export const navigate = definePageTool(args => {
   };
 });
 
-export const evaluate = definePageTool({
+export const evaluate = definePageTool((_args: ParsedArguments) => ({
   name: 'evaluate',
   description: `Evaluates a JavaScript script`,
   annotations: {
@@ -100,4 +101,4 @@ export const evaluate = definePageTool({
       response.appendResponseLine(String(err.message));
     }
   },
-});
+}));

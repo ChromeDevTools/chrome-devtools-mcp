@@ -51,7 +51,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -94,7 +94,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -127,7 +127,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -154,7 +154,7 @@ describe('thirdPartyDeveloperTools', () => {
         async (response, context) => {
           const page = await context.newPage();
           response.setPage(page);
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -215,7 +215,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -260,7 +260,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -272,7 +272,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
           assert.strictEqual(groupsLength, 1);
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools().handler(
             {params: {}, page},
             response,
             context,
@@ -299,7 +299,7 @@ describe('thirdPartyDeveloperTools', () => {
       const page = await context.newPage();
       response.setPage(page);
       await page.pptrPage.evaluate(evaluateFn);
-      await listThirdPartyDeveloperTools.handler(
+      await listThirdPartyDeveloperTools().handler(
         {params: {}, page},
         response,
         context,
@@ -335,7 +335,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -372,7 +372,7 @@ describe('thirdPartyDeveloperTools', () => {
 
         await assert.rejects(
           async () => {
-            await executeThirdPartyDeveloperTool.handler(
+            await executeThirdPartyDeveloperTool().handler(
               {
                 params: {
                   toolName: 'missing-tool',
@@ -419,7 +419,7 @@ describe('thirdPartyDeveloperTools', () => {
 
           await assert.rejects(
             async () => {
-              await executeThirdPartyDeveloperTool.handler(
+              await executeThirdPartyDeveloperTool().handler(
                 {
                   params: {
                     toolName: 'test-tool',
@@ -461,7 +461,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -548,7 +548,7 @@ describe('thirdPartyDeveloperTools', () => {
           throw new Error('Not found');
         };
 
-        await executeThirdPartyDeveloperTool.handler(
+        await executeThirdPartyDeveloperTool().handler(
           {
             params: {
               toolName: 'test-tool',
@@ -600,7 +600,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -647,7 +647,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -696,7 +696,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -752,7 +752,7 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -805,7 +805,7 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -859,7 +859,7 @@ describe('thirdPartyDeveloperTools', () => {
             .stub(TextSnapshot, 'create')
             .resolves({} as TextSnapshot);
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -918,7 +918,7 @@ describe('thirdPartyDeveloperTools', () => {
             assert.fail('No page found');
           }
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -935,7 +935,7 @@ describe('thirdPartyDeveloperTools', () => {
           // @ts-expect-error Internal Puppeteer API
           assert.ok(!firstHandles[0].disposed);
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool().handler(
             {
               params: {
                 toolName: 'test-tool',

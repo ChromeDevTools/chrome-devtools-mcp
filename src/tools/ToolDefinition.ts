@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import {parseArguments, type ParsedArguments} from '../config/mcp-options.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -68,24 +68,22 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Partial<
-    Record<keyof SchemaType<Schema>, FileVerificationOption>
-  >;
+  verifyFilesSchema: Partial<Record<keyof Schema, FileVerificationOption>>;
 }
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   schema: Schema;
-  handler: (
-    request: Request<Schema>,
+  handler(
+    request: Request<NoInfer<Schema>>,
     response: Response,
     context: Context,
-  ) => Promise<void>;
+  ): Promise<void>;
 }
 
-export type SchemaType<T extends zod.ZodRawShape> = zod.infer<
-  ReturnType<typeof zod.object<T>>
+export type SchemaType<T extends zod.ZodRawShape> = zod.output<
+  zod.ZodObject<T>
 >;
 
 export interface Request<Schema extends zod.ZodRawShape> {
@@ -375,89 +373,81 @@ export type ContextPage = Readonly<{
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
 }>;
 
-export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: ToolDefinition<Schema>,
-): ToolDefinition<Schema>;
-
-export function defineTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition: (args?: Args) => ToolDefinition<Schema>,
-): (args?: Args) => ToolDefinition<Schema>;
-
-export function defineTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition:
-    ToolDefinition<Schema> | ((args?: Args) => ToolDefinition<Schema>),
-) {
-  if (typeof definition === 'function') {
-    const factory = definition;
-    return (args: Args) => {
-      return factory(args);
-    };
-  }
-  return definition;
+export function defineTool<const Schema extends zod.ZodRawShape>(
+  definition: (args: ParsedArguments) => ToolDefinition<Schema>,
+): (args?: ParsedArguments) => ToolDefinition<Schema> {
+  return (args?: ParsedArguments) => definition(resolveToolArgs(args));
 }
 
 interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
-  handler: (
-    request: Request<Schema> & {page: ContextPage},
+  handler(
+    request: Request<NoInfer<Schema>> & {page: ContextPage},
     response: Response,
     context: Context,
-  ) => Promise<void>;
+  ): Promise<void>;
 }
 
 export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
   PageToolDefinition<Schema> & {
     pageScoped: true;
-    handler: (
-      request: Request<Schema> & {page: ContextPage},
-      response: Response,
-      context: Context,
-    ) => Promise<void>;
   };
 
-export function definePageTool<Schema extends zod.ZodRawShape>(
-  definition: PageToolDefinition<Schema>,
-): DefinedPageTool<Schema>;
-
-export function definePageTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition: (args?: Args) => PageToolDefinition<Schema>,
-): (args?: Args) => DefinedPageTool<Schema>;
-
-export function definePageTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition:
-    PageToolDefinition<Schema> | ((args?: Args) => PageToolDefinition<Schema>),
-): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
-  if (typeof definition === 'function') {
-    return (args?: Args): DefinedPageTool<Schema> => {
-      const tool = definition(args);
-      return {
-        ...tool,
-        pageScoped: true,
-      };
+export function definePageTool<const Schema extends zod.ZodRawShape>(
+  definition: (args: ParsedArguments) => PageToolDefinition<Schema>,
+): (args?: ParsedArguments) => DefinedPageTool<Schema> {
+  return (args?: ParsedArguments) => {
+    const tool = definition(resolveToolArgs(args));
+    return {
+      ...tool,
+      pageScoped: true,
     };
-  }
+  };
+}
 
-  return {
-    ...definition,
-    pageScoped: true,
-  } as DefinedPageTool<Schema>;
+const DEFAULT_TOOL_ARGV = ['node', 'chrome-devtools-mcp.js'];
+
+let defaultToolArgs: ParsedArguments | undefined;
+
+function resolveToolArgs(args?: ParsedArguments): ParsedArguments {
+  if (args !== undefined) {
+    return args;
+  }
+  defaultToolArgs ??= parseArguments('0.0.0', DEFAULT_TOOL_ARGV, {
+    ...process.env,
+    CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+  });
+  return defaultToolArgs;
 }
 
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
+
+type OptionalSchemaKey<T> = {
+  [K in keyof T]-?: undefined extends T[K]
+    ? K
+    : T[K] extends zod.ZodOptional<zod.ZodType>
+      ? K
+      : never;
+}[keyof T];
+
+export function omitSchemaField<
+  T extends object,
+  K extends OptionalSchemaKey<T>,
+>(schema: T, field: K): Omit<T, K> {
+  const {[field]: _omitted, ...rest} = schema;
+  Reflect.deleteProperty(schema, String(field));
+  return rest;
+}
+
+export function setSchemaField(
+  schema: object,
+  field: string,
+  value: unknown,
+): void {
+  Reflect.set(schema, field, value);
+}
 
 export const pageIdSchema = {
   pageId: zod.number().describe('Targets a specific page by ID.'),

@@ -639,7 +639,7 @@ export class McpPage implements ContextPage {
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.textSnapshot) {
       throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot().name} to capture one.`,
       );
     }
     const node = this.textSnapshot.idToNode.get(uid);

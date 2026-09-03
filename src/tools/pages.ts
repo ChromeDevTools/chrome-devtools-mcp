@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
@@ -14,13 +15,14 @@ import {
   CLOSE_PAGE_ERROR,
   definePageTool,
   defineTool,
+  omitSchemaField,
   timeoutSchema,
 } from './ToolDefinition.js';
 
-export const listPages = defineTool(args => {
+export const listPages = defineTool((args: ParsedArguments) => {
   return {
     name: 'list_pages',
-    description: `Get a list of pages${args?.categoryExtensions ? ' including extension service workers' : ''} open in the browser.`,
+    description: `Get a list of pages${args.categoryExtensions ? ' including extension service workers' : ''} open in the browser.`,
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: true,
@@ -36,7 +38,7 @@ export const listPages = defineTool(args => {
   };
 });
 
-export const selectPage = defineTool({
+export const selectPage = defineTool((_args: ParsedArguments) => ({
   name: 'select_page',
   description: `Select a page as a context for future tool calls.`,
   annotations: {
@@ -66,9 +68,9 @@ export const selectPage = defineTool({
       await page.pptrPage.bringToFront();
     }
   },
-});
+}));
 
-export const closePage = defineTool({
+export const closePage = defineTool((_args: ParsedArguments) => ({
   name: 'close_page',
   description: `Closes the page by its index. The last open page cannot be closed.`,
   annotations: {
@@ -95,9 +97,9 @@ export const closePage = defineTool({
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
   },
-});
+}));
 
-export const newPage = defineTool(args => {
+export const newPage = defineTool((args: ParsedArguments) => {
   return {
     name: 'new_page',
     description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
@@ -126,7 +128,7 @@ export const newPage = defineTool(args => {
     blockedByDialog: false,
     verifyFilesSchema: {},
     handler: async (request, response, context) => {
-      validateUrl(request.params.url, args?.javascriptEvaluation);
+      validateUrl(request.params.url, args.javascriptEvaluation);
 
       const page = await context.newPage(
         request.params.background,
@@ -148,7 +150,36 @@ export const newPage = defineTool(args => {
   };
 });
 
-export const navigatePage = definePageTool(args => {
+export const navigatePage = definePageTool((args: ParsedArguments) => {
+  const schema = {
+    type: zod
+      .enum(['url', 'back', 'forward', 'reload'])
+      .optional()
+      .describe(
+        'Navigate the page by URL, back or forward in history, or reload.',
+      ),
+    url: zod.string().optional().describe('Target URL (only type=url)'),
+    ignoreCache: zod
+      .boolean()
+      .optional()
+      .describe('Whether to ignore cache on reload.'),
+    handleBeforeUnload: zod
+      .enum(['accept', 'dismiss'])
+      .optional()
+      .describe(
+        'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
+      ),
+    initScript: zod
+      .string()
+      .optional()
+      .describe(
+        'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
+      ),
+    ...timeoutSchema,
+  };
+  if (args.javascriptEvaluation === false) {
+    omitSchemaField(schema, 'initScript');
+  }
   return {
     name: 'navigate_page',
     description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
@@ -156,36 +187,7 @@ export const navigatePage = definePageTool(args => {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: false,
     },
-    schema: {
-      type: zod
-        .enum(['url', 'back', 'forward', 'reload'])
-        .optional()
-        .describe(
-          'Navigate the page by URL, back or forward in history, or reload.',
-        ),
-      url: zod.string().optional().describe('Target URL (only type=url)'),
-      ignoreCache: zod
-        .boolean()
-        .optional()
-        .describe('Whether to ignore cache on reload.'),
-      handleBeforeUnload: zod
-        .enum(['accept', 'dismiss'])
-        .optional()
-        .describe(
-          'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
-        ),
-      ...(args?.javascriptEvaluation !== false
-        ? {
-            initScript: zod
-              .string()
-              .optional()
-              .describe(
-                'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
-              ),
-          }
-        : {}),
-      ...timeoutSchema,
-    },
+    schema,
     blockedByDialog: false,
     verifyFilesSchema: {},
     handler: async (request, response) => {
@@ -203,7 +205,7 @@ export const navigatePage = definePageTool(args => {
       }
 
       if (request.params.url) {
-        validateUrl(request.params.url, args?.javascriptEvaluation);
+        validateUrl(request.params.url, args.javascriptEvaluation);
       }
 
       let initScriptId: string | undefined;
@@ -305,7 +307,7 @@ export const navigatePage = definePageTool(args => {
   };
 });
 
-export const resizePage = definePageTool({
+export const resizePage = definePageTool((_args: ParsedArguments) => ({
   name: 'resize_page',
   description: `Resizes the page's window so that the page has specified dimension`,
   annotations: {
@@ -344,9 +346,9 @@ export const resizePage = definePageTool({
 
     response.setIncludePages(true);
   },
-});
+}));
 
-export const handleDialog = definePageTool({
+export const handleDialog = definePageTool((_args: ParsedArguments) => ({
   name: 'handle_dialog',
   description: `If a browser dialog was opened, use this command to handle it`,
   annotations: {
@@ -397,9 +399,9 @@ export const handleDialog = definePageTool({
     page.clearDialog();
     response.setIncludePages(true);
   },
-});
+}));
 
-export const getTabId = definePageTool({
+export const getTabId = definePageTool((_args: ParsedArguments) => ({
   name: 'get_tab_id',
   description: `Get the tab ID of the page`,
   annotations: {
@@ -416,4 +418,4 @@ export const getTabId = definePageTool({
     response.setTabId(tabId);
     response.appendResponseLine(`Tab ID: ${tabId}`);
   },
-});
+}));

@@ -17,7 +17,6 @@ import type {
   TextContent,
 } from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
-import {} from '@modelcontextprotocol/core';
 import {executablePath} from 'puppeteer';
 
 import {mcpOptions} from '../src/config/mcp-options.js';
@@ -276,7 +275,7 @@ describe('e2e', () => {
     try {
       await withClient(
         async client => {
-          client.setRequestHandler(ListRootsRequestSchema, () => {
+          client.setRequestHandler('roots/list', () => {
             return {
               roots: [
                 {uri: pathToFileURL(clientRoot).href, name: 'client-root'},
@@ -538,13 +537,11 @@ async function getToolsWithFilteredCategories(
     }
     const fileTools = await import(`../src/tools/${file}`);
 
-    for (const maybeTool of Object.values<unknown>(fileTools)) {
-      let tool;
-      if (typeof maybeTool === 'function') {
-        tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
-      } else {
-        tool = maybeTool as ToolDefinition;
+    for (const maybeTool of Object.values(fileTools)) {
+      if (typeof maybeTool !== 'function') {
+        continue;
       }
+      const tool = maybeTool();
 
       // Skipping all files that are not tool files
       if (tool === null || typeof tool !== 'object' || !('name' in tool)) {

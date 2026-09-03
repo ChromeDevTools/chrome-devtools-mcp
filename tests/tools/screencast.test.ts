@@ -258,7 +258,7 @@ describe('screencast', () => {
     it('returns an error message if no recording is active', async () => {
       await withMcpContext(async (response, context) => {
         assert.strictEqual(context.getScreenRecorder(), null);
-        await stopScreencast.handler(
+        await stopScreencast().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -280,7 +280,7 @@ describe('screencast', () => {
           filePath,
         });
 
-        await stopScreencast.handler(
+        await stopScreencast().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -306,7 +306,7 @@ describe('screencast', () => {
         });
 
         await assert.rejects(
-          stopScreencast.handler(
+          stopScreencast().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,

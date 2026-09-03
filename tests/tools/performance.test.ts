@@ -51,7 +51,7 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         sinon.stub(selectedPage, 'goto').resolves(null);
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler(
+        await startTrace().handler(
           {
             params: {reload: true, autoStop: false},
             page: context.getSelectedMcpPage(),
@@ -84,7 +84,7 @@ describe('performance', () => {
         sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
         const gotoStub = sinon.stub(selectedPage, 'goto');
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler(
+        await startTrace().handler(
           {
             params: {reload: true, autoStop: false},
             page: context.getSelectedMcpPage(),
@@ -123,7 +123,7 @@ describe('performance', () => {
           });
 
         const clock = sinon.useFakeTimers();
-        const handlerPromise = startTrace.handler(
+        const handlerPromise = startTrace().handler(
           {
             params: {reload: true, autoStop: true},
             page: context.getSelectedMcpPage(),
@@ -161,7 +161,7 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace.handler(
+        await startTrace().handler(
           {
             params: {reload: true, autoStop: false},
             page: context.getSelectedMcpPage(),
@@ -190,7 +190,7 @@ describe('performance', () => {
           .stub(selectedPage.tracing, 'stop')
           .rejects(new Error('Cannot stop recording: tracing was not started'));
         await assert.rejects(
-          startTrace.handler(
+          startTrace().handler(
             {
               params: {reload: true, autoStop: true},
               page: context.getSelectedMcpPage(),
@@ -206,7 +206,7 @@ describe('performance', () => {
         // A follow-up start_trace must proceed instead of reporting that a
         // trace is already running.
         gotoStub.resolves(null);
-        await startTrace.handler(
+        await startTrace().handler(
           {
             params: {reload: true, autoStop: false},
             page: context.getSelectedMcpPage(),
@@ -236,7 +236,7 @@ describe('performance', () => {
           .stub(context, 'saveFile')
           .resolves({filename: filePath});
 
-        const handlerPromise = startTrace.handler(
+        const handlerPromise = startTrace().handler(
           {
             params: {reload: true, autoStop: true, filePath},
             page: context.getSelectedMcpPage(),
@@ -282,7 +282,7 @@ describe('performance', () => {
         context.storeTraceRecording(trace);
         context.setIsRunningPerformanceTrace(false);
 
-        await analyzeInsight.handler(
+        await analyzeInsight().handler(
           {
             params: {
               insightSetId: 'NAVIGATION_0',
@@ -300,7 +300,7 @@ describe('performance', () => {
 
     it('returns an error if no trace has been recorded', async () => {
       await withMcpContext(async (response, context) => {
-        await analyzeInsight.handler(
+        await analyzeInsight().handler(
           {
             params: {
               insightSetId: '8463DF94CD61B265B664E7F768183DE3',
@@ -328,7 +328,7 @@ describe('performance', () => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop');
-        await stopTrace.handler(
+        await stopTrace().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -348,7 +348,7 @@ describe('performance', () => {
           .callsFake(async () => {
             return rawData;
           });
-        await stopTrace.handler(
+        await stopTrace().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -372,7 +372,7 @@ describe('performance', () => {
           .returns(Promise.resolve(undefined));
 
         await assert.rejects(
-          stopTrace.handler(
+          stopTrace().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
@@ -395,7 +395,7 @@ describe('performance', () => {
           .stub(context, 'saveFile')
           .resolves({filename: filePath});
 
-        await stopTrace.handler(
+        await stopTrace().handler(
           {params: {filePath}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -420,7 +420,7 @@ describe('performance', () => {
           const selectedPage = context.getSelectedMcpPage().pptrPage;
           sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
 
-          await stopTrace.handler(
+          await stopTrace().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
             context,
@@ -463,7 +463,7 @@ describe('performance', () => {
           );
         });
 
-        await stopTrace.handler(
+        await stopTrace().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -527,7 +527,7 @@ describe('performance', () => {
           );
         });
 
-        await stopTrace.handler(
+        await stopTrace().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,

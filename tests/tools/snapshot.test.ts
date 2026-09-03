@@ -14,7 +14,7 @@ describe('snapshot', () => {
   describe('browser_snapshot', () => {
     it('includes a snapshot', async () => {
       await withMcpContext(async (response, context) => {
-        await takeSnapshot.handler(
+        await takeSnapshot().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -31,7 +31,7 @@ describe('snapshot', () => {
         await page.setContent(
           html`<main><span>Hello</span><span> </span><div>World</div></main>`,
         );
-        await waitFor.handler(
+        await waitFor().handler(
           {
             params: {
               text: ['Hello'],
@@ -57,7 +57,7 @@ describe('snapshot', () => {
         await page.setContent(
           html`<main><span>Status</span><div>Error</div></main>`,
         );
-        await waitFor.handler(
+        await waitFor().handler(
           {
             params: {
               text: ['Complete', 'Error'],
@@ -80,7 +80,7 @@ describe('snapshot', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
-        const handlePromise = waitFor.handler(
+        const handlePromise = waitFor().handler(
           {
             params: {
               text: ['Complete', 'Error'],
@@ -111,7 +111,7 @@ describe('snapshot', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
-        const handlePromise = waitFor.handler(
+        const handlePromise = waitFor().handler(
           {
             params: {
               text: ['Hello World'],
@@ -143,7 +143,7 @@ describe('snapshot', () => {
           html`<main><h1>Header</h1><div>Text</div></main>`,
         );
 
-        await waitFor.handler(
+        await waitFor().handler(
           {
             params: {
               text: ['Header'],
@@ -171,7 +171,7 @@ describe('snapshot', () => {
             <iframe srcdoc="<p>Hello iframe</p>"></iframe>`,
         );
 
-        await waitFor.handler(
+        await waitFor().handler(
           {
             params: {
               text: ['Hello iframe'],

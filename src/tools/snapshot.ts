@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, timeoutSchema} from './ToolDefinition.js';
 
-export const takeSnapshot = definePageTool({
+export const takeSnapshot = definePageTool((_args: ParsedArguments) => ({
   name: 'take_snapshot',
   description: `Take a text snapshot of the target page based on the a11y tree. The snapshot lists page elements along with a unique
 identifier (uid). Always use the latest snapshot. Prefer taking a snapshot over taking a screenshot. The snapshot indicates the element selected
@@ -43,9 +44,9 @@ in the DevTools Elements panel (if any).`,
       filePath: request.params.filePath,
     });
   },
-});
+}));
 
-export const waitFor = definePageTool({
+export const waitFor = definePageTool((_args: ParsedArguments) => ({
   name: 'wait_for',
   description: `Wait for the specified text to appear on the selected page.`,
   annotations: {
@@ -73,4 +74,4 @@ export const waitFor = definePageTool({
 
     response.includeSnapshot();
   },
-});
+}));

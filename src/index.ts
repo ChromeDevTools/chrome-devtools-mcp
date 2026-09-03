@@ -21,7 +21,6 @@ import {
   type Transport,
   Mutex,
   puppeteer,
-  zod,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
@@ -293,7 +292,7 @@ export class McpServer {
       tool.name,
       {
         description: tool.description,
-        inputSchema: zod.object(toolHandler.registeredInputSchema),
+        inputSchema: toolHandler.registeredInputSchema,
         annotations: tool.annotations,
       },
       async params => {

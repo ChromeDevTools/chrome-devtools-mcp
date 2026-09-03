@@ -224,7 +224,10 @@ async function validateToolFiles(
 
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
-  readonly registeredInputSchema: zod.ZodTypeAny;
+  readonly registeredInputSchema: zod.ZodObject<
+    zod.ZodRawShape,
+    zod.core.$loose
+  >;
   readonly shouldRegister: boolean;
   private readonly disabledReason?: string;
 

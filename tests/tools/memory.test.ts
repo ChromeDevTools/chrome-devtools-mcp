@@ -37,7 +37,7 @@ describe('memory', () => {
       await withMcpContext(async (response, context) => {
         const filePath = join(tmpdir(), 'test-screenshot.heapsnapshot');
         try {
-          await takeHeapSnapshot.handler(
+          await takeHeapSnapshot().handler(
             {params: {filePath}, page: context.getSelectedMcpPage()},
             response,
             context,
@@ -65,7 +65,7 @@ describe('memory', () => {
 
         assert.ok(existsSync(filePath), `Fixture not found at ${filePath}`);
 
-        await getHeapSnapshotSummary.handler(
+        await getHeapSnapshotSummary().handler(
           {params: {filePath}},
           response,
           context,
@@ -90,7 +90,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotDetails.handler(
+        await getHeapSnapshotDetails().handler(
           {params: {filePath}},
           response,
           context,
@@ -112,7 +112,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotDetails.handler(
+        await getHeapSnapshotDetails().handler(
           {params: {filePath, filterName: 'objectsRetainedByContexts'}},
           response,
           context,
@@ -134,7 +134,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotDetails.handler(
+        await getHeapSnapshotDetails().handler(
           {params: {filePath, filterName: 'sharedNativeContext'}},
           response,
           context,
@@ -156,7 +156,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotDetails.handler(
+        await getHeapSnapshotDetails().handler(
           {
             params: {
               filePath,
@@ -189,7 +189,7 @@ describe('memory', () => {
 
         await context.getHeapSnapshotAggregates(filePath);
 
-        await getHeapSnapshotClassNodes.handler(
+        await getHeapSnapshotClassNodes().handler(
           {params: {filePath, id: 19}},
           response,
           context,
@@ -223,7 +223,7 @@ describe('memory', () => {
         const id = aggregate[stableIdSymbol];
         assert.ok(id);
 
-        await getHeapSnapshotClassNodes.handler(
+        await getHeapSnapshotClassNodes().handler(
           {params: {filePath, id, filterName: 'objectsRetainedByContexts'}},
           response,
           context,
@@ -249,7 +249,7 @@ describe('memory', () => {
         await context.getHeapSnapshotAggregates(filePath);
 
         await assert.rejects(
-          getHeapSnapshotClassNodes.handler(
+          getHeapSnapshotClassNodes().handler(
             {params: {filePath, id: 999999}},
             response,
             context,
@@ -268,7 +268,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotRetainers.handler(
+        await getHeapSnapshotRetainers().handler(
           {params: {filePath, nodeId: 25341}},
           response,
           context,
@@ -292,7 +292,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotObjectDetails.handler(
+        await getHeapSnapshotObjectDetails().handler(
           {params: {filePath, nodeId: 25341}},
           response,
           context,
@@ -316,7 +316,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotSummary.handler(
+        await getHeapSnapshotSummary().handler(
           {params: {filePath}},
           response,
           context,
@@ -324,7 +324,7 @@ describe('memory', () => {
 
         assert.ok(context.hasHeapSnapshots());
 
-        await closeHeapSnapshot.handler(
+        await closeHeapSnapshot().handler(
           {params: {filePath}},
           response,
           context,
@@ -345,7 +345,7 @@ describe('memory', () => {
         );
 
         await assert.rejects(
-          closeHeapSnapshot.handler({params: {filePath}}, response, context),
+          closeHeapSnapshot().handler({params: {filePath}}, response, context),
           {
             message: `Failed to close heap snapshot: ${filePath} was not loaded.`,
           },
@@ -362,7 +362,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotRetainingPaths.handler(
+        await getHeapSnapshotRetainingPaths().handler(
           {params: {filePath, nodeId: 45901}},
           response,
           context,
@@ -384,7 +384,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotRetainingPaths.handler(
+        await getHeapSnapshotRetainingPaths().handler(
           {params: {filePath, nodeId: 45901, maxDepth: 1}},
           response,
           context,
@@ -412,7 +412,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotEdges.handler(
+        await getHeapSnapshotEdges().handler(
           {params: {filePath, nodeId: 25341}},
           response,
           context,
@@ -434,7 +434,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotEdges.handler(
+        await getHeapSnapshotEdges().handler(
           {params: {filePath, nodeId: 25341, pageSize: 2}},
           response,
           context,
@@ -456,7 +456,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotEdges.handler(
+        await getHeapSnapshotEdges().handler(
           {
             params: {
               filePath,
@@ -486,7 +486,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotDominators.handler(
+        await getHeapSnapshotDominators().handler(
           {params: {filePath, nodeId: 25341}},
           response,
           context,
@@ -514,7 +514,7 @@ describe('memory', () => {
           'tests/fixtures/heap-2.heapsnapshot',
         );
 
-        await compareHeapSnapshots.handler(
+        await compareHeapSnapshots().handler(
           {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
           response,
           context,
@@ -540,7 +540,7 @@ describe('memory', () => {
           'tests/fixtures/heap-3.heapsnapshot',
         );
 
-        await compareHeapSnapshots.handler(
+        await compareHeapSnapshots().handler(
           {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
           response,
           context,
@@ -566,7 +566,7 @@ describe('memory', () => {
           'tests/fixtures/heap-2.heapsnapshot',
         );
 
-        await compareHeapSnapshots.handler(
+        await compareHeapSnapshots().handler(
           {
             params: {
               baseFilePath: filePathA,
@@ -599,7 +599,7 @@ describe('memory', () => {
         );
 
         await assert.rejects(
-          compareHeapSnapshots.handler(
+          compareHeapSnapshots().handler(
             {
               params: {
                 baseFilePath: filePathA,
@@ -665,7 +665,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await getHeapSnapshotDuplicateStrings.handler(
+        await getHeapSnapshotDuplicateStrings().handler(
           {params: {filePath}},
           response,
           context,
@@ -689,7 +689,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await queryHeapSnapshotObjects.handler(
+        await queryHeapSnapshotObjects().handler(
           {params: {filePath, pageSize: 10}},
           response,
           context,
@@ -711,7 +711,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await queryHeapSnapshotObjects.handler(
+        await queryHeapSnapshotObjects().handler(
           {params: {filePath, className: 'Window', pageSize: 10}},
           response,
           context,
@@ -733,7 +733,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await queryHeapSnapshotObjects.handler(
+        await queryHeapSnapshotObjects().handler(
           {
             params: {
               filePath,
@@ -761,7 +761,7 @@ describe('memory', () => {
           'tests/fixtures/example.heapsnapshot',
         );
 
-        await queryHeapSnapshotObjects.handler(
+        await queryHeapSnapshotObjects().handler(
           {params: {filePath, sortBy: 'selfSize', pageSize: 5, pageIdx: 0}},
           response,
           context,

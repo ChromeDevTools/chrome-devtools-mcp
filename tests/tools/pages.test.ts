@@ -483,7 +483,7 @@ describe('pages', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         const pageId = context.getSelectedMcpPage().id;
         assert.ok(!page.isClosed());
-        await closePage.handler({params: {pageId}}, response, context);
+        await closePage().handler({params: {pageId}}, response, context);
         assert.ok(page.isClosed());
       });
     });
@@ -532,7 +532,7 @@ describe('pages', () => {
       const isolatedPage = context.getSelectedMcpPage();
 
       // Switch global selection back to the default page.
-      await selectPage.handler({params: {pageId: 1}}, response, context);
+      await selectPage().handler({params: {pageId: 1}}, response, context);
       assert.notStrictEqual(context.getSelectedMcpPage(), isolatedPage);
 
       // Navigate using page; should target the isolated page.
@@ -570,7 +570,7 @@ describe('pages', () => {
           context.getSelectedMcpPage(),
         );
         assert.strictEqual(context.getPageById(2), page);
-        await closePage.handler({params: {pageId: 2}}, response, context);
+        await closePage().handler({params: {pageId: 2}}, response, context);
         assert.ok(page.pptrPage.isClosed());
         assert.ok(response.includePages);
       });
@@ -578,7 +578,7 @@ describe('pages', () => {
     it('cannot close the last page', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
-        await closePage.handler({params: {pageId: 1}}, response, context);
+        await closePage().handler({params: {pageId: 1}}, response, context);
         assert.deepStrictEqual(
           response.responseLines[0],
           `The last open page cannot be closed. It is fine to keep it open.`,
@@ -610,7 +610,7 @@ describe('pages', () => {
           });
         await dialogPromise;
 
-        await closePage.handler({params: {pageId: 2}}, response, context);
+        await closePage().handler({params: {pageId: 2}}, response, context);
 
         const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
@@ -625,7 +625,7 @@ describe('pages', () => {
           context.getPageById(2),
           context.getSelectedMcpPage(),
         );
-        await selectPage.handler({params: {pageId: 1}}, response, context);
+        await selectPage().handler({params: {pageId: 1}}, response, context);
         assert.strictEqual(
           context.getPageById(1),
           context.getSelectedMcpPage(),
@@ -646,7 +646,7 @@ describe('pages', () => {
             .pptrPage.evaluate(() => document.hasFocus()),
           true,
         );
-        await selectPage.handler({params: {pageId: 1}}, response, context);
+        await selectPage().handler({params: {pageId: 1}}, response, context);
         assert.strictEqual(
           context.getPageById(1),
           context.getSelectedMcpPage(),
@@ -699,7 +699,7 @@ describe('pages', () => {
         );
 
         // Switching back to pageA should preserve pageB's focus.
-        await selectPage.handler(
+        await selectPage().handler(
           {params: {pageId: pageAId}},
           response,
           context,
@@ -730,7 +730,7 @@ describe('pages', () => {
         });
         const dialog = await dialogPromise;
 
-        await selectPage.handler({params: {pageId: 1}}, response, context);
+        await selectPage().handler({params: {pageId: 1}}, response, context);
 
         const result = await response.handle(context);
         t.assert.snapshot(JSON.stringify(result));
@@ -1132,7 +1132,7 @@ describe('pages', () => {
             window.addEventListener('resize', resolve, {once: true});
           });
         });
-        await resizePage.handler(
+        await resizePage().handler(
           {
             params: {width: 700, height: 500},
             page: context.getSelectedMcpPage(),
@@ -1166,7 +1166,7 @@ describe('pages', () => {
             window.addEventListener('resize', resolve, {once: true});
           });
         });
-        await resizePage.handler(
+        await resizePage().handler(
           {
             params: {width: 650, height: 450},
             page: context.getSelectedMcpPage(),
@@ -1200,7 +1200,7 @@ describe('pages', () => {
             window.addEventListener('resize', resolve, {once: true});
           });
         });
-        await resizePage.handler(
+        await resizePage().handler(
           {
             params: {width: 750, height: 550},
             page: context.getSelectedMcpPage(),
@@ -1234,7 +1234,7 @@ describe('pages', () => {
             window.addEventListener('resize', resolve, {once: true});
           });
         });
-        await resizePage.handler(
+        await resizePage().handler(
           {
             params: {width: 725, height: 525},
             page: context.getSelectedMcpPage(),
@@ -1274,7 +1274,7 @@ describe('pages', () => {
               window.addEventListener('resize', resolve, {once: true});
             });
           });
-          await resizePage.handler(
+          await resizePage().handler(
             {
               params: {width: 850, height: 650},
               page: context.getSelectedMcpPage(),
@@ -1308,7 +1308,7 @@ describe('pages', () => {
         });
         const dialog = await dialogPromise;
 
-        await resizePage.handler(
+        await resizePage().handler(
           {
             params: {width: 1600, height: 1400},
             page: context.getSelectedMcpPage(),
@@ -1338,7 +1338,7 @@ describe('pages', () => {
           alert('test');
         });
         await dialogPromise;
-        await handleDialog.handler(
+        await handleDialog().handler(
           {
             params: {
               action: 'accept',
@@ -1368,7 +1368,7 @@ describe('pages', () => {
           alert('test');
         });
         await dialogPromise;
-        await handleDialog.handler(
+        await handleDialog().handler(
           {
             params: {
               action: 'dismiss',
@@ -1399,7 +1399,7 @@ describe('pages', () => {
         });
         const dialog = await dialogPromise;
         await dialog.dismiss();
-        await handleDialog.handler(
+        await handleDialog().handler(
           {
             params: {
               action: 'dismiss',
@@ -1433,7 +1433,7 @@ describe('pages', () => {
         await dialogPromise;
 
         // page1 is not selected, but its dialog should be accessible via page.
-        await handleDialog.handler(
+        await handleDialog().handler(
           {
             params: {
               action: 'accept',
@@ -1484,7 +1484,7 @@ describe('pages', () => {
         assert.ok(page2.getDialog());
 
         // Handle page1's dialog; page2's should remain.
-        await handleDialog.handler(
+        await handleDialog().handler(
           {params: {action: 'accept'}, page: page1},
           response,
           context,
@@ -1493,7 +1493,7 @@ describe('pages', () => {
         assert.ok(page2.getDialog());
 
         // Handle page2's dialog.
-        await handleDialog.handler(
+        await handleDialog().handler(
           {params: {action: 'dismiss'}, page: page2},
           response,
           context,
@@ -1513,7 +1513,7 @@ describe('pages', () => {
         assert.ok(typeof page._tabId === 'string');
         // @ts-expect-error _tabId is internal.
         page._tabId = 'test-tab-id';
-        await getTabId.handler(
+        await getTabId().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,

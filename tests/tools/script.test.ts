@@ -366,7 +366,7 @@ describe('script', () => {
     it('evaluates inside extension service worker', async () => {
       await withMcpContext(
         async (response, context) => {
-          await installExtension.handler(
+          await installExtension().handler(
             {params: {path: EXTENSION_PATH}},
             response,
             context,

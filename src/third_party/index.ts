@@ -10,7 +10,7 @@ import 'core-js/proposals/iterator-helpers.js';
 
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
-import {z as zod} from 'zod/v4';
+import {z as zod} from 'zod';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 

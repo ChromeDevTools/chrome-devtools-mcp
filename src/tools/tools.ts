@@ -22,7 +22,6 @@ import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
-import type {ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
 
 export const createTools = (args: ParsedArguments) => {
@@ -49,11 +48,7 @@ export const createTools = (args: ParsedArguments) => {
 
   const tools = [];
   for (const tool of rawTools) {
-    if (typeof tool === 'function') {
-      tools.push(tool(args) as unknown as ToolDefinition);
-    } else {
-      tools.push(tool as ToolDefinition);
-    }
+    tools.push(tool(args));
   }
 
   tools.sort((a, b) => {
