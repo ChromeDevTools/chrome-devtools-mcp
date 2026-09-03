@@ -373,18 +373,20 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the target page. Returns the response as JSON, so returned values have to be JSON-serializable.
+**Description:** Evaluate JavaScript inside the target page. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
-
-- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the target page.
-  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
-  Example with arguments: `(el) => el.innerText`
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
+- **format** (enum: "function", "script") _(optional)_: How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.
+- **function** (string) _(optional)_: JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
+  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
+  Example with arguments: `(el) => el.innerText`
+
+- **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.
 - **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
 ---
