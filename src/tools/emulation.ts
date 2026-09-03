@@ -100,7 +100,6 @@ export const emulate = definePageTool({
       ),
   },
   blockedByDialog: true,
-  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     await page.emulate(request.params);

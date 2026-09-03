@@ -18,7 +18,6 @@ export const listWebMcpTools = definePageTool({
   },
   schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (_request, response) => {
     response.setListWebMcpTools();
   },
@@ -39,7 +38,6 @@ export const executeWebMcpTool = definePageTool({
       .describe('The JSON-stringified parameters to pass to the WebMCP tool'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (request, response) => {
     const toolName = request.params.toolName;
 

@@ -71,7 +71,6 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: {},
   handler: async (request, response) => {
     const data = await request.page.getDevToolsData();
     response.attachDevToolsData(data);
@@ -107,19 +106,21 @@ export const getNetworkRequest = definePageTool({
       .optional()
       .describe(
         'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
-      ),
+      )
+      .meta({
+        verifyFile: true,
+      }),
     responseFilePath: zod
       .string()
       .optional()
       .describe(
         'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
-      ),
+      )
+      .meta({
+        verifyFile: true,
+      }),
   },
   blockedByDialog: true,
-  verifyFilesSchema: {
-    requestFilePath: true,
-    responseFilePath: true,
-  },
   handler: async (request, response) => {
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid, {

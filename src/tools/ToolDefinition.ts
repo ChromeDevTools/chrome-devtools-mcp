@@ -45,12 +45,7 @@ import type {
 import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
 
-export type FileVerificationOption =
-  | true
-  | {
-      local?: boolean;
-      remote?: boolean;
-    };
+export type {FileVerificationOption} from '../third_party/index.js';
 
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -68,7 +63,6 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Partial<Record<keyof Schema, FileVerificationOption>>;
 }
 
 export interface ToolDefinition<

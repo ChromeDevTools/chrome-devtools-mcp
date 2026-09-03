@@ -12,7 +12,7 @@ import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import type {CallToolResult} from './third_party/index.js';
-import {zod} from './third_party/index.js';
+import {zod, getZodMeta} from './third_party/index.js';
 import type {ToolCategory} from './tools/categories.js';
 import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
 import type {
@@ -200,7 +200,8 @@ async function validateToolFiles(
   context: McpContext,
 ): Promise<void> {
   const isLocal = isLocalBrowser(context);
-  for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
+  for (const [key, schema] of Object.entries(tool.schema)) {
+    const option = getZodMeta(schema, 'verifyFile');
     if (shouldValidateFile(option, isLocal)) {
       const val = params[key];
       if (typeof val === 'string') {

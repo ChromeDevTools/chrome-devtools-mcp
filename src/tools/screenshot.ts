@@ -172,12 +172,12 @@ export const screenshot = definePageTool(args => {
         .optional()
         .describe(
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
-        ),
+        )
+        .meta({
+          verifyFile: true,
+        }),
     },
     blockedByDialog: true,
-    verifyFilesSchema: {
-      filePath: true,
-    },
     handler: async (request, response, context) => {
       if (request.params.uid && request.params.fullPage) {
         throw new Error('Providing both "uid" and "fullPage" is not allowed.');

@@ -45,7 +45,6 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: {},
       pageScoped: true,
       handler: async () => {
         handlerCalled = true;
@@ -89,7 +88,6 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: {},
       pageScoped: true,
       handler: async () => {
         handlerCalled = true;
@@ -134,7 +132,6 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
       },
@@ -176,7 +173,6 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: {},
       handler: async () => {
         return;
       },
@@ -265,7 +261,6 @@ describe('ToolHandler', () => {
         url: zod.string(),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
       },
@@ -312,7 +307,6 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
-      verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
       },
@@ -462,7 +456,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(disabledHandler.shouldRegister, false);
   });
 
-  it('validates files specified in verifyFilesSchema and rewrites input with validated paths/URLs', async () => {
+  it('validates files specified in verifyFile meta and rewrites input with validated paths/URLs', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;
     const tool: ToolDefinition = {
@@ -473,14 +467,10 @@ describe('ToolHandler', () => {
         readOnlyHint: true,
       },
       schema: {
-        filePath: zod.string(),
-        fileList: zod.array(zod.string()),
+        filePath: zod.string().meta({verifyFile: true}),
+        fileList: zod.array(zod.string()).meta({verifyFile: true}),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePath: true,
-        fileList: true,
-      },
       handler: async request => {
         handlerCalled = true;
         receivedParams = request.params;
@@ -548,7 +538,7 @@ describe('ToolHandler', () => {
     });
   });
 
-  it('returns error when file validation fails for verifyFilesSchema', async () => {
+  it('returns error when file validation fails for verifyFile meta', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'file_tool',
@@ -558,12 +548,9 @@ describe('ToolHandler', () => {
         readOnlyHint: true,
       },
       schema: {
-        filePath: zod.string(),
+        filePath: zod.string().meta({verifyFile: true}),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePath: true,
-      },
       handler: async () => {
         handlerCalled = true;
       },
@@ -600,7 +587,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, false);
   });
 
-  it('validates verifyFilesSchema when local: true and browser is running locally via process', async () => {
+  it('validates verifyFile meta when local: true and browser is running locally via process', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;
     const tool: ToolDefinition = {
@@ -611,15 +598,14 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        filePaths: zod.array(zod.string()),
+        filePaths: zod.array(zod.string()).meta({
+          verifyFile: {
+            local: true,
+            remote: false,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePaths: {
-          local: true,
-          remote: false,
-        },
-      },
       handler: async request => {
         handlerCalled = true;
         receivedParams = request.params;
@@ -657,7 +643,7 @@ describe('ToolHandler', () => {
     });
   });
 
-  it('validates verifyFilesSchema when local: true and browser is connected to localhost wsEndpoint', async () => {
+  it('validates verifyFile meta when local: true and browser is connected to localhost wsEndpoint', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;
     const tool: ToolDefinition = {
@@ -668,14 +654,13 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        installUrlOrBundleUrl: zod.string(),
+        installUrlOrBundleUrl: zod.string().meta({
+          verifyFile: {
+            local: true,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        installUrlOrBundleUrl: {
-          local: true,
-        },
-      },
       handler: async request => {
         handlerCalled = true;
         receivedParams = request.params;
@@ -718,7 +703,7 @@ describe('ToolHandler', () => {
     });
   });
 
-  it('skips local-only verifyFilesSchema when browser is remote', async () => {
+  it('skips local-only verifyFile meta when browser is remote', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;
     const tool: ToolDefinition = {
@@ -729,15 +714,14 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        filePaths: zod.array(zod.string()),
+        filePaths: zod.array(zod.string()).meta({
+          verifyFile: {
+            local: true,
+            remote: false,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePaths: {
-          local: true,
-          remote: false,
-        },
-      },
       handler: async request => {
         handlerCalled = true;
         receivedParams = request.params;
@@ -773,7 +757,7 @@ describe('ToolHandler', () => {
     });
   });
 
-  it('skips local-only verifyFilesSchema when browser has no process', async () => {
+  it('skips local-only verifyFile meta when browser has no process', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'upload_tool',
@@ -783,14 +767,13 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        filePaths: zod.array(zod.string()),
+        filePaths: zod.array(zod.string()).meta({
+          verifyFile: {
+            local: true,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePaths: {
-          local: true,
-        },
-      },
       handler: async () => {
         handlerCalled = true;
       },
@@ -820,7 +803,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(mockContext.validatePath.called, false);
   });
 
-  it('skips non-file URLs for local-only verifyFilesSchema even on local browser', async () => {
+  it('skips non-file URLs for local-only verifyFile meta even on local browser', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'install_pwa_tool',
@@ -830,14 +813,13 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        installUrlOrBundleUrl: zod.string(),
+        installUrlOrBundleUrl: zod.string().meta({
+          verifyFile: {
+            local: true,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        installUrlOrBundleUrl: {
-          local: true,
-        },
-      },
       handler: async () => {
         handlerCalled = true;
       },
@@ -868,7 +850,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(mockContext.validatePath.called, false);
   });
 
-  it('validates verifyFilesSchema with true but skips local: true on remote browser', async () => {
+  it('validates verifyFile meta with true but skips local: true on remote browser', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;
     const tool: ToolDefinition = {
@@ -879,17 +861,15 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        outputFile: zod.string(),
-        inputFile: zod.string(),
+        outputFile: zod.string().meta({verifyFile: true}),
+        inputFile: zod.string().meta({
+          verifyFile: {
+            local: true,
+            remote: false,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        outputFile: true,
-        inputFile: {
-          local: true,
-          remote: false,
-        },
-      },
       handler: async request => {
         handlerCalled = true;
         receivedParams = request.params;
@@ -943,15 +923,14 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        filePaths: zod.array(zod.string()),
+        filePaths: zod.array(zod.string()).meta({
+          verifyFile: {
+            local: true,
+            remote: false,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePaths: {
-          local: true,
-          remote: false,
-        },
-      },
       handler: async () => {
         handlerCalled = true;
       },
@@ -997,15 +976,14 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        remoteFile: zod.string(),
+        remoteFile: zod.string().meta({
+          verifyFile: {
+            local: false,
+            remote: true,
+          },
+        }),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        remoteFile: {
-          local: false,
-          remote: true,
-        },
-      },
       handler: async () => {
         // no-op
       },
@@ -1063,12 +1041,9 @@ describe('ToolHandler', () => {
         readOnlyHint: false,
       },
       schema: {
-        filePath: zod.string(),
+        filePath: zod.string().meta({verifyFile: true}),
       },
       blockedByDialog: false,
-      verifyFilesSchema: {
-        filePath: true,
-      },
       pageScoped: true,
       handler: async request => {
         receivedParams = request.params;

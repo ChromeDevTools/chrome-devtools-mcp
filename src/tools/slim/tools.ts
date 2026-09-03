@@ -20,7 +20,6 @@ export const screenshot = definePageTool({
   },
   schema: {},
   blockedByDialog: true,
-  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = request.page;
     const screenshot = await page.pptrPage.screenshot({
@@ -47,7 +46,6 @@ export const navigate = definePageTool(args => {
       url: zod.string().describe('URL to navigate to'),
     },
     blockedByDialog: false,
-    verifyFilesSchema: {},
     handler: async (request, response) => {
       validateUrl(request.params.url, args?.javascriptEvaluation);
 
@@ -90,7 +88,6 @@ export const evaluate = definePageTool({
     script: zod.string().describe(`JS script to run on the page`),
   },
   blockedByDialog: true,
-  verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
     try {
