@@ -13,29 +13,8 @@ import {Locator} from 'puppeteer';
 import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
-import {getMockPage, withMcpContext} from './utils.js';
-
-/**
- * Extends the existing getMockPage() stub with the Puppeteer methods that
- * McpPage.emulate() and updateTimeouts() call internally. This avoids
- * any type casts while giving us a fully functional mock Puppeteer Page.
- */
-function createMockPuppeteerPage() {
-  const page = getMockPage();
-  return Object.assign(page, {
-    emulateNetworkConditions: sinon.stub().resolves(),
-    emulateCPUThrottling: sinon.stub().resolves(),
-    setGeolocation: sinon.stub().resolves(),
-    setUserAgent: sinon.stub().resolves(),
-    emulateMediaFeatures: sinon.stub().resolves(),
-    setViewport: sinon.stub().resolves(),
-    setExtraHTTPHeaders: sinon.stub().resolves(),
-    setDefaultTimeout: sinon.stub(),
-    setDefaultNavigationTimeout: sinon.stub(),
-    createCDPSession: sinon.stub().rejects(new Error('no session in tests')),
-    emulateFocusedPage: sinon.stub().resolves(),
-  });
-}
+import {createMockPuppeteerPage} from './mocks.js';
+import {withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -307,12 +286,38 @@ describe('McpPage', () => {
     });
 
     function createMcpPage() {
-      const mockPage = createMockPuppeteerPage();
-      const mcpPage = new McpPage(mockPage, 1, {
+      const pptrPage = createMockPuppeteerPage();
+      // _client() is an internal Puppeteer API used by ConsoleCollector
+      // in the McpPage constructor — stub it on the instance.
+      // @ts-expect-error internal API
+      pptrPage._client = sinon.stub().returns({
+        on: sinon.stub(),
+        off: sinon.stub(),
+        send: sinon.stub().resolves({}),
+        target: sinon.stub().returns({_targetId: '<mock>'}),
+      });
+      // These methods are on CdpPage (concrete subclass), not on the
+      // abstract Page, so createStubInstance(Page) doesn't include them.
+      // Stub them individually for the emulate() tests.
+      // The intersection type (method & SinonStub) requires an explicit
+      // type-aware stub via sinon.stub() on the prototype method signature.
+      Object.assign(pptrPage, {
+        emulateNetworkConditions: sinon.stub().resolves(),
+        emulateCPUThrottling: sinon.stub().resolves(),
+        setGeolocation: sinon.stub().resolves(),
+        setUserAgent: sinon.stub().resolves(),
+        emulateMediaFeatures: sinon.stub().resolves(),
+        setViewport: sinon.stub().resolves(),
+        setExtraHTTPHeaders: sinon.stub().resolves(),
+        setDefaultTimeout: sinon.stub(),
+        setDefaultNavigationTimeout: sinon.stub(),
+        emulateFocusedPage: sinon.stub().resolves(),
+      });
+      const mcpPage = new McpPage(pptrPage, 1, {
         hasNetworkBlockOrAllowlist: false,
         locatorClass: Locator,
       });
-      return {mcpPage, pptrPage: mockPage};
+      return {mcpPage, pptrPage};
     }
 
     it('calls emulateNetworkConditions with the predefined condition', async () => {

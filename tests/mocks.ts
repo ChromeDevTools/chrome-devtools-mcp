@@ -27,42 +27,20 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import type {Frame, Page} from '../src/third_party/index.js';
-
-import {mockListener} from './utils.js';
+import {Page} from 'puppeteer-core';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
+export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page>;
+
 /**
- * Returns a minimal fake Puppeteer Page using mockListener() for event
- * handling and the internal _client() CDP stub required by ConsoleCollector.
- *
- * Note: Puppeteer's Page is declared as `abstract class`, so
- * sinon.createStubInstance() cannot be used here. Additional methods
- * (emulateNetworkConditions, setUserAgent, etc.) can be added via
- * Object.assign() in the caller when needed.
+ * Returns a generic sinon stub of Puppeteer's Page.
+ * All Page methods are automatically stubbed — configure per-test as needed.
  */
-export function getMockPage(): Page {
-  const mainFrame = {} as Frame;
-  const cdpSession = {
-    ...mockListener(),
-    send: () => {
-      // no-op
-    },
-    target: () => ({_targetId: '<mock target ID>'}),
-  };
-  return {
-    mainFrame() {
-      return mainFrame;
-    },
-    ...mockListener(),
-    // @ts-expect-error internal API.
-    _client() {
-      return cdpSession;
-    },
-  } satisfies Page;
+export function createMockPuppeteerPage(): MockPuppeteerPage {
+  return sinon.createStubInstance(Page);
 }
 
 /**

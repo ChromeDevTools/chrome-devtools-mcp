@@ -29,7 +29,7 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
-import {getMockPage} from './mocks.js';
+import {createMockPuppeteerPage} from './mocks.js';
 
 export function assertNoServiceWorkerReported(targets: Target[], id: string) {
   const target = targets.find(target => {
@@ -395,13 +395,13 @@ export function mockListener() {
   };
 }
 
-export {getMockPage} from './mocks.js';
+export {createMockPuppeteerPage} from './mocks.js';
 
 export function getMockBrowser(options?: {
   process?: ChildProcess | null;
   wsEndpoint?: string;
 }): Browser {
-  const pages = [getMockPage()];
+  const pages: Page[] = [createMockPuppeteerPage()];
   return {
     process() {
       return options?.process ?? null;
