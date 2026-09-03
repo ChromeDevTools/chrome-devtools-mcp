@@ -9,7 +9,7 @@ import {ToolCategory} from '../tools/categories.js';
 export interface CategoryOption {
   type: 'boolean';
   describe: string;
-  default: boolean;
+  default?: boolean;
   hidden?: boolean;
   conflicts?: string[];
 }
@@ -27,7 +27,7 @@ const categoryOverrides: Record<
     describe?: string;
     hidden?: boolean;
     conflicts?: string[];
-    default?: boolean;
+    offByDefault?: boolean;
   }
 > = {
   [ToolCategory.INPUT]: {},
@@ -46,42 +46,41 @@ const categoryOverrides: Record<
   [ToolCategory.WEBMCP]: {
     describe:
       'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
-    default: false,
+    offByDefault: true,
   },
   [ToolCategory.EXTENSIONS]: {
     describe:
       'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
     hidden: false,
-    default: false,
+    offByDefault: true,
   },
   [ToolCategory.THIRD_PARTY]: {
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',
     hidden: false,
-    default: false,
+    offByDefault: true,
   },
   [ToolCategory.PWA]: {
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
     conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
     hidden: false,
-    default: false,
+    offByDefault: true,
   },
 };
 
 function createOption(category: ToolCategory): CategoryOption {
   const overrides = categoryOverrides[category];
-  const defaultVal = overrides.default ?? true;
-  const describe = defaultVal
-    ? `Set to false to exclude tools related to ${category}.`
-    : `Set to true to include tools related to ${category}.`;
+  const describe = overrides.offByDefault
+    ? `Set to true to include tools related to ${category}.`
+    : `Set to false to exclude tools related to ${category}.`;
 
   return {
     type: 'boolean',
     describe,
     hidden: true,
     ...overrides,
-    default: defaultVal,
+    ...(overrides.offByDefault ? {} : {default: true}),
   };
 }
 
