@@ -27,20 +27,24 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {Page} from 'puppeteer-core';
+import {CdpPage} from '../src/third_party/index.js';
+import type {Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
-export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page>;
-
 /**
- * Returns a generic sinon stub of Puppeteer's Page.
- * All Page methods are automatically stubbed — configure per-test as needed.
+ * Returns a full sinon stub of Puppeteer's Page using the concrete CdpPage
+ * subclass re-exported from src/third_party/index.ts. All Page and CdpPage
+ * methods (emulateNetworkConditions, emulateCPUThrottling, etc.) are
+ * automatically stubbed by sinon.
  */
-export function createMockPuppeteerPage(): MockPuppeteerPage {
-  return sinon.createStubInstance(Page);
+export function createMockPuppeteerPage(): Page {
+  // CdpPage is the concrete subclass of Page. The cast is necessary because
+  // SinonStubbedInstance<CdpPage> removes the private fields that TypeScript
+  // requires to satisfy the Page type, even though at runtime they are present.
+  return sinon.createStubInstance(CdpPage) as unknown as Page;
 }
 
 /**

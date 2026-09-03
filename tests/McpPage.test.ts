@@ -13,7 +13,9 @@ import {Locator} from 'puppeteer';
 import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
-import {createMockPuppeteerPage} from './mocks.js';
+import type {Page} from '../src/third_party/index.js';
+import {CdpPage} from '../src/third_party/index.js';
+
 import {withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
@@ -286,9 +288,10 @@ describe('McpPage', () => {
     });
 
     function createMcpPage() {
-      const pptrPage = createMockPuppeteerPage();
-      // _client() is an internal Puppeteer API used by ConsoleCollector
-      // in the McpPage constructor — stub it on the instance.
+      const pptrPage = sinon.createStubInstance(CdpPage);
+      // _client() is a private internal Puppeteer API used by ConsoleCollector
+      // in the McpPage constructor. It is not on the CdpPage prototype so
+      // must be added explicitly.
       // @ts-expect-error internal API
       pptrPage._client = sinon.stub().returns({
         on: sinon.stub(),
@@ -296,24 +299,7 @@ describe('McpPage', () => {
         send: sinon.stub().resolves({}),
         target: sinon.stub().returns({_targetId: '<mock>'}),
       });
-      // These methods are on CdpPage (concrete subclass), not on the
-      // abstract Page, so createStubInstance(Page) doesn't include them.
-      // Stub them individually for the emulate() tests.
-      // The intersection type (method & SinonStub) requires an explicit
-      // type-aware stub via sinon.stub() on the prototype method signature.
-      Object.assign(pptrPage, {
-        emulateNetworkConditions: sinon.stub().resolves(),
-        emulateCPUThrottling: sinon.stub().resolves(),
-        setGeolocation: sinon.stub().resolves(),
-        setUserAgent: sinon.stub().resolves(),
-        emulateMediaFeatures: sinon.stub().resolves(),
-        setViewport: sinon.stub().resolves(),
-        setExtraHTTPHeaders: sinon.stub().resolves(),
-        setDefaultTimeout: sinon.stub(),
-        setDefaultNavigationTimeout: sinon.stub(),
-        emulateFocusedPage: sinon.stub().resolves(),
-      });
-      const mcpPage = new McpPage(pptrPage, 1, {
+      const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
         hasNetworkBlockOrAllowlist: false,
         locatorClass: Locator,
       });
