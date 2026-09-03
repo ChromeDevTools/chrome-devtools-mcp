@@ -11,14 +11,13 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  ListRootsRequestSchema,
-  RootsListChangedNotificationSchema,
-  type ClientCapabilities,
-  type TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
+import {Client} from '@modelcontextprotocol/client';
+import type {
+  ClientCapabilities,
+  TextContent,
+} from '@modelcontextprotocol/client';
+import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
+import {} from '@modelcontextprotocol/core';
 import {executablePath} from 'puppeteer';
 
 import {mcpOptions} from '../src/config/mcp-options.js';
@@ -30,7 +29,10 @@ describe('e2e', () => {
   async function withClient(
     cb: (client: Client) => Promise<void>,
     extraArgs: string[] = [],
-    options: {capabilities?: ClientCapabilities} = {},
+    options: {
+      capabilities?: ClientCapabilities;
+      versionNegotiation?: {mode: 'auto' | 'legacy' | {pin: string}};
+    } = {},
   ) {
     let attempt = 1;
     while (attempt <= 3) {
@@ -53,6 +55,9 @@ describe('e2e', () => {
         },
         {
           capabilities: options.capabilities ?? {},
+          ...(options.versionNegotiation
+            ? {versionNegotiation: options.versionNegotiation}
+            : {}),
         },
       );
 
@@ -80,6 +85,20 @@ describe('e2e', () => {
       }
     }
   }
+  it('connects and negotiates 2026-07-28 era', async () => {
+    await withClient(
+      async client => {
+        const result = await client.callTool({
+          name: 'list_pages',
+          arguments: {},
+        });
+        assert.ok(result.content);
+      },
+      [],
+      {versionNegotiation: {mode: 'auto'}},
+    );
+  });
+
   it('calls a tool', async t => {
     await withClient(async client => {
       const result = await client.callTool({
@@ -225,13 +244,13 @@ describe('e2e', () => {
 
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           resolvePromise();
           return {roots};
         });
 
         await client.notification({
-          method: RootsListChangedNotificationSchema.shape.method.value,
+          method: 'notifications/roots/list_changed',
         });
 
         // Wait for the server to process the notification and request roots
@@ -294,7 +313,7 @@ describe('e2e', () => {
   it('denies file access if roots list is empty', async () => {
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           return {roots: []};
         });
 
@@ -351,7 +370,7 @@ describe('e2e', () => {
         // A client that negotiates roots but never responds. getContext()
         // awaits updateRoots() while holding the tool mutex, so an unbounded
         // request would stall this call for the SDK default of 60s.
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           return new Promise<never>(() => {
             // Intentionally never settles
           });
@@ -365,7 +384,6 @@ describe('e2e', () => {
             name: 'list_pages',
             arguments: {},
           },
-          undefined,
           {timeout: 90_000},
         );
         const elapsed = Date.now() - start;
@@ -396,7 +414,7 @@ describe('e2e', () => {
         async client => {
           // Answers after the bound the blocking call uses, so the roots only
           // arrive via the background listing
-          client.setRequestHandler(ListRootsRequestSchema, async () => {
+          client.setRequestHandler('roots/list', async () => {
             await new Promise(resolve => setTimeout(resolve, 8_000));
             return {
               roots: [{uri: pathToFileURL(workspace).href, name: 'workspace'}],

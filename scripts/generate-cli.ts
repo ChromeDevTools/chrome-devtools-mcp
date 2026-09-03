@@ -7,8 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+import {Client} from '@modelcontextprotocol/client';
+import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 
 import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
 import {buildFlag} from '../build/src/index.js';

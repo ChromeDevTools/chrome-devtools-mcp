@@ -394,15 +394,18 @@ export const fillForm = definePageTool({
   schema: {
     elements: zod
       .array(
-        // eslint-disable-next-line @local/enforce-zod-schema
-        zod.object({
-          uid: zod.string().describe('The uid of the element to fill out'),
-          value: zod
-            .string()
-            .describe(
-              'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
-            ),
-        }),
+        /* eslint-disable @local/enforce-zod-schema */
+        zod
+          .object({
+            uid: zod.string().describe('The uid of the element to fill out'),
+            value: zod
+              .string()
+              .describe(
+                'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+              ),
+          })
+          .describe('An element to fill out'),
+        /* eslint-enable @local/enforce-zod-schema */
       )
       .describe('Elements from snapshot to fill out.'),
     includeSnapshot: includeSnapshotSchema,

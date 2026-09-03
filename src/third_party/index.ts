@@ -10,6 +10,7 @@ import 'core-js/proposals/iterator-helpers.js';
 
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
+import {z as zod} from 'zod/v4';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
@@ -17,23 +18,28 @@ export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
-export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
-export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-export {Client} from '@modelcontextprotocol/sdk/client/index.js';
-export type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
+export {McpServer} from '@modelcontextprotocol/server';
+export {
+  StdioServerTransport,
+  serveStdio,
+} from '@modelcontextprotocol/server/stdio';
+export type {Transport} from '@modelcontextprotocol/server';
+export {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
+export {Client} from '@modelcontextprotocol/client';
 export {
   type CallToolResult,
-  SetLevelRequestSchema,
   type ImageContent,
   type TextContent,
   type Root,
+} from '@modelcontextprotocol/server';
+export {
+  SetLevelRequestSchema,
   ListRootsRequestSchema,
   RootsListChangedNotificationSchema,
   ListRootsResultSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-export {z as zod} from 'zod';
+} from '@modelcontextprotocol/core';
+export {zod};
+
 export {default as ajv} from 'ajv';
 export {
   Locator,
