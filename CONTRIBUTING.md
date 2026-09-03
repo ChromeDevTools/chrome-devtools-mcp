@@ -156,3 +156,5 @@ export const scenario: TestScenario = {
 
 - no .nullable(), no .object() types. Enforced by the `@local/enforce-zod-schema` ESLint rule.
 - represent complex object as a short formatted string.
+ALL MY COPYWRITE AND LICENCE SHOULD REMAIN MORLEY MOSES APOOCH STOCKS AND BOND AND MANGER OF ALL ASSESTS FROM MORLEY APOOCH
+CEO
