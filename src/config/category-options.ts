@@ -6,7 +6,7 @@
 
 import {ToolCategory} from '../tools/categories.js';
 
-export interface CategoryOptionOnByDefault {
+export interface CategoryOption {
   type: 'boolean';
   describe: string;
   default: boolean;
@@ -14,27 +14,12 @@ export interface CategoryOptionOnByDefault {
   conflicts?: string[];
 }
 
-export interface CategoryOptionOffByDefault {
-  type: 'boolean';
-  describe: string;
-  default?: boolean;
-  hidden?: boolean;
-  conflicts?: string[];
-}
+export type CategoryFlagName<T extends ToolCategory = ToolCategory> =
+  `category${Capitalize<T>}`;
 
-export interface CategoryFlags {
-  categoryInput: CategoryOptionOnByDefault;
-  categoryNavigation: CategoryOptionOnByDefault;
-  categoryEmulation: CategoryOptionOnByDefault;
-  categoryPerformance: CategoryOptionOnByDefault;
-  categoryNetwork: CategoryOptionOnByDefault;
-  categoryDebugging: CategoryOptionOnByDefault;
-  categoryMemory: CategoryOptionOnByDefault;
-  categoryExtensions: CategoryOptionOffByDefault;
-  categoryExperimentalThirdParty: CategoryOptionOffByDefault;
-  categoryExperimentalWebmcp: CategoryOptionOffByDefault;
-  categoryPwa: CategoryOptionOffByDefault;
-}
+export type CategoryFlags = {
+  [K in ToolCategory as CategoryFlagName<K>]: CategoryOption;
+};
 
 const categoryOverrides: Record<
   ToolCategory,
@@ -42,6 +27,7 @@ const categoryOverrides: Record<
     describe?: string;
     hidden?: boolean;
     conflicts?: string[];
+    default?: boolean;
   }
 > = {
   [ToolCategory.INPUT]: {},
@@ -54,83 +40,55 @@ const categoryOverrides: Record<
   [ToolCategory.WEBMCP]: {
     describe:
       'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
+    default: false,
   },
   [ToolCategory.EXTENSIONS]: {
     describe:
       'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
     hidden: false,
+    default: false,
   },
   [ToolCategory.THIRD_PARTY]: {
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',
+    hidden: false,
+    default: false,
   },
   [ToolCategory.PWA]: {
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
     conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
     hidden: false,
+    default: false,
   },
 };
 
-function createOnByDefaultOption(
-  category: ToolCategory,
-): CategoryOptionOnByDefault {
+function createOption(category: ToolCategory): CategoryOption {
   const overrides = categoryOverrides[category];
-  return {
-    type: 'boolean',
-    describe:
-      overrides.describe ??
-      `Set to false to exclude tools related to ${category}.`,
-    ...overrides,
-    default: true,
-    hidden: overrides.hidden ?? true,
-  };
-}
+  const defaultVal = overrides.default ?? true;
+  const describe = defaultVal
+    ? `Set to false to exclude tools related to ${category}.`
+    : `Set to true to include tools related to ${category}.`;
 
-function createOffByDefaultOption(
-  category: ToolCategory,
-): CategoryOptionOffByDefault {
-  const overrides = categoryOverrides[category];
   return {
     type: 'boolean',
-    describe:
-      overrides.describe ??
-      `Set to true to include tools related to ${category}.`,
+    describe,
     ...overrides,
+    default: defaultVal,
   };
 }
 
 export function getCategoryOptions(): CategoryFlags {
-  return {
-    categoryInput: createOnByDefaultOption(ToolCategory.INPUT),
-    categoryNavigation: createOnByDefaultOption(ToolCategory.NAVIGATION),
-    categoryEmulation: createOnByDefaultOption(ToolCategory.EMULATION),
-    categoryPerformance: createOnByDefaultOption(ToolCategory.PERFORMANCE),
-    categoryNetwork: createOnByDefaultOption(ToolCategory.NETWORK),
-    categoryDebugging: createOnByDefaultOption(ToolCategory.DEBUGGING),
-    categoryMemory: createOnByDefaultOption(ToolCategory.MEMORY),
-    categoryExtensions: createOffByDefaultOption(ToolCategory.EXTENSIONS),
-    categoryExperimentalThirdParty: createOffByDefaultOption(
-      ToolCategory.THIRD_PARTY,
-    ),
-    categoryExperimentalWebmcp: createOffByDefaultOption(ToolCategory.WEBMCP),
-    categoryPwa: createOffByDefaultOption(ToolCategory.PWA),
-  };
+  const options: Record<string, CategoryOption> = {};
+  for (const category of Object.values(ToolCategory)) {
+    const flagName = toFlagName(category);
+    options[flagName] = createOption(category);
+  }
+  if (isCategoryFlags(options)) {
+    return options;
+  }
+  throw new Error('Failed to create category options');
 }
-
-export const categoryToFlagName: Record<ToolCategory, keyof CategoryFlags> = {
-  [ToolCategory.INPUT]: 'categoryInput',
-  [ToolCategory.NAVIGATION]: 'categoryNavigation',
-  [ToolCategory.EMULATION]: 'categoryEmulation',
-  [ToolCategory.PERFORMANCE]: 'categoryPerformance',
-  [ToolCategory.NETWORK]: 'categoryNetwork',
-  [ToolCategory.DEBUGGING]: 'categoryDebugging',
-  [ToolCategory.MEMORY]: 'categoryMemory',
-  [ToolCategory.EXTENSIONS]: 'categoryExtensions',
-  [ToolCategory.THIRD_PARTY]: 'categoryExperimentalThirdParty',
-  [ToolCategory.WEBMCP]: 'categoryExperimentalWebmcp',
-  [ToolCategory.PWA]: 'categoryPwa',
-};
 
 function isToolCategory(val: string): val is ToolCategory {
   for (const cat of Object.values(ToolCategory)) {
