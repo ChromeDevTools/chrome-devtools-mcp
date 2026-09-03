@@ -4,6 +4,36 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
+- **`--categoryInput`/ `--category-input`**
+  Set to false to exclude tools related to input.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryNavigation`/ `--category-navigation`**
+  Set to false to exclude tools related to navigation.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryEmulation`/ `--category-emulation`**
+  Set to false to exclude tools related to emulation.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryPerformance`/ `--category-performance`**
+  Set to false to exclude tools related to performance.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryNetwork`/ `--category-network`**
+  Set to false to exclude tools related to network.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryDebugging`/ `--category-debugging`**
+  Set to false to exclude tools related to debugging.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--categoryExtensions`/ `--category-extensions`**
   Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
   - **Type:** boolean
@@ -13,6 +43,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   Set to true to enable third-party developer tools exposed by the inspected page itself
   - **Type:** boolean
   - **Default:** `false`
+
+- **`--categoryMemory`/ `--category-memory`**
+  Set to false to exclude tools related to memory.
+  - **Type:** boolean
+  - **Default:** `true`
 
 - **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
   Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`

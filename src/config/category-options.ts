@@ -82,7 +82,6 @@ export function categoryToFlagName(category: ToolCategory): CategoryFlagName {
   return `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as CategoryFlagName;
 }
 
-
 export function getCategoryOptions(): CategoryFlags {
   const options = {} as CategoryFlags;
   for (const category of Object.values(ToolCategory)) {

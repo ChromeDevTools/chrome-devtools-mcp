@@ -14,7 +14,7 @@ import {
 } from '../build/src/config/mcp-options.js';
 import {
   isCategoryOffByDefault,
-  getCategoryFlag,
+  categoryToFlagName,
 } from '../build/src/config/category-options.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import {pageIdSchema} from '../build/src/tools/ToolDefinition.js';
@@ -312,7 +312,7 @@ async function generateReference(
     markdown += `## ${categoryName}\n\n`;
 
     if (isCategoryOffByDefault(category)) {
-      const flagName = `--${getCategoryFlag(category)}`;
+      const flagName = `--${categoryToFlagName(category)}`;
 
       markdown += `> NOTE: The ${categoryName} category is not active by default. Use the '${flagName}' flag.\n\n`;
     }
@@ -331,7 +331,7 @@ async function generateReference(
 
         const isOffByDefault = isCategoryOffByDefault(category);
         if (isOffByDefault) {
-          const categoryFlag = getCategoryFlag(category);
+          const categoryFlag = categoryToFlagName(category);
           requiredFlags.push(`--${categoryFlag}=true`);
         }
 

@@ -13,7 +13,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
 import {
   isCategoryOffByDefault,
-  getCategoryFlag,
+  categoryToFlagName,
 } from '../build/src/config/category-options.js';
 import {labels, ToolCategory} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';
@@ -167,7 +167,7 @@ async function generateCli() {
 
     const isOffByDefault = isCategoryOffByDefault(categoryEnum);
     if (isOffByDefault) {
-      const categoryFlag = getCategoryFlag(categoryEnum);
+      const categoryFlag = categoryToFlagName(categoryEnum);
       requiredFlags.push(`--${categoryFlag}=true`);
     }
 
