@@ -69,7 +69,12 @@ export const navigate = definePageTool(args => {
       page.pptrPage.on('dialog', dialogHandler);
 
       try {
-        await page.pptrPage.goto(request.params.url, options);
+        await page.waitForEventsAfterAction(
+          async () => {
+            await page.pptrPage.goto(request.params.url, options);
+          },
+          {timeout: options.timeout},
+        );
         response.appendResponseLine(`Navigated to ${page.pptrPage.url()}.`);
       } finally {
         page.pptrPage.off('dialog', dialogHandler);

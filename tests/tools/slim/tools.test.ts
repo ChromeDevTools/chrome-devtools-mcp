@@ -11,10 +11,12 @@ import {describe, it} from 'node:test';
 
 import {parseArguments} from '../../../src/config/mcp-options.js';
 import {evaluate, navigate, screenshot} from '../../../src/tools/slim/tools.js';
+import {serverHooks} from '../../server.js';
 import {screenshots} from '../../snapshot.js';
-import {withMcpContext} from '../../utils.js';
+import {html, withMcpContext} from '../../utils.js';
 
 describe('slim', () => {
+  const server = serverHooks();
   it('evaluates', async t => {
     await withMcpContext(async (response, context) => {
       await evaluate.handler(
@@ -64,6 +66,32 @@ describe('slim', () => {
       );
       assert(!response.includePages);
       t.assert.snapshot(response.responseLines.join('\n'));
+    });
+  });
+
+  it('waits for meta refresh before returning', async () => {
+    server.addHtmlRoute('/final', html`<main id="done">arrived</main>`);
+    server.addHtmlRoute(
+      '/meta',
+      html`<meta http-equiv="refresh" content="0;url=/final" />START`,
+    );
+
+    await withMcpContext(async (response, context) => {
+      await navigate().handler(
+        {
+          params: {url: server.getRoute('/meta')},
+          page: context.getSelectedMcpPage(),
+        },
+        response,
+        context,
+      );
+      const page = context.getSelectedMcpPage().pptrPage;
+      assert.equal(
+        await page.evaluate(() => document.querySelector('#done')?.textContent),
+        'arrived',
+      );
+      assert.ok(page.url().endsWith('/final'));
+      assert.match(response.responseLines.join('\n'), /\/final/);
     });
   });
 
