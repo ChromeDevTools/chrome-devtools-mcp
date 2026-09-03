@@ -306,70 +306,92 @@ describe('McpPage', () => {
       sinon.restore();
     });
 
-    function createMcpPage(): McpPage {
+    function createMcpPage() {
       const fakePage = createFakePuppeteerPage();
-      return new McpPage(fakePage, 1, {
+      const mcpPage = new McpPage(fakePage, 1, {
         hasNetworkBlockOrAllowlist: false,
         locatorClass: Locator,
       });
+      return {mcpPage, fakePage};
     }
 
-    it('stores networkConditions in emulationSettings', async () => {
-      const page = createMcpPage();
-      await page.emulate({networkConditions: 'Slow 3G'});
-      assert.strictEqual(page.networkConditions, 'Slow 3G');
+    it('calls emulateNetworkConditions with the predefined condition', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({networkConditions: 'Slow 3G'});
+      assert.strictEqual(mcpPage.networkConditions, 'Slow 3G');
+      sinon.assert.calledOnce(fakePage.emulateNetworkConditions);
+      // First arg must be a non-null network condition object (not null/Offline)
+      assert.ok(fakePage.emulateNetworkConditions.firstCall.args[0] !== null);
     });
 
-    it('clears networkConditions when omitted', async () => {
-      const page = createMcpPage();
-      await page.emulate({networkConditions: 'Slow 3G'});
-      await page.emulate({});
-      assert.strictEqual(page.networkConditions, null);
+    it('calls emulateNetworkConditions(null) when networkConditions is omitted', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({networkConditions: 'Slow 3G'});
+      await mcpPage.emulate({});
+      assert.strictEqual(mcpPage.networkConditions, null);
+      // Second call clears — must pass null
+      sinon.assert.calledWith(fakePage.emulateNetworkConditions.secondCall, null);
     });
 
-    it('ignores unknown networkConditions values', async () => {
-      const page = createMcpPage();
-      await page.emulate({networkConditions: 'Slow 11G'});
-      assert.strictEqual(page.networkConditions, null);
+    it('does not call emulateNetworkConditions for unknown values', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      // emulate({}) is always called first to initialise; reset call count
+      fakePage.emulateNetworkConditions.resetHistory();
+      await mcpPage.emulate({networkConditions: 'Slow 11G'});
+      assert.strictEqual(mcpPage.networkConditions, null);
+      // Unknown value — no Puppeteer network call should be made
+      sinon.assert.notCalled(fakePage.emulateNetworkConditions);
     });
 
-    it('stores cpuThrottlingRate in emulationSettings', async () => {
-      const page = createMcpPage();
-      await page.emulate({cpuThrottlingRate: 4});
-      assert.strictEqual(page.cpuThrottlingRate, 4);
+    it('calls emulateCPUThrottling with the given rate', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 4);
+      sinon.assert.calledWith(fakePage.emulateCPUThrottling, 4);
     });
 
-    it('resets cpuThrottlingRate to 1', async () => {
-      const page = createMcpPage();
-      await page.emulate({cpuThrottlingRate: 4});
-      await page.emulate({cpuThrottlingRate: 1});
-      assert.strictEqual(page.cpuThrottlingRate, 1);
+    it('calls emulateCPUThrottling(1) to reset throttling', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      await mcpPage.emulate({cpuThrottlingRate: 1});
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 1);
+      sinon.assert.calledWith(fakePage.emulateCPUThrottling.secondCall, 1);
     });
 
-    it('stores userAgent in emulationSettings', async () => {
-      const page = createMcpPage();
-      await page.emulate({userAgent: 'TestUA/1.0'});
-      assert.strictEqual(page.userAgent, 'TestUA/1.0');
+    it('calls setUserAgent with the given user agent', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({userAgent: 'TestUA/1.0'});
+      assert.strictEqual(mcpPage.userAgent, 'TestUA/1.0');
+      sinon.assert.calledWith(fakePage.setUserAgent, {userAgent: 'TestUA/1.0'});
     });
 
-    it('clears userAgent when empty string is provided', async () => {
-      const page = createMcpPage();
-      await page.emulate({userAgent: 'TestUA/1.0'});
-      await page.emulate({userAgent: ''});
-      assert.strictEqual(page.userAgent, null);
+    it('calls setUserAgent with undefined to clear the user agent', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({userAgent: 'TestUA/1.0'});
+      await mcpPage.emulate({userAgent: ''});
+      assert.strictEqual(mcpPage.userAgent, null);
+      sinon.assert.calledWith(fakePage.setUserAgent.secondCall, {
+        userAgent: undefined,
+      });
     });
 
-    it('stores colorScheme in emulationSettings', async () => {
-      const page = createMcpPage();
-      await page.emulate({colorScheme: 'dark'});
-      assert.strictEqual(page.colorScheme, 'dark');
+    it('calls emulateMediaFeatures with dark color scheme', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({colorScheme: 'dark'});
+      assert.strictEqual(mcpPage.colorScheme, 'dark');
+      sinon.assert.calledWith(fakePage.emulateMediaFeatures, [
+        {name: 'prefers-color-scheme', value: 'dark'},
+      ]);
     });
 
-    it('clears colorScheme when set to auto', async () => {
-      const page = createMcpPage();
-      await page.emulate({colorScheme: 'dark'});
-      await page.emulate({colorScheme: 'auto'});
-      assert.strictEqual(page.colorScheme, null);
+    it('calls emulateMediaFeatures with empty string to reset color scheme', async () => {
+      const {mcpPage, fakePage} = createMcpPage();
+      await mcpPage.emulate({colorScheme: 'dark'});
+      await mcpPage.emulate({colorScheme: 'auto'});
+      assert.strictEqual(mcpPage.colorScheme, null);
+      sinon.assert.calledWith(fakePage.emulateMediaFeatures.secondCall, [
+        {name: 'prefers-color-scheme', value: ''},
+      ]);
     });
   });
 });

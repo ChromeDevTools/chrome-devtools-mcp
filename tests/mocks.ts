@@ -35,17 +35,14 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
-// ---------------------------------------------------------------------------
-// Puppeteer Page mock
-// ---------------------------------------------------------------------------
-
 /**
- * Returns a minimal fake Puppeteer Page built with the same pattern as the
- * existing getMockPage() helper — using mockListener() for event handling and
- * the internal _client() CDP stub required by ConsoleCollector.
+ * Returns a minimal fake Puppeteer Page using mockListener() for event
+ * handling and the internal _client() CDP stub required by ConsoleCollector.
  *
- * Additional Puppeteer methods (emulateNetworkConditions, setUserAgent, etc.)
- * can be added via Object.assign() in the caller when needed.
+ * Note: Puppeteer's Page is declared as `abstract class`, so
+ * sinon.createStubInstance() cannot be used here. Additional methods
+ * (emulateNetworkConditions, setUserAgent, etc.) can be added via
+ * Object.assign() in the caller when needed.
  */
 export function getMockPage(): Page {
   const mainFrame = {} as Frame;
@@ -68,10 +65,6 @@ export function getMockPage(): Page {
   } satisfies Page;
 }
 
-// ---------------------------------------------------------------------------
-// McpPage mock
-// ---------------------------------------------------------------------------
-
 /**
  * Returns a sinon stub instance of McpPage.
  * Every method is automatically stubbed. Override per-test as needed, e.g.:
@@ -80,10 +73,6 @@ export function getMockPage(): Page {
 export function createMockMcpPage(): MockMcpPage {
   return sinon.createStubInstance(McpPage);
 }
-
-// ---------------------------------------------------------------------------
-// McpContext mock
-// ---------------------------------------------------------------------------
 
 /**
  * Returns a sinon stub instance of McpContext.
@@ -97,10 +86,6 @@ export function createMockMcpContext(
   context.getSelectedMcpPage.returns(page satisfies McpPage);
   return context;
 }
-
-// ---------------------------------------------------------------------------
-// McpResponse mock
-// ---------------------------------------------------------------------------
 
 /**
  * Returns a sinon stub instance of McpResponse.
