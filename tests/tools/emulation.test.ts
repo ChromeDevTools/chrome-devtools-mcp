@@ -8,6 +8,8 @@ import assert from 'node:assert';
 import type {IncomingHttpHeaders} from 'node:http';
 import {beforeEach, describe, it, mock} from 'node:test';
 
+import sinon from 'sinon';
+
 import {emulate} from '../../src/tools/emulation.js';
 import {
   geolocationTransform,
@@ -95,8 +97,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(page.emulate, {
         networkConditions: 'Offline',
       });
     });
@@ -108,8 +109,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(page.emulate, {
         networkConditions: 'Slow 3G',
       });
     });
@@ -121,8 +121,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {});
+      sinon.assert.calledOnceWithExactly(page.emulate, {});
     });
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
@@ -149,8 +148,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(page.emulate, {
         networkConditions: 'Slow 3G',
       });
     });
@@ -164,10 +162,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
-        cpuThrottlingRate: 4,
-      });
+      sinon.assert.calledOnceWithExactly(page.emulate, {cpuThrottlingRate: 4});
     });
 
     it('applies cpu throttling to secondary session', async () => {
@@ -207,10 +202,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
-        cpuThrottlingRate: 1,
-      });
+      sinon.assert.calledOnceWithExactly(page.emulate, {cpuThrottlingRate: 1});
     });
 
     it('report correctly for the currently selected page', async () => {
@@ -220,10 +212,7 @@ describe('emulation', () => {
         response,
         context,
       );
-      assert.ok(page.emulate.calledOnce);
-      assert.deepStrictEqual(page.emulate.firstCall.args[0], {
-        cpuThrottlingRate: 4,
-      });
+      sinon.assert.calledOnceWithExactly(page.emulate, {cpuThrottlingRate: 4});
     });
   });
 

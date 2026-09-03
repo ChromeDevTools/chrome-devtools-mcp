@@ -396,13 +396,11 @@ export function mockListener() {
   };
 }
 
-export {createMockPuppeteerPage} from './mocks.js';
-
 export function getMockBrowser(options?: {
   process?: ChildProcess | null;
   wsEndpoint?: string;
 }): Browser {
-  const pages: Page[] = [createMockPuppeteerPage()];
+  const pages = [createMockPuppeteerPage() as unknown as Page];
   return {
     process() {
       return options?.process ?? null;

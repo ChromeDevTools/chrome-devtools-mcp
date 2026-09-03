@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,7 +19,7 @@
  *
  *   await myTool.handler({params: {networkConditions: 'Slow 3G'}, page}, response, context);
  *
- *   sinon.assert.calledWith(page.emulate, sinon.match({networkConditions: 'Slow 3G'}));
+ *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
 import sinon from 'sinon';
@@ -34,32 +34,14 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
-/**
- * Returns a full sinon stub of Puppeteer's Page using the concrete CdpPage
- * subclass re-exported from src/third_party/index.ts. All Page and CdpPage
- * methods (emulateNetworkConditions, emulateCPUThrottling, etc.) are
- * automatically stubbed by sinon.
- */
-export function createMockPuppeteerPage(): Page {
-  // CdpPage is the concrete subclass of Page. The cast is necessary because
-  // SinonStubbedInstance<CdpPage> removes the private fields that TypeScript
-  // requires to satisfy the Page type, even though at runtime they are present.
-  return sinon.createStubInstance(CdpPage) as unknown as Page;
+export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
+  return sinon.createStubInstance(CdpPage) as unknown as sinon.SinonStubbedInstance<Page>;
 }
 
-/**
- * Returns a sinon stub instance of McpPage.
- * Every method is automatically stubbed. Override per-test as needed, e.g.:
- *   page.emulate.resolves();
- */
 export function createMockMcpPage(): MockMcpPage {
   return sinon.createStubInstance(McpPage);
 }
 
-/**
- * Returns a sinon stub instance of McpContext.
- * `getSelectedMcpPage()` is pre-configured to return the provided page.
- */
 export function createMockMcpContext(
   options: {selectedPage?: MockMcpPage} = {},
 ): MockMcpContext {
@@ -69,16 +51,12 @@ export function createMockMcpContext(
   return context;
 }
 
-/**
- * Returns a sinon stub instance of McpResponse.
- */
 export function createMockMcpResponse(): MockMcpResponse {
   return sinon.createStubInstance(McpResponse);
 }
 
 /**
- * Convenience helper that creates a mock page, context and response in one
- * call — the common setup for tool handler tests.
+ * Convenience helper — creates a mock page, context and response in one call.
  *
  *   const {page, context, response} = createHandlerMocks();
  */
