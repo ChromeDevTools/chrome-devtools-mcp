@@ -70,7 +70,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, true);
+    assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({pageId: 1});
 
     assert.strictEqual(mockContext.getPageById.calledOnce, true);
@@ -116,7 +116,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, true);
+    assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
@@ -156,7 +156,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, true);
+    assert.strictEqual(toolHandler.disabled, false);
     const result = await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
@@ -301,7 +301,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, false);
   });
 
-  it('sets shouldRegister to false and returns disabled reason when category is disabled', async () => {
+  it('sets disabled to true and returns disabled reason when category is disabled', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'disabled_tool',
@@ -333,7 +333,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, false);
+    assert.strictEqual(toolHandler.disabled, true);
 
     const result = await toolHandler.handle({});
     assert.strictEqual(result.isError, true);
@@ -363,7 +363,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(defaultHandler.shouldRegister, true);
+    assert.strictEqual(defaultHandler.disabled, false);
 
     const disabledServerArgs = parseArguments(
       '1.0.0',
@@ -382,7 +382,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(disabledHandler.shouldRegister, false);
+    assert.strictEqual(disabledHandler.disabled, true);
 
     const disabledResult = await disabledHandler.handle({function: '() => 1'});
     assert.strictEqual(disabledResult.isError, true);
@@ -410,7 +410,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(cliHandler.shouldRegister, true);
+    assert.strictEqual(cliHandler.disabled, false);
     const cliResult = await cliHandler.handle({function: '() => 1'});
     assert.strictEqual(cliResult.isError, true);
     assert.match(
@@ -440,7 +440,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(defaultHandler.shouldRegister, true);
+    assert.strictEqual(defaultHandler.disabled, false);
 
     const disabledServerArgs = parseArguments(
       '1.0.0',
@@ -459,7 +459,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(disabledHandler.shouldRegister, false);
+    assert.strictEqual(disabledHandler.disabled, true);
   });
 
   it('validates files specified in verifyFilesSchema and rewrites input with validated paths/URLs', async () => {

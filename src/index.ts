@@ -290,21 +290,19 @@ export class McpServer {
       this.#toolMutex,
     );
 
-    if (!toolHandler.shouldRegister) {
-      return;
-    }
-
-    this.server.registerTool(
+    const registeredTool = this.server.registerTool(
       tool.name,
       {
         description: tool.description,
         inputSchema: toolHandler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      async (params): Promise<CallToolResult> => {
-        return await toolHandler.handle(params);
-      },
+      toolHandler.handle,
     );
+
+    if (toolHandler.disabled) {
+      registeredTool.disable();
+    }
   }
 }
 
