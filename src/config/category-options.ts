@@ -73,6 +73,7 @@ function createOption(category: ToolCategory): CategoryOption {
   return {
     type: 'boolean',
     describe,
+    hidden: true,
     ...overrides,
     default: defaultVal,
   };
@@ -92,19 +93,7 @@ export function getCategoryOptions(): CategoryFlags {
   return options;
 }
 
-function isToolCategory(val: string): val is ToolCategory {
-  for (const cat of Object.values(ToolCategory)) {
-    if (cat === val) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function isCategoryOffByDefault(category: ToolCategory): boolean {
-  if (!isToolCategory(category)) {
-    return false;
-  }
   const flagName = categoryToFlagName(category);
   const option = getCategoryOptions()[flagName];
   return !('default' in option) || option.default !== true;
