@@ -139,7 +139,9 @@ function generateConfigOptionsMarkdown(): string {
       continue;
     }
 
-    const aliasText = optionConfig.alias ? `, \`-${optionConfig.alias}\`` : '';
+    const aliasText = optionConfig.alias
+      ? `, \`${optionConfig.alias.length === 1 ? '-' : '--'}${optionConfig.alias}\``
+      : '';
     const description = optionConfig.description || optionConfig.describe || '';
 
     // Convert camelCase to dash-case
@@ -164,7 +166,7 @@ function generateConfigOptionsMarkdown(): string {
     }
 
     // Add default if available
-    markdown += `  - **Default:** \`${optionConfig.default ?? 'false'}\`\n`;
+    markdown += `  - **Default:** \`${optionConfig.defaultDescription ?? optionConfig.default ?? 'false'}\`\n`;
 
     markdown += '\n';
   }

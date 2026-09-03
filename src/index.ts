@@ -5,6 +5,8 @@
  */
 
 import type fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 import type {Channel} from './browser.js';
 import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
@@ -55,11 +57,11 @@ export class McpServer {
   #context?: McpContext;
 
   /**
-   * Roots are client state rather than browser state, so the last listing stays
-   * valid across browser reconnects and only the client can invalidate it, via
-   * the `roots/list_changed` notification handled below
+   * Client roots stay valid across browser reconnects and only the client can
+   * invalidate them through a `roots/list_changed` notification. CLI-configured
+   * roots are read from `#serverArgs` when combining roots.
    */
-  #lastRoots?: Root[];
+  #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
 
   private constructor(
@@ -107,7 +109,10 @@ export class McpServer {
             void this.#updateRoots();
           },
         );
-      } else if (!this.#serverArgs.allowUnrestrictedPaths) {
+      } else if (
+        !this.#serverArgs.allowUnrestrictedPaths &&
+        (this.#serverArgs.filesystemRoot ?? []).length === 0
+      ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
             'capability. File-writing tools will be restricted to the OS temp directory. ' +
@@ -158,6 +163,24 @@ export class McpServer {
     await loadIssueDescriptions();
   }
 
+  #combinedRoots(): Root[] | undefined {
+    const configuredRoots = (
+      this.#serverArgs.allowUnrestrictedPaths
+        ? []
+        : (this.#serverArgs.filesystemRoot ?? [])
+    ).map(root => {
+      const rootPath = path.resolve(String(root));
+      return {
+        uri: pathToFileURL(rootPath).href,
+        name: path.basename(rootPath) || rootPath,
+      };
+    });
+    if (configuredRoots.length === 0 && this.#lastClientRoots === undefined) {
+      return undefined;
+    }
+    return [...configuredRoots, ...(this.#lastClientRoots ?? [])];
+  }
+
   /**
    * `timeout` is only passed where a tool call is waiting on the result – the
    * background refreshes below block nobody, so bounding them would just discard
@@ -173,8 +196,8 @@ export class McpServer {
         ListRootsResultSchema,
         timeout === undefined ? undefined : {timeout},
       );
-      this.#lastRoots = roots.roots;
-      this.#context?.setRoots(this.#lastRoots);
+      this.#lastClientRoots = roots.roots;
+      this.#context?.setRoots(this.#combinedRoots());
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
@@ -244,14 +267,14 @@ export class McpServer {
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
       });
-      if (this.#lastRoots === undefined) {
+      this.#context.setRoots(this.#combinedRoots());
+      if (this.#lastClientRoots === undefined) {
         // Nothing listed yet, so this call has to wait – bounded, since it is
         // holding the tool mutex, and a later background refresh still lands
         await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
       } else {
         // Carry the known roots over and refresh out of band, so a reconnect
         // never pays for a client round-trip
-        this.#context.setRoots(this.#lastRoots);
         void this.#updateRoots();
       }
     }

@@ -6,6 +6,9 @@
 
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
+import os from 'node:os';
+
+export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
 export const mcpOptions = {
   autoConnect: {
@@ -392,11 +395,20 @@ export const mcpOptions = {
   allowUnrestrictedPaths: {
     type: 'boolean',
     default: false,
+    deprecated: 'Use --workspace=/ instead.',
     describe:
       'If set, disables the default path restriction that applies when the MCP client does not negotiate ' +
       'the roots capability. By default, file-writing tools are restricted to the OS temp directory when ' +
       'no roots are configured. Use this only when connecting a trusted local client that does not implement ' +
       'MCP roots and requires access to paths outside the temp directory.',
+  },
+  filesystemRoot: {
+    type: 'array',
+    alias: 'workspace',
+    default: DEFAULT_FILESYSTEM_ROOT,
+    defaultDescription: 'OS temp directory',
+    describe:
+      'A directory that filesystem tools are allowed to access. May be specified more than once.',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -405,11 +417,6 @@ export type ParsedArguments = ReturnType<typeof parseArguments>;
 export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
     throw new Error('headless cli option unexpectedly does not have a default');
-  }
-  if (!('default' in mcpOptions.allowUnrestrictedPaths)) {
-    throw new Error(
-      'allowUnrestrictedPaths cli option unexpectedly does not have a default',
-    );
   }
   if (!('default' in mcpOptions.experimentalStructuredContent)) {
     throw new Error(
@@ -422,10 +429,6 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
 
   return {
     ...mcpOptions,
-    allowUnrestrictedPaths: {
-      ...mcpOptions.allowUnrestrictedPaths,
-      default: true,
-    },
     headless: {
       ...mcpOptions.headless,
       default: true,
@@ -470,6 +473,14 @@ export function parser(
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
+      if (isViaCli && args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
+        const cliFilesystemArgs: {
+          allowUnrestrictedPaths?: boolean;
+          filesystemRoot?: unknown;
+        } = args;
+        cliFilesystemArgs.allowUnrestrictedPaths = true;
+        cliFilesystemArgs.filesystemRoot = undefined;
+      }
       // We can't set default in the options else
       // Yargs will complain
       if (
