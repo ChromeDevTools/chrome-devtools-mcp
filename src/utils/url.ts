@@ -49,17 +49,81 @@ export function isLocalhost(url?: string): boolean {
   return false;
 }
 
+export interface ValidateUrlOptions {
+  javascriptEvaluation: boolean | undefined;
+  categoryExtensions: boolean | undefined;
+}
+
+export interface IsAllowedUrlOptions {
+  categoryExtensions: boolean | undefined;
+}
+
+/**
+ * Determines whether a URL is allowed for navigation and page tracking.
+ *
+ * Disallowed schemes:
+ * - chrome: (except chrome://newtab/ and chrome://inspect*)
+ * - chrome-untrusted:
+ * - chrome-extension: (unless categoryExtensions is true)
+ *
+ * @param url The URL string to test.
+ * @param options Configuration specifying whether extensions are enabled.
+ * @returns true if the URL is allowed.
+ */
+export function isAllowedUrl(
+  url: string,
+  options: IsAllowedUrlOptions,
+): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol === 'chrome:') {
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    if (host === 'newtab' || host === 'new-tab-page' || host === 'inspect') {
+      return true;
+    }
+    if (
+      host === '' &&
+      (path === 'newtab' ||
+        path === 'new-tab-page' ||
+        path.startsWith('inspect'))
+    ) {
+      return true;
+    }
+  }
+
+  if (
+    parsed.protocol === 'chrome:' ||
+    parsed.protocol === 'chrome-untrusted:'
+  ) {
+    return false;
+  }
+  if (!options.categoryExtensions && parsed.protocol === 'chrome-extension:') {
+    return false;
+  }
+
+  return true;
+}
+
 const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
 
 /**
- * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols.
+ * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
  *
  * @param url The URL string to validate.
- * @param javascriptEvaluation Whether JavaScript evaluation is enabled.
+ * @param options Options object containing javascriptEvaluation and categoryExtensions.
  * @returns The parsed URL.
- * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed.
+ * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed,
+ * or if navigating to a restricted scheme.
  */
-export function validateUrl(url: string, javascriptEvaluation?: boolean): URL {
+export function validateUrl(url: string, options: ValidateUrlOptions): URL {
+  const {javascriptEvaluation, categoryExtensions} = options;
+
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -76,6 +140,15 @@ export function validateUrl(url: string, javascriptEvaluation?: boolean): URL {
     throw new Error(
       `Navigating to ${parsed.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
     );
+  }
+
+  if (!isAllowedUrl(url, {categoryExtensions})) {
+    if (parsed.protocol === 'chrome-extension:') {
+      throw new Error(
+        `Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.`,
+      );
+    }
+    throw new Error(`Navigating to ${parsed.protocol} URLs is not allowed.`);
   }
 
   return parsed;

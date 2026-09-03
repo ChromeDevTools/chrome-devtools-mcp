@@ -126,7 +126,10 @@ export const newPage = defineTool(args => {
     blockedByDialog: false,
     verifyFilesSchema: {},
     handler: async (request, response, context) => {
-      validateUrl(request.params.url, args?.javascriptEvaluation);
+      validateUrl(request.params.url, {
+        javascriptEvaluation: args?.javascriptEvaluation,
+        categoryExtensions: args?.categoryExtensions,
+      });
 
       const page = await context.newPage(
         request.params.background,
@@ -203,7 +206,10 @@ export const navigatePage = definePageTool(args => {
       }
 
       if (request.params.url) {
-        validateUrl(request.params.url, args?.javascriptEvaluation);
+        validateUrl(request.params.url, {
+          javascriptEvaluation: args?.javascriptEvaluation,
+          categoryExtensions: args?.categoryExtensions,
+        });
       }
 
       let initScriptId: string | undefined;

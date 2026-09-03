@@ -319,6 +319,70 @@ describe('pages', () => {
         );
       });
     });
+    it('rejects chrome: and chrome-untrusted: URLs', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = newPage();
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'chrome://settings'}},
+              response,
+              context,
+            );
+          },
+          {
+            message: 'Navigating to chrome: URLs is not allowed.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'chrome-untrusted://terminal'}},
+              response,
+              context,
+            );
+          },
+          {
+            message: 'Navigating to chrome-untrusted: URLs is not allowed.',
+          },
+        );
+        assert.strictEqual(context.getPages().length, 1);
+      });
+    });
+    it('rejects chrome-extension: URLs unless categoryExtensions is enabled', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = newPage();
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'chrome-extension://abcdef/popup.html'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
+          },
+        );
+      });
+    });
+    it('allows chrome://newtab/', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = newPage();
+        await tool.handler(
+          {params: {url: 'chrome://newtab/'}},
+          response,
+          context,
+        );
+        assert.ok(
+          context
+            .getSelectedMcpPage()
+            .pptrPage.url()
+            .startsWith('chrome://new'),
+        );
+      });
+    });
     it('create a page in the background', async () => {
       await withMcpContext(async (response, context) => {
         const originalPage = context.getPageById(1);
@@ -1089,6 +1153,84 @@ describe('pages', () => {
             message:
               'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
           },
+        );
+      });
+    });
+
+    it('rejects chrome: and chrome-untrusted: URLs', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = navigatePage();
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {url: 'chrome://settings'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message: 'Navigating to chrome: URLs is not allowed.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {url: 'chrome-untrusted://terminal'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message: 'Navigating to chrome-untrusted: URLs is not allowed.',
+          },
+        );
+      });
+    });
+
+    it('rejects chrome-extension: URLs unless categoryExtensions is enabled', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = navigatePage();
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {url: 'chrome-extension://abcdef/popup.html'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
+          },
+        );
+      });
+    });
+
+    it('allows chrome://newtab/', async () => {
+      await withMcpContext(async (response, context) => {
+        const tool = navigatePage();
+        await tool.handler(
+          {
+            params: {url: 'chrome://newtab/'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        assert.ok(
+          context
+            .getSelectedMcpPage()
+            .pptrPage.url()
+            .startsWith('chrome://new'),
         );
       });
     });

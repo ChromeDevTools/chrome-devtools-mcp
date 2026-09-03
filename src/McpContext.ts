@@ -50,6 +50,7 @@ import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {isAllowedUrl} from './utils/url.js';
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
@@ -70,6 +71,8 @@ interface McpContextOptions {
   reconnected?: boolean;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
+  // Whether extension tools and targets are enabled.
+  categoryExtensions?: boolean;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -164,6 +167,14 @@ export class McpContext implements Context {
 
   #onTargetCreated = async (target: Target) => {
     try {
+      const url = target.url();
+      if (
+        !isAllowedUrl(url, {
+          categoryExtensions: this.#options.categoryExtensions,
+        })
+      ) {
+        return;
+      }
       const page = await target.page();
       if (!page) {
         return;
@@ -604,36 +615,47 @@ export class McpContext implements Context {
     const allPages = (
       await this.browser.pages(this.#options.experimentalIncludeAllPages)
     ).filter(page => {
-      return (
-        this.#options.experimentalDevToolsDebugging ||
-        !page.url().startsWith('devtools://')
-      );
+      if (
+        !this.#options.experimentalDevToolsDebugging &&
+        page.url().startsWith('devtools://')
+      ) {
+        return false;
+      }
+      return isAllowedUrl(page.url(), {
+        categoryExtensions: this.#options.categoryExtensions,
+      });
     });
 
-    const allTargets = this.browser.targets();
-    const extensionTargets = allTargets.filter(target => {
-      return (
-        target.url().startsWith('chrome-extension://') &&
-        target.type() === 'page'
-      );
-    });
+    if (this.#options.categoryExtensions) {
+      const allTargets = this.browser.targets();
+      const extensionTargets = allTargets.filter(target => {
+        return (
+          target.url().startsWith('chrome-extension://') &&
+          target.type() === 'page'
+        );
+      });
 
-    await Promise.allSettled(
-      extensionTargets.map(async target => {
-        try {
-          let page = await target.page();
-          if (!page) {
-            page = await target.asPage();
+      await Promise.allSettled(
+        extensionTargets.map(async target => {
+          try {
+            let page = await target.page();
+            if (!page) {
+              page = await target.asPage();
+            }
+            this.#extensionPages.set(target, page);
+            if (
+              page &&
+              isAllowedUrl(page.url(), {categoryExtensions: true}) &&
+              !allPages.includes(page)
+            ) {
+              allPages.push(page);
+            }
+          } catch (e) {
+            this.logger?.('Failed to get page for extension target', e);
           }
-          this.#extensionPages.set(target, page);
-          if (page && !allPages.includes(page)) {
-            allPages.push(page);
-          }
-        } catch (e) {
-          this.logger?.('Failed to get page for extension target', e);
-        }
-      }),
-    );
+        }),
+      );
+    }
 
     return allPages;
   }

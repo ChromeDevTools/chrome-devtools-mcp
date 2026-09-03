@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {isLocalhost, validateUrl} from '../../src/utils/url.js';
+import {isAllowedUrl, isLocalhost, validateUrl} from '../../src/utils/url.js';
 
 describe('isLocalhost', () => {
   it('should return true for valid localhost and loopback URLs', () => {
@@ -88,82 +88,344 @@ describe('isLocalhost', () => {
   });
 });
 
+const defaultOptions = {
+  javascriptEvaluation: undefined,
+  categoryExtensions: undefined,
+};
+
 describe('validateUrl', () => {
   it('should return URL object for valid URLs', () => {
     assert.strictEqual(
-      validateUrl('https://example.com').href,
+      validateUrl('https://example.com', defaultOptions).href,
       'https://example.com/',
     );
     assert.strictEqual(
-      validateUrl('http://localhost:3000').href,
+      validateUrl('http://localhost:3000', defaultOptions).href,
       'http://localhost:3000/',
     );
-    assert.strictEqual(validateUrl('about:blank').href, 'about:blank');
     assert.strictEqual(
-      validateUrl('data:text/html,<div>test</div>').href,
+      validateUrl('about:blank', defaultOptions).href,
+      'about:blank',
+    );
+    assert.strictEqual(
+      validateUrl('data:text/html,<div>test</div>', defaultOptions).href,
       'data:text/html,<div>test</div>',
     );
   });
 
   it('should reject URLs that do not parse with new URL', () => {
-    assert.throws(() => validateUrl('not a url'), /Invalid URL: "not a url"/);
-    assert.throws(() => validateUrl(''), /Invalid URL: ""/);
-    assert.throws(() => validateUrl('http://'), /Invalid URL: "http:\/\/"/);
-    assert.throws(() => validateUrl('://'), /Invalid URL: ":\/\/"/);
+    assert.throws(
+      () => validateUrl('not a url', defaultOptions),
+      /Invalid URL: "not a url"/,
+    );
+    assert.throws(() => validateUrl('', defaultOptions), /Invalid URL: ""/);
+    assert.throws(
+      () => validateUrl('http://', defaultOptions),
+      /Invalid URL: "http:\/\/"/,
+    );
+    assert.throws(
+      () => validateUrl('://', defaultOptions),
+      /Invalid URL: ":\/\/"/,
+    );
   });
 
   it('should allow javascript, data, and vbscript URLs when javascriptEvaluation is true or omitted', () => {
     assert.strictEqual(
-      validateUrl('javascript:alert(1)').protocol,
+      validateUrl('javascript:alert(1)', defaultOptions).protocol,
       'javascript:',
     );
     assert.strictEqual(
-      validateUrl('javascript:alert(1)', true).protocol,
+      validateUrl('javascript:alert(1)', {
+        javascriptEvaluation: true,
+        categoryExtensions: undefined,
+      }).protocol,
       'javascript:',
     );
     assert.strictEqual(
-      validateUrl('data:text/html,<div>test</div>').protocol,
+      validateUrl('data:text/html,<div>test</div>', defaultOptions).protocol,
       'data:',
     );
     assert.strictEqual(
-      validateUrl('data:text/html,<div>test</div>', true).protocol,
+      validateUrl('data:text/html,<div>test</div>', {
+        javascriptEvaluation: true,
+        categoryExtensions: undefined,
+      }).protocol,
       'data:',
     );
-    assert.strictEqual(validateUrl('vbscript:msgbox(1)').protocol, 'vbscript:');
     assert.strictEqual(
-      validateUrl('vbscript:msgbox(1)', true).protocol,
+      validateUrl('vbscript:msgbox(1)', defaultOptions).protocol,
+      'vbscript:',
+    );
+    assert.strictEqual(
+      validateUrl('vbscript:msgbox(1)', {
+        javascriptEvaluation: true,
+        categoryExtensions: undefined,
+      }).protocol,
       'vbscript:',
     );
   });
 
   it('should reject javascript, data, and vbscript URLs when javascriptEvaluation is false', () => {
     assert.throws(
-      () => validateUrl('javascript:alert(1)', false),
+      () =>
+        validateUrl('javascript:alert(1)', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
     assert.throws(
-      () => validateUrl('JAVASCRIPT:alert(1)', false),
+      () =>
+        validateUrl('JAVASCRIPT:alert(1)', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
     assert.throws(
-      () => validateUrl('javascript:void(0)', false),
+      () =>
+        validateUrl('javascript:void(0)', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
     assert.throws(
-      () => validateUrl('data:text/html,<div>test</div>', false),
+      () =>
+        validateUrl('data:text/html,<div>test</div>', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
     assert.throws(
-      () => validateUrl('DATA:text/html,<div>test</div>', false),
+      () =>
+        validateUrl('DATA:text/html,<div>test</div>', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
     assert.throws(
-      () => validateUrl('vbscript:msgbox(1)', false),
+      () =>
+        validateUrl('vbscript:msgbox(1)', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
     assert.throws(
-      () => validateUrl('VBSCRIPT:msgbox(1)', false),
+      () =>
+        validateUrl('VBSCRIPT:msgbox(1)', {
+          javascriptEvaluation: false,
+          categoryExtensions: undefined,
+        }),
       /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
+    );
+  });
+
+  it('should allow chrome://newtab/ and chrome://inspect', () => {
+    assert.strictEqual(
+      validateUrl('chrome://newtab/', defaultOptions).href,
+      'chrome://newtab/',
+    );
+    assert.strictEqual(
+      validateUrl('chrome://newtab', defaultOptions).href,
+      'chrome://newtab',
+    );
+    assert.strictEqual(
+      validateUrl('chrome://inspect', defaultOptions).href,
+      'chrome://inspect',
+    );
+    assert.strictEqual(
+      validateUrl('chrome://inspect/#devices', defaultOptions).href,
+      'chrome://inspect/#devices',
+    );
+  });
+
+  it('should reject chrome: and chrome-untrusted: URLs', () => {
+    assert.throws(
+      () => validateUrl('chrome://settings', defaultOptions),
+      /Navigating to chrome: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('chrome://version', defaultOptions),
+      /Navigating to chrome: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('chrome:version', defaultOptions),
+      /Navigating to chrome: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('CHROME://version', defaultOptions),
+      /Navigating to chrome: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('chrome-untrusted://terminal', defaultOptions),
+      /Navigating to chrome-untrusted: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('chrome-untrusted:terminal', defaultOptions),
+      /Navigating to chrome-untrusted: URLs is not allowed\./,
+    );
+  });
+
+  it('should reject chrome-extension: URLs unless categoryExtensions is enabled', () => {
+    assert.throws(
+      () => validateUrl('chrome-extension://abcdef/popup.html', defaultOptions),
+      /Navigating to chrome-extension: URLs is not allowed without --categoryExtensions\./,
+    );
+    assert.throws(
+      () =>
+        validateUrl('chrome-extension://abcdef/popup.html', {
+          javascriptEvaluation: undefined,
+          categoryExtensions: false,
+        }),
+      /Navigating to chrome-extension: URLs is not allowed without --categoryExtensions\./,
+    );
+    assert.strictEqual(
+      validateUrl('chrome-extension://abcdef/popup.html', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: true,
+      }).href,
+      'chrome-extension://abcdef/popup.html',
+    );
+  });
+});
+
+describe('isAllowedUrl', () => {
+  it('should allow chrome://newtab/ and chrome://inspect', () => {
+    assert.strictEqual(
+      isAllowedUrl('chrome://newtab/', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome://newtab', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('CHROME://newtab/', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome://inspect', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome://inspect/', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome://inspect/#devices', {
+        categoryExtensions: undefined,
+      }),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('CHROME://inspect', {categoryExtensions: undefined}),
+      true,
+    );
+  });
+
+  it('should disallow internal chrome: and chrome-untrusted: URLs', () => {
+    assert.strictEqual(
+      isAllowedUrl('chrome://settings', {categoryExtensions: undefined}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome://version', {categoryExtensions: undefined}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome:version', {categoryExtensions: undefined}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('CHROME://settings', {categoryExtensions: undefined}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome-untrusted://terminal', {
+        categoryExtensions: undefined,
+      }),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome-untrusted:terminal', {
+        categoryExtensions: undefined,
+      }),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('CHROME-UNTRUSTED://terminal', {
+        categoryExtensions: undefined,
+      }),
+      false,
+    );
+  });
+
+  it('should disallow chrome-extension: URLs when extensions are disabled and allow when enabled', () => {
+    assert.strictEqual(
+      isAllowedUrl('chrome-extension://abcdef/popup.html', {
+        categoryExtensions: undefined,
+      }),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome-extension://abcdef/popup.html', {
+        categoryExtensions: false,
+      }),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome-extension:abcdef', {categoryExtensions: false}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome-extension://abcdef/popup.html', {
+        categoryExtensions: true,
+      }),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('chrome-extension:abcdef', {categoryExtensions: true}),
+      true,
+    );
+  });
+
+  it('should allow standard web and navigation URLs', () => {
+    assert.strictEqual(
+      isAllowedUrl('https://example.com', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('http://localhost:3000', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('about:blank', {categoryExtensions: undefined}),
+      true,
+    );
+    assert.strictEqual(
+      isAllowedUrl('data:text/html,<div>test</div>', {
+        categoryExtensions: undefined,
+      }),
+      true,
+    );
+  });
+
+  it('should return false for unparseable URLs', () => {
+    assert.strictEqual(
+      isAllowedUrl('not a url', {categoryExtensions: undefined}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('', {categoryExtensions: undefined}),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('://', {categoryExtensions: undefined}),
+      false,
     );
   });
 });

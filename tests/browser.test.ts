@@ -11,7 +11,12 @@ import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 
-import {detectDisplay, ensureBrowserConnected, launch} from '../src/browser.js';
+import {
+  detectDisplay,
+  ensureBrowserConnected,
+  launch,
+  makeTargetFilter,
+} from '../src/browser.js';
 import type {Browser} from '../src/third_party/index.js';
 
 import {serverHooks} from './server.js';
@@ -242,6 +247,69 @@ describe('browser', () => {
           await safeClose(browser);
         }
       });
+    });
+  });
+
+  describe('makeTargetFilter', () => {
+    it('filters internal chrome and extension targets', () => {
+      const filterWithoutExtensions = makeTargetFilter(false);
+      const filterWithExtensions = makeTargetFilter(true);
+
+      const mockTarget = (url: string) => ({
+        url: () => url,
+      });
+
+      // Newtab and inspect allowances
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('chrome://newtab/')),
+        true,
+      );
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('chrome://inspect')),
+        true,
+      );
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('chrome://inspect/#devices')),
+        true,
+      );
+
+      // Disallowed internal schemes
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('chrome://settings')),
+        false,
+      );
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('chrome://version')),
+        false,
+      );
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('chrome-untrusted://terminal')),
+        false,
+      );
+
+      // Extensions toggle
+      assert.strictEqual(
+        filterWithoutExtensions(
+          mockTarget('chrome-extension://abcdef/popup.html'),
+        ),
+        false,
+      );
+      assert.strictEqual(
+        filterWithExtensions(
+          mockTarget('chrome-extension://abcdef/popup.html'),
+        ),
+        true,
+      );
+
+      // Web URLs
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('https://example.com')),
+        true,
+      );
+      assert.strictEqual(
+        filterWithoutExtensions(mockTarget('about:blank')),
+        true,
+      );
     });
   });
 });

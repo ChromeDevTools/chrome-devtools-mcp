@@ -147,6 +147,42 @@ describe('slim', () => {
     });
   });
 
+  it('rejects chrome: and chrome-untrusted: URLs', async () => {
+    await withMcpContext(async (response, context) => {
+      const tool = navigate();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {url: 'chrome://settings'},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to chrome: URLs is not allowed.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {url: 'chrome-untrusted://terminal'},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to chrome-untrusted: URLs is not allowed.',
+        },
+      );
+    });
+  });
+
   it('with default options', async () => {
     await withMcpContext(async (response, context) => {
       const fixture = screenshots.basic;
