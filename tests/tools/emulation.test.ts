@@ -18,7 +18,7 @@ import {
   createMockMcpContext,
   createMockMcpPage,
   createMockMcpResponse,
-} from '../testMocks.js';
+} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('emulation', () => {

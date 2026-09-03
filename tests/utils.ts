@@ -29,6 +29,8 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
+import {getMockPage} from './mocks.js';
+
 export function assertNoServiceWorkerReported(targets: Target[], id: string) {
   const target = targets.find(target => {
     return target.url().includes(id) && target.type() === 'service_worker';
@@ -393,26 +395,7 @@ export function mockListener() {
   };
 }
 
-export function getMockPage(): Page {
-  const mainFrame = {} as Frame;
-  const cdpSession = {
-    ...mockListener(),
-    send: () => {
-      // no-op
-    },
-    target: () => ({_targetId: '<mock target ID>'}),
-  };
-  return {
-    mainFrame() {
-      return mainFrame;
-    },
-    ...mockListener(),
-    // @ts-expect-error internal API.
-    _client() {
-      return cdpSession;
-    },
-  } satisfies Page;
-}
+export {getMockPage} from './mocks.js';
 
 export function getMockBrowser(options?: {
   process?: ChildProcess | null;

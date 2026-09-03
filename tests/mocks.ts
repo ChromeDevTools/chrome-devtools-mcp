@@ -5,7 +5,8 @@
  */
 
 /**
- * Sinon-based mock factories for McpPage, McpContext and McpResponse.
+ * Sinon-based mock factories for McpPage, McpContext, McpResponse and
+ * the underlying Puppeteer Page.
  *
  * Uses sinon.createStubInstance() so all methods are automatically stubbed
  * from the real class prototype — no hand-rolled interface definitions needed.
@@ -26,10 +27,50 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
+import type {Frame, Page} from '../src/third_party/index.js';
+
+import {mockListener} from './utils.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
+
+// ---------------------------------------------------------------------------
+// Puppeteer Page mock
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a minimal fake Puppeteer Page built with the same pattern as the
+ * existing getMockPage() helper — using mockListener() for event handling and
+ * the internal _client() CDP stub required by ConsoleCollector.
+ *
+ * Additional Puppeteer methods (emulateNetworkConditions, setUserAgent, etc.)
+ * can be added via Object.assign() in the caller when needed.
+ */
+export function getMockPage(): Page {
+  const mainFrame = {} as Frame;
+  const cdpSession = {
+    ...mockListener(),
+    send: () => {
+      // no-op
+    },
+    target: () => ({_targetId: '<mock target ID>'}),
+  };
+  return {
+    mainFrame() {
+      return mainFrame;
+    },
+    ...mockListener(),
+    // @ts-expect-error internal API.
+    _client() {
+      return cdpSession;
+    },
+  } satisfies Page;
+}
+
+// ---------------------------------------------------------------------------
+// McpPage mock
+// ---------------------------------------------------------------------------
 
 /**
  * Returns a sinon stub instance of McpPage.
@@ -40,6 +81,10 @@ export function createMockMcpPage(): MockMcpPage {
   return sinon.createStubInstance(McpPage);
 }
 
+// ---------------------------------------------------------------------------
+// McpContext mock
+// ---------------------------------------------------------------------------
+
 /**
  * Returns a sinon stub instance of McpContext.
  * `getSelectedMcpPage()` is pre-configured to return the provided page.
@@ -49,11 +94,13 @@ export function createMockMcpContext(
 ): MockMcpContext {
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
-  // SinonStubbedInstance<McpPage> satisfies McpPage structurally; the cast
-  // is expressed via satisfies to avoid the banned `as` keyword.
   context.getSelectedMcpPage.returns(page satisfies McpPage);
   return context;
 }
+
+// ---------------------------------------------------------------------------
+// McpResponse mock
+// ---------------------------------------------------------------------------
 
 /**
  * Returns a sinon stub instance of McpResponse.
