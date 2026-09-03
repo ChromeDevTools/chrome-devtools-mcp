@@ -93,3 +93,20 @@ export function createMockMcpContext(
 export function createMockMcpResponse(): MockMcpResponse {
   return sinon.createStubInstance(McpResponse);
 }
+
+/**
+ * Convenience helper that creates a mock page, context and response in one
+ * call — the common setup for tool handler tests.
+ *
+ *   const {page, context, response} = createHandlerMocks();
+ */
+export function createHandlerMocks(): {
+  page: MockMcpPage;
+  context: MockMcpContext;
+  response: MockMcpResponse;
+} {
+  const page = createMockMcpPage();
+  const context = createMockMcpContext({selectedPage: page});
+  const response = createMockMcpResponse();
+  return {page, context, response};
+}

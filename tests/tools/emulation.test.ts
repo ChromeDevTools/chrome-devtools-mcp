@@ -15,9 +15,7 @@ import {
 } from '../../src/tools/ToolDefinition.js';
 import {serverHooks} from '../server.js';
 import {
-  createMockMcpContext,
-  createMockMcpPage,
-  createMockMcpResponse,
+  createHandlerMocks,
 } from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -91,9 +89,7 @@ describe('emulation', () => {
 
   describe('network', () => {
     it('emulates offline network conditions', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {networkConditions: 'Offline'}, page},
         response,
@@ -106,9 +102,7 @@ describe('emulation', () => {
     });
 
     it('emulates network throttling when the throttling option is valid', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {networkConditions: 'Slow 3G'}, page},
         response,
@@ -121,9 +115,7 @@ describe('emulation', () => {
     });
 
     it('disables network emulation when networkConditions is omitted', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {}, page},
         response,
@@ -151,9 +143,7 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {networkConditions: 'Slow 3G'}, page},
         response,
@@ -168,9 +158,7 @@ describe('emulation', () => {
 
   describe('cpu', () => {
     it('emulates cpu throttling when the rate is valid (1-20x)', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {cpuThrottlingRate: 4}, page},
         response,
@@ -213,9 +201,7 @@ describe('emulation', () => {
     });
 
     it('disables cpu throttling when rate is 1', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {cpuThrottlingRate: 1}, page},
         response,
@@ -228,9 +214,7 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      const page = createMockMcpPage();
-      const context = createMockMcpContext({selectedPage: page});
-      const response = createMockMcpResponse();
+      const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {params: {cpuThrottlingRate: 4}, page},
         response,
