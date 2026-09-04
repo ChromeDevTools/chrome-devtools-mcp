@@ -80,6 +80,21 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Choices:** `canary`, `dev`, `beta`, `stable`
   - **Default:** `false`
 
+- **`--proxyServer`/ `--proxy-server`**
+  Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
+  - **Type:** string
+  - **Default:** `false`
+
+- **`--chromeArg`/ `--chrome-arg`**
+  Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+  - **Default:** `false`
+
+- **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
+  Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+  - **Default:** `false`
+
 - **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
   - **Type:** string
@@ -87,11 +102,6 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--viewport`**
   Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
-  - **Type:** string
-  - **Default:** `false`
-
-- **`--proxyServer`/ `--proxy-server`**
-  Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string
   - **Default:** `false`
 
@@ -145,11 +155,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** number
   - **Default:** `false`
 
-- **`--chromeArg`/ `--chrome-arg`**
-  Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
-  - **Type:** array
-  - **Default:** `false`
-
 - **`--blockedUrlPattern`/ `--blocked-url-pattern`**
   Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
   - **Type:** array
@@ -157,11 +162,6 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--allowedUrlPattern`/ `--allowed-url-pattern`**
   Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
-  - **Type:** array
-  - **Default:** `false`
-
-- **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
-  Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
   - **Default:** `false`
 
