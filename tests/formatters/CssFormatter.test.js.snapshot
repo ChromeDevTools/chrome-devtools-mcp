@@ -1,0 +1,541 @@
+exports[`CssFormatter > formats constructed stylesheet rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-constructed",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".constructed-btn",
+      "source": "constructed stylesheet",
+      "properties": [
+        {
+          "name": "color",
+          "value": "purple",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats constructed stylesheet rules toString 1`] = `
+Styles for button (uid: "elem-constructed"):
+
+  /* resolved: undefined */
+  .constructed-btn (constructed stylesheet) {
+    [active] color: purple;
+  }
+`;
+
+exports[`CssFormatter > formats constructed stylesheet with sourceURL pragma toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-themed",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".themed-btn",
+      "source": "theme.css:11:6",
+      "properties": [
+        {
+          "name": "color",
+          "value": "orange",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats constructed stylesheet with sourceURL pragma toString 1`] = `
+Styles for button (uid: "elem-themed"):
+
+  /* resolved: undefined */
+  .themed-btn (theme.css:11:6) {
+    [active] color: orange;
+  }
+`;
+
+exports[`CssFormatter > formats data: and blob: stylesheet URLs correctly toJSON 1`] = `
+{
+  "element": {
+    "uid": "data-elem",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".data-rule",
+      "source": "(data-uri):1:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "blue",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "matched",
+      "selector": ".blob-rule",
+      "source": "(blob):1:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "green",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats data: and blob: stylesheet URLs correctly toString 1`] = `
+Styles for button (uid: "data-elem"):
+
+  /* resolved: undefined */
+  .data-rule ((data-uri):1:1) {
+    [active] color: blue;
+  }
+
+  /* resolved: undefined */
+  .blob-rule ((blob):1:1) {
+    [active] color: green;
+  }
+`;
+
+exports[`CssFormatter > formats element label with id, class, and uid and no styles toJSON 1`] = `
+{
+  "element": {
+    "uid": "1_1",
+    "selector": "div#main"
+  },
+  "rules": []
+}
+`;
+
+exports[`CssFormatter > formats element label with id, class, and uid and no styles toString 1`] = `
+Styles for div#main (uid: "1_1"):
+
+  (no styles)
+`;
+
+exports[`CssFormatter > formats empty matched styles toJSON 1`] = `
+{
+  "element": {
+    "uid": "empty-1",
+    "selector": "div"
+  },
+  "rules": []
+}
+`;
+
+exports[`CssFormatter > formats empty matched styles toString 1`] = `
+Styles for div (uid: "empty-1"):
+
+  (no styles)
+`;
+
+exports[`CssFormatter > formats inherited styles from ancestors and ignores non-inheritable ones toJSON 1`] = `
+{
+  "element": {
+    "uid": "child-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inherited",
+      "node": {
+        "selector": "section#parent-sec"
+      },
+      "selector": ".parent-style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "black",
+          "status": "active"
+        },
+        {
+          "name": "--custom-var",
+          "value": "10px",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inherited styles from ancestors and ignores non-inheritable ones toString 1`] = `
+Styles for button (uid: "child-1"):
+
+  Inherited from section#parent-sec:
+    /* resolved: undefined */
+    .parent-style {
+      [active] color: black;
+      [active] --custom-var: 10px;
+    }
+`;
+
+exports[`CssFormatter > formats injected stylesheet rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-injected",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".extension-override",
+      "source": "injected stylesheet",
+      "properties": [
+        {
+          "name": "display",
+          "value": "none",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats injected stylesheet rules toString 1`] = `
+Styles for button (uid: "elem-injected"):
+
+  /* resolved: undefined */
+  .extension-override (injected stylesheet) {
+    [active] display: none;
+  }
+`;
+
+exports[`CssFormatter > formats inline styles with active and overloaded properties toJSON 1`] = `
+{
+  "element": {
+    "uid": "1_2",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "overloaded"
+        },
+        {
+          "name": "font-size",
+          "value": "14px",
+          "status": "active",
+          "important": true
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inline styles with active and overloaded properties toString 1`] = `
+Styles for button (uid: "1_2"):
+
+  element.style {
+    [overloaded] color: red;
+    [active] font-size: 14px !important;
+  }
+`;
+
+exports[`CssFormatter > formats inspector stylesheet rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-inspector",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": "#interactive-test",
+      "source": "via inspector",
+      "properties": [
+        {
+          "name": "outline",
+          "value": "2px solid red",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inspector stylesheet rules toString 1`] = `
+Styles for button (uid: "elem-inspector"):
+
+  /* resolved: undefined */
+  #interactive-test (via inspector) {
+    [active] outline: 2px solid red;
+  }
+`;
+
+exports[`CssFormatter > formats mixed inline and matched rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "1_1",
+    "selector": "button#btn-id"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "matched",
+      "selector": ".btn",
+      "source": "style.css:6:1",
+      "properties": [
+        {
+          "name": "font-size",
+          "value": "16px",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats mixed inline and matched rules toString 1`] = `
+Styles for button#btn-id (uid: "1_1"):
+
+  element.style {
+    [active] color: red;
+  }
+
+  /* resolved: undefined */
+  .btn (style.css:6:1) {
+    [active] font-size: 16px;
+  }
+`;
+
+exports[`CssFormatter > formats nested CSS rules with resolvedSelector toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-child",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": "& .child",
+      "resolvedSelector": ":is(.card) .child",
+      "source": "styles.css:16:3",
+      "properties": [
+        {
+          "name": "color",
+          "value": "blue",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats nested CSS rules with resolvedSelector toString 1`] = `
+Styles for button (uid: "elem-child"):
+
+  /* :is(.card) .child */
+  & .child (styles.css:16:3) {
+    [active] color: blue;
+  }
+`;
+
+exports[`CssFormatter > formats pseudo-elements like ::before and ::after toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "pseudo",
+      "pseudoType": "::before",
+      "properties": [
+        {
+          "name": "content",
+          "value": "\\"*\\"",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats pseudo-elements like ::before and ::after toString 1`] = `
+Styles for button (uid: "elem-1"):
+
+  ::before {
+    [active] content: "*";
+  }
+`;
+
+exports[`CssFormatter > rule subsets > matched rules all 3 rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "btn-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".rule-1",
+      "source": "app.css:11:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "matched",
+      "selector": ".rule-2",
+      "source": "app.css:21:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "blue",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "matched",
+      "selector": ".rule-3",
+      "source": "app.css:31:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "green",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > rule subsets > matched rules all 3 rules toString 1`] = `
+Styles for button (uid: "btn-1"):
+
+  /* resolved: undefined */
+  .rule-1 (app.css:11:1) {
+    [active] color: red;
+  }
+
+  /* resolved: undefined */
+  .rule-2 (app.css:21:1) {
+    [active] color: blue;
+  }
+
+  /* resolved: undefined */
+  .rule-3 (app.css:31:1) {
+    [active] color: green;
+  }
+`;
+
+exports[`CssFormatter > rule subsets > matched rules subset - first 2 rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "btn-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".rule-1",
+      "source": "app.css:11:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "matched",
+      "selector": ".rule-2",
+      "source": "app.css:21:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "blue",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > rule subsets > matched rules subset - first 2 rules toString 1`] = `
+Styles for button (uid: "btn-1"):
+
+  /* resolved: undefined */
+  .rule-1 (app.css:11:1) {
+    [active] color: red;
+  }
+
+  /* resolved: undefined */
+  .rule-2 (app.css:21:1) {
+    [active] color: blue;
+  }
+`;
+
+exports[`CssFormatter > rule subsets > matched rules subset - last rule toJSON 1`] = `
+{
+  "element": {
+    "uid": "btn-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "matched",
+      "selector": ".rule-3",
+      "source": "app.css:31:1",
+      "properties": [
+        {
+          "name": "color",
+          "value": "green",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > rule subsets > matched rules subset - last rule toString 1`] = `
+Styles for button (uid: "btn-1"):
+
+  /* resolved: undefined */
+  .rule-3 (app.css:31:1) {
+    [active] color: green;
+  }
+`;

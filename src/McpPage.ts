@@ -77,7 +77,7 @@ import {
   type Page,
   type ConsoleMessage,
   type HTTPRequest,
-  type DevTools,
+  DevTools,
   type JSONSchema7Definition,
 } from './third_party/index.js';
 import {takeSnapshot} from './tools/snapshot.js';
@@ -87,6 +87,7 @@ const NAVIGATION_TIMEOUT = 10_000;
 import type {
   ContextPage,
   DevToolsData,
+  MatchedStyles,
   Response,
 } from './tools/ToolDefinition.js';
 import type {
@@ -101,6 +102,12 @@ import {
   type WaitForEventsResult,
   type DialogAction,
 } from './utils/WaitForHelper.js';
+
+function isBackendNodeId(
+  id: unknown,
+): id is DevTools.Protocol.DOM.BackendNodeId {
+  return typeof id === 'number';
+}
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
@@ -669,6 +676,71 @@ export class McpPage implements ContextPage {
 
   getAXNodeByUid(uid: string) {
     return this.textSnapshot?.idToNode.get(uid);
+  }
+
+  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+    if (!this.textSnapshot) {
+      throw new Error(
+        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+      );
+    }
+    const node = this.textSnapshot.idToNode.get(uid);
+    if (!node) {
+      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
+    }
+
+    const backendNodeId = node.backendNodeId;
+    if (!isBackendNodeId(backendNodeId)) {
+      throw new Error(
+        `Failed to resolve backend node ID for element with uid "${uid}".`,
+      );
+    }
+
+    if (!this.#devtoolsUniverse) {
+      throw new Error(
+        `DevTools universe is not available for page ${this.id ?? '?'}.`,
+      );
+    }
+
+    const targetManager = this.#devtoolsUniverse.universe.context.get(
+      DevTools.TargetManager,
+    );
+    let domNode: DevTools.DOMModel.DOMNode | undefined;
+    let cssModel: DevTools.CSSModel.CSSModel | null = null;
+
+    for (const dom of targetManager.models(DevTools.DOMModel.DOMModel)) {
+      const nodeMap = await dom.pushNodesByBackendIdsToFrontend(
+        new Set([backendNodeId]),
+      );
+      const node = nodeMap?.get(backendNodeId);
+      if (node) {
+        domNode = node;
+        cssModel = dom.target().model(DevTools.CSSModel.CSSModel);
+        break;
+      }
+    }
+
+    if (!domNode || !cssModel) {
+      throw new Error(
+        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with ${takeSnapshot.name}.`,
+      );
+    }
+
+    const targetElement = domNode.enclosingElementOrSelf();
+    if (!targetElement) {
+      throw new Error(
+        `Element with uid "${uid}" is not an element node and has no parent element.`,
+      );
+    }
+
+    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    if (!matchedStyles) {
+      throw new Error(
+        `Could not retrieve matched styles for element with uid "${uid}".`,
+      );
+    }
+
+    return matchedStyles;
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

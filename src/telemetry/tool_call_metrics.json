@@ -1053,5 +1053,18 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "get_css_styles",
+    "args": [
+      {
+        "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      }
+    ]
   }
 ]

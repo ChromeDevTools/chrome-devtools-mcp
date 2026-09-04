@@ -9,6 +9,10 @@ import type {WebMCPTool} from 'puppeteer-core';
 import type {ParsedArguments} from './config/mcp-options.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {
+  CssFormatter,
+  type CssFormatterOptions,
+} from './formatters/CssFormatter.js';
+import {
   HeapSnapshotFormatter,
   isEdgeLike,
   isNodeLike,
@@ -42,6 +46,7 @@ import type {
   DevToolsData,
   ImageContentData,
   LighthouseData,
+  MatchedStyles,
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
@@ -113,6 +118,10 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
     includeStackTraces?: boolean;
     serviceWorkerId?: string;
+  };
+  #cssStylesData?: {
+    matchedStyles: MatchedStyles;
+    options: CssFormatterOptions;
   };
   #listExtensions?: boolean;
   #listThirdPartyDeveloperTools?: boolean;
@@ -240,6 +249,16 @@ export class McpResponse implements Response {
       includePreservedMessages: options?.includePreservedMessages,
       includeStackTraces: options?.includeStackTraces,
       serviceWorkerId: options?.serviceWorkerId,
+    };
+  }
+
+  setIncludeCssStyles(
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions,
+  ): void {
+    this.#cssStylesData = {
+      matchedStyles,
+      options,
     };
   }
 
@@ -805,6 +824,7 @@ export class McpResponse implements Response {
       heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
+      matchedStyles?: object;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1392,6 +1412,38 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
+    if (this.#cssStylesData) {
+      let formatter = new CssFormatter(
+        this.#cssStylesData.matchedStyles,
+        this.#cssStylesData.options,
+      );
+
+      const hasPagination =
+        this.#cssStylesData.options.pageSize !== undefined ||
+        this.#cssStylesData.options.pageIdx !== undefined;
+
+      if (hasPagination && formatter.rules.length > 0) {
+        const paginationData = this.#dataWithPagination(
+          formatter.rules,
+          this.#cssStylesData.options,
+        );
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+        formatter = new CssFormatter(
+          this.#cssStylesData.matchedStyles,
+          this.#cssStylesData.options,
+          paginationData.items,
+        );
+      }
+
+      structuredContent.matchedStyles = formatter.toJSON();
+      if (compactEncode) {
+        response.push(compactEncode(structuredContent.matchedStyles));
+      } else {
+        response.push(formatter.toString());
+      }
+    }
+
     if (data.errorMessage) {
       response.push(`Error: ${data.errorMessage}`);
       structuredContent.errorMessage = data.errorMessage;
@@ -1414,7 +1466,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
     };
   }
 
-  #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
+  #dataWithPagination<T>(data: readonly T[], pagination?: PaginationOptions) {
     const response = [];
     const paginationResult = paginate<T>(data, pagination);
     if (paginationResult.invalidPage) {
