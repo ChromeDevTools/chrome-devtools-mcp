@@ -126,6 +126,11 @@
       },
       {
         "name": "page_id",
+        "argType": "number",
+        "isDeprecated": true
+      },
+      {
+        "name": "service_worker_id_length",
         "argType": "number"
       }
     ]

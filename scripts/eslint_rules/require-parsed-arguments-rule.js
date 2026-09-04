@@ -38,8 +38,8 @@ export default {
                     name: node.callee.name
                   },
                   fix(fixer) {
-                    const sourceCode = context.sourceCode || context.getSourceCode();
-                    const firstToken = sourceCode.getFirstToken(arg);
+                    const sourceCode =
+                      context.sourceCode || context.getSourceCode();
                     
                     // The arrow function might start with `async`, so find the param token
                     const paramToken = sourceCode.getFirstToken(firstParam);
