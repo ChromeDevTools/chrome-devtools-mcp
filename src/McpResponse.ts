@@ -896,7 +896,7 @@ export class McpResponse implements Response {
     if (this.#reconnectNotice) {
       structuredContent.reconnected = true;
       response.push(
-        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages().name} to see open pages.`,
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#args).name} to see open pages.`,
       );
     }
     if (this.#textResponseLines.length) {
@@ -963,7 +963,7 @@ export class McpResponse implements Response {
           : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog.name} to handle it before continuing.`);
+Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       structuredContent.dialog = {
         type: dialog.type(),
         message: dialog.message(),

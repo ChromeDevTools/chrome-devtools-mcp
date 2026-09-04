@@ -18,7 +18,6 @@ import {
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import {pageIdSchema} from '../build/src/tools/ToolDefinition.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
@@ -414,7 +413,7 @@ async function generateReference(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getToolsAndCategories(tools: any, slim = false) {
+function getToolsAndCategories(tools: any) {
   // Convert ToolDefinitions to ToolWithAnnotations
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {
@@ -435,12 +434,8 @@ function getToolsAndCategories(tools: any, slim = false) {
       const properties: Record<string, TypeInfo> = {};
       const required: string[] = [];
 
-      const toolSchema = {
-        ...tool.schema,
-        ...(tool.pageScoped && !slim ? pageIdSchema : {}),
-      };
       for (const [key, schema] of Object.entries(
-        toolSchema as unknown as Record<string, ZodSchema>,
+        tool.schema as unknown as Record<string, ZodSchema>,
       )) {
         const info = getZodTypeInfo(schema);
         properties[key] = info;
@@ -518,10 +513,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(
-          createTools({slim: true} as ParsedArguments),
-          true,
-        );
+        getToolsAndCategories(createTools({slim: true} as ParsedArguments));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,

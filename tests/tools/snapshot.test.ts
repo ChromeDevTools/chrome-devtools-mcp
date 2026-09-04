@@ -18,8 +18,8 @@ describe('snapshot', () => {
 
   describe('take_snapshot', () => {
     it('includes a snapshot', async () => {
-      const {page, context, response} = createHandlerMocks();
-      await takeSnapshot.handler({params: {}, page}, response, context);
+      const {page, context, response, args} = createHandlerMocks();
+      await takeSnapshot(args).handler({params: {}, page}, response, context);
       sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
         verbose: false,
         filePath: undefined,
@@ -27,8 +27,8 @@ describe('snapshot', () => {
     });
 
     it('includes a snapshot with parameters', async () => {
-      const {page, context, response} = createHandlerMocks();
-      await takeSnapshot.handler(
+      const {page, context, response, args} = createHandlerMocks();
+      await takeSnapshot(args).handler(
         {params: {verbose: true, filePath: 'custom/path.txt'}, page},
         response,
         context,
@@ -42,8 +42,8 @@ describe('snapshot', () => {
 
   describe('wait_for', () => {
     it('waits for text and appends response line', async () => {
-      const {page, context, response} = createHandlerMocks();
-      await waitFor.handler(
+      const {page, context, response, args} = createHandlerMocks();
+      await waitFor(args).handler(
         {params: {text: ['Hello']}, page},
         response,
         context,
@@ -61,8 +61,8 @@ describe('snapshot', () => {
     });
 
     it('waits for text with timeout', async () => {
-      const {page, context, response} = createHandlerMocks();
-      await waitFor.handler(
+      const {page, context, response, args} = createHandlerMocks();
+      await waitFor(args).handler(
         {params: {text: ['Complete', 'Error'], timeout: 5000}, page},
         response,
         context,

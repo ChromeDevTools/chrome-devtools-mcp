@@ -45,7 +45,7 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulate = definePageTool({
+export const emulate = definePageTool(() => ({
   name: 'emulate',
   description: `Emulates various features on the target page.`,
   annotations: {
@@ -106,4 +106,4 @@ export const emulate = definePageTool({
     await page.emulate(request.params);
     response.appendResponseLine('Emulation configured successfully');
   },
-});
+}));

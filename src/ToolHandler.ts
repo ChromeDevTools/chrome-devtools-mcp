@@ -21,7 +21,6 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
-import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -180,13 +179,7 @@ export class ToolHandler {
     this.disabledReason = reason;
     this.shouldRegister = !(disabled && !serverArgs.viaCli);
 
-    this.inputSchema =
-      'pageScoped' in tool &&
-      tool.pageScoped &&
-      serverArgs.pageIdRouting &&
-      !serverArgs.slim
-        ? {...pageIdSchema, ...tool.schema}
-        : tool.schema;
+    this.inputSchema = tool.schema;
     this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
   }
 

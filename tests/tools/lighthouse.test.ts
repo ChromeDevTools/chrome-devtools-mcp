@@ -29,11 +29,11 @@ describe('lighthouse', () => {
     it('runs Lighthouse audit by default (navigation, desktop)', async () => {
       server.addHtmlRoute('/test', html`<div>Test</div>`);
 
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/test'));
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit(args).handler(
           {
             params: {
               mode: 'navigation',
@@ -62,13 +62,13 @@ describe('lighthouse', () => {
     });
 
     it('restores emulation', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
       sinon
         .stub(lighthouseRunner, 'snapshot')
         .resolves(createMockRunnerResult());
 
-      await lighthouseAudit.handler(
+      await lighthouseAudit(args).handler(
         {
           params: {
             mode: 'snapshot',
@@ -84,14 +84,14 @@ describe('lighthouse', () => {
     });
 
     it('restores emulation even when audit fails', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       sinon
         .stub(lighthouseRunner, 'snapshot')
         .rejects(new Error('Audit failed'));
 
       await assert.rejects(
         () =>
-          lighthouseAudit.handler(
+          lighthouseAudit(args).handler(
             {
               params: {
                 mode: 'snapshot',
@@ -111,11 +111,11 @@ describe('lighthouse', () => {
     it('runs Lighthouse in snapshot mode with mobile device', async () => {
       server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
 
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/test-mobile'));
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit(args).handler(
           {
             params: {
               mode: 'snapshot',
@@ -146,11 +146,11 @@ describe('lighthouse', () => {
       );
 
       try {
-        await withMcpContext(async (response, context) => {
+        await withMcpContext(async (response, context, args) => {
           const page = context.getSelectedMcpPage().pptrPage;
           await page.goto(server.getRoute('/test-mobile'));
 
-          await lighthouseAudit.handler(
+          await lighthouseAudit(args).handler(
             {
               params: {
                 mode: 'snapshot',

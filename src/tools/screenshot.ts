@@ -128,7 +128,7 @@ export const screenshot = definePageTool(args => {
     screenshotQuality,
     screenshotMaxWidth,
     screenshotMaxHeight,
-  } = args ?? {};
+  } = args;
 
   const defaultFormat: ScreenshotFormat = screenshotFormat ?? 'png';
 

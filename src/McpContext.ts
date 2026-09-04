@@ -39,7 +39,6 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
@@ -422,7 +421,7 @@ export class McpContext implements Context {
     }
     if (page.pptrPage.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages().name} to see open pages.`,
+        'The selected page has been closed. Call list_pages to see open pages.',
       );
     }
     return page;

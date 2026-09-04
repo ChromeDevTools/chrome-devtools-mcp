@@ -81,7 +81,7 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
   return true;
 }
 
-export const click = definePageTool({
+export const click = definePageTool(() => ({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -131,9 +131,9 @@ export const click = definePageTool({
       handleActionError(error, uid);
     }
   },
-});
+}));
 
-export const clickAt = definePageTool({
+export const clickAt = definePageTool(() => ({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
   annotations: {
@@ -166,9 +166,9 @@ export const clickAt = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const hover = definePageTool({
+export const hover = definePageTool(() => ({
   name: 'hover',
   description: `Hover over the provided element`,
   annotations: {
@@ -201,7 +201,7 @@ export const hover = definePageTool({
       handleActionError(error, uid);
     }
   },
-});
+}));
 
 // The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
 // If the form is a combobox, we need to find the correct option by its text value.
@@ -281,7 +281,7 @@ async function fillFormElement(
   }
 }
 
-export const fill = definePageTool({
+export const fill = definePageTool(() => ({
   name: 'fill',
   description: `Type text into an input, text area or select an option from a <select> element.`,
   annotations: {
@@ -319,9 +319,9 @@ export const fill = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const typeText = definePageTool({
+export const typeText = definePageTool(() => ({
   name: 'type_text',
   description: `Type text using keyboard into a previously focused input`,
   annotations: {
@@ -349,9 +349,9 @@ export const typeText = definePageTool({
     );
     response.attachWaitForResult(result);
   },
-});
+}));
 
-export const drag = definePageTool({
+export const drag = definePageTool(() => ({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
@@ -382,9 +382,9 @@ export const drag = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const fillForm = definePageTool({
+export const fillForm = definePageTool(() => ({
   name: 'fill_form',
   description: `Fill out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple individual 'fill' or 'click' calls when interacting with forms. It is significantly faster, more reliable, and reduces turn count. Example: Fill username, password, and check "Remember Me" in one call.`,
   annotations: {
@@ -428,9 +428,9 @@ export const fillForm = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const uploadFile = definePageTool({
+export const uploadFile = definePageTool(() => ({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
   annotations: {
@@ -489,9 +489,9 @@ export const uploadFile = definePageTool({
     }
     response.appendResponseLine(`File uploaded from ${filePaths.join(', ')}.`);
   },
-});
+}));
 
-export const pressKey = definePageTool({
+export const pressKey = definePageTool(() => ({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   annotations: {
@@ -539,4 +539,4 @@ export const pressKey = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));

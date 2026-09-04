@@ -23,22 +23,22 @@ describe('slim', () => {
   });
 
   it('evaluates', async () => {
-    const {page, context, response} = createHandlerMocks();
+    const {page, context, response, args} = createHandlerMocks();
     const script = '2 * 5';
     page.pptrPage.evaluate.resolves(10);
 
-    await evaluate.handler({params: {script}, page}, response, context);
+    await evaluate(args).handler({params: {script}, page}, response, context);
 
     sinon.assert.calledOnceWithExactly(page.pptrPage.evaluate, script);
     sinon.assert.calledOnceWithExactly(response.appendResponseLine, '10');
   });
 
   it('handles errors', async () => {
-    const {page, context, response} = createHandlerMocks();
+    const {page, context, response, args} = createHandlerMocks();
     const script = "throw new Error('test error')";
     page.pptrPage.evaluate.rejects(new Error('test error'));
 
-    await evaluate.handler({params: {script}, page}, response, context);
+    await evaluate(args).handler({params: {script}, page}, response, context);
 
     sinon.assert.calledOnceWithExactly(page.pptrPage.evaluate, script);
     sinon.assert.calledOnceWithExactly(
@@ -48,8 +48,8 @@ describe('slim', () => {
   });
 
   it('navigates to correct page', async t => {
-    await withMcpContext(async (response, context) => {
-      await navigate().handler(
+    await withMcpContext(async (response, context, args) => {
+      await navigate(args).handler(
         {
           params: {url: 'data:text/html,<div>Hello MCP</div>'},
           page: context.getSelectedMcpPage(),
@@ -68,11 +68,11 @@ describe('slim', () => {
   });
 
   it('throws when URL does not parse with new URL', async () => {
-    const {page, context, response} = createHandlerMocks();
+    const {page, context, response, args} = createHandlerMocks();
 
     await assert.rejects(
       async () => {
-        await navigate().handler(
+        await navigate(args).handler(
           {params: {url: 'not a valid url'}, page},
           response,
           context,
@@ -139,8 +139,8 @@ describe('slim', () => {
   });
 
   it('rejects chrome: and chrome-untrusted: URLs', async () => {
-    const {page, context, response} = createHandlerMocks();
-    const tool = navigate();
+    const {page, context, response, args} = createHandlerMocks();
+    const tool = navigate(args);
     await assert.rejects(
       async () => {
         await tool.handler(
@@ -170,11 +170,11 @@ describe('slim', () => {
   });
 
   it('with default options', async () => {
-    await withMcpContext(async (response, context) => {
+    await withMcpContext(async (response, context, args) => {
       const fixture = screenshots.basic;
       const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(fixture.html);
-      await screenshot.handler(
+      await screenshot(args).handler(
         {params: {format: 'png'}, page: context.getSelectedMcpPage()},
         response,
         context,

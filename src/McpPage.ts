@@ -81,7 +81,6 @@ import {
   DevTools,
   type JSONSchema7Definition,
 } from './third_party/index.js';
-import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
@@ -686,7 +685,7 @@ export class McpPage implements ContextPage {
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.textSnapshot) {
       throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
       );
     }
     const node = this.textSnapshot.idToNode.get(uid);
@@ -758,7 +757,7 @@ export class McpPage implements ContextPage {
   async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
     if (!this.textSnapshot) {
       throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
       );
     }
     const node = this.textSnapshot.idToNode.get(uid);
@@ -799,7 +798,7 @@ export class McpPage implements ContextPage {
 
     if (!domNode || !cssModel) {
       throw new Error(
-        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with ${takeSnapshot.name}.`,
+        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
       );
     }
 
