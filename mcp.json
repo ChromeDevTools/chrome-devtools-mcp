@@ -4,7 +4,11 @@
     "chrome-devtools": {
       "type": "stdio",
       "command": "npx",
-      "args": ["--prefix", "${PLUGIN_DATA}", "chrome-devtools-mcp@1.8.0"]
+      "args": [
+        "--prefix",
+        "${PLUGIN_DATA}",
+        "chrome-devtools-mcp@1.9.0"
+      ]
     }
   }
 }
