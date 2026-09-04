@@ -396,6 +396,7 @@ export function mockListener() {
 
 export function getMockPage(): Page {
   const mainFrame = {} as Frame;
+  Object.assign(mainFrame, mockListener());
   const cdpSession = {
     ...mockListener(),
     send: () => {

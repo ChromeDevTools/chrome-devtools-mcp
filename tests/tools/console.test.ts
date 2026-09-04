@@ -144,6 +144,8 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    const server = serverHooks();
+
     it('list messages', async () => {
       await withMcpContext(async (response, context) => {
         await listConsoleMessages().handler(
@@ -169,6 +171,32 @@ describe('console', () => {
         const formattedResponse = await response.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] This is an error'));
+      });
+    });
+
+    it('preserves messages across same-document navigations', async () => {
+      server.addHtmlRoute(
+        '/console-history',
+        '<script>console.log("Before same-document navigation")</script>',
+      );
+
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/console-history'));
+        await page.pptrPage.evaluate(() => {
+          history.pushState({}, '', '/console-history/route');
+          console.log('After same-document navigation');
+        });
+
+        await listConsoleMessages().handler(
+          {params: {}, page},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(textContent.includes('Before same-document navigation'));
+        assert.ok(textContent.includes('After same-document navigation'));
       });
     });
 
