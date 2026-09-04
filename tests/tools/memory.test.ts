@@ -32,6 +32,26 @@ import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
+  describe('pagination validation', () => {
+    const paginatedTools = [
+      getHeapSnapshotDetails,
+      getHeapSnapshotClassNodes,
+      getHeapSnapshotRetainers,
+      getHeapSnapshotEdges,
+      getHeapSnapshotDuplicateStrings,
+      queryHeapSnapshotObjects,
+    ];
+
+    for (const tool of paginatedTools) {
+      it(`${tool.name} rejects invalid pagination`, () => {
+        assert.strictEqual(tool.schema.pageIdx.safeParse(-1).success, false);
+        assert.strictEqual(tool.schema.pageIdx.safeParse(0.5).success, false);
+        assert.strictEqual(tool.schema.pageSize.safeParse(0).success, false);
+        assert.strictEqual(tool.schema.pageSize.safeParse(1.5).success, false);
+      });
+    }
+  });
+
   describe('take_heapsnapshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
