@@ -468,5 +468,32 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.headless, false);
     assert.strictEqual(args.categoryInput, false);
     assert.strictEqual(args.categoryNetwork, false);
+    assert.strictEqual(args.categoryMemory, true);
+  });
+
+  it('parses config should not allow no prefix', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        headless: true,
+        'no-category-memory': true,
+      }),
+      'cd4a.test.config.mixed.json',
+    );
+    const args = parseArguments(['--config', testConfig.path]);
+    assert.strictEqual(args.config, testConfig.path);
+    assert.strictEqual(args.categoryMemory, true);
+  });
+
+  it('parses config should allow dashed property`', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        headless: true,
+        'category-memory': false,
+      }),
+      'cd4a.test.config.mixed.json',
+    );
+    const args = parseArguments(['--config', testConfig.path]);
+    assert.strictEqual(args.config, testConfig.path);
+    assert.strictEqual(args.categoryMemory, false);
   });
 });
