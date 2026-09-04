@@ -44,6 +44,7 @@ export {
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
