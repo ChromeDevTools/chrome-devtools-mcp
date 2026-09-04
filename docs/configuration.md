@@ -180,6 +180,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--sourceMaps`/ `--source-maps`**
+  Whether to enable source maps in DevTools. Use --no-source-maps to disable.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--screenshotFormat`/ `--screenshot-format`**
   Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").
   - **Type:** string

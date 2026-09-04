@@ -38,6 +38,7 @@ describe('cli args parsing', () => {
     memoryDebugging: false,
     experimentalStructuredContent: false,
     pageIdRouting: true,
+    sourceMaps: true,
   };
 
   it('parses with default args', async () => {
@@ -414,5 +415,19 @@ describe('cli args parsing', () => {
       'https://a.com/*',
       'https://b.com/*',
     ]);
+  });
+
+  it('parses source-maps flag', async () => {
+    const defaultParsed = parseArguments(['main.js']);
+    assert.strictEqual(defaultParsed.sourceMaps, true);
+
+    const disabledArgs = parseArguments(['--no-source-maps']);
+    assert.strictEqual(disabledArgs.sourceMaps, false);
+
+    const explicitFalseArgs = parseArguments(['--source-maps=false']);
+    assert.strictEqual(explicitFalseArgs.sourceMaps, false);
+
+    const explicitTrueArgs = parseArguments(['--source-maps=true']);
+    assert.strictEqual(explicitTrueArgs.sourceMaps, true);
   });
 });

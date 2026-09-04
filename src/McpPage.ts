@@ -138,6 +138,7 @@ export class McpPage implements ContextPage {
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
+  #sourceMaps: boolean;
 
   constructor(
     page: Page,
@@ -147,11 +148,13 @@ export class McpPage implements ContextPage {
       locatorClass: typeof Locator;
       isolatedContextName?: string;
       navigationTimeout?: number;
+      sourceMaps?: boolean;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
+    this.#sourceMaps = options.sourceMaps ?? true;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -196,7 +199,9 @@ export class McpPage implements ContextPage {
     }
     try {
       const session = await this.pptrPage.createCDPSession();
-      this.#devtoolsUniverse = await createTargetUniverse(session);
+      this.#devtoolsUniverse = await createTargetUniverse(session, {
+        sourceMaps: this.#sourceMaps,
+      });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
