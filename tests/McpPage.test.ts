@@ -289,14 +289,6 @@ describe('McpPage', () => {
 
     function createMcpPage() {
       const pptrPage = createMockPuppeteerPage();
-      // _client() is a private internal Puppeteer API used by ConsoleCollector.
-      // @ts-expect-error internal API
-      pptrPage._client = sinon.stub().returns({
-        on: sinon.stub(),
-        off: sinon.stub(),
-        send: sinon.stub().resolves({}),
-        target: sinon.stub().returns({_targetId: '<mock>'}),
-      });
       const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
         hasNetworkBlockOrAllowlist: false,
         locatorClass: Locator,
