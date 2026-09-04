@@ -24,7 +24,7 @@ describe('network', () => {
   describe('network_list_requests', () => {
     it('list requests', async () => {
       await withMcpContext(async (response, context) => {
-        await listNetworkRequests.handler(
+        await listNetworkRequests().handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -45,7 +45,7 @@ describe('network', () => {
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
         await page.goto(server.getRoute('/three'));
-        await listNetworkRequests.handler(
+        await listNetworkRequests().handler(
           {
             params: {},
 
@@ -72,7 +72,7 @@ describe('network', () => {
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
         await page.goto(server.getRoute('/three'));
-        await listNetworkRequests.handler(
+        await listNetworkRequests().handler(
           {
             params: {
               includePreservedRequests: true,
@@ -115,7 +115,7 @@ describe('network', () => {
         await page.goto(server.getRoute('/redirect'), {
           waitUntil: 'networkidle0',
         });
-        await listNetworkRequests.handler(
+        await listNetworkRequests().handler(
           {
             params: {
               includePreservedRequests: true,
@@ -137,7 +137,7 @@ describe('network', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto('data:text/html,<div>Hello MCP</div>');
-        await getNetworkRequest.handler(
+        await getNetworkRequest().handler(
           {params: {reqid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -150,7 +150,7 @@ describe('network', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto('data:text/html,<div>Hello MCP</div>');
-        await getNetworkRequest.handler(
+        await getNetworkRequest().handler(
           {params: {reqid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -169,7 +169,7 @@ describe('network', () => {
         await page.goto(server.getRoute('/one'));
         await page.goto(server.getRoute('/two'));
         await page.goto(server.getRoute('/three'));
-        await getNetworkRequest.handler(
+        await getNetworkRequest().handler(
           {
             params: {
               reqid: 1,

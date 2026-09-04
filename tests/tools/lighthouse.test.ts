@@ -25,7 +25,7 @@ describe('lighthouse', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/test'));
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit().handler(
           {
             params: {
               mode: 'navigation',
@@ -86,7 +86,7 @@ describe('lighthouse', () => {
           });
         }
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit().handler(
           {
             params: {
               mode: 'snapshot',
@@ -125,7 +125,7 @@ describe('lighthouse', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/test-mobile'));
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit().handler(
           {
             params: {
               mode: 'snapshot',
@@ -160,7 +160,7 @@ describe('lighthouse', () => {
           const page = context.getSelectedMcpPage().pptrPage;
           await page.goto(server.getRoute('/test-mobile'));
 
-          await lighthouseAudit.handler(
+          await lighthouseAudit().handler(
             {
               params: {
                 mode: 'snapshot',

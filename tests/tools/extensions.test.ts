@@ -51,7 +51,7 @@ describe('extension', () => {
   it('installs and uninstalls an extension and verifies it in chrome://extensions', async () => {
     await withMcpContext(async (response, context) => {
       // Install the extension
-      await installExtension.handler(
+      await installExtension().handler(
         {params: {path: EXTENSION_PATH}},
         response,
         context,
@@ -65,7 +65,7 @@ describe('extension', () => {
       );
 
       // Uninstall the extension
-      await uninstallExtension.handler(
+      await uninstallExtension().handler(
         {params: {id: extensionId!}},
         response,
         context,
@@ -87,7 +87,7 @@ describe('extension', () => {
   it('lists installed extensions', async () => {
     await withMcpContext(async (response, context) => {
       const setListExtensionsSpy = sinon.spy(response, 'setListExtensions');
-      await listExtensions.handler({params: {}}, response, context);
+      await listExtensions().handler({params: {}}, response, context);
       assert.ok(
         setListExtensionsSpy.calledOnce,
         'setListExtensions should be called',
@@ -97,7 +97,7 @@ describe('extension', () => {
   it('reloads an extension', async () => {
     await withMcpContext(
       async (response, context) => {
-        await installExtension.handler(
+        await installExtension().handler(
           {params: {path: EXTENSION_PATH}},
           response,
           context,
@@ -107,7 +107,7 @@ describe('extension', () => {
         const installSpy = sinon.spy(context, 'installExtension');
         response.resetResponseLineForTesting();
 
-        await reloadExtension.handler(
+        await reloadExtension().handler(
           {params: {id: extensionId!}},
           response,
           context,
@@ -149,7 +149,7 @@ describe('extension', () => {
         );
         assert.ok(!pageTargetBefore, 'Page should not exist before action');
 
-        await triggerExtensionAction.handler(
+        await triggerExtensionAction().handler(
           {params: {id: extensionId}},
           response,
           context,

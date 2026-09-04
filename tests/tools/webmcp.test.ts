@@ -38,7 +38,7 @@ describe('webmcp', () => {
     it('list webmcp tools in select_page response', async () => {
       await withMcpContext(async (response, context) => {
         const pageId = context.getSelectedMcpPage().id ?? 1;
-        await selectPage.handler({params: {pageId}}, response, context);
+        await selectPage().handler({params: {pageId}}, response, context);
         assert.ok(response.listWebMcpTools);
       });
     });
@@ -73,7 +73,7 @@ describe('webmcp', () => {
           // Wait for WebMCP tools to be registered and detected by Puppeteer
           await toolsAddedPromise;
 
-          await executeWebMcpTool.handler(
+          await executeWebMcpTool().handler(
             {params: {toolName: 'test_tool', input: JSON.stringify({})}, page},
             response,
             context,
@@ -93,7 +93,7 @@ describe('webmcp', () => {
         async (response, context) => {
           await assert.rejects(
             async () => {
-              await executeWebMcpTool.handler(
+              await executeWebMcpTool().handler(
                 {
                   params: {toolName: 'missing-tool', input: JSON.stringify({})},
                   page: context.getSelectedMcpPage(),
@@ -118,7 +118,7 @@ describe('webmcp', () => {
               const page = context.getSelectedMcpPage();
               await setupWebMcpTool(page);
 
-              await executeWebMcpTool.handler(
+              await executeWebMcpTool().handler(
                 {params: {toolName: 'test_tool', input: 'invalid'}, page},
                 response,
                 context,

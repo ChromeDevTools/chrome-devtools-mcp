@@ -87,7 +87,7 @@ describe('emulation', () => {
   describe('network', () => {
     it('emulates offline network conditions', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               networkConditions: 'Offline',
@@ -106,7 +106,7 @@ describe('emulation', () => {
     });
     it('emulates network throttling when the throttling option is valid', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               networkConditions: 'Slow 3G',
@@ -126,7 +126,7 @@ describe('emulation', () => {
 
     it('disables network emulation', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {},
             page: context.getSelectedMcpPage(),
@@ -144,7 +144,7 @@ describe('emulation', () => {
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               networkConditions: 'Slow 11G',
@@ -164,7 +164,7 @@ describe('emulation', () => {
 
     it('report correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               networkConditions: 'Slow 3G',
@@ -194,7 +194,7 @@ describe('emulation', () => {
   describe('cpu', () => {
     it('emulates cpu throttling when the rate is valid (1-20x)', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               cpuThrottlingRate: 4,
@@ -217,7 +217,7 @@ describe('emulation', () => {
 
         const sendSpy = mock.method(universe.session, 'send');
 
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               cpuThrottlingRate: 4,
@@ -244,7 +244,7 @@ describe('emulation', () => {
         await context.getSelectedMcpPage().emulate({
           cpuThrottlingRate: 4,
         });
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               cpuThrottlingRate: 1,
@@ -261,7 +261,7 @@ describe('emulation', () => {
 
     it('report correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               cpuThrottlingRate: 4,
@@ -285,7 +285,7 @@ describe('emulation', () => {
   describe('geolocation', () => {
     it('emulates geolocation with latitude and longitude', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               geolocation: {
@@ -308,7 +308,7 @@ describe('emulation', () => {
     it('clears geolocation override when geolocation is set to null', async () => {
       await withMcpContext(async (response, context) => {
         // First set a geolocation
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               geolocation: {
@@ -325,7 +325,7 @@ describe('emulation', () => {
         assert.notStrictEqual(context.getSelectedMcpPage().geolocation, null);
 
         // Then clear it by setting geolocation to null
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {},
             page: context.getSelectedMcpPage(),
@@ -340,7 +340,7 @@ describe('emulation', () => {
 
     it('reports correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               geolocation: {
@@ -374,7 +374,7 @@ describe('emulation', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.baseUrl + '/viewport');
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               viewport: {
@@ -414,7 +414,7 @@ describe('emulation', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         // First set a viewport
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               viewport: {
@@ -441,7 +441,7 @@ describe('emulation', () => {
         });
 
         // Then clear it by setting viewport to null
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {},
             page: context.getSelectedMcpPage(),
@@ -461,7 +461,7 @@ describe('emulation', () => {
 
     it('reports correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               viewport: {
@@ -493,7 +493,7 @@ describe('emulation', () => {
   describe('userAgent', () => {
     it('emulates userAgent', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               userAgent: 'MyUA',
@@ -513,7 +513,7 @@ describe('emulation', () => {
 
     it('updates userAgent', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               userAgent: 'UA1',
@@ -525,7 +525,7 @@ describe('emulation', () => {
         );
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'UA1');
 
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               userAgent: 'UA2',
@@ -544,7 +544,7 @@ describe('emulation', () => {
 
     it('clears userAgent override when userAgent is set to null', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               userAgent: 'MyUA',
@@ -557,7 +557,7 @@ describe('emulation', () => {
 
         assert.strictEqual(context.getSelectedMcpPage().userAgent, 'MyUA');
 
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {},
             page: context.getSelectedMcpPage(),
@@ -576,7 +576,7 @@ describe('emulation', () => {
 
     it('reports correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               userAgent: 'MyUA',
@@ -613,7 +613,7 @@ describe('emulation', () => {
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               extraHttpHeaders: {'X-Custom-Header': 'test-value'},
@@ -640,7 +640,7 @@ describe('emulation', () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
         // Set headers first
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               extraHttpHeaders: {'X-To-Clear': 'value'},
@@ -652,7 +652,7 @@ describe('emulation', () => {
         );
 
         // Clear headers
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               extraHttpHeaders: {},
@@ -687,7 +687,7 @@ describe('emulation', () => {
 
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               extraHttpHeaders: {'X-Persist': 'yes'},
@@ -709,7 +709,7 @@ describe('emulation', () => {
     it('does not affect other emulation settings', async () => {
       await withMcpContext(async (response, context) => {
         // Set userAgent first
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               userAgent: 'MyUA',
@@ -721,7 +721,7 @@ describe('emulation', () => {
         );
 
         // Set extraHTTPHeaders separately
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               extraHttpHeaders: {'X-Test': 'value'},
@@ -741,7 +741,7 @@ describe('emulation', () => {
 
     it('reports correctly for the currently selected page', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               extraHttpHeaders: {'X-Page': 'one'},
@@ -771,7 +771,7 @@ describe('emulation', () => {
   describe('colorScheme', () => {
     it('emulates color scheme', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               colorScheme: 'dark',
@@ -795,7 +795,7 @@ describe('emulation', () => {
 
     it('updates color scheme', async () => {
       await withMcpContext(async (response, context) => {
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               colorScheme: 'dark',
@@ -807,7 +807,7 @@ describe('emulation', () => {
         );
         assert.strictEqual(context.getSelectedMcpPage().colorScheme, 'dark');
 
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               colorScheme: 'light',
@@ -836,7 +836,7 @@ describe('emulation', () => {
           () => window.matchMedia('(prefers-color-scheme: dark)').matches,
         );
 
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               colorScheme: 'dark',
@@ -856,7 +856,7 @@ describe('emulation', () => {
           true,
         );
 
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               colorScheme: 'auto',

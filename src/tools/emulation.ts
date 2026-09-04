@@ -6,6 +6,7 @@
  */
 
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -45,7 +46,7 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulate = definePageTool({
+export const emulate = definePageTool((_args: ParsedArguments) => ({
   name: 'emulate',
   description: `Emulates various features on the target page.`,
   annotations: {
@@ -106,4 +107,4 @@ export const emulate = definePageTool({
     await page.emulate(request.params);
     response.appendResponseLine('Emulation configured successfully');
   },
-});
+}));
