@@ -449,4 +449,24 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.categoryInput, false);
     assert.deepStrictEqual(args.blockedUrlPattern, ['https://example.com/*']);
   });
+
+  it('parses config option mixed with cli arguments', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        headless: true,
+        categoryInput: false,
+      }),
+      'cd4a.test.config.mixed.json',
+    );
+    const args = parseArguments([
+      '--config',
+      testConfig.path,
+      '--headless=false',
+      '--category-network=false',
+    ]);
+    assert.strictEqual(args.config, testConfig.path);
+    assert.strictEqual(args.headless, false);
+    assert.strictEqual(args.categoryInput, false);
+    assert.strictEqual(args.categoryNetwork, false);
+  });
 });
