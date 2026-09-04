@@ -466,7 +466,7 @@ export const timeoutSchema = {
       `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
     )
     .transform(value => {
-      return value && value <= 0 ? undefined : value;
+      return value === undefined || value <= 0 ? undefined : value;
     }),
 };
 
