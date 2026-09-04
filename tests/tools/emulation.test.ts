@@ -16,9 +16,7 @@ import {
   viewportTransform,
 } from '../../src/tools/ToolDefinition.js';
 import {serverHooks} from '../server.js';
-import {
-  createHandlerMocks,
-} from '../mocks.js';
+import {createHandlerMocks} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
@@ -116,11 +114,7 @@ describe('emulation', () => {
 
     it('disables network emulation when networkConditions is omitted', async () => {
       const {page, context, response} = createHandlerMocks();
-      await emulate.handler(
-        {params: {}, page},
-        response,
-        context,
-      );
+      await emulate.handler({params: {}, page}, response, context);
       sinon.assert.calledOnceWithExactly(page.emulate, {});
     });
 

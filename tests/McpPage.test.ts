@@ -312,7 +312,10 @@ describe('McpPage', () => {
       await mcpPage.emulate({networkConditions: 'Slow 3G'});
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.networkConditions, null);
-      sinon.assert.calledWithExactly(pptrPage.emulateNetworkConditions.secondCall, null);
+      sinon.assert.calledWithExactly(
+        pptrPage.emulateNetworkConditions.secondCall,
+        null,
+      );
     });
 
     it('does not call emulateNetworkConditions for unknown values', async () => {
@@ -334,14 +337,19 @@ describe('McpPage', () => {
       await mcpPage.emulate({cpuThrottlingRate: 4});
       await mcpPage.emulate({cpuThrottlingRate: 1});
       assert.strictEqual(mcpPage.cpuThrottlingRate, 1);
-      sinon.assert.calledWithExactly(pptrPage.emulateCPUThrottling.secondCall, 1);
+      sinon.assert.calledWithExactly(
+        pptrPage.emulateCPUThrottling.secondCall,
+        1,
+      );
     });
 
     it('calls setUserAgent with the given user agent', async () => {
       const {mcpPage, pptrPage} = createMcpPage();
       await mcpPage.emulate({userAgent: 'TestUA/1.0'});
       assert.strictEqual(mcpPage.userAgent, 'TestUA/1.0');
-      sinon.assert.calledOnceWithExactly(pptrPage.setUserAgent, {userAgent: 'TestUA/1.0'});
+      sinon.assert.calledOnceWithExactly(pptrPage.setUserAgent, {
+        userAgent: 'TestUA/1.0',
+      });
     });
 
     it('calls setUserAgent with undefined to clear the user agent', async () => {
@@ -349,7 +357,9 @@ describe('McpPage', () => {
       await mcpPage.emulate({userAgent: 'TestUA/1.0'});
       await mcpPage.emulate({userAgent: ''});
       assert.strictEqual(mcpPage.userAgent, null);
-      sinon.assert.calledWithExactly(pptrPage.setUserAgent.secondCall, {userAgent: undefined});
+      sinon.assert.calledWithExactly(pptrPage.setUserAgent.secondCall, {
+        userAgent: undefined,
+      });
     });
 
     it('calls emulateMediaFeatures with dark color scheme', async () => {

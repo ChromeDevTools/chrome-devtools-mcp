@@ -35,7 +35,9 @@ export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
 export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
-  const page = sinon.createStubInstance(CdpPage) as unknown as sinon.SinonStubbedInstance<Page>;
+  const page = sinon.createStubInstance(
+    CdpPage,
+  ) as unknown as sinon.SinonStubbedInstance<Page>;
   // _client() is a private internal Puppeteer API used by ConsoleCollector
   // in the McpPage constructor. Not on the CdpPage prototype, so added explicitly.
   // @ts-expect-error internal API
