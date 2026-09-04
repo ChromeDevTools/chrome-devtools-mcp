@@ -74,77 +74,89 @@ export class NetworkFormatter {
   }
 
   async #loadDetailedData(): Promise<void> {
-    // Load Request Body
-    if (this.#request.hasPostData()) {
-      let data;
-      try {
-        data =
-          this.#request.postData() ?? (await this.#request.fetchPostData());
-      } catch {
-        // Ignore parsing errors
-      }
-      const requestBodyNotAvailableMessage =
-        '<Request body not available anymore>';
-      if (this.#options.requestFilePath) {
-        if (!this.#options.saveFile) {
-          throw new Error(
-            'Unable to save the request body to a file: no saveFile callback was configured.',
-          );
-        }
-        if (data) {
-          const result = await this.#options.saveFile(
-            Buffer.from(data),
-            this.#options.requestFilePath,
-            '.network-request',
-          );
-          this.#requestBodyFilePath = result.filename;
-        } else {
-          this.#requestBody = requestBodyNotAvailableMessage;
-        }
-      } else {
-        if (data) {
-          this.#requestBody = getSizeLimitedString(
-            data,
-            BODY_CONTEXT_SIZE_LIMIT,
-          );
-        } else {
-          this.#requestBody = requestBodyNotAvailableMessage;
-        }
-      }
+    await Promise.all([
+      this.#loadRequestBody(),
+      this.#loadResponseBody(),
+    ]);
+  }
+
+  async #loadRequestBody(): Promise<void> {
+    if (!this.#request.hasPostData()) {
+      return;
     }
 
-    // Load Response Body
-    const response = this.#request.response();
-    if (response) {
-      const responseBodyNotAvailableMessage =
-        '<Response body not available anymore>';
-      if (this.#options.responseFilePath) {
-        try {
-          const buffer = await response.buffer();
-          if (!this.#options.saveFile) {
-            throw new Error(
-              'Unable to save the response body to a file: no saveFile callback was configured.',
-            );
-          }
-          const result = await this.#options.saveFile(
-            buffer,
-            this.#options.responseFilePath,
-            '.network-response',
-          );
-          this.#responseBodyFilePath = result.filename;
-        } catch {
-          // Flatten error handling for buffer() failure and save failure
-        }
+    let data;
+    try {
+      data =
+        this.#request.postData() ?? (await this.#request.fetchPostData());
+    } catch {
+      // Ignore parsing errors
+    }
 
-        if (!this.#responseBodyFilePath) {
-          this.#responseBody = responseBodyNotAvailableMessage;
-        }
-      } else {
-        this.#responseBody = await this.#getFormattedResponseBody(
-          response,
-          BODY_CONTEXT_SIZE_LIMIT,
+    const requestBodyNotAvailableMessage =
+      '<Request body not available anymore>';
+    if (this.#options.requestFilePath) {
+      if (!this.#options.saveFile) {
+        throw new Error(
+          'Unable to save the request body to a file: no saveFile callback was configured.',
         );
       }
+      if (data) {
+        const result = await this.#options.saveFile(
+          Buffer.from(data),
+          this.#options.requestFilePath,
+          '.network-request',
+        );
+        this.#requestBodyFilePath = result.filename;
+      } else {
+        this.#requestBody = requestBodyNotAvailableMessage;
+      }
+    } else {
+      if (data) {
+        this.#requestBody = getSizeLimitedString(
+          data,
+          BODY_CONTEXT_SIZE_LIMIT,
+        );
+      } else {
+        this.#requestBody = requestBodyNotAvailableMessage;
+      }
+    }
+  }
+
+  async #loadResponseBody(): Promise<void> {
+    const response = this.#request.response();
+    if (!response) {
+      return;
+    }
+
+    const responseBodyNotAvailableMessage =
+      '<Response body not available anymore>';
+    if (this.#options.responseFilePath) {
+      try {
+        const buffer = await response.buffer();
+        if (!this.#options.saveFile) {
+          throw new Error(
+            'Unable to save the response body to a file: no saveFile callback was configured.',
+          );
+        }
+        const result = await this.#options.saveFile(
+          buffer,
+          this.#options.responseFilePath,
+          '.network-response',
+        );
+        this.#responseBodyFilePath = result.filename;
+      } catch {
+        // Flatten error handling for buffer() failure and save failure
+      }
+
+      if (!this.#responseBodyFilePath) {
+        this.#responseBody = responseBodyNotAvailableMessage;
+      }
+    } else {
+      this.#responseBody = await this.#getFormattedResponseBody(
+        response,
+        BODY_CONTEXT_SIZE_LIMIT,
+      );
     }
   }
 
