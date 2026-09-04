@@ -5,10 +5,17 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import {Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
+import type {Page} from '../src/third_party/index.js';
+import {createMockPuppeteerPage} from './mocks.js';
+
 import {withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
@@ -272,6 +279,106 @@ describe('McpPage', () => {
 
       // @ts-expect-error Internal Puppeteer API
       assert.ok(handle.disposed);
+    });
+  });
+
+  describe('emulate()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    function createMcpPage() {
+      const pptrPage = createMockPuppeteerPage();
+      const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+      return {mcpPage, pptrPage};
+    }
+
+    it('calls emulateNetworkConditions with the predefined condition', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({networkConditions: 'Slow 3G'});
+      assert.strictEqual(mcpPage.networkConditions, 'Slow 3G');
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateNetworkConditions, {
+        download: 50000,
+        upload: 50000,
+        latency: 2000,
+      });
+    });
+
+    it('calls emulateNetworkConditions(null) when networkConditions is omitted', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({networkConditions: 'Slow 3G'});
+      await mcpPage.emulate({});
+      assert.strictEqual(mcpPage.networkConditions, null);
+      sinon.assert.calledWithExactly(
+        pptrPage.emulateNetworkConditions.secondCall,
+        null,
+      );
+    });
+
+    it('does not call emulateNetworkConditions for unknown values', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({networkConditions: 'Slow 11G'});
+      assert.strictEqual(mcpPage.networkConditions, null);
+      sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
+    });
+
+    it('calls emulateCPUThrottling with the given rate', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 4);
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
+    });
+
+    it('calls emulateCPUThrottling(1) to reset throttling', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      await mcpPage.emulate({cpuThrottlingRate: 1});
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 1);
+      sinon.assert.calledWithExactly(
+        pptrPage.emulateCPUThrottling.secondCall,
+        1,
+      );
+    });
+
+    it('calls setUserAgent with the given user agent', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({userAgent: 'TestUA/1.0'});
+      assert.strictEqual(mcpPage.userAgent, 'TestUA/1.0');
+      sinon.assert.calledOnceWithExactly(pptrPage.setUserAgent, {
+        userAgent: 'TestUA/1.0',
+      });
+    });
+
+    it('calls setUserAgent with undefined to clear the user agent', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({userAgent: 'TestUA/1.0'});
+      await mcpPage.emulate({userAgent: ''});
+      assert.strictEqual(mcpPage.userAgent, null);
+      sinon.assert.calledWithExactly(pptrPage.setUserAgent.secondCall, {
+        userAgent: undefined,
+      });
+    });
+
+    it('calls emulateMediaFeatures with dark color scheme', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({colorScheme: 'dark'});
+      assert.strictEqual(mcpPage.colorScheme, 'dark');
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateMediaFeatures, [
+        {name: 'prefers-color-scheme', value: 'dark'},
+      ]);
+    });
+
+    it('calls emulateMediaFeatures with empty string to reset color scheme', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({colorScheme: 'dark'});
+      await mcpPage.emulate({colorScheme: 'auto'});
+      assert.strictEqual(mcpPage.colorScheme, null);
+      sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
+        {name: 'prefers-color-scheme', value: ''},
+      ]);
     });
   });
 });

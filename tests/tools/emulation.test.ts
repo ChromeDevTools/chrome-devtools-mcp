@@ -8,12 +8,15 @@ import assert from 'node:assert';
 import type {IncomingHttpHeaders} from 'node:http';
 import {beforeEach, describe, it, mock} from 'node:test';
 
+import sinon from 'sinon';
+
 import {emulate} from '../../src/tools/emulation.js';
 import {
   geolocationTransform,
   viewportTransform,
 } from '../../src/tools/ToolDefinition.js';
 import {serverHooks} from '../server.js';
+import {createHandlerMocks} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
@@ -68,6 +71,26 @@ describe('emulation', () => {
           isLandscape: true,
         });
       });
+
+      it('throws on non-numeric dimensions', () => {
+        assert.throws(() => viewportTransform('abc'));
+      });
+
+      it('throws when width is not positive', () => {
+        assert.throws(() => viewportTransform('0x600'));
+      });
+
+      it('throws when height is not positive', () => {
+        assert.throws(() => viewportTransform('800x0'));
+      });
+
+      it('throws when devicePixelRatio is not positive', () => {
+        assert.throws(() => viewportTransform('1024x768x0'));
+      });
+
+      it('throws when height is missing', () => {
+        assert.throws(() => viewportTransform('800'));
+      });
     });
 
     describe('geolocationTransform', () => {
@@ -81,80 +104,66 @@ describe('emulation', () => {
           longitude: 11.576124,
         });
       });
+
+      it('throws when latitude is out of range', () => {
+        assert.throws(() => geolocationTransform('999,999'));
+      });
+
+      it('throws when longitude is out of range', () => {
+        assert.throws(() => geolocationTransform('48.1,999'));
+      });
+
+      it('throws on non-numeric input', () => {
+        assert.throws(() => geolocationTransform('abc,def'));
+      });
+
+      it('throws when longitude is missing', () => {
+        assert.throws(() => geolocationTransform('48.1'));
+      });
     });
   });
 
   describe('network', () => {
     it('emulates offline network conditions', async () => {
-      await withMcpContext(async (response, context) => {
-        await emulate.handler(
-          {
-            params: {
-              networkConditions: 'Offline',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          'Offline',
-        );
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler(
+        {params: {networkConditions: 'Offline'}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        networkConditions: 'Offline',
       });
     });
+
     it('emulates network throttling when the throttling option is valid', async () => {
-      await withMcpContext(async (response, context) => {
-        await emulate.handler(
-          {
-            params: {
-              networkConditions: 'Slow 3G',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          'Slow 3G',
-        );
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler(
+        {params: {networkConditions: 'Slow 3G'}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        networkConditions: 'Slow 3G',
       });
     });
 
-    it('disables network emulation', async () => {
-      await withMcpContext(async (response, context) => {
-        await emulate.handler(
-          {
-            params: {},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          null,
-        );
-      });
+    it('disables network emulation when networkConditions is omitted', async () => {
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler({params: {}, page}, response, context);
+      sinon.assert.calledOnceWithExactly(page.emulate, {});
     });
 
     it('does not set throttling when the network throttling is not one of the predefined options', async () => {
       await withMcpContext(async (response, context) => {
         await emulate.handler(
           {
-            params: {
-              networkConditions: 'Slow 11G',
-            },
+            params: {networkConditions: 'Slow 11G'},
             page: context.getSelectedMcpPage(),
           },
           response,
           context,
         );
-
         assert.strictEqual(
           context.getSelectedMcpPage().networkConditions,
           null,
@@ -163,50 +172,27 @@ describe('emulation', () => {
     });
 
     it('report correctly for the currently selected page', async () => {
-      await withMcpContext(async (response, context) => {
-        await emulate.handler(
-          {
-            params: {
-              networkConditions: 'Slow 3G',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          'Slow 3G',
-        );
-
-        const page = await context.newPage();
-        context.selectPage(page);
-
-        assert.strictEqual(
-          context.getSelectedMcpPage().networkConditions,
-          null,
-        );
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler(
+        {params: {networkConditions: 'Slow 3G'}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        networkConditions: 'Slow 3G',
       });
     });
   });
 
   describe('cpu', () => {
     it('emulates cpu throttling when the rate is valid (1-20x)', async () => {
-      await withMcpContext(async (response, context) => {
-        await emulate.handler(
-          {
-            params: {
-              cpuThrottlingRate: 4,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
-      });
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler(
+        {params: {cpuThrottlingRate: 4}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {cpuThrottlingRate: 4});
     });
 
     it('applies cpu throttling to secondary session', async () => {
@@ -239,46 +225,24 @@ describe('emulation', () => {
       });
     });
 
-    it('disables cpu throttling', async () => {
-      await withMcpContext(async (response, context) => {
-        await context.getSelectedMcpPage().emulate({
-          cpuThrottlingRate: 4,
-        });
-        await emulate.handler(
-          {
-            params: {
-              cpuThrottlingRate: 1,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 1);
-      });
+    it('disables cpu throttling when rate is 1', async () => {
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler(
+        {params: {cpuThrottlingRate: 1}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {cpuThrottlingRate: 1});
     });
 
     it('report correctly for the currently selected page', async () => {
-      await withMcpContext(async (response, context) => {
-        await emulate.handler(
-          {
-            params: {
-              cpuThrottlingRate: 4,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 4);
-
-        const page = await context.newPage();
-        context.selectPage(page);
-
-        assert.strictEqual(context.getSelectedMcpPage().cpuThrottlingRate, 1);
-      });
+      const {page, context, response} = createHandlerMocks();
+      await emulate.handler(
+        {params: {cpuThrottlingRate: 4}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {cpuThrottlingRate: 4});
     });
   });
 
