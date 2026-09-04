@@ -9,6 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {Locator} from '../src/third_party/index.js';
@@ -287,14 +288,28 @@ describe('McpPage', () => {
       sinon.restore();
     });
 
-    function createMcpPage() {
+    function createMcpPage(
+      options: {hasNetworkBlockOrAllowlist?: boolean} = {},
+    ) {
       const pptrPage = createMockPuppeteerPage();
       const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
         locatorClass: Locator,
       });
       return {mcpPage, pptrPage};
     }
+
+    it('calls emulateNetworkConditions with offline settings', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({networkConditions: 'Offline'});
+      assert.strictEqual(mcpPage.networkConditions, 'Offline');
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateNetworkConditions, {
+        offline: true,
+        download: 0,
+        upload: 0,
+        latency: 0,
+      });
+    });
 
     it('calls emulateNetworkConditions with the predefined condition', async () => {
       const {mcpPage, pptrPage} = createMcpPage();
@@ -325,6 +340,17 @@ describe('McpPage', () => {
       sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
     });
 
+    it('throws when networkConditions is set with network blocking enabled', async () => {
+      const {mcpPage, pptrPage} = createMcpPage({
+        hasNetworkBlockOrAllowlist: true,
+      });
+      await assert.rejects(
+        () => mcpPage.emulate({networkConditions: 'Slow 3G'}),
+        /Network throttling is not supported when network blocking/,
+      );
+      sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
+    });
+
     it('calls emulateCPUThrottling with the given rate', async () => {
       const {mcpPage, pptrPage} = createMcpPage();
       await mcpPage.emulate({cpuThrottlingRate: 4});
@@ -341,6 +367,68 @@ describe('McpPage', () => {
         pptrPage.emulateCPUThrottling.secondCall,
         1,
       );
+    });
+
+    it('sends Emulation.setCPUThrottlingRate to secondary session if present', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const mockSession = {
+        send: sinon.stub().resolves(),
+      };
+      sinon
+        .stub(mcpPage, 'devtoolsUniverse')
+        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
+      sinon.assert.calledOnceWithExactly(
+        mockSession.send,
+        'Emulation.setCPUThrottlingRate',
+        {rate: 4},
+      );
+    });
+
+    it('sends Emulation.setCPUThrottlingRate with rate 1 to secondary session when cpuThrottlingRate is omitted', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const mockSession = {
+        send: sinon.stub().resolves(),
+      };
+      sinon
+        .stub(mcpPage, 'devtoolsUniverse')
+        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+      await mcpPage.emulate({});
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 1);
+      sinon.assert.calledOnceWithExactly(
+        mockSession.send,
+        'Emulation.setCPUThrottlingRate',
+        {rate: 1},
+      );
+    });
+
+    it('calls setGeolocation with the given coordinates', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        geolocation: {latitude: 48.137154, longitude: 11.576124},
+      });
+      assert.deepStrictEqual(mcpPage.geolocation, {
+        latitude: 48.137154,
+        longitude: 11.576124,
+      });
+      sinon.assert.calledOnceWithExactly(pptrPage.setGeolocation, {
+        latitude: 48.137154,
+        longitude: 11.576124,
+      });
+    });
+
+    it('calls setGeolocation with (0, 0) when geolocation is omitted', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        geolocation: {latitude: 48.137154, longitude: 11.576124},
+      });
+      await mcpPage.emulate({});
+      assert.strictEqual(mcpPage.geolocation, null);
+      sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, {
+        latitude: 0,
+        longitude: 0,
+      });
     });
 
     it('calls setUserAgent with the given user agent', async () => {
@@ -379,6 +467,70 @@ describe('McpPage', () => {
       sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
         {name: 'prefers-color-scheme', value: ''},
       ]);
+    });
+
+    it('calls setViewport with the given dimensions merged with defaults', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        viewport: {
+          width: 400,
+          height: 400,
+          deviceScaleFactor: 2,
+          isMobile: true,
+          hasTouch: true,
+          isLandscape: false,
+        },
+      });
+      assert.deepStrictEqual(mcpPage.viewport, {
+        width: 400,
+        height: 400,
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+        isLandscape: false,
+      });
+      sinon.assert.calledOnceWithExactly(pptrPage.setViewport, {
+        width: 400,
+        height: 400,
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+        isLandscape: false,
+      });
+    });
+
+    it('calls setViewport(null) when viewport is omitted', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({viewport: {width: 400, height: 400}});
+      await mcpPage.emulate({});
+      assert.strictEqual(mcpPage.viewport, null);
+      sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, null);
+    });
+
+    it('calls setExtraHTTPHeaders with the given headers', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        extraHttpHeaders: {'X-Custom-Header': 'test-value'},
+      });
+      assert.deepStrictEqual(mcpPage.emulationSettings.extraHttpHeaders, {
+        'X-Custom-Header': 'test-value',
+      });
+      sinon.assert.calledOnceWithExactly(pptrPage.setExtraHTTPHeaders, {
+        'X-Custom-Header': 'test-value',
+      });
+    });
+
+    it('clears extraHttpHeaders when empty object is passed', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        extraHttpHeaders: {'X-Custom-Header': 'test-value'},
+      });
+      await mcpPage.emulate({extraHttpHeaders: {}});
+      assert.strictEqual(mcpPage.emulationSettings.extraHttpHeaders, undefined);
+      sinon.assert.calledWithExactly(
+        pptrPage.setExtraHTTPHeaders.secondCall,
+        {},
+      );
     });
   });
 });
