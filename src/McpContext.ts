@@ -344,7 +344,7 @@ export class McpContext implements Context {
         ctx = await this.browser.createBrowserContext();
         this.#isolatedContexts.set(isolatedContextName, ctx);
       }
-      page = await ctx.newPage();
+      page = await ctx.newPage({background});
     } else {
       page = await this.browser.newPage({background});
     }

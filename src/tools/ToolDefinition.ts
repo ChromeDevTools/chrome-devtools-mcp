@@ -492,6 +492,21 @@ export function viewportTransform(arg: string | undefined):
     number,
     number | undefined,
   ];
+  if (!Number.isFinite(width) || width <= 0) {
+    throw new Error(
+      `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
+    );
+  }
+  if (!Number.isFinite(height) || height <= 0) {
+    throw new Error(
+      `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
+    );
+  }
+  if (dpr !== undefined && (!Number.isFinite(dpr) || dpr <= 0)) {
+    throw new Error(
+      `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
+    );
+  }
   return {
     width,
     height,
@@ -507,6 +522,16 @@ export function geolocationTransform(arg: string | undefined) {
     return undefined;
   }
   const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    throw new Error(
+      `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
+    );
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error(
+      `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
+    );
+  }
   return {
     latitude,
     longitude,

@@ -430,6 +430,38 @@ describe('pages', () => {
       });
     });
 
+    it('keeps focus when background is true with isolatedContext', async () => {
+      await withMcpContext(async (response, context) => {
+        const originalPage = context.getPageById(1);
+        assert.strictEqual(originalPage, context.getSelectedMcpPage());
+        // Ensure original page has focus
+        await originalPage.pptrPage.bringToFront();
+        assert.strictEqual(
+          await originalPage.pptrPage.evaluate(() => document.hasFocus()),
+          true,
+        );
+        await newPage().handler(
+          {
+            params: {
+              url: 'data:text/html,<html></html>',
+              background: true,
+              isolatedContext: 'session-a',
+            },
+          },
+          response,
+          context,
+        );
+        // New page should be selected but original should retain focus
+        const mcpPage = context.getSelectedMcpPage();
+        assert.strictEqual(mcpPage.isolatedContextName, 'session-a');
+        assert.strictEqual(
+          await originalPage.pptrPage.evaluate(() => document.hasFocus()),
+          true,
+        );
+        assert.ok(response.includePages);
+      });
+    });
+
     it('reuses the same context for the same isolatedContext name', async () => {
       await withMcpContext(async (response, context) => {
         await newPage().handler(
