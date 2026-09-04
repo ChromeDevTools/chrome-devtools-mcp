@@ -221,6 +221,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** array
   - **Default:** `OS temp directory`
 
+- **`--config`**
+  Path to JSON configuration file.
+  - **Type:** string
+  - **Default:** `false`
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:
