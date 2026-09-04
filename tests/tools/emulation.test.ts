@@ -68,6 +68,26 @@ describe('emulation', () => {
           isLandscape: true,
         });
       });
+
+      it('throws on non-numeric dimensions', () => {
+        assert.throws(() => viewportTransform('abc'));
+      });
+
+      it('throws when width is not positive', () => {
+        assert.throws(() => viewportTransform('0x600'));
+      });
+
+      it('throws when height is not positive', () => {
+        assert.throws(() => viewportTransform('800x0'));
+      });
+
+      it('throws when devicePixelRatio is not positive', () => {
+        assert.throws(() => viewportTransform('1024x768x0'));
+      });
+
+      it('throws when height is missing', () => {
+        assert.throws(() => viewportTransform('800'));
+      });
     });
 
     describe('geolocationTransform', () => {
@@ -80,6 +100,22 @@ describe('emulation', () => {
           latitude: 48.137154,
           longitude: 11.576124,
         });
+      });
+
+      it('throws when latitude is out of range', () => {
+        assert.throws(() => geolocationTransform('999,999'));
+      });
+
+      it('throws when longitude is out of range', () => {
+        assert.throws(() => geolocationTransform('48.1,999'));
+      });
+
+      it('throws on non-numeric input', () => {
+        assert.throws(() => geolocationTransform('abc,def'));
+      });
+
+      it('throws when longitude is missing', () => {
+        assert.throws(() => geolocationTransform('48.1'));
       });
     });
   });
