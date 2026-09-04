@@ -445,5 +445,9 @@
   {
     "name": "source_maps",
     "flagType": "boolean"
+  },
+  {
+    "name": "config_present",
+    "flagType": "boolean"
   }
 ]
