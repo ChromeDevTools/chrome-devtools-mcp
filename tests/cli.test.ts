@@ -6,6 +6,9 @@
 
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   DEFAULT_FILESYSTEM_ROOT,
@@ -17,6 +20,21 @@ function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return parser('0.0.0', ['node', 'main.js', ...argv], env)
     .exitProcess(false)
     .parseSync();
+}
+
+function createTempFile(content: string, fileName: string) {
+  const filePath = path.join(os.tmpdir(), fileName);
+  fs.writeFileSync(filePath, content);
+  return {
+    path: filePath,
+    [Symbol.dispose]() {
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        // ignore
+      }
+    },
+  };
 }
 
 describe('cli args parsing', () => {
@@ -414,5 +432,21 @@ describe('cli args parsing', () => {
       'https://a.com/*',
       'https://b.com/*',
     ]);
+  });
+
+  it('parses config option', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        headless: true,
+        categoryInput: false,
+        blockedUrlPattern: ['https://example.com/*'],
+      }),
+      'cd4a.test.config.json',
+    );
+    const args = parseArguments(['--config', testConfig.path]);
+    assert.strictEqual(args.config, testConfig.path);
+    assert.strictEqual(args.headless, true);
+    assert.strictEqual(args.categoryInput, false);
+    assert.deepStrictEqual(args.blockedUrlPattern, ['https://example.com/*']);
   });
 });
