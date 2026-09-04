@@ -8,10 +8,10 @@ import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
-import {Locator} from 'puppeteer';
 
 import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import {Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 import {createMockPuppeteerPage} from './mocks.js';
