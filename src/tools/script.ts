@@ -17,6 +17,65 @@ export type Evaluatable = Page | Frame | WebWorker;
 
 export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
   const toolArgs = resolveToolArgs(cliArgs);
+  const schema = {
+    pageId: pageIdSchema.pageId.optional(),
+    function: zod.string().describe(
+      `A JavaScript function declaration to be executed by the tool in the target page.
+Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
+Example with arguments: \`(el) => el.innerText\`
+`,
+    ),
+    args: zod
+      .array(
+        zod
+          .string()
+          .describe(
+            'The uid of an element on the page from the page content snapshot',
+          ),
+      )
+      .optional()
+      .describe(`An optional list of arguments to pass to the function.`),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+      ),
+    dialogAction: zod
+      .string()
+      .optional()
+      .describe(
+        'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+      ),
+    waitForStableDom: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+      ),
+    serviceWorkerId: zod
+      .string()
+      .optional()
+      .describe(
+        `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
+      ),
+  };
+
+  if (!toolArgs.pageIdRouting) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (schema as any).pageId;
+  } else if (toolArgs.pageIdRouting && cliArgs.categoryExtensions) {
+    schema.pageId = zod
+      .number()
+      .optional()
+      .describe(
+        'Targets a specific page by ID. Required when not evaluating in a service worker.',
+      );
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (schema as any).pageId;
+  }
+
   return {
     name: 'evaluate_script',
     description: `Evaluate a JavaScript function inside the target page${toolArgs.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
@@ -25,60 +84,7 @@ export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
       readOnlyHint: false,
       conditions: ['javascriptEvaluation'],
     },
-    schema: {
-      ...(toolArgs.pageIdRouting
-        ? cliArgs.categoryExtensions
-          ? {
-              pageId: zod
-                .number()
-                .optional()
-                .describe(
-                  'Targets a specific page by ID. Required when not evaluating in a service worker.',
-                ),
-            }
-          : pageIdSchema
-        : {}),
-      function: zod.string().describe(
-        `A JavaScript function declaration to be executed by the tool in the target page.
-Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
-Example with arguments: \`(el) => el.innerText\`
-`,
-      ),
-      args: zod
-        .array(
-          zod
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
-        )
-        .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
-      filePath: zod
-        .string()
-        .optional()
-        .describe(
-          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
-        ),
-      dialogAction: zod
-        .string()
-        .optional()
-        .describe(
-          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
-        ),
-      waitForStableDom: zod
-        .boolean()
-        .optional()
-        .describe(
-          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
-        ),
-      serviceWorkerId: zod
-        .string()
-        .optional()
-        .describe(
-          `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
-        ),
-    },
+    schema,
     blockedByDialog: true,
     verifyFilesSchema: {
       filePath: true,
@@ -166,7 +172,7 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options?: {filePath: string; context: Context},
+  options?: {filePath?: string; context: Context},
 ) => {
   using fn = await evaluatable.evaluateHandle(`(${fnString})`);
 
