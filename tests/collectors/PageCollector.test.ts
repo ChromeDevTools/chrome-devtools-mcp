@@ -16,7 +16,7 @@ import {
   NetworkCollector,
   PageCollector,
 } from '../../src/collectors/PageCollector.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
@@ -75,6 +75,33 @@ describe('PageCollector', () => {
     page.emit('framenavigated', {} as Frame);
 
     assert.equal(collector.getData().length, 1);
+  });
+
+  it('does not clean up after same-document navigation', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const request = getMockRequest();
+    const collector = new PageCollector(page, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+
+    page.emit('request', request);
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
+    page.emit('framenavigated', mainFrame);
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
+    page.emit('framenavigated', mainFrame);
+
+    assert.deepEqual(collector.getData(), [request]);
+
+    page.emit('framenavigated', mainFrame);
+
+    assert.deepEqual(collector.getData(), []);
+    assert.deepEqual(collector.getData(true), [request]);
   });
 
   it('clean up after navigation and be able to add data after', async () => {

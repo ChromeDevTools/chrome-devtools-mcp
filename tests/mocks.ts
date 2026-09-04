@@ -22,13 +22,12 @@
  *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
-import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpPage} from '../src/third_party/index.js';
+import {CdpPage, Frame} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
@@ -64,6 +63,7 @@ export function mockListener() {
       for (const listener of listeners[eventName] ?? []) {
         listener(data);
       }
+      return true;
     },
   };
 }
@@ -73,10 +73,18 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
 
-  // mainFrame() must return a stable object so tests can pass it back into
-  // page.emit('framenavigated', mainFrame) and have it recognized as the
-  // same frame instance across calls.
-  page.mainFrame.returns({} as Frame);
+  const frame = sinon.createStubInstance(Frame);
+  const frameListener = mockListener();
+  frame.on.callsFake((eventName, handler) => {
+    frameListener.on(eventName, handler);
+    return frame;
+  });
+  frame.off.callsFake((eventName, handler) => {
+    frameListener.off(eventName, handler);
+    return frame;
+  });
+  frame.emit.callsFake(frameListener.emit);
+  page.mainFrame.returns(frame);
 
   // _client() is a private internal Puppeteer API used by ConsoleCollector
   // in the McpPage constructor. Not on the CdpPage prototype, so added
