@@ -437,5 +437,9 @@
   {
     "name": "category_memory",
     "flagType": "boolean"
+  },
+  {
+    "name": "config_present",
+    "flagType": "boolean"
   }
 ]
