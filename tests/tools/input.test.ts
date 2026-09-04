@@ -41,7 +41,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -70,7 +70,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -107,7 +107,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        const clickPromise = click.handler(
+        const clickPromise = click().handler(
           {
             params: {
               uid: '1_1',
@@ -144,7 +144,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_2',
@@ -173,7 +173,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -213,7 +213,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        const handlerResolveTime = await click
+        const handlerResolveTime = await click()
           .handler(
             {
               params: {
@@ -243,7 +243,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -270,7 +270,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -305,7 +305,7 @@ describe('input', () => {
         );
         assert.ok(optionNode);
 
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: optionNode.id,
@@ -354,7 +354,7 @@ describe('input', () => {
         );
         assert.ok(optionNode);
 
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: optionNode.id,
@@ -406,7 +406,7 @@ describe('input', () => {
         );
         assert.ok(optionNode);
 
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: optionNode.id,
@@ -439,7 +439,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await hover.handler(
+        await hover().handler(
           {
             params: {
               uid: '1_1',
@@ -472,7 +472,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await clickAt.handler(
+        await clickAt().handler(
           {
             params: {
               x: 50,
@@ -504,7 +504,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await clickAt.handler(
+        await clickAt().handler(
           {
             params: {
               x: 50,
@@ -534,7 +534,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -566,7 +566,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -605,7 +605,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -634,7 +634,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -666,7 +666,7 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
         page.setDefaultTimeout(1000);
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -700,7 +700,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await typeText.handler(
+        await typeText().handler(
           {
             params: {
               text: 'test',
@@ -728,7 +728,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await typeText.handler(
+        await typeText().handler(
           {
             params: {
               text: 'test',
@@ -768,7 +768,7 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
         try {
-          await typeText.handler(
+          await typeText().handler(
             {
               params: {
                 text: 'test',
@@ -806,7 +806,7 @@ describe('input', () => {
 
         // Fill email
         const response1 = new McpResponse({} as ParsedArguments);
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_2', // email input
@@ -824,7 +824,7 @@ describe('input', () => {
 
         // Fill password
         const response2 = new McpResponse({} as ParsedArguments);
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_3', // password input
@@ -876,7 +876,7 @@ describe('input', () => {
         );
 
         // Check it
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -900,7 +900,7 @@ describe('input', () => {
         assert.strictEqual(isChecked, true);
 
         // Uncheck it
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -939,7 +939,7 @@ describe('input', () => {
         );
 
         // Turn it on
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -958,7 +958,7 @@ describe('input', () => {
         assert.strictEqual(swChecked, true);
 
         // Turn it off
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_1',
@@ -1011,7 +1011,7 @@ describe('input', () => {
         assert.strictEqual(r2Checked, false);
 
         // Fill second radio with true
-        await fill.handler(
+        await fill().handler(
           {
             params: {
               uid: '1_2',
@@ -1073,7 +1073,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await drag.handler(
+        await drag().handler(
           {
             params: {
               from_uid: '1_1',
@@ -1119,7 +1119,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await fillForm.handler(
+        await fillForm().handler(
           {
             params: {
               elements: [
@@ -1172,7 +1172,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await fillForm.handler(
+        await fillForm().handler(
           {
             params: {
               elements: [
@@ -1227,7 +1227,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await uploadFile.handler(
+        await uploadFile().handler(
           {
             params: {
               uid: '1_2',
@@ -1268,7 +1268,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await uploadFile.handler(
+        await uploadFile().handler(
           {
             params: {
               uid: '1_2',
@@ -1318,7 +1318,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await uploadFile.handler(
+        await uploadFile().handler(
           {
             params: {
               uid: '1_1',
@@ -1356,7 +1356,7 @@ describe('input', () => {
         );
 
         await assert.rejects(
-          uploadFile.handler(
+          uploadFile().handler(
             {
               params: {
                 uid: '1_1',
@@ -1396,7 +1396,7 @@ describe('input', () => {
           context.getSelectedMcpPage(),
         );
 
-        await pressKey.handler(
+        await pressKey().handler(
           {
             params: {
               key: 'Control+Shift+C',
@@ -1440,7 +1440,7 @@ describe('input', () => {
 
         try {
           await assert.rejects(
-            pressKey.handler(
+            pressKey().handler(
               {
                 params: {
                   key: 'Control+Shift+C',

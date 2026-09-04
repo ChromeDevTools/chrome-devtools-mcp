@@ -194,7 +194,7 @@ describe('Network Blocking Integration', () => {
           'Fetch should be blocked before audit',
         );
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit().handler(
           {
             params: {
               mode: 'navigation',
@@ -247,7 +247,7 @@ describe('Network Blocking Integration', () => {
       async (response, context) => {
         // Attempting to emulate network conditions should throw an error.
         await assert.rejects(async () => {
-          await emulate.handler(
+          await emulate().handler(
             {
               params: {
                 networkConditions: 'Offline',
@@ -260,7 +260,7 @@ describe('Network Blocking Integration', () => {
         }, /Network throttling is not supported when network blocking \(allowlist\/blocklist\) is configured\./);
 
         // Attempting to emulate CPU rate or other things should succeed without errors.
-        await emulate.handler(
+        await emulate().handler(
           {
             params: {
               cpuThrottlingRate: 2,

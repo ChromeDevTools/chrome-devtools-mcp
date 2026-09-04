@@ -15,14 +15,15 @@ import {
   type RunnerResult,
   type OutputMode,
 } from '../third_party/index.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 
 import {ToolCategory} from './categories.js';
 import {startTrace} from './performance.js';
 import {definePageTool} from './ToolDefinition.js';
 
-export const lighthouseAudit = definePageTool({
+export const lighthouseAudit = definePageTool((_args: ParsedArguments) => ({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace.name}`,
+  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace().name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -172,4 +173,4 @@ export const lighthouseAudit = definePageTool({
 
     response.attachLighthouseResult(output);
   },
-});
+}));

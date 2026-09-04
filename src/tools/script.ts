@@ -8,79 +8,87 @@ import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
 import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
 
-export const evaluateScript = defineTool(cliArgs => {
+export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
+  const schema = {
+    pageId: pageIdSchema.pageId.optional(),
+    function: zod.string().describe(
+      `A JavaScript function declaration to be executed by the tool in the target page.
+Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
+Example with arguments: \`(el) => el.innerText\`
+`,
+    ),
+    args: zod
+      .array(
+        zod
+          .string()
+          .describe(
+            'The uid of an element on the page from the page content snapshot',
+          ),
+      )
+      .optional()
+      .describe(`An optional list of arguments to pass to the function.`),
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+      ),
+    dialogAction: zod
+      .string()
+      .optional()
+      .describe(
+        'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+      ),
+    waitForStableDom: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+      ),
+    serviceWorkerId: zod
+      .string()
+      .optional()
+      .describe(
+        `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
+      ),
+  };
+
+  if (!cliArgs.pageIdRouting) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (schema as any).pageId;
+  } else if (cliArgs.pageIdRouting && cliArgs.categoryExtensions) {
+    schema.pageId = zod
+      .number()
+      .optional()
+      .describe(
+        'Targets a specific page by ID. Required when not evaluating in a service worker.',
+      );
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (schema as any).pageId;
+  }
+
+  if (!cliArgs.categoryExtensions) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (schema as any).serviceWorkerId;
+  }
+
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the target page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the target page${cliArgs.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
       conditions: ['javascriptEvaluation'],
     },
-    schema: {
-      ...(cliArgs?.pageIdRouting
-        ? cliArgs.categoryExtensions
-          ? {
-              pageId: zod
-                .number()
-                .optional()
-                .describe(
-                  'Targets a specific page by ID. Required when not evaluating in a service worker.',
-                ),
-            }
-          : pageIdSchema
-        : {}),
-      function: zod.string().describe(
-        `A JavaScript function declaration to be executed by the tool in the target page.
-Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
-Example with arguments: \`(el) => el.innerText\`
-`,
-      ),
-      args: zod
-        .array(
-          zod
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
-        )
-        .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
-      filePath: zod
-        .string()
-        .optional()
-        .describe(
-          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
-        ),
-      dialogAction: zod
-        .string()
-        .optional()
-        .describe(
-          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
-        ),
-      waitForStableDom: zod
-        .boolean()
-        .optional()
-        .describe(
-          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
-        ),
-      ...(cliArgs?.categoryExtensions
-        ? {
-            serviceWorkerId: zod
-              .string()
-              .optional()
-              .describe(
-                `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
-              ),
-          }
-        : {}),
-    },
+    schema,
     blockedByDialog: true,
     verifyFilesSchema: {
       filePath: true,
@@ -96,7 +104,7 @@ Example with arguments: \`(el) => el.innerText\`
         waitForStableDom,
       } = request.params;
 
-      if (cliArgs?.categoryExtensions && serviceWorkerId) {
+      if (cliArgs.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
           throw new Error(
             'args (element uids) cannot be used when evaluating in a service worker.',
@@ -112,7 +120,7 @@ Example with arguments: \`(el) => el.innerText\`
           .waitForEventsAfterAction(
             async () => {
               await performEvaluation(worker, fnString, [], response, {
-                filePath,
+                ...(filePath ? {filePath} : {}),
                 context,
               });
             },
@@ -126,12 +134,12 @@ Example with arguments: \`(el) => el.innerText\`
         return;
       }
 
-      if (cliArgs?.categoryExtensions && cliArgs?.pageIdRouting && !pageId) {
+      if (cliArgs.categoryExtensions && cliArgs.pageIdRouting && !pageId) {
         throw new Error('specify either a pageId or a serviceWorkerId.');
       }
 
       const mcpPage =
-        cliArgs?.pageIdRouting && request.params.pageId
+        cliArgs.pageIdRouting && request.params.pageId
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
@@ -168,7 +176,7 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options?: {filePath: string; context: Context},
+  options?: {filePath?: string; context: Context},
 ) => {
   using fn = await evaluatable.evaluateHandle(`(${fnString})`);
 

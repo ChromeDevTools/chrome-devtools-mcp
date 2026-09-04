@@ -45,7 +45,7 @@ describe('console', () => {
   it('captures logs and errors from extension service worker', async t => {
     await withMcpContext(
       async (response, context) => {
-        await installExtension.handler(
+        await installExtension().handler(
           {params: {path: EXTENSION_LOGGING_PATH}},
           response,
           context,
@@ -389,7 +389,7 @@ describe('console', () => {
           response,
           context,
         );
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -424,7 +424,7 @@ describe('console', () => {
           );
           const response2 = new McpResponse({} as ParsedArguments);
           response2.setPage(context.getSelectedMcpPage());
-          await getConsoleMessage.handler(
+          await getConsoleMessage().handler(
             {params: {msgid: 1}, page: context.getSelectedMcpPage()},
             response2,
             context,
@@ -480,7 +480,7 @@ describe('console', () => {
           );
           const response2 = new McpResponse({} as ParsedArguments);
           response2.setPage(context.getSelectedMcpPage());
-          await getConsoleMessage.handler(
+          await getConsoleMessage().handler(
             {params: {msgid: id}, page: context.getSelectedMcpPage()},
             response2,
             context,
@@ -515,7 +515,7 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -544,7 +544,7 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -573,7 +573,7 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -602,7 +602,7 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -631,7 +631,7 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -674,7 +674,7 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         await page.pptrPage.goto(server.getRoute('/index.html'));
 
-        await getConsoleMessage.handler(
+        await getConsoleMessage().handler(
           {params: {msgid: 1}, page: context.getSelectedMcpPage()},
           response,
           context,
@@ -712,7 +712,7 @@ describe('console', () => {
         const dialog = await dialogPromise;
 
         try {
-          await getConsoleMessage.handler(
+          await getConsoleMessage().handler(
             {params: {msgid: 1}, page: context.getSelectedMcpPage()},
             response,
             context,

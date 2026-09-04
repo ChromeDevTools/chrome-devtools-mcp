@@ -17,7 +17,7 @@ import {withMcpContext} from '../../utils.js';
 describe('slim', () => {
   it('evaluates', async t => {
     await withMcpContext(async (response, context) => {
-      await evaluate.handler(
+      await evaluate().handler(
         {
           params: {
             script: `2 * 5`,
@@ -33,7 +33,7 @@ describe('slim', () => {
 
   it('handles errors', async t => {
     await withMcpContext(async (response, context) => {
-      await evaluate.handler(
+      await evaluate().handler(
         {
           params: {
             script: `throw new Error('test error')`,
@@ -188,7 +188,7 @@ describe('slim', () => {
       const fixture = screenshots.basic;
       const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(fixture.html);
-      await screenshot.handler(
+      await screenshot().handler(
         {params: {format: 'png'}, page: context.getSelectedMcpPage()},
         response,
         context,

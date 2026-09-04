@@ -14,6 +14,7 @@ import type {
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
 
@@ -122,7 +123,7 @@ function computeDownscaleClip(
   };
 }
 
-export const screenshot = definePageTool(args => {
+export const screenshot = definePageTool((args: ParsedArguments) => {
   const {
     screenshotFormat,
     screenshotQuality,
