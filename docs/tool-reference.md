@@ -378,8 +378,8 @@
 **Parameters:**
 
 - **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the target page.
-Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
-Example with arguments: `(el) => el.innerText`
+  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
+  Example with arguments: `(el) => el.innerText`
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.

@@ -22,6 +22,7 @@
  *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
+import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
@@ -34,19 +35,64 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
+/**
+ * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
+ * Puppeteer objects (Page, CDPSession, Browser) so tests can trigger events
+ * synchronously without a real browser.
+ */
+export function mockListener() {
+  const listeners: Record<
+    string | symbol | number,
+    Array<(data: unknown) => void>
+  > = {};
+  return {
+    on(eventName: string | symbol | number, listener: (data: unknown) => void) {
+      const arr = listeners[eventName];
+      if (arr) {
+        arr.push(listener);
+      } else {
+        listeners[eventName] = [listener];
+      }
+    },
+    off(
+      _eventName: string | symbol | number,
+      _listener?: (data: unknown) => void,
+    ) {
+      // no-op
+    },
+    emit(eventName: string | symbol | number, data?: unknown) {
+      for (const listener of listeners[eventName] ?? []) {
+        listener(data);
+      }
+    },
+  };
+}
+
 export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   const page = sinon.createStubInstance(
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
+
+  // mainFrame() must return a stable object so tests can pass it back into
+  // page.emit('framenavigated', mainFrame) and have it recognized as the
+  // same frame instance across calls.
+  page.mainFrame.returns({} as Frame);
+
   // _client() is a private internal Puppeteer API used by ConsoleCollector
-  // in the McpPage constructor. Not on the CdpPage prototype, so added explicitly.
-  // @ts-expect-error internal API
-  page._client = sinon.stub().returns({
-    on: sinon.stub(),
-    off: sinon.stub(),
+  // in the McpPage constructor. Not on the CdpPage prototype, so added
+  // explicitly. It needs real on/off/emit behavior so tests can trigger CDP
+  // events directly via cdpSession.emit(...).
+  const cdpListener = mockListener();
+  const cdpSession = {
+    on: sinon.stub().callsFake(cdpListener.on),
+    off: sinon.stub().callsFake(cdpListener.off),
     send: sinon.stub().resolves({}),
     target: sinon.stub().returns({_targetId: '<mock>'}),
-  });
+    emit: cdpListener.emit,
+  };
+  // @ts-expect-error internal API
+  page._client = sinon.stub().returns(cdpSession);
+
   return page;
 }
 
