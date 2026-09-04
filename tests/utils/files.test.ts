@@ -12,6 +12,29 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 
+async function createSymlinkOrSkip(
+  t: it.TestContext,
+  target: string,
+  symlinkPath: string,
+  type?: 'dir' | 'file' | 'junction',
+): Promise<boolean> {
+  try {
+    await fs.symlink(target, symlinkPath, type);
+    return true;
+  } catch (error) {
+    if (
+      os.platform() === 'win32' &&
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'EPERM' || error.code === 'EACCES')
+    ) {
+      t.skip('creating symlinks requires additional privileges on Windows');
+      return false;
+    }
+    throw error;
+  }
+}
+
 describe('resolveCanonicalPath', () => {
   let tmpDir: string;
   let canonicalTmpDir: string;
@@ -60,14 +83,16 @@ describe('resolveCanonicalPath', () => {
     );
   });
 
-  it('should resolve existing files with symlinks in path', async () => {
+  it('should resolve existing files with symlinks in path', async t => {
     const targetDir = path.join(tmpDir, 'target');
     await fs.mkdir(targetDir);
     const targetFile = path.join(targetDir, 'file.txt');
     await fs.writeFile(targetFile, 'hello');
 
     const symlinkDir = path.join(tmpDir, 'symlink_dir');
-    await fs.symlink(targetDir, symlinkDir, 'dir');
+    if (!(await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir'))) {
+      return;
+    }
 
     const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
 
@@ -76,12 +101,14 @@ describe('resolveCanonicalPath', () => {
     assert.strictEqual(resolved, path.join(canonicalTargetDir, 'file.txt'));
   });
 
-  it('should resolve non-existent files with symlinks in path', async () => {
+  it('should resolve non-existent files with symlinks in path', async t => {
     const targetDir = path.join(tmpDir, 'target');
     await fs.mkdir(targetDir);
 
     const symlinkDir = path.join(tmpDir, 'symlink_dir');
-    await fs.symlink(targetDir, symlinkDir, 'dir');
+    if (!(await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir'))) {
+      return;
+    }
 
     const filePathWithSymlink = path.join(symlinkDir, 'non-existent.txt');
 
@@ -93,10 +120,12 @@ describe('resolveCanonicalPath', () => {
     );
   });
 
-  it('should resolve dangling symlink at the end of path', async () => {
+  it('should resolve dangling symlink at the end of path', async t => {
     const nonExistentTarget = path.join(tmpDir, 'non-existent-target.txt');
     const danglingSymlink = path.join(tmpDir, 'dangling-symlink.txt');
-    await fs.symlink(nonExistentTarget, danglingSymlink);
+    if (!(await createSymlinkOrSkip(t, nonExistentTarget, danglingSymlink))) {
+      return;
+    }
 
     const resolved = await resolveCanonicalPath(danglingSymlink);
     assert.strictEqual(
@@ -105,10 +134,19 @@ describe('resolveCanonicalPath', () => {
     );
   });
 
-  it('should resolve path with a dangling symlink directory in the middle', async () => {
+  it('should resolve path with a dangling symlink directory in the middle', async t => {
     const nonExistentTargetDir = path.join(tmpDir, 'non-existent-dir');
     const danglingSymlinkDir = path.join(tmpDir, 'dangling-dir');
-    await fs.symlink(nonExistentTargetDir, danglingSymlinkDir, 'dir');
+    if (
+      !(await createSymlinkOrSkip(
+        t,
+        nonExistentTargetDir,
+        danglingSymlinkDir,
+        'dir',
+      ))
+    ) {
+      return;
+    }
 
     const filePath = path.join(danglingSymlinkDir, 'file.txt');
     const resolved = await resolveCanonicalPath(filePath);
