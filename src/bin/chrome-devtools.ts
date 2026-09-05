@@ -220,19 +220,23 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     name => !args[name].required,
   );
 
+  // Flags are listed in the usage line only: yargs would parse them as
+  // trailing positionals, and a variadic positional must be last.
   let commandStr = commandName;
   for (const arg of requiredArgNames) {
-    commandStr += ` <${arg}>`;
+    commandStr += args[arg].type === 'array' ? ` <${arg}..>` : ` <${arg}>`;
   }
 
+  let usageStr = `$0 ${commandStr}`;
   for (const arg of optionalArgNames) {
-    commandStr += ` [--${arg}]`;
+    usageStr += ` [--${arg}]`;
   }
 
   y.command(
     commandStr,
     commandDef.description,
     y => {
+      y.usage(usageStr);
       y.option('output-format', {
         choices: ['md', 'json'],
         default: 'md',
