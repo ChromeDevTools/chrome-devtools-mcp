@@ -494,12 +494,13 @@ describe('cli args parsing', () => {
       }),
       'cd4a.test.config.mixed.json',
     );
-    const args = parseArguments(['--config', testConfig.path]);
-    assert.strictEqual(args.config, testConfig.path);
-    assert.strictEqual(args.categoryMemory, true);
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file: Unknown argument: no-category-memory/,
+    );
   });
 
-  it('parses config should allow dashed property`', async () => {
+  it('parses config should not allow dashed property', async () => {
     using testConfig = createTempFile(
       JSON.stringify({
         headless: true,
@@ -507,8 +508,9 @@ describe('cli args parsing', () => {
       }),
       'cd4a.test.config.mixed.json',
     );
-    const args = parseArguments(['--config', testConfig.path]);
-    assert.strictEqual(args.config, testConfig.path);
-    assert.strictEqual(args.categoryMemory, false);
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file: Unknown argument: category-memory/,
+    );
   });
 });

@@ -440,7 +440,26 @@ export function parser(
   return yargsInstance
     .config('config', 'Path to JSON configuration file', configPath => {
       try {
-        return JSON.parse(readFileSync(configPath, 'utf-8'));
+        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
+          throw new Error('Config must be a JSON object');
+        }
+
+        return yargs()
+          .parserConfiguration({
+            'strip-aliased': true,
+            'camel-case-expansion': false,
+          })
+          .options(options)
+          .config(parsed)
+          .strict()
+          .fail(false)
+          .exitProcess(false)
+          .parseSync([]);
       } catch (err) {
         throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
       }
