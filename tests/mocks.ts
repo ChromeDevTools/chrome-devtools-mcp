@@ -22,15 +22,13 @@
  *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
-import path from 'node:path';
-
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpPage, ScreenRecorder} from '../src/third_party/index.js';
+import {CdpPage} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -38,7 +36,6 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
-export type MockScreenRecorder = sinon.SinonStubbedInstance<ScreenRecorder>;
 
 /**
  * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
@@ -101,12 +98,6 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   return page;
 }
 
-export function createMockScreenRecorder(): MockScreenRecorder {
-  const recorder = sinon.createStubInstance(ScreenRecorder);
-  recorder.stop.resolves();
-  return recorder;
-}
-
 export function createMockMcpPage(
   options: {pptrPage?: sinon.SinonStubbedInstance<Page>} = {},
 ): MockMcpPage {
@@ -127,23 +118,11 @@ export function createMockMcpContext(
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
 
-  let screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
-    null;
+  let screenRecorderData: ReturnType<McpContext['getScreenRecorder']> = null;
   context.getScreenRecorder.callsFake(() => screenRecorderData);
   context.setScreenRecorder.callsFake(data => {
     screenRecorderData = data;
   });
-
-  context.ensureExtension.callsFake(
-    async <Extension extends `.${string}`>(
-      filePath: string,
-      extension: Extension,
-    ) => {
-      const ext = path.extname(filePath);
-      const res: `${string}${Extension}` = `${filePath.slice(0, filePath.length - ext.length)}${extension}`;
-      return res;
-    },
-  );
 
   return context;
 }
