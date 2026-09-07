@@ -675,6 +675,10 @@ export class McpResponse implements Response {
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
   }> {
+    if (this.#attachedWaitForResult?.newPages?.length && !this.#includePages) {
+      await context.createPagesSnapshot();
+    }
+
     const [
       snapshot,
       detailedNetworkRequest,
@@ -784,6 +788,7 @@ export class McpResponse implements Response {
         defaultValue?: string;
       };
       pages?: object[];
+      newPages?: object[];
       pagination?: object;
       heapSnapshot?: {
         stats?: object;
@@ -855,6 +860,29 @@ export class McpResponse implements Response {
         );
         structuredContent.navigatedToUrl =
           this.#attachedWaitForResult.navigatedToUrl;
+      }
+      if (this.#attachedWaitForResult.newPages?.length) {
+        const mcpPagesByPptrPage = new Map(
+          context.getPages().map(mcpPage => [mcpPage.pptrPage, mcpPage]),
+        );
+        const newPages = this.#attachedWaitForResult.newPages.flatMap(page => {
+          const mcpPage = mcpPagesByPptrPage.get(page);
+          return mcpPage ? [mcpPage] : [];
+        });
+
+        if (newPages.length) {
+          response.push('## New pages');
+          const structuredPages = [];
+          for (const mcpPage of newPages) {
+            const title = await fetchPageTitle(mcpPage.pptrPage);
+            const pageLabel = title
+              ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
+              : mcpPage.pptrPage.url();
+            response.push(`${mcpPage.id}: ${pageLabel}`);
+            structuredPages.push(createStructuredPage(mcpPage, context, title));
+          }
+          structuredContent.newPages = structuredPages;
+        }
       }
     }
 
