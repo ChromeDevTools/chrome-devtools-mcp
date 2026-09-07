@@ -643,6 +643,39 @@ describe('console', () => {
       });
     });
 
+    it('does not apply source maps when sourceMaps is false', async () => {
+      server.addRoute('/main.min.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function n(){throw new Error("b00m!")}function o(){n()}(function n(){o()})();
+          //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJiYXIiLCJFcnJvciIsImZvbyIsIklpZmUiXSwic291cmNlcyI6WyIuL21haW4uanMiXSwic291cmNlc0NvbnRlbnQiOlsiXG5mdW5jdGlvbiBiYXIoKSB7XG4gIHRocm93IG5ldyBFcnJvcignYjAwbSEnKTtcbn1cblxuZnVuY3Rpb24gZm9vKCkge1xuICBiYXIoKTtcbn1cblxuKGZ1bmN0aW9uIElpZmUoKSB7XG4gIGZvbygpO1xufSkoKTtcblxuIl0sIm1hcHBpbmdzIjoiQUFDQSxTQUFTQSxJQUNQLE1BQU0sSUFBSUMsTUFBTSxRQUNsQixDQUVBLFNBQVNDLElBQ1BGLEdBQ0YsRUFFQSxTQUFVRyxJQUNSRCxHQUNELEVBRkQiLCJpZ25vcmVMaXN0IjpbXX0=
+        `);
+      });
+      server.addHtmlRoute(
+        '/index.html',
+        `<script src="${server.getRoute('/main.min.js')}"></script>`,
+      );
+
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage();
+          await page.pptrPage.goto(server.getRoute('/index.html'));
+
+          await getConsoleMessage.handler(
+            {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle(context);
+          const rawText = getTextContent(formattedResponse.content[0]);
+
+          assert.ok(rawText.includes('main.min.js'));
+          assert.ok(!rawText.includes('main.js'));
+        },
+        {sourceMaps: false},
+      );
+    });
+
     it('ignores frames from ignore listed URLs', async t => {
       server.addHtmlRoute(
         '/index.html',
