@@ -11,117 +11,11 @@ import os from 'node:os';
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
 import {getCategoryOptions} from './category-options.js';
+import {getBrowserOptions} from './browser-options.js';
 
 export const mcpOptions = {
   ...getCategoryOptions(),
-  autoConnect: {
-    type: 'boolean',
-    description:
-      'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
-    conflicts: ['isolated', 'executablePath'],
-    default: false,
-    coerce: (value: boolean | undefined) => {
-      if (!value) {
-        return;
-      }
-      return value;
-    },
-  },
-  browserUrl: {
-    type: 'string',
-    description:
-      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.',
-    alias: 'u',
-    conflicts: ['wsEndpoint'],
-    coerce: (url: string | undefined) => {
-      if (!url) {
-        return;
-      }
-      try {
-        new URL(url);
-      } catch {
-        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
-      }
-      return url;
-    },
-  },
-  wsEndpoint: {
-    type: 'string',
-    description:
-      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
-    alias: 'w',
-    conflicts: ['browserUrl'],
-    coerce: (url: string | undefined) => {
-      if (!url) {
-        return;
-      }
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
-          throw new Error(
-            `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
-          );
-        }
-        return url;
-      } catch (error) {
-        if ((error as Error).message.includes('ws://')) {
-          throw error;
-        }
-        throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
-      }
-    },
-  },
-  wsHeaders: {
-    type: 'string',
-    description:
-      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    implies: 'wsEndpoint',
-    coerce: (val: string | undefined) => {
-      if (!val) {
-        return;
-      }
-      try {
-        const parsed = JSON.parse(val);
-        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('Headers must be a JSON object');
-        }
-        return parsed as Record<string, string>;
-      } catch (error) {
-        throw new Error(
-          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
-        );
-      }
-    },
-  },
-  headless: {
-    type: 'boolean',
-    description: 'Whether to run in headless (no UI) mode.',
-    default: false,
-  },
-  executablePath: {
-    type: 'string',
-    description: 'Path to custom Chrome executable.',
-    conflicts: ['browserUrl', 'wsEndpoint'],
-    alias: 'e',
-  },
-  isolated: {
-    type: 'boolean',
-    description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
-  },
-  userDataDir: {
-    type: 'string',
-    description:
-      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
-    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
-  },
-  channel: {
-    type: 'string',
-    description:
-      'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['canary', 'dev', 'beta', 'stable'] as const,
-    conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
-  },
+  ...getBrowserOptions(),
   logFile: {
     type: 'string',
     describe:
@@ -144,10 +38,6 @@ export const mcpOptions = {
         height,
       };
     },
-  },
-  proxyServer: {
-    type: 'string',
-    description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
   },
   acceptInsecureCerts: {
     type: 'boolean',
@@ -229,11 +119,6 @@ export const mcpOptions = {
       return value;
     },
   },
-  chromeArg: {
-    type: 'array',
-    describe:
-      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-  },
   blockedUrlPattern: {
     type: 'array',
     describe:
@@ -245,11 +130,6 @@ export const mcpOptions = {
     describe:
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['blockedUrlPattern'],
-  },
-  ignoreDefaultChromeArg: {
-    type: 'array',
-    describe:
-      'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
   performanceCrux: {
     type: 'boolean',
