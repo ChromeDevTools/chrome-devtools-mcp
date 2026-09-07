@@ -28,13 +28,24 @@ async function getSourceBox(
 ): Promise<SourceBox | undefined> {
   if (element) {
     const viewport = page.viewport();
-    const [box, devicePixelRatio] = await Promise.all([
+    const [box, metrics] = await Promise.all([
       element.boundingBox(),
-      viewport
-        ? (viewport.deviceScaleFactor ?? 1)
-        : page.evaluate(() => window.devicePixelRatio),
+      page.evaluate(() => ({
+        x: window.scrollX,
+        y: window.scrollY,
+        devicePixelRatio: window.devicePixelRatio,
+      })),
     ]);
-    return box ? {...box, devicePixelRatio} : undefined;
+    return box
+      ? {
+          ...box,
+          x: box.x + metrics.x,
+          y: box.y + metrics.y,
+          devicePixelRatio: viewport
+            ? (viewport.deviceScaleFactor ?? 1)
+            : metrics.devicePixelRatio,
+        }
+      : undefined;
   }
   if (fullPage) {
     const dims = await page.evaluate(() => ({
@@ -60,10 +71,19 @@ async function getSourceBox(
     };
   }
   const viewport = page.viewport();
+  // Clips use page coordinates. Read the scroll offset alongside the native
+  // dimensions used when no viewport is emulated.
+  const dims = await page.evaluate(() => ({
+    x: window.scrollX,
+    y: window.scrollY,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+  }));
   if (viewport) {
     return {
-      x: 0,
-      y: 0,
+      x: dims.x,
+      y: dims.y,
       width: viewport.width,
       height: viewport.height,
       devicePixelRatio: viewport.deviceScaleFactor ?? 1,
@@ -72,17 +92,12 @@ async function getSourceBox(
   // The browser is launched and connected with `defaultViewport: null`, so
   // `page.viewport()` stays null until something emulates one. Fall back to the
   // window's own dimensions, which is the area a viewport screenshot captures.
-  const dims = await page.evaluate(() => ({
-    width: window.innerWidth,
-    height: window.innerHeight,
-    devicePixelRatio: window.devicePixelRatio,
-  }));
   if (dims.width <= 0 || dims.height <= 0) {
     return undefined;
   }
   return {
-    x: 0,
-    y: 0,
+    x: dims.x,
+    y: dims.y,
     width: dims.width,
     height: dims.height,
     devicePixelRatio: dims.devicePixelRatio,

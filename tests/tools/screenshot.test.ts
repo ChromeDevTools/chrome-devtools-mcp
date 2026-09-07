@@ -13,6 +13,7 @@ import {describe, it, afterEach} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import {parseArguments} from '../../src/config/mcp-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
@@ -402,6 +403,89 @@ describe('screenshot', () => {
         assert.equal(pngHeight(buf), 75);
       });
     });
+
+    for (const mode of ['emulated viewport', 'native viewport', 'element']) {
+      it(`preserves the scrolled region when downscaling ${mode} screenshots`, async () => {
+        const tool = screenshot({
+          ...parseArguments('1.0.0', ['node', 'test']),
+          screenshotMaxWidth: 100,
+        });
+        await withMcpContext(async (response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          const pptrPage = mcpPage.pptrPage;
+          if (mode === 'emulated viewport') {
+            await pptrPage.setViewport({width: 800, height: 600});
+          }
+          await pptrPage.setContent(html`
+            <style>
+              body {
+                margin: 0;
+                width: calc(100vw + 800px);
+                height: calc(100vh + 1000px);
+                background: red;
+              }
+              button {
+                position: absolute;
+                left: ${mode === 'element' ? '920px' : '800px'};
+                top: ${mode === 'element' ? '1080px' : '1000px'};
+                width: ${mode === 'element' ? '400px' : '100vw'};
+                height: ${mode === 'element' ? '300px' : '100vh'};
+                border: 0;
+                background: linear-gradient(to right, blue 50%, lime 50%);
+              }
+            </style>
+            <button aria-label="Target"></button>
+          `);
+          await pptrPage.evaluate(() => window.scrollTo(800, 1000));
+          assert.deepStrictEqual(
+            await pptrPage.evaluate(() => [window.scrollX, window.scrollY]),
+            [800, 1000],
+          );
+          if (mode === 'element') {
+            mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+          }
+
+          await tool.handler(
+            {
+              params: {
+                format: 'png',
+                uid: mode === 'element' ? '1_1' : undefined,
+              },
+              page: mcpPage,
+            },
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          const data = response.images[0].data;
+          assert.equal(pngWidth(Buffer.from(data, 'base64')), 100);
+          const pixels = await pptrPage.evaluate(async data => {
+            const image = new Image();
+            image.src = `data:image/png;base64,${data}`;
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) {
+              throw new Error('Could not create a 2D canvas context');
+            }
+            context.drawImage(image, 0, 0);
+            return [
+              [...context.getImageData(10, 10, 1, 1).data],
+              [...context.getImageData(90, 10, 1, 1).data],
+            ];
+          }, data);
+          assert.deepStrictEqual(pixels, [
+            [0, 0, 255, 255],
+            [0, 255, 0, 255],
+          ]);
+          assert.deepStrictEqual(
+            await pptrPage.evaluate(() => [window.scrollX, window.scrollY]),
+            [800, 1000],
+          );
+        });
+      });
+    }
 
     it('honors screenshotMaxWidth at device scale factors above 1', async () => {
       const tool = screenshot({
