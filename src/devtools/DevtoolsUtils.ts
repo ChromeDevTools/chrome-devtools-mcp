@@ -137,8 +137,13 @@ export interface TargetUniverse {
   session: CDPSession;
 }
 
+export interface CreateTargetUniverseOptions {
+  sourceMaps?: boolean;
+}
+
 export async function createTargetUniverse(
   session: CDPSession,
+  options?: CreateTargetUniverseOptions,
 ): Promise<TargetUniverse> {
   const settingStorage = new DevTools.Common.Settings.SettingsStorage({});
   const universe = new DevTools.Foundation.Universe.Universe({
@@ -155,6 +160,17 @@ export async function createTargetUniverse(
       DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
     supportsEmulation: false,
   });
+
+  const sourceMaps = options?.sourceMaps ?? true;
+  const jsSourceMapsSetting = universe.settings.resolve(
+    DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor,
+  );
+  jsSourceMapsSetting.set(sourceMaps);
+
+  const cssSourceMapsSetting = universe.settings.resolve(
+    DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor,
+  );
+  cssSourceMapsSetting.set(sourceMaps);
 
   const setting = universe.settings.resolve(
     DevTools.SourceMapManager.lazyLoadingSettingDescriptor,
