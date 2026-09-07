@@ -11,7 +11,7 @@ import type {
   Protocol,
   Issue,
 } from '../third_party/index.js';
-import {DevTools} from '../third_party/index.js';
+import {DevTools, FrameEvent} from '../third_party/index.js';
 import {
   type Frame,
   type Handler,
@@ -48,6 +48,8 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
 export class PageCollector<T> {
   protected pptrPage: Page;
   #listeners?: ListenerMap<PageEvents>;
+  #mainFrame: Frame;
+  #pendingSameDocumentNavigation = false;
   protected maxNavigationSaved = 3;
 
   /**
@@ -63,6 +65,11 @@ export class PageCollector<T> {
     maxResourcesPerNavigation?: number,
   ) {
     this.pptrPage = page;
+    this.#mainFrame = page.mainFrame();
+    this.#mainFrame.on(
+      FrameEvent.FrameNavigatedWithinDocument,
+      this.#onFrameNavigatedWithinDocument,
+    );
 
     const idGenerator = createIdGenerator();
 
@@ -86,6 +93,14 @@ export class PageCollector<T> {
       if (frame !== this.pptrPage.mainFrame()) {
         return;
       }
+      // Same-document (SPA) navigations also emit `framenavigated`, but they
+      // must not rotate the retained history. Puppeteer emits
+      // `FrameNavigatedWithinDocument` right before `FrameNavigated` for such
+      // navigations, so consume the flag here to skip the split.
+      if (this.#pendingSameDocumentNavigation) {
+        this.#pendingSameDocumentNavigation = false;
+        return;
+      }
       this.splitAfterNavigation();
     };
 
@@ -97,12 +112,23 @@ export class PageCollector<T> {
   }
 
   dispose() {
+    this.#mainFrame.off(
+      FrameEvent.FrameNavigatedWithinDocument,
+      this.#onFrameNavigatedWithinDocument,
+    );
     if (this.#listeners) {
       for (const [name, listener] of Object.entries(this.#listeners)) {
         this.pptrPage.off(name, listener as Handler<unknown>);
       }
     }
   }
+
+  // Puppeteer emits this right before the page-level navigation event for
+  // same-document (SPA) navigations, which lets `framenavigated` skip the
+  // history rotation for those navigations.
+  #onFrameNavigatedWithinDocument = () => {
+    this.#pendingSameDocumentNavigation = true;
+  };
 
   protected splitAfterNavigation() {
     // Add the latest navigation first

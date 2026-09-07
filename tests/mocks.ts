@@ -84,8 +84,9 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
 
   // mainFrame() must return a stable object so tests can pass it back into
   // page.emit('framenavigated', mainFrame) and have it recognized as the
-  // same frame instance across calls.
-  page.mainFrame.returns({} as Frame);
+  // same frame instance across calls. It also needs real on/off/emit so the
+  // PageCollector can subscribe to `FrameEvent.FrameNavigatedWithinDocument`.
+  page.mainFrame.returns(mockListener() as unknown as Frame);
 
   // _client() is a private internal Puppeteer API used by ConsoleCollector
   // in the McpPage constructor. Not on the CdpPage prototype, so added

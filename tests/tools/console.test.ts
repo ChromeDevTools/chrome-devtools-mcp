@@ -155,6 +155,36 @@ describe('console', () => {
       });
     });
 
+    describe('same-document navigation', () => {
+      const server = serverHooks();
+
+      it('preserves console messages across same-document navigations', async () => {
+        await withMcpContext(async (response, context) => {
+          const page = context.getSelectedMcpPage();
+          server.addHtmlRoute(
+            '/spa',
+            '<script>console.log("before-navigation")</script>',
+          );
+          await page.pptrPage.goto(server.getRoute('/spa'));
+          await page.pptrPage.evaluate(() => {
+            history.pushState({}, '', '/route');
+          });
+          await page.pptrPage.evaluate(() => {
+            console.log('after-navigation');
+          });
+          await listConsoleMessages().handler(
+            {params: {}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+          const formattedResponse = await response.handle(context);
+          const textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('before-navigation'));
+          assert.ok(textContent.includes('after-navigation'));
+        });
+      });
+    });
+
     it('lists error messages', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage();
