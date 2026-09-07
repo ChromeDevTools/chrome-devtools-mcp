@@ -392,6 +392,7 @@ describe('emulation', () => {
         response,
         context,
       );
+      sinon.assert.calledTwice(page.emulate);
       sinon.assert.calledWithExactly(page.emulate.secondCall, {
         userAgent: 'UA2',
       });
@@ -429,7 +430,7 @@ describe('emulation', () => {
   });
 
   describe('extraHttpHeaders', () => {
-    it('sets extra headers on requests', async () => {
+    it('emulates extraHttpHeaders', async () => {
       const {page, context, response} = createHandlerMocks();
       await emulate.handler(
         {
@@ -533,6 +534,7 @@ describe('emulation', () => {
         response,
         context,
       );
+      sinon.assert.calledTwice(page.emulate);
       sinon.assert.calledWithExactly(page.emulate.secondCall, {
         colorScheme: 'light',
       });

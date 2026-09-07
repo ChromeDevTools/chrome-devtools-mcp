@@ -296,7 +296,13 @@ describe('McpPage', () => {
         hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
         locatorClass: Locator,
       });
-      return {mcpPage, pptrPage};
+      const mockSession = {
+        send: sinon.stub().resolves(),
+      };
+      sinon
+        .stub(mcpPage, 'devtoolsUniverse')
+        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+      return {mcpPage, pptrPage, mockSession};
     }
 
     it('calls emulateNetworkConditions with offline settings', async () => {
@@ -327,6 +333,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({networkConditions: 'Slow 3G'});
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.networkConditions, null);
+      sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
       sinon.assert.calledWithExactly(
         pptrPage.emulateNetworkConditions.secondCall,
         null,
@@ -363,6 +370,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({cpuThrottlingRate: 4});
       await mcpPage.emulate({cpuThrottlingRate: 1});
       assert.strictEqual(mcpPage.cpuThrottlingRate, 1);
+      sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
       sinon.assert.calledWithExactly(
         pptrPage.emulateCPUThrottling.secondCall,
         1,
@@ -370,13 +378,7 @@ describe('McpPage', () => {
     });
 
     it('sends Emulation.setCPUThrottlingRate to secondary session if present', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
-      const mockSession = {
-        send: sinon.stub().resolves(),
-      };
-      sinon
-        .stub(mcpPage, 'devtoolsUniverse')
-        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+      const {mcpPage, pptrPage, mockSession} = createMcpPage();
       await mcpPage.emulate({cpuThrottlingRate: 4});
       sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
       sinon.assert.calledOnceWithExactly(
@@ -387,13 +389,7 @@ describe('McpPage', () => {
     });
 
     it('sends Emulation.setCPUThrottlingRate with rate 1 to secondary session when cpuThrottlingRate is omitted', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
-      const mockSession = {
-        send: sinon.stub().resolves(),
-      };
-      sinon
-        .stub(mcpPage, 'devtoolsUniverse')
-        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+      const {mcpPage, pptrPage, mockSession} = createMcpPage();
       await mcpPage.emulate({});
       sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 1);
       sinon.assert.calledOnceWithExactly(
@@ -425,6 +421,7 @@ describe('McpPage', () => {
       });
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.geolocation, null);
+      sinon.assert.calledTwice(pptrPage.setGeolocation);
       sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, {
         latitude: 0,
         longitude: 0,
@@ -445,6 +442,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({userAgent: 'TestUA/1.0'});
       await mcpPage.emulate({userAgent: ''});
       assert.strictEqual(mcpPage.userAgent, null);
+      sinon.assert.calledTwice(pptrPage.setUserAgent);
       sinon.assert.calledWithExactly(pptrPage.setUserAgent.secondCall, {
         userAgent: undefined,
       });
@@ -464,6 +462,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({colorScheme: 'dark'});
       await mcpPage.emulate({colorScheme: 'auto'});
       assert.strictEqual(mcpPage.colorScheme, null);
+      sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
       sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
         {name: 'prefers-color-scheme', value: ''},
       ]);
@@ -475,26 +474,22 @@ describe('McpPage', () => {
         viewport: {
           width: 400,
           height: 400,
-          deviceScaleFactor: 2,
-          isMobile: true,
-          hasTouch: true,
-          isLandscape: false,
         },
       });
       assert.deepStrictEqual(mcpPage.viewport, {
         width: 400,
         height: 400,
-        deviceScaleFactor: 2,
-        isMobile: true,
-        hasTouch: true,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
         isLandscape: false,
       });
       sinon.assert.calledOnceWithExactly(pptrPage.setViewport, {
         width: 400,
         height: 400,
-        deviceScaleFactor: 2,
-        isMobile: true,
-        hasTouch: true,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
         isLandscape: false,
       });
     });
@@ -504,6 +499,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({viewport: {width: 400, height: 400}});
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.viewport, null);
+      sinon.assert.calledTwice(pptrPage.setViewport);
       sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, null);
     });
 
@@ -527,6 +523,7 @@ describe('McpPage', () => {
       });
       await mcpPage.emulate({extraHttpHeaders: {}});
       assert.strictEqual(mcpPage.emulationSettings.extraHttpHeaders, undefined);
+      sinon.assert.calledTwice(pptrPage.setExtraHTTPHeaders);
       sinon.assert.calledWithExactly(
         pptrPage.setExtraHTTPHeaders.secondCall,
         {},
