@@ -21,6 +21,12 @@ export function bucketizeLatency(latencyMs: number): number {
   return LATENCY_BUCKETS[LATENCY_BUCKETS.length - 1];
 }
 
+export const MAX_ACTIVE_DAYS = 31;
+
+export function bucketizeDaysSince(days: number): number {
+  return Math.min(days, MAX_ACTIVE_DAYS);
+}
+
 export const PARAM_BLOCKLIST = new Set(['uid', 'reqid', 'msgid']);
 
 const SUPPORTED_ZOD_TYPES = [
