@@ -17,7 +17,7 @@ import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 import {createMockPuppeteerPage} from './mocks.js';
 
-import {withMcpContext} from './utils.js';
+import {html, withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -528,6 +528,99 @@ describe('McpPage', () => {
         pptrPage.setExtraHTTPHeaders.secondCall,
         {},
       );
+    });
+  });
+
+  describe('waitForTextOnPage()', () => {
+    it('finds text on the page', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Hello']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with any-match array', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><span>Status</span><div>Error</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Complete', 'Error']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with any-match array when element shows up later', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        const waitPromise = mcpPage.waitForTextOnPage(['Complete', 'Error']);
+
+        await page.setContent(
+          html`<main
+            ><span>Hello</span><span> </span><div>Complete</div></main
+          >`,
+        );
+
+        const element = await waitPromise;
+        assert.ok(element);
+      });
+    });
+
+    it('works with element that shows up later', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        const waitPromise = mcpPage.waitForTextOnPage(['Hello World']);
+
+        await page.setContent(
+          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
+        );
+
+        const element = await waitPromise;
+        assert.ok(element);
+      });
+    });
+
+    it('works with aria elements', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><h1>Header</h1><div>Text</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Header']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with iframe content', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<h1>Top level</h1>
+            <iframe srcdoc="<p>Hello iframe</p>"></iframe>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
+        assert.ok(element);
+      });
     });
   });
 });
