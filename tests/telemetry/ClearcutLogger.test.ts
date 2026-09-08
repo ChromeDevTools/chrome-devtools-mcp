@@ -25,9 +25,7 @@ describe('ClearcutLogger', () => {
   beforeEach(() => {
     ClearcutLogger.resetForTesting();
     mockPersistence = sinon.createStubInstance(FilePersistence, {
-      loadState: Promise.resolve({
-        lastActive: '',
-      }),
+      loadState: Promise.resolve({}),
     });
     mockWatchdogClient = sinon.createStubInstance(WatchdogClient);
   });
@@ -298,9 +296,7 @@ describe('ClearcutLogger', () => {
     });
 
     it('logs daily active with -1 if lastActive is missing', async () => {
-      mockPersistence.loadState.resolves({
-        lastActive: '',
-      });
+      mockPersistence.loadState.resolves({});
 
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,
@@ -315,6 +311,161 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.daily_active?.days_since_last_active, -1);
       assert(mockPersistence.saveState.called);
+    });
+  });
+
+  describe('tool_active logging', () => {
+    it('logs tool active with -1 on first tool call when lastToolCall is not set', async () => {
+      mockPersistence.loadState.resolves({});
+
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      // Wait for initial loadState to populate #state
+      await Promise.resolve();
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      assert.strictEqual(mockWatchdogClient.send.callCount, 2);
+      const activeCall = mockWatchdogClient.send.args.find(
+        args => args[0].payload.tool_active !== undefined,
+      );
+      assert.ok(activeCall);
+      assert.strictEqual(
+        activeCall[0].payload.tool_active?.days_since_last_tool_call,
+        -1,
+      );
+
+      const invocationCall = mockWatchdogClient.send.args.find(
+        args => args[0].payload.tool_invocation !== undefined,
+      );
+      assert.ok(invocationCall);
+      assert.strictEqual(
+        invocationCall[0].payload.tool_invocation?.tool_name,
+        'test_tool',
+      );
+
+      assert(mockPersistence.saveState.calledOnce);
+      const savedState = mockPersistence.saveState.firstCall.args[0];
+      assert.ok(savedState.lastToolCall);
+    });
+
+    it('does not log tool active on subsequent tool calls on the same day', async () => {
+      mockPersistence.loadState.resolves({
+        lastToolCall: new Date().toISOString(),
+      });
+
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      await Promise.resolve();
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      assert.strictEqual(mockWatchdogClient.send.callCount, 1);
+      assert.strictEqual(
+        mockWatchdogClient.send.firstCall.args[0].payload.tool_invocation
+          ?.tool_name,
+        'test_tool',
+      );
+      assert(mockPersistence.saveState.notCalled);
+    });
+
+    it('caps days_since_last_tool_call at 31 if lastToolCall was > 30 days ago', async () => {
+      const fortyDaysAgo = new Date();
+      fortyDaysAgo.setDate(fortyDaysAgo.getDate() - 40);
+
+      mockPersistence.loadState.resolves({
+        lastToolCall: fortyDaysAgo.toISOString(),
+      });
+
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      await Promise.resolve();
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      assert.strictEqual(mockWatchdogClient.send.callCount, 2);
+      const activeCall = mockWatchdogClient.send.args.find(
+        args => args[0].payload.tool_active !== undefined,
+      );
+      assert.ok(activeCall);
+      assert.strictEqual(
+        activeCall[0].payload.tool_active?.days_since_last_tool_call,
+        31,
+      );
+    });
+
+    it('deduplicates when another process updated the state file to today', async () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      mockPersistence.loadState.onFirstCall().resolves({
+        lastToolCall: yesterday.toISOString(),
+      });
+      mockPersistence.loadState.onSecondCall().resolves({
+        lastToolCall: new Date().toISOString(),
+      });
+
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      await Promise.resolve();
+
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 100,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      assert.strictEqual(mockWatchdogClient.send.callCount, 1);
+      assert.strictEqual(
+        mockWatchdogClient.send.firstCall.args[0].payload.tool_invocation
+          ?.tool_name,
+        'test_tool',
+      );
+      assert(mockPersistence.saveState.notCalled);
     });
   });
 
