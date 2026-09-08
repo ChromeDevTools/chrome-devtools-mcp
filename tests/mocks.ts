@@ -103,12 +103,7 @@ export function createMockMcpPage(
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
-  Object.defineProperty(page, 'pptrPage', {
-    value: pptrPage,
-    writable: true,
-    configurable: true,
-  });
-  return page as unknown as MockMcpPage;
+  return Object.assign(page, {pptrPage});
 }
 
 export function createMockMcpContext(
@@ -117,12 +112,6 @@ export function createMockMcpContext(
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
-
-  let screenRecorderData: ReturnType<McpContext['getScreenRecorder']> = null;
-  context.getScreenRecorder.callsFake(() => screenRecorderData);
-  context.setScreenRecorder.callsFake(data => {
-    screenRecorderData = data;
-  });
 
   return context;
 }
