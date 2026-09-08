@@ -283,27 +283,25 @@ describe('McpPage', () => {
     });
   });
 
+  function createMcpPage(options: {hasNetworkBlockOrAllowlist?: boolean} = {}) {
+    const pptrPage = createMockPuppeteerPage();
+    const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
+      hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
+      locatorClass: Locator,
+    });
+    const mockSession = {
+      send: sinon.stub().resolves(),
+    };
+    sinon
+      .stub(mcpPage, 'devtoolsUniverse')
+      .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+    return {mcpPage, pptrPage, mockSession};
+  }
+
   describe('emulate()', () => {
     afterEach(() => {
       sinon.restore();
     });
-
-    function createMcpPage(
-      options: {hasNetworkBlockOrAllowlist?: boolean} = {},
-    ) {
-      const pptrPage = createMockPuppeteerPage();
-      const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
-        hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
-        locatorClass: Locator,
-      });
-      const mockSession = {
-        send: sinon.stub().resolves(),
-      };
-      sinon
-        .stub(mcpPage, 'devtoolsUniverse')
-        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
-      return {mcpPage, pptrPage, mockSession};
-    }
 
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = createMcpPage();
@@ -621,6 +619,56 @@ describe('McpPage', () => {
         const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
         assert.ok(element);
       });
+    });
+  });
+
+  describe('DevToolsCommentBridge lifecycle', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('does not create commentBridge on construction or getDevToolsPage', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      pptrPage.hasDevTools.resolves(true);
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const retrieved = await mcpPage.getDevToolsPage();
+      assert.strictEqual(retrieved, devtoolsPage);
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+    });
+
+    it('creates and attaches commentBridge when openDevTools is called', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const result = await mcpPage.openDevTools();
+      assert.strictEqual(result, devtoolsPage);
+      assert.notStrictEqual(mcpPage.commentBridge, undefined);
+      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    });
+
+    it('disposes commentBridge on mcpPage.dispose()', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      await mcpPage.openDevTools();
+      const bridge = mcpPage.commentBridge;
+      assert.notStrictEqual(bridge, undefined);
+
+      if (bridge) {
+        const disposeSpy = sinon.spy(bridge, 'dispose');
+        mcpPage.dispose();
+
+        sinon.assert.calledOnce(disposeSpy);
+        assert.strictEqual(mcpPage.commentBridge, undefined);
+      }
     });
   });
 });

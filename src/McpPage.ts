@@ -55,6 +55,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
   type TargetUniverse,
@@ -139,6 +140,8 @@ export class McpPage implements ContextPage {
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
   #sourceMaps: boolean;
+  #commentBridge?: DevToolsCommentBridge;
+  #onNotification?: (message: string) => void;
 
   constructor(
     page: Page,
@@ -149,12 +152,14 @@ export class McpPage implements ContextPage {
       isolatedContextName?: string;
       navigationTimeout?: number;
       sourceMaps?: boolean;
+      onNotification?: (message: string) => void;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
+    this.#onNotification = options.onNotification;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -352,8 +357,30 @@ export class McpPage implements ContextPage {
     return this.networkCollector.getIdForResource(request);
   }
 
+  resolveReqidToCdpRequestId(reqid: number): string | undefined {
+    const request = this.networkCollector.getById(reqid);
+    if (!request) {
+      return undefined;
+    }
+    // @ts-expect-error id is internal.
+    return request.id;
+  }
+
   getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
     return this.networkCollector.getData(includePreservedRequests);
+  }
+
+  get commentBridge(): DevToolsCommentBridge | undefined {
+    return this.#commentBridge;
+  }
+
+  async ensureDevToolsCommentBridge(devtoolsPage: Page): Promise<void> {
+    if (!this.#commentBridge) {
+      this.#commentBridge = new DevToolsCommentBridge({
+        onNotification: this.#onNotification,
+      });
+    }
+    await this.#commentBridge.attach(devtoolsPage);
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {
@@ -368,6 +395,12 @@ export class McpPage implements ContextPage {
       // Fall back to not exposing DevTools at all.
       return undefined;
     }
+  }
+
+  async openDevTools(): Promise<Page | undefined> {
+    const devtoolsPage = await this.pptrPage.openDevTools();
+    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    return devtoolsPage;
   }
 
   getConsoleData(
@@ -436,6 +469,8 @@ export class McpPage implements ContextPage {
   }
 
   dispose(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
     this.pptrPage.off('dialog', this.#dialogHandler);
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
@@ -674,6 +709,34 @@ export class McpPage implements ContextPage {
 
   getAXNodeByUid(uid: string) {
     return this.textSnapshot?.idToNode.get(uid);
+  }
+
+  async resolveBackendNodeId(
+    backendNodeId: number,
+  ): Promise<string | undefined> {
+    if (!this.textSnapshot) {
+      this.textSnapshot = await TextSnapshot.create(this);
+    }
+    let id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    if (!id) {
+      this.textSnapshot = await TextSnapshot.create(this);
+      id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    }
+    return id;
+  }
+
+  async resolveUidToBackendNodeId(uid: string): Promise<number | undefined> {
+    const node = this.getAXNodeByUid(uid);
+    if (node?.backendNodeId !== undefined) {
+      return node.backendNodeId;
+    }
+    try {
+      const handle = await this.getElementByUid(uid);
+      const backendId = await handle.backendNodeId();
+      return backendId || undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async getDevToolsData(): Promise<DevToolsData> {
