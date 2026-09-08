@@ -31,7 +31,9 @@ import {McpResponse} from '../src/McpResponse.js';
 import {CdpPage} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 
-export type MockMcpPage = sinon.SinonStubbedInstance<McpPage>;
+export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
+  pptrPage: sinon.SinonStubbedInstance<Page>;
+};
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
 
@@ -96,8 +98,12 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   return page;
 }
 
-export function createMockMcpPage(): MockMcpPage {
-  return sinon.createStubInstance(McpPage);
+export function createMockMcpPage(
+  options: {pptrPage?: sinon.SinonStubbedInstance<Page>} = {},
+): MockMcpPage {
+  const page = sinon.createStubInstance(McpPage);
+  const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
+  return Object.assign(page, {pptrPage});
 }
 
 export function createMockMcpContext(
@@ -106,6 +112,7 @@ export function createMockMcpContext(
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
+
   return context;
 }
 
