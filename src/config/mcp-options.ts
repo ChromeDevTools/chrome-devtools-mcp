@@ -7,6 +7,7 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 import os from 'node:os';
+import {readFileSync} from 'node:fs';
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
@@ -259,6 +260,10 @@ export const mcpOptions = {
     describe:
       'A directory that filesystem tools are allowed to access. May be specified more than once.',
   },
+  config: {
+    type: 'string',
+    describe: 'Path to JSON configuration file.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
@@ -433,6 +438,32 @@ export function parser(
     ]);
 
   return yargsInstance
+    .config('config', 'Path to JSON configuration file', configPath => {
+      try {
+        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
+          throw new Error('Config must be a JSON object');
+        }
+
+        return yargs()
+          .parserConfiguration({
+            'strip-aliased': true,
+            'camel-case-expansion': false,
+          })
+          .options(options)
+          .config(parsed)
+          .strict()
+          .fail(false)
+          .exitProcess(false)
+          .parseSync([]);
+      } catch (err) {
+        throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
+      }
+    })
     .wrap(Math.min(120, yargsInstance.terminalWidth()))
     .help()
     .version(version);
