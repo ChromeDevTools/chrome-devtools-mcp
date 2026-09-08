@@ -83,19 +83,16 @@ of the MCP client sandbox.
 
 ### Running as root
 
-Chrome does not start as root unless its own sandbox is disabled, which is a
-common issue in containers and CI images that run everything as root. Chrome
-exits immediately and `chrome-devtools-mcp` reports that Chrome failed to start.
+Chrome does not start as root
+([crbug.com/638180](https://crbug.com/638180)). It exits immediately and
+`chrome-devtools-mcp` reports that Chrome failed to start. This is a common
+issue in containers and CI images that run everything as root.
 
-The recommended fix is to run `chrome-devtools-mcp` as a non-root user. If that
-is not possible, disable the Chrome sandbox explicitly:
-
-```sh
-npx chrome-devtools-mcp@latest --chrome-arg='--no-sandbox'
-```
-
-Chrome's sandbox is a core security boundary, so only disable it when you trust
-the pages the browser will load. See [crbug.com/638180](https://crbug.com/638180).
+Run `chrome-devtools-mcp` as a non-root user. In a container, create an
+unprivileged user in the image and switch to it with `USER`; the build itself
+can still run as root. For the host-side setup that Chrome's sandbox needs, see
+Puppeteer's
+[Setting up Chrome Linux sandbox](https://pptr.dev/troubleshooting#setting-up-chrome-linux-sandbox).
 
 ### WSL
 

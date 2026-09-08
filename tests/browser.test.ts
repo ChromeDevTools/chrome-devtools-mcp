@@ -69,7 +69,8 @@ describe('browser', () => {
     it('explains an opaque launch failure when running as root', () => {
       const error = rootSandboxLaunchError(targetClosed, [], 0);
       assert.ok(error);
-      assert.match(error.message, /--chrome-arg=--no-sandbox/);
+      assert.match(error.message, /non-root user/);
+      assert.match(error.message, /pptr\.dev\/troubleshooting/);
       // The original failure stays visible so unrelated errors are not masked.
       assert.match(error.message, /Target closed/);
       assert.strictEqual(error.cause, targetClosed);
@@ -89,7 +90,7 @@ describe('browser', () => {
       );
     });
 
-    it('does not explain failures when the sandbox is already opted out of', () => {
+    it('does not explain failures when the sandbox is already disabled', () => {
       assert.strictEqual(
         rootSandboxLaunchError(targetClosed, ['--no-sandbox'], 0),
         undefined,

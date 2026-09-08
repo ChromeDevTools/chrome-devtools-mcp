@@ -191,8 +191,8 @@ export function detectDisplay(): void {
  * situation and explain the way out instead. See https://crbug.com/638180.
  *
  * Returns `undefined` when the failure cannot be explained by running as root,
- * including on platforms without uids and when the sandbox was already opted
- * out of (in which case root is not what stopped Chrome).
+ * including on platforms without uids and when the sandbox was already disabled
+ * through `--chrome-arg` (in which case root is not what stopped Chrome).
  *
  * Exported for testing.
  */
@@ -212,10 +212,10 @@ export function rootSandboxLaunchError(
   return new Error(
     `Chrome failed to start: ${error.message}\n\n` +
       'chrome-devtools-mcp is running as root and Chrome does not start as root ' +
-      'unless its sandbox is disabled (https://crbug.com/638180). Prefer running ' +
-      'chrome-devtools-mcp as a non-root user. If that is not possible, for example ' +
-      'in a container, pass --chrome-arg=--no-sandbox. That disables the Chrome ' +
-      'sandbox, so only do it for content you trust.',
+      '(https://crbug.com/638180). Run chrome-devtools-mcp as a non-root user; in a ' +
+      'container, create an unprivileged user in the image and switch to it with ' +
+      "USER. For the setup that Chrome's sandbox needs, see " +
+      'https://pptr.dev/troubleshooting#setting-up-chrome-linux-sandbox.',
     {
       cause: error,
     },
