@@ -13,6 +13,7 @@ import {logger} from '../utils/logger.js';
 import type {ErrorCode} from './errors.js';
 import type {LocalState, Persistence} from './persistence.js';
 import {
+  bucketizeDaysSince,
   bucketizeLatency,
   buildContext,
   sanitizeParams,
@@ -187,7 +188,7 @@ export class ClearcutLogger {
           payload: {
             mcp_client: this.#mcpClient,
             daily_active: {
-              days_since_last_active: daysSince,
+              days_since_last_active: bucketizeDaysSince(daysSince),
             },
           },
         });
