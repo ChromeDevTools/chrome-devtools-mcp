@@ -437,12 +437,11 @@ export const openDevtools = definePageTool({
   handler: async (request, response) => {
     const page = request.page;
     try {
-      await page.pptrPage.openDevTools();
+      await page.getDevToolsPage();
       response.appendResponseLine('DevTools window opened successfully.');
     } catch (e) {
-      response.appendResponseLine(
-        `Failed to open DevTools: ${(e as Error).message}`,
-      );
+      const message = e instanceof Error ? e.message : String(e);
+      response.appendResponseLine(`Failed to open DevTools: ${message}`);
     }
     response.setIncludePages(true);
   },
