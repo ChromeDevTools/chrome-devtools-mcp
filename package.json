@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "MCP server for Chrome DevTools",
   "type": "module",
   "bin": {
@@ -15,7 +15,7 @@
     "build": "tsc && node scripts/post-build.ts",
     "typecheck": "tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
-    "check-format": "eslint --cache . && prettier --check --cache .;",
+    "check-format": "eslint --cache . && prettier --check --cache .",
     "gen": "npm run build && npm run cli:generate && npm run docs:generate && npm run update-metrics && npm run format",
     "docs:generate": "node scripts/generate-docs.ts",
     "start": "npm run build && node build/src/bin/chrome-devtools-mcp.js",
@@ -76,7 +76,7 @@
     "globals": "^17.0.0",
     "lighthouse": "13.4.1",
     "prettier": "^3.6.2",
-    "puppeteer": "25.8.0",
+    "puppeteer": "25.10.0",
     "rollup": "4.62.5",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-license": "^3.6.0",

@@ -21,6 +21,7 @@ import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import type {
   DefinedPageTool,
+  DevToolsData,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {createTools} from '../src/tools/tools.js';
@@ -165,7 +166,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
   });
 
-  it('appends correct context to tool call logs', async () => {
+  it('passes devToolsData and pageUrl to logger', async () => {
     const baseTool: ToolDefinition = {
       name: 'test_tool',
       description: 'A test tool',
@@ -183,9 +184,8 @@ describe('ToolHandler', () => {
 
     const testCases: Array<{
       tool: ToolDefinition | DefinedPageTool;
-      devToolsData: Record<string, unknown>;
+      devToolsData: DevToolsData;
       pageUrl?: string;
-      expectedContext: Record<string, unknown>;
     }> = [
       {
         tool: {
@@ -195,13 +195,6 @@ describe('ToolHandler', () => {
         },
         devToolsData: {cdpBackendNodeId: 1},
         pageUrl: 'http://localhost:9222/',
-        expectedContext: {
-          is_devtools_open: true,
-          is_localhost: true,
-          devtools_data: {
-            is_dom_element_selected: true,
-          },
-        },
       },
       {
         tool: {
@@ -210,9 +203,6 @@ describe('ToolHandler', () => {
         },
         devToolsData: {},
         pageUrl: undefined,
-        expectedContext: {
-          is_devtools_open: false,
-        },
       },
     ];
 
@@ -251,9 +241,10 @@ describe('ToolHandler', () => {
 
       assert.strictEqual(logSpy.calledOnce, true);
       assert.deepStrictEqual(
-        logSpy.firstCall.args[0].context,
-        testCase.expectedContext,
+        logSpy.firstCall.args[0].devToolsData,
+        testCase.devToolsData,
       );
+      assert.strictEqual(logSpy.firstCall.args[0].pageUrl, testCase.pageUrl);
       assert.strictEqual(handlerCalled, true);
 
       sinon.restore();

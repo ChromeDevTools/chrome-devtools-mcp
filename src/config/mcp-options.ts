@@ -6,116 +6,17 @@
 
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
+import os from 'node:os';
+import {readFileSync} from 'node:fs';
+
+export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+
+import {getCategoryOptions} from './category-options.js';
+import {getBrowserOptions} from './browser-options.js';
 
 export const mcpOptions = {
-  autoConnect: {
-    type: 'boolean',
-    description:
-      'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
-    conflicts: ['isolated', 'executablePath'],
-    default: false,
-    coerce: (value: boolean | undefined) => {
-      if (!value) {
-        return;
-      }
-      return value;
-    },
-  },
-  browserUrl: {
-    type: 'string',
-    description:
-      'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp#connecting-to-a-running-chrome-instance.',
-    alias: 'u',
-    conflicts: ['wsEndpoint'],
-    coerce: (url: string | undefined) => {
-      if (!url) {
-        return;
-      }
-      try {
-        new URL(url);
-      } catch {
-        throw new Error(`Provided browserUrl ${url} is not valid URL.`);
-      }
-      return url;
-    },
-  },
-  wsEndpoint: {
-    type: 'string',
-    description:
-      'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
-    alias: 'w',
-    conflicts: ['browserUrl'],
-    coerce: (url: string | undefined) => {
-      if (!url) {
-        return;
-      }
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
-          throw new Error(
-            `Provided wsEndpoint ${url} must use ws:// or wss:// protocol.`,
-          );
-        }
-        return url;
-      } catch (error) {
-        if ((error as Error).message.includes('ws://')) {
-          throw error;
-        }
-        throw new Error(`Provided wsEndpoint ${url} is not valid URL.`);
-      }
-    },
-  },
-  wsHeaders: {
-    type: 'string',
-    description:
-      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    implies: 'wsEndpoint',
-    coerce: (val: string | undefined) => {
-      if (!val) {
-        return;
-      }
-      try {
-        const parsed = JSON.parse(val);
-        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('Headers must be a JSON object');
-        }
-        return parsed as Record<string, string>;
-      } catch (error) {
-        throw new Error(
-          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
-        );
-      }
-    },
-  },
-  headless: {
-    type: 'boolean',
-    description: 'Whether to run in headless (no UI) mode.',
-    default: false,
-  },
-  executablePath: {
-    type: 'string',
-    description: 'Path to custom Chrome executable.',
-    conflicts: ['browserUrl', 'wsEndpoint'],
-    alias: 'e',
-  },
-  isolated: {
-    type: 'boolean',
-    description:
-      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
-  },
-  userDataDir: {
-    type: 'string',
-    description:
-      'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
-    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
-  },
-  channel: {
-    type: 'string',
-    description:
-      'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['canary', 'dev', 'beta', 'stable'] as const,
-    conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
-  },
+  ...getCategoryOptions(),
+  ...getBrowserOptions(),
   logFile: {
     type: 'string',
     describe:
@@ -138,10 +39,6 @@ export const mcpOptions = {
         height,
       };
     },
-  },
-  proxyServer: {
-    type: 'string',
-    description: `Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.`,
   },
   acceptInsecureCerts: {
     type: 'boolean',
@@ -206,15 +103,22 @@ export const mcpOptions = {
     describe: 'Path to ffmpeg executable for screencast recording.',
     implies: 'experimentalScreencast',
   },
-  categoryExperimentalWebmcp: {
-    type: 'boolean',
+  experimentalScreencastFps: {
+    type: 'number',
     describe:
-      'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
-  },
-  chromeArg: {
-    type: 'array',
-    describe:
-      'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
+      'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
+    implies: 'experimentalScreencast',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(
+          `Invalid experimentalScreencastFps ${value}. Expected a positive integer.`,
+        );
+      }
+      return value;
+    },
   },
   blockedUrlPattern: {
     type: 'array',
@@ -227,46 +131,6 @@ export const mcpOptions = {
     describe:
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['blockedUrlPattern'],
-  },
-  ignoreDefaultChromeArg: {
-    type: 'array',
-    describe:
-      'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
-  },
-  categoryEmulation: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to emulation.',
-  },
-  categoryPerformance: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to performance.',
-  },
-  categoryNetwork: {
-    type: 'boolean',
-    default: true,
-    describe: 'Set to false to exclude tools related to network.',
-  },
-  categoryExtensions: {
-    type: 'boolean',
-    hidden: false,
-    default: false,
-    describe:
-      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
-  },
-  categoryExperimentalThirdParty: {
-    type: 'boolean',
-    default: false,
-    describe:
-      'Set to true to enable third-party developer tools exposed by the inspected page itself',
-  },
-  categoryPwa: {
-    type: 'boolean',
-    hidden: false,
-    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
-    describe:
-      'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
   },
   performanceCrux: {
     type: 'boolean',
@@ -283,7 +147,14 @@ export const mcpOptions = {
   javascriptEvaluation: {
     type: 'boolean',
     default: true,
-    describe: 'Set to false to disable tools to evaluate JavaScript scripts.',
+    describe:
+      'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
+  },
+  sourceMaps: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Whether to enable source maps in DevTools. Use --no-source-maps to disable.',
   },
   clearcutEndpoint: {
     type: 'string',
@@ -303,7 +174,7 @@ export const mcpOptions = {
   screenshotFormat: {
     type: 'string',
     description:
-      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which helps reduce context size in AI conversations. Unset preserves the existing default ("png").',
+      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
     choices: ['jpeg', 'png', 'webp'] as const,
   },
   screenshotQuality: {
@@ -374,11 +245,24 @@ export const mcpOptions = {
   allowUnrestrictedPaths: {
     type: 'boolean',
     default: false,
+    deprecated: 'Use --workspace=/ instead.',
     describe:
       'If set, disables the default path restriction that applies when the MCP client does not negotiate ' +
       'the roots capability. By default, file-writing tools are restricted to the OS temp directory when ' +
       'no roots are configured. Use this only when connecting a trusted local client that does not implement ' +
       'MCP roots and requires access to paths outside the temp directory.',
+  },
+  filesystemRoot: {
+    type: 'array',
+    alias: 'workspace',
+    default: DEFAULT_FILESYSTEM_ROOT,
+    defaultDescription: 'OS temp directory',
+    describe:
+      'A directory that filesystem tools are allowed to access. May be specified more than once.',
+  },
+  config: {
+    type: 'string',
+    describe: 'Path to JSON configuration file.',
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -387,11 +271,6 @@ export type ParsedArguments = ReturnType<typeof parseArguments>;
 export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
     throw new Error('headless cli option unexpectedly does not have a default');
-  }
-  if (!('default' in mcpOptions.allowUnrestrictedPaths)) {
-    throw new Error(
-      'allowUnrestrictedPaths cli option unexpectedly does not have a default',
-    );
   }
   if (!('default' in mcpOptions.experimentalStructuredContent)) {
     throw new Error(
@@ -404,10 +283,6 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
 
   return {
     ...mcpOptions,
-    allowUnrestrictedPaths: {
-      ...mcpOptions.allowUnrestrictedPaths,
-      default: true,
-    },
     headless: {
       ...mcpOptions.headless,
       default: true,
@@ -452,6 +327,14 @@ export function parser(
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
+      if (isViaCli && args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
+        const cliFilesystemArgs: {
+          allowUnrestrictedPaths?: boolean;
+          filesystemRoot?: unknown;
+        } = args;
+        cliFilesystemArgs.allowUnrestrictedPaths = true;
+        cliFilesystemArgs.filesystemRoot = undefined;
+      }
       // We can't set default in the options else
       // Yargs will complain
       if (
@@ -543,9 +426,10 @@ export function parser(
         '$0 --no-performance-crux',
         'Disable CrUX (field data) integration in performance tools.',
       ],
+      ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
       [
         '$0 --no-javascript-evaluation',
-        'Disable tools to evaluate JavaScript scripts.',
+        'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
       ],
       [
         '$0 --slim',
@@ -554,6 +438,32 @@ export function parser(
     ]);
 
   return yargsInstance
+    .config('config', 'Path to JSON configuration file', configPath => {
+      try {
+        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
+          throw new Error('Config must be a JSON object');
+        }
+
+        return yargs()
+          .parserConfiguration({
+            'strip-aliased': true,
+            'camel-case-expansion': false,
+          })
+          .options(options)
+          .config(parsed)
+          .strict()
+          .fail(false)
+          .exitProcess(false)
+          .parseSync([]);
+      } catch (err) {
+        throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
+      }
+    })
     .wrap(Math.min(120, yargsInstance.terminalWidth()))
     .help()
     .version(version);

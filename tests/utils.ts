@@ -29,6 +29,8 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
+import {createMockPuppeteerPage, mockListener} from './mocks.js';
+
 export function assertNoServiceWorkerReported(targets: Target[], id: string) {
   const target = targets.find(target => {
     return target.url().includes(id) && target.type() === 'service_worker';
@@ -159,6 +161,7 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
+    sourceMaps?: boolean;
     executablePath?: string;
     args?: string[];
     blockedUrlPattern?: string[];
@@ -181,12 +184,14 @@ export async function withMcpContext(
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        sourceMaps: options.sourceMaps ?? true,
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
         allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
         navigationTimeout:
           options.navigationTimeout ??
           (process.platform === 'win32' ? 20000 : undefined),
+        categoryExtensions: args?.categoryExtensions,
       },
       Locator,
     );
@@ -300,6 +305,9 @@ export function html(
 }
 
 export function stabilizeStructuredContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return stabilizeResponseOutput(content);
+  }
   const stabilize = (c: unknown): unknown => {
     if (typeof c === 'string') {
       return stabilizeResponseOutput(c);
@@ -369,53 +377,24 @@ export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<DevTools.Ag
   return mockAggregatedIssue;
 }
 
-export function mockListener() {
-  const listeners: Record<string, Array<(data: unknown) => void>> = {};
-  return {
-    on(eventName: string, listener: (data: unknown) => void) {
-      if (listeners[eventName]) {
-        listeners[eventName].push(listener);
-      } else {
-        listeners[eventName] = [listener];
-      }
-    },
-    off(_eventName: string, _listener: (data: unknown) => void) {
-      // no-op
-    },
-    emit(eventName: string, data: unknown) {
-      for (const listener of listeners[eventName] ?? []) {
-        listener(data);
-      }
-    },
-  };
-}
-
-export function getMockPage(): Page {
-  const mainFrame = {} as Frame;
-  const cdpSession = {
-    ...mockListener(),
-    send: () => {
-      // no-op
-    },
-    target: () => ({_targetId: '<mock target ID>'}),
-  };
-  return {
-    mainFrame() {
-      return mainFrame;
-    },
-    ...mockListener(),
-    // @ts-expect-error internal API.
-    _client() {
-      return cdpSession;
-    },
-  } satisfies Page;
-}
-
 export function getMockBrowser(options?: {
   process?: ChildProcess | null;
   wsEndpoint?: string;
 }): Browser {
-  const pages = [getMockPage()];
+  const page = createMockPuppeteerPage();
+  const listener = mockListener();
+  page.on.callsFake((eventName, handler) => {
+    listener.on(eventName, handler);
+    return page;
+  });
+  page.off.callsFake((eventName, handler) => {
+    if (handler) {
+      listener.off(eventName, handler);
+    }
+    return page;
+  });
+  (page as unknown as {emit: typeof listener.emit}).emit = listener.emit;
+  const pages = [page as unknown as Page];
   return {
     process() {
       return options?.process ?? null;

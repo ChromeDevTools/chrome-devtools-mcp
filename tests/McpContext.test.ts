@@ -134,6 +134,89 @@ describe('McpContext', () => {
       },
     );
   });
+
+  it('drops pages reaching internal chrome or chrome-untrusted schemes by any route', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      const pageId = page.id;
+      assert.strictEqual(context.getPageById(pageId), page);
+
+      const urlStub = sinon
+        .stub(page.pptrPage, 'url')
+        .returns('chrome://settings');
+      try {
+        await context.createPagesSnapshot();
+        const listed = context.getPages();
+        assert.ok(
+          !listed.some(p => p.id === pageId),
+          'page reaching chrome://settings should be dropped from listing',
+        );
+        assert.throws(() => context.getPageById(pageId), /No page found/);
+      } finally {
+        urlStub.restore();
+      }
+    });
+  });
+
+  it('drops pages with chrome-extension schemes unless categoryExtensions is enabled', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      const pageId = page.id;
+
+      const urlStub = sinon
+        .stub(page.pptrPage, 'url')
+        .returns('chrome-extension://some-ext-id/popup.html');
+      try {
+        await context.createPagesSnapshot();
+        const listed = context.getPages();
+        assert.ok(
+          !listed.some(p => p.id === pageId),
+          'extension page should be dropped from listing when categoryExtensions is disabled',
+        );
+        assert.throws(() => context.getPageById(pageId), /No page found/);
+      } finally {
+        urlStub.restore();
+      }
+    });
+  });
+
+  it('keeps pages with chrome://newtab/ and chrome://inspect', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      const pageId = page.id;
+
+      const newtabStub = sinon
+        .stub(page.pptrPage, 'url')
+        .returns('chrome://newtab/');
+      try {
+        await context.createPagesSnapshot();
+        const listed = context.getPages();
+        assert.ok(
+          listed.some(p => p.id === pageId),
+          'chrome://newtab/ should be kept in listing',
+        );
+        assert.strictEqual(context.getPageById(pageId), page);
+      } finally {
+        newtabStub.restore();
+      }
+
+      const inspectStub = sinon
+        .stub(page.pptrPage, 'url')
+        .returns('chrome://inspect/#devices');
+      try {
+        await context.createPagesSnapshot();
+        const listed = context.getPages();
+        assert.ok(
+          listed.some(p => p.id === pageId),
+          'chrome://inspect should be kept in listing',
+        );
+        assert.strictEqual(context.getPageById(pageId), page);
+      } finally {
+        inspectStub.restore();
+      }
+    });
+  });
+
   it('resolves uid from a non-selected page snapshot', async () => {
     await withMcpContext(async (_response, context) => {
       // Page 1: set content and snapshot

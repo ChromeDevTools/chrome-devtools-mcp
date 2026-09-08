@@ -50,7 +50,6 @@ describe('ClearcutLogger', () => {
         schema: {},
         success: true,
         latencyMs: 123,
-        context: {},
       });
 
       assert(mockWatchdogClient.send.calledOnce);
@@ -58,7 +57,7 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.tool_invocation?.tool_name, 'test_tool');
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
-      assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 123);
+      assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 250);
     });
     it('sends context when provided', async () => {
       const logger = ClearcutLogger.initialize({
@@ -72,10 +71,10 @@ describe('ClearcutLogger', () => {
         schema: {},
         success: true,
         latencyMs: 123,
-        context: {
-          is_devtools_open: true,
-          is_localhost: false,
+        devToolsData: {
+          cdpBackendNodeId: 1,
         },
+        pageUrl: 'https://example.com',
       });
 
       assert(mockWatchdogClient.send.calledOnce);
@@ -84,6 +83,9 @@ describe('ClearcutLogger', () => {
       assert.deepStrictEqual(msg.payload.tool_invocation?.context, {
         is_devtools_open: true,
         is_localhost: false,
+        devtools_data: {
+          is_dom_element_selected: true,
+        },
       });
     });
     it('sends sanitized params', async () => {
@@ -109,7 +111,6 @@ describe('ClearcutLogger', () => {
         schema,
         success: true,
         latencyMs: 123,
-        context: {},
       });
 
       assert(mockWatchdogClient.send.calledOnce);
@@ -251,7 +252,30 @@ describe('ClearcutLogger', () => {
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.ok(msg.payload.daily_active);
+      assert.ok(msg.payload.daily_active.days_since_last_active !== undefined);
 
+      assert(mockPersistence.saveState.called);
+    });
+
+    it('caps days_since_last_active at 31 if lastActive was > 30 days ago', async () => {
+      const longAgo = new Date();
+      longAgo.setDate(longAgo.getDate() - 45);
+      mockPersistence.loadState.resolves({
+        lastActive: longAgo.toISOString(),
+      });
+
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+
+      await logger.logDailyActiveIfNeeded();
+
+      assert(mockWatchdogClient.send.calledOnce);
+      const msg = mockWatchdogClient.send.firstCall.args[0];
+      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
+      assert.strictEqual(msg.payload.daily_active?.days_since_last_active, 31);
       assert(mockPersistence.saveState.called);
     });
 

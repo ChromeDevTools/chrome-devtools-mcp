@@ -31,10 +31,3 @@ export const labels = {
   [ToolCategory.WEBMCP]: 'WebMCP',
   [ToolCategory.PWA]: 'Progressive Web Apps',
 };
-
-export const OFF_BY_DEFAULT_CATEGORIES = [
-  ToolCategory.EXTENSIONS,
-  ToolCategory.THIRD_PARTY,
-  ToolCategory.WEBMCP,
-  ToolCategory.PWA,
-];

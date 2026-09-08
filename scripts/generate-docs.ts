@@ -12,18 +12,16 @@ import {
   mcpOptions,
   type ParsedArguments,
 } from '../build/src/config/mcp-options.js';
-import {buildFlag} from '../build/src/ToolHandler.js';
 import {
-  ToolCategory,
-  OFF_BY_DEFAULT_CATEGORIES,
-  labels,
-} from '../build/src/tools/categories.js';
+  isCategoryOffByDefault,
+  categoryToFlagName,
+} from '../build/src/config/category-options.js';
+import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import {pageIdSchema} from '../build/src/tools/ToolDefinition.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
-const README_PATH = './README.md';
 
 // Extend the MCP Tool type to include our annotations
 interface ToolWithAnnotations extends Tool {
@@ -119,51 +117,6 @@ function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
   return a.name.localeCompare(b.name);
 }
 
-function generateToolsTOC(
-  categories: Record<string, ToolWithAnnotations[]>,
-  sortedCategories: string[],
-): string {
-  let toc = '';
-
-  for (const category of sortedCategories) {
-    const categoryTools = categories[category];
-    const categoryName = labels[category];
-    toc += `- **${categoryName}** (${categoryTools.length} tools)\n`;
-
-    // Sort tools within category for TOC
-    categoryTools.sort(sortTools);
-    for (const tool of categoryTools) {
-      const anchorLink = tool.name.toLowerCase();
-      toc += `  - [\`${tool.name}\`](docs/tool-reference.md#${anchorLink})\n`;
-    }
-  }
-
-  return toc;
-}
-
-function updateReadmeWithToolsTOC(toolsTOC: string): void {
-  const readmeContent = fs.readFileSync(README_PATH, 'utf8');
-
-  const beginMarker = '<!-- BEGIN AUTO GENERATED TOOLS -->';
-  const endMarker = '<!-- END AUTO GENERATED TOOLS -->';
-
-  const beginIndex = readmeContent.indexOf(beginMarker);
-  const endIndex = readmeContent.indexOf(endMarker);
-
-  if (beginIndex === -1 || endIndex === -1) {
-    console.warn('Could not find auto-generated tools markers in README.md');
-    return;
-  }
-
-  const before = readmeContent.substring(0, beginIndex + beginMarker.length);
-  const after = readmeContent.substring(endIndex);
-
-  const updatedContent = before + '\n\n' + toolsTOC + '\n' + after;
-
-  fs.writeFileSync(README_PATH, updatedContent);
-  console.log('Updated README.md with tools table of contents');
-}
-
 interface OptionConfig {
   hidden?: boolean;
   alias?: string;
@@ -185,7 +138,9 @@ function generateConfigOptionsMarkdown(): string {
       continue;
     }
 
-    const aliasText = optionConfig.alias ? `, \`-${optionConfig.alias}\`` : '';
+    const aliasText = optionConfig.alias
+      ? `, \`${optionConfig.alias.length === 1 ? '-' : '--'}${optionConfig.alias}\``
+      : '';
     const description = optionConfig.description || optionConfig.describe || '';
 
     // Convert camelCase to dash-case
@@ -210,7 +165,7 @@ function generateConfigOptionsMarkdown(): string {
     }
 
     // Add default if available
-    markdown += `  - **Default:** \`${optionConfig.default ?? 'false'}\`\n`;
+    markdown += `  - **Default:** \`${optionConfig.defaultDescription ?? optionConfig.default ?? 'false'}\`\n`;
 
     markdown += '\n';
   }
@@ -218,8 +173,9 @@ function generateConfigOptionsMarkdown(): string {
   return markdown.trim();
 }
 
-function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
-  const readmeContent = fs.readFileSync(README_PATH, 'utf8');
+function updateConfigurationWithOptionsMarkdown(optionsMarkdown: string): void {
+  const configPath = './docs/configuration.md';
+  const readmeContent = fs.readFileSync(configPath, 'utf8');
 
   const beginMarker = '<!-- BEGIN AUTO GENERATED OPTIONS -->';
   const endMarker = '<!-- END AUTO GENERATED OPTIONS -->';
@@ -228,7 +184,9 @@ function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
   const endIndex = readmeContent.indexOf(endMarker);
 
   if (beginIndex === -1 || endIndex === -1) {
-    console.warn('Could not find auto-generated options markers in README.md');
+    console.warn(
+      'Could not find auto-generated options markers in ./docs/configuration.md',
+    );
     return;
   }
 
@@ -237,8 +195,8 @@ function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
 
   const updatedContent = before + '\n\n' + optionsMarkdown + '\n\n' + after;
 
-  fs.writeFileSync(README_PATH, updatedContent);
-  console.log('Updated README.md with options markdown');
+  fs.writeFileSync(configPath, updatedContent);
+  console.log('Updated configuration.md with options markdown');
 }
 
 // Helper to convert Zod schema to JSON schema-like object for docs
@@ -353,8 +311,8 @@ async function generateReference(
 
     markdown += `## ${categoryName}\n\n`;
 
-    if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
-      const flagName = `--${buildFlag(category)}`;
+    if (isCategoryOffByDefault(category)) {
+      const flagName = `--${categoryToFlagName(category)}`;
 
       markdown += `> NOTE: The ${categoryName} category is not active by default. Use the '${flagName}' flag.\n\n`;
     }
@@ -371,9 +329,9 @@ async function generateReference(
 
         const requiredFlags: string[] = [];
 
-        const isOffByDefault = OFF_BY_DEFAULT_CATEGORIES.includes(category);
+        const isOffByDefault = isCategoryOffByDefault(category);
         if (isOffByDefault) {
-          const categoryFlag = buildFlag(category);
+          const categoryFlag = categoryToFlagName(category);
           requiredFlags.push(`--${categoryFlag}=true`);
         }
 
@@ -519,8 +477,8 @@ function getToolsAndCategories(tools: any, slim = false) {
   // Sort categories using the enum order
   const categoryOrder = Object.values(ToolCategory);
   const sortedCategories = Object.keys(categories).sort((a, b) => {
-    const aOff = OFF_BY_DEFAULT_CATEGORIES.includes(a as ToolCategory);
-    const bOff = OFF_BY_DEFAULT_CATEGORIES.includes(b as ToolCategory);
+    const aOff = isCategoryOffByDefault(a);
+    const bOff = isCategoryOffByDefault(b);
 
     if (aOff !== bOff) {
       return aOff ? 1 : -1;
@@ -560,10 +518,6 @@ async function generateToolDocumentation(): Promise<void> {
         categories,
         sortedCategories,
       );
-
-      // Generate tools TOC and update README
-      const toolsTOC = generateToolsTOC(categories, sortedCategories);
-      updateReadmeWithToolsTOC(toolsTOC);
     }
 
     {
@@ -583,7 +537,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     // Generate and update configuration options
     const optionsMarkdown = generateConfigOptionsMarkdown();
-    updateReadmeWithOptionsMarkdown(optionsMarkdown);
+    updateConfigurationWithOptionsMarkdown(optionsMarkdown);
     process.exit(0);
   } catch (error) {
     console.error('Error generating documentation:', error);

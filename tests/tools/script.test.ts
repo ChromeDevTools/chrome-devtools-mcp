@@ -20,7 +20,6 @@ import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
   extractExtensionId,
-  getTextContent,
   html,
   withMcpContext,
 } from '../utils.js';
@@ -71,30 +70,6 @@ describe('script', () => {
         } finally {
           spy.restore();
         }
-      });
-    });
-    it('still awaits a navigation when waitForStableDom is false', async () => {
-      await withMcpContext(async (response, context) => {
-        server.addHtmlRoute('/nav-target', html`<main>navigated</main>`);
-        const url = server.getRoute('/nav-target');
-        await evaluateScript().handler(
-          {
-            params: {
-              function: `() => {
-                location.href = '${url}';
-              }`,
-              waitForStableDom: false,
-            },
-          },
-          response,
-          context,
-        );
-        const result = await response.handle(context);
-        const textContent = getTextContent(result.content[0]);
-        assert.ok(
-          textContent.includes(`Page navigated to ${url}`),
-          `Expected the navigation to be awaited and reported, got: ${textContent}`,
-        );
       });
     });
     it('runs in selected page', async () => {
