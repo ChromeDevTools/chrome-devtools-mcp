@@ -172,6 +172,23 @@ describe('console', () => {
           await page.pptrPage.evaluate(() => {
             console.log('after-navigation');
           });
+          // Poll the collector (read-only) until the console events have
+          // arrived: the CDP console event may fire after the evaluate call
+          // resolves.
+          await waitExecutionFor(async () => {
+            const messages = context.getSelectedMcpPage().getConsoleData(true);
+            const text = messages
+              .map(message => {
+                if ('text' in message) {
+                  return (message as {text: () => string}).text();
+                }
+                return String(message);
+              })
+              .join('\n');
+            assert.ok(text.includes('before-navigation'));
+            assert.ok(text.includes('after-navigation'));
+          }, 10000);
+
           await listConsoleMessages().handler(
             {params: {}, page: context.getSelectedMcpPage()},
             response,
