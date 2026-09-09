@@ -126,12 +126,53 @@ export interface PseudoElementRule {
   properties: StructuredCssProperty[];
 }
 
+export interface AtRule {
+  type: 'at-rule';
+  atRuleType: string;
+  name?: string;
+  subsection?: string;
+  selector: string;
+  source?: string;
+  ancestors?: AncestorCSSRule[];
+  properties: StructuredCssProperty[];
+}
+
+export interface PositionTryRule {
+  type: 'position-try';
+  name: string;
+  active: boolean;
+  selector: string;
+  source?: string;
+  ancestors?: AncestorCSSRule[];
+  properties: StructuredCssProperty[];
+}
+
+export interface PropertyRule {
+  type: 'property';
+  name: string;
+  selector: string;
+  source?: string;
+  properties: StructuredCssProperty[];
+}
+
+export interface FunctionRule {
+  type: 'function';
+  name: string;
+  selector: string;
+  source?: string;
+  properties: StructuredCssProperty[];
+}
+
 export type CascadeRule =
   | NodeStyleRule
   | AnimationRule
   | MatchedRule
   | InheritedRule
-  | PseudoElementRule;
+  | PseudoElementRule
+  | AtRule
+  | PositionTryRule
+  | PropertyRule
+  | FunctionRule;
 
 export interface StructuredCssStyles {
   element: {
@@ -470,6 +511,9 @@ function getCascadeRuleHeader(rule: CascadeRule): string {
     case 'animation':
     case 'attributes':
     case 'matched':
+    case 'at-rule':
+    case 'property':
+    case 'function':
       selector = rule.selector;
       break;
     case 'inherited':
@@ -478,6 +522,11 @@ function getCascadeRuleHeader(rule: CascadeRule): string {
     case 'pseudo':
       selector = rule.selector ?? rule.pseudoType;
       break;
+    case 'position-try': {
+      const statePrefix = rule.active ? '' : '[inactive] ';
+      selector = `${statePrefix}${rule.selector}`;
+      break;
+    }
   }
   const source = 'source' in rule ? rule.source : undefined;
   return source ? `${selector} (${source})` : selector;
@@ -605,6 +654,10 @@ export class CssFormatter {
     const rules: CascadeRule[] = [];
     CssFormatter.#collectNodeStyles(rules, matchedStyles, options);
     CssFormatter.#collectPseudoStyles(rules, matchedStyles, options);
+    CssFormatter.#collectAtRules(rules, matchedStyles);
+    CssFormatter.#collectPositionTryRules(rules, matchedStyles);
+    CssFormatter.#collectRegisteredProperties(rules, matchedStyles);
+    CssFormatter.#collectFunctionRules(rules, matchedStyles);
     return rules;
   }
 
@@ -829,6 +882,128 @@ export class CssFormatter {
         ...(node ? {node} : {}),
         ...(rule ? {selector: rule.selectorText()} : {}),
         ...meta,
+        properties: CssFormatter.#formatProperties(properties, matchedStyles),
+      });
+    }
+  }
+
+  static #collectAtRules(
+    rules: CascadeRule[],
+    matchedStyles: MatchedStyles,
+  ): void {
+    const atRules = matchedStyles.atRules?.() ?? [];
+    for (const atRule of atRules) {
+      const properties = CssFormatter.#getStyleProperties(atRule.style);
+      if (!properties.length) {
+        continue;
+      }
+      const subsection = atRule.subsection() ?? undefined;
+      const name = atRule.name()?.text;
+      const type = atRule.type();
+      const selector = subsection
+        ? `@${subsection}`
+        : name
+          ? `@${type} ${name}`
+          : `@${type}`;
+
+      const ancestors: AncestorCSSRule[] = [];
+      if (subsection) {
+        ancestors.push({
+          type: 'at-rule',
+          atRuleType: type,
+          ...(name ? {name} : {}),
+        });
+      }
+
+      rules.push({
+        type: 'at-rule',
+        atRuleType: type,
+        ...(name ? {name} : {}),
+        ...(subsection ? {subsection} : {}),
+        selector,
+        ...(ancestors.length > 0 ? {ancestors} : {}),
+        source: getSourceLocation(atRule),
+        properties: CssFormatter.#formatProperties(properties, matchedStyles),
+      });
+    }
+  }
+
+  static #collectPositionTryRules(
+    rules: CascadeRule[],
+    matchedStyles: MatchedStyles,
+  ): void {
+    const positionTryRules = matchedStyles.positionTryRules?.() ?? [];
+    for (const positionTryRule of positionTryRules) {
+      const properties = CssFormatter.#getStyleProperties(
+        positionTryRule.style,
+      );
+      if (!properties.length) {
+        continue;
+      }
+      const name = positionTryRule.name?.()?.text ?? '';
+      const active = positionTryRule.active?.() ?? false;
+      const source = getSourceLocation(positionTryRule);
+
+      rules.push({
+        type: 'position-try',
+        name,
+        active,
+        selector: `@position-try ${name}`,
+        ...(source ? {source} : {}),
+        properties: CssFormatter.#formatProperties(properties, matchedStyles),
+      });
+    }
+  }
+
+  static #collectRegisteredProperties(
+    rules: CascadeRule[],
+    matchedStyles: MatchedStyles,
+  ): void {
+    const registeredProperties = matchedStyles.registeredProperties?.() ?? [];
+    for (const propertyRule of registeredProperties) {
+      const style = propertyRule.style?.();
+      if (!style) {
+        continue;
+      }
+      const properties = CssFormatter.#getStyleProperties(style);
+      if (!properties.length) {
+        continue;
+      }
+      const name = propertyRule.propertyName?.() ?? '';
+      const parentRule = style.parentRule;
+      const source = parentRule
+        ? getSourceLocation(parentRule)
+        : 'CSS.registerProperty';
+
+      rules.push({
+        type: 'property',
+        name,
+        selector: `@property ${name}`,
+        ...(source ? {source} : {}),
+        properties: CssFormatter.#formatProperties(properties, matchedStyles),
+      });
+    }
+  }
+
+  static #collectFunctionRules(
+    rules: CascadeRule[],
+    matchedStyles: MatchedStyles,
+  ): void {
+    const functionRules = matchedStyles.functionRules?.() ?? [];
+    for (const functionRule of functionRules) {
+      const properties = CssFormatter.#getStyleProperties(functionRule.style);
+      if (!properties.length) {
+        continue;
+      }
+      const name = functionRule.functionName?.()?.text ?? '';
+      const nameWithParameters = functionRule.nameWithParameters?.() || name;
+      const source = getSourceLocation(functionRule);
+
+      rules.push({
+        type: 'function',
+        name,
+        selector: `@function ${nameWithParameters}`,
+        ...(source ? {source} : {}),
         properties: CssFormatter.#formatProperties(properties, matchedStyles),
       });
     }

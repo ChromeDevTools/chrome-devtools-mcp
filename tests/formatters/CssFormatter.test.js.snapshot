@@ -1,3 +1,112 @@
+exports[`CssFormatter > formats @font-face at-rule without name toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-at-2",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "at-rule",
+      "atRuleType": "font-face",
+      "selector": "@font-face",
+      "source": "<style>",
+      "properties": [
+        {
+          "name": "font-family",
+          "value": "Open Sans",
+          "status": "active"
+        },
+        {
+          "name": "src",
+          "value": "url(font.woff2)",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats @font-face at-rule without name toString 1`] = `
+Styles for button (uid: "elem-at-2"):
+
+  @font-face (<style>) {
+    font-family: Open Sans;
+    src: url(font.woff2);
+  }
+`;
+
+exports[`CssFormatter > formats @font-palette-values at-rule with name toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-at-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "at-rule",
+      "atRuleType": "font-palette-values",
+      "name": "--my-palette",
+      "selector": "@font-palette-values --my-palette",
+      "source": "fonts.css:11",
+      "properties": [
+        {
+          "name": "font-family",
+          "value": "Bixa",
+          "status": "active"
+        },
+        {
+          "name": "base-palette",
+          "value": "3",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats @font-palette-values at-rule with name toString 1`] = `
+Styles for button (uid: "elem-at-1"):
+
+  @font-palette-values --my-palette (fonts.css:11) {
+    font-family: Bixa;
+    base-palette: 3;
+  }
+`;
+
+exports[`CssFormatter > formats @function custom function rule with parameters and declarations toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-func",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "function",
+      "name": "--double",
+      "selector": "@function --double(--x)",
+      "source": "math.css:5",
+      "properties": [
+        {
+          "name": "result",
+          "value": "calc(var(--x) * 2)",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats @function custom function rule with parameters and declarations toString 1`] = `
+Styles for button (uid: "elem-func"):
+
+  @function --double(--x) (math.css:5) {
+    result: calc(var(--x) * 2);
+  }
+`;
+
 exports[`CssFormatter > formats @layer, @media, @supports, and @starting-style ancestor rules toJSON 1`] = `
 {
   "element": {
@@ -93,6 +202,79 @@ Styles for button (uid: "elem-nav"):
   }
 `;
 
+exports[`CssFormatter > formats @property rules defined in stylesheets and programmatically toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-prop",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "property",
+      "name": "--brand-color",
+      "selector": "@property --brand-color",
+      "source": "theme.css:11",
+      "properties": [
+        {
+          "name": "syntax",
+          "value": "\\"<color>\\"",
+          "status": "active"
+        },
+        {
+          "name": "inherits",
+          "value": "false",
+          "status": "active"
+        },
+        {
+          "name": "initial-value",
+          "value": "#1a73e8",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "name": "--runtime-var",
+      "selector": "@property --runtime-var",
+      "source": "CSS.registerProperty",
+      "properties": [
+        {
+          "name": "syntax",
+          "value": "\\"<length>\\"",
+          "status": "active"
+        },
+        {
+          "name": "inherits",
+          "value": "true",
+          "status": "active"
+        },
+        {
+          "name": "initial-value",
+          "value": "10px",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats @property rules defined in stylesheets and programmatically toString 1`] = `
+Styles for button (uid: "elem-prop"):
+
+  @property --brand-color (theme.css:11) {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: #1a73e8;
+  }
+
+  @property --runtime-var (CSS.registerProperty) {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 10px;
+  }
+`;
+
 exports[`CssFormatter > formats @scope ancestor rule toJSON 1`] = `
 {
   "element": {
@@ -129,6 +311,90 @@ Styles for button (uid: "item-1"):
     .scoped-item (<style>) {
       color: blue;
     }
+  }
+`;
+
+exports[`CssFormatter > formats active and inactive @position-try rules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-pos",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "position-try",
+      "name": "--bottom",
+      "active": true,
+      "selector": "@position-try --bottom",
+      "source": "anchor.css:21",
+      "properties": [
+        {
+          "name": "top",
+          "value": "anchor(bottom)",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "position-try",
+      "name": "--top",
+      "active": false,
+      "selector": "@position-try --top",
+      "source": "anchor.css:26",
+      "properties": [
+        {
+          "name": "bottom",
+          "value": "anchor(top)",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats active and inactive @position-try rules toString 1`] = `
+Styles for button (uid: "elem-pos"):
+
+  @position-try --bottom (anchor.css:21) {
+    top: anchor(bottom);
+  }
+
+  [inactive] @position-try --top (anchor.css:26) {
+    bottom: anchor(top);
+  }
+`;
+
+exports[`CssFormatter > formats at-rule when present in atRules toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-at-4",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "at-rule",
+      "atRuleType": "counter-style",
+      "name": "thumbs",
+      "selector": "@counter-style thumbs",
+      "source": "<style>",
+      "properties": [
+        {
+          "name": "system",
+          "value": "cyclic",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats at-rule when present in atRules toString 1`] = `
+Styles for button (uid: "elem-at-4"):
+
+  @counter-style thumbs (<style>) {
+    system: cyclic;
   }
 `;
 
