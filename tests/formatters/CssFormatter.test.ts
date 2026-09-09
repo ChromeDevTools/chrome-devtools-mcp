@@ -25,6 +25,7 @@ import {
   createMockCSSPositionTryRule,
   createMockCSSRegisteredProperty,
   createMockCSSFunctionRule,
+  createMockCSSKeyframesRule,
 } from '../mocks.js';
 
 describe('CssFormatter', () => {
@@ -620,6 +621,31 @@ describe('CssFormatter', () => {
       });
 
       return new CssFormatter(matchedStyles, {uid: 'elem-func'});
+    },
+  );
+
+  formatterTest(
+    'formats @keyframes rule with multiple steps and source location',
+    () => {
+      const keyframesRule = createMockCSSKeyframesRule('slideIn', [
+        {
+          key: 'from',
+          properties: [createMockCSSProperty('opacity', '0')],
+          sourceURL: 'animations.css',
+          range: {startLine: 10, startColumn: 2, endLine: 12, endColumn: 3},
+        },
+        {
+          key: 'to',
+          properties: [createMockCSSProperty('opacity', '1')],
+          sourceURL: 'animations.css',
+          range: {startLine: 13, startColumn: 2, endLine: 15, endColumn: 3},
+        },
+      ]);
+      const matchedStyles = createMockCSSMatchedStyles({
+        keyframes: [keyframesRule],
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'elem-kf'});
     },
   );
 });

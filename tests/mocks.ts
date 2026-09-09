@@ -45,6 +45,8 @@ export type MockCSSMatchedStyles =
   sinon.SinonStubbedInstance<DevTools.CSSMatchedStyles.CSSMatchedStyles>;
 export type MockCSSStyleRule =
   sinon.SinonStubbedInstance<DevTools.CSSRule.CSSStyleRule>;
+export type MockCSSKeyframesRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSKeyframesRule>;
 export type MockCSSAtRule =
   sinon.SinonStubbedInstance<DevTools.CSSRule.CSSAtRule>;
 export type MockCSSPositionTryRule =
@@ -383,6 +385,38 @@ export function createMockCSSStyleRule(
   return rule;
 }
 
+export function createMockCSSKeyframesRule(
+  name: string,
+  keyframes: Array<{
+    key: string;
+    properties: DevTools.CSSProperty.CSSProperty[];
+    sourceURL?: string;
+    range?: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+  }>,
+): MockCSSKeyframesRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSKeyframesRule);
+  const mockKeyframes = [];
+  for (const kf of keyframes) {
+    const kfMock = sinon.createStubInstance(DevTools.CSSRule.CSSKeyframeRule);
+    attachRuleMeta(kfMock, kf.sourceURL);
+    const style = createMockCSSStyleDeclaration(kf.properties, {
+      rule: kfMock,
+      range: kf.range,
+    });
+    kfMock.key.returns(createCSSValue(kf.key));
+    Object.assign(kfMock, {style});
+    mockKeyframes.push(kfMock);
+  }
+  rule.name.returns(createCSSValue(name));
+  rule.keyframes.returns(mockKeyframes);
+  return rule;
+}
+
 export function createMockCSSAtRule(
   type: string,
   options: {
@@ -524,6 +558,7 @@ export interface MockCSSMatchedStylesParams {
   node?: string | DevTools.DOMModel.DOMNode;
   nodeStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
   inheritedStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
+  keyframes?: DevTools.CSSRule.CSSKeyframesRule[];
   atRules?: DevTools.CSSRule.CSSAtRule[];
   positionTryRules?: DevTools.CSSRule.CSSPositionTryRule[];
   registeredProperties?: DevTools.CSSMatchedStyles.CSSRegisteredProperty[];
@@ -576,6 +611,7 @@ export function createMockCSSMatchedStyles(
   mock.node.returns(mockNode);
   mock.nodeStyles.returns(nodeStyles);
   mock.inheritedStyles.returns(inheritedStyles);
+  mock.keyframes.returns(params.keyframes ?? []);
   mock.atRules.returns(params.atRules ?? []);
   mock.positionTryRules.returns(params.positionTryRules ?? []);
   mock.registeredProperties.returns(params.registeredProperties ?? []);
