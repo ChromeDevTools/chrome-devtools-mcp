@@ -44,6 +44,33 @@ function detectOsType(): OsType {
   }
 }
 
+function isSameDay(d1: Date, d2: Date): boolean {
+  return (
+    d1.getUTCFullYear() === d2.getUTCFullYear() &&
+    d1.getUTCMonth() === d2.getUTCMonth() &&
+    d1.getUTCDate() === d2.getUTCDate()
+  );
+}
+
+function shouldLogDailyActive(state: LocalState): boolean {
+  if (!state.lastActive) {
+    return true;
+  }
+  return !isSameDay(new Date(state.lastActive), new Date());
+}
+
+function calculateDaysSince(
+  lastDateString?: string,
+  now: Date = new Date(),
+): number {
+  if (!lastDateString) {
+    return -1;
+  }
+  const lastDate = new Date(lastDateString);
+  const diffTime = Math.abs(now.getTime() - lastDate.getTime());
+  return Math.ceil(diffTime / MS_PER_DAY);
+}
+
 export interface ClearcutLoggerOptions {
   appVersion: string;
   persistence: Persistence;
@@ -61,6 +88,7 @@ export class ClearcutLogger {
   #persistence: Persistence;
   #watchdog: WatchdogClient;
   #mcpClient: McpClient;
+  #state?: LocalState;
 
   static initialize(options: ClearcutLoggerOptions): ClearcutLogger {
     if (_clearcut_logger_instance) {
@@ -92,6 +120,15 @@ export class ClearcutLogger {
         clearcutIncludePidHeader: options.clearcutIncludePidHeader,
       });
     this.#mcpClient = McpClient.MCP_CLIENT_UNSPECIFIED;
+    void this.#persistence
+      .loadState()
+      .then(state => {
+        this.#state = state;
+      })
+      .catch(error => {
+        this.#state = undefined;
+        logger?.('Failed to load telemetry state:', error);
+      });
   }
 
   setClientName(clientName: string): void {
@@ -132,6 +169,10 @@ export class ClearcutLogger {
     devToolsData?: DevToolsData;
     pageUrl?: string;
   }): Promise<void> {
+    void this.#logToolActiveIfNeeded().catch(error => {
+      logger?.('Error in logToolActiveIfNeeded:', error);
+    });
+
     const context = buildContext(args.devToolsData, args.pageUrl);
     const sanitizedToolName = stripUnderscoreBeforeNumber(args.toolName);
     const tool_invocation: ToolInvocation = {
@@ -174,16 +215,10 @@ export class ClearcutLogger {
 
   async logDailyActiveIfNeeded(): Promise<void> {
     try {
-      const state = await this.#persistence.loadState();
+      this.#state = await this.#persistence.loadState();
 
-      if (this.#shouldLogDailyActive(state)) {
-        let daysSince = -1;
-        if (state.lastActive) {
-          const lastActiveDate = new Date(state.lastActive);
-          const now = new Date();
-          const diffTime = Math.abs(now.getTime() - lastActiveDate.getTime());
-          daysSince = Math.ceil(diffTime / MS_PER_DAY);
-        }
+      if (shouldLogDailyActive(this.#state)) {
+        const daysSince = calculateDaysSince(this.#state.lastActive);
 
         this.#watchdog.send({
           type: WatchdogMessageType.LOG_EVENT,
@@ -195,8 +230,8 @@ export class ClearcutLogger {
           },
         });
 
-        state.lastActive = new Date().toISOString();
-        await this.#persistence.saveState(state);
+        this.#state.lastActive = new Date().toISOString();
+        await this.#persistence.saveState(this.#state);
       }
     } catch (err) {
       logger?.('Error in logDailyActiveIfNeeded:', err);
@@ -221,19 +256,41 @@ export class ClearcutLogger {
     });
   }
 
-  #shouldLogDailyActive(state: LocalState): boolean {
-    if (!state.lastActive) {
-      return true;
+  async #logToolActiveIfNeeded(): Promise<void> {
+    // Expect state loaded at first tool call, if not, just skip logging.
+    if (!this.#state) {
+      return;
     }
-    const lastActiveDate = new Date(state.lastActive);
+
+    // Don't log tool active if it has already been logged today.
     const now = new Date();
+    if (
+      this.#state.lastToolCall &&
+      isSameDay(now, new Date(this.#state.lastToolCall))
+    ) {
+      return;
+    }
 
-    // Compare UTC dates
-    const isSameDay =
-      lastActiveDate.getUTCFullYear() === now.getUTCFullYear() &&
-      lastActiveDate.getUTCMonth() === now.getUTCMonth() &&
-      lastActiveDate.getUTCDate() === now.getUTCDate();
+    // Refresh state in case it now contains more recent value, and test again.
+    const state = await this.#persistence.loadState();
+    this.#state = state;
+    if (state.lastToolCall && isSameDay(now, new Date(state.lastToolCall))) {
+      return;
+    }
 
-    return !isSameDay;
+    const daysSinceToolCall = calculateDaysSince(state.lastToolCall, now);
+
+    this.#watchdog.send({
+      type: WatchdogMessageType.LOG_EVENT,
+      payload: {
+        mcp_client: this.#mcpClient,
+        tool_active: {
+          days_since_last_tool_call: bucketizeDaysSince(daysSinceToolCall),
+        },
+      },
+    });
+
+    this.#state.lastToolCall = now.toISOString();
+    await this.#persistence.saveState(this.#state);
   }
 }

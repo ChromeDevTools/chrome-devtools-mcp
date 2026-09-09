@@ -17,6 +17,7 @@ export interface ChromeDevToolsMcpExtension {
   daily_active?: DailyActive;
   server_shutdown?: ServerShutdown;
   server_error?: ServerError;
+  tool_active?: ToolActive;
 }
 
 export interface ServerError {
@@ -51,6 +52,10 @@ export interface ServerStart {
 
 export interface DailyActive {
   days_since_last_active: number;
+}
+
+export interface ToolActive {
+  days_since_last_tool_call: number;
 }
 
 export type FlagUsage = Record<string, boolean | string | number | undefined>;
