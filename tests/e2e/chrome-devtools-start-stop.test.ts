@@ -79,6 +79,22 @@ describe('chrome-devtools', () => {
     await assertDaemonIsRunning(sessionId);
   });
 
+  it('forwards an explicit headless=false option', async () => {
+    const startResult = await runCli(['start', '--headless=false'], sessionId);
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+
+    const statusResult = await runCli(['status'], sessionId);
+    assert.strictEqual(statusResult.status, 0);
+    assert.ok(
+      statusResult.stdout.includes('--no-headless'),
+      `headless=false was not forwarded: ${statusResult.stdout}`,
+    );
+  });
+
   it('can start the daemon with a workspace', async () => {
     const workspace = fs.mkdtempSync(
       path.join(os.tmpdir(), 'chrome-devtools-workspace-'),
