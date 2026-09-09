@@ -197,7 +197,10 @@ describe('comments tools', () => {
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
-      page.resolveUidToBackendNodeId.resolves(101);
+      page.resolveUidToBackendNodeId.resolves({
+        backendNodeId: 101,
+        targetId: 'target-1',
+      });
       devtoolsPage.evaluate.resolves(undefined);
 
       await revealInDevtools.handler(
@@ -274,7 +277,10 @@ describe('comments tools', () => {
       const {page, context, response} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
-      page.resolveUidToBackendNodeId.resolves(101);
+      page.resolveUidToBackendNodeId.resolves({
+        backendNodeId: 101,
+        targetId: 'target-1',
+      });
       devtoolsPage.evaluate.resolves(undefined);
 
       await revealInDevtools.handler(

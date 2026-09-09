@@ -725,15 +725,24 @@ export class McpPage implements ContextPage {
     return id;
   }
 
-  async resolveUidToBackendNodeId(uid: string): Promise<number | undefined> {
+  async resolveUidToBackendNodeId(
+    uid: string,
+  ): Promise<{backendNodeId: number; targetId?: string} | undefined> {
+    const target = this.pptrPage.target();
+    const targetId =
+      Boolean(target) &&
+      '_targetId' in target &&
+      typeof target._targetId === 'string'
+        ? target._targetId
+        : undefined;
     const node = this.getAXNodeByUid(uid);
     if (node?.backendNodeId !== undefined) {
-      return node.backendNodeId;
+      return {backendNodeId: node.backendNodeId, targetId};
     }
     try {
       const handle = await this.getElementByUid(uid);
-      const backendId = await handle.backendNodeId();
-      return backendId || undefined;
+      const backendNodeId = await handle.backendNodeId();
+      return backendNodeId ? {backendNodeId, targetId} : undefined;
     } catch {
       return undefined;
     }

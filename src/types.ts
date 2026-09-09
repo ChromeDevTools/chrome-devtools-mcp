@@ -59,6 +59,7 @@ export interface CD4ACommentThread {
 export interface CD4ARevealTarget {
   networkRequestId?: string;
   backendNodeId?: number;
+  targetId?: string;
 }
 
 export enum CD4ABridgeEvents {

@@ -338,7 +338,9 @@ export type ContextPage = Readonly<{
   resolveCdpRequestId(cdpRequestId: string): number | undefined;
   resolveReqidToCdpRequestId(reqid: number): string | undefined;
   resolveBackendNodeId(backendNodeId: number): Promise<string | undefined>;
-  resolveUidToBackendNodeId(uid: string): Promise<number | undefined>;
+  resolveUidToBackendNodeId(
+    uid: string,
+  ): Promise<{backendNodeId: number; targetId?: string} | undefined>;
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;

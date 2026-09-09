@@ -214,12 +214,14 @@ export const revealInDevtools = definePageTool({
 
     const {panelName, uid, reqid} = request.params;
     let backendNodeId: number | undefined;
+    let targetId: string | undefined;
     let networkRequestId: string | undefined;
 
     if (uid) {
-      const resolvedBackendNodeId = await page.resolveUidToBackendNodeId(uid);
-      if (resolvedBackendNodeId !== undefined) {
-        backendNodeId = resolvedBackendNodeId;
+      const resolved = await page.resolveUidToBackendNodeId(uid);
+      if (resolved) {
+        backendNodeId = resolved.backendNodeId;
+        targetId = resolved.targetId;
       } else {
         response.appendResponseLine(
           `Warning: Could not resolve snapshot UID "${uid}" to a backend DOM node ID.`,
@@ -239,14 +241,11 @@ export const revealInDevtools = definePageTool({
     }
 
     await devtoolsPage.evaluate(
-      async (
-        panel: string | undefined,
-        target: {backendNodeId?: number; networkRequestId?: string},
-      ) => {
+      async (panel: string | undefined, target: CD4ARevealTarget) => {
         await window.universe?.cd4aBridge?.reveal(panel, target);
       },
       panelName,
-      {backendNodeId, networkRequestId},
+      {backendNodeId, targetId, networkRequestId},
     );
 
     let targetDesc = '';
