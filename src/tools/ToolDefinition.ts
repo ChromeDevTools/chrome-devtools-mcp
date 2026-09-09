@@ -322,6 +322,8 @@ export type Context = Readonly<{
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
+export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
+
 /**
  * Only add methods used by tools/*.
  */

@@ -28,7 +28,7 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpPage} from '../src/third_party/index.js';
+import {CdpPage, DevTools} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -36,6 +36,13 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
+export type MockDOMNode = sinon.SinonStubbedInstance<DevTools.DOMModel.DOMNode>;
+export type MockCSSProperty =
+  sinon.SinonStubbedInstance<DevTools.CSSProperty.CSSProperty>;
+export type MockCSSStyleDeclaration =
+  sinon.SinonStubbedInstance<DevTools.CSSStyleDeclaration.CSSStyleDeclaration>;
+export type MockCSSMatchedStyles =
+  sinon.SinonStubbedInstance<DevTools.CSSMatchedStyles.CSSMatchedStyles>;
 
 /**
  * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
@@ -134,4 +141,134 @@ export function createHandlerMocks(): {
   const context = createMockMcpContext({selectedPage: page});
   const response = createMockMcpResponse();
   return {page, context, response};
+}
+
+function isBackendNodeId(
+  id: unknown,
+): id is DevTools.Protocol.DOM.BackendNodeId {
+  return typeof id === 'number';
+}
+
+export interface MockDOMNodeOptions {
+  selector?: string;
+  backendNodeId?: number;
+}
+
+export function createMockDOMNode(
+  options: MockDOMNodeOptions = {},
+): MockDOMNode {
+  const node = sinon.createStubInstance(DevTools.DOMModel.DOMNode);
+  const selector = options.selector ?? 'button';
+  const backendNodeId = options.backendNodeId ?? 1;
+  if (isBackendNodeId(backendNodeId)) {
+    node.backendNodeId.returns(backendNodeId);
+  }
+  node.simpleSelector.returns(selector);
+  node.nodeNameInCorrectCase.returns(selector.split(/[#.]/)[0] || selector);
+  return node;
+}
+
+export interface MockCSSPropertyOptions {
+  important?: boolean;
+  parsedOk?: boolean;
+  disabled?: boolean;
+}
+
+export function createMockCSSProperty(
+  name: string,
+  value: string,
+  options: MockCSSPropertyOptions = {},
+): MockCSSProperty {
+  const prop = sinon.createStubInstance(DevTools.CSSProperty.CSSProperty);
+  prop.name = name;
+  prop.value = value;
+  prop.important = options.important ?? false;
+  prop.parsedOk = options.parsedOk ?? true;
+  prop.disabled = options.disabled ?? false;
+  return prop;
+}
+
+export interface MockCSSStyleDeclarationOptions {
+  rule?: DevTools.CSSRule.CSSRule | null;
+  type?: DevTools.CSSStyleDeclaration.Type;
+  animationName?: string;
+  range?: {
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
+  };
+}
+
+export function createMockCSSStyleDeclaration(
+  properties: DevTools.CSSProperty.CSSProperty[],
+  options: MockCSSStyleDeclarationOptions = {},
+): MockCSSStyleDeclaration {
+  const style = sinon.createStubInstance(
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+  );
+  style.type = options.type ?? DevTools.CSSStyleDeclaration.Type.Regular;
+  style.allProperties.returns(properties);
+  style.leadingProperties.returns(properties);
+  style.parentRule = options.rule ?? null;
+  style.animationName.returns(options.animationName ?? '');
+  if (options.range) {
+    Object.assign(style, {range: options.range});
+  }
+  return style;
+}
+
+export function createMockCSSInlineStyle(
+  properties: DevTools.CSSProperty.CSSProperty[],
+): MockCSSStyleDeclaration {
+  return createMockCSSStyleDeclaration(properties, {
+    type: DevTools.CSSStyleDeclaration.Type.Inline,
+  });
+}
+
+export interface MockCSSMatchedStylesParams {
+  node?: string | DevTools.DOMModel.DOMNode;
+  nodeStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
+  parentNode?: string | DevTools.DOMModel.DOMNode;
+  nodeForStyleMap?: Map<
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+    DevTools.DOMModel.DOMNode
+  >;
+  propertyStates?: Map<DevTools.CSSProperty.CSSProperty, string>;
+  matchingSelectorsMap?: Map<unknown, number[]>;
+}
+
+export function createMockCSSMatchedStyles(
+  params: MockCSSMatchedStylesParams = {},
+): MockCSSMatchedStyles {
+  const mockNode =
+    typeof params.node === 'string'
+      ? createMockDOMNode({selector: params.node})
+      : (params.node ?? createMockDOMNode());
+  const nodeStyles = params.nodeStyles ?? [];
+
+  const defaultParentNode =
+    typeof params.parentNode === 'string'
+      ? createMockDOMNode({selector: params.parentNode})
+      : params.parentNode;
+  const nodeForStyleMap = params.nodeForStyleMap ?? new Map();
+
+  const propertyStates = params.propertyStates ?? new Map();
+
+  const mock = sinon.createStubInstance(
+    DevTools.CSSMatchedStyles.CSSMatchedStyles,
+  );
+  mock.node.returns(mockNode);
+  mock.nodeStyles.returns(nodeStyles);
+
+  mock.nodeForStyle.callsFake(
+    style => nodeForStyleMap.get(style) ?? defaultParentNode ?? null,
+  );
+
+  mock.propertyState.callsFake(prop => propertyStates.get(prop) ?? 'Active');
+  mock.getMatchingSelectors.callsFake(
+    rule => params.matchingSelectorsMap?.get(rule) ?? [],
+  );
+
+  return mock;
 }
