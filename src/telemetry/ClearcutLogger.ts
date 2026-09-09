@@ -116,6 +116,8 @@ export class ClearcutLogger {
       this.#mcpClient = McpClient.MCP_CLIENT_GROK;
     } else if (lowerName.includes('copilot')) {
       this.#mcpClient = McpClient.MCP_CLIENT_GITHUB_COPILOT;
+    } else if (lowerName.includes('hermes-agent')) {
+      this.#mcpClient = McpClient.MCP_CLIENT_HERMES;
     } else {
       this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
     }

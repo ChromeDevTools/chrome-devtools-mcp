@@ -140,6 +140,7 @@ describe('ClearcutLogger', () => {
       {name: 'github-copilot-developer', expected: 11}, // MCP_CLIENT_GITHUB_COPILOT
       {name: 'copilot-intellij', expected: 11}, // MCP_CLIENT_GITHUB_COPILOT
       {name: 'unknown-client', expected: 3}, // MCP_CLIENT_OTHER
+      {name: 'hermes-agent/1.0.0', expected: 12}, // MCP_CLIENT_HERMES
     ];
 
     for (const {name, expected} of clients) {
