@@ -73,7 +73,7 @@ export const resolveDevtoolsComment = definePageTool({
 export const revealInDevtools = definePageTool({
   name: 'reveal_in_devtools',
   description:
-    'Navigate DevTools to a specified panel and highlight a target DOM node or network request.',
+    'Navigate DevTools to a specified panel and highlight a target DOM node or network request. The parameters uid and reqid are mutually exclusive.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -82,6 +82,7 @@ export const revealInDevtools = definePageTool({
   schema: {
     panelName: zod
       .string()
+      .optional()
       .describe(
         'The target DevTools panel (e.g. "elements", "network", "sources", "console").',
       ),
@@ -94,9 +95,7 @@ export const revealInDevtools = definePageTool({
     reqid: zod
       .number()
       .optional()
-      .describe(
-        'Optional network request ID (from chrome-devtools-mcp network tools) to reveal in the Network panel.',
-      ),
+      .describe('Optional network request ID to reveal in the Network panel.'),
   },
   blockedByDialog: false,
   verifyFilesSchema: {},
