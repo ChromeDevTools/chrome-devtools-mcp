@@ -28,7 +28,7 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpPage, DevTools} from '../src/third_party/index.js';
+import {CdpFrame, CdpPage, DevTools} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -64,10 +64,18 @@ export function mockListener() {
       }
     },
     off(
-      _eventName: string | symbol | number,
-      _listener?: (data: unknown) => void,
+      eventName: string | symbol | number,
+      listener?: (data: unknown) => void,
     ) {
-      // no-op
+      const arr = listeners[eventName];
+      if (!arr) {
+        return;
+      }
+      if (!listener) {
+        delete listeners[eventName];
+        return;
+      }
+      listeners[eventName] = arr.filter(entry => entry !== listener);
     },
     emit(eventName: string | symbol | number, data?: unknown) {
       for (const listener of listeners[eventName] ?? []) {
@@ -84,9 +92,25 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
 
   // mainFrame() must return a stable object so tests can pass it back into
   // page.emit('framenavigated', mainFrame) and have it recognized as the
-  // same frame instance across calls. It also needs real on/off/emit so the
-  // PageCollector can subscribe to `FrameEvent.FrameNavigatedWithinDocument`.
-  page.mainFrame.returns(mockListener() as unknown as Frame);
+  // same frame instance across calls. It needs real on/off/emit so the
+  // PageCollector can subscribe to FrameNavigatedWithinDocument and tests
+  // can trigger it.
+  const mainFrameStub = sinon.createStubInstance(CdpFrame);
+  const mainFrameListener = mockListener();
+  mainFrameStub.on.callsFake((eventName, handler) => {
+    mainFrameListener.on(eventName, handler);
+    return mainFrameStub;
+  });
+  mainFrameStub.off.callsFake((eventName, handler) => {
+    mainFrameListener.off(eventName, handler);
+    return mainFrameStub;
+  });
+  mainFrameStub.emit.callsFake((eventName, data) => {
+    mainFrameListener.emit(eventName, data);
+    return true;
+  });
+  // SinonStubbedInstance<CdpFrame> is not assignable to Frame due to private fields.
+  page.mainFrame.returns(mainFrameStub as unknown as Frame);
 
   // _client() is a private internal Puppeteer API used by ConsoleCollector
   // in the McpPage constructor. Not on the CdpPage prototype, so added

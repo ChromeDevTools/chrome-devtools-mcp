@@ -78,9 +78,7 @@ describe('PageCollector', () => {
 
     // Simulate a same-document (SPA) navigation: Puppeteer emits
     // `FrameNavigatedWithinDocument` right before `framenavigated`.
-    (mainFrame as unknown as {emit: (e: unknown, d?: unknown) => void}).emit(
-      FrameEvent.FrameNavigatedWithinDocument,
-    );
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
     page.emit('framenavigated', mainFrame);
 
     assert.equal(collector.getData()[0], request);
@@ -102,9 +100,7 @@ describe('PageCollector', () => {
     page.emit('request', request);
 
     // Same-document navigation: history is kept.
-    (mainFrame as unknown as {emit: (e: unknown, d?: unknown) => void}).emit(
-      FrameEvent.FrameNavigatedWithinDocument,
-    );
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
     page.emit('framenavigated', mainFrame);
     assert.equal(collector.getData()[0], request);
 

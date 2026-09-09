@@ -48,8 +48,8 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
 export class PageCollector<T> {
   protected pptrPage: Page;
   #listeners?: ListenerMap<PageEvents>;
-  #mainFrame: Frame;
   #pendingSameDocumentNavigation = false;
+  #frameNavigatedWithinDocumentTarget?: Frame;
   protected maxNavigationSaved = 3;
 
   /**
@@ -65,11 +65,7 @@ export class PageCollector<T> {
     maxResourcesPerNavigation?: number,
   ) {
     this.pptrPage = page;
-    this.#mainFrame = page.mainFrame();
-    this.#mainFrame.on(
-      FrameEvent.FrameNavigatedWithinDocument,
-      this.#onFrameNavigatedWithinDocument,
-    );
+    this.#attachFrameNavigatedWithinDocumentListener();
 
     const idGenerator = createIdGenerator();
 
@@ -93,6 +89,10 @@ export class PageCollector<T> {
       if (frame !== this.pptrPage.mainFrame()) {
         return;
       }
+      // Re-attach the listener to the current main frame: a cross-document
+      // navigation may have replaced the frame object, so the reference
+      // captured at construction time would be stale.
+      this.#attachFrameNavigatedWithinDocumentListener();
       // Same-document (SPA) navigations also emit `framenavigated`, but they
       // must not rotate the retained history. Puppeteer emits
       // `FrameNavigatedWithinDocument` right before `FrameNavigated` for such
@@ -112,10 +112,7 @@ export class PageCollector<T> {
   }
 
   dispose() {
-    this.#mainFrame.off(
-      FrameEvent.FrameNavigatedWithinDocument,
-      this.#onFrameNavigatedWithinDocument,
-    );
+    this.#detachFrameNavigatedWithinDocumentListener();
     if (this.#listeners) {
       for (const [name, listener] of Object.entries(this.#listeners)) {
         this.pptrPage.off(name, listener as Handler<unknown>);
@@ -129,6 +126,25 @@ export class PageCollector<T> {
   #onFrameNavigatedWithinDocument = () => {
     this.#pendingSameDocumentNavigation = true;
   };
+
+  #attachFrameNavigatedWithinDocumentListener() {
+    this.#detachFrameNavigatedWithinDocumentListener();
+    this.#frameNavigatedWithinDocumentTarget = this.pptrPage.mainFrame();
+    this.#frameNavigatedWithinDocumentTarget.on(
+      FrameEvent.FrameNavigatedWithinDocument,
+      this.#onFrameNavigatedWithinDocument,
+    );
+  }
+
+  #detachFrameNavigatedWithinDocumentListener() {
+    if (this.#frameNavigatedWithinDocumentTarget) {
+      this.#frameNavigatedWithinDocumentTarget.off(
+        FrameEvent.FrameNavigatedWithinDocument,
+        this.#onFrameNavigatedWithinDocument,
+      );
+      this.#frameNavigatedWithinDocumentTarget = undefined;
+    }
+  }
 
   protected splitAfterNavigation() {
     // Add the latest navigation first
@@ -209,6 +225,8 @@ class PageEventSubscriber {
   #page: Page;
   #session: CDPSession;
   #targetId: string;
+  #pendingSameDocumentNavigation = false;
+  #frameNavigatedWithinDocumentTarget?: Frame;
 
   constructor(page: Page) {
     this.#page = page;
@@ -238,11 +256,13 @@ class PageEventSubscriber {
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
     this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
+    this.#attachFrameNavigatedWithinDocumentListener();
   }
 
   unsubscribe() {
     this.#seenKeys.clear();
     this.#seenIssues.clear();
+    this.#detachFrameNavigatedWithinDocumentListener();
     this.#page.off('framenavigated', this.#onFrameNavigated);
     this.#page.off('issue', this.#onIssueAdded);
     this.#session.off('Runtime.exceptionThrown', this.#onExceptionThrown);
@@ -277,10 +297,44 @@ class PageEventSubscriber {
     if (frame !== frame.page().mainFrame()) {
       return;
     }
+    // Re-attach the listener to the current main frame: a cross-document
+    // navigation may have replaced the frame object, so the reference
+    // captured at construction time would be stale.
+    this.#attachFrameNavigatedWithinDocumentListener();
+    if (this.#pendingSameDocumentNavigation) {
+      this.#pendingSameDocumentNavigation = false;
+      return;
+    }
     this.#seenKeys.clear();
     this.#seenIssues.clear();
     this.#resetIssueAggregator();
   };
+
+  // Puppeteer emits this right before the page-level navigation event for
+  // same-document (SPA) navigations, which lets `framenavigated` skip the
+  // issue aggregation reset for those navigations.
+  #onFrameNavigatedWithinDocument = () => {
+    this.#pendingSameDocumentNavigation = true;
+  };
+
+  #attachFrameNavigatedWithinDocumentListener() {
+    this.#detachFrameNavigatedWithinDocumentListener();
+    this.#frameNavigatedWithinDocumentTarget = this.#page.mainFrame();
+    this.#frameNavigatedWithinDocumentTarget.on(
+      FrameEvent.FrameNavigatedWithinDocument,
+      this.#onFrameNavigatedWithinDocument,
+    );
+  }
+
+  #detachFrameNavigatedWithinDocumentListener() {
+    if (this.#frameNavigatedWithinDocumentTarget) {
+      this.#frameNavigatedWithinDocumentTarget.off(
+        FrameEvent.FrameNavigatedWithinDocument,
+        this.#onFrameNavigatedWithinDocument,
+      );
+      this.#frameNavigatedWithinDocumentTarget = undefined;
+    }
+  }
 
   #onIssueAdded = (inspectorIssue: Issue) => {
     try {
