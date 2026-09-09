@@ -50,6 +50,13 @@ export const mcpOptions = {
       'Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.',
     default: true,
   },
+  devtoolsComments: {
+    type: 'boolean',
+    describe:
+      'Whether to enable DevTools comments tools. Internal WIP feature.',
+    hidden: true,
+    default: false,
+  },
   experimentalDevtools: {
     type: 'boolean',
     describe: 'Whether to enable automation over DevTools targets',
