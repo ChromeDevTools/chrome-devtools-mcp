@@ -70,7 +70,7 @@ export interface CD4ABridge {
   getCommentThreads(): CD4ACommentThread[];
   takeComments(): CD4ACommentThread[];
   resolveCommentThread(threadId: string, replyText?: string): boolean;
-  reveal(panelName: string, target?: CD4ARevealTarget): Promise<void>;
+  reveal(panelName?: string, target?: CD4ARevealTarget): Promise<void>;
   addEventListener(
     event: CD4ABridgeEvents | 'CommentThreadsChanged' | string,
     listener: () => void,

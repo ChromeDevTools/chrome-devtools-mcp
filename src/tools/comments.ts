@@ -240,7 +240,7 @@ export const revealInDevtools = definePageTool({
 
     await devtoolsPage.evaluate(
       async (
-        panel: string,
+        panel: string | undefined,
         target: {backendNodeId?: number; networkRequestId?: string},
       ) => {
         await window.universe?.cd4aBridge?.reveal(panel, target);
@@ -256,8 +256,12 @@ export const revealInDevtools = definePageTool({
       targetDesc = ` (revealing network request ${reqid} [${networkRequestId}])`;
     }
 
-    response.appendResponseLine(
-      `Navigated to ${panelName} panel${targetDesc} in DevTools.`,
-    );
+    if (panelName) {
+      response.appendResponseLine(
+        `Navigated to ${panelName} panel${targetDesc} in DevTools.`,
+      );
+    } else {
+      response.appendResponseLine(`Revealed target${targetDesc} in DevTools.`);
+    }
   },
 });

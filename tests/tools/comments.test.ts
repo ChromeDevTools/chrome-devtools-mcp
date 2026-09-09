@@ -269,6 +269,35 @@ describe('comments tools', () => {
 
       t.assert.snapshot(lines.join('\n'));
     });
+
+    it('reveals element when panelName is omitted', async () => {
+      const {page, context, response} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.resolveUidToBackendNodeId.resolves(101);
+      devtoolsPage.evaluate.resolves(undefined);
+
+      await revealInDevtools.handler(
+        {
+          params: {
+            uid: 'uid-header',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        page.resolveUidToBackendNodeId,
+        'uid-header',
+      );
+      sinon.assert.calledOnce(devtoolsPage.evaluate);
+      sinon.assert.calledWithExactly(
+        response.appendResponseLine,
+        'Revealed target (revealing element uid-header [backend node 101]) in DevTools.',
+      );
+    });
   });
 
   describe('open_devtools', () => {
