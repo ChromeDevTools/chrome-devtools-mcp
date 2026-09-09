@@ -96,7 +96,7 @@ describe('comments tools', () => {
       t.assert.snapshot(lines.join('\n'));
     });
 
-    it('falls back to backendNodeId and networkRequestId if resolution returns undefined', async t => {
+    it('omits target element and network request ID if resolution returns undefined', async t => {
       const {page, context, response} = createHandlerMocks();
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();

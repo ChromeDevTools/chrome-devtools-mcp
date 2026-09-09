@@ -1,10 +1,8 @@
-exports[`comments tools > get_devtools_comments > falls back to backendNodeId and networkRequestId if resolution returns undefined 1`] = `
+exports[`comments tools > get_devtools_comments > omits target element and network request ID if resolution returns undefined 1`] = `
 Found 1 DevTools comment thread(s):
 
 ### Thread: comment-2
 - Comment: Fix heading font size
-- Target element (backendNodeId): 42
-- Network request ID: req-99
 `;
 
 exports[`comments tools > get_devtools_comments > formats comment threads with text, targets, and editor location 1`] = `

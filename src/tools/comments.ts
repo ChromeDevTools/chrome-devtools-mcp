@@ -87,20 +87,12 @@ export const getDevtoolsComments = definePageTool({
           response.appendResponseLine(
             `- Target element (snapshot UID): ${elementUid}`,
           );
-        } else {
-          response.appendResponseLine(
-            `- Target element (backendNodeId): ${thread.backendNodeId}`,
-          );
         }
       }
       if (thread.networkRequestId) {
         const reqid = page.resolveCdpRequestId(thread.networkRequestId);
         if (reqid !== undefined) {
           response.appendResponseLine(`- Network request ID (reqid): ${reqid}`);
-        } else {
-          response.appendResponseLine(
-            `- Network request ID: ${thread.networkRequestId}`,
-          );
         }
       }
       if (thread.editor) {
