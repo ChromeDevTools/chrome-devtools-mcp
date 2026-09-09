@@ -242,6 +242,100 @@ Styles for div#main (uid: "1_1"):
   (no styles)
 `;
 
+exports[`CssFormatter > formats inherited styles from ancestors and ignores non-inheritable ones toJSON 1`] = `
+{
+  "element": {
+    "uid": "child-1",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inherited",
+      "node": {
+        "selector": "section#parent-sec"
+      },
+      "selector": ".parent-style",
+      "source": "<style>",
+      "properties": [
+        {
+          "name": "color",
+          "value": "black",
+          "status": "active"
+        },
+        {
+          "name": "--custom-var",
+          "value": "10px",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inherited styles from ancestors and ignores non-inheritable ones toString 1`] = `
+Styles for button (uid: "child-1"):
+
+  Inherited from section#parent-sec:
+    .parent-style (<style>) {
+      color: black;
+      --custom-var: 10px;
+    }
+`;
+
+exports[`CssFormatter > formats inherited transition and animation styles with parent node toJSON 1`] = `
+{
+  "element": {
+    "uid": "child-elem",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inherited",
+      "node": {
+        "selector": "div#wrapper"
+      },
+      "selector": "transitions style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "purple",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "inherited",
+      "node": {
+        "selector": "div#wrapper"
+      },
+      "selector": "pulse animation",
+      "properties": [
+        {
+          "name": "color",
+          "value": "orange",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inherited transition and animation styles with parent node toString 1`] = `
+Styles for button (uid: "child-elem"):
+
+  Inherited from div#wrapper:
+    transitions style {
+      color: purple;
+    }
+
+  Inherited from div#wrapper:
+    pulse animation {
+      color: orange;
+    }
+`;
+
 exports[`CssFormatter > formats injected stylesheet rules toJSON 1`] = `
 {
   "element": {

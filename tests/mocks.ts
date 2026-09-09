@@ -378,6 +378,7 @@ export function createMockCSSStyleRule(
 export interface MockCSSMatchedStylesParams {
   node?: string | DevTools.DOMModel.DOMNode;
   nodeStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
+  inheritedStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
   parentNode?: string | DevTools.DOMModel.DOMNode;
   nodeForStyleMap?: Map<
     DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
@@ -394,7 +395,11 @@ export function createMockCSSMatchedStyles(
     typeof params.node === 'string'
       ? createMockDOMNode({selector: params.node})
       : (params.node ?? createMockDOMNode());
-  const nodeStyles = params.nodeStyles ?? [];
+
+  const inheritedStyles = params.inheritedStyles ?? [];
+  const nodeStyles = params.nodeStyles
+    ? [...params.nodeStyles, ...inheritedStyles]
+    : inheritedStyles;
 
   const defaultParentNode =
     typeof params.parentNode === 'string'
@@ -409,11 +414,14 @@ export function createMockCSSMatchedStyles(
   );
   mock.node.returns(mockNode);
   mock.nodeStyles.returns(nodeStyles);
+  mock.inheritedStyles.returns(inheritedStyles);
 
   mock.nodeForStyle.callsFake(
     style => nodeForStyleMap.get(style) ?? defaultParentNode ?? null,
   );
-
+  mock.isInherited.callsFake(style =>
+    Boolean(inheritedStyles.find(inheritedStyle => inheritedStyle === style)),
+  );
   mock.propertyState.callsFake(prop => propertyStates.get(prop) ?? 'Active');
   mock.getMatchingSelectors.callsFake(
     rule => params.matchingSelectorsMap?.get(rule) ?? [],
