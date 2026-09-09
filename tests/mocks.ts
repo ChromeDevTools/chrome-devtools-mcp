@@ -43,6 +43,8 @@ export type MockCSSStyleDeclaration =
   sinon.SinonStubbedInstance<DevTools.CSSStyleDeclaration.CSSStyleDeclaration>;
 export type MockCSSMatchedStyles =
   sinon.SinonStubbedInstance<DevTools.CSSMatchedStyles.CSSMatchedStyles>;
+export type MockCSSStyleRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSStyleRule>;
 
 /**
  * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
@@ -168,6 +170,8 @@ export function createHandlerMocks(): {
   return {page, context, response};
 }
 
+type RuleOrigin = 'regular' | 'user-agent' | 'injected' | 'inspector';
+
 function isBackendNodeId(
   id: unknown,
 ): id is DevTools.Protocol.DOM.BackendNodeId {
@@ -249,6 +253,126 @@ export function createMockCSSInlineStyle(
   return createMockCSSStyleDeclaration(properties, {
     type: DevTools.CSSStyleDeclaration.Type.Inline,
   });
+}
+
+export interface MockRuleOptions {
+  sourceURL?: string;
+  lineNumber?: number;
+  columnNumber?: number;
+  origin?: RuleOrigin;
+  isConstructed?: boolean;
+  nestingSelectors?: string[];
+  selectors?: Array<{text: string}>;
+  layers?: Array<{text?: string}>;
+  media?: Array<{text: string}>;
+  containerQueries?: Array<{
+    text?: string;
+    name?: string;
+    getContainerForNode?: (nodeId: number) => Promise<unknown>;
+  }>;
+  scopes?: Array<{text: string}>;
+  supports?: Array<{text: string}>;
+  startingStyles?: unknown[];
+  navigations?: Array<{text?: string}>;
+  ruleTypes?: DevTools.Protocol.CSS.CSSRuleType[];
+}
+
+export function synthesizeRuleTypes(
+  options: MockRuleOptions,
+): DevTools.Protocol.CSS.CSSRuleType[] | undefined {
+  if (options.ruleTypes !== undefined) {
+    return options.ruleTypes;
+  }
+  const ruleTypes: DevTools.Protocol.CSS.CSSRuleType[] = [];
+  const mappings: Array<
+    [unknown[] | undefined, DevTools.Protocol.CSS.CSSRuleType]
+  > = [
+    [options.navigations, DevTools.Protocol.CSS.CSSRuleType.NavigationRule],
+    [options.nestingSelectors, DevTools.Protocol.CSS.CSSRuleType.StyleRule],
+    [
+      options.startingStyles,
+      DevTools.Protocol.CSS.CSSRuleType.StartingStyleRule,
+    ],
+    [options.scopes, DevTools.Protocol.CSS.CSSRuleType.ScopeRule],
+    [options.supports, DevTools.Protocol.CSS.CSSRuleType.SupportsRule],
+    [options.containerQueries, DevTools.Protocol.CSS.CSSRuleType.ContainerRule],
+    [options.media, DevTools.Protocol.CSS.CSSRuleType.MediaRule],
+    [options.layers, DevTools.Protocol.CSS.CSSRuleType.LayerRule],
+  ];
+  for (const [items, ruleType] of mappings) {
+    if (items) {
+      for (const _ of items) {
+        ruleTypes.push(ruleType);
+      }
+    }
+  }
+  return ruleTypes.length > 0 ? ruleTypes : undefined;
+}
+
+export function attachRuleMeta(
+  rule: sinon.SinonStubbedInstance<DevTools.CSSRule.CSSRule>,
+  sourceURL?: string,
+  origin: RuleOrigin = 'regular',
+  isConstructed = false,
+): void {
+  rule.isUserAgent.returns(origin === 'user-agent');
+  rule.isInjected.returns(origin === 'injected');
+  rule.isViaInspector.returns(origin === 'inspector');
+  if (sourceURL || isConstructed) {
+    const header = {
+      sourceURL: sourceURL ?? '',
+      lineNumberInSource: (line: number) => line,
+      columnNumberInSource: (_line: number, col: number) => col,
+      isConstructedByNew: () => isConstructed,
+    };
+    Object.assign(rule, {header});
+  }
+  Object.defineProperty(rule, 'sourceURL', {
+    value: sourceURL,
+    writable: true,
+    configurable: true,
+  });
+}
+
+function createCSSValue(text: string) {
+  return {
+    text,
+    rebase() {
+      // no-op
+    },
+  };
+}
+
+export function createMockCSSStyleRule(
+  selector: string,
+  options: MockRuleOptions = {},
+): MockCSSStyleRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSStyleRule);
+  attachRuleMeta(
+    rule,
+    options.sourceURL,
+    options.origin,
+    options.isConstructed ?? false,
+  );
+  rule.selectorText.returns(selector);
+  rule.lineNumberInSource.returns(options.lineNumber ?? -1);
+  rule.columnNumberInSource.returns(options.columnNumber);
+  const selectors = options.selectors
+    ? options.selectors.map(s => ({...createCSSValue(s.text), ...s}))
+    : [createCSSValue(selector)];
+  Object.assign(rule, {
+    selectors,
+    nestingSelectors: options.nestingSelectors,
+    layers: options.layers,
+    media: options.media,
+    containerQueries: options.containerQueries,
+    scopes: options.scopes,
+    supports: options.supports,
+    startingStyles: options.startingStyles,
+    navigations: options.navigations,
+    ruleTypes: synthesizeRuleTypes(options),
+  });
+  return rule;
 }
 
 export interface MockCSSMatchedStylesParams {
