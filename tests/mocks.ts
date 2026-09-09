@@ -28,8 +28,13 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpFrame, CdpPage, DevTools} from '../src/third_party/index.js';
-import type {Page} from '../src/third_party/index.js';
+import {
+  CdpExtension,
+  CdpFrame,
+  CdpPage,
+  DevTools,
+} from '../src/third_party/index.js';
+import type {Extension, Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
   pptrPage: sinon.SinonStubbedInstance<Page>;
@@ -446,4 +451,24 @@ export function createMockCSSMatchedStyles(
   );
 
   return mock;
+}
+
+export function createMockExtension(
+  options: {
+    id?: string;
+    path?: string;
+    name?: string;
+    version?: string;
+    enabled?: boolean;
+  } = {},
+): Extension {
+  const extension = sinon.createStubInstance(CdpExtension);
+  sinon.stub(extension, 'id').value(options.id ?? 'mock-extension-id');
+  sinon
+    .stub(extension, 'path')
+    .value(options.path ?? '/path/to/mock/extension');
+  sinon.stub(extension, 'name').value(options.name ?? 'Mock Extension');
+  sinon.stub(extension, 'version').value(options.version ?? '1.0.0');
+  sinon.stub(extension, 'enabled').value(options.enabled ?? true);
+  return extension as unknown as Extension;
 }
