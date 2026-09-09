@@ -112,8 +112,26 @@ export interface InheritedRule {
   properties: StructuredCssProperty[];
 }
 
+export interface PseudoElementRule {
+  type: 'pseudo';
+  pseudoType: string;
+  node?: {
+    uid?: string;
+    selector: string;
+  };
+  selector?: string;
+  matchingSelectors?: string[];
+  source?: string;
+  ancestors?: AncestorCSSRule[];
+  properties: StructuredCssProperty[];
+}
+
 export type CascadeRule =
-  NodeStyleRule | AnimationRule | MatchedRule | InheritedRule;
+  | NodeStyleRule
+  | AnimationRule
+  | MatchedRule
+  | InheritedRule
+  | PseudoElementRule;
 
 export interface StructuredCssStyles {
   element: {
@@ -397,12 +415,21 @@ function formatPropertyLine(prop: StructuredCssProperty): string {
 
 /**
  * Filters properties to only those that can be inherited from an ancestor element.
+ *
+ * For highlight pseudo-elements, custom properties (`--*`) are not inherited.
+ * For other CSS custom properties, check registered @property inheritance
+ * rules if available.
+ * For all remaining properties, use standard CSSMetadata inheritance check.
  */
 function getInheritableProperties(
   properties: DevTools.CSSProperty.CSSProperty[],
   matchedStyles: MatchedStyles,
+  isHighlight = false,
 ): DevTools.CSSProperty.CSSProperty[] {
   return properties.filter(prop => {
+    if (isHighlight) {
+      return !DevTools.CSSMetadata.cssMetadata().isCustomProperty(prop.name);
+    }
     if (DevTools.CSSMetadata.cssMetadata().isCustomProperty(prop.name)) {
       const registered = matchedStyles.getRegisteredProperty?.(prop.name);
       if (registered) {
@@ -447,6 +474,9 @@ function getCascadeRuleHeader(rule: CascadeRule): string {
       break;
     case 'inherited':
       selector = rule.selector ?? 'element.style';
+      break;
+    case 'pseudo':
+      selector = rule.selector ?? rule.pseudoType;
       break;
   }
   const source = 'source' in rule ? rule.source : undefined;
@@ -544,6 +574,14 @@ function appendCssSectionsToString(
       writer.indent();
       appendRuleWithAncestors(writer, rule);
       writer.dedent();
+    } else if (rule.type === 'pseudo') {
+      let inheritedStr = '';
+      if (rule.node) {
+        const uidPart = rule.node.uid ? `, uid: "${rule.node.uid}"` : '';
+        inheritedStr = ` (inherited from ${rule.node.selector}${uidPart})`;
+      }
+      writer.writeComment(`Pseudo ${rule.pseudoType} element${inheritedStr}`);
+      appendRuleWithAncestors(writer, rule);
     } else {
       appendRuleWithAncestors(writer, rule);
     }
@@ -566,6 +604,7 @@ export class CssFormatter {
   ): CascadeRule[] {
     const rules: CascadeRule[] = [];
     CssFormatter.#collectNodeStyles(rules, matchedStyles, options);
+    CssFormatter.#collectPseudoStyles(rules, matchedStyles, options);
     return rules;
   }
 
@@ -717,6 +756,82 @@ export class CssFormatter {
         matchedStyles,
       ),
     };
+  }
+
+  static #collectPseudoStyles(
+    rules: CascadeRule[],
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions,
+  ): void {
+    const customHighlightNames =
+      matchedStyles.customHighlightPseudoNames?.() ?? [];
+    for (const highlightName of customHighlightNames) {
+      const pseudoStyles =
+        matchedStyles.customHighlightPseudoStyles?.(highlightName) ?? [];
+      CssFormatter.#collectPseudoList(
+        rules,
+        `::highlight(${highlightName})`,
+        pseudoStyles,
+        matchedStyles,
+        options,
+        true,
+      );
+    }
+
+    // Standard Pseudos (::before, ::after, ::marker, ::selection, etc.)
+    const otherPseudoTypes = matchedStyles.pseudoTypes?.() ?? [];
+    for (const pseudoType of otherPseudoTypes) {
+      const pseudoStyles = matchedStyles.pseudoStyles?.(pseudoType) ?? [];
+      CssFormatter.#collectPseudoList(
+        rules,
+        `::${pseudoType}`,
+        pseudoStyles,
+        matchedStyles,
+        options,
+        DevTools.CSSMetadata.cssMetadata().isHighlightPseudoType(pseudoType),
+      );
+    }
+  }
+
+  static #collectPseudoList(
+    rules: CascadeRule[],
+    pseudoType: string,
+    pseudoStyles: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[],
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions,
+    isHighlight = false,
+  ): void {
+    for (const style of pseudoStyles) {
+      const allProps = CssFormatter.#getStyleProperties(style);
+      if (!allProps.length) {
+        continue;
+      }
+      const node = getParentNodeInfo(style, matchedStyles, options.resolveUid);
+      const properties = node
+        ? getInheritableProperties(allProps, matchedStyles, isHighlight)
+        : allProps;
+      if (!properties.length) {
+        continue;
+      }
+      const rule =
+        style.parentRule instanceof DevTools.CSSRule.CSSStyleRule
+          ? style.parentRule
+          : undefined;
+      const meta = getCSSStyleRuleMetadata(
+        rule,
+        matchedStyles,
+        options.containerDetails,
+      );
+
+      rules.push({
+        type: 'pseudo',
+        pseudoType,
+        ...(node ? {node} : {}),
+        ...(rule ? {selector: rule.selectorText()} : {}),
+        ...meta,
+        properties: CssFormatter.#formatProperties(properties, matchedStyles),
+      });
+    }
   }
 
   static #formatProperties(

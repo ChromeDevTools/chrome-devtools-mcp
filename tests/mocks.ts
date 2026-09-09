@@ -384,6 +384,14 @@ export interface MockCSSMatchedStylesParams {
     DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
     DevTools.DOMModel.DOMNode
   >;
+  pseudoStyles?: Map<
+    DevTools.Protocol.DOM.PseudoType,
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration[]
+  >;
+  customHighlights?: Map<
+    string,
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration[]
+  >;
   propertyStates?: Map<DevTools.CSSProperty.CSSProperty, string>;
   matchingSelectorsMap?: Map<unknown, number[]>;
 }
@@ -407,6 +415,10 @@ export function createMockCSSMatchedStyles(
       : params.parentNode;
   const nodeForStyleMap = params.nodeForStyleMap ?? new Map();
 
+  const pseudoStylesMap = params.pseudoStyles ?? new Map();
+  const pseudoTypes = new Set(pseudoStylesMap.keys());
+  const customHighlights = params.customHighlights ?? new Map();
+
   const propertyStates = params.propertyStates ?? new Map();
 
   const mock = sinon.createStubInstance(
@@ -415,12 +427,18 @@ export function createMockCSSMatchedStyles(
   mock.node.returns(mockNode);
   mock.nodeStyles.returns(nodeStyles);
   mock.inheritedStyles.returns(inheritedStyles);
+  mock.pseudoTypes.returns(pseudoTypes);
+  mock.customHighlightPseudoNames.returns(new Set(customHighlights.keys()));
 
   mock.nodeForStyle.callsFake(
     style => nodeForStyleMap.get(style) ?? defaultParentNode ?? null,
   );
   mock.isInherited.callsFake(style =>
     Boolean(inheritedStyles.find(inheritedStyle => inheritedStyle === style)),
+  );
+  mock.pseudoStyles.callsFake(type => pseudoStylesMap.get(type) ?? []);
+  mock.customHighlightPseudoStyles.callsFake(
+    name => customHighlights.get(name) ?? [],
   );
   mock.propertyState.callsFake(prop => propertyStates.get(prop) ?? 'Active');
   mock.getMatchingSelectors.callsFake(

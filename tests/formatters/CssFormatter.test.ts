@@ -11,6 +11,7 @@ import {
   type ContainerQuery,
   CssFormatter,
   type ResolvedContainerDetails,
+  type UidResolver,
 } from '../../src/formatters/CssFormatter.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {
@@ -418,6 +419,103 @@ describe('CssFormatter', () => {
       });
 
       return new CssFormatter(matchedStyles, {uid: 'child-elem'});
+    },
+  );
+
+  formatterTest(
+    'formats pseudo-elements with rules and inline pseudo styles',
+    () => {
+      const pseudoRule = createMockCSSStyleRule('button.btn::before', {
+        sourceURL: 'styles.css',
+        lineNumber: 20,
+        columnNumber: 4,
+        selectors: [{text: 'button.btn::before'}, {text: 'a.link::before'}],
+        nestingSelectors: ['.btn-group'],
+      });
+      const beforeStyle = createMockCSSStyleDeclaration(
+        [
+          createMockCSSProperty('content', '"→"'),
+          createMockCSSProperty('color', 'blue'),
+        ],
+        {rule: pseudoRule},
+      );
+      const afterStyle = createMockCSSStyleDeclaration([
+        createMockCSSProperty('content', '"*"'),
+      ]);
+      const matchedStyles = createMockCSSMatchedStyles({
+        pseudoStyles: new Map([
+          [DevTools.Protocol.DOM.PseudoType.Before, [beforeStyle]],
+          [DevTools.Protocol.DOM.PseudoType.After, [afterStyle]],
+        ]),
+        matchingSelectorsMap: new Map([[pseudoRule, [0]]]),
+      });
+      return new CssFormatter(matchedStyles, {uid: 'btn-pseudo'});
+    },
+  );
+
+  formatterTest(
+    'formats inherited pseudo-elements with ancestor node and resolves uid',
+    () => {
+      const selectionRule = createMockCSSStyleRule('div.container::selection', {
+        sourceURL: 'theme.css',
+        lineNumber: 5,
+        columnNumber: 1,
+      });
+      const inheritedSelectionStyle = createMockCSSStyleDeclaration(
+        [
+          createMockCSSProperty('color', 'white'),
+          createMockCSSProperty('background-color', 'navy'),
+          createMockCSSProperty('--selection-var', 'red'),
+        ],
+        {rule: selectionRule},
+      );
+
+      const inheritedHighlightStyle = createMockCSSStyleDeclaration([
+        createMockCSSProperty('color', 'yellow'),
+        createMockCSSProperty('--highlight-color', 'gold'),
+      ]);
+
+      const inheritedMarkerStyle = createMockCSSStyleDeclaration([
+        createMockCSSProperty('color', 'green'),
+        createMockCSSProperty('padding', '5px'),
+      ]);
+
+      const directMarkerStyle = createMockCSSStyleDeclaration([
+        createMockCSSProperty('content', '"•"'),
+      ]);
+
+      const parentNode = createMockDOMNode({
+        selector: 'div.container',
+        backendNodeId: 10,
+      });
+      const matchedStyles = createMockCSSMatchedStyles({
+        node: createMockDOMNode({selector: 'p.paragraph', backendNodeId: 1}),
+        parentNode,
+        inheritedStyles: [
+          inheritedSelectionStyle,
+          inheritedHighlightStyle,
+          inheritedMarkerStyle,
+        ],
+        pseudoStyles: new Map([
+          [
+            DevTools.Protocol.DOM.PseudoType.Selection,
+            [inheritedSelectionStyle],
+          ],
+          [
+            DevTools.Protocol.DOM.PseudoType.Marker,
+            [directMarkerStyle, inheritedMarkerStyle],
+          ],
+        ]),
+        customHighlights: new Map([['search', [inheritedHighlightStyle]]]),
+      });
+
+      const resolveUid: UidResolver = (backendId: number) =>
+        backendId === 10 ? 'cont-10' : undefined;
+
+      return new CssFormatter(matchedStyles, {
+        uid: 'para-1',
+        resolveUid,
+      });
     },
   );
 });
