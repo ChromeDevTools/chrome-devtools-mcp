@@ -50,7 +50,7 @@ describe('FilePersistence', () => {
       const filePersistence = new persistence.FilePersistence(tmpDir);
       const state = await filePersistence.loadState();
       assert.deepStrictEqual(state, {});
-      assert(logServerErrorStub.notCalled);
+      sinon.assert.notCalled(logServerErrorStub);
     });
 
     it('returns default state and LOGS telemetry if load fails due to corruption', async () => {
@@ -61,8 +61,7 @@ describe('FilePersistence', () => {
       const state = await filePersistence.loadState();
 
       assert.deepStrictEqual(state, {});
-      assert(logServerErrorStub.calledOnce);
-      assert.deepStrictEqual(logServerErrorStub.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(logServerErrorStub, {
         errorCode: ErrorCode.ERROR_CODE_PERSISTENCE_FILE_READ_FAILED,
       });
     });
@@ -79,8 +78,7 @@ describe('FilePersistence', () => {
       const state = await filePersistence.loadState();
 
       assert.deepStrictEqual(state, {});
-      assert(logServerErrorStub.calledOnce);
-      assert.deepStrictEqual(logServerErrorStub.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(logServerErrorStub, {
         errorCode: ErrorCode.ERROR_CODE_PERSISTENCE_FILE_READ_FAILED,
       });
 
@@ -95,8 +93,7 @@ describe('FilePersistence', () => {
       const state = await filePersistence.loadState();
 
       assert.deepStrictEqual(state, {});
-      assert(logServerErrorStub.calledOnce);
-      assert.deepStrictEqual(logServerErrorStub.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(logServerErrorStub, {
         errorCode: ErrorCode.ERROR_CODE_PERSISTENCE_FILE_READ_FAILED,
       });
     });
@@ -113,7 +110,7 @@ describe('FilePersistence', () => {
       const state = await filePersistence.loadState();
 
       assert.deepStrictEqual(state, {});
-      assert(logServerErrorStub.notCalled);
+      sinon.assert.notCalled(logServerErrorStub);
     });
 
     it('returns default state if lastToolCall is invalid date string', async () => {
@@ -131,7 +128,7 @@ describe('FilePersistence', () => {
       const state = await filePersistence.loadState();
 
       assert.deepStrictEqual(state, {});
-      assert(logServerErrorStub.notCalled);
+      sinon.assert.notCalled(logServerErrorStub);
     });
 
     it('returns stored state if file exists', async () => {
@@ -164,7 +161,7 @@ describe('FilePersistence', () => {
         'utf-8',
       );
       assert.deepStrictEqual(JSON.parse(content), state);
-      assert(logServerErrorStub.notCalled);
+      sinon.assert.notCalled(logServerErrorStub);
     });
 
     it('logs telemetry when failing to save to file', async () => {
@@ -178,8 +175,7 @@ describe('FilePersistence', () => {
       };
       await filePersistence.saveState(state);
 
-      assert(logServerErrorStub.calledOnce);
-      assert.deepStrictEqual(logServerErrorStub.firstCall.args[0], {
+      sinon.assert.calledOnceWithExactly(logServerErrorStub, {
         errorCode: ErrorCode.ERROR_CODE_PERSISTENCE_FILE_SAVE_FAILED,
       });
     });

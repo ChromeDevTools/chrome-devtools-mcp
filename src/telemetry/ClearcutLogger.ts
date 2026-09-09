@@ -120,14 +120,15 @@ export class ClearcutLogger {
         clearcutIncludePidHeader: options.clearcutIncludePidHeader,
       });
     this.#mcpClient = McpClient.MCP_CLIENT_UNSPECIFIED;
-    void this.#persistence.loadState().then(
-      state => {
+    void this.#persistence
+      .loadState()
+      .then(state => {
         this.#state = state;
-      },
-      () => {
+      })
+      .catch(error => {
         this.#state = undefined;
-      },
-    );
+        logger?.('Failed to load telemetry state:', error);
+      });
   }
 
   setClientName(clientName: string): void {
@@ -168,7 +169,9 @@ export class ClearcutLogger {
     devToolsData?: DevToolsData;
     pageUrl?: string;
   }): Promise<void> {
-    void this.#logToolActiveIfNeeded();
+    void this.#logToolActiveIfNeeded().catch(error => {
+      logger?.('Error in logToolActiveIfNeeded:', error);
+    });
 
     const context = buildContext(args.devToolsData, args.pageUrl);
     const sanitizedToolName = stripUnderscoreBeforeNumber(args.toolName);

@@ -50,7 +50,7 @@ describe('ClearcutLogger', () => {
         latencyMs: 123,
       });
 
-      assert(mockWatchdogClient.send.calledOnce);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.tool_invocation?.tool_name, 'test_tool');
@@ -75,7 +75,7 @@ describe('ClearcutLogger', () => {
         pageUrl: 'https://example.com',
       });
 
-      assert(mockWatchdogClient.send.calledOnce);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.deepStrictEqual(msg.payload.tool_invocation?.context, {
@@ -111,7 +111,7 @@ describe('ClearcutLogger', () => {
         latencyMs: 123,
       });
 
-      assert(mockWatchdogClient.send.calledOnce);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.deepStrictEqual(msg.payload.tool_invocation?.tool_params, {
@@ -152,10 +152,15 @@ describe('ClearcutLogger', () => {
         logger.setClientName(name);
         await logger.logServerStart({headless: true});
 
-        assert(mockWatchdogClient.send.calledOnce);
-        const msg = mockWatchdogClient.send.firstCall.args[0];
-        assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-        assert.strictEqual(msg.payload.mcp_client, expected);
+        sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
+          type: WatchdogMessageType.LOG_EVENT,
+          payload: {
+            mcp_client: expected,
+            server_start: {
+              flag_usage: {headless: true},
+            },
+          },
+        });
       });
     }
   });
@@ -173,9 +178,7 @@ describe('ClearcutLogger', () => {
         errorCode: ErrorCode.ERROR_CODE_UNSPECIFIED,
       });
 
-      assert(mockWatchdogClient.send.calledOnce);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.deepStrictEqual(msg, {
+      sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
         type: WatchdogMessageType.LOG_EVENT,
         payload: {
           mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
@@ -198,9 +201,7 @@ describe('ClearcutLogger', () => {
         errorCode: ErrorCode.ERROR_CODE_UNSPECIFIED,
       });
 
-      assert(mockWatchdogClient.send.calledOnce);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.deepStrictEqual(msg, {
+      sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
         type: WatchdogMessageType.LOG_EVENT,
         payload: {
           mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
@@ -223,10 +224,15 @@ describe('ClearcutLogger', () => {
 
       await logger.logServerStart({headless: true});
 
-      assert(mockWatchdogClient.send.calledOnce);
-      const msg = mockWatchdogClient.send.firstCall.args[0];
-      assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
-      assert.strictEqual(msg.payload.server_start?.flag_usage?.headless, true);
+      sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
+          server_start: {
+            flag_usage: {headless: true},
+          },
+        },
+      });
     });
   });
 
@@ -247,13 +253,13 @@ describe('ClearcutLogger', () => {
 
       await logger.logDailyActiveIfNeeded();
 
-      assert(mockWatchdogClient.send.calledOnce);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.ok(msg.payload.daily_active);
       assert.ok(msg.payload.daily_active.days_since_last_active !== undefined);
 
-      assert(mockPersistence.saveState.called);
+      sinon.assert.called(mockPersistence.saveState);
     });
 
     it('caps days_since_last_active at 31 if lastActive was > 30 days ago', async () => {
@@ -271,11 +277,11 @@ describe('ClearcutLogger', () => {
 
       await logger.logDailyActiveIfNeeded();
 
-      assert(mockWatchdogClient.send.calledOnce);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.daily_active?.days_since_last_active, 31);
-      assert(mockPersistence.saveState.called);
+      sinon.assert.called(mockPersistence.saveState);
     });
 
     it('does not log daily active if not needed (today)', async () => {
@@ -291,8 +297,8 @@ describe('ClearcutLogger', () => {
 
       await logger.logDailyActiveIfNeeded();
 
-      assert(mockWatchdogClient.send.notCalled);
-      assert(mockPersistence.saveState.notCalled);
+      sinon.assert.notCalled(mockWatchdogClient.send);
+      sinon.assert.notCalled(mockPersistence.saveState);
     });
 
     it('logs daily active with -1 if lastActive is missing', async () => {
@@ -306,11 +312,11 @@ describe('ClearcutLogger', () => {
 
       await logger.logDailyActiveIfNeeded();
 
-      assert(mockWatchdogClient.send.calledOnce);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.strictEqual(msg.payload.daily_active?.days_since_last_active, -1);
-      assert(mockPersistence.saveState.called);
+      sinon.assert.called(mockPersistence.saveState);
     });
   });
 
@@ -337,7 +343,7 @@ describe('ClearcutLogger', () => {
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      assert.strictEqual(mockWatchdogClient.send.callCount, 2);
+      sinon.assert.callCount(mockWatchdogClient.send, 2);
       const activeCall = mockWatchdogClient.send.args.find(
         args => args[0].payload.tool_active !== undefined,
       );
@@ -356,7 +362,7 @@ describe('ClearcutLogger', () => {
         'test_tool',
       );
 
-      assert(mockPersistence.saveState.calledOnce);
+      sinon.assert.calledOnce(mockPersistence.saveState);
       const savedState = mockPersistence.saveState.firstCall.args[0];
       assert.ok(savedState.lastToolCall);
     });
@@ -384,13 +390,13 @@ describe('ClearcutLogger', () => {
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      assert.strictEqual(mockWatchdogClient.send.callCount, 1);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       assert.strictEqual(
         mockWatchdogClient.send.firstCall.args[0].payload.tool_invocation
           ?.tool_name,
         'test_tool',
       );
-      assert(mockPersistence.saveState.notCalled);
+      sinon.assert.notCalled(mockPersistence.saveState);
     });
 
     it('caps days_since_last_tool_call at 31 if lastToolCall was > 30 days ago', async () => {
@@ -419,7 +425,7 @@ describe('ClearcutLogger', () => {
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      assert.strictEqual(mockWatchdogClient.send.callCount, 2);
+      sinon.assert.callCount(mockWatchdogClient.send, 2);
       const activeCall = mockWatchdogClient.send.args.find(
         args => args[0].payload.tool_active !== undefined,
       );
@@ -459,13 +465,13 @@ describe('ClearcutLogger', () => {
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      assert.strictEqual(mockWatchdogClient.send.callCount, 1);
+      sinon.assert.calledOnce(mockWatchdogClient.send);
       assert.strictEqual(
         mockWatchdogClient.send.firstCall.args[0].payload.tool_invocation
           ?.tool_name,
         'test_tool',
       );
-      assert(mockPersistence.saveState.notCalled);
+      sinon.assert.notCalled(mockPersistence.saveState);
     });
   });
 
