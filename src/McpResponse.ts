@@ -7,6 +7,10 @@
 import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './config/mcp-options.js';
+import {
+  CommentFormatter,
+  type StructuredCommentThread,
+} from './formatters/CommentFormatter.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {
   HeapSnapshotFormatter,
@@ -51,7 +55,7 @@ import {
   getInsightOutput,
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
-import type {PaginationOptions} from './types.js';
+import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
@@ -125,6 +129,7 @@ export class McpResponse implements Response {
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
+  #devtoolsComments?: CD4ACommentThread[];
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -325,6 +330,18 @@ export class McpResponse implements Response {
 
   attachWaitForResult(result: WaitForEventsResult): void {
     this.#attachedWaitForResult = result;
+  }
+
+  setDevtoolsComments(threads: CD4ACommentThread[]): void {
+    this.#devtoolsComments = threads;
+  }
+
+  setComments(threads: CD4ACommentThread[]): void {
+    this.setDevtoolsComments(threads);
+  }
+
+  get devtoolsComments(): readonly CD4ACommentThread[] | undefined {
+    return this.#devtoolsComments;
   }
 
   setHeapSnapshotAggregates(
@@ -668,6 +685,22 @@ export class McpResponse implements Response {
     );
   }
 
+  async #handleComments(): Promise<CommentFormatter | undefined> {
+    const comments = this.#devtoolsComments;
+    if (!comments) {
+      return undefined;
+    }
+    const page = this.#page;
+    return await CommentFormatter.from(comments, {
+      resolveBackendNodeId: page
+        ? (id: number) => page.resolveBackendNodeId(id)
+        : undefined,
+      resolveCdpRequestId: page
+        ? (id: string) => page.resolveCdpRequestId(id)
+        : undefined,
+    });
+  }
+
   async handle(
     context: McpContext,
     dataFormat: DataFormat = 'default',
@@ -683,6 +716,7 @@ export class McpResponse implements Response {
       webmcpTools,
       consoleMessages,
       networkRequests,
+      comments,
     ] = await Promise.all([
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
@@ -691,6 +725,7 @@ export class McpResponse implements Response {
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
+      this.#handleComments(),
     ]);
 
     if (this.#includeExtensionServiceWorkers) {
@@ -716,6 +751,7 @@ export class McpResponse implements Response {
         lighthouseResult: this.#attachedLighthouseResult,
         thirdPartyDeveloperTools,
         webmcpTools,
+        comments,
         errorMessage: this.#error?.message,
       },
       dataFormat,
@@ -746,6 +782,7 @@ export class McpResponse implements Response {
       lighthouseResult?: LighthouseData;
       thirdPartyDeveloperTools?: ToolGroups;
       webmcpTools?: WebMCPTool[];
+      comments?: CommentFormatter;
       errorMessage?: string;
     },
     dataFormat: DataFormat = 'default',
@@ -805,6 +842,7 @@ export class McpResponse implements Response {
       heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
+      comments?: StructuredCommentThread[];
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1390,6 +1428,14 @@ Call ${handleDialog.name} to handle it before continuing.`);
       } else {
         response.push('<no console messages found>');
       }
+    }
+
+    if (data.comments) {
+      const commentsJson = data.comments.toJSON();
+      structuredContent.comments = commentsJson;
+      response.push(
+        compactEncode ? compactEncode(commentsJson) : data.comments.toString(),
+      );
     }
 
     if (data.errorMessage) {

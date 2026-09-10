@@ -45,34 +45,14 @@ describe('comments tools', () => {
         response.appendResponseLine,
         'DevTools window is not open for this page. Call open_devtools first to open DevTools.',
       );
+      sinon.assert.notCalled(response.setDevtoolsComments);
       t.assert.snapshot(lines.join('\n'));
     });
 
-    it('reports message when no comments are found', async t => {
+    it('fetches comments and sets them on response', async () => {
       const {page, context, response} = createHandlerMocks();
-      const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
-      devtoolsPage.evaluate.resolves([]);
-
-      await getDevtoolsComments.handler({params: {}, page}, response, context);
-
-      sinon.assert.calledOnce(page.getDevToolsPage);
-      sinon.assert.calledOnce(devtoolsPage.evaluate);
-      sinon.assert.calledOnceWithExactly(
-        response.appendResponseLine,
-        'No open DevTools comments found.',
-      );
-      t.assert.snapshot(lines.join('\n'));
-    });
-
-    it('formats comment threads with text, targets, and editor location', async t => {
-      const {page, context, response} = createHandlerMocks();
-      const lines = trackResponseLines(response);
-      const devtoolsPage = createMockPuppeteerPage();
-      page.getDevToolsPage.resolves(devtoolsPage);
-      page.resolveBackendNodeId.resolves('element-uid-42');
-      page.resolveCdpRequestId.returns(7);
 
       const mockThread: CommentThreadPayload = {
         id: 'comment-1',
@@ -91,31 +71,22 @@ describe('comments tools', () => {
 
       sinon.assert.calledOnce(page.getDevToolsPage);
       sinon.assert.calledOnce(devtoolsPage.evaluate);
-      sinon.assert.calledOnceWithExactly(page.resolveBackendNodeId, 42);
-      sinon.assert.calledOnceWithExactly(page.resolveCdpRequestId, 'req-99');
-      t.assert.snapshot(lines.join('\n'));
+      sinon.assert.calledOnceWithExactly(response.setDevtoolsComments, [
+        mockThread,
+      ]);
     });
 
-    it('omits target element and network request ID if resolution returns undefined', async t => {
+    it('sets empty comments list when no comments are found', async () => {
       const {page, context, response} = createHandlerMocks();
-      const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
-      page.resolveBackendNodeId.resolves(undefined);
-      page.resolveCdpRequestId.returns(undefined);
-
-      const mockThread: CommentThreadPayload = {
-        id: 'comment-2',
-        text: 'Fix heading font size',
-        backendNodeId: 42,
-        networkRequestId: 'req-99',
-      };
-
-      devtoolsPage.evaluate.resolves([mockThread]);
+      devtoolsPage.evaluate.resolves([]);
 
       await getDevtoolsComments.handler({params: {}, page}, response, context);
 
-      t.assert.snapshot(lines.join('\n'));
+      sinon.assert.calledOnce(page.getDevToolsPage);
+      sinon.assert.calledOnce(devtoolsPage.evaluate);
+      sinon.assert.calledOnceWithExactly(response.setDevtoolsComments, []);
     });
   });
 

@@ -35,6 +35,7 @@ import type {
   TextSnapshotNode,
   GeolocationOptions,
   ExtensionServiceWorker,
+  CD4ACommentThread,
 } from '../types.js';
 import type {PaginationOptions} from '../types.js';
 import type {
@@ -194,6 +195,8 @@ export interface Response {
   setListThirdPartyDeveloperTools(): void;
   setListWebMcpTools(): void;
   attachWaitForResult(result: WaitForEventsResult): void;
+  setDevtoolsComments(threads: CD4ACommentThread[]): void;
+  setComments?(threads: CD4ACommentThread[]): void;
 }
 
 export type SupportedExtensions =
