@@ -28,7 +28,7 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpPage} from '../src/third_party/index.js';
+import {CdpFrame, CdpPage, DevTools} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -36,6 +36,15 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
+export type MockDOMNode = sinon.SinonStubbedInstance<DevTools.DOMModel.DOMNode>;
+export type MockCSSProperty =
+  sinon.SinonStubbedInstance<DevTools.CSSProperty.CSSProperty>;
+export type MockCSSStyleDeclaration =
+  sinon.SinonStubbedInstance<DevTools.CSSStyleDeclaration.CSSStyleDeclaration>;
+export type MockCSSMatchedStyles =
+  sinon.SinonStubbedInstance<DevTools.CSSMatchedStyles.CSSMatchedStyles>;
+export type MockCSSStyleRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSStyleRule>;
 
 /**
  * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
@@ -57,10 +66,18 @@ export function mockListener() {
       }
     },
     off(
-      _eventName: string | symbol | number,
-      _listener?: (data: unknown) => void,
+      eventName: string | symbol | number,
+      listener?: (data: unknown) => void,
     ) {
-      // no-op
+      const arr = listeners[eventName];
+      if (!arr) {
+        return;
+      }
+      if (!listener) {
+        delete listeners[eventName];
+        return;
+      }
+      listeners[eventName] = arr.filter(entry => entry !== listener);
     },
     emit(eventName: string | symbol | number, data?: unknown) {
       for (const listener of listeners[eventName] ?? []) {
@@ -77,8 +94,25 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
 
   // mainFrame() must return a stable object so tests can pass it back into
   // page.emit('framenavigated', mainFrame) and have it recognized as the
-  // same frame instance across calls.
-  page.mainFrame.returns({} as Frame);
+  // same frame instance across calls. It needs real on/off/emit so the
+  // PageCollector can subscribe to FrameNavigatedWithinDocument and tests
+  // can trigger it.
+  const mainFrameStub = sinon.createStubInstance(CdpFrame);
+  const mainFrameListener = mockListener();
+  mainFrameStub.on.callsFake((eventName, handler) => {
+    mainFrameListener.on(eventName, handler);
+    return mainFrameStub;
+  });
+  mainFrameStub.off.callsFake((eventName, handler) => {
+    mainFrameListener.off(eventName, handler);
+    return mainFrameStub;
+  });
+  mainFrameStub.emit.callsFake((eventName, data) => {
+    mainFrameListener.emit(eventName, data);
+    return true;
+  });
+  // SinonStubbedInstance<CdpFrame> is not assignable to Frame due to private fields.
+  page.mainFrame.returns(mainFrameStub as unknown as Frame);
 
   // _client() is a private internal Puppeteer API used by ConsoleCollector
   // in the McpPage constructor. Not on the CdpPage prototype, so added
@@ -134,4 +168,282 @@ export function createHandlerMocks(): {
   const context = createMockMcpContext({selectedPage: page});
   const response = createMockMcpResponse();
   return {page, context, response};
+}
+
+type RuleOrigin = 'regular' | 'user-agent' | 'injected' | 'inspector';
+
+function isBackendNodeId(
+  id: unknown,
+): id is DevTools.Protocol.DOM.BackendNodeId {
+  return typeof id === 'number';
+}
+
+export interface MockDOMNodeOptions {
+  selector?: string;
+  backendNodeId?: number;
+}
+
+export function createMockDOMNode(
+  options: MockDOMNodeOptions = {},
+): MockDOMNode {
+  const node = sinon.createStubInstance(DevTools.DOMModel.DOMNode);
+  const selector = options.selector ?? 'button';
+  const backendNodeId = options.backendNodeId ?? 1;
+  if (isBackendNodeId(backendNodeId)) {
+    node.backendNodeId.returns(backendNodeId);
+  }
+  node.simpleSelector.returns(selector);
+  node.nodeNameInCorrectCase.returns(selector.split(/[#.]/)[0] || selector);
+  return node;
+}
+
+export interface MockCSSPropertyOptions {
+  important?: boolean;
+  parsedOk?: boolean;
+  disabled?: boolean;
+}
+
+export function createMockCSSProperty(
+  name: string,
+  value: string,
+  options: MockCSSPropertyOptions = {},
+): MockCSSProperty {
+  const prop = sinon.createStubInstance(DevTools.CSSProperty.CSSProperty);
+  prop.name = name;
+  prop.value = value;
+  prop.important = options.important ?? false;
+  prop.parsedOk = options.parsedOk ?? true;
+  prop.disabled = options.disabled ?? false;
+  return prop;
+}
+
+export interface MockCSSStyleDeclarationOptions {
+  rule?: DevTools.CSSRule.CSSRule | null;
+  type?: DevTools.CSSStyleDeclaration.Type;
+  animationName?: string;
+  range?: {
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
+  };
+}
+
+export function createMockCSSStyleDeclaration(
+  properties: DevTools.CSSProperty.CSSProperty[],
+  options: MockCSSStyleDeclarationOptions = {},
+): MockCSSStyleDeclaration {
+  const style = sinon.createStubInstance(
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+  );
+  style.type = options.type ?? DevTools.CSSStyleDeclaration.Type.Regular;
+  style.allProperties.returns(properties);
+  style.leadingProperties.returns(properties);
+  style.parentRule = options.rule ?? null;
+  style.animationName.returns(options.animationName ?? '');
+  if (options.range) {
+    Object.assign(style, {range: options.range});
+  }
+  return style;
+}
+
+export function createMockCSSInlineStyle(
+  properties: DevTools.CSSProperty.CSSProperty[],
+): MockCSSStyleDeclaration {
+  return createMockCSSStyleDeclaration(properties, {
+    type: DevTools.CSSStyleDeclaration.Type.Inline,
+  });
+}
+
+export interface MockRuleOptions {
+  sourceURL?: string;
+  lineNumber?: number;
+  columnNumber?: number;
+  origin?: RuleOrigin;
+  isConstructed?: boolean;
+  nestingSelectors?: string[];
+  selectors?: Array<{text: string}>;
+  layers?: Array<{text?: string}>;
+  media?: Array<{text: string}>;
+  containerQueries?: Array<{
+    text?: string;
+    name?: string;
+    getContainerForNode?: (nodeId: number) => Promise<unknown>;
+  }>;
+  scopes?: Array<{text: string}>;
+  supports?: Array<{text: string}>;
+  startingStyles?: unknown[];
+  navigations?: Array<{text?: string}>;
+  ruleTypes?: DevTools.Protocol.CSS.CSSRuleType[];
+}
+
+export function synthesizeRuleTypes(
+  options: MockRuleOptions,
+): DevTools.Protocol.CSS.CSSRuleType[] | undefined {
+  if (options.ruleTypes !== undefined) {
+    return options.ruleTypes;
+  }
+  const ruleTypes: DevTools.Protocol.CSS.CSSRuleType[] = [];
+  const mappings: Array<
+    [unknown[] | undefined, DevTools.Protocol.CSS.CSSRuleType]
+  > = [
+    [options.navigations, DevTools.Protocol.CSS.CSSRuleType.NavigationRule],
+    [options.nestingSelectors, DevTools.Protocol.CSS.CSSRuleType.StyleRule],
+    [
+      options.startingStyles,
+      DevTools.Protocol.CSS.CSSRuleType.StartingStyleRule,
+    ],
+    [options.scopes, DevTools.Protocol.CSS.CSSRuleType.ScopeRule],
+    [options.supports, DevTools.Protocol.CSS.CSSRuleType.SupportsRule],
+    [options.containerQueries, DevTools.Protocol.CSS.CSSRuleType.ContainerRule],
+    [options.media, DevTools.Protocol.CSS.CSSRuleType.MediaRule],
+    [options.layers, DevTools.Protocol.CSS.CSSRuleType.LayerRule],
+  ];
+  for (const [items, ruleType] of mappings) {
+    if (items) {
+      for (const _ of items) {
+        ruleTypes.push(ruleType);
+      }
+    }
+  }
+  return ruleTypes.length > 0 ? ruleTypes : undefined;
+}
+
+export function attachRuleMeta(
+  rule: sinon.SinonStubbedInstance<DevTools.CSSRule.CSSRule>,
+  sourceURL?: string,
+  origin: RuleOrigin = 'regular',
+  isConstructed = false,
+): void {
+  rule.isUserAgent.returns(origin === 'user-agent');
+  rule.isInjected.returns(origin === 'injected');
+  rule.isViaInspector.returns(origin === 'inspector');
+  if (sourceURL || isConstructed) {
+    const header = {
+      sourceURL: sourceURL ?? '',
+      lineNumberInSource: (line: number) => line,
+      columnNumberInSource: (_line: number, col: number) => col,
+      isConstructedByNew: () => isConstructed,
+    };
+    Object.assign(rule, {header});
+  }
+  Object.defineProperty(rule, 'sourceURL', {
+    value: sourceURL,
+    writable: true,
+    configurable: true,
+  });
+}
+
+function createCSSValue(text: string) {
+  return {
+    text,
+    rebase() {
+      // no-op
+    },
+  };
+}
+
+export function createMockCSSStyleRule(
+  selector: string,
+  options: MockRuleOptions = {},
+): MockCSSStyleRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSStyleRule);
+  attachRuleMeta(
+    rule,
+    options.sourceURL,
+    options.origin,
+    options.isConstructed ?? false,
+  );
+  rule.selectorText.returns(selector);
+  rule.lineNumberInSource.returns(options.lineNumber ?? -1);
+  rule.columnNumberInSource.returns(options.columnNumber);
+  const selectors = options.selectors
+    ? options.selectors.map(s => ({...createCSSValue(s.text), ...s}))
+    : [createCSSValue(selector)];
+  Object.assign(rule, {
+    selectors,
+    nestingSelectors: options.nestingSelectors,
+    layers: options.layers,
+    media: options.media,
+    containerQueries: options.containerQueries,
+    scopes: options.scopes,
+    supports: options.supports,
+    startingStyles: options.startingStyles,
+    navigations: options.navigations,
+    ruleTypes: synthesizeRuleTypes(options),
+  });
+  return rule;
+}
+
+export interface MockCSSMatchedStylesParams {
+  node?: string | DevTools.DOMModel.DOMNode;
+  nodeStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
+  inheritedStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
+  parentNode?: string | DevTools.DOMModel.DOMNode;
+  nodeForStyleMap?: Map<
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+    DevTools.DOMModel.DOMNode
+  >;
+  pseudoStyles?: Map<
+    DevTools.Protocol.DOM.PseudoType,
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration[]
+  >;
+  customHighlights?: Map<
+    string,
+    DevTools.CSSStyleDeclaration.CSSStyleDeclaration[]
+  >;
+  propertyStates?: Map<DevTools.CSSProperty.CSSProperty, string>;
+  matchingSelectorsMap?: Map<unknown, number[]>;
+}
+
+export function createMockCSSMatchedStyles(
+  params: MockCSSMatchedStylesParams = {},
+): MockCSSMatchedStyles {
+  const mockNode =
+    typeof params.node === 'string'
+      ? createMockDOMNode({selector: params.node})
+      : (params.node ?? createMockDOMNode());
+
+  const inheritedStyles = params.inheritedStyles ?? [];
+  const nodeStyles = params.nodeStyles
+    ? [...params.nodeStyles, ...inheritedStyles]
+    : inheritedStyles;
+
+  const defaultParentNode =
+    typeof params.parentNode === 'string'
+      ? createMockDOMNode({selector: params.parentNode})
+      : params.parentNode;
+  const nodeForStyleMap = params.nodeForStyleMap ?? new Map();
+
+  const pseudoStylesMap = params.pseudoStyles ?? new Map();
+  const pseudoTypes = new Set(pseudoStylesMap.keys());
+  const customHighlights = params.customHighlights ?? new Map();
+
+  const propertyStates = params.propertyStates ?? new Map();
+
+  const mock = sinon.createStubInstance(
+    DevTools.CSSMatchedStyles.CSSMatchedStyles,
+  );
+  mock.node.returns(mockNode);
+  mock.nodeStyles.returns(nodeStyles);
+  mock.inheritedStyles.returns(inheritedStyles);
+  mock.pseudoTypes.returns(pseudoTypes);
+  mock.customHighlightPseudoNames.returns(new Set(customHighlights.keys()));
+
+  mock.nodeForStyle.callsFake(
+    style => nodeForStyleMap.get(style) ?? defaultParentNode ?? null,
+  );
+  mock.isInherited.callsFake(style =>
+    Boolean(inheritedStyles.find(inheritedStyle => inheritedStyle === style)),
+  );
+  mock.pseudoStyles.callsFake(type => pseudoStylesMap.get(type) ?? []);
+  mock.customHighlightPseudoStyles.callsFake(
+    name => customHighlights.get(name) ?? [],
+  );
+  mock.propertyState.callsFake(prop => propertyStates.get(prop) ?? 'Active');
+  mock.getMatchingSelectors.callsFake(
+    rule => params.matchingSelectorsMap?.get(rule) ?? [],
+  );
+
+  return mock;
 }

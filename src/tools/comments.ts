@@ -68,40 +68,7 @@ export const getDevtoolsComments = definePageTool({
       return window.universe?.cd4aBridge?.getCommentThreads() ?? [];
     });
 
-    if (threads.length === 0) {
-      response.appendResponseLine('No open DevTools comments found.');
-      return;
-    }
-
-    response.appendResponseLine(
-      `Found ${threads.length} DevTools comment thread(s):`,
-    );
-    for (const thread of threads) {
-      response.appendResponseLine(`\n### Thread: ${thread.id}`);
-      response.appendResponseLine(`- Comment: ${thread.text}`);
-      if (thread.backendNodeId !== undefined) {
-        const elementUid = await page.resolveBackendNodeId(
-          thread.backendNodeId,
-        );
-        if (elementUid) {
-          response.appendResponseLine(
-            `- Target element (snapshot UID): ${elementUid}`,
-          );
-        }
-      }
-      if (thread.networkRequestId) {
-        const reqid = page.resolveCdpRequestId(thread.networkRequestId);
-        if (reqid !== undefined) {
-          response.appendResponseLine(`- Network request ID (reqid): ${reqid}`);
-        }
-      }
-      if (thread.editor) {
-        const location = thread.editor.filePath
-          ? `${thread.editor.filePath}:${thread.editor.lineNumber}`
-          : `line ${thread.editor.lineNumber}`;
-        response.appendResponseLine(`- Editor location: ${location}`);
-      }
-    }
+    response.setDevToolsComments(threads);
   },
 });
 
