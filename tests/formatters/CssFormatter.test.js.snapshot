@@ -1,0 +1,113 @@
+exports[`CssFormatter > formats element label with id, class, and uid and no styles toJSON 1`] = `
+{
+  "element": {
+    "uid": "1_1",
+    "selector": "div#main"
+  },
+  "rules": []
+}
+`;
+
+exports[`CssFormatter > formats element label with id, class, and uid and no styles toString 1`] = `
+Styles for div#main (uid: "1_1"):
+
+  (no styles)
+`;
+
+exports[`CssFormatter > formats inline styles with active and overloaded properties toJSON 1`] = `
+{
+  "element": {
+    "uid": "1_2",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "inline",
+      "selector": "element.style",
+      "properties": [
+        {
+          "name": "color",
+          "value": "red",
+          "status": "overloaded"
+        },
+        {
+          "name": "font-size",
+          "value": "14px",
+          "status": "active",
+          "important": true
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inline styles with active and overloaded properties toString 1`] = `
+Styles for button (uid: "1_2"):
+
+  element.style {
+    [overloaded] color: red;
+    font-size: 14px !important;
+  }
+`;
+
+exports[`CssFormatter > formats transition, animation, and attributes styles toJSON 1`] = `
+{
+  "element": {
+    "uid": "table-1",
+    "selector": "table#data"
+  },
+  "rules": [
+    {
+      "type": "transition",
+      "selector": "transitions style",
+      "properties": [
+        {
+          "name": "opacity",
+          "value": "1",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "animation",
+      "name": "pulse",
+      "selector": "pulse animation",
+      "properties": [
+        {
+          "name": "transform",
+          "value": "scale(1.2)",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "attributes",
+      "selector": "table[attributes style]",
+      "properties": [
+        {
+          "name": "border",
+          "value": "1px",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats transition, animation, and attributes styles toString 1`] = `
+Styles for table#data (uid: "table-1"):
+
+  transitions style {
+    opacity: 1;
+  }
+
+  pulse animation {
+    transform: scale(1.2);
+  }
+
+  table[attributes style] {
+    border: 1px;
+  }
+`;
