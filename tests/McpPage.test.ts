@@ -17,7 +17,7 @@ import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 import {createMockPuppeteerPage} from './mocks.js';
 
-import {withMcpContext} from './utils.js';
+import {html, withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -283,27 +283,25 @@ describe('McpPage', () => {
     });
   });
 
+  function createMcpPage(options: {hasNetworkBlockOrAllowlist?: boolean} = {}) {
+    const pptrPage = createMockPuppeteerPage();
+    const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
+      hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
+      locatorClass: Locator,
+    });
+    const mockSession = {
+      send: sinon.stub().resolves(),
+    };
+    sinon
+      .stub(mcpPage, 'devtoolsUniverse')
+      .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+    return {mcpPage, pptrPage, mockSession};
+  }
+
   describe('emulate()', () => {
     afterEach(() => {
       sinon.restore();
     });
-
-    function createMcpPage(
-      options: {hasNetworkBlockOrAllowlist?: boolean} = {},
-    ) {
-      const pptrPage = createMockPuppeteerPage();
-      const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
-        hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
-        locatorClass: Locator,
-      });
-      const mockSession = {
-        send: sinon.stub().resolves(),
-      };
-      sinon
-        .stub(mcpPage, 'devtoolsUniverse')
-        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
-      return {mcpPage, pptrPage, mockSession};
-    }
 
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = createMcpPage();
@@ -528,6 +526,149 @@ describe('McpPage', () => {
         pptrPage.setExtraHTTPHeaders.secondCall,
         {},
       );
+    });
+  });
+
+  describe('waitForTextOnPage()', () => {
+    it('finds text on the page', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Hello']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with any-match array', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><span>Status</span><div>Error</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Complete', 'Error']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with any-match array when element shows up later', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        const waitPromise = mcpPage.waitForTextOnPage(['Complete', 'Error']);
+
+        await page.setContent(
+          html`<main
+            ><span>Hello</span><span> </span><div>Complete</div></main
+          >`,
+        );
+
+        const element = await waitPromise;
+        assert.ok(element);
+      });
+    });
+
+    it('works with element that shows up later', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        const waitPromise = mcpPage.waitForTextOnPage(['Hello World']);
+
+        await page.setContent(
+          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
+        );
+
+        const element = await waitPromise;
+        assert.ok(element);
+      });
+    });
+
+    it('works with aria elements', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><h1>Header</h1><div>Text</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Header']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with iframe content', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<h1>Top level</h1>
+            <iframe srcdoc="<p>Hello iframe</p>"></iframe>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
+        assert.ok(element);
+      });
+    });
+  });
+
+  describe('DevToolsCommentBridge lifecycle', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('does not create commentBridge on construction or getDevToolsPage', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      pptrPage.hasDevTools.resolves(true);
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const retrieved = await mcpPage.getDevToolsPage();
+      assert.strictEqual(retrieved, devtoolsPage);
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+    });
+
+    it('creates and attaches commentBridge when openDevTools is called', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const result = await mcpPage.openDevTools();
+      assert.strictEqual(result, devtoolsPage);
+      assert.notStrictEqual(mcpPage.commentBridge, undefined);
+      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    });
+
+    it('disposes commentBridge on mcpPage.dispose()', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      await mcpPage.openDevTools();
+      const bridge = mcpPage.commentBridge;
+      assert.notStrictEqual(bridge, undefined);
+
+      if (bridge) {
+        const disposeSpy = sinon.spy(bridge, 'dispose');
+        mcpPage.dispose();
+
+        sinon.assert.calledOnce(disposeSpy);
+        assert.strictEqual(mcpPage.commentBridge, undefined);
+      }
     });
   });
 });

@@ -4,190 +4,79 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
+
+import sinon from 'sinon';
 
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
-import {html, withMcpContext} from '../utils.js';
+import {createHandlerMocks} from '../mocks.js';
 
 describe('snapshot', () => {
-  describe('browser_snapshot', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  describe('take_snapshot', () => {
     it('includes a snapshot', async () => {
-      await withMcpContext(async (response, context) => {
-        await takeSnapshot.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
+      const {page, context, response} = createHandlerMocks();
+      await takeSnapshot.handler({params: {}, page}, response, context);
+      sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
+        verbose: false,
+        filePath: undefined,
+      });
+    });
+
+    it('includes a snapshot with parameters', async () => {
+      const {page, context, response} = createHandlerMocks();
+      await takeSnapshot.handler(
+        {params: {verbose: true, filePath: 'custom/path.txt'}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(response.includeSnapshot, {
+        verbose: true,
+        filePath: 'custom/path.txt',
       });
     });
   });
-  describe('browser_wait_for', () => {
-    it('should work', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
 
-        await page.setContent(
-          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
-        );
-        await waitFor.handler(
-          {
-            params: {
-              text: ['Hello'],
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.equal(
-          response.responseLines[0],
-          'Element matching one of ["Hello"] found.',
-        );
-        assert.ok(response.includeSnapshot);
-      });
+  describe('wait_for', () => {
+    it('waits for text and appends response line', async () => {
+      const {page, context, response} = createHandlerMocks();
+      await waitFor.handler(
+        {params: {text: ['Hello']}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(
+        page.waitForTextOnPage,
+        ['Hello'],
+        undefined,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Element matching one of ["Hello"] found.',
+      );
+      sinon.assert.calledOnceWithExactly(response.includeSnapshot);
     });
 
-    it('should work with any-match array', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-
-        await page.setContent(
-          html`<main><span>Status</span><div>Error</div></main>`,
-        );
-        await waitFor.handler(
-          {
-            params: {
-              text: ['Complete', 'Error'],
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.equal(
-          response.responseLines[0],
-          'Element matching one of ["Complete","Error"] found.',
-        );
-        assert.ok(response.includeSnapshot);
-      });
-    });
-
-    it('should work with any-match array when element shows up later', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-
-        const handlePromise = waitFor.handler(
-          {
-            params: {
-              text: ['Complete', 'Error'],
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        await page.setContent(
-          html`<main
-            ><span>Hello</span><span> </span><div>Complete</div></main
-          >`,
-        );
-
-        await handlePromise;
-
-        assert.equal(
-          response.responseLines[0],
-          'Element matching one of ["Complete","Error"] found.',
-        );
-        assert.ok(response.includeSnapshot);
-      });
-    });
-
-    it('should work with element that show up later', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-
-        const handlePromise = waitFor.handler(
-          {
-            params: {
-              text: ['Hello World'],
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        await page.setContent(
-          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
-        );
-
-        await handlePromise;
-
-        assert.equal(
-          response.responseLines[0],
-          'Element matching one of ["Hello World"] found.',
-        );
-        assert.ok(response.includeSnapshot);
-      });
-    });
-    it('should work with aria elements', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-
-        await page.setContent(
-          html`<main><h1>Header</h1><div>Text</div></main>`,
-        );
-
-        await waitFor.handler(
-          {
-            params: {
-              text: ['Header'],
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.equal(
-          response.responseLines[0],
-          'Element matching one of ["Header"] found.',
-        );
-        assert.ok(response.includeSnapshot);
-      });
-    });
-
-    it('should work with iframe content', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-
-        await page.setContent(
-          html`<h1>Top level</h1>
-            <iframe srcdoc="<p>Hello iframe</p>"></iframe>`,
-        );
-
-        await waitFor.handler(
-          {
-            params: {
-              text: ['Hello iframe'],
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        assert.equal(
-          response.responseLines[0],
-          'Element matching one of ["Hello iframe"] found.',
-        );
-        assert.ok(response.includeSnapshot);
-      });
+    it('waits for text with timeout', async () => {
+      const {page, context, response} = createHandlerMocks();
+      await waitFor.handler(
+        {params: {text: ['Complete', 'Error'], timeout: 5000}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(
+        page.waitForTextOnPage,
+        ['Complete', 'Error'],
+        5000,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Element matching one of ["Complete","Error"] found.',
+      );
+      sinon.assert.calledOnceWithExactly(response.includeSnapshot);
     });
   });
 });
