@@ -6,6 +6,7 @@
 
 import {DevTools} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {parseTraceEventsFromBuffer} from './ChunkedTraceParser.js';
 
 const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
 
@@ -32,25 +33,18 @@ export async function parseRawTraceBuffer(
   },
 ): Promise<TraceResult | TraceParseError> {
   engine.resetProcessor();
-  if (!buffer) {
+  if (!buffer || buffer.length === 0) {
     return {
       error: 'No buffer was provided.',
     };
   }
-  const asString = new TextDecoder().decode(buffer);
-  if (!asString) {
-    return {
-      error: 'Decoding the trace buffer returned an empty string.',
-    };
-  }
   try {
-    const data = JSON.parse(asString) as
-      | {
-          traceEvents: DevTools.TraceEngine.Types.Events.Event[];
-        }
-      | DevTools.TraceEngine.Types.Events.Event[];
-
-    const events = Array.isArray(data) ? data : data.traceEvents;
+    const {events} = parseTraceEventsFromBuffer(buffer);
+    if (events.length === 0) {
+      return {
+        error: 'Decoding the trace buffer returned an empty string.',
+      };
+    }
     await engine.parse(events, {metadata});
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
