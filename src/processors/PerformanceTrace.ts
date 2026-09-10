@@ -6,24 +6,47 @@
 
 import {DevTools} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {parseTraceEventsFromBuffer} from './ChunkedTraceParser.js';
 
 const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
 
+/**
+ * Represents the successful output of processing a performance trace.
+ */
 export interface TraceResult {
+  /** The fully processed trace model output containing event graphs and handler data. */
   parsedTrace: DevTools.TraceEngine.TraceModel.ParsedTrace;
+  /** Computed performance insights for navigations in the trace, or null if unavailable. */
   insights: DevTools.TraceEngine.Insights.Types.TraceInsightSets | null;
 }
 
+/**
+ * Type guard that verifies if an operation returned a valid TraceResult.
+ *
+ * @param x - The result or error object to inspect.
+ * @returns True if the object is a TraceResult; otherwise false.
+ */
 export function traceResultIsSuccess(
   x: TraceResult | TraceParseError,
 ): x is TraceResult {
   return 'parsedTrace' in x;
 }
 
+/**
+ * Represents an error encountered while reading or parsing a trace buffer.
+ */
 export interface TraceParseError {
+  /** The descriptive error message detailing why trace processing failed. */
   error: string;
 }
 
+/**
+ * Parses and processes a raw trace buffer using the DevTools trace engine.
+ *
+ * @param buffer - The raw binary trace data to process.
+ * @param metadata - Optional environment parameters applied during trace recording.
+ * @returns A promise resolving to a TraceResult on success or a TraceParseError on failure.
+ */
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
   metadata?: {
@@ -32,26 +55,22 @@ export async function parseRawTraceBuffer(
   },
 ): Promise<TraceResult | TraceParseError> {
   engine.resetProcessor();
-  if (!buffer) {
+  if (!buffer || buffer.length === 0) {
     return {
       error: 'No buffer was provided.',
     };
   }
-  const asString = new TextDecoder().decode(buffer);
-  if (!asString) {
-    return {
-      error: 'Decoding the trace buffer returned an empty string.',
-    };
-  }
   try {
-    const data = JSON.parse(asString) as
-      | {
-          traceEvents: DevTools.TraceEngine.Types.Events.Event[];
-        }
-      | DevTools.TraceEngine.Types.Events.Event[];
-
-    const events = Array.isArray(data) ? data : data.traceEvents;
-    await engine.parse(events, {metadata});
+    const {events, metadata: fileMetadata} = parseTraceEventsFromBuffer(buffer);
+    if (events.length === 0) {
+      return {
+        error: 'No trace events were found in the trace buffer.',
+      };
+    }
+    const combinedMetadata = fileMetadata
+      ? {...fileMetadata, ...metadata}
+      : metadata;
+    await engine.parse(events, {metadata: combinedMetadata});
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
       return {
@@ -59,7 +78,7 @@ export async function parseRawTraceBuffer(
       };
     }
 
-    const insights = parsedTrace?.insights ?? null;
+    const insights = parsedTrace.insights ?? null;
 
     return {
       parsedTrace,
@@ -80,6 +99,13 @@ ${DevTools.PerformanceTraceFormatter.callFrameDataFormatDescription}
 
 ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 
+/**
+ * Generates a Markdown summary of main thread activity and network metrics from a parsed trace.
+ *
+ * @param result - The parsed trace result to summarize.
+ * @param deviceScope - Optional CrUX device scope to filter field data.
+ * @returns Formatted Markdown text describing performance findings.
+ */
 export function getTraceSummary(
   result: TraceResult,
   deviceScope?: DevTools.CrUXManager.DeviceScope | null,
@@ -94,10 +120,22 @@ ${summaryText}
 ${extraFormatDescriptions}`;
 }
 
+/** Identifies a specific performance insight model type supported by the trace engine. */
 export type InsightName =
   keyof DevTools.TraceEngine.Insights.Types.InsightModels;
+
+/** Represents the result of an insight formatting request. */
 export type InsightOutput = {output: string} | {error: string};
 
+/**
+ * Formats a specific performance insight from a parsed trace for display.
+ *
+ * @param result - The parsed trace result containing computed insight sets.
+ * @param insightSetId - The identifier of the target insight set.
+ * @param insightName - The name of the insight model to extract.
+ * @param deviceScope - Optional CrUX device scope to contextualize metrics.
+ * @returns An object containing the formatted insight output text or an error message.
+ */
 export function getInsightOutput(
   result: TraceResult,
   insightSetId: string,

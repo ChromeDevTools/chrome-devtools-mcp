@@ -2,8 +2,8 @@ exports[`Trace parsing > can format results of a trace 1`] = `
 ## Summary of Performance trace findings:
 URL: https://web.dev/
 Trace bounds: {min: 122410994891µs, max: 122416385853µs}
-CPU throttling: none
-Network throttling: none
+CPU throttling: 1x
+Network throttling: No throttling
 
 # Available insight sets
 
