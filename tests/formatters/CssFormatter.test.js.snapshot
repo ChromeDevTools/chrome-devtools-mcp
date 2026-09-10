@@ -107,6 +107,60 @@ Styles for button (uid: "elem-func"):
   }
 `;
 
+exports[`CssFormatter > formats @keyframes rule with multiple steps and source location toJSON 1`] = `
+{
+  "element": {
+    "uid": "elem-kf",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "keyframes",
+      "name": "slideIn",
+      "selector": "@keyframes slideIn",
+      "source": "animations.css:11",
+      "keyframes": [
+        {
+          "keyText": "from",
+          "source": "animations.css:11",
+          "properties": [
+            {
+              "name": "opacity",
+              "value": "0",
+              "status": "active"
+            }
+          ]
+        },
+        {
+          "keyText": "to",
+          "source": "animations.css:14",
+          "properties": [
+            {
+              "name": "opacity",
+              "value": "1",
+              "status": "active"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats @keyframes rule with multiple steps and source location toString 1`] = `
+Styles for button (uid: "elem-kf"):
+
+  @keyframes slideIn (animations.css:11) {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+`;
+
 exports[`CssFormatter > formats @layer, @media, @supports, and @starting-style ancestor rules toJSON 1`] = `
 {
   "element": {

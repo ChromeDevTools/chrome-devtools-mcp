@@ -126,6 +126,20 @@ export interface PseudoElementRule {
   properties: StructuredCssProperty[];
 }
 
+export interface KeyframeStep {
+  keyText: string;
+  source?: string;
+  properties: StructuredCssProperty[];
+}
+
+export interface KeyframesRule {
+  type: 'keyframes';
+  name: string;
+  selector: string;
+  source?: string;
+  keyframes: KeyframeStep[];
+}
+
 export interface AtRule {
   type: 'at-rule';
   atRuleType: string;
@@ -169,6 +183,7 @@ export type CascadeRule =
   | MatchedRule
   | InheritedRule
   | PseudoElementRule
+  | KeyframesRule
   | AtRule
   | PositionTryRule
   | PropertyRule
@@ -511,6 +526,7 @@ function getCascadeRuleHeader(rule: CascadeRule): string {
     case 'animation':
     case 'attributes':
     case 'matched':
+    case 'keyframes':
     case 'at-rule':
     case 'property':
     case 'function':
@@ -579,7 +595,7 @@ function formatAncestorRuleHeader(ancestor: AncestorCSSRule): {
 
 function appendRuleWithAncestors(
   writer: IndentedWriter,
-  rule: CascadeRule,
+  rule: Exclude<CascadeRule, KeyframesRule>,
 ): void {
   const ancestors = 'ancestors' in rule ? rule.ancestors : undefined;
   let ancestorCount = 0;
@@ -611,6 +627,26 @@ function appendRuleWithAncestors(
   }
 }
 
+function appendKeyframesRule(
+  writer: IndentedWriter,
+  rule: KeyframesRule,
+): void {
+  const header = getCascadeRuleHeader(rule);
+  writer.writeLine(`${header} {`);
+  writer.indent();
+  for (const step of rule.keyframes) {
+    writer.writeLine(`${step.keyText} {`);
+    writer.indent();
+    for (const prop of step.properties) {
+      writer.writeLine(formatPropertyLine(prop));
+    }
+    writer.dedent();
+    writer.writeLine('}');
+  }
+  writer.dedent();
+  writer.writeLine('}');
+}
+
 function appendCssSectionsToString(
   writer: IndentedWriter,
   styles: StructuredCssStyles,
@@ -631,6 +667,8 @@ function appendCssSectionsToString(
       }
       writer.writeComment(`Pseudo ${rule.pseudoType} element${inheritedStr}`);
       appendRuleWithAncestors(writer, rule);
+    } else if (rule.type === 'keyframes') {
+      appendKeyframesRule(writer, rule);
     } else {
       appendRuleWithAncestors(writer, rule);
     }
@@ -654,6 +692,7 @@ export class CssFormatter {
     const rules: CascadeRule[] = [];
     CssFormatter.#collectNodeStyles(rules, matchedStyles, options);
     CssFormatter.#collectPseudoStyles(rules, matchedStyles, options);
+    CssFormatter.#collectKeyframes(rules, matchedStyles);
     CssFormatter.#collectAtRules(rules, matchedStyles);
     CssFormatter.#collectPositionTryRules(rules, matchedStyles);
     CssFormatter.#collectRegisteredProperties(rules, matchedStyles);
@@ -883,6 +922,50 @@ export class CssFormatter {
         ...(rule ? {selector: rule.selectorText()} : {}),
         ...meta,
         properties: CssFormatter.#formatProperties(properties, matchedStyles),
+      });
+    }
+  }
+
+  static #collectKeyframes(
+    rules: CascadeRule[],
+    matchedStyles: MatchedStyles,
+  ): void {
+    const keyframesRules = matchedStyles.keyframes?.() ?? [];
+    for (const keyframesRule of keyframesRules) {
+      const name = keyframesRule.name?.()?.text ?? '';
+      const rawKeyframes = keyframesRule.keyframes?.() ?? [];
+
+      const steps: KeyframeStep[] = [];
+      let parentSource: string | undefined;
+
+      for (const keyframe of rawKeyframes) {
+        const properties = CssFormatter.#getStyleProperties(keyframe.style);
+        if (!properties.length) {
+          continue;
+        }
+        const keyText = keyframe.key?.()?.text ?? '';
+        const source = getSourceLocation(keyframe);
+        if (!parentSource && source) {
+          parentSource = source;
+        }
+
+        steps.push({
+          keyText,
+          ...(source ? {source} : {}),
+          properties: CssFormatter.#formatProperties(properties, matchedStyles),
+        });
+      }
+
+      if (!steps.length) {
+        continue;
+      }
+
+      rules.push({
+        type: 'keyframes',
+        name,
+        selector: `@keyframes ${name}`,
+        ...(parentSource ? {source: parentSource} : {}),
+        keyframes: steps,
       });
     }
   }
