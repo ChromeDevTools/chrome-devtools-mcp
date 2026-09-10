@@ -242,6 +242,176 @@ Styles for div#main (uid: "1_1"):
   (no styles)
 `;
 
+exports[`CssFormatter > formats inherited pseudo-elements with ancestor node and resolves uid toJSON 1`] = `
+{
+  "element": {
+    "uid": "para-1",
+    "selector": "p.paragraph"
+  },
+  "rules": [
+    {
+      "type": "inherited",
+      "node": {
+        "uid": "cont-10",
+        "selector": "div.container"
+      },
+      "selector": "div.container::selection",
+      "source": "theme.css:6",
+      "properties": [
+        {
+          "name": "color",
+          "value": "white",
+          "status": "active"
+        },
+        {
+          "name": "--selection-var",
+          "value": "red",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "inherited",
+      "node": {
+        "uid": "cont-10",
+        "selector": "div.container"
+      },
+      "properties": [
+        {
+          "name": "color",
+          "value": "yellow",
+          "status": "active"
+        },
+        {
+          "name": "--highlight-color",
+          "value": "gold",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "inherited",
+      "node": {
+        "uid": "cont-10",
+        "selector": "div.container"
+      },
+      "properties": [
+        {
+          "name": "color",
+          "value": "green",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "pseudo",
+      "pseudoType": "::highlight(search)",
+      "node": {
+        "uid": "cont-10",
+        "selector": "div.container"
+      },
+      "properties": [
+        {
+          "name": "color",
+          "value": "yellow",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "pseudo",
+      "pseudoType": "::selection",
+      "node": {
+        "uid": "cont-10",
+        "selector": "div.container"
+      },
+      "selector": "div.container::selection",
+      "source": "theme.css:6",
+      "properties": [
+        {
+          "name": "color",
+          "value": "white",
+          "status": "active"
+        },
+        {
+          "name": "background-color",
+          "value": "navy",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "pseudo",
+      "pseudoType": "::marker",
+      "properties": [
+        {
+          "name": "content",
+          "value": "\\"•\\"",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "pseudo",
+      "pseudoType": "::marker",
+      "node": {
+        "uid": "cont-10",
+        "selector": "div.container"
+      },
+      "properties": [
+        {
+          "name": "color",
+          "value": "green",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats inherited pseudo-elements with ancestor node and resolves uid toString 1`] = `
+Styles for p.paragraph (uid: "para-1"):
+
+  Inherited from div.container (uid: "cont-10"):
+    div.container::selection (theme.css:6) {
+      color: white;
+      --selection-var: red;
+    }
+
+  Inherited from div.container (uid: "cont-10"):
+    element.style {
+      color: yellow;
+      --highlight-color: gold;
+    }
+
+  Inherited from div.container (uid: "cont-10"):
+    element.style {
+      color: green;
+    }
+
+  /* Pseudo ::highlight(search) element (inherited from div.container, uid: "cont-10") */
+  ::highlight(search) {
+    color: yellow;
+  }
+
+  /* Pseudo ::selection element (inherited from div.container, uid: "cont-10") */
+  div.container::selection (theme.css:6) {
+    color: white;
+    background-color: navy;
+  }
+
+  /* Pseudo ::marker element */
+  ::marker {
+    content: "•";
+  }
+
+  /* Pseudo ::marker element (inherited from div.container, uid: "cont-10") */
+  ::marker {
+    color: green;
+  }
+`;
+
 exports[`CssFormatter > formats inherited styles from ancestors and ignores non-inheritable ones toJSON 1`] = `
 {
   "element": {
@@ -517,6 +687,72 @@ Styles for button (uid: "elem-child"):
     & .child (styles.css:16) {
       color: blue;
     }
+  }
+`;
+
+exports[`CssFormatter > formats pseudo-elements with rules and inline pseudo styles toJSON 1`] = `
+{
+  "element": {
+    "uid": "btn-pseudo",
+    "selector": "button"
+  },
+  "rules": [
+    {
+      "type": "pseudo",
+      "pseudoType": "::before",
+      "selector": "button.btn::before",
+      "ancestors": [
+        {
+          "type": "nesting",
+          "selector": ".btn-group"
+        }
+      ],
+      "matchingSelectors": [
+        "button.btn::before"
+      ],
+      "source": "styles.css:21",
+      "properties": [
+        {
+          "name": "content",
+          "value": "\\"→\\"",
+          "status": "active"
+        },
+        {
+          "name": "color",
+          "value": "blue",
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "type": "pseudo",
+      "pseudoType": "::after",
+      "properties": [
+        {
+          "name": "content",
+          "value": "\\"*\\"",
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}
+`;
+
+exports[`CssFormatter > formats pseudo-elements with rules and inline pseudo styles toString 1`] = `
+Styles for button (uid: "btn-pseudo"):
+
+  /* Pseudo ::before element */
+  .btn-group {
+    button.btn::before (styles.css:21) {
+      content: "→";
+      color: blue;
+    }
+  }
+
+  /* Pseudo ::after element */
+  ::after {
+    content: "*";
   }
 `;
 
