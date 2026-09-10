@@ -11,7 +11,7 @@ import type {
   Protocol,
   Issue,
 } from '../third_party/index.js';
-import {DevTools} from '../third_party/index.js';
+import {DevTools, FrameEvent} from '../third_party/index.js';
 import {
   type Frame,
   type Handler,
@@ -47,7 +47,9 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
 
 export class PageCollector<T> {
   protected pptrPage: Page;
+  #mainFrame: Frame;
   #listeners?: ListenerMap<PageEvents>;
+  #navigatedWithinDocument = false;
   protected maxNavigationSaved = 3;
 
   /**
@@ -63,6 +65,11 @@ export class PageCollector<T> {
     maxResourcesPerNavigation?: number,
   ) {
     this.pptrPage = page;
+    this.#mainFrame = page.mainFrame();
+    this.#mainFrame.on(
+      FrameEvent.FrameNavigatedWithinDocument,
+      this.#onFrameNavigatedWithinDocument,
+    );
 
     const idGenerator = createIdGenerator();
 
@@ -83,7 +90,11 @@ export class PageCollector<T> {
 
     listenerMap['framenavigated'] = (frame: Frame) => {
       // Only split the storage on main frame navigation
-      if (frame !== this.pptrPage.mainFrame()) {
+      if (frame !== this.#mainFrame) {
+        return;
+      }
+      if (this.#navigatedWithinDocument) {
+        this.#navigatedWithinDocument = false;
         return;
       }
       this.splitAfterNavigation();
@@ -97,12 +108,21 @@ export class PageCollector<T> {
   }
 
   dispose() {
+    this.#mainFrame.off(
+      FrameEvent.FrameNavigatedWithinDocument,
+      this.#onFrameNavigatedWithinDocument,
+    );
     if (this.#listeners) {
       for (const [name, listener] of Object.entries(this.#listeners)) {
         this.pptrPage.off(name, listener as Handler<unknown>);
       }
     }
   }
+
+  // Puppeteer emits the frame event before the page-level navigation event.
+  #onFrameNavigatedWithinDocument = () => {
+    this.#navigatedWithinDocument = true;
+  };
 
   protected splitAfterNavigation() {
     // Add the latest navigation first
