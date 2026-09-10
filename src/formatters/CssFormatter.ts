@@ -99,7 +99,21 @@ export interface MatchedRule {
   properties: StructuredCssProperty[];
 }
 
-export type CascadeRule = NodeStyleRule | AnimationRule | MatchedRule;
+export interface InheritedRule {
+  type: 'inherited';
+  node: {
+    uid?: string;
+    selector: string;
+  };
+  selector?: string;
+  matchingSelectors?: string[];
+  source?: string;
+  ancestors?: AncestorCSSRule[];
+  properties: StructuredCssProperty[];
+}
+
+export type CascadeRule =
+  NodeStyleRule | AnimationRule | MatchedRule | InheritedRule;
 
 export interface StructuredCssStyles {
   element: {
@@ -347,7 +361,7 @@ interface RuleMetadata {
  * Extracts common metadata (`ancestors`, `matchingSelectors`, `source`)
  * uniformly across matched rules, inherited rules, and pseudo-element rules.
  */
-function getRuleMetadata(
+function getCSSStyleRuleMetadata(
   rule: DevTools.CSSRule.CSSStyleRule | undefined,
   matchedStyles: MatchedStyles,
   containerDetails?: Map<ContainerQuery, ResolvedContainerDetails>,
@@ -381,6 +395,46 @@ function formatPropertyLine(prop: StructuredCssProperty): string {
   return `${stateStr}${prop.name}: ${prop.value}${imp};`;
 }
 
+/**
+ * Filters properties to only those that can be inherited from an ancestor element.
+ */
+function getInheritableProperties(
+  properties: DevTools.CSSProperty.CSSProperty[],
+  matchedStyles: MatchedStyles,
+): DevTools.CSSProperty.CSSProperty[] {
+  return properties.filter(prop => {
+    if (DevTools.CSSMetadata.cssMetadata().isCustomProperty(prop.name)) {
+      const registered = matchedStyles.getRegisteredProperty?.(prop.name);
+      if (registered) {
+        return registered.inherits();
+      }
+    }
+    return DevTools.CSSMetadata.cssMetadata().isPropertyInherited(prop.name);
+  });
+}
+
+/**
+ * Resolves DOM ancestor node details when a style declaration is inherited.
+ */
+function getParentNodeInfo(
+  style: DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+  matchedStyles: MatchedStyles,
+  resolveUid?: UidResolver,
+): {uid?: string; selector: string} | undefined {
+  if (!matchedStyles.isInherited?.(style)) {
+    return undefined;
+  }
+  const parentNode = matchedStyles.nodeForStyle?.(style);
+  if (!parentNode) {
+    return undefined;
+  }
+  const parentUid = resolveUid?.(parentNode.backendNodeId());
+  return {
+    ...(parentUid ? {uid: parentUid} : {}),
+    selector: parentNode.simpleSelector(),
+  };
+}
+
 function getCascadeRuleHeader(rule: CascadeRule): string {
   let selector: string;
   switch (rule.type) {
@@ -390,6 +444,9 @@ function getCascadeRuleHeader(rule: CascadeRule): string {
     case 'attributes':
     case 'matched':
       selector = rule.selector;
+      break;
+    case 'inherited':
+      selector = rule.selector ?? 'element.style';
       break;
   }
   const source = 'source' in rule ? rule.source : undefined;
@@ -481,7 +538,15 @@ function appendCssSectionsToString(
 ): void {
   for (const rule of styles.rules) {
     writer.writeEmptyLine();
-    appendRuleWithAncestors(writer, rule);
+    if (rule.type === 'inherited') {
+      const uidStr = rule.node.uid ? ` (uid: "${rule.node.uid}")` : '';
+      writer.writeLine(`Inherited from ${rule.node.selector}${uidStr}:`);
+      writer.indent();
+      appendRuleWithAncestors(writer, rule);
+      writer.dedent();
+    } else {
+      appendRuleWithAncestors(writer, rule);
+    }
   }
 }
 
@@ -515,10 +580,23 @@ export class CssFormatter {
         continue;
       }
 
+      if (matchedStyles.isInherited(style)) {
+        const inheritedRule = CssFormatter.#createInheritedRule(
+          style,
+          properties,
+          matchedStyles,
+          options,
+        );
+        if (inheritedRule) {
+          rules.push(inheritedRule);
+        }
+        continue;
+      }
+
       if (style.type === DevTools.CSSStyleDeclaration.Type.Transition) {
         rules.push({
           type: 'transition',
-          selector: 'transitions style',
+          selector: CssFormatter.#getNodeStyleSelector(style),
           properties: CssFormatter.#formatProperties(properties, matchedStyles),
         });
       } else if (style.type === DevTools.CSSStyleDeclaration.Type.Animation) {
@@ -526,21 +604,19 @@ export class CssFormatter {
         rules.push({
           type: 'animation',
           ...(animName ? {name: animName} : {}),
-          selector: animName ? `${animName} animation` : 'animation style',
+          selector: CssFormatter.#getNodeStyleSelector(style),
           properties: CssFormatter.#formatProperties(properties, matchedStyles),
         });
       } else if (style.type === DevTools.CSSStyleDeclaration.Type.Attributes) {
-        const node = matchedStyles.nodeForStyle(style);
-        const tag = node ? node.nodeNameInCorrectCase() : '';
         rules.push({
           type: 'attributes',
-          selector: tag ? `${tag}[attributes style]` : '[attributes style]',
+          selector: CssFormatter.#getNodeStyleSelector(style, matchedStyles),
           properties: CssFormatter.#formatProperties(properties, matchedStyles),
         });
       } else if (style.type === DevTools.CSSStyleDeclaration.Type.Inline) {
         rules.push({
           type: 'inline',
-          selector: 'element.style',
+          selector: CssFormatter.#getNodeStyleSelector(style),
           properties: CssFormatter.#formatProperties(properties, matchedStyles),
         });
       } else if (style.parentRule instanceof DevTools.CSSRule.CSSStyleRule) {
@@ -562,13 +638,84 @@ export class CssFormatter {
     matchedStyles: MatchedStyles,
     options: CssFormatterOptions,
   ): MatchedRule {
-    const meta = getRuleMetadata(rule, matchedStyles, options.containerDetails);
+    const meta = getCSSStyleRuleMetadata(
+      rule,
+      matchedStyles,
+      options.containerDetails,
+    );
     return {
       type: 'matched',
       selector: rule.selectorText(),
       ...meta,
       ...(rule.isUserAgent?.() ? {isUserAgent: true} : {}),
       properties: CssFormatter.#formatProperties(properties, matchedStyles),
+    };
+  }
+
+  static #getNodeStyleSelector(
+    style: DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+    matchedStyles?: MatchedStyles,
+  ): string {
+    switch (style.type) {
+      case DevTools.CSSStyleDeclaration.Type.Transition:
+        return 'transitions style';
+      case DevTools.CSSStyleDeclaration.Type.Animation: {
+        const animName = style.animationName();
+        return animName ? `${animName} animation` : 'animation style';
+      }
+      case DevTools.CSSStyleDeclaration.Type.Attributes: {
+        const node = matchedStyles?.nodeForStyle(style);
+        const tag = node ? node.nodeNameInCorrectCase() : '';
+        return tag ? `${tag}[attributes style]` : '[attributes style]';
+      }
+      case DevTools.CSSStyleDeclaration.Type.Inline:
+        return 'element.style';
+      default:
+        if (style.parentRule instanceof DevTools.CSSRule.CSSStyleRule) {
+          return style.parentRule.selectorText();
+        }
+        return '';
+    }
+  }
+
+  static #createInheritedRule(
+    style: DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
+    properties: DevTools.CSSProperty.CSSProperty[],
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions,
+  ): InheritedRule | undefined {
+    const node = getParentNodeInfo(style, matchedStyles, options.resolveUid);
+    if (!node) {
+      return undefined;
+    }
+    const inheritableProps = getInheritableProperties(
+      properties,
+      matchedStyles,
+    );
+    if (!inheritableProps.length) {
+      return undefined;
+    }
+    const rule =
+      style.parentRule instanceof DevTools.CSSRule.CSSStyleRule
+        ? style.parentRule
+        : undefined;
+    const meta = getCSSStyleRuleMetadata(
+      rule,
+      matchedStyles,
+      options.containerDetails,
+    );
+    const selector =
+      CssFormatter.#getNodeStyleSelector(style, matchedStyles) || undefined;
+
+    return {
+      type: 'inherited',
+      node,
+      ...(selector ? {selector} : {}),
+      ...meta,
+      properties: CssFormatter.#formatProperties(
+        inheritableProps,
+        matchedStyles,
+      ),
     };
   }
 

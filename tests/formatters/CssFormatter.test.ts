@@ -375,4 +375,49 @@ describe('CssFormatter', () => {
     const matchedStyles = createMockCSSMatchedStyles({nodeStyles: [style]});
     return new CssFormatter(matchedStyles, {uid: 'item-1'});
   });
+
+  formatterTest(
+    'formats inherited styles from ancestors and ignores non-inheritable ones',
+    () => {
+      const inhStyle = createMockCSSStyleDeclaration(
+        [
+          createMockCSSProperty('color', 'black'),
+          createMockCSSProperty('margin', '20px'),
+          createMockCSSProperty('--custom-var', '10px'),
+        ],
+        {rule: createMockCSSStyleRule('.parent-style')},
+      );
+
+      const matchedStyles = createMockCSSMatchedStyles({
+        inheritedStyles: [inhStyle],
+        parentNode: 'section#parent-sec',
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'child-1'});
+    },
+  );
+
+  formatterTest(
+    'formats inherited transition and animation styles with parent node',
+    () => {
+      const inhTransition = createMockCSSStyleDeclaration(
+        [createMockCSSProperty('color', 'purple')],
+        {type: DevTools.CSSStyleDeclaration.Type.Transition},
+      );
+      const inhAnimation = createMockCSSStyleDeclaration(
+        [createMockCSSProperty('color', 'orange')],
+        {
+          type: DevTools.CSSStyleDeclaration.Type.Animation,
+          animationName: 'pulse',
+        },
+      );
+
+      const matchedStyles = createMockCSSMatchedStyles({
+        inheritedStyles: [inhTransition, inhAnimation],
+        parentNode: 'div#wrapper',
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'child-elem'});
+    },
+  );
 });
