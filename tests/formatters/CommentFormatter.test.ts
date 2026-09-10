@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -20,16 +19,25 @@ describe('CommentFormatter', () => {
     sinon.restore();
   });
 
-  it('formats empty comments list', () => {
-    const formatter = new CommentFormatter([]);
-    assert.deepStrictEqual(formatter.toJSON(), []);
-    assert.strictEqual(
-      formatter.toString(),
-      'No open DevTools comments found.',
-    );
+  function formatterTest(
+    label: string,
+    setup: (t: it.TestContext) => CommentFormatter | Promise<CommentFormatter>,
+  ) {
+    it(label + ' toString', async t => {
+      const formatter = await setup(t);
+      t.assert.snapshot(formatter.toString());
+    });
+    it(label + ' toJSON', async t => {
+      const formatter = await setup(t);
+      t.assert.snapshot(JSON.stringify(formatter.toJSON(), null, 2));
+    });
+  }
+
+  formatterTest('formats empty comments list', () => {
+    return new CommentFormatter([]);
   });
 
-  it('formats comments with targets and editor locations', () => {
+  formatterTest('formats comments with targets and editor locations', () => {
     const thread: StructuredCommentThread = {
       id: 'comment-1',
       text: 'Fix the color contrast here',
@@ -40,21 +48,10 @@ describe('CommentFormatter', () => {
         lineNumber: 10,
       },
     };
-    const formatter = new CommentFormatter([thread]);
-
-    assert.deepStrictEqual(formatter.toJSON(), [thread]);
-    const expected = [
-      'Found 1 DevTools comment thread(s):',
-      '\n### Thread: comment-1',
-      '- Comment: Fix the color contrast here',
-      '- Target element (snapshot UID): element-uid-42',
-      '- Network request ID (reqid): 7',
-      '- Editor location: src/style.css:10',
-    ].join('\n');
-    assert.strictEqual(formatter.toString(), expected);
+    return new CommentFormatter([thread]);
   });
 
-  it('formats editor location when filePath is missing', () => {
+  formatterTest('formats editor location when filePath is missing', () => {
     const thread: StructuredCommentThread = {
       id: 'comment-2',
       text: 'Review this script line',
@@ -62,33 +59,19 @@ describe('CommentFormatter', () => {
         lineNumber: 25,
       },
     };
-    const formatter = new CommentFormatter([thread]);
-
-    const expected = [
-      'Found 1 DevTools comment thread(s):',
-      '\n### Thread: comment-2',
-      '- Comment: Review this script line',
-      '- Editor location: line 25',
-    ].join('\n');
-    assert.strictEqual(formatter.toString(), expected);
+    return new CommentFormatter([thread]);
   });
 
-  it('formats single thread using static formatThread', () => {
+  it('formats single thread using static formatThread', t => {
     const thread: StructuredCommentThread = {
       id: 'comment-3',
       text: 'Check padding',
       elementUid: 'node-99',
     };
-    const formatted = CommentFormatter.formatThread(thread);
-    const expected = [
-      '### Thread: comment-3',
-      '- Comment: Check padding',
-      '- Target element (snapshot UID): node-99',
-    ].join('\n');
-    assert.strictEqual(formatted, expected);
+    t.assert.snapshot(CommentFormatter.formatThread(thread));
   });
 
-  it('resolves targets using from() method', async () => {
+  formatterTest('resolves targets using from() method', async () => {
     const rawThread: CD4ACommentThread = {
       id: 'comment-1',
       text: 'Fix the color contrast here',
@@ -111,50 +94,31 @@ describe('CommentFormatter', () => {
     sinon.assert.calledOnceWithExactly(resolveBackendNodeId, 42);
     sinon.assert.calledOnceWithExactly(resolveCdpRequestId, 'req-99');
 
-    assert.deepStrictEqual(formatter.toJSON(), [
-      {
-        id: 'comment-1',
-        text: 'Fix the color contrast here',
-        elementUid: 'element-uid-42',
-        reqid: 7,
-        editor: {
-          filePath: 'src/style.css',
-          lineNumber: 10,
-        },
-      },
-    ]);
+    return formatter;
   });
 
-  it('omits unresolved targets when from() resolves undefined', async () => {
-    const rawThread: CD4ACommentThread = {
-      id: 'comment-2',
-      text: 'Fix heading font size',
-      backendNodeId: 42,
-      networkRequestId: 'req-99',
-    };
-
-    const resolveBackendNodeId = sinon.stub().resolves(undefined);
-    const resolveCdpRequestId = sinon.stub().returns(undefined);
-
-    const formatter = await CommentFormatter.from([rawThread], {
-      resolveBackendNodeId,
-      resolveCdpRequestId,
-    });
-
-    sinon.assert.calledOnceWithExactly(resolveBackendNodeId, 42);
-    sinon.assert.calledOnceWithExactly(resolveCdpRequestId, 'req-99');
-
-    assert.deepStrictEqual(formatter.toJSON(), [
-      {
+  formatterTest(
+    'omits unresolved targets when from() resolves undefined',
+    async () => {
+      const rawThread: CD4ACommentThread = {
         id: 'comment-2',
         text: 'Fix heading font size',
-      },
-    ]);
-    const expected = [
-      'Found 1 DevTools comment thread(s):',
-      '\n### Thread: comment-2',
-      '- Comment: Fix heading font size',
-    ].join('\n');
-    assert.strictEqual(formatter.toString(), expected);
-  });
+        backendNodeId: 42,
+        networkRequestId: 'req-99',
+      };
+
+      const resolveBackendNodeId = sinon.stub().resolves(undefined);
+      const resolveCdpRequestId = sinon.stub().returns(undefined);
+
+      const formatter = await CommentFormatter.from([rawThread], {
+        resolveBackendNodeId,
+        resolveCdpRequestId,
+      });
+
+      sinon.assert.calledOnceWithExactly(resolveBackendNodeId, 42);
+      sinon.assert.calledOnceWithExactly(resolveCdpRequestId, 'req-99');
+
+      return formatter;
+    },
+  );
 });
