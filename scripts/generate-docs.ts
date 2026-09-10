@@ -164,8 +164,13 @@ function generateConfigOptionsMarkdown(): string {
       markdown += `  - **Choices:** ${optionConfig.choices.map(c => `\`${c}\``).join(', ')}\n`;
     }
 
-    // Add default if available
-    markdown += `  - **Default:** \`${optionConfig.defaultDescription ?? optionConfig.default ?? 'false'}\`\n`;
+    // Add default if available. Options that declare no default (most string,
+    // number and array options) must not be documented with an invented one.
+    const defaultValue =
+      optionConfig.defaultDescription ?? optionConfig.default;
+    if (defaultValue !== undefined) {
+      markdown += `  - **Default:** \`${defaultValue}\`\n`;
+    }
 
     markdown += '\n';
   }
