@@ -205,4 +205,103 @@ describe('ChunkedTraceParser', () => {
       expectedEvents[lastIndex]?.name,
     );
   });
+
+  it('throws SyntaxError when a bare array is truncated before closing bracket', () => {
+    const buffer = encoder.encode('[{"name": "e1", "ts": 1}');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError when a string inside an event is unterminated', () => {
+    const buffer = encoder.encode('[{"name": "unterminated');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError when an object container is truncated before closing brace', () => {
+    const buffer = encoder.encode('{"traceEvents": [{"name": "e1"}]');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError on stray closing braces', () => {
+    const buffer = encoder.encode('[{"name": "e1"}}]');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('handles multibyte UTF-8 characters across batch boundaries', () => {
+    const json = JSON.stringify({
+      traceEvents: [
+        {
+          name: '日本語テスト-1',
+          args: {data: {url: 'https://example.com/こんにちは世界-🚀'}},
+        },
+        {
+          name: 'emoji-🎉-2',
+          args: {data: {url: 'https://example.com/€100-and-50¢'}},
+        },
+        {
+          name: 'umlaut-äöü-3',
+          args: {data: {url: 'https://example.com/Deutsch-äöü'}},
+        },
+      ],
+    });
+    const buffer = encoder.encode(json);
+    const result = parseTraceEventsFromBuffer(buffer, {eventsPerBatch: 1});
+
+    assert.strictEqual(result.events.length, 3);
+    assert.strictEqual(result.events[0]?.name, '日本語テスト-1');
+    assert.strictEqual(
+      result.events[0]?.args?.data?.url,
+      'https://example.com/こんにちは世界-🚀',
+    );
+    assert.strictEqual(result.events[1]?.name, 'emoji-🎉-2');
+    assert.strictEqual(
+      result.events[1]?.args?.data?.url,
+      'https://example.com/€100-and-50¢',
+    );
+    assert.strictEqual(result.events[2]?.name, 'umlaut-äöü-3');
+    assert.strictEqual(
+      result.events[2]?.args?.data?.url,
+      'https://example.com/Deutsch-äöü',
+    );
+  });
+
+  it('parses large batches exceeding function argument limits without call stack errors', () => {
+    const eventCount = 70_000;
+    const items: string[] = [];
+    for (let idx = 0; idx < eventCount; idx++) {
+      items.push(`{"name":"evt-${idx}","ts":${idx}}`);
+    }
+    const buffer = encoder.encode(`[${items.join(',')}]`);
+    const result = parseTraceEventsFromBuffer(buffer, {
+      eventsPerBatch: eventCount,
+    });
+
+    assert.strictEqual(result.events.length, eventCount);
+    assert.strictEqual(result.events[0]?.name, 'evt-0');
+    assert.strictEqual(result.events[69_999]?.name, 'evt-69999');
+  });
+
+  it('throws SyntaxError when non-whitespace characters follow a closed array', () => {
+    const buffer = encoder.encode('[{"name": "e1"}] extra');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError when non-whitespace characters follow a closed object', () => {
+    const buffer = encoder.encode('{"traceEvents": []} extra');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError when a property key is missing a colon in object container', () => {
+    const buffer = encoder.encode('{"traceEvents" []}');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError when a comma is missing between object properties', () => {
+    const buffer = encoder.encode('{"traceEvents": [] "metadata": {}}');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
+
+  it('throws SyntaxError when an object key string is unterminated', () => {
+    const buffer = encoder.encode('{"traceEvents');
+    assert.throws(() => parseTraceEventsFromBuffer(buffer), SyntaxError);
+  });
 });
