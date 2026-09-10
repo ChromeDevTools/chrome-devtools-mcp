@@ -68,7 +68,7 @@ export const getDevtoolsComments = definePageTool({
       return window.universe?.cd4aBridge?.getCommentThreads() ?? [];
     });
 
-    response.setDevtoolsComments(threads);
+    response.setDevToolsComments(threads);
   },
 });
 

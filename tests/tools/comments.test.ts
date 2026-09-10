@@ -45,7 +45,7 @@ describe('comments tools', () => {
         response.appendResponseLine,
         'DevTools window is not open for this page. Call open_devtools first to open DevTools.',
       );
-      sinon.assert.notCalled(response.setDevtoolsComments);
+      sinon.assert.notCalled(response.setDevToolsComments);
       t.assert.snapshot(lines.join('\n'));
     });
 
@@ -71,7 +71,7 @@ describe('comments tools', () => {
 
       sinon.assert.calledOnce(page.getDevToolsPage);
       sinon.assert.calledOnce(devtoolsPage.evaluate);
-      sinon.assert.calledOnceWithExactly(response.setDevtoolsComments, [
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
         mockThread,
       ]);
     });
@@ -86,7 +86,7 @@ describe('comments tools', () => {
 
       sinon.assert.calledOnce(page.getDevToolsPage);
       sinon.assert.calledOnce(devtoolsPage.evaluate);
-      sinon.assert.calledOnceWithExactly(response.setDevtoolsComments, []);
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
     });
   });
 

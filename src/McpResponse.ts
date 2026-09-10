@@ -129,7 +129,7 @@ export class McpResponse implements Response {
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
-  #devtoolsComments?: CD4ACommentThread[];
+  #devToolsComments?: CD4ACommentThread[];
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -332,16 +332,12 @@ export class McpResponse implements Response {
     this.#attachedWaitForResult = result;
   }
 
-  setDevtoolsComments(threads: CD4ACommentThread[]): void {
-    this.#devtoolsComments = threads;
+  setDevToolsComments(threads: CD4ACommentThread[]): void {
+    this.#devToolsComments = threads;
   }
 
-  setComments(threads: CD4ACommentThread[]): void {
-    this.setDevtoolsComments(threads);
-  }
-
-  get devtoolsComments(): readonly CD4ACommentThread[] | undefined {
-    return this.#devtoolsComments;
+  get devToolsComments(): readonly CD4ACommentThread[] | undefined {
+    return this.#devToolsComments;
   }
 
   setHeapSnapshotAggregates(
@@ -686,7 +682,7 @@ export class McpResponse implements Response {
   }
 
   async #handleComments(): Promise<CommentFormatter | undefined> {
-    const comments = this.#devtoolsComments;
+    const comments = this.#devToolsComments;
     if (!comments) {
       return undefined;
     }

@@ -195,8 +195,7 @@ export interface Response {
   setListThirdPartyDeveloperTools(): void;
   setListWebMcpTools(): void;
   attachWaitForResult(result: WaitForEventsResult): void;
-  setDevtoolsComments(threads: CD4ACommentThread[]): void;
-  setComments?(threads: CD4ACommentThread[]): void;
+  setDevToolsComments(threads: CD4ACommentThread[]): void;
 }
 
 export type SupportedExtensions =
