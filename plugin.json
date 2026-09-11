@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "chrome-devtools",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Reliable Chrome automation, debugging, and performance analysis for AI agents.",
   "author": {
     "name": "Google Chrome",

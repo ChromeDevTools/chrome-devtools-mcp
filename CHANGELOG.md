@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.10.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.9.0...chrome-devtools-mcp-v1.10.0) (2026-09-11)
+
+
+### 🎉 Features
+
+* add css formatter class ([#2707](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2707)) ([f0b5fa4](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f0b5fa4bde0afa30c53996ec0f987af6b6ab28ac))
+* add get_css_style tool ([#2612](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2612)) ([4454ae0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4454ae0a8a3d6072ea52d8931a9562907e8dbaae))
+* support config file ([#2661](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2661)) ([314a5fa](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/314a5fabfec56f3067c8bd754a945e9e76bea4fb))
+* **telemetry:** persist date of the last tool call. ([#2705](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2705)) ([c54a493](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c54a49383a47e10c445ab9997fd0032fc7acf177))
+* **telemetry:** report hermes client usage. ([#2703](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2703)) ([fb47e6c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fb47e6ca31d06874fa00daafee7a4823793dcb6b))
+* update css formatter class to add AtRule, PositionTryRule, PropertyRule, FunctionRule ([#2717](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2717)) ([d4a0620](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d4a0620ce620a3ddc0c0f45703198536367b4f9b))
+* update css formatter class to add inherited rules ([#2715](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2715)) ([3d7e7bb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3d7e7bb4382971cedc313eb52d5d508284be7388))
+* update css formatter class to add matched rules ([#2713](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2713)) ([8c8616f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8c8616fcc4ad3f793f88ed0f358f4c7c0dd0d96e))
+* update css formatter class to add pseudo element ([#2716](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2716)) ([df1469a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/df1469af579163fbfee312661bcae3630fd89733))
+* update css formatter to add keyframes rules ([#2718](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2718)) ([cdc365c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cdc365ca95f53e67a724ec45d4fca7e62cff0824))
+
+
+### 🛠️ Fixes
+
+* **cli:** forward explicit false options on start ([#2702](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2702)) ([d9a8cb6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d9a8cb6ec22aadf5cb964c5e97a8b047693046e2))
+* **performance:** prevent memory leak by scoping trace engine model per parse ([#2720](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2720)) ([d05cbc0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/d05cbc0511c6f05396d0419bf56962fcd2498203))
+* preserve console history across same-document navigations ([#2676](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2676)) ([aa25562](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/aa255629f29611a7ae0b7affffcd55dc0698e13b))
+
+
+### 🏗️ Refactor
+
+* move comments formatting to CommentFormatter class ([#2719](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2719)) ([e3cded0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e3cded0f43b06a7e8f935a37223016bb93fa725a))
+
 ## [1.9.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.8.0...chrome-devtools-mcp-v1.9.0) (2026-09-08)
 
 
