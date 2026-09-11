@@ -9,7 +9,9 @@ import {existsSync} from 'node:fs';
 import {rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import {describe, it, afterEach} from 'node:test';
+
+import sinon from 'sinon';
 
 import {
   takeHeapSnapshot,
@@ -27,11 +29,29 @@ import {
   queryHeapSnapshotObjects,
 } from '../../src/tools/memory.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
-import {stableIdSymbol} from '../../src/utils/id.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {
+  createHandlerMocks,
+  createMockClassDiffs,
+  createMockDetailedClassDiff,
+  createMockDominatorChain,
+  createMockDuplicateStrings,
+  createMockHeapSnapshotAggregateData,
+  createMockHeapSnapshotStats,
+  createMockHeapSnapshotStaticData,
+  createMockItemsRange,
+  createMockNativeContextSizes,
+  createMockObjectInfo,
+  createMockRetainedByContextSummary,
+  createMockRetainingPaths,
+} from '../mocks.js';
 import {withMcpContext} from '../utils.js';
 
 describe('memory', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   describe('take_heapsnapshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
@@ -56,723 +76,546 @@ describe('memory', () => {
   });
 
   describe('get_heapsnapshot_summary', () => {
-    it('with default options', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('fetches stats, static data, native context sizes, and retained summary', async () => {
+      const {context, response} = createHandlerMocks();
+      const stats = createMockHeapSnapshotStats();
+      const staticData = createMockHeapSnapshotStaticData();
+      const nativeContextSizes = createMockNativeContextSizes();
+      const retainedByContextSummary = createMockRetainedByContextSummary();
 
-        assert.ok(existsSync(filePath), `Fixture not found at ${filePath}`);
+      context.getHeapSnapshotStats.resolves(stats);
+      context.getHeapSnapshotStaticData.resolves(staticData);
+      context.getHeapSnapshotNativeContextSizes.resolves(nativeContextSizes);
+      context.getHeapSnapshotRetainedByContextSummary.resolves(
+        retainedByContextSummary,
+      );
 
-        await getHeapSnapshotSummary.handler(
-          {params: {filePath}},
-          response,
-          context,
-        );
+      await getHeapSnapshotSummary.handler(
+        {params: {filePath: 'test.heapsnapshot'}},
+        response,
+        context,
+      );
 
-        // Call handle to trigger formatting (similar to network tests)
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotStats,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotStaticData,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotNativeContextSizes,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotRetainedByContextSummary,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotStats,
+        stats,
+        staticData,
+        nativeContextSizes,
+        retainedByContextSummary,
+      );
     });
   });
 
   describe('get_heapsnapshot_details', () => {
-    it('with default options', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const aggregates = createMockHeapSnapshotAggregateData();
+      context.getHeapSnapshotAggregates.resolves(aggregates);
 
-        await getHeapSnapshotDetails.handler(
-          {params: {filePath}},
-          response,
-          context,
-        );
+      await getHeapSnapshotDetails.handler(
+        {params: {filePath: 'test.heapsnapshot'}},
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotAggregates,
+        'test.heapsnapshot',
+        undefined,
+        undefined,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotAggregates,
+        aggregates,
+        {pageIdx: undefined, pageSize: undefined},
+      );
     });
 
-    it('with objectsRetainedByContexts filterName', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with filters and pagination', async () => {
+      const {context, response} = createHandlerMocks();
+      const aggregates = createMockHeapSnapshotAggregateData();
+      context.getHeapSnapshotAggregates.resolves(aggregates);
 
-        await getHeapSnapshotDetails.handler(
-          {params: {filePath, filterName: 'objectsRetainedByContexts'}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('with sharedNativeContext filterName', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await getHeapSnapshotDetails.handler(
-          {params: {filePath, filterName: 'sharedNativeContext'}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('with attributedToSpecificNativeContext filterName and objectId', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await getHeapSnapshotDetails.handler(
-          {
-            params: {
-              filePath,
-              filterName: 'attributedToSpecificNativeContext',
-              objectId: 7249,
-              pageSize: 10,
-            },
+      await getHeapSnapshotDetails.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            filterName: 'attributedToSpecificNativeContext',
+            objectId: 123,
+            pageIdx: 1,
+            pageSize: 10,
           },
-          response,
-          context,
-        );
+        },
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotAggregates,
+        'test.heapsnapshot',
+        'attributedToSpecificNativeContext',
+        123,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotAggregates,
+        aggregates,
+        {pageIdx: 1, pageSize: 10},
+      );
     });
   });
 
   describe('get_heapsnapshot_class_nodes', () => {
-    it('with default options', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const nodes = createMockItemsRange();
+      context.getHeapSnapshotNodesById.resolves(nodes);
 
-        await context.getHeapSnapshotAggregates(filePath);
+      await getHeapSnapshotClassNodes.handler(
+        {params: {filePath: 'test.heapsnapshot', id: 19}},
+        response,
+        context,
+      );
 
-        await getHeapSnapshotClassNodes.handler(
-          {params: {filePath, id: 19}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotNodesById,
+        'test.heapsnapshot',
+        19,
+        undefined,
+        undefined,
+      );
+      sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, nodes, {
+        pageIdx: undefined,
+        pageSize: undefined,
       });
     });
 
-    it('with objectsRetainedByContexts filterName', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with filters and pagination', async () => {
+      const {context, response} = createHandlerMocks();
+      const nodes = createMockItemsRange();
+      context.getHeapSnapshotNodesById.resolves(nodes);
 
-        const aggregateData = await context.getHeapSnapshotAggregates(
-          filePath,
-          'objectsRetainedByContexts',
-        );
-        const aggregate = Object.values(aggregateData.aggregates).find(
-          a => a.name === 'Function',
-        );
-        assert.ok(aggregate);
-        const id = aggregate[stableIdSymbol];
-        assert.ok(id);
+      await getHeapSnapshotClassNodes.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            id: 19,
+            filterName: 'objectsRetainedByContexts',
+            objectId: 456,
+            pageIdx: 2,
+            pageSize: 20,
+          },
+        },
+        response,
+        context,
+      );
 
-        await getHeapSnapshotClassNodes.handler(
-          {params: {filePath, id, filterName: 'objectsRetainedByContexts'}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('with non-existent class name', async () => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await context.getHeapSnapshotAggregates(filePath);
-
-        await assert.rejects(
-          getHeapSnapshotClassNodes.handler(
-            {params: {filePath, id: 999999}},
-            response,
-            context,
-          ),
-          {message: 'Class with ID 999999 not found in heap snapshot'},
-        );
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotNodesById,
+        'test.heapsnapshot',
+        19,
+        'objectsRetainedByContexts',
+        456,
+      );
+      sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, nodes, {
+        pageIdx: 2,
+        pageSize: 20,
       });
     });
   });
 
   describe('get_heapsnapshot_retainers', () => {
-    it('with valid nodeId', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with valid nodeId and pagination', async () => {
+      const {context, response} = createHandlerMocks();
+      const retainers = createMockItemsRange();
+      context.getHeapSnapshotRetainers.resolves(retainers);
 
-        await getHeapSnapshotRetainers.handler(
-          {params: {filePath, nodeId: 25341}},
-          response,
-          context,
-        );
+      await getHeapSnapshotRetainers.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            nodeId: 25341,
+            pageIdx: 1,
+            pageSize: 5,
+          },
+        },
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotRetainers,
+        'test.heapsnapshot',
+        25341,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotNodes,
+        retainers,
+        {pageIdx: 1, pageSize: 5},
+      );
     });
   });
 
   describe('get_heapsnapshot_object_details', () => {
-    it('with valid nodeId', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with valid nodeId', async () => {
+      const {context, response} = createHandlerMocks();
+      const objectInfo = createMockObjectInfo();
+      context.getHeapSnapshotObjectDetails.resolves(objectInfo);
 
-        await getHeapSnapshotObjectDetails.handler(
-          {params: {filePath, nodeId: 25341}},
-          response,
-          context,
-        );
+      await getHeapSnapshotObjectDetails.handler(
+        {params: {filePath: 'test.heapsnapshot', nodeId: 25341}},
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotObjectDetails,
+        'test.heapsnapshot',
+        25341,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotObjectDetails,
+        objectInfo,
+      );
     });
   });
 
   describe('close_heapsnapshot', () => {
-    it('with default options', async () => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('closes loaded snapshot', async () => {
+      const {context, response} = createHandlerMocks();
+      context.closeHeapSnapshot.resolves(true);
 
-        await getHeapSnapshotSummary.handler(
-          {params: {filePath}},
-          response,
-          context,
-        );
+      await closeHeapSnapshot.handler(
+        {params: {filePath: 'test.heapsnapshot'}},
+        response,
+        context,
+      );
 
-        assert.ok(context.hasHeapSnapshots());
-
-        await closeHeapSnapshot.handler(
-          {params: {filePath}},
-          response,
-          context,
-        );
-
-        assert.ok(
-          response.responseLines.includes(`Closed heap snapshot: ${filePath}`),
-        );
-        assert.ok(!context.hasHeapSnapshots());
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.closeHeapSnapshot,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Closed heap snapshot: test.heapsnapshot',
+      );
     });
 
-    it('with non-existent snapshot', async () => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('throws error when snapshot was not loaded', async () => {
+      const {context, response} = createHandlerMocks();
+      context.closeHeapSnapshot.resolves(false);
 
-        await assert.rejects(
-          closeHeapSnapshot.handler({params: {filePath}}, response, context),
-          {
-            message: `Failed to close heap snapshot: ${filePath} was not loaded.`,
-          },
-        );
-      });
+      await assert.rejects(
+        closeHeapSnapshot.handler(
+          {params: {filePath: 'test.heapsnapshot'}},
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to close heap snapshot: test.heapsnapshot was not loaded.',
+        },
+      );
     });
   });
 
   describe('get_heapsnapshot_retaining_paths', () => {
-    it('with valid nodeId', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with valid nodeId and search limits', async () => {
+      const {context, response} = createHandlerMocks();
+      const retainingPaths = createMockRetainingPaths();
+      context.getHeapSnapshotRetainingPaths.resolves(retainingPaths);
 
-        await getHeapSnapshotRetainingPaths.handler(
-          {params: {filePath, nodeId: 45901}},
-          response,
-          context,
-        );
+      await getHeapSnapshotRetainingPaths.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            nodeId: 45901,
+            maxDepth: 5,
+            maxNodes: 10,
+            maxSiblings: 2,
+          },
+        },
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('reports when limits are reached', async () => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await getHeapSnapshotRetainingPaths.handler(
-          {params: {filePath, nodeId: 45901, maxDepth: 1}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        assert.match(output, /No retaining paths found\./);
-        assert.match(
-          output,
-          /Note: results are truncated, the following limits were reached: depth\./,
-        );
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotRetainingPaths,
+        'test.heapsnapshot',
+        45901,
+        5,
+        10,
+        2,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotRetainingPaths,
+        retainingPaths,
+      );
     });
   });
 
   describe('get_heapsnapshot_edges', () => {
-    it('with valid nodeId', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const edges = createMockItemsRange();
+      context.getHeapSnapshotEdges.resolves(edges);
 
-        await getHeapSnapshotEdges.handler(
-          {params: {filePath, nodeId: 25341}},
-          response,
-          context,
-        );
+      await getHeapSnapshotEdges.handler(
+        {params: {filePath: 'test.heapsnapshot', nodeId: 25341}},
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotEdges,
+        'test.heapsnapshot',
+        25341,
+        {
+          sortBy: 'retainedSize',
+          minRetainedSize: undefined,
+          excludePrimitives: true,
+        },
+      );
+      sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, edges, {
+        pageIdx: undefined,
+        pageSize: undefined,
       });
     });
 
-    it('with pagination', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with retainedSize range, sortBy, and excludePrimitives', async () => {
+      const {context, response} = createHandlerMocks();
+      const edges = createMockItemsRange();
+      context.getHeapSnapshotEdges.resolves(edges);
 
-        await getHeapSnapshotEdges.handler(
-          {params: {filePath, nodeId: 25341, pageSize: 2}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('with retainedSize range', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await getHeapSnapshotEdges.handler(
-          {
-            params: {
-              filePath,
-              nodeId: 25341,
-              retainedSize: parseByteSizeRange('100B-100B'),
-            },
+      await getHeapSnapshotEdges.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            nodeId: 25341,
+            sortBy: 'selfSize',
+            retainedSize: parseByteSizeRange('100B-200B'),
+            excludePrimitives: false,
+            pageIdx: 0,
+            pageSize: 2,
           },
-          response,
-          context,
-        );
+        },
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotEdges,
+        'test.heapsnapshot',
+        25341,
+        {
+          sortBy: 'selfSize',
+          minRetainedSize: 100,
+          excludePrimitives: false,
+        },
+      );
+      sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, edges, {
+        pageIdx: 0,
+        pageSize: 2,
       });
     });
   });
 
   describe('get_heapsnapshot_dominators', () => {
-    it('with valid nodeId', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with valid nodeId', async () => {
+      const {context, response} = createHandlerMocks();
+      const dominators = createMockDominatorChain();
+      context.getHeapSnapshotDominators.resolves(dominators);
 
-        await getHeapSnapshotDominators.handler(
-          {params: {filePath, nodeId: 25341}},
-          response,
-          context,
-        );
+      await getHeapSnapshotDominators.handler(
+        {params: {filePath: 'test.heapsnapshot', nodeId: 25341}},
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotDominators,
+        'test.heapsnapshot',
+        25341,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotDominators,
+        dominators,
+      );
     });
   });
 
   describe('compare_heapsnapshots', () => {
-    it('compare heap-1 to heap-2', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePathA = join(
-          process.cwd(),
-          'tests/fixtures/heap-1.heapsnapshot',
-        );
-        const filePathB = join(
-          process.cwd(),
-          'tests/fixtures/heap-2.heapsnapshot',
-        );
+    it('returns summary diff when classIndex is omitted', async () => {
+      const {context, response} = createHandlerMocks();
+      const diffs = createMockClassDiffs();
+      context.getHeapSnapshotClassDiffs.resolves(diffs);
 
-        await compareHeapSnapshots.handler(
-          {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('compare heap-2 to heap-3', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePathA = join(
-          process.cwd(),
-          'tests/fixtures/heap-2.heapsnapshot',
-        );
-        const filePathB = join(
-          process.cwd(),
-          'tests/fixtures/heap-3.heapsnapshot',
-        );
-
-        await compareHeapSnapshots.handler(
-          {params: {baseFilePath: filePathA, currentFilePath: filePathB}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('compare heap-1 to heap-2 with classIndex filter', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePathA = join(
-          process.cwd(),
-          'tests/fixtures/heap-1.heapsnapshot',
-        );
-        const filePathB = join(
-          process.cwd(),
-          'tests/fixtures/heap-2.heapsnapshot',
-        );
-
-        await compareHeapSnapshots.handler(
-          {
-            params: {
-              baseFilePath: filePathA,
-              currentFilePath: filePathB,
-              classIndex: 2, // NewObject
-            },
+      await compareHeapSnapshots.handler(
+        {
+          params: {
+            baseFilePath: 'heap1.heapsnapshot',
+            currentFilePath: 'heap2.heapsnapshot',
           },
-          response,
-          context,
-        );
+        },
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotClassDiffs,
+        'heap1.heapsnapshot',
+        'heap2.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotClassDiffs,
+        diffs,
+      );
     });
 
-    it('compare heap-1 to heap-2 with invalid classIndex throws error', async () => {
-      await withMcpContext(async (response, context) => {
-        const filePathA = join(
-          process.cwd(),
-          'tests/fixtures/heap-1.heapsnapshot',
-        );
-        const filePathB = join(
-          process.cwd(),
-          'tests/fixtures/heap-2.heapsnapshot',
-        );
+    it('returns detailed diff when classIndex is provided', async () => {
+      const {context, response} = createHandlerMocks();
+      const detailedDiff = createMockDetailedClassDiff();
+      context.getHeapSnapshotDetailedClassDiff.resolves(detailedDiff);
 
-        await assert.rejects(
-          compareHeapSnapshots.handler(
-            {
-              params: {
-                baseFilePath: filePathA,
-                currentFilePath: filePathB,
-                classIndex: 99,
-              },
-            },
-            response,
-            context,
-          ),
-          /Invalid classIndex: 99. Total classes with changes: 10/,
-        );
-      });
-    });
-  });
-
-  // Verifies that the caching mechanism in HeapSnapshotManager correctly
-  // distinguishes comparisons when the same "current" snapshot is compared
-  // against different "base" snapshots. If the cache key (diffCacheKey) is
-  // not unique per base snapshot, the second comparison might incorrectly
-  // return cached results from the first comparison.
-  it('compares the same current snapshot against different bases', async () => {
-    await withMcpContext(async (_response, context) => {
-      const filePathA = join(
-        process.cwd(),
-        'tests/fixtures/heap-1.heapsnapshot',
-      );
-      const filePathB = join(
-        process.cwd(),
-        'tests/fixtures/heap-2.heapsnapshot',
-      );
-      const filePathC = join(
-        process.cwd(),
-        'tests/fixtures/heap-3.heapsnapshot',
+      await compareHeapSnapshots.handler(
+        {
+          params: {
+            baseFilePath: 'heap1.heapsnapshot',
+            currentFilePath: 'heap2.heapsnapshot',
+            classIndex: 2,
+          },
+        },
+        response,
+        context,
       );
 
-      const firstDiff = await context.getHeapSnapshotClassDiffs(
-        filePathA,
-        filePathC,
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotDetailedClassDiff,
+        'heap1.heapsnapshot',
+        'heap2.heapsnapshot',
+        2,
       );
-      const secondDiff = await context.getHeapSnapshotClassDiffs(
-        filePathB,
-        filePathC,
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotDetailedClassDiff,
+        detailedDiff,
       );
-      const firstNewObjectDiff = firstDiff.find(
-        entry => entry.className === 'NewObject',
-      );
-      const secondNewObjectDiff = secondDiff.find(
-        entry => entry.className === 'NewObject',
-      );
-      assert.ok(firstNewObjectDiff);
-      assert.ok(secondNewObjectDiff);
-      assert.equal(firstNewObjectDiff.addedCount, 7);
-      assert.equal(secondNewObjectDiff.addedCount, 5);
     });
   });
 
   describe('get_heapsnapshot_duplicate_strings', () => {
-    it('with default options', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const duplicateStrings = createMockDuplicateStrings();
+      context.getHeapSnapshotDuplicateStrings.resolves(duplicateStrings);
 
-        await getHeapSnapshotDuplicateStrings.handler(
-          {params: {filePath}},
-          response,
-          context,
-        );
+      await getHeapSnapshotDuplicateStrings.handler(
+        {params: {filePath: 'test.heapsnapshot'}},
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotDuplicateStrings,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotDuplicateStrings,
+        duplicateStrings,
+        {pageIdx: undefined, pageSize: undefined},
+      );
     });
   });
 
   describe('query_heapsnapshot_objects', () => {
-    it('with default options', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const range = createMockItemsRange();
+      context.queryHeapSnapshotObjects.resolves(range);
 
-        await queryHeapSnapshotObjects.handler(
-          {params: {filePath, pageSize: 10}},
-          response,
-          context,
-        );
+      await queryHeapSnapshotObjects.handler(
+        {params: {filePath: 'test.heapsnapshot'}},
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
+      sinon.assert.calledOnceWithExactly(
+        context.queryHeapSnapshotObjects,
+        'test.heapsnapshot',
+        {
+          className: undefined,
+          propertyName: undefined,
+          nodeType: undefined,
+          minRetainedSize: undefined,
+          maxRetainedSize: undefined,
+          minSelfSize: undefined,
+          maxSelfSize: undefined,
+          isDetached: undefined,
+          sortBy: undefined,
+        },
+      );
+      sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, range, {
+        pageIdx: undefined,
+        pageSize: undefined,
       });
     });
 
-    it('with className filter', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
+    it('with all query filters and pagination', async () => {
+      const {context, response} = createHandlerMocks();
+      const range = createMockItemsRange();
+      context.queryHeapSnapshotObjects.resolves(range);
 
-        await queryHeapSnapshotObjects.handler(
-          {params: {filePath, className: 'Window', pageSize: 10}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('with an unbounded retainedSize filter', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await queryHeapSnapshotObjects.handler(
-          {
-            params: {
-              filePath,
-              retainedSize: parseByteSizeRange('1KB'),
-              pageSize: 10,
-            },
+      await queryHeapSnapshotObjects.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            className: 'Window',
+            propertyName: 'prop',
+            nodeType: 'object',
+            retainedSize: parseByteSizeRange('1KB-2KB'),
+            selfSize: parseByteSizeRange('100B-200B'),
+            isDetached: true,
+            sortBy: 'selfSize',
+            pageIdx: 1,
+            pageSize: 10,
           },
-          response,
-          context,
-        );
+        },
+        response,
+        context,
+      );
 
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
-      });
-    });
-
-    it('with sortBy selfSize and pagination', async t => {
-      await withMcpContext(async (response, context) => {
-        const filePath = join(
-          process.cwd(),
-          'tests/fixtures/example.heapsnapshot',
-        );
-
-        await queryHeapSnapshotObjects.handler(
-          {params: {filePath, sortBy: 'selfSize', pageSize: 5, pageIdx: 0}},
-          response,
-          context,
-        );
-
-        const responseData = await response.handle(context);
-        const output = responseData.content
-          .map(c => (c.type === 'text' ? c.text : ''))
-          .join('\n');
-
-        t.assert.snapshot(output);
+      sinon.assert.calledOnceWithExactly(
+        context.queryHeapSnapshotObjects,
+        'test.heapsnapshot',
+        {
+          className: 'Window',
+          propertyName: 'prop',
+          nodeType: 'object',
+          minRetainedSize: 1000,
+          maxRetainedSize: 2000,
+          minSelfSize: 100,
+          maxSelfSize: 200,
+          isDetached: true,
+          sortBy: 'selfSize',
+        },
+      );
+      sinon.assert.calledOnceWithExactly(response.setHeapSnapshotNodes, range, {
+        pageIdx: 1,
+        pageSize: 10,
       });
     });
   });

@@ -28,6 +28,12 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
+import type {
+  DuplicateStringGroup,
+  HeapSnapshotAggregateData,
+  HeapSnapshotClassDiff,
+  HeapSnapshotDetailedClassDiff,
+} from '../src/processors/HeapSnapshotManager.js';
 import {
   CdpExtension,
   CdpFrame,
@@ -679,4 +685,128 @@ export function createMockExtension(
   sinon.stub(extension, 'version').value(options.version ?? '1.0.0');
   sinon.stub(extension, 'enabled').value(options.enabled ?? true);
   return extension as unknown as Extension;
+}
+
+export function createMockHeapSnapshotStats(): DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics {
+  return {
+    total: 1000,
+    native: {total: 200, typedArrays: 50},
+    v8heap: {
+      total: 800,
+      code: 50,
+      jsArrays: 150,
+      strings: 200,
+      system: 400,
+    },
+  };
+}
+
+export function createMockHeapSnapshotStaticData(): DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData {
+  return new DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData(
+    10,
+    0,
+    1000,
+    100,
+  );
+}
+
+export function createMockNativeContextSizes(): DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes {
+  return {
+    nativeContexts: [],
+    sharedSize: 0,
+    noAttributionSize: 0,
+  };
+}
+
+export function createMockRetainedByContextSummary(): DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary {
+  return {
+    contextCount: 0,
+    retainedByContextSize: 0,
+    retainedByContextCount: 0,
+    notRetainedByContextSize: 0,
+    notRetainedByContextCount: 0,
+    totalSize: 0,
+  };
+}
+
+export function createMockHeapSnapshotAggregateData(): HeapSnapshotAggregateData {
+  return {
+    aggregates: {},
+    objectCount: 0,
+    totalSelfSize: 0,
+  };
+}
+
+export function createMockItemsRange(): DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange {
+  return new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+    0,
+    0,
+    0,
+    [],
+  );
+}
+
+export function createMockRetainingPaths(): DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths {
+  return {
+    paths: [],
+    limitsReached: {
+      depth: false,
+      nodes: false,
+      siblings: false,
+    },
+  };
+}
+
+export function createMockDominatorChain(): DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain {
+  return [];
+}
+
+export function createMockClassDiffs(): HeapSnapshotClassDiff[] {
+  return [
+    {
+      className: 'TestClass',
+      addedCount: 1,
+      removedCount: 0,
+      countDelta: 1,
+      addedSize: 10,
+      removedSize: 0,
+      sizeDelta: 10,
+    },
+  ];
+}
+
+export function createMockDetailedClassDiff(): HeapSnapshotDetailedClassDiff {
+  return {
+    className: 'TestClass',
+    addedCount: 1,
+    removedCount: 0,
+    countDelta: 1,
+    addedSize: 10,
+    removedSize: 0,
+    sizeDelta: 10,
+    addedIds: [1],
+    addedSelfSizes: [10],
+    deletedIds: [],
+    deletedSelfSizes: [],
+  };
+}
+
+export function createMockDuplicateStrings(): DuplicateStringGroup[] {
+  return [];
+}
+
+export function createMockObjectInfo(): DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo {
+  return {
+    id: 1,
+    nodeIndex: 0,
+    name: 'Object',
+    type: 'object',
+    selfSize: 100,
+    retainedSize: 200,
+    distance: 1,
+    edgeCount: 2,
+    retainerCount: 1,
+    detachedness:
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.ATTACHED,
+  };
 }
