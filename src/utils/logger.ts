@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import process from 'node:process';
 import util from 'node:util';
 
 import type {Logger} from '../types.js';
@@ -49,8 +50,19 @@ export const logger: Logger = (...args: unknown[]) => {
   }
 };
 
+const isPptrProtocolLoggingEnabled = (): boolean => {
+  const envVal = process.env['CHROME_DEVTOOLS_MCP_PPTR_LOGGING_ENABLED'];
+  return Boolean(envVal && envVal !== 'false' && envVal !== '0');
+};
+
 export const puppeteerLogger = (prefix: string) => {
   if (logFileStream) {
+    if (
+      prefix.startsWith('puppeteer:protocol') &&
+      !isPptrProtocolLoggingEnabled()
+    ) {
+      return undefined;
+    }
     return (...args: unknown[]) => {
       logFileStream!.write(
         `${new Date().toISOString()} ${prefix} ${util.format(...args)}\n`,

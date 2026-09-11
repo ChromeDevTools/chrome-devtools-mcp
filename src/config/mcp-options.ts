@@ -20,7 +20,7 @@ export const mcpOptions = {
   logFile: {
     type: 'string',
     describe:
-      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
+      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. To include verbose Puppeteer protocol logs (`puppeteer:protocol:*`), set the env variable `CHROME_DEVTOOLS_MCP_PPTR_LOGGING_ENABLED` to `true`. Useful for submitting bug reports.',
   },
   viewport: {
     type: 'string',
