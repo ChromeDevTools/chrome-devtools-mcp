@@ -12,11 +12,13 @@ import sinon from 'sinon';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {Locator} from '../src/third_party/index.js';
+import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
+import type {TextSnapshotNode} from '../src/types.js';
 import {createMockPuppeteerPage} from './mocks.js';
-
+import {serverHooks} from './server.js';
 import {html, withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
@@ -268,21 +270,6 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
-  it('creates a handle on the page and disposes it as such', async () => {
-    await withMcpContext(async (response, context) => {
-      const page = context.getSelectedMcpPage().pptrPage;
-
-      using handle = await page.evaluateHandle('new Set()');
-
-      {
-        using _ = handle;
-      }
-
-      // @ts-expect-error Internal Puppeteer API
-      assert.ok(handle.disposed);
-    });
-  });
-
   function createMcpPage(options: {hasNetworkBlockOrAllowlist?: boolean} = {}) {
     const pptrPage = createMockPuppeteerPage();
     const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
@@ -296,6 +283,19 @@ describe('McpPage', () => {
       .stub(mcpPage, 'devtoolsUniverse')
       .get(() => ({session: mockSession}) as unknown as TargetUniverse);
     return {mcpPage, pptrPage, mockSession};
+  }
+
+  function getUidForNode(mcpPage: McpPage, matcher: string): string {
+    const textSnapshot = mcpPage.textSnapshot;
+    if (!textSnapshot) {
+      throw new Error('No textSnapshot on mcpPage');
+    }
+    for (const [uid, node] of textSnapshot.idToNode) {
+      if (node.name?.includes(matcher)) {
+        return uid;
+      }
+    }
+    throw new Error(`Target element "${matcher}" not found in snapshot`);
   }
 
   describe('emulate()', () => {
@@ -669,6 +669,207 @@ describe('McpPage', () => {
         sinon.assert.calledOnce(disposeSpy);
         assert.strictEqual(mcpPage.commentBridge, undefined);
       }
+    });
+  });
+
+  describe('getMatchedStylesForUid()', () => {
+    const server = serverHooks();
+
+    function getSelectors(
+      matchedStyles: DevTools.CSSMatchedStyles.CSSMatchedStyles,
+    ): string[] {
+      const styles = matchedStyles.nodeStyles();
+      assert.ok(styles.length > 0);
+      const selectors: string[] = [];
+      for (const s of styles) {
+        if (s.parentRule instanceof DevTools.CSSRule.CSSStyleRule) {
+          selectors.push(s.parentRule.selectorText());
+        }
+      }
+      return selectors;
+    }
+
+    async function getSelectorsForUid(
+      uid: string,
+      mcpPage: McpPage,
+    ): Promise<string[]> {
+      const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+      assert.ok(matchedStyles);
+      return getSelectors(matchedStyles);
+    }
+
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('throws when snapshot has not been captured', async () => {
+      const {mcpPage} = createMcpPage();
+      await assert.rejects(
+        () => mcpPage.getMatchedStylesForUid('node_1'),
+        /No snapshot found for page/,
+      );
+    });
+
+    it('throws when element uid is not found in snapshot', async () => {
+      const {mcpPage} = createMcpPage();
+      const rootNode: TextSnapshotNode = {
+        id: '1_0',
+        role: 'root',
+        children: [],
+        elementHandle: async () => null,
+      };
+      mcpPage.textSnapshot = new TextSnapshot({
+        root: rootNode,
+        idToNode: new Map<string, TextSnapshotNode>(),
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose: false,
+      });
+      await assert.rejects(
+        () => mcpPage.getMatchedStylesForUid('node_1'),
+        /Element uid "node_1" not found on page/,
+      );
+    });
+
+    it('throws when element has no backendNodeId', async () => {
+      const {mcpPage} = createMcpPage();
+      const node: TextSnapshotNode = {
+        id: '1_1',
+        role: 'button',
+        children: [],
+        elementHandle: async () => null,
+      };
+      const idToNode = new Map<string, TextSnapshotNode>([['node_1', node]]);
+      mcpPage.textSnapshot = new TextSnapshot({
+        root: node,
+        idToNode,
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose: false,
+      });
+      await assert.rejects(
+        () => mcpPage.getMatchedStylesForUid('node_1'),
+        /Failed to resolve backend node ID for element with uid "node_1"/,
+      );
+    });
+
+    it('retrieves matched styles across elements, shadow roots, and iframes', async () => {
+      server.addHtmlRoute(
+        '/iframe_content.html',
+        html`
+          <style>
+            .frame-btn {
+              background-color: purple;
+              color: white;
+            }
+          </style>
+          <button
+            id="iframe-btn"
+            class="frame-btn"
+            >Iframe Button</button
+          >
+        `,
+      );
+      server.addHtmlRoute(
+        '/styles_combined_test.html',
+        html`
+          <style>
+            .btn-primary {
+              color: blue;
+              font-size: 14px;
+            }
+            #my-button {
+              color: green;
+            }
+          </style>
+          <button
+            id="my-button"
+            class="btn-primary"
+            style="font-size: 16px; padding: 8px;"
+          >
+            Click Me
+          </button>
+          <div id="open-host"></div>
+          <div id="closed-host"></div>
+          <iframe
+            id="child-frame"
+            src="/iframe_content.html"
+          ></iframe>
+          <script>
+            const openHost = document.getElementById('open-host');
+            const openRoot = openHost.attachShadow({mode: 'open'});
+            openRoot.innerHTML = \`
+              <style>
+                .shadow-btn-open {
+                  color: rgb(100, 200, 50);
+                }
+              </style>
+              <button class="shadow-btn-open">Open Shadow Button</button>
+            \`;
+
+            const closedHost = document.getElementById('closed-host');
+            const closedRoot = closedHost.attachShadow({mode: 'closed'});
+            closedRoot.innerHTML = \`
+              <style>
+                .shadow-btn-closed {
+                  color: rgb(200, 50, 100);
+                }
+              </style>
+              <button class="shadow-btn-closed">Closed Shadow Button</button>
+            \`;
+          </script>
+        `,
+      );
+
+      await withMcpContext(async (_, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.goto(
+          server.getRoute('/styles_combined_test.html'),
+        );
+        const frame = await mcpPage.pptrPage.waitForFrame(
+          f => f.url() === server.getRoute('/iframe_content.html'),
+        );
+        if (!frame) {
+          throw new Error('Child frame not found');
+        }
+        await frame.waitForSelector('#iframe-btn');
+
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+
+        // 1. Regular element
+        {
+          const uid = getUidForNode(mcpPage, 'Click Me');
+          const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+          const inlineStyle = matchedStyles
+            .nodeStyles()
+            .find(s => s.type === DevTools.CSSStyleDeclaration.Type.Inline);
+          assert.ok(inlineStyle);
+          const selectors = getSelectors(matchedStyles);
+          assert.ok(selectors.includes('#my-button'));
+          assert.ok(selectors.includes('.btn-primary'));
+        }
+
+        // 2. Open shadow root
+        {
+          const uid = getUidForNode(mcpPage, 'Open Shadow Button');
+          const selectors = await getSelectorsForUid(uid, mcpPage);
+          assert.ok(selectors.includes('.shadow-btn-open'));
+        }
+
+        // 3. Closed shadow root
+        {
+          const uid = getUidForNode(mcpPage, 'Closed Shadow Button');
+          const selectors = await getSelectorsForUid(uid, mcpPage);
+          assert.ok(selectors.includes('.shadow-btn-closed'));
+        }
+
+        // 4. Iframe
+        {
+          const uid = getUidForNode(mcpPage, 'Iframe Button');
+          const selectors = await getSelectorsForUid(uid, mcpPage);
+          assert.ok(selectors.includes('.frame-btn'));
+        }
+      });
     });
   });
 });

@@ -47,15 +47,65 @@ export async function startSourceMapTestServer(
     {length: scriptCount},
     (_, index) => `<script src="/scripts/script-${index}.js"></script>`,
   ).join('\n');
+  const styledButtons = Array.from(
+    {length: 25},
+    (_, index) =>
+      `<button id="btn-${index}" class="styled-btn${index % 2 === 0 ? ' alternate' : ''}" style="${index % 3 === 0 ? 'color: red;' : ''}">Button ${index}</button>`,
+  ).join('\n');
+
   const html = `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8">
     <title>Source map profiler fixture</title>
+    <style>
+      :root {
+        --primary-color: #1a73e8;
+        --accent-color: #34a853;
+      }
+      body {
+        font-family: sans-serif;
+        color: #333;
+        margin: 16px;
+      }
+      @layer base {
+        .styled-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+
+          & .styled-btn {
+            padding: 8px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            background: #fff;
+            color: var(--primary-color);
+            cursor: pointer;
+
+            &::before {
+              content: '▶ ';
+              font-size: 10px;
+            }
+
+            &:hover {
+              background: #f1f3f4;
+            }
+
+            &.alternate {
+              border-color: var(--accent-color);
+              font-weight: bold;
+            }
+          }
+        }
+      }
+    </style>
   </head>
   <body>
     <h1>Source map profiler fixture</h1>
     <p>${scriptCount} scripts, each with a distinct source map.</p>
+    <div class="styled-list">
+      ${styledButtons}
+    </div>
     ${scriptTags}
   </body>
 </html>`;
