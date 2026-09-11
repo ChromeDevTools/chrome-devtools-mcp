@@ -12,6 +12,7 @@ import {describe, it} from 'node:test';
 import {executablePath} from 'puppeteer';
 
 import {
+  BrowserManager,
   detectDisplay,
   ensureBrowserConnected,
   launch,
@@ -156,6 +157,29 @@ describe('browser', () => {
         connectedBrowser.disconnect();
       } finally {
         await safeClose(browser);
+      }
+    });
+  });
+
+  it('keeps browser lifecycle isolated per manager', async () => {
+    await runWithRetry(async () => {
+      const manager1 = new BrowserManager();
+      const manager2 = new BrowserManager();
+      const options = {
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+      };
+      const browser1 = await manager1.ensureBrowserLaunched(options);
+      try {
+        const browser2 = await manager2.ensureBrowserLaunched(options);
+        assert.notStrictEqual(browser1, browser2);
+        await manager1.closeBrowser();
+        assert.strictEqual(browser2.connected, true);
+      } finally {
+        await manager1.closeBrowser();
+        await manager2.closeBrowser();
       }
     });
   });

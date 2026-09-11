@@ -112,6 +112,18 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.categoryExperimentalWebmcp, true);
   });
 
+  it('parses HTTP transport options', async () => {
+    const args = parseArguments([
+      '--http-port',
+      '0',
+      '--http-host',
+      'localhost',
+    ]);
+
+    assert.strictEqual(args.httpPort, 0);
+    assert.strictEqual(args.httpHost, 'localhost');
+  });
+
   it('parses with user data dir', async () => {
     const args = parseArguments(['--user-data-dir', '/tmp/chrome-profile']);
     assert.deepStrictEqual(args, {

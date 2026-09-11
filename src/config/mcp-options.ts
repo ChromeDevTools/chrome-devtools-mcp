@@ -22,6 +22,36 @@ export const mcpOptions = {
     describe:
       'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
+  httpPort: {
+    type: 'number',
+    describe:
+      'Serve MCP over the Streamable HTTP transport instead of stdio. Each client session gets its own browser and MCP state. Use 0 to let the OS choose a free port.',
+    alias: 'port',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value < 0 || value > 65535) {
+        throw new Error(`Provided httpPort ${value} is not a valid port.`);
+      }
+      return value;
+    },
+  },
+  httpHost: {
+    type: 'string',
+    describe:
+      'Host interface for the Streamable HTTP server. Defaults to 127.0.0.1.',
+    alias: 'host',
+    coerce: (value: string | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (value.length === 0 || value.trim() !== value) {
+        throw new Error(`Provided httpHost ${value} is not a valid host.`);
+      }
+      return value;
+    },
+  },
   viewport: {
     type: 'string',
     describe:

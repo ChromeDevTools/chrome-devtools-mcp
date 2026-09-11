@@ -18,6 +18,7 @@ export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+export {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -33,6 +34,7 @@ export {
   RootsListChangedNotificationSchema,
   ListRootsResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+export {isInitializeRequest} from '@modelcontextprotocol/sdk/types.js';
 export {z as zod} from 'zod';
 export {default as ajv} from 'ajv';
 export {
