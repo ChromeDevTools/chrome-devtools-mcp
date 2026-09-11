@@ -5,6 +5,8 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
@@ -44,6 +46,124 @@ describe('script', () => {
         );
         const lineEvaluation = response.responseLines.at(2)!;
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
+      });
+    });
+    it('evaluates an inline classic script', async () => {
+      await withMcpContext(async (response, context) => {
+        await evaluateScript().handler(
+          {
+            params: {
+              function: 'document.title = "Script title"; document.title',
+              format: 'script',
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2);
+        assert.ok(lineEvaluation);
+        assert.strictEqual(JSON.parse(lineEvaluation), 'Script title');
+      });
+    });
+    it('evaluates a function loaded from a local file', async () => {
+      const directory = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'evaluate-script-function-'),
+      );
+      const sourcePath = path.join(directory, 'function.js');
+      try {
+        await fs.writeFile(sourcePath, '() => document.title', 'utf8');
+        await withMcpContext(async (response, context) => {
+          await context
+            .getSelectedMcpPage()
+            .pptrPage.setContent('<title>File function</title>');
+          await evaluateScript().handler(
+            {params: {sourcePath}},
+            response,
+            context,
+          );
+          const lineEvaluation = response.responseLines.at(2);
+          assert.ok(lineEvaluation);
+          assert.strictEqual(JSON.parse(lineEvaluation), 'File function');
+        });
+      } finally {
+        await fs.rm(directory, {recursive: true, force: true});
+      }
+    });
+    it('evaluates a classic script loaded from a local file', async () => {
+      const directory = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'evaluate-classic-script-'),
+      );
+      const sourcePath = path.join(directory, 'script.js');
+      try {
+        await fs.writeFile(
+          sourcePath,
+          'document.body.dataset.source = "file"; document.body.dataset.source',
+          'utf8',
+        );
+        await withMcpContext(async (response, context) => {
+          await evaluateScript().handler(
+            {params: {sourcePath, format: 'script'}},
+            response,
+            context,
+          );
+          const lineEvaluation = response.responseLines.at(2);
+          assert.ok(lineEvaluation);
+          assert.strictEqual(JSON.parse(lineEvaluation), 'file');
+        });
+      } finally {
+        await fs.rm(directory, {recursive: true, force: true});
+      }
+    });
+    it('requires exactly one script source', async () => {
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          evaluateScript().handler({params: {}}, response, context),
+          /Specify exactly one of function or sourcePath/,
+        );
+        await assert.rejects(
+          evaluateScript().handler(
+            {
+              params: {
+                function: '() => true',
+                sourcePath: 'script.js',
+              },
+            },
+            response,
+            context,
+          ),
+          /Specify exactly one of function or sourcePath/,
+        );
+      });
+    });
+    it('rejects args for classic scripts', async () => {
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          evaluateScript().handler(
+            {
+              params: {
+                function: 'document.title',
+                format: 'script',
+                args: ['1_1'],
+              },
+            },
+            response,
+            context,
+          ),
+          /args cannot be used when format is "script"/,
+        );
+      });
+    });
+    it('reports unreadable source files', async () => {
+      const sourcePath = path.join(
+        os.tmpdir(),
+        'missing-evaluate-script-source.js',
+      );
+      await fs.rm(sourcePath, {force: true});
+      await withMcpContext(async (response, context) => {
+        await assert.rejects(
+          evaluateScript().handler({params: {sourcePath}}, response, context),
+          /Unable to read script source/,
+        );
       });
     });
     it('skips the stable DOM wait when waitForStableDom is false', async () => {
@@ -310,10 +430,10 @@ describe('script', () => {
       });
     });
     it('saves output to file when filePath is provided', async () => {
-      const {rm, readFile} = await import('node:fs/promises');
-      const {tmpdir} = await import('node:os');
-      const {join} = await import('node:path');
-      const filePath = join(tmpdir(), 'test-evaluate-script-output.json');
+      const filePath = path.join(
+        os.tmpdir(),
+        'test-evaluate-script-output.json',
+      );
       try {
         await withMcpContext(async (response, context) => {
           await evaluateScript().handler(
@@ -332,10 +452,10 @@ describe('script', () => {
             `Expected "Output saved to" but got: ${response.responseLines[0]}`,
           );
         });
-        const content = await readFile(filePath, 'utf-8');
+        const content = await fs.readFile(filePath, 'utf-8');
         assert.deepStrictEqual(JSON.parse(content), {hello: 'world'});
       } finally {
-        await rm(filePath, {force: true});
+        await fs.rm(filePath, {force: true});
       }
     });
     it('evaluates inside extension service worker', async () => {
@@ -365,9 +485,10 @@ describe('script', () => {
           await context.triggerExtensionAction(extensionId);
 
           response.resetResponseLineForTesting();
-          await evaluateScript({
+          const extensionEvaluateScript = evaluateScript({
             categoryExtensions: true,
-          } as ParsedArguments).handler(
+          } as ParsedArguments);
+          await extensionEvaluateScript.handler(
             {
               params: {
                 function: String(() => {
@@ -382,6 +503,24 @@ describe('script', () => {
 
           const lineEvaluation = response.responseLines.at(2)!;
           assert.strictEqual(JSON.parse(lineEvaluation), 'has-chrome');
+
+          response.resetResponseLineForTesting();
+          await extensionEvaluateScript.handler(
+            {
+              params: {
+                function:
+                  '"chrome" in globalThis ? "has-chrome-script" : "no-chrome"',
+                format: 'script',
+                serviceWorkerId: swId,
+              },
+            },
+            response,
+            context,
+          );
+          const scriptEvaluation = response.responseLines.at(2);
+          assert.ok(scriptEvaluation);
+          assert.strictEqual(JSON.parse(scriptEvaluation), 'has-chrome-script');
+
           await context.uninstallExtension(extensionId);
           const targets = context.browser.targets();
           assertNoServiceWorkerReported(targets, extensionId);
