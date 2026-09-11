@@ -220,16 +220,14 @@ const DISABLE_NETWORK = {
 };
 
 export type RemoteObjectLike =
-  | Protocol.Runtime.RemoteObject
-  | DevTools.Protocol.Runtime.RemoteObject;
+  Protocol.Runtime.RemoteObject | DevTools.Protocol.Runtime.RemoteObject;
 
 export type ExceptionDetailsLike =
   | Protocol.Runtime.ExceptionDetails
   | DevTools.Protocol.Runtime.ExceptionDetails;
 
 export type StackTraceLike =
-  | Protocol.Runtime.StackTrace
-  | DevTools.Protocol.Runtime.StackTrace;
+  Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
 /**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
@@ -348,9 +346,7 @@ export class SymbolizedError {
     return details.text;
   }
 
-  static #getMessageFromException(
-    error: RemoteObjectLike,
-  ): string {
+  static #getMessageFromException(error: RemoteObjectLike): string {
     const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
     return messageWithRest[0] ?? '';
   }
