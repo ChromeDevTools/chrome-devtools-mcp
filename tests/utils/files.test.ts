@@ -90,7 +90,8 @@ describe('resolveCanonicalPath', () => {
     await fs.writeFile(targetFile, 'hello');
 
     const symlinkDir = path.join(tmpDir, 'symlink_dir');
-    if (!(await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir'))) {
+    const created = await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir');
+    if (!created) {
       return;
     }
 
@@ -106,7 +107,8 @@ describe('resolveCanonicalPath', () => {
     await fs.mkdir(targetDir);
 
     const symlinkDir = path.join(tmpDir, 'symlink_dir');
-    if (!(await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir'))) {
+    const created = await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir');
+    if (!created) {
       return;
     }
 
@@ -123,7 +125,12 @@ describe('resolveCanonicalPath', () => {
   it('should resolve dangling symlink at the end of path', async t => {
     const nonExistentTarget = path.join(tmpDir, 'non-existent-target.txt');
     const danglingSymlink = path.join(tmpDir, 'dangling-symlink.txt');
-    if (!(await createSymlinkOrSkip(t, nonExistentTarget, danglingSymlink))) {
+    const created = await createSymlinkOrSkip(
+      t,
+      nonExistentTarget,
+      danglingSymlink,
+    );
+    if (!created) {
       return;
     }
 
@@ -137,14 +144,13 @@ describe('resolveCanonicalPath', () => {
   it('should resolve path with a dangling symlink directory in the middle', async t => {
     const nonExistentTargetDir = path.join(tmpDir, 'non-existent-dir');
     const danglingSymlinkDir = path.join(tmpDir, 'dangling-dir');
-    if (
-      !(await createSymlinkOrSkip(
-        t,
-        nonExistentTargetDir,
-        danglingSymlinkDir,
-        'dir',
-      ))
-    ) {
+    const created = await createSymlinkOrSkip(
+      t,
+      nonExistentTargetDir,
+      danglingSymlinkDir,
+      'dir',
+    );
+    if (!created) {
       return;
     }
 
