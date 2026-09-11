@@ -5,11 +5,13 @@
  */
 
 import type {McpContext} from '../McpContext.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
+import {validateUrl} from '../utils/url.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
@@ -81,57 +83,77 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
   return true;
 }
 
-export const click = definePageTool({
-  name: 'click',
-  description: `Clicks on the provided element`,
-  annotations: {
-    category: ToolCategory.INPUT,
-    readOnlyHint: false,
-  },
-  schema: {
-    uid: zod
-      .string()
-      .describe(
-        'The uid of an element on the page from the page content snapshot',
-      ),
-    dblClick: dblClickSchema,
-    includeSnapshot: includeSnapshotSchema,
-  },
-  blockedByDialog: true,
-  verifyFilesSchema: {},
-  handler: async (request, response) => {
-    const uid = request.params.uid;
-    using handle = await request.page.getElementByUid(uid);
-    const aXNode = request.page.getAXNodeByUid(uid);
-    const shouldSelectNativeOption =
-      !request.params.dblClick && aXNode?.role === 'option';
-    try {
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        if (
-          shouldSelectNativeOption &&
-          (await selectNativeSelectOption(handle))
-        ) {
-          return;
-        }
-
-        await handle.asLocator().click({
-          count: request.params.dblClick ? 2 : 1,
+export const click = (
+  args?: Partial<
+    Pick<ParsedArguments, 'javascriptEvaluation' | 'categoryExtensions'>
+  >,
+) =>
+  definePageTool({
+    name: 'click',
+    description: `Clicks on the provided element`,
+    annotations: {
+      category: ToolCategory.INPUT,
+      readOnlyHint: false,
+    },
+    schema: {
+      uid: zod
+        .string()
+        .describe(
+          'The uid of an element on the page from the page content snapshot',
+        ),
+      dblClick: dblClickSchema,
+      includeSnapshot: includeSnapshotSchema,
+    },
+    blockedByDialog: true,
+    verifyFilesSchema: {},
+    handler: async (request, response) => {
+      const uid = request.params.uid;
+      using handle = await request.page.getElementByUid(uid);
+      const aXNode = request.page.getAXNodeByUid(uid);
+      const shouldSelectNativeOption =
+        !request.params.dblClick && aXNode?.role === 'option';
+      if (args?.javascriptEvaluation === false) {
+        const href = await handle.evaluate(element => {
+          const target = element.closest('a[href], area[href]');
+          return target instanceof HTMLAnchorElement ||
+            target instanceof HTMLAreaElement
+            ? target.href
+            : null;
         });
-      });
-      response.appendResponseLine(
-        request.params.dblClick
-          ? `Successfully double clicked on the element`
-          : `Successfully clicked on the element`,
-      );
-      response.attachWaitForResult(result);
-      if (request.params.includeSnapshot) {
-        response.includeSnapshot();
+        if (href) {
+          validateUrl(href, {
+            javascriptEvaluation: args.javascriptEvaluation,
+            categoryExtensions: args.categoryExtensions,
+          });
+        }
       }
-    } catch (error) {
-      handleActionError(error, uid);
-    }
-  },
-});
+      try {
+        const result = await request.page.waitForEventsAfterAction(async () => {
+          if (
+            shouldSelectNativeOption &&
+            (await selectNativeSelectOption(handle))
+          ) {
+            return;
+          }
+
+          await handle.asLocator().click({
+            count: request.params.dblClick ? 2 : 1,
+          });
+        });
+        response.appendResponseLine(
+          request.params.dblClick
+            ? `Successfully double clicked on the element`
+            : `Successfully clicked on the element`,
+        );
+        response.attachWaitForResult(result);
+        if (request.params.includeSnapshot) {
+          response.includeSnapshot();
+        }
+      } catch (error) {
+        handleActionError(error, uid);
+      }
+    },
+  });
 
 export const clickAt = definePageTool({
   name: 'click_at',
