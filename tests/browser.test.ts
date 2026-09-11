@@ -14,6 +14,7 @@ import {executablePath} from 'puppeteer';
 import {
   detectDisplay,
   ensureBrowserConnected,
+  forgetBrowser,
   launch,
   makeTargetFilter,
 } from '../src/browser.js';
@@ -153,6 +154,75 @@ describe('browser', () => {
         });
         assert.ok(connectedBrowser);
         assert.ok(connectedBrowser.connected);
+        connectedBrowser.disconnect();
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('reconnects after the browser transport disconnects cleanly', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+        const connectedBrowser = await ensureBrowserConnected(connectOptions);
+        assert.ok(connectedBrowser.connected);
+
+        const disconnected = new Promise<void>(resolve => {
+          connectedBrowser.once('disconnected', () => resolve());
+        });
+        connectedBrowser.disconnect();
+        await disconnected;
+
+        // The `disconnected` listener installed by ensureBrowserConnected
+        // should have forgotten the cached handle, so this reconnects
+        // instead of trying to reuse (or erroring out on) the dead one.
+        const reconnectedBrowser = await ensureBrowserConnected(connectOptions);
+        assert.notStrictEqual(reconnectedBrowser, connectedBrowser);
+        assert.ok(reconnectedBrowser.connected);
+        reconnectedBrowser.disconnect();
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('forgetBrowser only clears the cache on an exact match', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+        const connectedBrowser = await ensureBrowserConnected(connectOptions);
+
+        forgetBrowser({} as Browser);
+
+        const sameBrowser = await ensureBrowserConnected(connectOptions);
+        assert.strictEqual(sameBrowser, connectedBrowser);
         connectedBrowser.disconnect();
       } finally {
         await safeClose(browser);

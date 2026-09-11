@@ -21,6 +21,28 @@ import {isAllowedUrl} from './utils/url.js';
 let browser: Browser | undefined;
 let browserMode: 'launched' | 'connected' | undefined;
 
+/**
+ * Clears the cached browser handle if it still matches `candidate`, so the
+ * next ensureBrowserConnected()/ensureBrowserLaunched() call establishes a
+ * fresh connection instead of reusing a handle that looks connected but is
+ * actually dead (e.g. its CDP transport died without ever emitting a
+ * `close`/`disconnected` event — as happens when an adb port-forward is torn
+ * down mid-call rather than closed cleanly).
+ */
+export function forgetBrowser(candidate: Browser): void {
+  if (browser === candidate) {
+    browser = undefined;
+    browserMode = undefined;
+  }
+}
+
+function trackDisconnect(candidate: Browser): void {
+  candidate.once('disconnected', () => {
+    logger?.('Browser disconnected event received');
+    forgetBrowser(candidate);
+  });
+}
+
 export function makeTargetFilter(enableExtensions = false) {
   return function targetFilter(target: {url(): string}): boolean {
     const url = target.url();
@@ -119,6 +141,7 @@ export async function ensureBrowserConnected(options: {
     const connected = await puppeteer.connect(connectOptions);
     browserMode = 'connected';
     browser = connected;
+    trackDisconnect(connected);
   } catch (err) {
     throw new Error(
       `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
@@ -273,6 +296,7 @@ export async function ensureBrowserLaunched(
   const launched = await launch(options);
   browserMode = 'launched';
   browser = launched;
+  trackDisconnect(launched);
   return browser;
 }
 

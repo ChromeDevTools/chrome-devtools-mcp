@@ -17,7 +17,7 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
-import {ToolHandler} from '../src/ToolHandler.js';
+import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import type {
   DefinedPageTool,
@@ -1116,5 +1116,106 @@ describe('ToolHandler', () => {
     assert.deepStrictEqual(receivedParams, {
       filePath: canonicalFilePath,
     });
+  });
+
+  it('times out a hung tool handler, fails fast, and forgets the browser', async () => {
+    const tool: ToolDefinition = {
+      name: 'hanging_tool',
+      description: 'A tool whose handler never resolves',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        return new Promise<void>(() => {
+          // Simulates a tool call awaiting a CDP response on a transport
+          // that died silently: it never resolves or rejects on its own.
+        });
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const forgetBrowserSpy = sinon.spy();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      forgetBrowserSpy,
+    );
+
+    const clock = sinon.useFakeTimers();
+    try {
+      const resultPromise = toolHandler.handle({});
+      await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
+      const result = await resultPromise;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /timed out/,
+      );
+      assert.strictEqual(
+        forgetBrowserSpy.calledOnceWith(mockContext.browser),
+        true,
+      );
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('does not forget the browser when a tool handler rejects normally', async () => {
+    const tool: ToolDefinition = {
+      name: 'failing_tool',
+      description: 'A tool whose handler rejects immediately',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        throw new Error('Something went wrong');
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const forgetBrowserSpy = sinon.spy();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      forgetBrowserSpy,
+    );
+
+    const result = await toolHandler.handle({});
+
+    assert.strictEqual(result.isError, true);
+    assert.match(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      /Something went wrong/,
+    );
+    assert.strictEqual(forgetBrowserSpy.called, false);
   });
 });

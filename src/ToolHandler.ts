@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {forgetBrowser} from './browser.js';
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
@@ -11,7 +12,7 @@ import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import type {CallToolResult} from './third_party/index.js';
+import type {Browser, CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
@@ -26,6 +27,21 @@ import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isLocalhost} from './utils/url.js';
+
+/**
+ * Upper bound on how long a single tool call may wait on the browser
+ * connection. Puppeteer normally rejects in-flight CDP calls when the
+ * underlying transport closes, but a transport that dies silently (e.g. an
+ * adb port-forward torn down mid-call, rather than closed cleanly) never
+ * fires `close`/`error`/`disconnected`, so the call would otherwise hang
+ * until an external (client-side) timeout gives up on the whole server. This
+ * bound turns that into a fast, clear error instead, and forgets the cached
+ * browser handle so the next call reconnects rather than reusing a handle
+ * that still looks connected.
+ */
+export const TOOL_CALL_TIMEOUT_MS = 60_000;
+
+class ToolCallTimeoutError extends Error {}
 
 function buildDisabledMessage(
   toolName: string,
@@ -175,6 +191,8 @@ export class ToolHandler {
     private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
+    // Injectable for tests; production callers rely on the default.
+    private readonly forgetBrowserOnTimeout: (browser: Browser) => void = forgetBrowser,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -194,6 +212,38 @@ export class ToolHandler {
     return Object.keys(params).filter(
       key => !Object.hasOwn(this.inputSchema, key),
     );
+  }
+
+  /**
+   * Races a tool handler invocation against TOOL_CALL_TIMEOUT_MS. On timeout,
+   * forgets the cached browser handle (see forgetBrowser()) so the next tool
+   * call re-establishes the connection instead of hanging on the same dead
+   * one. The loser of the race (a genuinely hung handler) is left running;
+   * there is no way to cancel a pending Puppeteer call, but since nothing is
+   * left awaiting it, it cannot block subsequent tool calls.
+   */
+  async #runToolWithTimeout<T>(
+    context: McpContext,
+    handlerPromise: Promise<T>,
+  ): Promise<T> {
+    const timeoutError = new ToolCallTimeoutError(
+      `Tool "${this.tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting on the browser connection. The connection may have been lost (for example, the debugged browser or app restarted). It will be re-established automatically on the next tool call.`,
+    );
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(timeoutError), TOOL_CALL_TIMEOUT_MS);
+      timer.unref?.();
+    });
+    try {
+      return await Promise.race([handlerPromise, timeout]);
+    } catch (err) {
+      if (err === timeoutError) {
+        this.forgetBrowserOnTimeout(context.browser);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer!);
+    }
   }
 
   async handle(params: Record<string, unknown>): Promise<CallToolResult> {
@@ -261,21 +311,27 @@ export class ToolHandler {
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();
           }
-          await this.tool.handler(
-            {
-              params,
-              page,
-            },
-            response,
+          await this.#runToolWithTimeout(
             context,
+            this.tool.handler(
+              {
+                params,
+                page,
+              },
+              response,
+              context,
+            ),
           );
         } else {
-          await this.tool.handler(
-            {
-              params,
-            },
-            response,
+          await this.#runToolWithTimeout(
             context,
+            this.tool.handler(
+              {
+                params,
+              },
+              response,
+              context,
+            ),
           );
         }
       } catch (err) {
