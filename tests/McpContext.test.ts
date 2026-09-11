@@ -22,13 +22,24 @@ import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
+import {serverHooks} from './server.js';
 import {
+  assertNoServiceWorkerReported,
   getMockRequest,
   html,
   withBrowser,
   withMcpContext,
   stabilizeStructuredContent,
 } from './utils.js';
+
+const EXTENSION_WITH_SW_PATH = path.join(
+  import.meta.dirname,
+  '../../tests/tools/fixtures/extension-sw',
+);
+const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
+  import.meta.dirname,
+  '../../tests/tools/fixtures/extension-content-script',
+);
 
 describe('McpContext', () => {
   afterEach(() => {
@@ -907,6 +918,104 @@ describe('McpContext', () => {
           assert.strictEqual(result, undefined);
         });
       });
+    });
+  });
+
+  describe('extensions', () => {
+    const server = serverHooks();
+
+    it('manages extension lifecycle (install, list, get, reload, triggerAction, and uninstall)', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          const extensionId = await context.installExtension(
+            EXTENSION_WITH_SW_PATH,
+          );
+
+          let extensions = await context.listExtensions();
+          assert.ok(
+            extensions.has(extensionId),
+            `Extension with ID "${extensionId}" should be installed`,
+          );
+
+          const extension = await context.getExtension(extensionId);
+          assert.ok(extension, 'Extension should be returned');
+          assert.strictEqual(extension.id, extensionId);
+          assert.strictEqual(extension.path, EXTENSION_WITH_SW_PATH);
+
+          await context.installExtension(extension.path);
+          extensions = await context.listExtensions();
+          assert.ok(
+            extensions.has(extensionId),
+            'Extension should still be installed after reload',
+          );
+
+          const targetsBefore = context.browser.targets();
+          const pageTargetBefore = targetsBefore.find(
+            t => t.type() === 'page' && t.url().includes(extensionId),
+          );
+          assert.ok(!pageTargetBefore, 'Page should not exist before action');
+
+          await context.triggerExtensionAction(extensionId);
+
+          const pageTargetAfter = await context.browser.waitForTarget(
+            t => t.type() === 'page' && t.url().includes(extensionId),
+          );
+          assert.ok(pageTargetAfter, 'Page should exist after action');
+
+          await context.uninstallExtension(extensionId);
+          extensions = await context.listExtensions();
+          assert.ok(
+            !extensions.has(extensionId),
+            `Extension with ID "${extensionId}" should NOT be installed`,
+          );
+
+          const targets = context.browser.targets();
+          assertNoServiceWorkerReported(targets, extensionId);
+        },
+        {},
+        {
+          categoryExtensions: true,
+        },
+      );
+    });
+
+    it('verifies that content script console logs are received', async () => {
+      await withMcpContext(
+        async (_response, context) => {
+          server.addHtmlRoute(
+            '/test-content-script',
+            html`<h1>Test Content Script</h1>`,
+          );
+          const url = server.getRoute('/test-content-script');
+
+          const extensionId = await context.installExtension(
+            EXTENSION_CONTENT_SCRIPT_PATH,
+          );
+
+          const mcpPage = context.getSelectedMcpPage();
+          const page = mcpPage.pptrPage;
+
+          await page.goto(url);
+
+          const messages = mcpPage.getConsoleData(true);
+          const hasContentScriptLog = messages.some(
+            message =>
+              'text' in message &&
+              typeof message.text === 'function' &&
+              message.text().includes('from content script!'),
+          );
+          assert.ok(
+            hasContentScriptLog,
+            'Console output should contain message from content script.',
+          );
+
+          await context.uninstallExtension(extensionId);
+        },
+        {},
+        {
+          categoryExtensions: true,
+        },
+      );
     });
   });
 });

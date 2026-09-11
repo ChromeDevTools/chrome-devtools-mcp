@@ -15,12 +15,17 @@ import {
 } from '../../src/formatters/CssFormatter.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {
+  createMockCSSAtRule,
   createMockCSSInlineStyle,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
   createMockDOMNode,
   createMockCSSStyleRule,
+  createMockCSSPositionTryRule,
+  createMockCSSRegisteredProperty,
+  createMockCSSFunctionRule,
+  createMockCSSKeyframesRule,
 } from '../mocks.js';
 
 describe('CssFormatter', () => {
@@ -516,6 +521,131 @@ describe('CssFormatter', () => {
         uid: 'para-1',
         resolveUid,
       });
+    },
+  );
+
+  formatterTest('formats @font-palette-values at-rule with name', () => {
+    const atRule = createMockCSSAtRule('font-palette-values', {
+      name: '--my-palette',
+      properties: [
+        createMockCSSProperty('font-family', 'Bixa'),
+        createMockCSSProperty('base-palette', '3'),
+      ],
+      sourceURL: 'https://example.com/fonts.css',
+      range: {startLine: 10, startColumn: 0, endLine: 14, endColumn: 1},
+    });
+    const matchedStyles = createMockCSSMatchedStyles({atRules: [atRule]});
+    return new CssFormatter(matchedStyles, {uid: 'elem-at-1'});
+  });
+
+  formatterTest('formats @font-face at-rule without name', () => {
+    const atRule = createMockCSSAtRule('font-face', {
+      properties: [
+        createMockCSSProperty('font-family', 'Open Sans'),
+        createMockCSSProperty('src', 'url(font.woff2)'),
+      ],
+    });
+    const matchedStyles = createMockCSSMatchedStyles({atRules: [atRule]});
+    return new CssFormatter(matchedStyles, {uid: 'elem-at-2'});
+  });
+
+  formatterTest('formats at-rule when present in atRules', () => {
+    const atRule = createMockCSSAtRule('counter-style', {
+      name: 'thumbs',
+      properties: [createMockCSSProperty('system', 'cyclic')],
+    });
+    const matchedStyles = createMockCSSMatchedStyles({
+      atRules: [atRule],
+    });
+    return new CssFormatter(matchedStyles, {uid: 'elem-at-4'});
+  });
+
+  formatterTest('formats active and inactive @position-try rules', () => {
+    const posActive = createMockCSSPositionTryRule('--bottom', {
+      active: true,
+      properties: [createMockCSSProperty('top', 'anchor(bottom)')],
+      sourceURL: 'anchor.css',
+      range: {startLine: 20, startColumn: 0, endLine: 22, endColumn: 1},
+    });
+    const posInactive = createMockCSSPositionTryRule('--top', {
+      active: false,
+      properties: [createMockCSSProperty('bottom', 'anchor(top)')],
+      sourceURL: 'anchor.css',
+      range: {startLine: 25, startColumn: 0, endLine: 27, endColumn: 1},
+    });
+    const matchedStyles = createMockCSSMatchedStyles({
+      positionTryRules: [posActive, posInactive],
+    });
+
+    return new CssFormatter(matchedStyles, {uid: 'elem-pos'});
+  });
+
+  formatterTest(
+    'formats @property rules defined in stylesheets and programmatically',
+    () => {
+      const propStylesheet = createMockCSSRegisteredProperty('--brand-color', {
+        syntax: '"<color>"',
+        inherits: false,
+        initialValue: '#1a73e8',
+        sourceURL: 'theme.css',
+        range: {startLine: 10, startColumn: 0, endLine: 14, endColumn: 1},
+      });
+      const propProgrammatic = createMockCSSRegisteredProperty(
+        '--runtime-var',
+        {
+          syntax: '"<length>"',
+          inherits: true,
+          initialValue: '10px',
+          isProgrammatic: true,
+        },
+      );
+      const matchedStyles = createMockCSSMatchedStyles({
+        registeredProperties: [propStylesheet, propProgrammatic],
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'elem-prop'});
+    },
+  );
+
+  formatterTest(
+    'formats @function custom function rule with parameters and declarations',
+    () => {
+      const funcRule = createMockCSSFunctionRule('--double(--x)', {
+        functionName: '--double',
+        properties: [createMockCSSProperty('result', 'calc(var(--x) * 2)')],
+        sourceURL: 'math.css',
+        range: {startLine: 4, startColumn: 0, endLine: 6, endColumn: 1},
+      });
+      const matchedStyles = createMockCSSMatchedStyles({
+        functionRules: [funcRule],
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'elem-func'});
+    },
+  );
+
+  formatterTest(
+    'formats @keyframes rule with multiple steps and source location',
+    () => {
+      const keyframesRule = createMockCSSKeyframesRule('slideIn', [
+        {
+          key: 'from',
+          properties: [createMockCSSProperty('opacity', '0')],
+          sourceURL: 'animations.css',
+          range: {startLine: 10, startColumn: 2, endLine: 12, endColumn: 3},
+        },
+        {
+          key: 'to',
+          properties: [createMockCSSProperty('opacity', '1')],
+          sourceURL: 'animations.css',
+          range: {startLine: 13, startColumn: 2, endLine: 15, endColumn: 3},
+        },
+      ]);
+      const matchedStyles = createMockCSSMatchedStyles({
+        keyframes: [keyframesRule],
+      });
+
+      return new CssFormatter(matchedStyles, {uid: 'elem-kf'});
     },
   );
 });

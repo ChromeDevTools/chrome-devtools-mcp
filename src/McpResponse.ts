@@ -13,6 +13,12 @@ import {
 } from './formatters/CommentFormatter.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {
+  type CascadeRule,
+  CssFormatter,
+  type CssFormatterOptions,
+  resolveContainerQueries,
+} from './formatters/CssFormatter.js';
+import {
   HeapSnapshotFormatter,
   isEdgeLike,
   isNodeLike,
@@ -46,6 +52,7 @@ import type {
   DevToolsData,
   ImageContentData,
   LighthouseData,
+  MatchedStyles,
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
@@ -117,6 +124,10 @@ export class McpResponse implements Response {
     includePreservedMessages?: boolean;
     includeStackTraces?: boolean;
     serviceWorkerId?: string;
+  };
+  #cssStylesData?: {
+    matchedStyles: MatchedStyles;
+    options: CssFormatterOptions & PaginationOptions;
   };
   #listExtensions?: boolean;
   #listThirdPartyDeveloperTools?: boolean;
@@ -245,6 +256,16 @@ export class McpResponse implements Response {
       includePreservedMessages: options?.includePreservedMessages,
       includeStackTraces: options?.includeStackTraces,
       serviceWorkerId: options?.serviceWorkerId,
+    };
+  }
+
+  setIncludeCssStyles(
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions & PaginationOptions,
+  ): void {
+    this.#cssStylesData = {
+      matchedStyles,
+      options,
     };
   }
 
@@ -839,6 +860,7 @@ export class McpResponse implements Response {
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       comments?: StructuredCommentThread[];
+      matchedStyles?: object;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1432,6 +1454,56 @@ Call ${handleDialog.name} to handle it before continuing.`);
       response.push(
         compactEncode ? compactEncode(commentsJson) : data.comments.toString(),
       );
+    }
+
+    if (this.#cssStylesData) {
+      const resolveUid = (backendNodeId: number) =>
+        this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
+
+      const containerDetails = await resolveContainerQueries(
+        this.#cssStylesData.matchedStyles,
+        resolveUid,
+      );
+
+      const options = {
+        ...this.#cssStylesData.options,
+        resolveUid,
+        containerDetails,
+      };
+
+      const allRules = CssFormatter.collectRules(
+        this.#cssStylesData.matchedStyles,
+        options,
+      );
+
+      let rules: readonly CascadeRule[] = allRules;
+
+      const hasPagination =
+        this.#cssStylesData.options.pageSize !== undefined ||
+        this.#cssStylesData.options.pageIdx !== undefined;
+
+      if (hasPagination) {
+        const paginationData = this.#dataWithPagination(
+          allRules,
+          this.#cssStylesData.options,
+        );
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+        rules = paginationData.items;
+      }
+
+      const formatter = new CssFormatter(
+        this.#cssStylesData.matchedStyles,
+        options,
+        rules,
+      );
+
+      structuredContent.matchedStyles = formatter.toJSON();
+      if (compactEncode) {
+        response.push(compactEncode(structuredContent.matchedStyles));
+      } else {
+        response.push(formatter.toString());
+      }
     }
 
     if (data.errorMessage) {

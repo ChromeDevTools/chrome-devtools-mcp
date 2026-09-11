@@ -28,8 +28,18 @@ import sinon from 'sinon';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
-import {CdpFrame, CdpPage, DevTools} from '../src/third_party/index.js';
-import type {Page} from '../src/third_party/index.js';
+import {
+  CdpExtension,
+  CdpFrame,
+  CdpPage,
+  DevTools,
+} from '../src/third_party/index.js';
+import type {
+  Extension,
+  Page,
+  Result,
+  RunnerResult,
+} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
   pptrPage: sinon.SinonStubbedInstance<Page>;
@@ -45,6 +55,16 @@ export type MockCSSMatchedStyles =
   sinon.SinonStubbedInstance<DevTools.CSSMatchedStyles.CSSMatchedStyles>;
 export type MockCSSStyleRule =
   sinon.SinonStubbedInstance<DevTools.CSSRule.CSSStyleRule>;
+export type MockCSSKeyframesRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSKeyframesRule>;
+export type MockCSSAtRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSAtRule>;
+export type MockCSSPositionTryRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSPositionTryRule>;
+export type MockCSSRegisteredProperty =
+  sinon.SinonStubbedInstance<DevTools.CSSMatchedStyles.CSSRegisteredProperty>;
+export type MockCSSFunctionRule =
+  sinon.SinonStubbedInstance<DevTools.CSSRule.CSSFunctionRule>;
 
 /**
  * A minimal event emitter used to back mocked `on`/`off`/`emit` methods on
@@ -168,6 +188,20 @@ export function createHandlerMocks(): {
   const context = createMockMcpContext({selectedPage: page});
   const response = createMockMcpResponse();
   return {page, context, response};
+}
+
+export function createMockRunnerResult(): RunnerResult {
+  const lhr = {
+    mainDocumentUrl: 'http://localhost',
+    categories: {},
+    audits: {},
+    timing: {total: 0},
+  };
+  return {
+    lhr: lhr as unknown as Result,
+    report: '',
+    artifacts: {} as unknown as RunnerResult['artifacts'],
+  };
 }
 
 type RuleOrigin = 'regular' | 'user-agent' | 'injected' | 'inspector';
@@ -375,10 +409,184 @@ export function createMockCSSStyleRule(
   return rule;
 }
 
+export function createMockCSSKeyframesRule(
+  name: string,
+  keyframes: Array<{
+    key: string;
+    properties: DevTools.CSSProperty.CSSProperty[];
+    sourceURL?: string;
+    range?: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+  }>,
+): MockCSSKeyframesRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSKeyframesRule);
+  const mockKeyframes = [];
+  for (const kf of keyframes) {
+    const kfMock = sinon.createStubInstance(DevTools.CSSRule.CSSKeyframeRule);
+    attachRuleMeta(kfMock, kf.sourceURL);
+    const style = createMockCSSStyleDeclaration(kf.properties, {
+      rule: kfMock,
+      range: kf.range,
+    });
+    kfMock.key.returns(createCSSValue(kf.key));
+    Object.assign(kfMock, {style});
+    mockKeyframes.push(kfMock);
+  }
+  rule.name.returns(createCSSValue(name));
+  rule.keyframes.returns(mockKeyframes);
+  return rule;
+}
+
+export function createMockCSSAtRule(
+  type: string,
+  options: {
+    name?: string;
+    subsection?: string;
+    properties: DevTools.CSSProperty.CSSProperty[];
+    sourceURL?: string;
+    origin?: RuleOrigin;
+    range?: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+  },
+): MockCSSAtRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSAtRule);
+  attachRuleMeta(rule, options.sourceURL, options.origin);
+  const style = createMockCSSStyleDeclaration(options.properties, {
+    rule,
+    range: options.range,
+  });
+  rule.type.returns(type);
+  rule.name.returns(options.name ? createCSSValue(options.name) : null);
+  rule.subsection.returns(options.subsection ?? null);
+  Object.assign(rule, {style});
+  return rule;
+}
+
+export function createMockCSSPositionTryRule(
+  name: string,
+  options: {
+    active?: boolean;
+    properties: DevTools.CSSProperty.CSSProperty[];
+    sourceURL?: string;
+    range?: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+  },
+): MockCSSPositionTryRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSPositionTryRule);
+  attachRuleMeta(rule, options.sourceURL);
+  const style = createMockCSSStyleDeclaration(options.properties, {
+    rule,
+    range: options.range,
+  });
+  rule.name.returns(createCSSValue(name));
+  rule.active.returns(options.active ?? false);
+  Object.assign(rule, {style});
+  return rule;
+}
+
+export function createMockCSSRegisteredProperty(
+  name: string,
+  options: {
+    syntax?: string;
+    inherits?: boolean;
+    initialValue?: string;
+    sourceURL?: string;
+    range?: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+    isProgrammatic?: boolean;
+  } = {},
+): MockCSSRegisteredProperty {
+  const properties = [
+    createMockCSSProperty('syntax', options.syntax ?? '"*"'),
+    createMockCSSProperty('inherits', String(options.inherits ?? false)),
+  ];
+  if (options.initialValue) {
+    properties.push(
+      createMockCSSProperty('initial-value', options.initialValue),
+    );
+  }
+
+  let parentRule: sinon.SinonStubbedInstance<DevTools.CSSRule.CSSPropertyRule> | null =
+    null;
+  if (!options.isProgrammatic) {
+    const mockRule = sinon.createStubInstance(DevTools.CSSRule.CSSPropertyRule);
+    attachRuleMeta(mockRule, options.sourceURL);
+    mockRule.propertyName.returns(createCSSValue(name));
+    parentRule = mockRule;
+  }
+
+  const style = createMockCSSStyleDeclaration(properties, {
+    rule: parentRule,
+    range: options.range,
+  });
+  if (parentRule) {
+    Object.assign(parentRule, {style});
+  }
+
+  const prop = sinon.createStubInstance(
+    DevTools.CSSMatchedStyles.CSSRegisteredProperty,
+  );
+  prop.propertyName.returns(name);
+  prop.inherits.returns(options.inherits ?? false);
+  prop.syntax.returns(options.syntax ?? '"*"');
+  prop.initialValue.returns(options.initialValue ?? null);
+  prop.style.returns(style);
+  return prop;
+}
+
+export function createMockCSSFunctionRule(
+  nameWithParams: string,
+  options: {
+    functionName?: string;
+    properties: DevTools.CSSProperty.CSSProperty[];
+    sourceURL?: string;
+    range?: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+  },
+): MockCSSFunctionRule {
+  const rule = sinon.createStubInstance(DevTools.CSSRule.CSSFunctionRule);
+  attachRuleMeta(rule, options.sourceURL);
+  const style = createMockCSSStyleDeclaration(options.properties, {
+    rule,
+    range: options.range,
+  });
+  const baseName =
+    options.functionName ?? nameWithParams.split('(')[0] ?? nameWithParams;
+  rule.functionName.returns(createCSSValue(baseName));
+  rule.nameWithParameters.returns(nameWithParams);
+  Object.assign(rule, {style});
+  return rule;
+}
+
 export interface MockCSSMatchedStylesParams {
   node?: string | DevTools.DOMModel.DOMNode;
   nodeStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
   inheritedStyles?: DevTools.CSSStyleDeclaration.CSSStyleDeclaration[];
+  keyframes?: DevTools.CSSRule.CSSKeyframesRule[];
+  atRules?: DevTools.CSSRule.CSSAtRule[];
+  positionTryRules?: DevTools.CSSRule.CSSPositionTryRule[];
+  registeredProperties?: DevTools.CSSMatchedStyles.CSSRegisteredProperty[];
+  functionRules?: DevTools.CSSRule.CSSFunctionRule[];
   parentNode?: string | DevTools.DOMModel.DOMNode;
   nodeForStyleMap?: Map<
     DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
@@ -427,6 +635,11 @@ export function createMockCSSMatchedStyles(
   mock.node.returns(mockNode);
   mock.nodeStyles.returns(nodeStyles);
   mock.inheritedStyles.returns(inheritedStyles);
+  mock.keyframes.returns(params.keyframes ?? []);
+  mock.atRules.returns(params.atRules ?? []);
+  mock.positionTryRules.returns(params.positionTryRules ?? []);
+  mock.registeredProperties.returns(params.registeredProperties ?? []);
+  mock.functionRules.returns(params.functionRules ?? []);
   mock.pseudoTypes.returns(pseudoTypes);
   mock.customHighlightPseudoNames.returns(new Set(customHighlights.keys()));
 
@@ -446,4 +659,24 @@ export function createMockCSSMatchedStyles(
   );
 
   return mock;
+}
+
+export function createMockExtension(
+  options: {
+    id?: string;
+    path?: string;
+    name?: string;
+    version?: string;
+    enabled?: boolean;
+  } = {},
+): Extension {
+  const extension = sinon.createStubInstance(CdpExtension);
+  sinon.stub(extension, 'id').value(options.id ?? 'mock-extension-id');
+  sinon
+    .stub(extension, 'path')
+    .value(options.path ?? '/path/to/mock/extension');
+  sinon.stub(extension, 'name').value(options.name ?? 'Mock Extension');
+  sinon.stub(extension, 'version').value(options.version ?? '1.0.0');
+  sinon.stub(extension, 'enabled').value(options.enabled ?? true);
+  return extension as unknown as Extension;
 }
