@@ -113,17 +113,17 @@ export function isAllowedUrl(
 const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
 
 /**
- * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
+ * Validates whether a URL is compatible with the JavaScript evaluation setting.
  *
  * @param url The URL string to validate.
- * @param options Options object containing javascriptEvaluation and categoryExtensions.
+ * @param javascriptEvaluation Whether JavaScript evaluation is enabled.
  * @returns The parsed URL.
- * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed,
- * or if navigating to a restricted scheme.
+ * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed.
  */
-export function validateUrl(url: string, options: ValidateUrlOptions): URL {
-  const {javascriptEvaluation, categoryExtensions} = options;
-
+export function validateJavaScriptEvaluationUrl(
+  url: string,
+  javascriptEvaluation: boolean | undefined,
+): URL {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -141,6 +141,22 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
       `Navigating to ${parsed.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
     );
   }
+
+  return parsed;
+}
+
+/**
+ * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
+ *
+ * @param url The URL string to validate.
+ * @param options Options object containing javascriptEvaluation and categoryExtensions.
+ * @returns The parsed URL.
+ * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed,
+ * or if navigating to a restricted scheme.
+ */
+export function validateUrl(url: string, options: ValidateUrlOptions): URL {
+  const {javascriptEvaluation, categoryExtensions} = options;
+  const parsed = validateJavaScriptEvaluationUrl(url, javascriptEvaluation);
 
   if (!isAllowedUrl(url, {categoryExtensions})) {
     if (parsed.protocol === 'chrome-extension:') {

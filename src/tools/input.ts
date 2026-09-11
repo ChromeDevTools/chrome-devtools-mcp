@@ -10,6 +10,7 @@ import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
+import {validateJavaScriptEvaluationUrl} from '../utils/url.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
@@ -81,7 +82,28 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
   return true;
 }
 
-export const click = definePageTool({
+async function validateClickNavigation(
+  handle: ElementHandle<Element>,
+  javascriptEvaluation: boolean | undefined,
+) {
+  if (javascriptEvaluation !== false) {
+    return;
+  }
+
+  const href = await handle.evaluate(node => {
+    const link = node.closest('a[href], area[href]');
+    if (link instanceof HTMLAnchorElement || link instanceof HTMLAreaElement) {
+      return link.href;
+    }
+    return null;
+  });
+
+  if (href) {
+    validateJavaScriptEvaluationUrl(href, javascriptEvaluation);
+  }
+}
+
+export const click = definePageTool(args => ({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -105,6 +127,7 @@ export const click = definePageTool({
     const aXNode = request.page.getAXNodeByUid(uid);
     const shouldSelectNativeOption =
       !request.params.dblClick && aXNode?.role === 'option';
+    await validateClickNavigation(handle, args?.javascriptEvaluation);
     try {
       const result = await request.page.waitForEventsAfterAction(async () => {
         if (
@@ -131,7 +154,7 @@ export const click = definePageTool({
       handleActionError(error, uid);
     }
   },
-});
+}));
 
 export const clickAt = definePageTool({
   name: 'click_at',

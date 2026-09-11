@@ -41,7 +41,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -70,7 +70,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -107,7 +107,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        const clickPromise = click.handler(
+        const clickPromise = click().handler(
           {
             params: {
               uid: '1_1',
@@ -144,7 +144,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_2',
@@ -164,6 +164,39 @@ describe('input', () => {
       });
     });
 
+    it('blocks javascript URL navigation through click when JavaScript evaluation is disabled', async () => {
+      await withMcpContext(async (response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent(
+          html`<a href="javascript:document.body.dataset.executed='true'"
+            >Run script</a
+          >`,
+        );
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const linkNode = [...mcpPage.textSnapshot.idToNode.values()].find(
+          node => node.role === 'link' && node.name === 'Run script',
+        );
+        assert.ok(linkNode);
+
+        const tool = click({javascriptEvaluation: false} as ParsedArguments);
+        await assert.rejects(
+          tool.handler(
+            {
+              params: {uid: linkNode.id},
+              page: mcpPage,
+            },
+            response,
+            context,
+          ),
+          /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled/,
+        );
+        assert.strictEqual(
+          await page.evaluate(() => document.body.dataset.executed),
+          undefined,
+        );
+      });
+    });
     it('does not report navigation when click does not navigate', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -173,7 +206,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -213,7 +246,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        const handlerResolveTime = await click
+        const handlerResolveTime = await click()
           .handler(
             {
               params: {
@@ -243,7 +276,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -270,7 +303,7 @@ describe('input', () => {
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: '1_1',
@@ -305,7 +338,7 @@ describe('input', () => {
         );
         assert.ok(optionNode);
 
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: optionNode.id,
@@ -354,7 +387,7 @@ describe('input', () => {
         );
         assert.ok(optionNode);
 
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: optionNode.id,
@@ -406,7 +439,7 @@ describe('input', () => {
         );
         assert.ok(optionNode);
 
-        await click.handler(
+        await click().handler(
           {
             params: {
               uid: optionNode.id,
