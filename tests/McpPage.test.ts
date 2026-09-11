@@ -529,6 +529,54 @@ describe('McpPage', () => {
     });
   });
 
+  describe('restoreEmulation()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('re-applies previously configured viewport emulation', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        viewport: {
+          width: 400,
+          height: 400,
+          deviceScaleFactor: 1,
+          isMobile: false,
+          hasTouch: false,
+          isLandscape: false,
+        },
+      });
+      sinon.assert.calledOnce(pptrPage.setViewport);
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledTwice(pptrPage.setViewport);
+      sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, {
+        width: 400,
+        height: 400,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      });
+    });
+
+    it('re-applies previously configured network and cpu throttling emulation', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        networkConditions: 'Slow 3G',
+        cpuThrottlingRate: 4,
+      });
+      sinon.assert.calledOnce(pptrPage.emulateNetworkConditions);
+      sinon.assert.calledOnce(pptrPage.emulateCPUThrottling);
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
+      sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
+    });
+  });
+
   describe('waitForTextOnPage()', () => {
     it('finds text on the page', async () => {
       await withMcpContext(async (_response, context) => {
