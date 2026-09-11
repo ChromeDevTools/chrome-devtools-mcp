@@ -14,6 +14,7 @@ import type {
   HeapQueryOptions,
 } from '../processors/HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
+import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -173,6 +174,10 @@ export interface Response {
       includeStackTraces?: boolean;
       serviceWorkerId?: string;
     },
+  ): void;
+  setIncludeCssStyles(
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions & PaginationOptions,
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
@@ -335,6 +340,7 @@ export type ContextPage = Readonly<{
   readonly networkConditions: string | null;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+  getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
 
   /**
    * Returns a reqid for a cdpRequestId.

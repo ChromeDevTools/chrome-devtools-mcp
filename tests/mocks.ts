@@ -34,7 +34,12 @@ import {
   CdpPage,
   DevTools,
 } from '../src/third_party/index.js';
-import type {Extension, Page} from '../src/third_party/index.js';
+import type {
+  Extension,
+  Page,
+  Result,
+  RunnerResult,
+} from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
   pptrPage: sinon.SinonStubbedInstance<Page>;
@@ -183,6 +188,20 @@ export function createHandlerMocks(): {
   const context = createMockMcpContext({selectedPage: page});
   const response = createMockMcpResponse();
   return {page, context, response};
+}
+
+export function createMockRunnerResult(): RunnerResult {
+  const lhr = {
+    mainDocumentUrl: 'http://localhost',
+    categories: {},
+    audits: {},
+    timing: {total: 0},
+  };
+  return {
+    lhr: lhr as unknown as Result,
+    report: '',
+    artifacts: {} as unknown as RunnerResult['artifacts'],
+  };
 }
 
 type RuleOrigin = 'regular' | 'user-agent' | 'injected' | 'inspector';
