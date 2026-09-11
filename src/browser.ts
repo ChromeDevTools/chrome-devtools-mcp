@@ -170,6 +170,45 @@ export function detectDisplay(): void {
   }
 }
 
+/**
+ * Chrome refuses to start as root unless the sandbox is explicitly disabled and
+ * only says so on its stderr. Because we launch with `pipe: true`, Puppeteer
+ * never surfaces that stderr and the failure reaches the client as an opaque
+ * `Protocol error (Target.setDiscoverTargets): Target closed`. Detect the
+ * situation and explain the way out instead. See https://crbug.com/638180.
+ *
+ * Returns `undefined` when the failure cannot be explained by running as root,
+ * including on platforms without uids and when the sandbox was already disabled
+ * through `--chrome-arg` (in which case root is not what stopped Chrome).
+ *
+ * Exported for testing.
+ */
+export function rootSandboxLaunchError(
+  error: Error,
+  args: readonly string[],
+  uid = process.getuid?.(),
+): Error | undefined {
+  if (uid !== 0) {
+    return undefined;
+  }
+  if (
+    args.some(arg => arg === '--no-sandbox' || arg.startsWith('--no-sandbox='))
+  ) {
+    return undefined;
+  }
+  return new Error(
+    `Chrome failed to start: ${error.message}\n\n` +
+      'chrome-devtools-mcp is running as root and Chrome does not start as root ' +
+      '(https://crbug.com/638180). Run chrome-devtools-mcp as a non-root user; in a ' +
+      'container, create an unprivileged user in the image and switch to it with ' +
+      "USER. For the setup that Chrome's sandbox needs, see " +
+      'https://pptr.dev/troubleshooting#setting-up-chrome-linux-sandbox.',
+    {
+      cause: error,
+    },
+  );
+}
+
 export async function launch(options: McpLaunchOptions): Promise<Browser> {
   const {channel, executablePath, headless, isolated} = options;
   const profileDirName =
@@ -258,6 +297,10 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
           cause: error,
         },
       );
+    }
+    const rootError = rootSandboxLaunchError(error as Error, args);
+    if (rootError) {
+      throw rootError;
     }
     throw error;
   }
