@@ -35,6 +35,7 @@ import type {
   TextSnapshotNode,
   GeolocationOptions,
   ExtensionServiceWorker,
+  CD4ACommentThread,
 } from '../types.js';
 import type {PaginationOptions} from '../types.js';
 import type {
@@ -194,6 +195,7 @@ export interface Response {
   setListThirdPartyDeveloperTools(): void;
   setListWebMcpTools(): void;
   attachWaitForResult(result: WaitForEventsResult): void;
+  setDevToolsComments(threads: CD4ACommentThread[]): void;
 }
 
 export type SupportedExtensions =
@@ -322,6 +324,8 @@ export type Context = Readonly<{
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
 
+export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
+
 /**
  * Only add methods used by tools/*.
  */
@@ -336,6 +340,11 @@ export type ContextPage = Readonly<{
    * Returns a reqid for a cdpRequestId.
    */
   resolveCdpRequestId(cdpRequestId: string): number | undefined;
+  resolveReqidToCdpRequestId(reqid: number): string | undefined;
+  resolveBackendNodeId(backendNodeId: number): Promise<string | undefined>;
+  resolveUidToBackendNodeId(
+    uid: string,
+  ): Promise<{backendNodeId: number; targetId?: string} | undefined>;
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;
@@ -367,6 +376,8 @@ export type ContextPage = Readonly<{
     viewport?: Viewport;
   }): Promise<void>;
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  getDevToolsPage(): Promise<Page | undefined>;
+  openDevTools(): Promise<Page | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

@@ -7,8 +7,6 @@
 import {DevTools} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 
-const engine = DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
-
 export interface TraceResult {
   parsedTrace: DevTools.TraceEngine.TraceModel.ParsedTrace;
   insights: DevTools.TraceEngine.Insights.Types.TraceInsightSets | null;
@@ -24,6 +22,17 @@ export interface TraceParseError {
   error: string;
 }
 
+/**
+ * Parses raw JSON trace buffer bytes into a DevTools TraceEngine representation.
+ *
+ * Accepts either a JSON array of trace events or an object with a `traceEvents` field.
+ * A new trace engine model is created per call to ensure session isolation and prevent
+ * memory retention.
+ *
+ * @param buffer Raw UTF-8 encoded JSON bytes representing trace data.
+ * @param metadata Optional throttling configurations applied during recording.
+ * @returns A {@link TraceResult} with parsed traces and insights, or a {@link TraceParseError} on failure.
+ */
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
   metadata?: {
@@ -31,7 +40,6 @@ export async function parseRawTraceBuffer(
     networkThrottling?: string;
   },
 ): Promise<TraceResult | TraceParseError> {
-  engine.resetProcessor();
   if (!buffer) {
     return {
       error: 'No buffer was provided.',
@@ -51,6 +59,11 @@ export async function parseRawTraceBuffer(
       | DevTools.TraceEngine.Types.Events.Event[];
 
     const events = Array.isArray(data) ? data : data.traceEvents;
+    // Instantiate a fresh TraceModel per invocation because Model permanently
+    // retains parsed traces in its internal `#traces` array, which causes an
+    // unbounded memory leak if reused across sessions.
+    const engine =
+      DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
     await engine.parse(events, {metadata});
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
@@ -59,7 +72,7 @@ export async function parseRawTraceBuffer(
       };
     }
 
-    const insights = parsedTrace?.insights ?? null;
+    const insights = parsedTrace.insights ?? null;
 
     return {
       parsedTrace,
