@@ -219,6 +219,18 @@ const DISABLE_NETWORK = {
   },
 };
 
+export type RemoteObjectLike =
+  | Protocol.Runtime.RemoteObject
+  | DevTools.Protocol.Runtime.RemoteObject;
+
+export type ExceptionDetailsLike =
+  | Protocol.Runtime.ExceptionDetails
+  | DevTools.Protocol.Runtime.ExceptionDetails;
+
+export type StackTraceLike =
+  | Protocol.Runtime.StackTrace
+  | DevTools.Protocol.Runtime.StackTrace;
+
 /**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
  *
@@ -243,7 +255,7 @@ export class SymbolizedError {
 
   static async fromDetails(opts: {
     devTools?: TargetUniverse;
-    details: Protocol.Runtime.ExceptionDetails;
+    details: ExceptionDetailsLike;
     targetId: string;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
@@ -301,7 +313,7 @@ export class SymbolizedError {
 
   static async fromError(opts: {
     devTools?: TargetUniverse;
-    error: Protocol.Runtime.RemoteObject;
+    error: RemoteObjectLike;
     targetId: string;
   }): Promise<SymbolizedError> {
     const details = await SymbolizedError.#getExceptionDetails(
@@ -323,7 +335,7 @@ export class SymbolizedError {
     );
   }
 
-  static #getMessage(details: Protocol.Runtime.ExceptionDetails): string {
+  static #getMessage(details: ExceptionDetailsLike): string {
     // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
     // we have to manually parse out the error text from the exception description.
     // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
@@ -337,7 +349,7 @@ export class SymbolizedError {
   }
 
   static #getMessageFromException(
-    error: Protocol.Runtime.RemoteObject,
+    error: RemoteObjectLike,
   ): string {
     const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
     return messageWithRest[0] ?? '';
@@ -345,9 +357,9 @@ export class SymbolizedError {
 
   static async #getExceptionDetails(
     devTools: TargetUniverse | undefined,
-    error: Protocol.Runtime.RemoteObject,
+    error: RemoteObjectLike,
     targetId: string,
-  ): Promise<Protocol.Runtime.ExceptionDetails | null> {
+  ): Promise<DevTools.Protocol.Runtime.ExceptionDetails | null> {
     if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
       return null;
     }
@@ -366,9 +378,9 @@ export class SymbolizedError {
 
   static async #lookupCause(
     devTools: TargetUniverse | undefined,
-    error: Protocol.Runtime.RemoteObject,
+    error: RemoteObjectLike,
     targetId: string,
-  ): Promise<Protocol.Runtime.RemoteObject | null> {
+  ): Promise<DevTools.Protocol.Runtime.RemoteObject | null> {
     if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
       return null;
     }
@@ -414,7 +426,7 @@ export async function createStackTraceForConsoleMessage(
 
 export async function createStackTrace(
   devTools: TargetUniverse,
-  rawStackTrace: Protocol.Runtime.StackTrace,
+  rawStackTrace: StackTraceLike,
   targetId: string | undefined,
 ): Promise<DevTools.StackTrace.StackTrace.StackTrace> {
   const targetManager = devTools.universe.context.get(DevTools.TargetManager);
@@ -428,12 +440,12 @@ export async function createStackTrace(
   // work in the MCP case, so we'll collect all script IDs upfront and wait for any pending source map
   // loads before creating the stack trace. We might also have to wait for Debugger.ScriptParsed events if
   // the stack trace is created particularly early.
-  const scriptIds = new Set<Protocol.Runtime.ScriptId>();
+  const scriptIds = new Set<string>();
   for (const frame of rawStackTrace.callFrames) {
     scriptIds.add(frame.scriptId);
   }
   for (
-    let asyncStack = rawStackTrace.parent;
+    let asyncStack: StackTraceLike | undefined = rawStackTrace.parent;
     asyncStack;
     asyncStack = asyncStack.parent
   ) {
@@ -468,7 +480,7 @@ export async function createStackTrace(
 // Waits indefinitely for the script so pair it with Promise.race.
 async function waitForScript(
   model: DevTools.DebuggerModel,
-  scriptId: Protocol.Runtime.ScriptId,
+  scriptId: string,
   signal: AbortSignal,
 ) {
   while (true) {
