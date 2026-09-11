@@ -79,15 +79,18 @@ import {
   generateReport as generateReportImpl,
 } from './lighthouse-devtools-mcp-bundle.js';
 
-export const snapshot = snapshotImpl as (
-  page: Page,
-  options: {flags?: Flags},
-) => Promise<RunnerResult>;
-export const navigation = navigationImpl as (
-  page: Page,
-  url: string,
-  options: {flags?: Flags},
-) => Promise<RunnerResult>;
+export const lighthouseRunner = {
+  snapshot: snapshotImpl as (
+    page: Page,
+    options: {flags?: Flags},
+  ) => Promise<RunnerResult>,
+  navigation: navigationImpl as (
+    page: Page,
+    url: string,
+    options: {flags?: Flags},
+  ) => Promise<RunnerResult>,
+};
+
 export const generateReport = generateReportImpl as (
   lhr: Result,
   format: string,
