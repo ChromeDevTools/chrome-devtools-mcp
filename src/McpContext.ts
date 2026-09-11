@@ -58,6 +58,8 @@ interface McpContextOptions {
   experimentalIncludeAllPages?: boolean;
   // Whether CrUX data should be fetched.
   performanceCrux: boolean;
+  // Whether source maps are enabled in DevTools.
+  sourceMaps?: boolean;
   // The allow list of URL patterns to allow loading resources.
   allowList?: string[];
   // The block list of URL patterns to block loading resources.
@@ -73,6 +75,8 @@ interface McpContextOptions {
   navigationTimeout?: number;
   // Whether extension tools and targets are enabled.
   categoryExtensions?: boolean;
+  // Callback when a notification should be emitted to MCP client.
+  onNotification?: (message: string) => void;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -567,6 +571,8 @@ export class McpContext implements Context {
           page.browserContext(),
         ),
         navigationTimeout: this.#options.navigationTimeout,
+        sourceMaps: this.#options.sourceMaps,
+        onNotification: this.#options.onNotification,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();

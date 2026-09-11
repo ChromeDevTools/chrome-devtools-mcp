@@ -1,0 +1,55 @@
+exports[`comments tools > get_devtools_comments > omits target element and network request ID if resolution returns undefined 1`] = `
+Found 1 DevTools comment thread(s):
+
+### Thread: comment-2
+- Comment: Fix heading font size
+`;
+
+exports[`comments tools > get_devtools_comments > formats comment threads with text, targets, and editor location 1`] = `
+Found 1 DevTools comment thread(s):
+
+### Thread: comment-1
+- Comment: Fix the color contrast here
+- Target element (snapshot UID): element-uid-42
+- Network request ID (reqid): 7
+- Editor location: src/style.css:10
+`;
+
+exports[`comments tools > get_devtools_comments > reports error when DevTools window is not open 1`] = `
+DevTools window is not open for this page. Call open_devtools first to open DevTools.
+`;
+
+exports[`comments tools > get_devtools_comments > reports message when no comments are found 1`] = `
+No open DevTools comments found.
+`;
+
+exports[`comments tools > resolve_devtools_comment > reports error when DevTools window is not open 1`] = `
+DevTools window is not open for this page. Call open_devtools first to open DevTools.
+`;
+
+exports[`comments tools > resolve_devtools_comment > reports error when thread is not found 1`] = `
+Failed to resolve comment thread "comment-nonexistent". Thread not found.
+`;
+
+exports[`comments tools > resolve_devtools_comment > resolves comment thread and appends reply text 1`] = `
+Comment thread comment-1 resolved successfully.
+Agent reply added: "Updated background color in index.css"
+`;
+
+exports[`comments tools > reveal_in_devtools > reports error when DevTools window is not open 1`] = `
+DevTools window is not open for this page. Call open_devtools first to open DevTools.
+`;
+
+exports[`comments tools > reveal_in_devtools > reveals element by snapshot uid 1`] = `
+Navigated to elements panel (revealing element uid-header [backend node 101]) in DevTools.
+`;
+
+exports[`comments tools > reveal_in_devtools > reveals network request by reqid 1`] = `
+Navigated to network panel (revealing network request 5 [cdp-req-123]) in DevTools.
+`;
+
+exports[`comments tools > reveal_in_devtools > warns when snapshot uid or reqid cannot be resolved 1`] = `
+Warning: Could not resolve snapshot UID "unknown-uid" to a backend DOM node ID.
+Warning: Could not resolve network request ID 999 to a CDP request ID.
+Navigated to elements panel in DevTools.
+`;

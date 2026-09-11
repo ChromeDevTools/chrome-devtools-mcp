@@ -437,5 +437,25 @@
   {
     "name": "category_memory",
     "flagType": "boolean"
+  },
+  {
+    "name": "source_maps_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "source_maps",
+    "flagType": "boolean"
+  },
+  {
+    "name": "config_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "devtools_comments_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "devtools_comments",
+    "flagType": "boolean"
   }
 ]

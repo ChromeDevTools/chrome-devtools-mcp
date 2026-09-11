@@ -3,8 +3,10 @@ CHANGELOG.md
 src/third_party/lighthouse-devtools-mcp-bundle.js
 third_party/devtools-frontend
 
-# Release-please formatting brakes CI checks
+# Release-please formatting breaks CI checks
 .claude-plugin/plugin.json
 .cursor-plugin/plugin.json
 .github/plugin/plugin.json
 gemini-extension.json
+mcp.json
+plugin.json

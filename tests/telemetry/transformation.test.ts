@@ -8,9 +8,11 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
+  bucketizeDaysSince,
   bucketizeLatency,
   buildContext,
   getEnumValues,
+  MAX_ACTIVE_DAYS,
   sanitizeParams,
   stripUnderscoreBeforeNumber,
   transformArgName,
@@ -78,6 +80,28 @@ describe('bucketizeLatency', () => {
 
     assert.strictEqual(bucketizeLatency(10001), 10000);
     assert.strictEqual(bucketizeLatency(99999), 10000);
+  });
+});
+
+describe('bucketizeDaysSince', () => {
+  it('should bucketize days correctly', () => {
+    const testCases = [
+      {input: -1, expected: -1},
+      {input: 0, expected: 0},
+      {input: 1, expected: 1},
+      {input: 7, expected: 7},
+      {input: 14, expected: 14},
+      {input: 30, expected: 30},
+      {input: 31, expected: 31},
+      {input: MAX_ACTIVE_DAYS, expected: 31},
+      {input: 32, expected: 31},
+      {input: 45, expected: 31},
+      {input: 100, expected: 31},
+    ];
+
+    for (const {input, expected} of testCases) {
+      assert.strictEqual(bucketizeDaysSince(input), expected);
+    }
   });
 });
 
