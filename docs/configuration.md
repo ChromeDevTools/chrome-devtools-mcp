@@ -55,10 +55,18 @@ npx -y chrome-devtools-mcp@latest
 Server URL mode takes precedence over HTTP mode, which takes precedence over
 the existing stdio mode. The proxy owns no browser and forwards JSON-RPC
 transparently, including roots requests and notifications.
-`chrome-devtools-axi` versions with shared-server support forward
-`CHROME_DEVTOOLS_AXI_MCP_SERVER_URL` to the spawned MCP proxy. Each named AXI
-bridge then receives a separate remote MCP context; see the AXI recipe in
-[advanced usage](./advanced-usage.md#chrome-devtools-axi).
+AXI can use this shared endpoint in either of two ways. With
+`CHROME_DEVTOOLS_AXI_MCP_SERVER_URL` nonblank and
+`CHROME_DEVTOOLS_AXI_MCP_PATH` absent or blank, AXI connects directly over
+Streamable HTTP (the recommended mode). Each named AXI bridge creates its own
+HTTP transport, MCP session, and `McpContext`, while the shared service is the
+only MCP process; no local MCP build is required. If the shared URL is
+nonblank and `CHROME_DEVTOOLS_AXI_MCP_PATH` is also nonblank, AXI uses the
+compatibility stdio proxy path: it checks the selected executable's `--help`
+for `--serverUrl` and spawns that executable with only
+`--server-url=<URL>`. Each named bridge still receives a separate remote MCP
+session/context. The generic stdio proxy above remains available for non-AXI
+clients; see the AXI recipe in [advanced usage](./advanced-usage.md#chrome-devtools-axi).
 
 The service is loopback-only and rejects non-loopback `Host` or `Origin`
 values. Remote clients must use SSH port forwarding, for example:

@@ -157,24 +157,50 @@ original stdio client's identity and creates one remote MCP session for that
 client. In proxy mode, AXI-injected local Chrome launch or attach flags are
 ignored because the proxy owns no browser.
 
-### chrome-devtools-axi
+### `chrome-devtools-axi`
 
 Use a `chrome-devtools-axi` version that supports
-`CHROME_DEVTOOLS_AXI_MCP_SERVER_URL`. Each named AXI bridge starts its own MCP
-stdio proxy, so it receives a separate remote MCP context while all bridges
-use the one shared Chrome:
+`CHROME_DEVTOOLS_AXI_MCP_SERVER_URL`. AXI has two deterministic ways to reach
+the shared service. In both modes, one shared `chrome-devtools-mcp` HTTP
+service owns the browser, while each named AXI bridge receives its own remote
+MCP session and context (selected page, roots, isolated contexts, and tool
+state).
+
+**Recommended: direct Streamable HTTP (URL only)**
+
+Set `CHROME_DEVTOOLS_AXI_MCP_SERVER_URL` and leave
+`CHROME_DEVTOOLS_AXI_MCP_PATH` unset or blank:
 
 ```bash
-# In this checkout, build the MCP proxy entrypoint.
-npm run build
-
 # In another terminal, start one shared service (choose any startup mode above).
 npx -y chrome-devtools-mcp@latest \
   --http-port=9333 \
   --headless=true \
   --isolated=true
 
-# In each AXI shell, point at this unreleased MCP build and the shared service.
+# In each AXI shell, use the shared endpoint. No local MCP build is required.
+export CHROME_DEVTOOLS_AXI_MCP_SERVER_URL="http://127.0.0.1:9333/mcp"
+unset CHROME_DEVTOOLS_AXI_MCP_PATH
+
+CHROME_DEVTOOLS_AXI_SESSION=agent-a npx -y chrome-devtools-axi pages
+CHROME_DEVTOOLS_AXI_SESSION=agent-b npx -y chrome-devtools-axi pages
+```
+
+With no nonblank `CHROME_DEVTOOLS_AXI_MCP_PATH`, each AXI bridge constructs its
+own Streamable HTTP transport to the shared URL. This arrangement runs exactly
+one MCP process: the shared HTTP service. The bridges still have separate MCP
+sessions and contexts even though they share the browser and its pages.
+
+**Compatibility and local testing: stdio proxy (URL + MCP_PATH)**
+
+Set both variables only when you intentionally need the verified stdio proxy
+path, such as testing a local MCP build:
+
+```bash
+# Run this in the MCP checkout only when using an unreleased local executable.
+cd /path/to/chrome-devtools-mcp
+npm run build
+
 export CHROME_DEVTOOLS_AXI_MCP_PATH="/path/to/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js"
 export CHROME_DEVTOOLS_AXI_MCP_SERVER_URL="http://127.0.0.1:9333/mcp"
 
@@ -182,16 +208,18 @@ CHROME_DEVTOOLS_AXI_SESSION=agent-a npx -y chrome-devtools-axi pages
 CHROME_DEVTOOLS_AXI_SESSION=agent-b npx -y chrome-devtools-axi pages
 ```
 
-`CHROME_DEVTOOLS_AXI_MCP_PATH` is needed only to test an unreleased MCP build;
-AXI otherwise resolves the installed or latest MCP package normally. AXI
-forwards `CHROME_DEVTOOLS_AXI_MCP_SERVER_URL` to the spawned MCP command as
-`CHROME_DEVTOOLS_MCP_SERVER_URL`, which selects stdio proxy mode. Each named
-AXI bridge therefore gets its own selected page, roots, and tool state while
-the remote service owns the one Chrome connection.
+When the shared URL and a nonblank `CHROME_DEVTOOLS_AXI_MCP_PATH` are set, AXI
+checks that executable's `--help` output for `--serverUrl`, then spawns only
+that executable with `--server-url=<URL>`. This is the compatibility stdio
+proxy path; each named bridge still gets a separate remote MCP session and
+context. The proxy owns no browser, so configure headless, headed, automatic
+connection, or `--browser-url` options on the shared HTTP service, not in AXI.
 
-Do not set AXI's local browser-launch or browser-attach variables for this
-arrangement. If they are injected, the MCP `--server-url` mode still wins and
-the proxy does not create another browser.
+If the shared URL is absent or blank, AXI keeps its existing standalone stdio
+behavior. Do not set AXI's local browser-launch or browser-attach variables for
+either shared arrangement. For a service reached through an SSH tunnel,
+filesystem artifacts and paths returned by MCP tools remain on the MCP host;
+the tunnel transports MCP traffic but does not copy those files.
 
 > [!WARNING]
 > AXI clients can control the same Chrome pages through the shared endpoint.
