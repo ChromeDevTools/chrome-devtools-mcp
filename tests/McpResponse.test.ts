@@ -14,8 +14,9 @@ import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
 import type {McpContext} from '../src/McpContext.js';
-import type {McpResponse} from '../src/McpResponse.js';
-import type {Extension} from '../src/third_party/index.js';
+import {McpResponse} from '../src/McpResponse.js';
+import {DevTools, type Extension} from '../src/third_party/index.js';
+import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
   listPages,
@@ -32,10 +33,20 @@ import {
 import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
+  createMockAggregatedInfo,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
   createMockCSSStyleRule,
+  createMockClassDiffs,
+  createMockDetailedClassDiff,
+  createMockHeapSnapshotEdge,
+  createMockHeapSnapshotNode,
+  createMockHeapSnapshotStats,
+  createMockHeapSnapshotStaticData,
+  createMockMcpContext,
+  createMockObjectInfo,
+  createMockParsedArguments,
 } from './mocks.js';
 import {
   getImageContent,
@@ -1189,5 +1200,340 @@ describe('webmcp', () => {
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-2 of 5'));
     });
+  });
+});
+
+describe('McpResponse heap snapshot formatting', () => {
+  DevTools.I18n.DevToolsLocale.DevToolsLocale.instance({
+    create: true,
+    data: {
+      navigatorLanguage: 'en-US',
+      settingLanguage: 'en-US',
+      lookupClosestDevToolsLocale: l => l,
+    },
+  });
+  DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
+
+  it('formats stats, staticData, nativeContextSizes, and retainedByContextSummary', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const stats = createMockHeapSnapshotStats();
+    const staticData = createMockHeapSnapshotStaticData();
+    const nativeContextSizes = {
+      nativeContexts: [
+        {
+          nodeId: 10,
+          nodeIndex: 1,
+          nodeName: 'system / NativeContext',
+          attributedSize: 500,
+          retainedSize: 1000,
+          selfSize: 100,
+        },
+      ],
+      sharedSize: 300,
+      noAttributionSize: 400,
+    };
+    const retainedByContextSummary = {
+      contextCount: 2,
+      retainedByContextSize: 5000,
+      retainedByContextCount: 10,
+      notRetainedByContextSize: 1000,
+      notRetainedByContextCount: 5,
+      totalSize: 6000,
+    };
+    response.setHeapSnapshotStats(
+      stats,
+      staticData,
+      nativeContextSizes,
+      retainedByContextSummary,
+    );
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('## Heap Snapshot Data'));
+    assert.ok(text.includes('Statistics: '));
+    assert.ok(text.includes('Static Data: '));
+    assert.ok(text.includes('### Native Contexts'));
+    assert.ok(text.includes('system / NativeContext'));
+    assert.ok(text.includes('### Retained by Context Summary'));
+    assert.ok(text.includes('Context count: 2'));
+    assert.ok(text.includes('Total size: '));
+
+    const heapData: unknown = Reflect.get(structuredContent, 'heapSnapshot');
+    assert.ok(heapData && typeof heapData === 'object');
+    assert.deepStrictEqual(Reflect.get(heapData, 'stats'), stats);
+    assert.deepStrictEqual(Reflect.get(heapData, 'staticData'), staticData);
+    assert.deepStrictEqual(
+      Reflect.get(heapData, 'nativeContextSizes'),
+      nativeContextSizes,
+    );
+    assert.deepStrictEqual(
+      Reflect.get(heapData, 'retainedByContextSummary'),
+      retainedByContextSummary,
+    );
+  });
+
+  it('formats aggregate data with shallow size and pagination summaries', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const aggregates = {
+      aggregates: {
+        ObjectA: createMockAggregatedInfo({
+          name: 'ObjectA',
+          count: 10,
+          self: 100,
+          maxRet: 1000,
+          distance: 1,
+          idxs: [],
+          [stableIdSymbol]: 1,
+        }),
+        ObjectB: createMockAggregatedInfo({
+          name: 'ObjectB',
+          count: 5,
+          self: 50,
+          maxRet: 500,
+          distance: 2,
+          idxs: [],
+          [stableIdSymbol]: 2,
+        }),
+      },
+      objectCount: 15,
+      totalSelfSize: 150,
+    };
+
+    response.setHeapSnapshotAggregates(aggregates, {
+      pageSize: 1,
+      pageIdx: 0,
+    });
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('## Heap Snapshot Data'));
+    assert.ok(text.includes('Objects: 15'));
+    assert.ok(text.includes('Total shallow size: '));
+    assert.ok(text.includes('Showing 1-1 of 2 (Page 1 of 2).'));
+    assert.ok(text.includes('Next page: 1'));
+    assert.ok(text.includes('ObjectA'));
+    assert.ok(!text.includes('ObjectB'));
+
+    const heapData: unknown = Reflect.get(structuredContent, 'heapSnapshot');
+    assert.ok(heapData && typeof heapData === 'object');
+    assert.deepStrictEqual(Reflect.get(heapData, 'aggregateStats'), {
+      objectCount: 15,
+      totalSelfSize: 150,
+    });
+  });
+
+  it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const nodeSmall = createMockHeapSnapshotNode({
+      id: 1,
+      name: 'SmallNode',
+      retainedSize: 100,
+    });
+    const nodeLarge = createMockHeapSnapshotNode({
+      id: 2,
+      name: 'LargeNode',
+      retainedSize: 500,
+    });
+    const nodeMedium = createMockHeapSnapshotNode({
+      id: 3,
+      name: 'MediumNode',
+      retainedSize: 200,
+    });
+
+    const itemsRange =
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(0, 3, 3, [
+        nodeSmall,
+        nodeLarge,
+        nodeMedium,
+      ]);
+
+    response.setHeapSnapshotNodes(itemsRange, {
+      pageSize: 2,
+      pageIdx: 0,
+    });
+
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('Showing 1-2 of 3 (Page 1 of 2).'));
+    assert.ok(text.includes('Next page: 1'));
+
+    const largeIndex = text.indexOf('LargeNode');
+    const mediumIndex = text.indexOf('MediumNode');
+    assert.ok(largeIndex !== -1, 'LargeNode should be present');
+    assert.ok(mediumIndex !== -1, 'MediumNode should be present');
+    assert.ok(
+      largeIndex < mediumIndex,
+      'LargeNode should precede MediumNode due to descending retainedSize sorting',
+    );
+    assert.ok(
+      !text.includes('SmallNode'),
+      'SmallNode should be on page 1, not page 0',
+    );
+  });
+
+  it('formats edge nodes correctly', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const edge = createMockHeapSnapshotEdge({
+      name: 'myProp',
+      type: 'property',
+      node: createMockHeapSnapshotNode({id: 42, name: 'TargetNode'}),
+    });
+
+    const itemsRange =
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(0, 1, 1, [
+        edge,
+      ]);
+
+    response.setHeapSnapshotNodes(itemsRange);
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('name,type,nodeId,nodeName,selfSize,retainedSize'));
+    assert.ok(text.includes('myProp,property,42,TargetNode'));
+  });
+
+  it('formats retaining paths with truncation note when limits are reached', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const retainingPaths = {
+      paths: [
+        {
+          edgeIndex: 0,
+          edgeName: 'ref',
+          edgeType: 'property',
+          nodeId: 10,
+          nodeIndex: 1,
+          nodeName: 'ParentClass',
+          distance: 1,
+          children: [],
+        },
+      ],
+      limitsReached: {
+        depth: true,
+        nodes: false,
+        siblings: false,
+      },
+    };
+
+    response.setHeapSnapshotRetainingPaths(retainingPaths);
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Retaining Paths'));
+    assert.ok(
+      text.includes('<- @10 ParentClass via property ref (distance: 1)'),
+    );
+    assert.ok(
+      text.includes(
+        'Note: results are truncated, the following limits were reached: depth.',
+      ),
+    );
+  });
+
+  it('formats empty retaining paths with no paths message', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    response.setHeapSnapshotRetainingPaths({
+      paths: [],
+      limitsReached: {depth: false, nodes: false, siblings: false},
+    });
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Retaining Paths'));
+    assert.ok(text.includes('No retaining paths found.'));
+  });
+
+  it('formats dominator chain and handles empty dominators', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const dominators = [
+      {
+        nodeId: 10,
+        nodeIndex: 1,
+        nodeName: 'DomClass',
+        retainedSize: 1000,
+        selfSize: 100,
+      },
+    ];
+
+    response.setHeapSnapshotDominators(dominators);
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Dominator Chain'));
+    assert.ok(text.includes('10,DomClass'));
+
+    const emptyResponse = new McpResponse(createMockParsedArguments());
+    emptyResponse.setHeapSnapshotDominators([]);
+    const emptyResult = await emptyResponse.handle(context);
+    const emptyText = getTextContent(emptyResult.content[0]);
+    assert.ok(emptyText.includes('### Dominator Chain'));
+    assert.ok(emptyText.includes('No dominators found.'));
+  });
+
+  it('formats class diff summary and detailed diff headers', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const diffs = createMockClassDiffs();
+    response.setHeapSnapshotClassDiffs(diffs);
+
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Heap Snapshot Diff'));
+    assert.ok(text.includes('TestClass'));
+
+    const detailedResponse = new McpResponse(createMockParsedArguments());
+    const detailedDiff = createMockDetailedClassDiff();
+    detailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff);
+
+    const detailedResult = await detailedResponse.handle(context);
+    const detailedText = getTextContent(detailedResult.content[0]);
+    assert.ok(detailedText.includes('### Heap Snapshot Detailed Diff'));
+    assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
+  });
+
+  it('formats duplicate strings with pagination and object details', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const duplicateStrings = [
+      {
+        value: 'duplicated-string-value',
+        count: 5,
+        totalSelfSize: 100,
+        totalRetainedSize: 500,
+        nodes: [
+          {id: 10, selfSize: 50, retainedSize: 250, distance: 1},
+          {id: 20, selfSize: 50, retainedSize: 250, distance: 2},
+        ],
+      },
+    ];
+    response.setHeapSnapshotDuplicateStrings(duplicateStrings, {
+      pageSize: 1,
+      pageIdx: 0,
+    });
+
+    const context = createMockMcpContext();
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Duplicate Strings'));
+    assert.ok(text.includes('duplicated-string-value'));
+    assert.ok(text.includes('Showing 1-1 of 1 (Page 1 of 1).'));
+
+    const objectInfoResponse = new McpResponse(createMockParsedArguments());
+    const objectInfo = createMockObjectInfo();
+    objectInfoResponse.setHeapSnapshotObjectDetails(objectInfo);
+
+    const objectResult = await objectInfoResponse.handle(context);
+    const objectText = getTextContent(objectResult.content[0]);
+    assert.ok(objectText.includes('### Object Details'));
+    assert.ok(objectText.includes('id: @1'));
+    assert.ok(objectText.includes('name: Object'));
   });
 });
