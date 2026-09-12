@@ -457,5 +457,13 @@
   {
     "name": "devtools_comments",
     "flagType": "boolean"
+  },
+  {
+    "name": "default_background_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "default_background",
+    "flagType": "boolean"
   }
 ]

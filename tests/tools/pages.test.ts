@@ -383,6 +383,22 @@ describe('pages', () => {
         );
       });
     });
+    it('uses the configured background default', async () => {
+      await withMcpContext(async (response, context) => {
+        const args = parseArguments(
+          '1.0.0',
+          ['node', 'script.js', '--default-background'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        );
+        const newPageSpy = sinon.spy(context, 'newPage');
+        await newPage(args).handler(
+          {params: {url: 'data:text/html,<html></html>'}},
+          response,
+          context,
+        );
+        sinon.assert.calledWith(newPageSpy, true, undefined);
+      });
+    });
     it('create a page in the background', async () => {
       await withMcpContext(async (response, context) => {
         const originalPage = context.getPageById(1);

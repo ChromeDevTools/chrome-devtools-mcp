@@ -110,6 +110,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--defaultBackground`/ `--default-background`**
+  Open new pages in the background by default.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--pageIdRouting`/ `--page-id-routing`**
   Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.
   - **Type:** boolean

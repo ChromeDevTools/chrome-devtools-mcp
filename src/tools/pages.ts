@@ -111,7 +111,7 @@ export const newPage = defineTool(args => {
         .boolean()
         .optional()
         .describe(
-          'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+          'Whether to open the page in the background without bringing it to the front. Defaults to the server defaultBackground setting.',
         ),
       isolatedContext: zod
         .string()
@@ -132,7 +132,7 @@ export const newPage = defineTool(args => {
       });
 
       const page = await context.newPage(
-        request.params.background,
+        request.params.background ?? args?.defaultBackground,
         request.params.isolatedContext,
       );
 

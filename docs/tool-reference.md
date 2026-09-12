@@ -243,7 +243,7 @@
 **Parameters:**
 
 - **url** (string) **(required)**: URL to load in a new page.
-- **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Default is false (foreground).
+- **background** (boolean) _(optional)_: Whether to open the page in the background without bringing it to the front. Defaults to the server defaultBackground setting.
 - **isolatedContext** (string) _(optional)_: If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated (useful for clean-slate testing of cookies and authentication).
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 

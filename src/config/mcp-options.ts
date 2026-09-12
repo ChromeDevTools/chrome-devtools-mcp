@@ -44,6 +44,11 @@ export const mcpOptions = {
     type: 'boolean',
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
+  defaultBackground: {
+    type: 'boolean',
+    default: false,
+    describe: 'Open new pages in the background by default.',
+  },
   pageIdRouting: {
     type: 'boolean',
     describe:
