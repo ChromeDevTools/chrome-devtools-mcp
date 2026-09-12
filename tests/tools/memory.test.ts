@@ -73,6 +73,31 @@ describe('memory', () => {
         }
       });
     });
+
+    it('delegates to ensureExtension, captureHeapSnapshot, and appends response line', async () => {
+      const {page, context, response} = createHandlerMocks();
+      context.ensureExtension.resolves('/canonical/test.heapsnapshot');
+      page.pptrPage.captureHeapSnapshot.resolves();
+
+      await takeHeapSnapshot.handler(
+        {params: {filePath: 'test.heapsnapshot'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        context.ensureExtension,
+        'test.heapsnapshot',
+        '.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(page.pptrPage.captureHeapSnapshot, {
+        path: '/canonical/test.heapsnapshot',
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Heap snapshot saved to /canonical/test.heapsnapshot',
+      );
+    });
   });
 
   describe('get_heapsnapshot_summary', () => {
@@ -240,7 +265,30 @@ describe('memory', () => {
   });
 
   describe('get_heapsnapshot_retainers', () => {
-    it('with valid nodeId and pagination', async () => {
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const retainers = createMockItemsRange();
+      context.getHeapSnapshotRetainers.resolves(retainers);
+
+      await getHeapSnapshotRetainers.handler(
+        {params: {filePath: 'test.heapsnapshot', nodeId: 25341}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotRetainers,
+        'test.heapsnapshot',
+        25341,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotNodes,
+        retainers,
+        {pageIdx: undefined, pageSize: undefined},
+      );
+    });
+
+    it('with pagination', async () => {
       const {context, response} = createHandlerMocks();
       const retainers = createMockItemsRange();
       context.getHeapSnapshotRetainers.resolves(retainers);
@@ -335,7 +383,32 @@ describe('memory', () => {
   });
 
   describe('get_heapsnapshot_retaining_paths', () => {
-    it('with valid nodeId and search limits', async () => {
+    it('with default options', async () => {
+      const {context, response} = createHandlerMocks();
+      const retainingPaths = createMockRetainingPaths();
+      context.getHeapSnapshotRetainingPaths.resolves(retainingPaths);
+
+      await getHeapSnapshotRetainingPaths.handler(
+        {params: {filePath: 'test.heapsnapshot', nodeId: 45901}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotRetainingPaths,
+        'test.heapsnapshot',
+        45901,
+        undefined,
+        undefined,
+        undefined,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotRetainingPaths,
+        retainingPaths,
+      );
+    });
+
+    it('with search limits', async () => {
       const {context, response} = createHandlerMocks();
       const retainingPaths = createMockRetainingPaths();
       context.getHeapSnapshotRetainingPaths.resolves(retainingPaths);
@@ -537,6 +610,34 @@ describe('memory', () => {
         response.setHeapSnapshotDuplicateStrings,
         duplicateStrings,
         {pageIdx: undefined, pageSize: undefined},
+      );
+    });
+
+    it('with pagination', async () => {
+      const {context, response} = createHandlerMocks();
+      const duplicateStrings = createMockDuplicateStrings();
+      context.getHeapSnapshotDuplicateStrings.resolves(duplicateStrings);
+
+      await getHeapSnapshotDuplicateStrings.handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            pageIdx: 2,
+            pageSize: 10,
+          },
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        context.getHeapSnapshotDuplicateStrings,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotDuplicateStrings,
+        duplicateStrings,
+        {pageIdx: 2, pageSize: 10},
       );
     });
   });

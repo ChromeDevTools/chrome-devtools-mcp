@@ -25,15 +25,18 @@
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
+import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
 import type {
+  AggregatedInfoWithId,
   DuplicateStringGroup,
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
 } from '../src/processors/HeapSnapshotManager.js';
+import {stableIdSymbol} from '../src/utils/id.js';
 import {
   CdpExtension,
   CdpFrame,
@@ -808,5 +811,56 @@ export function createMockObjectInfo(): DevTools.HeapSnapshotModel.HeapSnapshotM
     retainerCount: 1,
     detachedness:
       DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.ATTACHED,
+  };
+}
+
+export function createMockParsedArguments(
+  options: Partial<ParsedArguments> = {},
+): ParsedArguments {
+  const defaultArgs = parser('0.0.0', ['node', 'main.js']).parseSync();
+  return {...defaultArgs, ...options};
+}
+
+export function createMockHeapSnapshotNode(
+  options: Partial<DevTools.HeapSnapshotModel.HeapSnapshotModel.Node> = {},
+): DevTools.HeapSnapshotModel.HeapSnapshotModel.Node {
+  return {
+    id: options.id ?? 1,
+    name: options.name ?? 'Node',
+    distance: options.distance ?? 1,
+    nodeIndex: options.nodeIndex ?? 0,
+    retainedSize: options.retainedSize ?? 100,
+    selfSize: options.selfSize ?? 10,
+    type: options.type ?? 'object',
+    canBeQueried: options.canBeQueried ?? false,
+    detachedDOMTreeNode: options.detachedDOMTreeNode ?? false,
+    ignored: options.ignored ?? false,
+    isAddedNotRemoved: options.isAddedNotRemoved ?? null,
+  };
+}
+
+export function createMockHeapSnapshotEdge(
+  options: Partial<DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge> = {},
+): DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge {
+  return {
+    name: options.name ?? 'edge',
+    type: options.type ?? 'property',
+    edgeIndex: options.edgeIndex ?? 0,
+    isAddedNotRemoved: options.isAddedNotRemoved ?? null,
+    node: options.node ?? createMockHeapSnapshotNode(),
+  };
+}
+
+export function createMockAggregatedInfo(
+  options: Partial<AggregatedInfoWithId> = {},
+): AggregatedInfoWithId {
+  return {
+    count: options.count ?? 1,
+    distance: options.distance ?? 1,
+    self: options.self ?? 10,
+    maxRet: options.maxRet ?? 100,
+    name: options.name ?? 'Object',
+    idxs: options.idxs ?? [],
+    [stableIdSymbol]: options[stableIdSymbol] ?? 1,
   };
 }

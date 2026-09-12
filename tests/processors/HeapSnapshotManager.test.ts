@@ -74,4 +74,54 @@ describe('HeapSnapshotManager', () => {
       manager.dispose();
     }
   });
+
+  it('throws when getNodesById is called with a non-existent class ID', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      await manager.getAggregates(filePath);
+
+      await assert.rejects(manager.getNodesById(filePath, 999999), {
+        message: 'Class with ID 999999 not found in heap snapshot',
+      });
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('throws when getDetailedClassDiff is called with an invalid classIndex', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePathA = 'tests/fixtures/heap-1.heapsnapshot';
+      const filePathB = 'tests/fixtures/heap-2.heapsnapshot';
+
+      await assert.rejects(
+        manager.getDetailedClassDiff(filePathA, filePathB, 99),
+        /Invalid classIndex: 99. Total classes with changes: 10/,
+      );
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('gets stats and staticData, and disposes snapshot', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const stats = await manager.getStats(filePath);
+      assert.ok(stats.total > 0);
+      assert.ok(stats.v8heap.total > 0);
+
+      const staticData = await manager.getStaticData(filePath);
+      assert.ok(staticData);
+      assert.ok(staticData.nodeCount > 0);
+
+      assert.strictEqual(manager.hasSnapshots(), true);
+      assert.strictEqual(manager.disposeSnapshot(filePath), true);
+      assert.strictEqual(manager.disposeSnapshot(filePath), false);
+      assert.strictEqual(manager.hasSnapshots(), false);
+    } finally {
+      manager.dispose();
+    }
+  });
 });
