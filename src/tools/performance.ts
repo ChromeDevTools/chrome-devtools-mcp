@@ -59,6 +59,7 @@ export const startTrace = definePageTool({
       return;
     }
     context.setIsRunningPerformanceTrace(true);
+    context.setPerformanceTracePage(request.page);
 
     const page = request.page;
     const pageUrlForTracing = page.pptrPage.url();
@@ -142,7 +143,7 @@ export const stopTrace = definePageTool({
     if (!context.isRunningPerformanceTrace()) {
       return;
     }
-    const page = request.page;
+    const page = context.getPerformanceTracePage() ?? request.page;
     await stopTracingAndAppendOutput(
       page,
       response,

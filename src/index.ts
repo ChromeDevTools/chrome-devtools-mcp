@@ -46,6 +46,7 @@ const ROOTS_REQUEST_TIMEOUT = 5_000;
 
 export interface McpServerOptions {
   logFile?: fs.WriteStream;
+  getSessionId?: () => string | undefined;
 }
 
 export class McpServer {
@@ -61,6 +62,7 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
+  #closePromise?: Promise<void>;
 
   private constructor(
     serverArgs: ParsedArguments,
@@ -69,7 +71,7 @@ export class McpServer {
     this.#serverArgs = serverArgs;
     this.#options = options;
 
-    if (this.#serverArgs.usageStatistics) {
+    if (this.#serverArgs.usageStatistics && !ClearcutLogger.get()) {
       ClearcutLogger.initialize({
         persistence: new FilePersistence(),
         logFile: this.#serverArgs.logFile,
@@ -129,9 +131,47 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
-    this.#context?.dispose();
+    if (this.#closePromise !== undefined) {
+      return await this.#closePromise;
+    }
+
+    const context = this.#context;
     this.#context = undefined;
-    await this.server.close();
+    const closePromise = (async (): Promise<void> => {
+      let serverCloseError: unknown;
+      let serverCloseFailed = false;
+      try {
+        await this.server.close();
+      } catch (error) {
+        serverCloseFailed = true;
+        serverCloseError = error;
+      }
+
+      const guard = await this.#toolMutex.acquire();
+      try {
+        // Acquiring and releasing the mutex drains any tool already in flight.
+      } finally {
+        guard[Symbol.dispose]();
+      }
+
+      let contextDisposeError: unknown;
+      let contextDisposeFailed = false;
+      try {
+        await context?.dispose();
+      } catch (error) {
+        contextDisposeFailed = true;
+        contextDisposeError = error;
+      }
+
+      if (serverCloseFailed) {
+        throw serverCloseError;
+      }
+      if (contextDisposeFailed) {
+        throw contextDisposeError;
+      }
+    })();
+    this.#closePromise = closePromise;
+    return await closePromise;
   }
 
   [Symbol.dispose](): void {
@@ -253,7 +293,9 @@ export class McpServer {
           });
 
     if (this.#context?.browser !== browser) {
-      this.#context?.dispose();
+      const previousContext = this.#context;
+      this.#context = undefined;
+      await previousContext?.dispose();
       this.#context = await McpContext.from(browser, logger, {
         experimentalDevToolsDebugging: devtools,
         experimentalIncludeAllPages:
@@ -264,14 +306,17 @@ export class McpServer {
         blocklist: blocklist,
         allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
         // Surfaces a one-time note in the next response after a reconnect.
-        reconnected: this.#context !== undefined,
+        reconnected: previousContext !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
         onNotification: (message: string) => {
           void this.server
-            .sendLoggingMessage({
-              level: 'info',
-              data: message,
-            })
+            .sendLoggingMessage(
+              {
+                level: 'info',
+                data: message,
+              },
+              this.#options.getSessionId?.(),
+            )
             .catch(e => {
               logger?.('Failed to send MCP notification', e);
             });
@@ -297,6 +342,7 @@ export class McpServer {
       this.#serverArgs,
       () => this.#getContext(),
       this.#toolMutex,
+      () => this.server.server.getClientVersion()?.name,
     );
 
     if (!toolHandler.shouldRegister) {

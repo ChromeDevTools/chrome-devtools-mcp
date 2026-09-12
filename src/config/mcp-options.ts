@@ -11,6 +11,41 @@ import {readFileSync} from 'node:fs';
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
+function validateServerUrl(value: string | undefined): string | undefined {
+  if (value === undefined || value === '') {
+    return;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(
+      `Provided serverUrl ${value} is not a valid absolute HTTP(S) URL.`,
+    );
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `Provided serverUrl ${value} is not a valid absolute HTTP(S) URL.`,
+    );
+  }
+
+  return value;
+}
+
+function validateHttpPort(value: number | undefined): number | undefined {
+  if (value === undefined) {
+    return;
+  }
+  if (!Number.isInteger(value) || value < 1 || value > 65535) {
+    throw new Error(
+      `Invalid httpPort ${value}. Expected an integer from 1 to 65535.`,
+    );
+  }
+  return value;
+}
+
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
 
@@ -21,6 +56,18 @@ export const mcpOptions = {
     type: 'string',
     describe:
       'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
+  },
+  httpPort: {
+    type: 'number',
+    describe:
+      'Start a shared Streamable HTTP MCP server on 127.0.0.1. The endpoint is available at /mcp.',
+    coerce: validateHttpPort,
+  },
+  serverUrl: {
+    type: 'string',
+    describe:
+      'Use an existing Streamable HTTP MCP server through a transparent stdio proxy.',
+    coerce: validateServerUrl,
   },
   viewport: {
     type: 'string',
@@ -334,6 +381,14 @@ export function parser(
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
+      if (args.serverUrl === undefined) {
+        const serverUrl = validateServerUrl(
+          env['CHROME_DEVTOOLS_MCP_SERVER_URL'],
+        );
+        if (serverUrl !== undefined) {
+          args.serverUrl = serverUrl;
+        }
+      }
       if (isViaCli && args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
         const cliFilesystemArgs: {
           allowUnrestrictedPaths?: boolean;

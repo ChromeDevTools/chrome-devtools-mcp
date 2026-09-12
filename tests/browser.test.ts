@@ -7,19 +7,65 @@
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
+import sinon from 'sinon';
 
 import {
+  closeBrowser,
   detectDisplay,
   ensureBrowserConnected,
+  ensureBrowserLaunched,
   launch,
   makeTargetFilter,
 } from '../src/browser.js';
-import type {Browser} from '../src/third_party/index.js';
+import {Browser, puppeteer} from '../src/third_party/index.js';
 
 import {serverHooks} from './server.js';
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T | PromiseLike<T>): void;
+  reject(reason?: unknown): void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolvePromise = (_value: T | PromiseLike<T>): void => {
+    throw new Error('Deferred promise resolver was not initialized');
+  };
+  let rejectPromise = (_reason?: unknown): void => {
+    throw new Error('Deferred promise rejecter was not initialized');
+  };
+  const promise = new Promise<T>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  return {
+    promise,
+    resolve: value => resolvePromise(value),
+    reject: reason => rejectPromise(reason),
+  };
+}
+
+function createMockBrowser(): sinon.SinonStubbedInstance<Browser> {
+  const mockBrowser = sinon.createStubInstance(Browser);
+  Object.defineProperties(mockBrowser, {
+    connected: {
+      configurable: true,
+      value: true,
+    },
+    close: {
+      configurable: true,
+      value: sinon.stub().resolves(),
+    },
+    disconnect: {
+      configurable: true,
+      value: sinon.stub().resolves(),
+    },
+  });
+  return mockBrowser;
+}
 
 async function safeClose(browser: Browser) {
   try {
@@ -57,8 +103,148 @@ async function runWithRetry(fn: () => Promise<void>) {
 }
 
 describe('browser', () => {
+  afterEach(async () => {
+    await closeBrowser();
+    sinon.restore();
+  });
+
   it('detects display does not crash', () => {
     detectDisplay();
+  });
+
+  it('single-flights concurrent launches', async () => {
+    const deferred = createDeferred<Browser>();
+    const mockBrowser = createMockBrowser();
+    const launchStub = sinon.stub(puppeteer, 'launch');
+    launchStub.returns(deferred.promise);
+
+    const options = {
+      headless: true,
+      isolated: true,
+      devtools: false,
+    };
+    const first = ensureBrowserLaunched(options);
+    const second = ensureBrowserLaunched(options);
+
+    sinon.assert.calledOnce(launchStub);
+    deferred.resolve(mockBrowser);
+    const [firstBrowser, secondBrowser] = await Promise.all([first, second]);
+
+    assert.strictEqual(firstBrowser, mockBrowser);
+    assert.strictEqual(secondBrowser, mockBrowser);
+  });
+
+  it('single-flights concurrent browser connections', async () => {
+    const deferred = createDeferred<Browser>();
+    const mockBrowser = createMockBrowser();
+    const connectStub = sinon.stub(puppeteer, 'connect');
+    connectStub.returns(deferred.promise);
+
+    const options = {
+      browserURL: 'http://127.0.0.1:9222',
+      devtools: false,
+    };
+    const first = ensureBrowserConnected(options);
+    const second = ensureBrowserConnected(options);
+
+    sinon.assert.calledOnce(connectStub);
+    deferred.resolve(mockBrowser);
+    const [firstBrowser, secondBrowser] = await Promise.all([first, second]);
+
+    assert.strictEqual(firstBrowser, mockBrowser);
+    assert.strictEqual(secondBrowser, mockBrowser);
+  });
+
+  it('clears a failed launch acquisition before retrying', async () => {
+    const launchError = new Error('launch failed');
+    const mockBrowser = createMockBrowser();
+    const launchStub = sinon.stub(puppeteer, 'launch');
+    launchStub.onFirstCall().rejects(launchError);
+    launchStub.onSecondCall().resolves(mockBrowser);
+
+    const options = {
+      headless: true,
+      isolated: true,
+      devtools: false,
+    };
+    const first = ensureBrowserLaunched(options);
+    const second = ensureBrowserLaunched(options);
+
+    sinon.assert.calledOnce(launchStub);
+    await assert.rejects(first, /launch failed/);
+    await assert.rejects(second, /launch failed/);
+
+    const retry = await ensureBrowserLaunched(options);
+
+    assert.strictEqual(retry, mockBrowser);
+    sinon.assert.calledTwice(launchStub);
+  });
+
+  it('closes a launched browser acquired during shutdown', async () => {
+    const deferred = createDeferred<Browser>();
+    const mockBrowser = createMockBrowser();
+    const launchStub = sinon.stub(puppeteer, 'launch');
+    launchStub.returns(deferred.promise);
+
+    const acquisition = ensureBrowserLaunched({
+      headless: true,
+      isolated: true,
+      devtools: false,
+    });
+    const shutdown = closeBrowser();
+
+    deferred.resolve(mockBrowser);
+    const [acquiredBrowser] = await Promise.all([acquisition, shutdown]);
+
+    assert.strictEqual(acquiredBrowser, mockBrowser);
+    sinon.assert.calledOnce(mockBrowser.close);
+    sinon.assert.notCalled(mockBrowser.disconnect);
+    sinon.assert.calledOnce(launchStub);
+  });
+
+  it('rejects acquisition while a launched browser is shutting down', async () => {
+    const closeDeferred = createDeferred<void>();
+    const mockBrowser = createMockBrowser();
+    mockBrowser.close.returns(closeDeferred.promise);
+    const launchStub = sinon.stub(puppeteer, 'launch').resolves(mockBrowser);
+
+    const options = {
+      headless: true,
+      isolated: true,
+      devtools: false,
+    };
+    await ensureBrowserLaunched(options);
+    const shutdown = closeBrowser();
+    await Promise.resolve();
+
+    const secondAcquisition = ensureBrowserLaunched(options);
+    await assert.rejects(secondAcquisition, /Browser is shutting down/);
+    sinon.assert.calledOnce(launchStub);
+    sinon.assert.calledOnce(mockBrowser.close);
+
+    closeDeferred.resolve(undefined);
+    await shutdown;
+  });
+
+  it('disconnects an attached browser acquired during shutdown', async () => {
+    const deferred = createDeferred<Browser>();
+    const mockBrowser = createMockBrowser();
+    const connectStub = sinon.stub(puppeteer, 'connect');
+    connectStub.returns(deferred.promise);
+
+    const acquisition = ensureBrowserConnected({
+      browserURL: 'http://127.0.0.1:9222',
+      devtools: false,
+    });
+    const shutdown = closeBrowser();
+
+    deferred.resolve(mockBrowser);
+    const [acquiredBrowser] = await Promise.all([acquisition, shutdown]);
+
+    assert.strictEqual(acquiredBrowser, mockBrowser);
+    sinon.assert.notCalled(mockBrowser.close);
+    sinon.assert.calledOnce(mockBrowser.disconnect);
+    sinon.assert.calledOnce(connectStub);
   });
 
   it('cannot launch multiple times with the same profile', async () => {

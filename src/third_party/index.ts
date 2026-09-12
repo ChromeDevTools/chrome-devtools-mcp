@@ -21,10 +21,18 @@ export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+export {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+export {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 export {Client} from '@modelcontextprotocol/sdk/client/index.js';
 export type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 export {
   type CallToolResult,
+  isInitializeRequest,
+  isJSONRPCNotification,
+  isJSONRPCRequest,
+  isJSONRPCResultResponse,
+  type JSONRPCMessage,
+  type RequestId,
   SetLevelRequestSchema,
   type ImageContent,
   type TextContent,
@@ -36,6 +44,7 @@ export {
 export {z as zod} from 'zod';
 export {default as ajv} from 'ajv';
 export {
+  Browser,
   Locator,
   PredefinedNetworkConditions,
   KnownDevices,

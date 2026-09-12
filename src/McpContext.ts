@@ -19,6 +19,7 @@ import type {
   HeapEdgesQueryOptions,
   HeapQueryOptions,
 } from './processors/HeapSnapshotManager.js';
+import type {TraceResult} from './processors/PerformanceTrace.js';
 import {McpPage} from './McpPage.js';
 import {type UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
@@ -43,10 +44,10 @@ import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
+  ContextPage,
   DevToolsData,
   SupportedExtensions,
 } from './tools/ToolDefinition.js';
-import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
@@ -91,6 +92,8 @@ export class McpContext implements Context {
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
+  // Browser contexts created by this context; discovered contexts are never owned.
+  #ownedIsolatedContexts = new Set<BrowserContext>();
   // Auto-generated name counter for when no name is provided.
   #nextIsolatedContextId = 1;
 
@@ -103,8 +106,10 @@ export class McpContext implements Context {
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
+  #performanceTracePage?: ContextPage;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
     null;
+  #disposePromise?: Promise<void>;
 
   #reconnectNotice = false;
   #extensionPages = new WeakMap<Target, Page>();
@@ -126,11 +131,7 @@ export class McpContext implements Context {
     options: McpContextOptions,
     locatorClass: typeof Locator,
   ) {
-    overrideDevToolsGlobals({
-      loadResource: (url: string) => {
-        return this.loadResource(url);
-      },
-    });
+    overrideDevToolsGlobals({});
 
     this.browser = browser;
     this.logger = logger;
@@ -153,20 +154,59 @@ export class McpContext implements Context {
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
   }
 
-  dispose() {
-    this.browser.off('targetcreated', this.#onTargetCreated);
-    this.browser.off('targetdestroyed', this.#onTargetDestroyed);
-
-    this.#serviceWorkerConsoleCollector.dispose();
-    this.#heapSnapshotManager.dispose();
-    for (const mcpPage of this.#mcpPages.values()) {
-      mcpPage.dispose();
+  async dispose(): Promise<void> {
+    if (this.#disposePromise !== undefined) {
+      return await this.#disposePromise;
     }
-    this.#mcpPages.clear();
-    // Isolated contexts are intentionally not closed here.
-    // Either the entire browser will be closed or we disconnect
-    // without destroying browser state.
-    this.#isolatedContexts.clear();
+
+    const disposePromise = (async (): Promise<void> => {
+      const recorderData = this.#screenRecorderData;
+      this.#screenRecorderData = null;
+      if (recorderData !== null) {
+        try {
+          await recorderData.recorder.stop();
+        } catch (error) {
+          this.logger?.(
+            'Failed to stop screencast during context disposal',
+            error,
+          );
+        }
+      }
+
+      const tracePage = this.#performanceTracePage;
+      this.#performanceTracePage = undefined;
+      this.#isRunningTrace = false;
+      if (tracePage !== undefined) {
+        try {
+          await tracePage.pptrPage.tracing.stop();
+        } catch (error) {
+          this.logger?.(
+            'Failed to stop performance trace during context disposal',
+            error,
+          );
+        }
+      }
+
+      this.browser.off('targetcreated', this.#onTargetCreated);
+      this.browser.off('targetdestroyed', this.#onTargetDestroyed);
+      this.#serviceWorkerConsoleCollector.dispose();
+      this.#heapSnapshotManager.dispose();
+      for (const mcpPage of this.#mcpPages.values()) {
+        mcpPage.dispose();
+      }
+      this.#mcpPages.clear();
+
+      const ownedContexts = [...this.#ownedIsolatedContexts];
+      this.#ownedIsolatedContexts.clear();
+      this.#isolatedContexts.clear();
+      await Promise.allSettled(
+        ownedContexts.map(async context => {
+          await context.close();
+        }),
+      );
+    })();
+    this.#disposePromise = disposePromise;
+    return await disposePromise;
   }
 
   #onTargetCreated = async (target: Target) => {
@@ -346,6 +386,7 @@ export class McpContext implements Context {
       let ctx = this.#isolatedContexts.get(isolatedContextName);
       if (!ctx) {
         ctx = await this.browser.createBrowserContext();
+        this.#ownedIsolatedContexts.add(ctx);
         this.#isolatedContexts.set(isolatedContextName, ctx);
       }
       page = await ctx.newPage({background});
@@ -391,10 +432,21 @@ export class McpContext implements Context {
 
   setIsRunningPerformanceTrace(x: boolean): void {
     this.#isRunningTrace = x;
+    if (!x) {
+      this.#performanceTracePage = undefined;
+    }
   }
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
+  }
+
+  getPerformanceTracePage(): ContextPage | undefined {
+    return this.#performanceTracePage;
+  }
+
+  setPerformanceTracePage(page: ContextPage | undefined): void {
+    this.#performanceTracePage = page;
   }
 
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
@@ -573,6 +625,7 @@ export class McpContext implements Context {
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
         onNotification: this.#options.onNotification,
+        loadResource: (url: string) => this.loadResource(url),
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();

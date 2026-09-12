@@ -83,6 +83,35 @@ export interface ClearcutLoggerOptions {
 
 // Not const to allow resetting the instance for testing purposes.
 let _clearcut_logger_instance: ClearcutLogger | undefined;
+let toolActiveLogQueue = Promise.resolve();
+
+function getMcpClient(clientName: string): McpClient {
+  const lowerName = clientName.toLowerCase();
+  if (lowerName.includes('claude-desktop')) {
+    return McpClient.MCP_CLIENT_CLAUDE_DESKTOP;
+  } else if (lowerName.includes('claude')) {
+    return McpClient.MCP_CLIENT_CLAUDE_CODE;
+  } else if (lowerName.includes('gemini')) {
+    return McpClient.MCP_CLIENT_GEMINI_CLI;
+  } else if (clientName === DAEMON_CLIENT_NAME) {
+    return McpClient.MCP_CLIENT_DT_MCP_CLI;
+  } else if (lowerName.includes('openclaw')) {
+    return McpClient.MCP_CLIENT_OPENCLAW;
+  } else if (lowerName.includes('opencode')) {
+    return McpClient.MCP_CLIENT_OPENCODE;
+  } else if (lowerName.includes('codex')) {
+    return McpClient.MCP_CLIENT_CODEX;
+  } else if (lowerName.includes('antigravity')) {
+    return McpClient.MCP_CLIENT_ANTIGRAVITY;
+  } else if (lowerName.includes('grok') || lowerName.includes('xai')) {
+    return McpClient.MCP_CLIENT_GROK;
+  } else if (lowerName.includes('copilot')) {
+    return McpClient.MCP_CLIENT_GITHUB_COPILOT;
+  } else if (lowerName.includes('hermes-agent')) {
+    return McpClient.MCP_CLIENT_HERMES;
+  }
+  return McpClient.MCP_CLIENT_OTHER;
+}
 
 export class ClearcutLogger {
   #persistence: Persistence;
@@ -104,6 +133,7 @@ export class ClearcutLogger {
 
   static resetForTesting(): void {
     _clearcut_logger_instance = undefined;
+    toolActiveLogQueue = Promise.resolve();
   }
 
   private constructor(options: ClearcutLoggerOptions) {
@@ -132,32 +162,7 @@ export class ClearcutLogger {
   }
 
   setClientName(clientName: string): void {
-    const lowerName = clientName.toLowerCase();
-    if (lowerName.includes('claude-desktop')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_DESKTOP;
-    } else if (lowerName.includes('claude')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_CLAUDE_CODE;
-    } else if (lowerName.includes('gemini')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_GEMINI_CLI;
-    } else if (clientName === DAEMON_CLIENT_NAME) {
-      this.#mcpClient = McpClient.MCP_CLIENT_DT_MCP_CLI;
-    } else if (lowerName.includes('openclaw')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_OPENCLAW;
-    } else if (lowerName.includes('opencode')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_OPENCODE;
-    } else if (lowerName.includes('codex')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_CODEX;
-    } else if (lowerName.includes('antigravity')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_ANTIGRAVITY;
-    } else if (lowerName.includes('grok') || lowerName.includes('xai')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_GROK;
-    } else if (lowerName.includes('copilot')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_GITHUB_COPILOT;
-    } else if (lowerName.includes('hermes-agent')) {
-      this.#mcpClient = McpClient.MCP_CLIENT_HERMES;
-    } else {
-      this.#mcpClient = McpClient.MCP_CLIENT_OTHER;
-    }
+    this.#mcpClient = getMcpClient(clientName);
   }
 
   async logToolInvocation(args: {
@@ -168,8 +173,9 @@ export class ClearcutLogger {
     latencyMs: number;
     devToolsData?: DevToolsData;
     pageUrl?: string;
+    clientName?: string;
   }): Promise<void> {
-    void this.#logToolActiveIfNeeded().catch(error => {
+    void this.#logToolActiveIfNeeded(args.clientName).catch(error => {
       logger?.('Error in logToolActiveIfNeeded:', error);
     });
 
@@ -195,7 +201,10 @@ export class ClearcutLogger {
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: {
-        mcp_client: this.#mcpClient,
+        mcp_client:
+          args.clientName === undefined
+            ? this.#mcpClient
+            : getMcpClient(args.clientName),
         tool_invocation: tool_invocation,
       },
     });
@@ -256,7 +265,18 @@ export class ClearcutLogger {
     });
   }
 
-  async #logToolActiveIfNeeded(): Promise<void> {
+  async #logToolActiveIfNeeded(clientName?: string): Promise<void> {
+    const queued = toolActiveLogQueue.then(async () => {
+      await this.#logToolActiveIfNeededLocked(clientName);
+    });
+    toolActiveLogQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return await queued;
+  }
+
+  async #logToolActiveIfNeededLocked(clientName?: string): Promise<void> {
     // Expect state loaded at first tool call, if not, just skip logging.
     if (!this.#state) {
       return;
@@ -283,7 +303,8 @@ export class ClearcutLogger {
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: {
-        mcp_client: this.#mcpClient,
+        mcp_client:
+          clientName === undefined ? this.#mcpClient : getMcpClient(clientName),
         tool_active: {
           days_since_last_tool_call: bucketizeDaysSince(daysSinceToolCall),
         },
