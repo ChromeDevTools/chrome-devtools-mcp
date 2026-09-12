@@ -57,6 +57,38 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 250);
     });
+    it('serializes concurrent tool active events', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+      await Promise.resolve();
+
+      await Promise.all([
+        logger.logToolInvocation({
+          toolName: 'first_tool',
+          params: {},
+          schema: {},
+          success: true,
+          latencyMs: 123,
+        }),
+        logger.logToolInvocation({
+          toolName: 'second_tool',
+          params: {},
+          schema: {},
+          success: true,
+          latencyMs: 123,
+        }),
+      ]);
+      await new Promise(resolve => setImmediate(resolve));
+
+      const activeMessages = mockWatchdogClient.send.args.filter(
+        call => call[0].payload.tool_active !== undefined,
+      );
+      assert.strictEqual(activeMessages.length, 1);
+    });
+
     it('sends context when provided', async () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,

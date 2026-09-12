@@ -229,6 +229,8 @@ export type Context = Readonly<{
   ): Promise<`${string}${Extension}`>;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
+  getPerformanceTracePage(): ContextPage | undefined;
+  setPerformanceTracePage(page: ContextPage | undefined): void;
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;

@@ -19,7 +19,47 @@ import {logger, puppeteerLogger} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
 
 let browser: Browser | undefined;
-let browserMode: 'launched' | 'connected' | undefined;
+type BrowserMode = 'launched' | 'connected';
+let browserMode: BrowserMode | undefined;
+let browserAcquisition: Promise<Browser> | undefined;
+let browserShutdown: Promise<void> | undefined;
+
+function acquireBrowser(
+  mode: BrowserMode,
+  acquire: () => Promise<Browser>,
+): Promise<Browser> {
+  if (browserShutdown) {
+    return Promise.reject(new Error('Browser is shutting down'));
+  }
+
+  const activeBrowser = browser;
+  if (activeBrowser?.connected) {
+    return Promise.resolve(activeBrowser);
+  }
+  if (browserAcquisition) {
+    return browserAcquisition;
+  }
+
+  const acquisition = acquire().then(acquiredBrowser => {
+    browserMode = mode;
+    browser = acquiredBrowser;
+    return acquiredBrowser;
+  });
+  browserAcquisition = acquisition;
+  void acquisition.then(
+    () => {
+      if (browserAcquisition === acquisition) {
+        browserAcquisition = undefined;
+      }
+    },
+    () => {
+      if (browserAcquisition === acquisition) {
+        browserAcquisition = undefined;
+      }
+    },
+  );
+  return acquisition;
+}
 
 export function makeTargetFilter(enableExtensions = false) {
   return function targetFilter(target: {url(): string}): boolean {
@@ -31,7 +71,7 @@ export function makeTargetFilter(enableExtensions = false) {
   };
 }
 
-export async function ensureBrowserConnected(options: {
+interface McpConnectOptions {
   browserURL?: string;
   wsEndpoint?: string;
   wsHeaders?: Record<string, string>;
@@ -41,12 +81,16 @@ export async function ensureBrowserConnected(options: {
   enableExtensions?: boolean;
   blocklist?: string[];
   allowlist?: string[];
-}) {
-  const {channel, enableExtensions} = options;
-  if (browser?.connected) {
-    return browser;
-  }
+}
 
+export async function ensureBrowserConnected(
+  options: McpConnectOptions,
+): Promise<Browser> {
+  return acquireBrowser('connected', () => connectBrowser(options));
+}
+
+async function connectBrowser(options: McpConnectOptions): Promise<Browser> {
+  const {channel, enableExtensions} = options;
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
     targetFilter: makeTargetFilter(enableExtensions),
     defaultViewport: null,
@@ -112,13 +156,9 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+  let connected: Browser;
   try {
-    // Assign mode before browser so a concurrent closeBrowser() never sees
-    // `browser` set with `browserMode` still undefined (would fall through
-    // to the disconnect() path and orphan a launched Chrome).
-    const connected = await puppeteer.connect(connectOptions);
-    browserMode = 'connected';
-    browser = connected;
+    connected = await puppeteer.connect(connectOptions);
   } catch (err) {
     throw new Error(
       `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
@@ -128,7 +168,7 @@ export async function ensureBrowserConnected(options: {
     );
   }
   logger?.('Connected Puppeteer');
-  return browser;
+  return connected;
 }
 
 interface McpLaunchOptions {
@@ -266,14 +306,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
 export async function ensureBrowserLaunched(
   options: McpLaunchOptions,
 ): Promise<Browser> {
-  if (browser?.connected) {
-    return browser;
-  }
-  // Assign mode before browser; see the connect path above for rationale.
-  const launched = await launch(options);
-  browserMode = 'launched';
-  browser = launched;
-  return browser;
+  return acquireBrowser('launched', () => launch(options));
 }
 
 /**
@@ -283,7 +316,39 @@ export async function ensureBrowserLaunched(
  * the connection has already been dropped. Called from the server entrypoint
  * on stdin EOF / SIGTERM / SIGINT.
  */
-export async function closeBrowser(): Promise<void> {
+export function closeBrowser(): Promise<void> {
+  if (browserShutdown) {
+    return browserShutdown;
+  }
+
+  const shutdown = Promise.resolve().then(() => shutdownBrowser());
+  browserShutdown = shutdown;
+  void shutdown.then(
+    () => {
+      if (browserShutdown === shutdown) {
+        browserShutdown = undefined;
+      }
+    },
+    () => {
+      if (browserShutdown === shutdown) {
+        browserShutdown = undefined;
+      }
+    },
+  );
+  return shutdown;
+}
+
+async function shutdownBrowser(): Promise<void> {
+  let acquisition = browserAcquisition;
+  while (acquisition) {
+    try {
+      await acquisition;
+    } catch {
+      // The acquisition caller receives the original error.
+    }
+    acquisition = browserAcquisition;
+  }
+
   const b = browser;
   const mode = browserMode;
   browser = undefined;

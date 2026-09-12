@@ -6,6 +6,7 @@
 
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {McpContext} from './McpContext.js';
+import {runWithResourceLoader} from './devtools/DevtoolsUtils.js';
 import type {McpPage} from './McpPage.js';
 import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
@@ -175,6 +176,7 @@ export class ToolHandler {
     private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
+    private readonly getClientName?: () => string | undefined,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -248,36 +250,41 @@ export class ToolHandler {
       let page: McpPage | undefined;
       try {
         await validateToolFiles(this.tool, params, context);
-        if (isPageScopedTool(this.tool)) {
-          const pageId =
-            typeof params.pageId === 'number' ? params.pageId : undefined;
-          page =
-            this.serverArgs.pageIdRouting &&
-            pageId !== undefined &&
-            !this.serverArgs.slim
-              ? context.getPageById(pageId)
-              : context.getSelectedMcpPage();
-          response.setPage(page);
-          if (this.tool.blockedByDialog) {
-            page.throwIfDialogOpen();
-          }
-          await this.tool.handler(
-            {
-              params,
-              page,
-            },
-            response,
-            context,
-          );
-        } else {
-          await this.tool.handler(
-            {
-              params,
-            },
-            response,
-            context,
-          );
-        }
+        await runWithResourceLoader(
+          (url: string) => context.loadResource(url),
+          async () => {
+            if (isPageScopedTool(this.tool)) {
+              const pageId =
+                typeof params.pageId === 'number' ? params.pageId : undefined;
+              page =
+                this.serverArgs.pageIdRouting &&
+                pageId !== undefined &&
+                !this.serverArgs.slim
+                  ? context.getPageById(pageId)
+                  : context.getSelectedMcpPage();
+              response.setPage(page);
+              if (this.tool.blockedByDialog) {
+                page.throwIfDialogOpen();
+              }
+              await this.tool.handler(
+                {
+                  params,
+                  page,
+                },
+                response,
+                context,
+              );
+            } else {
+              await this.tool.handler(
+                {
+                  params,
+                },
+                response,
+                context,
+              );
+            }
+          },
+        );
       } catch (err) {
         response.setError(err);
       }
@@ -291,9 +298,11 @@ export class ToolHandler {
         dataFormat = 'toon';
       }
 
-      const {content, structuredContent} = await response.handle(
-        context,
-        dataFormat,
+      const {content, structuredContent} = await runWithResourceLoader(
+        (url: string) => context.loadResource(url),
+        async () => {
+          return await response.handle(context, dataFormat);
+        },
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
@@ -332,6 +341,7 @@ export class ToolHandler {
         latencyMs: Date.now() - startTime,
         devToolsData,
         pageUrl,
+        clientName: this.getClientName?.(),
       });
       guard[Symbol.dispose]();
     }

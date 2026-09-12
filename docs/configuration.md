@@ -1,6 +1,86 @@
 # Configuration
 
-The Chrome DevTools MCP server supports the following configuration option:
+The Chrome DevTools MCP server supports the following configuration options:
+
+## Shared HTTP server and stdio proxy
+
+Use `--http-port=<1..65535>` to start one long-lived MCP service over
+Streamable HTTP. It binds to `127.0.0.1` and serves native MCP clients at
+`http://127.0.0.1:<port>/mcp`. The usual browser options still choose whether
+that service launches headless or headed Chrome (`--headless`, `--isolated`,
+and related options), or attaches to an existing remote-debugging endpoint
+(`--browser-url` or `--ws-endpoint`). See the [advanced usage guide](./advanced-usage.md)
+for complete launch and attachment recipes.
+
+Configure every native Streamable HTTP client with the same `/mcp` URL instead
+of launching another server process:
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "url": "http://127.0.0.1:9333/mcp"
+    }
+  }
+}
+```
+
+Each HTTP client receives its own MCP session, `McpServer`, and `McpContext`.
+Its selected page, negotiated roots, isolated-context names, trace/recording
+and other tool state, and request mutex are isolated from every other client.
+The browser connection and pages are shared: pages opened by one client are
+visible to the others, and browser mutations are visible to all of them.
+Clients should send their session `DELETE` before closing the transport. An
+accepted `DELETE` deterministically releases only that session; closing a
+transport is likewise scoped to that session, and the stdio proxy sends
+`DELETE` automatically on EOF. An abandoned or otherwise inactive session
+expires after 30 minutes. An active request or an open stream suspends idle
+expiry. No per-session close stops the service or shared browser.
+
+Clients that support only stdio can connect through the transparent proxy mode:
+
+```bash
+npx -y chrome-devtools-mcp@latest \
+  --server-url=http://127.0.0.1:9333/mcp
+```
+
+`--server-url` requires an absolute `http(s)` URL. Set
+`CHROME_DEVTOOLS_MCP_SERVER_URL` instead when the client cannot add the flag:
+
+```bash
+export CHROME_DEVTOOLS_MCP_SERVER_URL=http://127.0.0.1:9333/mcp
+npx -y chrome-devtools-mcp@latest
+```
+
+Server URL mode takes precedence over HTTP mode, which takes precedence over
+the existing stdio mode. The proxy owns no browser and forwards JSON-RPC
+transparently, including roots requests and notifications.
+AXI can use this shared endpoint in either of two ways. With
+`CHROME_DEVTOOLS_AXI_MCP_SERVER_URL` nonblank and
+`CHROME_DEVTOOLS_AXI_MCP_PATH` absent or blank, AXI connects directly over
+Streamable HTTP (the recommended mode). Each named AXI bridge creates its own
+HTTP transport, MCP session, and `McpContext`, while the shared service is the
+only MCP process; no local MCP build is required. If the shared URL is
+nonblank and `CHROME_DEVTOOLS_AXI_MCP_PATH` is also nonblank, AXI uses the
+compatibility stdio proxy path: it checks the selected executable's `--help`
+for `--serverUrl` and spawns that executable with only
+`--server-url=<URL>`. Each named bridge still receives a separate remote MCP
+session/context. The generic stdio proxy above remains available for non-AXI
+clients; see the AXI recipe in [advanced usage](./advanced-usage.md#chrome-devtools-axi).
+
+The service is loopback-only and rejects non-loopback `Host` or `Origin`
+values. Remote clients must use SSH port forwarding, for example:
+
+```bash
+ssh -N -L 9333:127.0.0.1:9333 user@chrome-host
+```
+
+Then connect to `http://127.0.0.1:9333/mcp` on the client side of the tunnel.
+
+> [!WARNING]
+> Anyone who can control this endpoint can control Chrome, including reading
+> and modifying browser data. Keep it loopback-only; remote hosts must use SSH
+> tunnels and must not expose the service as a public network endpoint.
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
@@ -97,6 +177,16 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--logFile`/ `--log-file`**
   Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
+  - **Type:** string
+  - **Default:** `false`
+
+- **`--httpPort`/ `--http-port`**
+  Start a shared Streamable HTTP MCP server on 127.0.0.1. The endpoint is available at /mcp.
+  - **Type:** number
+  - **Default:** `false`
+
+- **`--serverUrl`/ `--server-url`**
+  Use an existing Streamable HTTP MCP server through a transparent stdio proxy.
   - **Type:** string
   - **Default:** `false`
 

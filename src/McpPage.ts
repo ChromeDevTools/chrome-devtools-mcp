@@ -149,6 +149,7 @@ export class McpPage implements ContextPage {
   #sourceMaps: boolean;
   #commentBridge?: DevToolsCommentBridge;
   #onNotification?: (message: string) => void;
+  #loadResource?: (url: string) => Promise<string>;
 
   constructor(
     page: Page,
@@ -160,6 +161,7 @@ export class McpPage implements ContextPage {
       navigationTimeout?: number;
       sourceMaps?: boolean;
       onNotification?: (message: string) => void;
+      loadResource?: (url: string) => Promise<string>;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
@@ -167,6 +169,7 @@ export class McpPage implements ContextPage {
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
     this.#onNotification = options.onNotification;
+    this.#loadResource = options.loadResource;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -213,6 +216,7 @@ export class McpPage implements ContextPage {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session, {
         sourceMaps: this.#sourceMaps,
+        loadResource: this.#loadResource,
       });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);

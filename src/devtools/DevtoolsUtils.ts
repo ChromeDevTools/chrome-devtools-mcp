@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {AsyncLocalStorage} from 'node:async_hooks';
+
 import {DevTools} from '../third_party/index.js';
 import type {
   CDPSession,
@@ -12,6 +14,27 @@ import type {
 } from '../third_party/index.js';
 
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
+type ResourceLoader = (url: string) => Promise<string>;
+
+const resourceLoaderStorage = new AsyncLocalStorage<ResourceLoader>();
+const routedResourceLoader: ResourceLoader = async (url: string) => {
+  const loadResource = resourceLoaderStorage.getStore();
+  if (loadResource === undefined) {
+    throw new Error(
+      'No active MCP context is available to load this resource.',
+    );
+  }
+  return await loadResource(url);
+};
+const routedHost = new McpHostBindingAdapter(routedResourceLoader);
+let routedHostInstalled = false;
+
+export async function runWithResourceLoader<T>(
+  loadResource: ResourceLoader,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return await resourceLoaderStorage.run(loadResource, operation);
+}
 
 /**
  * A mock implementation of an issues manager that only implements the methods
@@ -25,13 +48,17 @@ export class FakeIssuesManager extends DevTools.Common.ObjectWrapper
 }
 
 export function overrideDevToolsGlobals({
-  loadResource,
+  installHost = true,
 }: {
-  loadResource: (url: string) => Promise<string>;
+  loadResource?: ResourceLoader;
+  installHost?: boolean;
 }): void {
-  DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
-    new McpHostBindingAdapter(loadResource),
-  );
+  if (installHost && !routedHostInstalled) {
+    DevTools.Host.InspectorFrontendHost.installInspectorFrontendHost(
+      routedHost,
+    );
+    routedHostInstalled = true;
+  }
 
   // DevTools CDP errors can get noisy.
   DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
@@ -139,6 +166,7 @@ export interface TargetUniverse {
 
 export interface CreateTargetUniverseOptions {
   sourceMaps?: boolean;
+  loadResource?: (url: string) => Promise<string>;
 }
 
 export async function createTargetUniverse(
@@ -157,7 +185,9 @@ export async function createTargetUniverse(
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
     hostConfig: {},
     inspectorFrontendHost:
-      DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
+      options?.loadResource === undefined
+        ? DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance
+        : new McpHostBindingAdapter(routedResourceLoader),
     supportsEmulation: false,
   });
 
