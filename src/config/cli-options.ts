@@ -1141,7 +1141,7 @@ export const commands: Commands = {
         name: 'background',
         type: 'boolean',
         description:
-          'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
+          'Whether to open the page in the background without bringing it to the front. Defaults to the server defaultBackground setting.',
         required: false,
       },
       isolatedContext: {
