@@ -10,6 +10,11 @@ import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
+import {
+  deleteSecrets,
+  placeholderHint,
+  resolvePlaceholders,
+} from '../utils/secrets.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
@@ -211,6 +216,7 @@ async function selectOption(
   handle: ElementHandle,
   aXNode: TextSnapshotNode,
   value: string,
+  displayValue: string,
 ) {
   let optionFound = false;
   for (const child of aXNode.children) {
@@ -230,7 +236,7 @@ async function selectOption(
     }
   }
   if (!optionFound) {
-    throw new Error(`Could not find option with text "${value}"`);
+    throw new Error(`Could not find option with text "${displayValue}"`);
   }
 }
 
@@ -243,6 +249,9 @@ async function fillFormElement(
   value: string,
   context: McpContext,
   page: ContextPage,
+  // Used in error messages in place of `value`, so that a value resolved from
+  // a secret is never echoed back to the caller.
+  displayValue: string = value,
 ) {
   using handle = await page.getElementByUid(uid);
   try {
@@ -250,7 +259,7 @@ async function fillFormElement(
     // We assume that combobox needs to be handled as select if it has
     // role='combobox' and option children.
     if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
-      await selectOption(handle, aXNode, value);
+      await selectOption(handle, aXNode, value, displayValue);
     } else {
       const isToggle = await handle.evaluate(el => {
         if (el instanceof HTMLInputElement) {
@@ -265,7 +274,7 @@ async function fillFormElement(
           await handle.asLocator().fill(value === 'true');
         } else {
           throw new Error(
-            `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+            `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${displayValue} was used`,
           );
         }
       } else {
@@ -297,7 +306,7 @@ export const fill = definePageTool({
     value: zod
       .string()
       .describe(
-        'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+        `The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons. ${placeholderHint}`,
       ),
     includeSnapshot: includeSnapshotSchema,
   },
@@ -305,14 +314,17 @@ export const fill = definePageTool({
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = request.page;
+    const secret = await resolvePlaceholders(request.params.value);
     const result = await page.waitForEventsAfterAction(async () => {
       await fillFormElement(
         request.params.uid,
-        request.params.value,
+        secret.value,
         context as McpContext,
         page,
+        request.params.value,
       );
     });
+    await deleteSecrets(secret.consume);
     response.appendResponseLine(`Successfully filled out the element`);
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
@@ -329,21 +341,24 @@ export const typeText = definePageTool({
     readOnlyHint: false,
   },
   schema: {
-    text: zod.string().describe('The text to type'),
+    text: zod.string().describe(`The text to type. ${placeholderHint}`),
     submitKey: submitKeySchema,
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const secret = await resolvePlaceholders(request.params.text);
     const result = await page.waitForEventsAfterAction(async () => {
-      await page.pptrPage.keyboard.type(request.params.text);
+      await page.pptrPage.keyboard.type(secret.value);
       if (request.params.submitKey) {
         await page.pptrPage.keyboard.press(
           request.params.submitKey as KeyInput,
         );
       }
     });
+    await deleteSecrets(secret.consume);
+    // Echoes the unresolved text so a resolved secret is never reported back.
     response.appendResponseLine(
       `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
     );
@@ -400,7 +415,7 @@ export const fillForm = definePageTool({
           value: zod
             .string()
             .describe(
-              'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+              `Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons. ${placeholderHint}`,
             ),
         }),
       )
@@ -412,16 +427,23 @@ export const fillForm = definePageTool({
   handler: async (request, response, context) => {
     const page = request.page;
     let lastResult: WaitForEventsResult = {};
+    const usedSecrets = new Set<string>();
     for (const element of request.params.elements) {
+      const secret = await resolvePlaceholders(element.value);
+      for (const name of secret.consume) {
+        usedSecrets.add(name);
+      }
       lastResult = await page.waitForEventsAfterAction(async () => {
         await fillFormElement(
           element.uid,
-          element.value,
+          secret.value,
           context as McpContext,
           page,
+          element.value,
         );
       });
     }
+    await deleteSecrets([...usedSecrets]);
     response.appendResponseLine(`Successfully filled out the form`);
     response.attachWaitForResult(lastResult);
     if (request.params.includeSnapshot) {
