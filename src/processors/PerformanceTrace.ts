@@ -22,17 +22,159 @@ export interface TraceParseError {
   error: string;
 }
 
-/**
- * Parses raw JSON trace buffer bytes into a DevTools TraceEngine representation.
- *
- * Accepts either a JSON array of trace events or an object with a `traceEvents` field.
- * A new trace engine model is created per call to ensure session isolation and prevent
- * memory retention.
- *
- * @param buffer Raw UTF-8 encoded JSON bytes representing trace data.
- * @param metadata Optional throttling configurations applied during recording.
- * @returns A {@link TraceResult} with parsed traces and insights, or a {@link TraceParseError} on failure.
- */
+// Finds the start of the traceEvents array without converting the whole
+// buffer into a string. Chrome traces can be either a plain array or an
+// object containing a "traceEvents" array.
+function findEventsArrayStart(buffer: Uint8Array): number {
+  const isWhitespace = (b: number) =>
+    b === 0x20 || b === 0x09 || b === 0x0a || b === 0x0d;
+
+  let i = 0;
+  while (i < buffer.length && isWhitespace(buffer[i])) {
+    i++;
+  }
+
+  if (i >= buffer.length) {
+    return -1;
+  }
+
+  if (buffer[i] === 0x5b) {
+    // The trace itself is the array.
+    return i;
+  }
+
+  if (buffer[i] !== 0x7b) {
+    return -1;
+  }
+
+  // Look for the traceEvents field in the root object.
+  const key = '"traceEvents"';
+  const keyBytes = new Uint8Array(key.length);
+  for (let k = 0; k < key.length; k++) {
+    keyBytes[k] = key.charCodeAt(k);
+  }
+
+  let keyIndex = -1;
+  for (let j = i; j <= buffer.length - keyBytes.length; j++) {
+    let matched = true;
+    for (let k = 0; k < keyBytes.length; k++) {
+      if (buffer[j + k] !== keyBytes[k]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      keyIndex = j;
+      break;
+    }
+  }
+
+  if (keyIndex === -1) {
+    return -1;
+  }
+
+  // Move past the key and find the array after the ':'.
+  let p = keyIndex + keyBytes.length;
+  while (p < buffer.length && isWhitespace(buffer[p])) {
+    p++;
+  }
+  if (p >= buffer.length || buffer[p] !== 0x3a) {
+    // ':'
+    return -1;
+  }
+  p++;
+  while (p < buffer.length && isWhitespace(buffer[p])) {
+    p++;
+  }
+  if (p >= buffer.length || buffer[p] !== 0x5b) {
+    // '['
+    return -1;
+  }
+  return p;
+}
+
+// Pulls the individual event objects out of the raw buffer without first
+// turning the entire trace into a string. This keeps large trace files from
+// hitting V8's maximum string size.
+function extractTraceEvents(
+  buffer: Uint8Array,
+): DevTools.TraceEngine.Types.Events.Event[] {
+  const events: DevTools.TraceEngine.Types.Events.Event[] = [];
+  const decoder = new TextDecoder();
+
+  const start = findEventsArrayStart(buffer);
+  if (start === -1) {
+    return events;
+  }
+
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+  let eventStart = -1;
+  let arrayDepth = 0;
+
+  for (let i = start; i < buffer.length; i++) {
+    const b = buffer[i];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+
+    if (b === 0x22) {
+      // '"'
+      inString = !inString;
+      continue;
+    }
+
+    if (b === 0x5c && inString) {
+      // '\'
+      escape = true;
+      continue;
+    }
+
+    if (!inString) {
+      if (b === 0x5b) {
+        // '['
+        arrayDepth++;
+      } else if (b === 0x5d) {
+        // ']'
+        arrayDepth--;
+
+        // We've reached the end of the traceEvents array.
+        if (arrayDepth === 0) {
+          break;
+        }
+      } else if (b === 0x7b) {
+        // '{'
+        if (depth === 0) {
+          eventStart = i;
+        }
+        depth++;
+      } else if (b === 0x7d) {
+        // '}'
+        depth--;
+
+        // A top-level object inside the array is one trace event.
+        if (depth === 0 && eventStart !== -1) {
+          if (arrayDepth > 0) {
+            const chunk = buffer.subarray(eventStart, i + 1);
+            events.push(JSON.parse(decoder.decode(chunk)));
+          }
+          eventStart = -1;
+        }
+      }
+    }
+  }
+
+  return events;
+}
+
+// Parses the raw trace data and passes the extracted events to TraceEngine.
+// The buffer is processed in smaller pieces instead of being decoded all at
+// once, which avoids the string-size limit for very large trace files.
+// A new model is used for each call so traces from different sessions don't
+// get retained by the same model.
 export async function parseRawTraceBuffer(
   buffer: Uint8Array<ArrayBufferLike> | undefined,
   metadata?: {
@@ -45,26 +187,25 @@ export async function parseRawTraceBuffer(
       error: 'No buffer was provided.',
     };
   }
-  const asString = new TextDecoder().decode(buffer);
-  if (!asString) {
-    return {
-      error: 'Decoding the trace buffer returned an empty string.',
-    };
-  }
-  try {
-    const data = JSON.parse(asString) as
-      | {
-          traceEvents: DevTools.TraceEngine.Types.Events.Event[];
-        }
-      | DevTools.TraceEngine.Types.Events.Event[];
 
-    const events = Array.isArray(data) ? data : data.traceEvents;
-    // Instantiate a fresh TraceModel per invocation because Model permanently
-    // retains parsed traces in its internal `#traces` array, which causes an
-    // unbounded memory leak if reused across sessions.
+  try {
+    // Extract the events directly from the buffer.
+    const events = extractTraceEvents(buffer);
+
+    if (events.length === 0) {
+      return {
+        error:
+          'No trace events could be parsed from the buffer. Expected either a top-level ' +
+          'JSON array of events or an object with a "traceEvents" array.',
+      };
+    }
+
+    // Use a new model for every trace so previous sessions don't stay in memory.
     const engine =
       DevTools.TraceEngine.TraceModel.Model.createWithAllHandlers();
+
     await engine.parse(events, {metadata});
+
     const parsedTrace = engine.parsedTrace();
     if (!parsedTrace) {
       return {
@@ -86,6 +227,10 @@ export async function parseRawTraceBuffer(
     };
   }
 }
+
+
+
+
 
 const extraFormatDescriptions = `Information on performance traces may contain main thread activity represented as call frames and network requests.
 
