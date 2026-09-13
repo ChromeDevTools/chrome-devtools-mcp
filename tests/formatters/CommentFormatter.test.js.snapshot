@@ -1,0 +1,99 @@
+exports[`CommentFormatter > formats comments with targets and editor locations toJSON 1`] = `
+[
+  {
+    "id": "comment-1",
+    "text": "Fix the color contrast here",
+    "elementUid": "element-uid-42",
+    "reqid": 7,
+    "editor": {
+      "filePath": "src/style.css",
+      "lineNumber": 10
+    }
+  }
+]
+`;
+
+exports[`CommentFormatter > formats comments with targets and editor locations toString 1`] = `
+Found 1 DevTools comment thread(s):
+
+### Thread: comment-1
+- Comment: Fix the color contrast here
+- Target element (snapshot UID): element-uid-42
+- Network request ID (reqid): 7
+- Editor location: src/style.css:10
+`;
+
+exports[`CommentFormatter > formats editor location when filePath is missing toJSON 1`] = `
+[
+  {
+    "id": "comment-2",
+    "text": "Review this script line",
+    "editor": {
+      "lineNumber": 25
+    }
+  }
+]
+`;
+
+exports[`CommentFormatter > formats editor location when filePath is missing toString 1`] = `
+Found 1 DevTools comment thread(s):
+
+### Thread: comment-2
+- Comment: Review this script line
+- Editor location: line 25
+`;
+
+exports[`CommentFormatter > formats empty comments list toJSON 1`] = `
+[]
+`;
+
+exports[`CommentFormatter > formats empty comments list toString 1`] = `
+No open DevTools comments found.
+`;
+
+exports[`CommentFormatter > formats single thread using static formatThread 1`] = `
+### Thread: comment-3
+- Comment: Check padding
+- Target element (snapshot UID): node-99
+`;
+
+exports[`CommentFormatter > omits unresolved targets when from() resolves undefined toJSON 1`] = `
+[
+  {
+    "id": "comment-2",
+    "text": "Fix heading font size"
+  }
+]
+`;
+
+exports[`CommentFormatter > omits unresolved targets when from() resolves undefined toString 1`] = `
+Found 1 DevTools comment thread(s):
+
+### Thread: comment-2
+- Comment: Fix heading font size
+`;
+
+exports[`CommentFormatter > resolves targets using from() method toJSON 1`] = `
+[
+  {
+    "id": "comment-1",
+    "text": "Fix the color contrast here",
+    "elementUid": "element-uid-42",
+    "reqid": 7,
+    "editor": {
+      "filePath": "src/style.css",
+      "lineNumber": 10
+    }
+  }
+]
+`;
+
+exports[`CommentFormatter > resolves targets using from() method toString 1`] = `
+Found 1 DevTools comment thread(s):
+
+### Thread: comment-1
+- Comment: Fix the color contrast here
+- Target element (snapshot UID): element-uid-42
+- Network request ID (reqid): 7
+- Editor location: src/style.css:10
+`;

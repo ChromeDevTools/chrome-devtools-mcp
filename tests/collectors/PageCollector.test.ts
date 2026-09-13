@@ -16,7 +16,7 @@ import {
   NetworkCollector,
   PageCollector,
 } from '../../src/collectors/PageCollector.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
@@ -56,6 +56,56 @@ describe('PageCollector', () => {
     assert.equal(collector.getData()[0], request);
     page.emit('framenavigated', mainFrame);
 
+    assert.equal(collector.getData().length, 0);
+  });
+
+  it('does not clean up after same-document navigation', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const request = getMockRequest();
+    const collector = new PageCollector(page, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+
+    page.emit('request', request);
+
+    assert.equal(collector.getData()[0], request);
+
+    // Simulate a same-document (SPA) navigation: Puppeteer emits
+    // `FrameNavigatedWithinDocument` right before `framenavigated`.
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
+    page.emit('framenavigated', mainFrame);
+
+    assert.equal(collector.getData()[0], request);
+  });
+
+  it('cleans up after a cross-document navigation following a same-document one', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const request = getMockRequest();
+    const collector = new PageCollector(page, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+
+    page.emit('request', request);
+
+    // Same-document navigation: history is kept.
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
+    page.emit('framenavigated', mainFrame);
+    assert.equal(collector.getData()[0], request);
+
+    // A real cross-document navigation must still rotate the history.
+    page.emit('framenavigated', mainFrame);
     assert.equal(collector.getData().length, 0);
   });
 

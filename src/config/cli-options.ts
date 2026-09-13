@@ -405,6 +405,40 @@ export const commands: Commands = {
       },
     },
   },
+  get_css_styles: {
+    description:
+      'Retrieve matched CSS rules, inline styles, inherited styles, and cascade information for an element identified by its UID.\nUse this tool to debug why specific CSS properties are applied, overridden, or conflicting. Supports pagination for elements with many matched rules. Requires a UID from take_snapshot.',
+    category: 'Debugging',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
+      uid: {
+        name: 'uid',
+        type: 'string',
+        description:
+          'The uid of the element on the page from the page content snapshot to inspect CSS styles for',
+        required: true,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'integer',
+        description:
+          'Maximum number of CSS rules to return per page. When omitted, returns all rules.',
+        required: false,
+      },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'integer',
+        description:
+          'Page number to return (0-based). When omitted, returns the first page.',
+        required: false,
+      },
+    },
+  },
   get_heapsnapshot_class_nodes: {
     description:
       'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',

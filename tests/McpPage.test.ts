@@ -12,12 +12,14 @@ import sinon from 'sinon';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {Locator} from '../src/third_party/index.js';
+import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
+import type {TextSnapshotNode} from '../src/types.js';
 import {createMockPuppeteerPage} from './mocks.js';
-
-import {withMcpContext} from './utils.js';
+import {serverHooks} from './server.js';
+import {html, withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -268,42 +270,38 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
-  it('creates a handle on the page and disposes it as such', async () => {
-    await withMcpContext(async (response, context) => {
-      const page = context.getSelectedMcpPage().pptrPage;
-
-      using handle = await page.evaluateHandle('new Set()');
-
-      {
-        using _ = handle;
-      }
-
-      // @ts-expect-error Internal Puppeteer API
-      assert.ok(handle.disposed);
+  function createMcpPage(options: {hasNetworkBlockOrAllowlist?: boolean} = {}) {
+    const pptrPage = createMockPuppeteerPage();
+    const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
+      hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
+      locatorClass: Locator,
     });
-  });
+    const mockSession = {
+      send: sinon.stub().resolves(),
+    };
+    sinon
+      .stub(mcpPage, 'devtoolsUniverse')
+      .get(() => ({session: mockSession}) as unknown as TargetUniverse);
+    return {mcpPage, pptrPage, mockSession};
+  }
+
+  function getUidForNode(mcpPage: McpPage, matcher: string): string {
+    const textSnapshot = mcpPage.textSnapshot;
+    if (!textSnapshot) {
+      throw new Error('No textSnapshot on mcpPage');
+    }
+    for (const [uid, node] of textSnapshot.idToNode) {
+      if (node.name?.includes(matcher)) {
+        return uid;
+      }
+    }
+    throw new Error(`Target element "${matcher}" not found in snapshot`);
+  }
 
   describe('emulate()', () => {
     afterEach(() => {
       sinon.restore();
     });
-
-    function createMcpPage(
-      options: {hasNetworkBlockOrAllowlist?: boolean} = {},
-    ) {
-      const pptrPage = createMockPuppeteerPage();
-      const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
-        hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
-        locatorClass: Locator,
-      });
-      const mockSession = {
-        send: sinon.stub().resolves(),
-      };
-      sinon
-        .stub(mcpPage, 'devtoolsUniverse')
-        .get(() => ({session: mockSession}) as unknown as TargetUniverse);
-      return {mcpPage, pptrPage, mockSession};
-    }
 
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = createMcpPage();
@@ -528,6 +526,398 @@ describe('McpPage', () => {
         pptrPage.setExtraHTTPHeaders.secondCall,
         {},
       );
+    });
+  });
+
+  describe('restoreEmulation()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('re-applies previously configured viewport emulation', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        viewport: {
+          width: 400,
+          height: 400,
+          deviceScaleFactor: 1,
+          isMobile: false,
+          hasTouch: false,
+          isLandscape: false,
+        },
+      });
+      sinon.assert.calledOnce(pptrPage.setViewport);
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledTwice(pptrPage.setViewport);
+      sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, {
+        width: 400,
+        height: 400,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      });
+    });
+
+    it('re-applies previously configured network and cpu throttling emulation', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      await mcpPage.emulate({
+        networkConditions: 'Slow 3G',
+        cpuThrottlingRate: 4,
+      });
+      sinon.assert.calledOnce(pptrPage.emulateNetworkConditions);
+      sinon.assert.calledOnce(pptrPage.emulateCPUThrottling);
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
+      sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
+    });
+  });
+
+  describe('waitForTextOnPage()', () => {
+    it('finds text on the page', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Hello']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with any-match array', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><span>Status</span><div>Error</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Complete', 'Error']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with any-match array when element shows up later', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        const waitPromise = mcpPage.waitForTextOnPage(['Complete', 'Error']);
+
+        await page.setContent(
+          html`<main
+            ><span>Hello</span><span> </span><div>Complete</div></main
+          >`,
+        );
+
+        const element = await waitPromise;
+        assert.ok(element);
+      });
+    });
+
+    it('works with element that shows up later', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        const waitPromise = mcpPage.waitForTextOnPage(['Hello World']);
+
+        await page.setContent(
+          html`<main><span>Hello</span><span> </span><div>World</div></main>`,
+        );
+
+        const element = await waitPromise;
+        assert.ok(element);
+      });
+    });
+
+    it('works with aria elements', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<main><h1>Header</h1><div>Text</div></main>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Header']);
+        assert.ok(element);
+      });
+    });
+
+    it('works with iframe content', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+
+        await page.setContent(
+          html`<h1>Top level</h1>
+            <iframe srcdoc="<p>Hello iframe</p>"></iframe>`,
+        );
+
+        const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
+        assert.ok(element);
+      });
+    });
+  });
+
+  describe('DevToolsCommentBridge lifecycle', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('does not create commentBridge on construction or getDevToolsPage', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      pptrPage.hasDevTools.resolves(true);
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const retrieved = await mcpPage.getDevToolsPage();
+      assert.strictEqual(retrieved, devtoolsPage);
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+    });
+
+    it('creates and attaches commentBridge when openDevTools is called', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const result = await mcpPage.openDevTools();
+      assert.strictEqual(result, devtoolsPage);
+      assert.notStrictEqual(mcpPage.commentBridge, undefined);
+      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    });
+
+    it('disposes commentBridge on mcpPage.dispose()', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      await mcpPage.openDevTools();
+      const bridge = mcpPage.commentBridge;
+      assert.notStrictEqual(bridge, undefined);
+
+      if (bridge) {
+        const disposeSpy = sinon.spy(bridge, 'dispose');
+        mcpPage.dispose();
+
+        sinon.assert.calledOnce(disposeSpy);
+        assert.strictEqual(mcpPage.commentBridge, undefined);
+      }
+    });
+  });
+
+  describe('getMatchedStylesForUid()', () => {
+    const server = serverHooks();
+
+    function getSelectors(
+      matchedStyles: DevTools.CSSMatchedStyles.CSSMatchedStyles,
+    ): string[] {
+      const styles = matchedStyles.nodeStyles();
+      assert.ok(styles.length > 0);
+      const selectors: string[] = [];
+      for (const s of styles) {
+        if (s.parentRule instanceof DevTools.CSSRule.CSSStyleRule) {
+          selectors.push(s.parentRule.selectorText());
+        }
+      }
+      return selectors;
+    }
+
+    async function getSelectorsForUid(
+      uid: string,
+      mcpPage: McpPage,
+    ): Promise<string[]> {
+      const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+      assert.ok(matchedStyles);
+      return getSelectors(matchedStyles);
+    }
+
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('throws when snapshot has not been captured', async () => {
+      const {mcpPage} = createMcpPage();
+      await assert.rejects(
+        () => mcpPage.getMatchedStylesForUid('node_1'),
+        /No snapshot found for page/,
+      );
+    });
+
+    it('throws when element uid is not found in snapshot', async () => {
+      const {mcpPage} = createMcpPage();
+      const rootNode: TextSnapshotNode = {
+        id: '1_0',
+        role: 'root',
+        children: [],
+        elementHandle: async () => null,
+      };
+      mcpPage.textSnapshot = new TextSnapshot({
+        root: rootNode,
+        idToNode: new Map<string, TextSnapshotNode>(),
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose: false,
+      });
+      await assert.rejects(
+        () => mcpPage.getMatchedStylesForUid('node_1'),
+        /Element uid "node_1" not found on page/,
+      );
+    });
+
+    it('throws when element has no backendNodeId', async () => {
+      const {mcpPage} = createMcpPage();
+      const node: TextSnapshotNode = {
+        id: '1_1',
+        role: 'button',
+        children: [],
+        elementHandle: async () => null,
+      };
+      const idToNode = new Map<string, TextSnapshotNode>([['node_1', node]]);
+      mcpPage.textSnapshot = new TextSnapshot({
+        root: node,
+        idToNode,
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose: false,
+      });
+      await assert.rejects(
+        () => mcpPage.getMatchedStylesForUid('node_1'),
+        /Failed to resolve backend node ID for element with uid "node_1"/,
+      );
+    });
+
+    it('retrieves matched styles across elements, shadow roots, and iframes', async () => {
+      server.addHtmlRoute(
+        '/iframe_content.html',
+        html`
+          <style>
+            .frame-btn {
+              background-color: purple;
+              color: white;
+            }
+          </style>
+          <button
+            id="iframe-btn"
+            class="frame-btn"
+            >Iframe Button</button
+          >
+        `,
+      );
+      server.addHtmlRoute(
+        '/styles_combined_test.html',
+        html`
+          <style>
+            .btn-primary {
+              color: blue;
+              font-size: 14px;
+            }
+            #my-button {
+              color: green;
+            }
+          </style>
+          <button
+            id="my-button"
+            class="btn-primary"
+            style="font-size: 16px; padding: 8px;"
+          >
+            Click Me
+          </button>
+          <div id="open-host"></div>
+          <div id="closed-host"></div>
+          <iframe
+            id="child-frame"
+            src="/iframe_content.html"
+          ></iframe>
+          <script>
+            const openHost = document.getElementById('open-host');
+            const openRoot = openHost.attachShadow({mode: 'open'});
+            openRoot.innerHTML = \`
+              <style>
+                .shadow-btn-open {
+                  color: rgb(100, 200, 50);
+                }
+              </style>
+              <button class="shadow-btn-open">Open Shadow Button</button>
+            \`;
+
+            const closedHost = document.getElementById('closed-host');
+            const closedRoot = closedHost.attachShadow({mode: 'closed'});
+            closedRoot.innerHTML = \`
+              <style>
+                .shadow-btn-closed {
+                  color: rgb(200, 50, 100);
+                }
+              </style>
+              <button class="shadow-btn-closed">Closed Shadow Button</button>
+            \`;
+          </script>
+        `,
+      );
+
+      await withMcpContext(async (_, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.goto(
+          server.getRoute('/styles_combined_test.html'),
+        );
+        const frame = await mcpPage.pptrPage.waitForFrame(
+          f => f.url() === server.getRoute('/iframe_content.html'),
+        );
+        if (!frame) {
+          throw new Error('Child frame not found');
+        }
+        await frame.waitForSelector('#iframe-btn');
+
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+
+        // 1. Regular element
+        {
+          const uid = getUidForNode(mcpPage, 'Click Me');
+          const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+          const inlineStyle = matchedStyles
+            .nodeStyles()
+            .find(s => s.type === DevTools.CSSStyleDeclaration.Type.Inline);
+          assert.ok(inlineStyle);
+          const selectors = getSelectors(matchedStyles);
+          assert.ok(selectors.includes('#my-button'));
+          assert.ok(selectors.includes('.btn-primary'));
+        }
+
+        // 2. Open shadow root
+        {
+          const uid = getUidForNode(mcpPage, 'Open Shadow Button');
+          const selectors = await getSelectorsForUid(uid, mcpPage);
+          assert.ok(selectors.includes('.shadow-btn-open'));
+        }
+
+        // 3. Closed shadow root
+        {
+          const uid = getUidForNode(mcpPage, 'Closed Shadow Button');
+          const selectors = await getSelectorsForUid(uid, mcpPage);
+          assert.ok(selectors.includes('.shadow-btn-closed'));
+        }
+
+        // 4. Iframe
+        {
+          const uid = getUidForNode(mcpPage, 'Iframe Button');
+          const selectors = await getSelectorsForUid(uid, mcpPage);
+          assert.ok(selectors.includes('.frame-btn'));
+        }
+      });
     });
   });
 });

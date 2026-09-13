@@ -8,14 +8,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import {lighthouseRunner} from '../../src/third_party/index.js';
 import {lighthouseAudit} from '../../src/tools/lighthouse.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {createHandlerMocks, createMockRunnerResult} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('lighthouse', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   const server = serverHooks();
   describe('lighthouse_audit', () => {
     it('runs Lighthouse audit by default (navigation, desktop)', async () => {
@@ -54,68 +62,50 @@ describe('lighthouse', () => {
     });
 
     it('restores emulation', async () => {
-      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+      const {page, context, response} = createHandlerMocks();
+      context.saveTemporaryFile.resolves({filepath: 'report.json'});
+      sinon
+        .stub(lighthouseRunner, 'snapshot')
+        .resolves(createMockRunnerResult());
 
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/test-mobile'));
-        await context.getSelectedMcpPage().emulate({
-          viewport: {
-            width: 400,
-            height: 400,
-            deviceScaleFactor: 1,
-            hasTouch: true,
-          },
-        });
-
+      await lighthouseAudit.handler(
         {
-          const viewportData = await page.evaluate(() => {
-            return {
-              width: window.innerWidth,
-              height: window.innerHeight,
-              deviceScaleFactor: window.devicePixelRatio,
-              hasTouch: navigator.maxTouchPoints > 0,
-            };
-          });
+          params: {
+            mode: 'snapshot',
+            device: 'mobile',
+          },
+          page,
+        },
+        response,
+        context,
+      );
 
-          assert.deepStrictEqual(viewportData, {
-            width: 400,
-            height: 400,
-            deviceScaleFactor: 1,
-            hasTouch: true,
-          });
-        }
+      sinon.assert.calledOnceWithExactly(page.restoreEmulation);
+    });
 
-        await lighthouseAudit.handler(
-          {
-            params: {
-              mode: 'snapshot',
-              device: 'mobile',
+    it('restores emulation even when audit fails', async () => {
+      const {page, context, response} = createHandlerMocks();
+      sinon
+        .stub(lighthouseRunner, 'snapshot')
+        .rejects(new Error('Audit failed'));
+
+      await assert.rejects(
+        () =>
+          lighthouseAudit.handler(
+            {
+              params: {
+                mode: 'snapshot',
+                device: 'mobile',
+              },
+              page,
             },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
+            response,
+            context,
+          ),
+        {message: 'Audit failed'},
+      );
 
-        {
-          const viewportData = await page.evaluate(() => {
-            return {
-              width: window.innerWidth,
-              height: window.innerHeight,
-              deviceScaleFactor: window.devicePixelRatio,
-              hasTouch: navigator.maxTouchPoints > 0,
-            };
-          });
-
-          assert.deepStrictEqual(viewportData, {
-            width: 400,
-            height: 400,
-            deviceScaleFactor: 1,
-            hasTouch: true,
-          });
-        }
-      });
+      sinon.assert.calledOnceWithExactly(page.restoreEmulation);
     });
 
     it('runs Lighthouse in snapshot mode with mobile device', async () => {

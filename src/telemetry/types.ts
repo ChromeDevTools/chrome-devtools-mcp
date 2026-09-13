@@ -17,6 +17,7 @@ export interface ChromeDevToolsMcpExtension {
   daily_active?: DailyActive;
   server_shutdown?: ServerShutdown;
   server_error?: ServerError;
+  tool_active?: ToolActive;
 }
 
 export interface ServerError {
@@ -51,6 +52,10 @@ export interface ServerStart {
 
 export interface DailyActive {
   days_since_last_active: number;
+}
+
+export interface ToolActive {
+  days_since_last_tool_call: number;
 }
 
 export type FlagUsage = Record<string, boolean | string | number | undefined>;
@@ -96,6 +101,7 @@ export enum McpClient {
   MCP_CLIENT_OPENCODE = 9,
   MCP_CLIENT_CLAUDE_DESKTOP = 10,
   MCP_CLIENT_GITHUB_COPILOT = 11,
+  MCP_CLIENT_HERMES = 12,
   MCP_CLIENT_OTHER = 3,
 }
 

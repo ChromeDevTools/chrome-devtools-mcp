@@ -7,8 +7,7 @@
 import path from 'node:path';
 
 import {
-  snapshot,
-  navigation,
+  lighthouseRunner,
   generateReport,
   zod,
   type Flags,
@@ -92,11 +91,15 @@ export const lighthouseAudit = definePageTool({
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page.pptrPage, page.pptrPage.url(), {
-          flags,
-        });
+        result = await lighthouseRunner.navigation(
+          page.pptrPage,
+          page.pptrPage.url(),
+          {
+            flags,
+          },
+        );
       } else {
-        result = await snapshot(page.pptrPage, {
+        result = await lighthouseRunner.snapshot(page.pptrPage, {
           flags,
         });
       }

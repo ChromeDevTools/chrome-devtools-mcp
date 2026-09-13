@@ -75,6 +75,8 @@ interface McpContextOptions {
   navigationTimeout?: number;
   // Whether extension tools and targets are enabled.
   categoryExtensions?: boolean;
+  // Callback when a notification should be emitted to MCP client.
+  onNotification?: (message: string) => void;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -570,6 +572,7 @@ export class McpContext implements Context {
         ),
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
+        onNotification: this.#options.onNotification,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();

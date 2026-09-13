@@ -57,6 +57,7 @@ describe('cli args parsing', () => {
     experimentalStructuredContent: false,
     pageIdRouting: true,
     sourceMaps: true,
+    devtoolsComments: false,
   };
 
   it('parses with default args', async () => {
@@ -512,5 +513,10 @@ describe('cli args parsing', () => {
       () => parseArguments(['--config', testConfig.path]),
       /Invalid JSON config file: Unknown argument: category-memory/,
     );
+  });
+
+  it('parses with devtoolsComments enabled', async () => {
+    const args = parseArguments(['--devtoolsComments']);
+    assert.strictEqual(args.devtoolsComments, true);
   });
 });
