@@ -14,7 +14,7 @@
 
 Start the MCP server with debugging enabled and a log file:
 
-- `DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
+- `NODE_DEBUG=* npx chrome-devtools-mcp@latest --log-file=/path/to/chrome-devtools-mcp.log`
 
 Using `.mcp.json` to debug while using a client:
 
@@ -30,7 +30,7 @@ Using `.mcp.json` to debug while using a client:
         "/path/to/chrome-devtools-mcp.log"
       ],
       "env": {
-        "DEBUG": "*"
+        "NODE_DEBUG": "*"
       }
     }
   }
