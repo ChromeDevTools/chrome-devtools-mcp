@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
+import type {Options as YargsOptions} from 'yargs';
 
 import {
   mcpOptions,
@@ -117,21 +118,11 @@ function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
   return a.name.localeCompare(b.name);
 }
 
-interface OptionConfig {
-  hidden?: boolean;
-  alias?: string;
-  description?: string;
-  describe?: string;
-  type?: string;
-  choices?: string[];
-  default?: unknown;
-}
-
 function generateConfigOptionsMarkdown(): string {
   let markdown = '';
 
   for (const [optionName, optionConfig] of Object.entries(
-    mcpOptions as Record<string, OptionConfig>,
+    mcpOptions as Record<string, Partial<YargsOptions>>,
   )) {
     // Skip hidden options
     if (optionConfig.hidden) {
@@ -164,8 +155,13 @@ function generateConfigOptionsMarkdown(): string {
       markdown += `  - **Choices:** ${optionConfig.choices.map(c => `\`${c}\``).join(', ')}\n`;
     }
 
-    // Add default if available
-    markdown += `  - **Default:** \`${optionConfig.defaultDescription ?? optionConfig.default ?? 'false'}\`\n`;
+    const defaultValue =
+      optionConfig.defaultDescription ?? optionConfig.default;
+    if (defaultValue !== undefined) {
+      markdown += `  - **Default:** \`${defaultValue}\`\n`;
+    } else if (optionConfig.type === 'boolean') {
+      markdown += `  - **Default:** \`false\`\n`;
+    }
 
     markdown += '\n';
   }
