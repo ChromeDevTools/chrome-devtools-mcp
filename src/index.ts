@@ -69,7 +69,7 @@ export class McpServer {
     this.#serverArgs = serverArgs;
     this.#options = options;
 
-    if (this.#serverArgs.usageStatistics) {
+    if (this.#serverArgs.usageStatistics && !ClearcutLogger.get()) {
       ClearcutLogger.initialize({
         persistence: new FilePersistence(),
         logFile: this.#serverArgs.logFile,
@@ -297,6 +297,7 @@ export class McpServer {
       this.#serverArgs,
       () => this.#getContext(),
       this.#toolMutex,
+      () => this.server.server.getClientVersion()?.name,
     );
 
     if (!toolHandler.shouldRegister) {

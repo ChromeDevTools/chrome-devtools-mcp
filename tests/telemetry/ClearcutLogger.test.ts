@@ -57,6 +57,28 @@ describe('ClearcutLogger', () => {
       assert.strictEqual(msg.payload.tool_invocation?.success, true);
       assert.strictEqual(msg.payload.tool_invocation?.latency_ms, 250);
     });
+    it('uses an invocation-specific client name', async () => {
+      const logger = ClearcutLogger.initialize({
+        persistence: mockPersistence,
+        appVersion: '1.0.0',
+        watchdogClient: mockWatchdogClient,
+      });
+      logger.setClientName('claude-code');
+      await logger.logToolInvocation({
+        toolName: 'test_tool',
+        params: {},
+        schema: {},
+        success: true,
+        latencyMs: 123,
+        clientName: 'codex-http-client',
+      });
+
+      sinon.assert.calledOnce(mockWatchdogClient.send);
+      assert.strictEqual(
+        mockWatchdogClient.send.firstCall.args[0].payload.mcp_client,
+        McpClient.MCP_CLIENT_CODEX,
+      );
+    });
     it('sends context when provided', async () => {
       const logger = ClearcutLogger.initialize({
         persistence: mockPersistence,

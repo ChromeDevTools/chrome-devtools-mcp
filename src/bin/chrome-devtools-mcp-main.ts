@@ -9,6 +9,7 @@ import '../utils/polyfill.js';
 import process from 'node:process';
 
 import {closeBrowser} from '../browser.js';
+import {HttpMcpServer} from '../http-server.js';
 import {McpServer, logDisclaimers} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
@@ -33,11 +34,8 @@ if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
   });
 }
 
-// Shutdown on stdin EOF (stdio MCP convention — the client closes the
-// transport to signal exit) and on standard termination signals. Without
-// this, an active Chrome subprocess keeps the Node event loop ref'd after
-// stdin closes and the server hangs until something else kills it.
 let shuttingDown = false;
+let httpServer: HttpMcpServer | undefined;
 async function shutdown(reason: string): Promise<void> {
   if (shuttingDown) {
     return;
@@ -52,15 +50,20 @@ async function shutdown(reason: string): Promise<void> {
     logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
   }, 5000).unref();
+  await httpServer?.close();
   await closeBrowser();
   process.exit(0);
 }
-process.stdin.on('end', () => {
-  void shutdown('stdin end');
-});
-process.stdin.on('close', () => {
-  void shutdown('stdin close');
-});
+if (args.port === undefined) {
+  // Shutdown on stdin EOF (stdio MCP convention — the client closes the
+  // transport to signal exit). An HTTP daemon must outlive client streams.
+  process.stdin.on('end', () => {
+    void shutdown('stdin end');
+  });
+  process.stdin.on('close', () => {
+    void shutdown('stdin close');
+  });
+}
 process.on('SIGTERM', () => {
   void shutdown('SIGTERM');
 });
@@ -72,12 +75,18 @@ process.on('SIGHUP', () => {
 });
 
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const server = await McpServer.from(args, {
-  logFile,
-});
-const transport = new StdioServerTransport();
-await server.connect(transport);
-logger?.('Chrome DevTools MCP Server connected');
+if (args.port === undefined) {
+  const server = await McpServer.from(args, {
+    logFile,
+  });
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  logger?.('Chrome DevTools MCP Server connected over stdio');
+} else {
+  httpServer = new HttpMcpServer(args, {logFile});
+  const url = await httpServer.start();
+  logger?.(`Chrome DevTools MCP Server listening on ${url.href}`);
+}
 logDisclaimers(args);
 void ClearcutLogger.get()?.logDailyActiveIfNeeded();
 void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));

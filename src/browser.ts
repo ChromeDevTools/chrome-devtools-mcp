@@ -20,6 +20,7 @@ import {isAllowedUrl} from './utils/url.js';
 
 let browser: Browser | undefined;
 let browserMode: 'launched' | 'connected' | undefined;
+let browserInitialization: Promise<Browser> | undefined;
 
 export function makeTargetFilter(enableExtensions = false) {
   return function targetFilter(target: {url(): string}): boolean {
@@ -45,6 +46,9 @@ export async function ensureBrowserConnected(options: {
   const {channel, enableExtensions} = options;
   if (browser?.connected) {
     return browser;
+  }
+  if (browserInitialization) {
+    return await browserInitialization;
   }
 
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
@@ -112,23 +116,30 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+  browserInitialization = (async () => {
+    try {
+      // Assign mode before browser so a concurrent closeBrowser() never sees
+      // `browser` set with `browserMode` still undefined (would fall through
+      // to the disconnect() path and orphan a launched Chrome).
+      const connected = await puppeteer.connect(connectOptions);
+      browserMode = 'connected';
+      browser = connected;
+      logger?.('Connected Puppeteer');
+      return connected;
+    } catch (err) {
+      throw new Error(
+        `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
+        {
+          cause: err,
+        },
+      );
+    }
+  })();
   try {
-    // Assign mode before browser so a concurrent closeBrowser() never sees
-    // `browser` set with `browserMode` still undefined (would fall through
-    // to the disconnect() path and orphan a launched Chrome).
-    const connected = await puppeteer.connect(connectOptions);
-    browserMode = 'connected';
-    browser = connected;
-  } catch (err) {
-    throw new Error(
-      `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
-      {
-        cause: err,
-      },
-    );
+    return await browserInitialization;
+  } finally {
+    browserInitialization = undefined;
   }
-  logger?.('Connected Puppeteer');
-  return browser;
 }
 
 interface McpLaunchOptions {
@@ -269,11 +280,21 @@ export async function ensureBrowserLaunched(
   if (browser?.connected) {
     return browser;
   }
-  // Assign mode before browser; see the connect path above for rationale.
-  const launched = await launch(options);
-  browserMode = 'launched';
-  browser = launched;
-  return browser;
+  if (browserInitialization) {
+    return await browserInitialization;
+  }
+  browserInitialization = (async () => {
+    // Assign mode before browser; see the connect path above for rationale.
+    const launched = await launch(options);
+    browserMode = 'launched';
+    browser = launched;
+    return launched;
+  })();
+  try {
+    return await browserInitialization;
+  } finally {
+    browserInitialization = undefined;
+  }
 }
 
 /**
@@ -284,6 +305,11 @@ export async function ensureBrowserLaunched(
  * on stdin EOF / SIGTERM / SIGINT.
  */
 export async function closeBrowser(): Promise<void> {
+  if (browserInitialization) {
+    await browserInitialization.catch(err => {
+      logger?.('Browser initialization failed during shutdown', err);
+    });
+  }
   const b = browser;
   const mode = browserMode;
   browser = undefined;

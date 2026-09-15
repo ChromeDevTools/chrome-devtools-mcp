@@ -457,5 +457,25 @@
   {
     "name": "devtools_comments",
     "flagType": "boolean"
+  },
+  {
+    "name": "host_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "port_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allowed_hosts_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allowed_origins_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "session_idle_timeout_present",
+    "flagType": "boolean"
   }
 ]

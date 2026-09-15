@@ -175,6 +175,7 @@ export class ToolHandler {
     private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
+    private readonly getClientName: () => string | undefined = () => undefined,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -324,7 +325,8 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
-      void ClearcutLogger.get()?.logToolInvocation({
+      const telemetry = ClearcutLogger.get();
+      void telemetry?.logToolInvocation({
         toolName: this.tool.name,
         params,
         schema: this.inputSchema,
@@ -332,6 +334,7 @@ export class ToolHandler {
         latencyMs: Date.now() - startTime,
         devToolsData,
         pageUrl,
+        clientName: this.getClientName(),
       });
       guard[Symbol.dispose]();
     }

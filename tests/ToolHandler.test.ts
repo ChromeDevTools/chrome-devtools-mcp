@@ -235,6 +235,7 @@ describe('ToolHandler', () => {
         serverArgs,
         async () => mockContext,
         toolMutex,
+        () => 'codex-http-client',
       );
 
       await toolHandler.handle({});
@@ -245,6 +246,10 @@ describe('ToolHandler', () => {
         testCase.devToolsData,
       );
       assert.strictEqual(logSpy.firstCall.args[0].pageUrl, testCase.pageUrl);
+      assert.strictEqual(
+        logSpy.firstCall.args[0].clientName,
+        'codex-http-client',
+      );
       assert.strictEqual(handlerCalled, true);
 
       sinon.restore();

@@ -58,6 +58,8 @@ describe('cli args parsing', () => {
     pageIdRouting: true,
     sourceMaps: true,
     devtoolsComments: false,
+    host: '127.0.0.1',
+    sessionIdleTimeout: 86400,
   };
 
   it('parses with default args', async () => {
@@ -90,6 +92,57 @@ describe('cli args parsing', () => {
       $0: 'npx chrome-devtools-mcp@latest',
       browserUrl: 'http://localhost:3000',
     });
+  });
+
+  it('parses Streamable HTTP options', () => {
+    const args = parseArguments([
+      '--host',
+      'localhost',
+      '--port',
+      '13501',
+      '--allowed-hosts',
+      'forwarded.local:9000',
+      '--allowed-origins',
+      'https://trusted.example',
+      '--session-idle-timeout',
+      '60',
+    ]);
+
+    assert.strictEqual(args.host, 'localhost');
+    assert.strictEqual(args.port, 13501);
+    assert.deepStrictEqual(args.allowedHosts, ['forwarded.local:9000']);
+    assert.deepStrictEqual(args.allowedOrigins, ['https://trusted.example']);
+    assert.strictEqual(args.sessionIdleTimeout, 60);
+  });
+
+  it('rejects invalid Streamable HTTP numeric options', () => {
+    const portCoerce = mcpOptions.port.coerce;
+    const timeoutCoerce = mcpOptions.sessionIdleTimeout.coerce;
+
+    assert.strictEqual(portCoerce(undefined), undefined);
+    assert.strictEqual(portCoerce(13501), 13501);
+    assert.strictEqual(timeoutCoerce(undefined), undefined);
+    assert.strictEqual(timeoutCoerce(0), 0);
+
+    for (const value of [0, -1, 65536, 1.5, Number.NaN]) {
+      assert.throws(
+        () => portCoerce(value),
+        /Invalid port .* Expected an integer between 1 and 65535\./,
+      );
+    }
+    for (const value of [-1, 1.5, Number.NaN]) {
+      assert.throws(
+        () => timeoutCoerce(value),
+        /Invalid sessionIdleTimeout .* Expected a non-negative integer\./,
+      );
+    }
+  });
+
+  it('rejects a non-loopback Streamable HTTP host', () => {
+    assert.throws(
+      () => parseArguments(['--host', '0.0.0.0']),
+      /Invalid host 0\.0\.0\.0\. Expected 127\.0\.0\.1, localhost, or ::1\./,
+    );
   });
 
   it('rejects unknown options', async () => {

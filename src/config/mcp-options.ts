@@ -22,6 +22,63 @@ export const mcpOptions = {
     describe:
       'Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
+  host: {
+    type: 'string',
+    default: '127.0.0.1',
+    describe:
+      'Loopback address for Streamable HTTP. The HTTP server starts only when --port is provided.',
+    coerce: (value: string) => {
+      if (!['127.0.0.1', 'localhost', '::1'].includes(value)) {
+        throw new Error(
+          `Invalid host ${value}. Expected 127.0.0.1, localhost, or ::1.`,
+        );
+      }
+      return value;
+    },
+  },
+  port: {
+    type: 'number',
+    describe:
+      'Port for Streamable HTTP. When omitted, the server uses stdio transport.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value <= 0 || value > 65535) {
+        throw new Error(
+          `Invalid port ${value}. Expected an integer between 1 and 65535.`,
+        );
+      }
+      return value;
+    },
+  },
+  allowedHosts: {
+    type: 'array',
+    describe:
+      'Additional Host header values accepted by Streamable HTTP. Loopback hosts on --port are always accepted.',
+  },
+  allowedOrigins: {
+    type: 'array',
+    describe:
+      'Additional Origin header values accepted by Streamable HTTP. Loopback origins on --port are always accepted.',
+  },
+  sessionIdleTimeout: {
+    type: 'number',
+    default: 86400,
+    describe:
+      'Close inactive Streamable HTTP sessions after this many seconds. Set to 0 to disable idle cleanup.',
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (!Number.isInteger(value) || value < 0) {
+        throw new Error(
+          `Invalid sessionIdleTimeout ${value}. Expected a non-negative integer.`,
+        );
+      }
+      return value;
+    },
+  },
   viewport: {
     type: 'string',
     describe:

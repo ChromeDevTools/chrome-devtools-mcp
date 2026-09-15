@@ -100,6 +100,31 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
   - **Default:** `false`
 
+- **`--host`**
+  Loopback address for Streamable HTTP. The HTTP server starts only when --port is provided.
+  - **Type:** string
+  - **Default:** `127.0.0.1`
+
+- **`--port`**
+  Port for Streamable HTTP. When omitted, the server uses stdio transport.
+  - **Type:** number
+  - **Default:** `false`
+
+- **`--allowedHosts`/ `--allowed-hosts`**
+  Additional Host header values accepted by Streamable HTTP. Loopback hosts on --port are always accepted.
+  - **Type:** array
+  - **Default:** `false`
+
+- **`--allowedOrigins`/ `--allowed-origins`**
+  Additional Origin header values accepted by Streamable HTTP. Loopback origins on --port are always accepted.
+  - **Type:** array
+  - **Default:** `false`
+
+- **`--sessionIdleTimeout`/ `--session-idle-timeout`**
+  Close inactive Streamable HTTP sessions after this many seconds. Set to 0 to disable idle cleanup.
+  - **Type:** number
+  - **Default:** `86400`
+
 - **`--viewport`**
   Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
   - **Type:** string
@@ -250,6 +275,23 @@ Pass them via the `args` property in the JSON configuration. For example:
   }
 }
 ```
+
+## Serving multiple MCP clients over HTTP
+
+Pass `--port` to run a long-lived Streamable HTTP server instead of using
+stdio. MCP clients connect to the `/mcp` endpoint:
+
+```sh
+npx chrome-devtools-mcp@latest \
+  --port=13501 \
+  --browser-url=http://127.0.0.1:9222
+```
+
+Each MCP session gets an independent server context while the process reuses
+one connection to the configured Chrome instance. Run a separate process for
+each Chrome endpoint or profile. The HTTP listener is restricted to loopback;
+`--allowed-hosts` and `--allowed-origins` add explicit values when a trusted
+local reverse proxy changes those headers.
 
 ## Connecting via WebSocket with custom headers
 
