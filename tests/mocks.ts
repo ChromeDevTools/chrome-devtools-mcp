@@ -25,9 +25,18 @@
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
+import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
+import type {
+  AggregatedInfoWithId,
+  DuplicateStringGroup,
+  HeapSnapshotAggregateData,
+  HeapSnapshotClassDiff,
+  HeapSnapshotDetailedClassDiff,
+} from '../src/processors/HeapSnapshotManager.js';
+import {stableIdSymbol} from '../src/utils/id.js';
 import {
   CdpExtension,
   CdpFrame,
@@ -679,4 +688,179 @@ export function createMockExtension(
   sinon.stub(extension, 'version').value(options.version ?? '1.0.0');
   sinon.stub(extension, 'enabled').value(options.enabled ?? true);
   return extension as unknown as Extension;
+}
+
+export function createMockHeapSnapshotStats(): DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics {
+  return {
+    total: 1000,
+    native: {total: 200, typedArrays: 50},
+    v8heap: {
+      total: 800,
+      code: 50,
+      jsArrays: 150,
+      strings: 200,
+      system: 400,
+    },
+  };
+}
+
+export function createMockHeapSnapshotStaticData(): DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData {
+  return new DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData(
+    10,
+    0,
+    1000,
+    100,
+  );
+}
+
+export function createMockNativeContextSizes(): DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes {
+  return {
+    nativeContexts: [],
+    sharedSize: 0,
+    noAttributionSize: 0,
+  };
+}
+
+export function createMockRetainedByContextSummary(): DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary {
+  return {
+    contextCount: 0,
+    retainedByContextSize: 0,
+    retainedByContextCount: 0,
+    notRetainedByContextSize: 0,
+    notRetainedByContextCount: 0,
+    totalSize: 0,
+  };
+}
+
+export function createMockHeapSnapshotAggregateData(): HeapSnapshotAggregateData {
+  return {
+    aggregates: {},
+    objectCount: 0,
+    totalSelfSize: 0,
+  };
+}
+
+export function createMockItemsRange(): DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange {
+  return new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+    0,
+    0,
+    0,
+    [],
+  );
+}
+
+export function createMockRetainingPaths(): DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths {
+  return {
+    paths: [],
+    limitsReached: {
+      depth: false,
+      nodes: false,
+      siblings: false,
+    },
+  };
+}
+
+export function createMockDominatorChain(): DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain {
+  return [];
+}
+
+export function createMockClassDiffs(): HeapSnapshotClassDiff[] {
+  return [
+    {
+      className: 'TestClass',
+      addedCount: 1,
+      removedCount: 0,
+      countDelta: 1,
+      addedSize: 10,
+      removedSize: 0,
+      sizeDelta: 10,
+    },
+  ];
+}
+
+export function createMockDetailedClassDiff(): HeapSnapshotDetailedClassDiff {
+  return {
+    className: 'TestClass',
+    addedCount: 1,
+    removedCount: 0,
+    countDelta: 1,
+    addedSize: 10,
+    removedSize: 0,
+    sizeDelta: 10,
+    addedIds: [1],
+    addedSelfSizes: [10],
+    deletedIds: [],
+    deletedSelfSizes: [],
+  };
+}
+
+export function createMockDuplicateStrings(): DuplicateStringGroup[] {
+  return [];
+}
+
+export function createMockObjectInfo(): DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo {
+  return {
+    id: 1,
+    nodeIndex: 0,
+    name: 'Object',
+    type: 'object',
+    selfSize: 100,
+    retainedSize: 200,
+    distance: 1,
+    edgeCount: 2,
+    retainerCount: 1,
+    detachedness:
+      DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.ATTACHED,
+  };
+}
+
+export function createMockParsedArguments(
+  options: Partial<ParsedArguments> = {},
+): ParsedArguments {
+  const defaultArgs = parser('0.0.0', ['node', 'main.js']).parseSync();
+  return {...defaultArgs, ...options};
+}
+
+export function createMockHeapSnapshotNode(
+  options: Partial<DevTools.HeapSnapshotModel.HeapSnapshotModel.Node> = {},
+): DevTools.HeapSnapshotModel.HeapSnapshotModel.Node {
+  return {
+    id: options.id ?? 1,
+    name: options.name ?? 'Node',
+    distance: options.distance ?? 1,
+    nodeIndex: options.nodeIndex ?? 0,
+    retainedSize: options.retainedSize ?? 100,
+    selfSize: options.selfSize ?? 10,
+    type: options.type ?? 'object',
+    canBeQueried: options.canBeQueried ?? false,
+    detachedDOMTreeNode: options.detachedDOMTreeNode ?? false,
+    ignored: options.ignored ?? false,
+    isAddedNotRemoved: options.isAddedNotRemoved ?? null,
+  };
+}
+
+export function createMockHeapSnapshotEdge(
+  options: Partial<DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge> = {},
+): DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge {
+  return {
+    name: options.name ?? 'edge',
+    type: options.type ?? 'property',
+    edgeIndex: options.edgeIndex ?? 0,
+    isAddedNotRemoved: options.isAddedNotRemoved ?? null,
+    node: options.node ?? createMockHeapSnapshotNode(),
+  };
+}
+
+export function createMockAggregatedInfo(
+  options: Partial<AggregatedInfoWithId> = {},
+): AggregatedInfoWithId {
+  return {
+    count: options.count ?? 1,
+    distance: options.distance ?? 1,
+    self: options.self ?? 10,
+    maxRet: options.maxRet ?? 100,
+    name: options.name ?? 'Object',
+    idxs: options.idxs ?? [],
+    [stableIdSymbol]: options[stableIdSymbol] ?? 1,
+  };
 }
