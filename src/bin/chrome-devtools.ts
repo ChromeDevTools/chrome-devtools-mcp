@@ -75,7 +75,7 @@ const y = yargs(hideBin(process.argv))
   .option('sessionId', {
     type: 'string',
     description: 'Session ID for daemon scoping',
-    default: process.env.CHROME_DEVTOOLS_MCP_SESSION_ID || '',
+    default: process.env.CD4A_INTERNAL_DAEMON_SESSION_ID || '',
     hidden: true,
     coerce: (sessionId: string) => {
       assertValidSessionId(sessionId);
