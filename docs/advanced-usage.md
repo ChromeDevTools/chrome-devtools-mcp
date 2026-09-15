@@ -13,11 +13,7 @@ each session can route tool calls to the tab it is working with. Use
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--pageIdRouting"
-      ]
+      "args": ["-y", "chrome-devtools-mcp@latest", "--pageIdRouting"]
     }
   }
 }
