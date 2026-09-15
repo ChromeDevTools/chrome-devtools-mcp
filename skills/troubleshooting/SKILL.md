@@ -60,6 +60,7 @@ Identify other error messages from the failed tool call or the MCP initializatio
 
 - `Target closed`
 - "Tool not found" (check if they are using `--slim` which only enables navigation and screenshot tools).
+- Missing `pageId`: Page-scoped tools require a `pageId` argument. Call `list_pages` to find active page IDs.
 - `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`
 - `Error [ERR_MODULE_NOT_FOUND]: Cannot find module`
 - Any sandboxing or host validation errors.

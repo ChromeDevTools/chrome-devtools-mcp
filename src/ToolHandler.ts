@@ -4,24 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {parseArguments} from './bin/chrome-devtools-mcp-cli-options.js';
-import {logger} from './logger.js';
+import type {ParsedArguments} from './config/mcp-options.js';
 import type {McpContext} from './McpContext.js';
+import type {McpPage} from './McpPage.js';
+import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
-import type {Mutex} from './Mutex.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import {bucketizeLatency} from './telemetry/transformation.js';
 import type {CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
-import type {ToolCategory} from './tools/categories.js';
-import {labels, OFF_BY_DEFAULT_CATEGORIES} from './tools/categories.js';
-import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
+import {labels} from './tools/categories.js';
+import {categoryToFlagName} from './config/category-options.js';
+import type {
+  DefinedPageTool,
+  DevToolsData,
+  FileVerificationOption,
+  ToolDefinition,
+} from './tools/ToolDefinition.js';
 import {pageIdSchema} from './tools/ToolDefinition.js';
-
-export function buildFlag(category: ToolCategory) {
-  return `category${category.charAt(0).toUpperCase() + category.slice(1)}`;
-}
+import {logger} from './utils/logger.js';
+import type {Mutex} from './third_party/index.js';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {isLocalhost} from './utils/url.js';
 
 function buildDisabledMessage(
   toolName: string,
@@ -30,85 +34,31 @@ function buildDisabledMessage(
 ): string {
   const reason = categoryLabel
     ? `is in category ${categoryLabel} which`
-    : `requires experimental feature ${flag} and`;
+    : `requires ${flag.startsWith('--experimental') ? 'experimental feature' : 'flag'} ${flag} and`;
 
   return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
 
-function getCategoryStatus(
-  category: ToolCategory,
-  serverArgs: ReturnType<typeof parseArguments>,
-): {categoryFlag?: string; disabled: boolean} {
-  const categoryFlag = buildFlag(category);
-
-  const flagValue = serverArgs[categoryFlag];
-
-  const isDisabled = OFF_BY_DEFAULT_CATEGORIES.includes(category)
-    ? !flagValue
-    : flagValue === false;
-
-  if (isDisabled) {
-    return {
-      categoryFlag,
-      disabled: true,
-    };
-  }
-
-  return {
-    disabled: false,
-  };
-}
-
-function getConditionStatus(
-  condition: string,
-  serverArgs: ReturnType<typeof parseArguments>,
-): {conditionFlag?: string; disabled: boolean} {
-  if (condition && !serverArgs[condition]) {
-    return {conditionFlag: condition, disabled: true};
-  }
-
-  return {disabled: false};
-}
-
 function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
-  serverArgs: ReturnType<typeof parseArguments>,
+  serverArgs: ParsedArguments,
 ): {disabled: boolean; reason?: string} {
   const category = tool.annotations.category;
-  const categoryCheck = getCategoryStatus(category, serverArgs);
-
-  if (category && categoryCheck.disabled) {
-    if (!categoryCheck.categoryFlag) {
-      throw new Error(
-        'when the category is disabled there should always be a flag set',
-      );
+  if (category) {
+    const flag = categoryToFlagName(category);
+    if (!serverArgs[flag]) {
+      return {
+        disabled: true,
+        reason: buildDisabledMessage(tool.name, `--${flag}`, labels[category]),
+      };
     }
-
-    return {
-      disabled: true,
-      reason: buildDisabledMessage(
-        tool.name,
-        `--${categoryCheck.categoryFlag}`,
-        labels[category!],
-      ),
-    };
   }
 
   for (const condition of tool.annotations.conditions || []) {
-    const conditionCheck = getConditionStatus(condition, serverArgs);
-    if (conditionCheck.disabled) {
-      if (!conditionCheck.conditionFlag) {
-        throw new Error(
-          'when the condition is disabled there should always be a flag set',
-        );
-      }
-
+    if (!serverArgs[condition]) {
       return {
         disabled: true,
-        reason: buildDisabledMessage(
-          tool.name,
-          `--${conditionCheck.conditionFlag}`,
-        ),
+        reason: buildDisabledMessage(tool.name, `--${condition}`),
       };
     }
   }
@@ -142,6 +92,78 @@ function buildUnknownArgumentsMessage(
   return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
 }
 
+async function validateAndResolvePathOrUrl(
+  filePathOrUrl: string,
+  context: McpContext,
+): Promise<string> {
+  try {
+    const url = new URL(filePathOrUrl);
+    if (url.protocol === 'file:') {
+      return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
+    } else if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
+      return filePathOrUrl;
+    }
+  } catch {
+    // Suppress parsing errors for regular file paths.
+  }
+  return await context.validatePath(filePathOrUrl);
+}
+
+function isLocalBrowser(context: McpContext): boolean {
+  if (context.browser.process()) {
+    return true;
+  }
+  const wsEndpoint = context.browser.wsEndpoint();
+  if (wsEndpoint && isLocalhost(wsEndpoint)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldValidateFile(
+  option: FileVerificationOption | undefined,
+  isLocal: boolean,
+): boolean {
+  if (option === true) {
+    return true;
+  }
+  if (typeof option === 'object' && option !== null) {
+    if (isLocal) {
+      return Boolean(option.local);
+    }
+    return Boolean(option.remote);
+  }
+  return false;
+}
+
+async function validateToolFiles(
+  tool: ToolDefinition | DefinedPageTool,
+  params: Record<string, unknown>,
+  context: McpContext,
+): Promise<void> {
+  const isLocal = isLocalBrowser(context);
+  for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
+    if (shouldValidateFile(option, isLocal)) {
+      const val = params[key];
+      if (typeof val === 'string') {
+        params[key] = await validateAndResolvePathOrUrl(val, context);
+      } else if (Array.isArray(val)) {
+        const updated: unknown[] = [];
+        for (const item of val) {
+          if (typeof item === 'string') {
+            updated.push(await validateAndResolvePathOrUrl(item, context));
+          } else {
+            throw new Error(
+              'Unexpected non-string value as a file path or URL',
+            );
+          }
+        }
+        params[key] = updated;
+      }
+    }
+  }
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodTypeAny;
@@ -150,7 +172,7 @@ export class ToolHandler {
 
   constructor(
     private readonly tool: ToolDefinition | DefinedPageTool,
-    private readonly serverArgs: ReturnType<typeof parseArguments>,
+    private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
   ) {
@@ -161,7 +183,7 @@ export class ToolHandler {
     this.inputSchema =
       'pageScoped' in tool &&
       tool.pageScoped &&
-      serverArgs.experimentalPageIdRouting &&
+      serverArgs.pageIdRouting &&
       !serverArgs.slim
         ? {...pageIdSchema, ...tool.schema}
         : tool.schema;
@@ -207,30 +229,30 @@ export class ToolHandler {
     const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
+    let devToolsData: DevToolsData | undefined;
+    let pageUrl: string | undefined;
     try {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
       const context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
-      await context.detectOpenDevToolsWindows();
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+      if (context.consumeReconnectNotice()) {
+        response.setReconnectNotice();
+      }
+      let page: McpPage | undefined;
       try {
-        if (this.tool.verifyFilesSchema) {
-          for (const key of this.tool.verifyFilesSchema) {
-            const filePath = params[key];
-            await context.validatePath(filePath as string);
-          }
-        }
+        await validateToolFiles(this.tool, params, context);
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
-          const page =
-            this.serverArgs.experimentalPageIdRouting &&
+          page =
+            this.serverArgs.pageIdRouting &&
             pageId !== undefined &&
             !this.serverArgs.slim
               ? context.getPageById(pageId)
@@ -259,10 +281,19 @@ export class ToolHandler {
       } catch (err) {
         response.setError(err);
       }
+      devToolsData = await context.getDevToolsData(page);
+      pageUrl = context.getSelectedMcpPageUrl(page);
+      // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
+      let dataFormat: DataFormat = 'default';
+      if (this.serverArgs.experimentalDataFormat) {
+        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
+      } else if (this.serverArgs.experimentalToonFormat) {
+        dataFormat = 'toon';
+      }
+
       const {content, structuredContent} = await response.handle(
-        this.tool.name,
         context,
-        this.serverArgs.experimentalToonFormat ?? false,
+        dataFormat,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
@@ -298,9 +329,11 @@ export class ToolHandler {
         params,
         schema: this.inputSchema,
         success,
-        latencyMs: bucketizeLatency(Date.now() - startTime),
+        latencyMs: Date.now() - startTime,
+        devToolsData,
+        pageUrl,
       });
-      guard.dispose();
+      guard[Symbol.dispose]();
     }
   }
 }

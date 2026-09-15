@@ -232,19 +232,23 @@
   },
   {
     "name": "experimental_navigation_allowlist",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_navigation_allowlist_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_page_id_routing",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_page_id_routing_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "experimental_webmcp",
@@ -346,6 +350,112 @@
   },
   {
     "name": "screenshot_max_height_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_data_format_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_data_format",
+    "flagType": "enum",
+    "choices": [
+      "EXPERIMENTAL_DATA_FORMAT_UNSPECIFIED",
+      "EXPERIMENTAL_DATA_FORMAT_DEFAULT",
+      "EXPERIMENTAL_DATA_FORMAT_TOON",
+      "EXPERIMENTAL_DATA_FORMAT_GCF"
+    ]
+  },
+  {
+    "name": "allow_unrestricted_paths_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "allow_unrestricted_paths",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_pwa_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_pwa",
+    "flagType": "boolean"
+  },
+  {
+    "name": "page_id_routing_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "page_id_routing",
+    "flagType": "boolean"
+  },
+  {
+    "name": "javascript_evaluation_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "javascript_evaluation",
+    "flagType": "boolean"
+  },
+  {
+    "name": "experimental_screencast_fps_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "filesystem_root_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_input_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_input",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_navigation_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_navigation",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_debugging_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_debugging",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_memory_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_memory",
+    "flagType": "boolean"
+  },
+  {
+    "name": "source_maps_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "source_maps",
+    "flagType": "boolean"
+  },
+  {
+    "name": "config_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "devtools_comments_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "devtools_comments",
     "flagType": "boolean"
   }
 ]

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import 'urlpattern-polyfill';
 import 'core-js/modules/es.promise.with-resolvers.js';
 import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
@@ -18,13 +17,12 @@ export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
-export {default as debug} from 'debug';
-export type {Debugger} from 'debug';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
 export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 export {Client} from '@modelcontextprotocol/sdk/client/index.js';
+export type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 export {
   type CallToolResult,
   SetLevelRequestSchema,
@@ -42,15 +40,24 @@ export {
   PredefinedNetworkConditions,
   KnownDevices,
   CDPSessionEvent,
+  ScreenRecorder,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
-export type {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
+export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
+export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
-
+export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {
+  DisposableStack,
+  AsyncDisposableStack,
+  SuppressedError,
+} from 'puppeteer-core/internal/util/disposable.js';
 export {
   resolveDefaultUserDataDir,
   detectBrowserPlatform,
@@ -61,6 +68,10 @@ export async function getToonEncode(): Promise<(val: unknown) => string> {
   const {encode} = await import('@toon-format/toon');
   return encode;
 }
+export async function getGcfEncode(): Promise<(val: unknown) => string> {
+  const {encodeGeneric} = await import('@blackwell-systems/gcf');
+  return encodeGeneric;
+}
 
 import {
   snapshot as snapshotImpl,
@@ -68,18 +79,21 @@ import {
   generateReport as generateReportImpl,
 } from './lighthouse-devtools-mcp-bundle.js';
 
-export const snapshot = snapshotImpl as (
-  page: Page,
-  options: {flags?: Flags},
-) => Promise<RunnerResult>;
-export const navigation = navigationImpl as (
-  page: Page,
-  url: string,
-  options: {flags?: Flags},
-) => Promise<RunnerResult>;
+export const lighthouseRunner = {
+  snapshot: snapshotImpl as (
+    page: Page,
+    options: {flags?: Flags},
+  ) => Promise<RunnerResult>,
+  navigation: navigationImpl as (
+    page: Page,
+    url: string,
+    options: {flags?: Flags},
+  ) => Promise<RunnerResult>,
+};
+
 export const generateReport = generateReportImpl as (
   lhr: Result,
   format: string,
 ) => string;
 
-export * as DevTools from '../../node_modules/chrome-devtools-frontend/mcp/mcp.js';
+export * as DevTools from '../../third_party/devtools-frontend/mcp/mcp.js';

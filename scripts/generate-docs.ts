@@ -7,20 +7,22 @@
 import fs from 'node:fs';
 
 import type {Tool} from '@modelcontextprotocol/sdk/types.js';
+import type {Options as YargsOptions} from 'yargs';
 
-import {cliOptions} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import type {ParsedArguments} from '../build/src/bin/chrome-devtools-mcp-cli-options.js';
-import {buildFlag} from '../build/src/index.js';
 import {
-  ToolCategory,
-  OFF_BY_DEFAULT_CATEGORIES,
-  labels,
-} from '../build/src/tools/categories.js';
+  mcpOptions,
+  type ParsedArguments,
+} from '../build/src/config/mcp-options.js';
+import {
+  isCategoryOffByDefault,
+  categoryToFlagName,
+} from '../build/src/config/category-options.js';
+import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import {pageIdSchema} from '../build/src/tools/ToolDefinition.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
-const README_PATH = './README.md';
 
 // Extend the MCP Tool type to include our annotations
 interface ToolWithAnnotations extends Tool {
@@ -92,9 +94,19 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
   return result;
 }
 
+function hasOffByDefaultConditions(tool: ToolWithAnnotations): boolean {
+  for (const condition of tool.annotations?.conditions || []) {
+    const option = mcpOptions[condition as keyof typeof mcpOptions];
+    if (!option || !('default' in option) || option.default !== true) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
-  const aHasConditions = Boolean(a.annotations?.conditions?.length > 0);
-  const bHasConditions = Boolean(b.annotations?.conditions?.length > 0);
+  const aHasConditions = hasOffByDefaultConditions(a);
+  const bHasConditions = hasOffByDefaultConditions(b);
 
   if (aHasConditions && !bHasConditions) {
     return 1;
@@ -106,61 +118,20 @@ function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
   return a.name.localeCompare(b.name);
 }
 
-function generateToolsTOC(
-  categories: Record<string, ToolWithAnnotations[]>,
-  sortedCategories: string[],
-): string {
-  let toc = '';
-
-  for (const category of sortedCategories) {
-    const categoryTools = categories[category];
-    const categoryName = labels[category];
-    toc += `- **${categoryName}** (${categoryTools.length} tools)\n`;
-
-    // Sort tools within category for TOC
-    categoryTools.sort(sortTools);
-    for (const tool of categoryTools) {
-      const anchorLink = tool.name.toLowerCase();
-      toc += `  - [\`${tool.name}\`](docs/tool-reference.md#${anchorLink})\n`;
-    }
-  }
-
-  return toc;
-}
-
-function updateReadmeWithToolsTOC(toolsTOC: string): void {
-  const readmeContent = fs.readFileSync(README_PATH, 'utf8');
-
-  const beginMarker = '<!-- BEGIN AUTO GENERATED TOOLS -->';
-  const endMarker = '<!-- END AUTO GENERATED TOOLS -->';
-
-  const beginIndex = readmeContent.indexOf(beginMarker);
-  const endIndex = readmeContent.indexOf(endMarker);
-
-  if (beginIndex === -1 || endIndex === -1) {
-    console.warn('Could not find auto-generated tools markers in README.md');
-    return;
-  }
-
-  const before = readmeContent.substring(0, beginIndex + beginMarker.length);
-  const after = readmeContent.substring(endIndex);
-
-  const updatedContent = before + '\n\n' + toolsTOC + '\n' + after;
-
-  fs.writeFileSync(README_PATH, updatedContent);
-  console.log('Updated README.md with tools table of contents');
-}
-
 function generateConfigOptionsMarkdown(): string {
   let markdown = '';
 
-  for (const [optionName, optionConfig] of Object.entries(cliOptions)) {
+  for (const [optionName, optionConfig] of Object.entries(
+    mcpOptions as Record<string, Partial<YargsOptions>>,
+  )) {
     // Skip hidden options
     if (optionConfig.hidden) {
       continue;
     }
 
-    const aliasText = optionConfig.alias ? `, \`-${optionConfig.alias}\`` : '';
+    const aliasText = optionConfig.alias
+      ? `, \`${optionConfig.alias.length === 1 ? '-' : '--'}${optionConfig.alias}\``
+      : '';
     const description = optionConfig.description || optionConfig.describe || '';
 
     // Convert camelCase to dash-case
@@ -184,8 +155,13 @@ function generateConfigOptionsMarkdown(): string {
       markdown += `  - **Choices:** ${optionConfig.choices.map(c => `\`${c}\``).join(', ')}\n`;
     }
 
-    // Add default if available
-    markdown += `  - **Default:** \`${optionConfig.default ?? 'false'}\`\n`;
+    const defaultValue =
+      optionConfig.defaultDescription ?? optionConfig.default;
+    if (defaultValue !== undefined) {
+      markdown += `  - **Default:** \`${defaultValue}\`\n`;
+    } else if (optionConfig.type === 'boolean') {
+      markdown += `  - **Default:** \`false\`\n`;
+    }
 
     markdown += '\n';
   }
@@ -193,8 +169,9 @@ function generateConfigOptionsMarkdown(): string {
   return markdown.trim();
 }
 
-function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
-  const readmeContent = fs.readFileSync(README_PATH, 'utf8');
+function updateConfigurationWithOptionsMarkdown(optionsMarkdown: string): void {
+  const configPath = './docs/configuration.md';
+  const readmeContent = fs.readFileSync(configPath, 'utf8');
 
   const beginMarker = '<!-- BEGIN AUTO GENERATED OPTIONS -->';
   const endMarker = '<!-- END AUTO GENERATED OPTIONS -->';
@@ -203,7 +180,9 @@ function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
   const endIndex = readmeContent.indexOf(endMarker);
 
   if (beginIndex === -1 || endIndex === -1) {
-    console.warn('Could not find auto-generated options markers in README.md');
+    console.warn(
+      'Could not find auto-generated options markers in ./docs/configuration.md',
+    );
     return;
   }
 
@@ -212,8 +191,8 @@ function updateReadmeWithOptionsMarkdown(optionsMarkdown: string): void {
 
   const updatedContent = before + '\n\n' + optionsMarkdown + '\n\n' + after;
 
-  fs.writeFileSync(README_PATH, updatedContent);
-  console.log('Updated README.md with options markdown');
+  fs.writeFileSync(configPath, updatedContent);
+  console.log('Updated configuration.md with options markdown');
 }
 
 // Helper to convert Zod schema to JSON schema-like object for docs
@@ -328,8 +307,8 @@ async function generateReference(
 
     markdown += `## ${categoryName}\n\n`;
 
-    if (OFF_BY_DEFAULT_CATEGORIES.includes(category)) {
-      const flagName = `--${buildFlag(category)}`;
+    if (isCategoryOffByDefault(category)) {
+      const flagName = `--${categoryToFlagName(category)}`;
 
       markdown += `> NOTE: The ${categoryName} category is not active by default. Use the '${flagName}' flag.\n\n`;
     }
@@ -346,15 +325,18 @@ async function generateReference(
 
         const requiredFlags: string[] = [];
 
-        const isOffByDefault = OFF_BY_DEFAULT_CATEGORIES.includes(category);
+        const isOffByDefault = isCategoryOffByDefault(category);
         if (isOffByDefault) {
-          const categoryFlag = buildFlag(category);
+          const categoryFlag = categoryToFlagName(category);
           requiredFlags.push(`--${categoryFlag}=true`);
         }
 
         const conditions = tool.annotations?.conditions || [];
         for (const condition of conditions) {
-          requiredFlags.push(`--${condition}=true`);
+          const option = mcpOptions[condition as keyof typeof mcpOptions];
+          if (!option || !('default' in option) || option.default !== true) {
+            requiredFlags.push(`--${condition}=true`);
+          }
         }
 
         if (requiredFlags.length > 0) {
@@ -432,7 +414,7 @@ async function generateReference(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getToolsAndCategories(tools: any) {
+function getToolsAndCategories(tools: any, slim = false) {
   // Convert ToolDefinitions to ToolWithAnnotations
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {
@@ -453,8 +435,12 @@ function getToolsAndCategories(tools: any) {
       const properties: Record<string, TypeInfo> = {};
       const required: string[] = [];
 
+      const toolSchema = {
+        ...tool.schema,
+        ...(tool.pageScoped && !slim ? pageIdSchema : {}),
+      };
       for (const [key, schema] of Object.entries(
-        tool.schema as unknown as Record<string, ZodSchema>,
+        toolSchema as unknown as Record<string, ZodSchema>,
       )) {
         const info = getZodTypeInfo(schema);
         properties[key] = info;
@@ -487,8 +473,8 @@ function getToolsAndCategories(tools: any) {
   // Sort categories using the enum order
   const categoryOrder = Object.values(ToolCategory);
   const sortedCategories = Object.keys(categories).sort((a, b) => {
-    const aOff = OFF_BY_DEFAULT_CATEGORIES.includes(a as ToolCategory);
-    const bOff = OFF_BY_DEFAULT_CATEGORIES.includes(b as ToolCategory);
+    const aOff = isCategoryOffByDefault(a);
+    const bOff = isCategoryOffByDefault(b);
 
     if (aOff !== bOff) {
       return aOff ? 1 : -1;
@@ -518,7 +504,9 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(createTools({slim: false} as ParsedArguments));
+        getToolsAndCategories(
+          createTools({slim: false, pageIdRouting: true} as ParsedArguments),
+        );
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,
@@ -526,15 +514,14 @@ async function generateToolDocumentation(): Promise<void> {
         categories,
         sortedCategories,
       );
-
-      // Generate tools TOC and update README
-      const toolsTOC = generateToolsTOC(categories, sortedCategories);
-      updateReadmeWithToolsTOC(toolsTOC);
     }
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(createTools({slim: true} as ParsedArguments));
+        getToolsAndCategories(
+          createTools({slim: true} as ParsedArguments),
+          true,
+        );
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,
@@ -546,7 +533,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     // Generate and update configuration options
     const optionsMarkdown = generateConfigOptionsMarkdown();
-    updateReadmeWithOptionsMarkdown(optionsMarkdown);
+    updateConfigurationWithOptionsMarkdown(optionsMarkdown);
     process.exit(0);
   } catch (error) {
     console.error('Error generating documentation:', error);

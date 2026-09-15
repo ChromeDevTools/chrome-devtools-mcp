@@ -1,0 +1,455 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import fsSync from 'node:fs';
+import path from 'node:path';
+
+import {DevTools} from '../third_party/index.js';
+import {
+  createIdGenerator,
+  stableIdSymbol,
+  type WithSymbolId,
+} from '../utils/id.js';
+
+export type AggregatedInfoWithId =
+  WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
+
+export interface HeapSnapshotAggregateData {
+  aggregates: Record<string, AggregatedInfoWithId>;
+  objectCount: number;
+  totalSelfSize: number;
+}
+
+export interface HeapSnapshotClassDiff {
+  className: string;
+  addedCount: number;
+  removedCount: number;
+  countDelta: number;
+  addedSize: number;
+  removedSize: number;
+  sizeDelta: number;
+}
+
+export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
+  addedIds: number[];
+  addedSelfSizes: number[];
+  deletedIds: number[];
+  deletedSelfSizes: number[];
+}
+
+export type DuplicateStringGroup =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.DuplicateStringGroup;
+
+export type HeapQueryOptions =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapQueryOptions;
+
+export type HeapEdgesQueryOptions =
+  DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
+const VALID_EXTENSIONS: readonly string[] = ['.heapsnapshot', '.heaptimeline'];
+
+function hasValidHeapSnapshotExtension(filePath: string): boolean {
+  return VALID_EXTENSIONS.some(ext => filePath.endsWith(ext));
+}
+
+export class HeapSnapshotManager {
+  #snapshotIdGenerator = createIdGenerator();
+  #snapshots = new Map<
+    string,
+    {
+      snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
+      worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+      // 1-indexed array where index is the class ID.
+      idToClassKey: string[];
+      classKeyToId: Map<string, number>;
+    }
+  >();
+
+  async getSnapshot(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy> {
+    if (!hasValidHeapSnapshotExtension(filePath)) {
+      throw new Error(
+        `File ${filePath} must have a .heapsnapshot or .heaptimeline extension.`,
+      );
+    }
+    const absolutePath = path.resolve(filePath);
+    const cached = this.#snapshots.get(absolutePath);
+    if (cached) {
+      return cached.snapshot;
+    }
+
+    const uid = this.#snapshotIdGenerator();
+    const {snapshot, worker} = await this.#loadSnapshot(absolutePath, uid);
+    this.#snapshots.set(absolutePath, {
+      snapshot,
+      worker,
+      idToClassKey: [''],
+      classKeyToId: new Map<string, number>(),
+    });
+
+    return snapshot;
+  }
+
+  async #applyNodeFilter(
+    snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy,
+    filter: DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter,
+    filterName?: string,
+    objectId?: number,
+  ): Promise<void> {
+    if (filterName === 'attributedToSpecificNativeContext') {
+      if (objectId === undefined) {
+        throw new Error(
+          'objectId is required when filterName is attributedToSpecificNativeContext',
+        );
+      }
+      const nodeIndex = await snapshot.nodeIndexForId(objectId);
+      if (nodeIndex === undefined) {
+        throw new Error(`Node with ID ${objectId} not found`);
+      }
+      filter.filterName = `nativeContext_${nodeIndex}`;
+    } else if (filterName) {
+      filter.filterName = filterName;
+    }
+  }
+
+  async getAggregates(
+    filePath: string,
+    filterName?: string,
+    objectId?: number,
+  ): Promise<HeapSnapshotAggregateData> {
+    const snapshot = await this.getSnapshot(filePath);
+    const filter =
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    await this.#applyNodeFilter(snapshot, filter, filterName, objectId);
+    const aggregates: Record<string, AggregatedInfoWithId> =
+      await snapshot.aggregatesWithFilter(filter);
+    let objectCount = 0;
+    let totalSelfSize = 0;
+
+    for (const [key, aggregate] of Object.entries(aggregates)) {
+      const id = await this.getOrCreateIdForClassKey(filePath, key);
+      aggregate[stableIdSymbol] = id;
+      objectCount += aggregate.count;
+      totalSelfSize += aggregate.self;
+    }
+
+    return {
+      aggregates,
+      objectCount,
+      totalSelfSize,
+    };
+  }
+
+  async getStats(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getStatistics();
+  }
+
+  async getStaticData(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
+    const snapshot = await this.getSnapshot(filePath);
+    return snapshot.staticData;
+  }
+
+  async getNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getNativeContextSizes();
+  }
+
+  async getRetainedByContextSummary(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getRetainedByContextSummary();
+  }
+
+  async getOrCreateIdForClassKey(
+    filePath: string,
+    classKey: string,
+  ): Promise<number> {
+    const cached = this.#getCachedSnapshot(filePath);
+    let id = cached.classKeyToId.get(classKey);
+    if (!id) {
+      id = cached.idToClassKey.length;
+      cached.classKeyToId.set(classKey, id);
+      cached.idToClassKey.push(classKey);
+    }
+    return id;
+  }
+
+  async getNodesById(
+    filePath: string,
+    id: number,
+    filterName?: string,
+    objectId?: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const filter =
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
+    await this.#applyNodeFilter(snapshot, filter, filterName, objectId);
+    const className = await this.resolveClassKeyFromId(filePath, id);
+    if (!className) {
+      throw new Error(`Class with ID ${id} not found in heap snapshot`);
+    }
+    const provider = snapshot.createNodesProviderForClass(className, filter);
+
+    return await provider.serializeItemsRange(0, Infinity);
+  }
+
+  async getRetainers(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    const provider = snapshot.createRetainingEdgesProvider(nodeIndex);
+    return await provider.serializeItemsRange(0, Infinity);
+  }
+
+  async getObjectInfo(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    return await snapshot.getObjectInfo(nodeIndex);
+  }
+
+  async getRetainingPaths(
+    filePath: string,
+    nodeId: number,
+    maxDepth?: number,
+    maxNodes?: number,
+    maxSiblings?: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    return await snapshot.getRetainingPaths(
+      nodeIndex,
+      maxDepth,
+      maxNodes,
+      maxSiblings,
+    );
+  }
+
+  async getDominatorsOf(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    return await snapshot.getDominatorsOf(nodeIndex);
+  }
+
+  async getEdges(
+    filePath: string,
+    nodeId: number,
+    options?: HeapEdgesQueryOptions,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const nodeIndex = await snapshot.nodeIndexForId(nodeId);
+    if (nodeIndex === undefined) {
+      throw new Error(`Node with ID ${nodeId} not found`);
+    }
+    const provider = snapshot.createEdgesProvider(nodeIndex, options);
+    return await provider.serializeItemsRange(0, Infinity);
+  }
+
+  async getClassDiffs(
+    baseFilePath: string,
+    currentFilePath: string,
+  ): Promise<HeapSnapshotClassDiff[]> {
+    const rawDiffs = await this.#getSortedRawClassDiffs(
+      baseFilePath,
+      currentFilePath,
+    );
+    return rawDiffs.map(rawDiff => ({
+      className: rawDiff.name,
+      addedCount: rawDiff.addedCount,
+      removedCount: rawDiff.removedCount,
+      countDelta: rawDiff.countDelta,
+      addedSize: rawDiff.addedSize,
+      removedSize: rawDiff.removedSize,
+      sizeDelta: rawDiff.sizeDelta,
+    }));
+  }
+
+  async getDetailedClassDiff(
+    baseFilePath: string,
+    currentFilePath: string,
+    classIndex: number,
+  ): Promise<HeapSnapshotDetailedClassDiff> {
+    const classDiffs = await this.#getSortedRawClassDiffs(
+      baseFilePath,
+      currentFilePath,
+    );
+    const rawDiff = classDiffs[classIndex];
+    if (!rawDiff) {
+      throw new Error(
+        `Invalid classIndex: ${classIndex}. Total classes with changes: ${classDiffs.length}`,
+      );
+    }
+    return {
+      className: rawDiff.name,
+      addedCount: rawDiff.addedCount,
+      removedCount: rawDiff.removedCount,
+      countDelta: rawDiff.countDelta,
+      addedSize: rawDiff.addedSize,
+      removedSize: rawDiff.removedSize,
+      sizeDelta: rawDiff.sizeDelta,
+      addedIds: rawDiff.addedIds ?? [],
+      addedSelfSizes: rawDiff.addedSelfSizes ?? [],
+      deletedIds: rawDiff.deletedIds ?? [],
+      deletedSelfSizes: rawDiff.deletedSelfSizes ?? [],
+    };
+  }
+
+  #getCachedSnapshot(filePath: string) {
+    const absolutePath = path.resolve(filePath);
+    const cached = this.#snapshots.get(absolutePath);
+    if (!cached) {
+      throw new Error(`Snapshot not loaded for ${filePath}`);
+    }
+    return cached;
+  }
+
+  async #getSortedRawClassDiffs(
+    baseFilePath: string,
+    currentFilePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff[]> {
+    const baseSnapshot = await this.getSnapshot(baseFilePath);
+    const currentSnapshot = await this.getSnapshot(currentFilePath);
+
+    const interfaceDefinitions = await currentSnapshot.interfaceDefinitions();
+    const aggregatesForDiff =
+      await baseSnapshot.aggregatesForDiff(interfaceDefinitions);
+    const baseSnapshotId = baseSnapshot.uid;
+    if (baseSnapshotId === undefined) {
+      throw new Error('Base snapshot UID is undefined');
+    }
+    // DevTools calculateSnapshotDiff uses the first parameter (baseSnapshotId)
+    // as a cache key. We pass the unique UID of the base snapshot.
+    const rawDiffs = await currentSnapshot.calculateSnapshotDiff(
+      baseSnapshotId,
+      aggregatesForDiff,
+    );
+
+    // Return a filtered and sorted array here to ensure that
+    // compare_heapsnapshot_summary and compare_heapsnapshot_details agree
+    // on indices.
+    return Object.values(rawDiffs)
+      .filter(diff => diff.addedCount > 0 || diff.removedCount > 0)
+      .sort((a, b) => b.sizeDelta - a.sizeDelta);
+  }
+
+  async resolveClassKeyFromId(
+    filePath: string,
+    id: number,
+  ): Promise<string | undefined> {
+    const cached = this.#getCachedSnapshot(filePath);
+    return cached.idToClassKey[id];
+  }
+
+  async #loadSnapshot(
+    absolutePath: string,
+    uid: number,
+  ): Promise<{
+    snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
+    worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+  }> {
+    const workerProxy =
+      new DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy(
+        () => {
+          /* noop */
+        },
+        DevTools.Common.Console.Console.instance(),
+        import.meta.resolve('../third_party/devtools-heap-snapshot-worker.js'),
+      );
+
+    try {
+      const {promise: snapshotPromise, resolve: resolveSnapshot} =
+        Promise.withResolvers<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>();
+
+      const loaderProxy = workerProxy.createLoader(uid, snapshotProxy => {
+        resolveSnapshot(snapshotProxy);
+      });
+
+      const fileStream = fsSync.createReadStream(absolutePath, {
+        encoding: 'utf-8',
+        highWaterMark: 1024 * 1024,
+      });
+
+      for await (const chunk of fileStream) {
+        await loaderProxy.write(chunk);
+      }
+
+      await loaderProxy.close();
+
+      const snapshot = await snapshotPromise;
+      return {snapshot, worker: workerProxy};
+    } catch (error) {
+      // The worker is created before the read, and a failed load never reaches
+      // the #snapshots map, so dispose()/disposeAll() can never clean it up.
+      // Dispose it here to avoid leaking a worker on every failed load (e.g. a
+      // missing or invalid .heapsnapshot path).
+      workerProxy.dispose();
+      throw error;
+    }
+  }
+
+  async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.getDuplicateStrings();
+  }
+
+  async queryObjects(
+    filePath: string,
+    options: HeapQueryOptions,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    const snapshot = await this.getSnapshot(filePath);
+    const provider = snapshot.queryObjects(options);
+    return await provider.serializeItemsRange(0, Infinity);
+  }
+
+  hasSnapshots(): boolean {
+    return this.#snapshots.size > 0;
+  }
+
+  disposeSnapshot(filePath: string): boolean {
+    const absolutePath = path.resolve(filePath);
+    const cached = this.#snapshots.get(absolutePath);
+    if (cached) {
+      cached.worker.dispose();
+      this.#snapshots.delete(absolutePath);
+      return true;
+    }
+    return false;
+  }
+
+  dispose(): void {
+    for (const cached of this.#snapshots.values()) {
+      cached.worker.dispose();
+    }
+    this.#snapshots.clear();
+  }
+}

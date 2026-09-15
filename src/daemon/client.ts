@@ -8,12 +8,16 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 
-import {logger} from '../logger.js';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
+import {logger, puppeteerLogger} from '../utils/logger.js';
 
-import type {DaemonMessage, DaemonResponse} from './types.js';
+import type {
+  DaemonMessage,
+  DaemonResponse,
+  DaemonStatusResult,
+} from './types.js';
 import {
   DAEMON_SCRIPT_PATH,
   getSocketPath,
@@ -22,6 +26,8 @@ import {
 } from './utils.js';
 
 const FILE_TIMEOUT = 10_000;
+const READY_CHECK_INTERVAL = 100;
+const READY_CHECK_COMMAND_TIMEOUT = 1_000;
 
 /**
  * Waits for a file to be created and populated (removed = false) or removed (removed = true).
@@ -67,9 +73,47 @@ function waitForFile(filePath: string, removed = false) {
   });
 }
 
+function delay(ms: number) {
+  return new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForDaemonReady(sessionId: string) {
+  const deadline = Date.now() + FILE_TIMEOUT;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await sendCommand(
+        {method: 'status'},
+        sessionId,
+        READY_CHECK_COMMAND_TIMEOUT,
+      );
+      if (response.success) {
+        return;
+      }
+      lastError = new Error(String(response.error));
+    } catch (error) {
+      lastError = error;
+    }
+
+    const timeLeft = deadline - Date.now();
+    if (timeLeft > 0) {
+      await delay(Math.min(READY_CHECK_INTERVAL, timeLeft));
+    }
+  }
+
+  throw new Error(
+    `Timeout: daemon not ready within ${FILE_TIMEOUT}ms`,
+    lastError === undefined ? undefined : {cause: lastError},
+  );
+}
+
 export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   if (isDaemonRunning(sessionId)) {
     logger?.('Daemon is already running');
+    await waitForDaemonReady(sessionId);
     return;
   }
 
@@ -90,6 +134,7 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   child.unref();
 
   await waitForFile(pidFilePath);
+  await waitForDaemonReady(sessionId);
 }
 
 const SEND_COMMAND_TIMEOUT = 60_000; // ms
@@ -100,7 +145,13 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
+  timeout = SEND_COMMAND_TIMEOUT,
 ): Promise<DaemonResponse> {
+  // Before connecting and sending, verify the daemon is still alive.
+  if (!isDaemonRunning(sessionId)) {
+    throw new Error('Daemon is not running.');
+  }
+
   const socketPath = getSocketPath(sessionId);
 
   const socket = net.createConnection({
@@ -111,9 +162,9 @@ export async function sendCommand(
     const timer = setTimeout(() => {
       socket.destroy();
       reject(new Error('Timeout waiting for daemon response'));
-    }, SEND_COMMAND_TIMEOUT);
+    }, timeout);
 
-    const transport = new PipeTransport(socket, socket);
+    const transport = new PipeTransport(socket, socket, puppeteerLogger);
     transport.onmessage = async (message: string) => {
       clearTimeout(timer);
       logger?.('onmessage', message);
@@ -147,11 +198,41 @@ export async function stopDaemon(sessionId: string) {
   await waitForFile(pidFilePath, /*removed=*/ true);
 }
 
+export async function verifyDaemonVersion(
+  sessionId: string,
+  cliVersion: string,
+): Promise<string | undefined> {
+  if (!isDaemonRunning(sessionId)) {
+    return undefined;
+  }
+  try {
+    const response = await sendCommand({method: 'status'}, sessionId);
+    if (response.success) {
+      const data: DaemonStatusResult = JSON.parse(response.result);
+      if (data?.version && data.version !== cliVersion) {
+        return `Warning: Daemon server version (${data.version}) does not match CLI version (${cliVersion}). Run 'chrome-devtools start' to update and restart the daemon.`;
+      }
+    }
+  } catch {
+    // Suppress communication failures during check; command execution handles unreachable daemon errors.
+  }
+  return undefined;
+}
+
 export async function handleResponse(
   response: CallToolResult,
   format: 'json' | 'md',
 ): Promise<string> {
   if (response.isError) {
+    if (format === 'md') {
+      const chunks = [];
+      for (const content of response.content) {
+        if (content.type === 'text') {
+          chunks.push(content.text);
+        }
+      }
+      return chunks.join(' ');
+    }
     return JSON.stringify(response.content);
   }
   const chunks = [];

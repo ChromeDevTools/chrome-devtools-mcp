@@ -4,34 +4,55 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {
-  AggregatedInfoWithId,
+  HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
-} from '../HeapSnapshotManager.js';
+  DuplicateStringGroup,
+  HeapEdgesQueryOptions,
+  HeapQueryOptions,
+} from '../processors/HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
+import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
   ElementHandle,
   Extension,
-  Page,
+  GetPWAStateOptions,
+  InstallPWAOptions,
+  LaunchPWAOptions,
+  PWAState,
   ScreenRecorder,
+  UninstallPWAOptions,
   Viewport,
   DevTools,
+  Protocol,
+  Page,
 } from '../third_party/index.js';
-import type {InsightName, TraceResult} from '../trace-processing/parse.js';
+import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
   ExtensionServiceWorker,
+  CD4ACommentThread,
 } from '../types.js';
-import type {PaginationOptions} from '../utils/types.js';
-import type {WaitForEventsResult} from '../WaitForHelper.js';
+import type {PaginationOptions} from '../types.js';
+import type {
+  WaitForEventsResult,
+  DialogAction,
+} from '../utils/WaitForHelper.js';
 
 import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
+
+export type FileVerificationOption =
+  | true
+  | {
+      local?: boolean;
+      remote?: boolean;
+    };
 
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
@@ -49,7 +70,7 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Array<keyof Schema>;
+  verifyFilesSchema: Partial<Record<keyof Schema, FileVerificationOption>>;
 }
 
 export interface ToolDefinition<
@@ -106,18 +127,21 @@ export interface DevToolsData {
 export interface Response {
   appendResponseLine(value: string): void;
   setHeapSnapshotAggregates(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
+    aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,
   ): void;
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
+    nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+    retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
+    options?: PaginationOptions,
+  ): void;
+  setHeapSnapshotDuplicateStrings(
+    duplicateStrings: DuplicateStringGroup[],
     options?: PaginationOptions,
   ): void;
   setHeapSnapshotRetainingPaths(
@@ -129,6 +153,9 @@ export interface Response {
   setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+  ): void;
+  setHeapSnapshotObjectDetails(
+    objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -144,8 +171,13 @@ export interface Response {
     options?: PaginationOptions & {
       types?: string[];
       includePreservedMessages?: boolean;
+      includeStackTraces?: boolean;
       serviceWorkerId?: string;
     },
+  ): void;
+  setIncludeCssStyles(
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions & PaginationOptions,
   ): void;
   includeSnapshot(params?: SnapshotParams): void;
   attachImage(value: ImageContentData): void;
@@ -168,6 +200,7 @@ export interface Response {
   setListThirdPartyDeveloperTools(): void;
   setListWebMcpTools(): void;
   attachWaitForResult(result: WaitForEventsResult): void;
+  setDevToolsComments(threads: CD4ACommentThread[]): void;
 }
 
 export type SupportedExtensions =
@@ -180,13 +213,20 @@ export type SupportedExtensions =
   | '.html'
   | '.txt'
   | '.csv'
-  | '.json.gz';
+  | '.gz';
 
 /**
  * Only add methods used by tools/*.
  */
 export type Context = Readonly<{
-  validatePath(filePath?: string): Promise<void>;
+  installPWA(options: InstallPWAOptions): Promise<string>;
+  uninstallPWA(options: UninstallPWAOptions): Promise<void>;
+  launchPWA(options: LaunchPWAOptions): Promise<Page>;
+  getPWAState(options: GetPWAStateOptions): Promise<PWAState>;
+  ensureExtension<Extension extends `.${string}`>(
+    filePath: string,
+    extension: Extension,
+  ): Promise<`${string}${Extension}`>;
   isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
   isCruxEnabled(): boolean;
@@ -199,18 +239,6 @@ export type Context = Readonly<{
   ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;
-  restoreEmulation(page: ContextPage): Promise<void>;
-  emulate(
-    options: {
-      networkConditions?: string;
-      cpuThrottlingRate?: number;
-      geolocation?: GeolocationOptions;
-      userAgent?: string;
-      colorScheme?: 'dark' | 'light' | 'auto';
-      viewport?: Viewport;
-    },
-    targetPage?: Page,
-  ): Promise<void>;
   saveTemporaryFile(
     data: Uint8Array<ArrayBufferLike>,
     filename: string,
@@ -220,18 +248,7 @@ export type Context = Readonly<{
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}>;
-  waitForTextOnPage(
-    text: string[],
-    timeout?: number,
-    page?: Page,
-  ): Promise<Element>;
-  /**
-   * Returns a reqid for a cdpRequestId.
-   */
-  resolveCdpRequestId(
-    page: ContextPage,
-    cdpRequestId: string,
-  ): number | undefined;
+
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
     data: {recorder: ScreenRecorder; filePath: string} | null,
@@ -248,21 +265,38 @@ export type Context = Readonly<{
   ): string | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
-  ): Promise<Record<string, AggregatedInfoWithId>>;
+    filterName?: string,
+    objectId?: number,
+  ): Promise<HeapSnapshotAggregateData>;
+  getHeapSnapshotDuplicateStrings(
+    filePath: string,
+  ): Promise<DuplicateStringGroup[]>;
   getHeapSnapshotStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
   getHeapSnapshotStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
+  getHeapSnapshotNativeContextSizes(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes>;
+  getHeapSnapshotRetainedByContextSummary(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary>;
   getHeapSnapshotNodesById(
     filePath: string,
     id: number,
+    filterName?: string,
+    objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
   getHeapSnapshotRetainers(
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+  getHeapSnapshotObjectDetails(
+    filePath: string,
+    nodeId: number,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo>;
   closeHeapSnapshot(filePath: string): Promise<boolean>;
   getHeapSnapshotRetainingPaths(
     filePath: string,
@@ -278,6 +312,7 @@ export type Context = Readonly<{
   getHeapSnapshotEdges(
     filePath: string,
     nodeId: number,
+    options?: HeapEdgesQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
   getHeapSnapshotClassDiffs(
     baseFilePath: string,
@@ -288,7 +323,13 @@ export type Context = Readonly<{
     currentFilePath: string,
     classIndex: number,
   ): Promise<HeapSnapshotDetailedClassDiff>;
+  queryHeapSnapshotObjects(
+    filePath: string,
+    options: HeapQueryOptions,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
 }>;
+
+export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
 
 /**
  * Only add methods used by tools/*.
@@ -299,13 +340,29 @@ export type ContextPage = Readonly<{
   readonly networkConditions: string | null;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+  getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+
+  /**
+   * Returns a reqid for a cdpRequestId.
+   */
+  resolveCdpRequestId(cdpRequestId: string): number | undefined;
+  resolveReqidToCdpRequestId(reqid: number): string | undefined;
+  resolveBackendNodeId(backendNodeId: number): Promise<string | undefined>;
+  resolveUidToBackendNodeId(
+    uid: string,
+  ): Promise<{backendNodeId: number; targetId?: string} | undefined>;
 
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
   waitForEventsAfterAction(
     action: () => Promise<unknown>,
-    options?: {timeout?: number; handleDialog?: 'accept' | 'dismiss' | string},
+    options?: {
+      timeout?: number;
+      waitForStableDom?: boolean;
+      handleDialog?:
+        DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+    },
   ): Promise<WaitForEventsResult>;
   getThirdPartyDeveloperTools(): ToolGroups;
 
@@ -315,6 +372,18 @@ export type ContextPage = Readonly<{
     response: Response,
   ): Promise<void>;
   getDevToolsData(): Promise<DevToolsData>;
+  restoreEmulation(): Promise<void>;
+  emulate(options: {
+    networkConditions?: string;
+    cpuThrottlingRate?: number;
+    geolocation?: GeolocationOptions;
+    userAgent?: string;
+    colorScheme?: 'dark' | 'light' | 'auto';
+    viewport?: Viewport;
+  }): Promise<void>;
+  waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  getDevToolsPage(): Promise<Page | undefined>;
+  openDevTools(): Promise<Page | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
@@ -440,6 +509,21 @@ export function viewportTransform(arg: string | undefined):
     number,
     number | undefined,
   ];
+  if (!Number.isFinite(width) || width <= 0) {
+    throw new Error(
+      `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
+    );
+  }
+  if (!Number.isFinite(height) || height <= 0) {
+    throw new Error(
+      `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
+    );
+  }
+  if (dpr !== undefined && (!Number.isFinite(dpr) || dpr <= 0)) {
+    throw new Error(
+      `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
+    );
+  }
   return {
     width,
     height,
@@ -455,6 +539,16 @@ export function geolocationTransform(arg: string | undefined) {
     return undefined;
   }
   const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    throw new Error(
+      `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
+    );
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new Error(
+      `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
+    );
+  }
   return {
     latitude,
     longitude,

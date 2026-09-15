@@ -1,6 +1,6 @@
 # Common Memory Leaks
 
-When analyzing a retainer trace from `memlab`, look for these common patterns in the codebase:
+When analyzing retaining paths, dominator chains, or class diffs with Chrome DevTools MCP memory tools, look for these common patterns in the codebase:
 
 ## 1. Uncleared Event Listeners
 

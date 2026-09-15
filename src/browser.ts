@@ -9,38 +9,25 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {logger} from './logger.js';
 import type {
   Browser,
   ChromeReleaseChannel,
   LaunchOptions,
-  Target,
 } from './third_party/index.js';
 import {puppeteer} from './third_party/index.js';
+import {logger, puppeteerLogger} from './utils/logger.js';
+import {isAllowedUrl} from './utils/url.js';
 
 let browser: Browser | undefined;
 let browserMode: 'launched' | 'connected' | undefined;
 
-function makeTargetFilter(enableExtensions = false) {
-  const ignoredPrefixes = new Set(['chrome://', 'chrome-untrusted://']);
-  if (!enableExtensions) {
-    ignoredPrefixes.add('chrome-extension://');
-  }
-
-  return function targetFilter(target: Target): boolean {
-    if (target.url() === 'chrome://newtab/') {
+export function makeTargetFilter(enableExtensions = false) {
+  return function targetFilter(target: {url(): string}): boolean {
+    const url = target.url();
+    if (!url) {
       return true;
     }
-    // Could be the only page opened in the browser.
-    if (target.url().startsWith('chrome://inspect')) {
-      return true;
-    }
-    for (const prefix of ignoredPrefixes) {
-      if (target.url().startsWith(prefix)) {
-        return false;
-      }
-    }
-    return true;
+    return isAllowedUrl(url, {categoryExtensions: enableExtensions});
   };
 }
 
@@ -66,6 +53,7 @@ export async function ensureBrowserConnected(options: {
     handleDevToolsAsPage: true,
     blocklist: options.blocklist,
     allowlist: options.allowlist,
+    logger: puppeteerLogger,
   };
 
   let autoConnect = false;
@@ -243,6 +231,7 @@ export async function launch(options: McpLaunchOptions): Promise<Browser> {
       enableExtensions: options.enableExtensions,
       blocklist: options.blocklist,
       allowlist: options.allowlist,
+      logger: puppeteerLogger,
     });
     if (options.logFile) {
       // FIXME: we are probably subscribing too late to catch startup logs. We

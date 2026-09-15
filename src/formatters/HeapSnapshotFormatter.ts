@@ -8,9 +8,12 @@ import type {
   AggregatedInfoWithId,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
-} from '../HeapSnapshotManager.js';
+  DuplicateStringGroup,
+} from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import {stableIdSymbol} from '../utils/id.js';
+
+const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
 export interface FormattedSnapshotEntry {
   className: string;
@@ -64,18 +67,18 @@ export class HeapSnapshotFormatter {
       if (isNodeLike(firstItem)) {
         lines.push('nodeId,nodeName,type,distance,selfSize,retainedSize');
       } else if (isEdgeLike(firstItem)) {
-        lines.push('name,type,nodeId,nodeName');
+        lines.push('name,type,nodeId,nodeName,selfSize,retainedSize');
       }
     }
 
     for (const item of items) {
       if (isNodeLike(item)) {
         lines.push(
-          `${item.id},${item.name},${item.type},${item.distance},${DevTools.I18n.ByteUtilities.formatBytesToKb(item.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(item.retainedSize)}`,
+          `${item.id},${item.name},${item.type},${item.distance},${formatBytesToKb(item.selfSize)},${formatBytesToKb(item.retainedSize)}`,
         );
       } else if (isEdgeLike(item)) {
         lines.push(
-          `${item.name},${item.type},${item.node.id},${item.node.name}`,
+          `${item.name},${item.type},${item.node.id},${item.node.name},${formatBytesToKb(item.node.selfSize)},${formatBytesToKb(item.node.retainedSize)}`,
         );
       }
     }
@@ -115,9 +118,59 @@ export class HeapSnapshotFormatter {
     lines.push('nodeId,nodeName,selfSize,retainedSize');
     for (const node of dominators) {
       lines.push(
-        `${node.nodeId},${node.nodeName},${DevTools.I18n.ByteUtilities.formatBytesToKb(node.selfSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(node.retainedSize)}`,
+        `${node.nodeId},${node.nodeName},${formatBytesToKb(node.selfSize)},${formatBytesToKb(node.retainedSize)}`,
       );
     }
+    return lines.join('\n');
+  }
+
+  static formatDuplicateStrings(
+    groups: readonly DuplicateStringGroup[],
+  ): string {
+    const lines: string[] = [];
+    lines.push('value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds');
+    for (const group of groups) {
+      const nodeIds = group.nodes.map(n => `@${n.id}`).join(' ');
+      const truncated = group.truncated ?? false;
+      lines.push(
+        `${JSON.stringify(group.value)},${group.count},${formatBytesToKb(group.totalSelfSize)},${formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}`,
+      );
+    }
+    return lines.join('\n');
+  }
+
+  static formatNativeContextSizes(
+    sizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+  ): string {
+    const lines: string[] = [];
+    lines.push('nodeId,nodeName,selfSize,retainedSize,attributedSize');
+    const sortedContexts = [...sizes.nativeContexts].sort(
+      (a, b) => b.attributedSize - a.attributedSize,
+    );
+    for (const nc of sortedContexts) {
+      lines.push(
+        `${nc.nodeId},${nc.nodeName},${formatBytesToKb(nc.selfSize)},${formatBytesToKb(nc.retainedSize)},${formatBytesToKb(nc.attributedSize)}`,
+      );
+    }
+    lines.push(`Shared Size: ${formatBytesToKb(sizes.sharedSize)}`);
+    lines.push(
+      `Unattributed Size: ${formatBytesToKb(sizes.noAttributionSize)}`,
+    );
+    return lines.join('\n');
+  }
+
+  static formatRetainedByContextSummary(
+    summary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
+  ): string {
+    const lines: string[] = [];
+    lines.push(`Context count: ${summary.contextCount}`);
+    lines.push(
+      `Retained by context size: ${formatBytesToKb(summary.retainedByContextSize)} (${summary.retainedByContextCount} objects)`,
+    );
+    lines.push(
+      `Not retained by context size: ${formatBytesToKb(summary.notRetainedByContextSize)} (${summary.notRetainedByContextCount} objects)`,
+    );
+    lines.push(`Total size: ${formatBytesToKb(summary.totalSize)}`);
     return lines.join('\n');
   }
 
@@ -128,12 +181,12 @@ export class HeapSnapshotFormatter {
   toString(): string {
     const sorted = this.#getSortedAggregates();
     const lines: string[] = [];
-    lines.push('id,name,count,selfSize,maxRetainedSize');
+    lines.push('id,name,count,selfSize,retainedSize');
 
     for (const info of sorted) {
       const id = info[stableIdSymbol] ?? '';
       lines.push(
-        `${id},${info.name},${info.count},${DevTools.I18n.ByteUtilities.formatBytesToKb(info.self)},${DevTools.I18n.ByteUtilities.formatBytesToKb(info.maxRet)}`,
+        `${id},${info.name},${info.count},${formatBytesToKb(info.self)},${formatBytesToKb(info.maxRet)}`,
       );
     }
 
@@ -146,8 +199,8 @@ export class HeapSnapshotFormatter {
       id: info[stableIdSymbol],
       className: info.name,
       count: info.count,
-      selfSize: DevTools.I18n.ByteUtilities.formatBytesToKb(info.self),
-      retainedSize: DevTools.I18n.ByteUtilities.formatBytesToKb(info.maxRet),
+      selfSize: formatBytesToKb(info.self),
+      retainedSize: formatBytesToKb(info.maxRet),
     }));
   }
 
@@ -171,7 +224,7 @@ export class HeapSnapshotFormatter {
     let index = 0;
     for (const diff of diffs) {
       lines.push(
-        `${index},${diff.className},${diff.addedCount},${diff.removedCount},${diff.countDelta},${DevTools.I18n.ByteUtilities.formatBytesToKb(diff.addedSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(diff.removedSize)},${DevTools.I18n.ByteUtilities.formatBytesToKb(diff.sizeDelta)}`,
+        `${index},${diff.className},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
       );
       index++;
     }
@@ -194,16 +247,47 @@ export class HeapSnapshotFormatter {
 
     for (let i = 0; i < addedIds.length; i++) {
       lines.push(
-        `  + @${addedIds[i]} (self_size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(addedSelfSizes[i])})`,
+        `  + @${addedIds[i]} (self_size: ${formatBytesToKb(addedSelfSizes[i])})`,
       );
     }
     for (let i = 0; i < deletedIds.length; i++) {
       lines.push(
-        `  - @${deletedIds[i]} (self_size: ${DevTools.I18n.ByteUtilities.formatBytesToKb(deletedSelfSizes[i])})`,
+        `  - @${deletedIds[i]} (self_size: ${formatBytesToKb(deletedSelfSizes[i])})`,
       );
     }
 
     return lines.join('\n');
+  }
+
+  static formatObjectInfo(
+    info: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+  ): string {
+    const lines = [
+      `id: @${info.id}`,
+      `name: ${info.name}`,
+      `type: ${info.type}`,
+      `detachedness: ${formatDOMLinkState(info.detachedness)}`,
+      `selfSize: ${formatBytesToKb(info.selfSize)}`,
+      `retainedSize: ${formatBytesToKb(info.retainedSize)}`,
+      `distance: ${info.distance}`,
+      `edgeCount: ${info.edgeCount}`,
+      `retainerCount: ${info.retainerCount}`,
+    ];
+    return lines.join('\n');
+  }
+}
+
+function formatDOMLinkState(
+  state: DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState,
+): string {
+  switch (state) {
+    case DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.ATTACHED:
+      return 'attached';
+    case DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.DETACHED:
+      return 'detached';
+    case DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.UNKNOWN:
+    default:
+      return 'unknown';
   }
 }
 
@@ -212,6 +296,6 @@ function formatSignedCount(n: number): string {
 }
 
 function formatSignedSize(bytes: number): string {
-  const formatted = DevTools.I18n.ByteUtilities.formatBytesToKb(bytes);
+  const formatted = formatBytesToKb(bytes);
   return bytes > 0 ? `+${formatted}` : formatted;
 }

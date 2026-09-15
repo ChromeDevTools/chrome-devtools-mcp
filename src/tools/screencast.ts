@@ -10,7 +10,6 @@ import path from 'node:path';
 
 import {zod} from '../third_party/index.js';
 import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
-import {ensureExtension} from '../utils/files.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -20,11 +19,13 @@ async function generateTempFilePath(): Promise<string> {
   return path.join(dir, `screencast.mp4`);
 }
 
-const supportedExtensions: Array<`.${string}`> = ['.webm', '.mp4'];
+type SupportedVideoExtension = '.webm' | '.mp4';
+
+const supportedExtensions: SupportedVideoExtension[] = ['.webm', '.mp4'];
 
 export const startScreencast = definePageTool(args => ({
   name: 'screencast_start',
-  description: `Starts recording a screencast (video) of the selected page in specified format.`,
+  description: `Starts recording a screencast (video) of the target page in specified format.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -39,7 +40,9 @@ export const startScreencast = definePageTool(args => ({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: ['filePath'],
+  verifyFilesSchema: {
+    filePath: true,
+  },
   handler: async (request, response, context) => {
     if (context.getScreenRecorder() !== null) {
       response.appendResponseLine(
@@ -68,14 +71,15 @@ export const startScreencast = definePageTool(args => ({
           `Supported formats: ${supportedExtensions.join(', ')} (case-insensitive).`,
       );
     }
-    const enforcedExtension: `.${string}` = matchedExtension ?? '.mp4';
+    const enforcedExtension: SupportedVideoExtension =
+      matchedExtension ?? '.mp4';
     const format: VideoFormat = (matchedExtension?.substring(1) ??
       'mp4') as VideoFormat;
 
-    const resolvedPath = ensureExtension(
-      path.resolve(filePath),
+    const resolvedPath = await context.ensureExtension(
+      filePath,
       enforcedExtension,
-    ) as `${string}.webm`;
+    );
 
     const page = request.page;
 
@@ -85,6 +89,7 @@ export const startScreencast = definePageTool(args => ({
         path: resolvedPath,
         format: format,
         ffmpegPath: args?.experimentalFfmpegPath,
+        fps: args?.experimentalScreencastFps,
       });
     } catch (err) {
       // If we generated a temporary directory for this recording, remove it so
@@ -119,7 +124,7 @@ export const startScreencast = definePageTool(args => ({
 
 export const stopScreencast = definePageTool({
   name: 'screencast_stop',
-  description: 'Stops the active screencast recording on the selected page.',
+  description: 'Stops the active screencast recording on the target page.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -127,7 +132,7 @@ export const stopScreencast = definePageTool({
   },
   schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (_request, response, context) => {
     const data = context.getScreenRecorder();
     if (!data) {

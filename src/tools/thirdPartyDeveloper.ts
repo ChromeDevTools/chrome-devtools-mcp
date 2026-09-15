@@ -45,20 +45,20 @@ declare global {
 export const listThirdPartyDeveloperTools = definePageTool({
   name: 'list_3p_developer_tools',
   description: `Lists all third-party developer tools the page exposes for providing runtime information.
-  Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.
-  Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the
-  following command to the script:
-  'window.__dtmcp.executeTool(toolName, params)'
-  This might be helpful when the third-party developer tools return non-serializable values or when composing
-  third-party developer tools with additional functionality.`,
+Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.
+Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the
+following command to the script:
+\`window.__dtmcp.executeTool(toolName, params)\`
+This might be helpful when the third-party developer tools return non-serializable values or when composing
+third-party developer tools with additional functionality.`,
   annotations: {
     category: ToolCategory.THIRD_PARTY,
     readOnlyHint: true,
   },
   schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: [],
-  handler: async (_request, response, _context) => {
+  verifyFilesSchema: {},
+  handler: async (_request, response) => {
     response.setListThirdPartyDeveloperTools();
   },
 });
@@ -78,7 +78,7 @@ export const executeThirdPartyDeveloperTool = definePageTool({
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response) => {
     const toolName = request.params.toolName;
     let params: Record<string, unknown> = {};

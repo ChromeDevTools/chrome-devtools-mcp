@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -20,8 +21,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import {executablePath} from 'puppeteer';
 
+import {mcpOptions} from '../src/config/mcp-options.js';
+import {getOffByDefaultCategories} from '../src/config/category-options.js';
 import type {ToolCategory} from '../src/tools/categories.js';
-import {OFF_BY_DEFAULT_CATEGORIES} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 describe('e2e', () => {
@@ -30,33 +32,52 @@ describe('e2e', () => {
     extraArgs: string[] = [],
     options: {capabilities?: ClientCapabilities} = {},
   ) {
-    const transport = new StdioClientTransport({
-      command: 'node',
-      args: [
-        'build/src/bin/chrome-devtools-mcp.js',
-        '--headless',
-        '--isolated',
-        '--executable-path',
-        await executablePath(),
-        ...extraArgs,
-      ],
-      env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    });
-    const client = new Client(
-      {
-        name: 'e2e-test',
-        version: '1.0.0',
-      },
-      {
-        capabilities: options.capabilities ?? {},
-      },
-    );
+    let attempt = 1;
+    while (attempt <= 3) {
+      const transport = new StdioClientTransport({
+        command: 'node',
+        args: [
+          'build/src/bin/chrome-devtools-mcp.js',
+          '--headless',
+          '--isolated',
+          '--executable-path',
+          await executablePath(),
+          ...extraArgs,
+        ],
+        env: {...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      });
+      const client = new Client(
+        {
+          name: 'e2e-test',
+          version: '1.0.0',
+        },
+        {
+          capabilities: options.capabilities ?? {},
+        },
+      );
 
-    try {
-      await client.connect(transport);
-      await cb(client);
-    } finally {
-      await client.close();
+      try {
+        await client.connect(transport);
+        await cb(client);
+        return;
+      } catch (error) {
+        if (
+          attempt === 3 ||
+          !(error instanceof Error) ||
+          (!error.message.includes('timed out') &&
+            !error.message.includes('timeout'))
+        ) {
+          throw error;
+        }
+        attempt++;
+        await new Promise(r => setTimeout(r, 1000));
+      } finally {
+        try {
+          await client.close();
+        } catch {
+          // Ignore close errors
+        }
+      }
     }
   }
   it('calls a tool', async t => {
@@ -92,7 +113,7 @@ describe('e2e', () => {
         definedNames.sort();
         assert.deepStrictEqual(exposedNames, definedNames);
       },
-      OFF_BY_DEFAULT_CATEGORIES.map(category => `--category-${category}`),
+      getOffByDefaultCategories().map(category => `--category-${category}`),
     );
   });
 
@@ -101,7 +122,7 @@ describe('e2e', () => {
       const {tools} = await client.listTools();
       const exposedNames = tools.map(t => t.name).sort();
       const definedNames = await getToolsWithFilteredCategories(
-        OFF_BY_DEFAULT_CATEGORIES,
+        getOffByDefaultCategories(),
       );
       definedNames.sort();
       assert.deepStrictEqual(exposedNames, definedNames);
@@ -184,6 +205,17 @@ describe('e2e', () => {
     );
   });
 
+  it('can disable javascript evaluation tools', async () => {
+    await withClient(
+      async client => {
+        const {tools} = await client.listTools();
+        const evaluateScript = tools.find(t => t.name === 'evaluate_script');
+        assert.strictEqual(evaluateScript, undefined);
+      },
+      ['--no-javascript-evaluation'],
+    );
+  });
+
   it('updates roots when client notifies', async () => {
     const roots = [{uri: 'file:///test-root', name: 'test-root'}];
     let resolvePromise: () => void;
@@ -214,6 +246,51 @@ describe('e2e', () => {
     );
   });
 
+  it('combines configured filesystem roots with client roots', async () => {
+    const configuredRoot = await fs.promises.mkdtemp(
+      path.join(os.homedir(), '.configured-root-'),
+    );
+    const clientRoot = await fs.promises.mkdtemp(
+      path.join(os.homedir(), '.client-root-'),
+    );
+
+    try {
+      await withClient(
+        async client => {
+          client.setRequestHandler(ListRootsRequestSchema, () => {
+            return {
+              roots: [
+                {uri: pathToFileURL(clientRoot).href, name: 'client-root'},
+              ],
+            };
+          });
+
+          for (const outputPath of [
+            path.join(configuredRoot, 'configured.png'),
+            path.join(clientRoot, 'client.png'),
+          ]) {
+            const result = await client.callTool({
+              name: 'take_screenshot',
+              arguments: {pageId: 1, filePath: outputPath},
+            });
+            assert.strictEqual(result.isError, undefined);
+            const content = result.content as TextContent[];
+            assert.match(content[0].text, /Saved screenshot to/);
+          }
+        },
+        [`--filesystem-root=${configuredRoot}`],
+        {
+          capabilities: {
+            roots: {listChanged: true},
+          },
+        },
+      );
+    } finally {
+      await fs.promises.rm(configuredRoot, {recursive: true, force: true});
+      await fs.promises.rm(clientRoot, {recursive: true, force: true});
+    }
+  });
+
   it('denies file access if roots list is empty', async () => {
     await withClient(
       async client => {
@@ -224,6 +301,7 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
+            pageId: 1,
             filePath: path.resolve(os.homedir(), 'test.png'),
           },
         });
@@ -244,10 +322,15 @@ describe('e2e', () => {
   it('allows file access if roots capability is missing', async () => {
     await withClient(
       async client => {
+        // Use os.tmpdir() rather than a hardcoded /tmp path.
+        // On macOS, os.tmpdir() returns /var/folders/... (not /tmp), so a
+        // hardcoded /tmp path is outside the allowed root after the
+        // validatePath fix and would be rejected with Access denied.
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
-            filePath: '/tmp/test.png',
+            pageId: 1,
+            filePath: path.join(os.tmpdir(), 'test.png'),
           },
         });
 
@@ -262,6 +345,92 @@ describe('e2e', () => {
     );
   });
 
+  it('does not block tools if the client never answers roots/list', async () => {
+    await withClient(
+      async client => {
+        // A client that negotiates roots but never responds. getContext()
+        // awaits updateRoots() while holding the tool mutex, so an unbounded
+        // request would stall this call for the SDK default of 60s.
+        client.setRequestHandler(ListRootsRequestSchema, () => {
+          return new Promise<never>(() => {
+            // Intentionally never settles
+          });
+        });
+
+        const start = Date.now();
+        // Raise the client-side timeout above the SDK default so an unbounded
+        // roots request surfaces as the assertion below rather than a timeout
+        const result = await client.callTool(
+          {
+            name: 'list_pages',
+            arguments: {},
+          },
+          undefined,
+          {timeout: 90_000},
+        );
+        const elapsed = Date.now() - start;
+
+        assert.strictEqual(result.isError, undefined);
+        // Bounded roots request plus browser launch settles well under this,
+        // leaving room for a slow CI runner while still catching the 60s stall
+        assert.ok(
+          elapsed < 45_000,
+          `list_pages took ${elapsed}ms, expected the bounded roots request to settle well before the 60s SDK default`,
+        );
+      },
+      [],
+      {
+        capabilities: {
+          roots: {listChanged: true},
+        },
+      },
+    );
+  });
+
+  it('still applies roots from a client slower than the bound', async () => {
+    const workspace = await fs.promises.mkdtemp(
+      path.join(os.homedir(), '.roots-slow-client-'),
+    );
+    try {
+      await withClient(
+        async client => {
+          // Answers after the bound the blocking call uses, so the roots only
+          // arrive via the background listing
+          client.setRequestHandler(ListRootsRequestSchema, async () => {
+            await new Promise(resolve => setTimeout(resolve, 8_000));
+            return {
+              roots: [{uri: pathToFileURL(workspace).href, name: 'workspace'}],
+            };
+          });
+
+          await client.callTool({name: 'list_pages', arguments: {}});
+          await new Promise(resolve => setTimeout(resolve, 5_000));
+
+          const result = await client.callTool({
+            name: 'take_screenshot',
+            arguments: {
+              pageId: 1,
+              filePath: path.join(workspace, 'shot.png'),
+            },
+          });
+
+          // Asserted before isError so a denial reports the path it rejected
+          const content = result.content as TextContent[];
+          assert.match(content[0].text, /Saved screenshot to/);
+          assert.strictEqual(result.isError, undefined);
+        },
+        [],
+        {
+          capabilities: {
+            roots: {listChanged: true},
+          },
+        },
+      );
+    } finally {
+      await fs.promises.rm(workspace, {recursive: true, force: true});
+    }
+  });
+
   describe('Dialogs', () => {
     async function createNewPageAndTriggerDialog(client: Client) {
       // Navigate to a page with a button that triggers a dialog on click
@@ -274,7 +443,9 @@ describe('e2e', () => {
 
       const snapshotResult = await client.callTool({
         name: 'take_snapshot',
-        arguments: {},
+        arguments: {
+          pageId: 2,
+        },
       });
 
       const snapshotText = (snapshotResult.content as TextContent[])[0].text;
@@ -285,6 +456,7 @@ describe('e2e', () => {
       const result = await client.callTool({
         name: 'click',
         arguments: {
+          pageId: 2,
           uid,
         },
       });
@@ -305,7 +477,10 @@ describe('e2e', () => {
         const result = await client.callTool({
           name: 'take_screenshot',
           arguments: {
-            filePath: '/tmp/test.png',
+            pageId: 2,
+            // Use os.tmpdir() so validatePath passes on macOS/Windows before
+            // reaching the dialog-blocked check.
+            filePath: path.join(os.tmpdir(), 'test.png'),
           },
         });
 
@@ -372,7 +547,12 @@ function toolShouldBeSkipped(
   filteredOutCategories: ToolCategory[],
 ) {
   if (tool.annotations?.conditions) {
-    return true;
+    for (const condition of tool.annotations.conditions) {
+      const option = mcpOptions[condition as keyof typeof mcpOptions];
+      if (!option || !('default' in option) || option.default !== true) {
+        return true;
+      }
+    }
   }
   if (
     tool.annotations?.category &&

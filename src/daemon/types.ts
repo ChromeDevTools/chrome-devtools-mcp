@@ -23,3 +23,11 @@ export interface DaemonResponse {
   result: string;
   error: unknown;
 }
+
+export interface DaemonStatusResult {
+  pid: number | null;
+  socketPath: string;
+  startDate: string;
+  version: string;
+  args: string[];
+}

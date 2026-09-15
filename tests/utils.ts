@@ -5,11 +5,11 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import {spawn, type ChildProcess} from 'node:child_process';
 import path from 'node:path';
 
 import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
-import logger from 'debug';
+
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
 import type {
@@ -22,12 +22,14 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/bin/chrome-devtools-mcp-cli-options.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
+
+import {createMockPuppeteerPage, mockListener} from './mocks.js';
 
 export function assertNoServiceWorkerReported(targets: Target[], id: string) {
   const target = targets.find(target => {
@@ -78,37 +80,79 @@ export async function withBrowser(
     allowedUrlPattern?: string[];
   } = {},
 ) {
-  const launchOptions: LaunchOptions = {
-    executablePath:
-      options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
-    headless: !options.debug,
-    defaultViewport: null,
-    devtools: options.autoOpenDevTools ?? false,
-    pipe: true,
-    handleDevToolsAsPage: true,
-    args: [...(options.args || []), '--screen-info={3840x2160}'],
-    enableExtensions: true,
-    blocklist: options.blockedUrlPattern,
-    allowlist: options.allowedUrlPattern,
-  };
-  const key = JSON.stringify(launchOptions);
+  let attempt = 1;
+  while (attempt <= 3) {
+    const launchOptions: LaunchOptions = {
+      executablePath:
+        options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: !options.debug,
+      defaultViewport: null,
+      devtools: options.autoOpenDevTools ?? false,
+      pipe: true,
+      handleDevToolsAsPage: true,
+      args: [...(options.args || []), '--screen-info={3840x2160}'],
+      enableExtensions: true,
+      blocklist: options.blockedUrlPattern,
+      allowlist: options.allowedUrlPattern,
+    };
+    const key = JSON.stringify(launchOptions);
 
-  let browser = browsers.get(key);
-  if (!browser) {
-    browser = await puppeteer.launch(launchOptions);
-    browsers.set(key, browser);
-  }
-  const newPage = await browser.newPage();
-  // Close other pages.
-  await Promise.all(
-    (await browser.pages()).map(async page => {
-      if (page !== newPage) {
-        await page.close();
+    let browser = browsers.get(key);
+    if (!browser) {
+      browser = await puppeteer.launch(launchOptions);
+      browsers.set(key, browser);
+    }
+
+    try {
+      await Promise.race([
+        (async () => {
+          const newPage = await browser.newPage();
+          // Close other pages.
+          await Promise.all(
+            (await browser.pages()).map(async page => {
+              if (page !== newPage) {
+                await page.close();
+              }
+            }),
+          );
+
+          await cb(browser, newPage);
+        })(),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('withBrowser timeout exceeded')),
+            60000,
+          ),
+        ),
+      ]);
+      return;
+    } catch (error) {
+      browsers.delete(key);
+      try {
+        await Promise.race([
+          browser.close(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('browser.close timeout')), 2000),
+          ),
+        ]);
+      } catch {
+        browser.process()?.kill('SIGKILL');
       }
-    }),
-  );
 
-  await cb(browser, newPage);
+      const isRetryable =
+        error instanceof Error &&
+        (error.message === 'withBrowser timeout exceeded' ||
+          error.message.includes('closed') ||
+          error.message.includes('crash') ||
+          error.message.includes('hang'));
+
+      if (attempt === 3 || !isRetryable) {
+        throw error;
+      }
+      attempt++;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
 }
 
 export async function withMcpContext(
@@ -117,27 +161,37 @@ export async function withMcpContext(
     debug?: boolean;
     autoOpenDevTools?: boolean;
     performanceCrux?: boolean;
+    sourceMaps?: boolean;
     executablePath?: string;
     args?: string[];
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
+    allowUnrestrictedPaths?: boolean;
+    navigationTimeout?: number;
   } = {},
   args: Partial<ParsedArguments> = {},
 ) {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
+    McpContext.resetPageIdsForTesting();
     const response = new McpResponse(args as ParsedArguments);
     if (context) {
       context.dispose();
     }
     context = await McpContext.from(
       browser,
-      logger('test'),
+      undefined,
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
+        sourceMaps: options.sourceMaps ?? true,
         allowList: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
+        allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
+        navigationTimeout:
+          options.navigationTimeout ??
+          (process.platform === 'win32' ? 20000 : undefined),
+        categoryExtensions: args?.categoryExtensions,
       },
       Locator,
     );
@@ -250,25 +304,32 @@ export function html(
 </html>`;
 }
 
-export function stabilizeStructuredContent(content: unknown): unknown {
+export function stabilizeStructuredContent(content: unknown): string {
   if (typeof content === 'string') {
     return stabilizeResponseOutput(content);
   }
-  if (Array.isArray(content)) {
-    return content.map(item => stabilizeStructuredContent(item));
-  }
-  if (typeof content === 'object' && content !== null) {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(content)) {
-      if (key === 'snapshotFilePath' && typeof value === 'string') {
-        result[key] = '<file>';
-      } else {
-        result[key] = stabilizeStructuredContent(value);
-      }
+  const stabilize = (c: unknown): unknown => {
+    if (typeof c === 'string') {
+      return stabilizeResponseOutput(c);
     }
-    return result;
-  }
-  return content;
+    if (Array.isArray(c)) {
+      return c.map(item => stabilize(item));
+    }
+    if (typeof c === 'object' && c !== null) {
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(c)) {
+        if (key === 'snapshotFilePath' && typeof value === 'string') {
+          result[key] = '<file>';
+        } else {
+          result[key] = stabilize(value);
+        }
+      }
+      return result;
+    }
+    return c;
+  };
+
+  return JSON.stringify(stabilize(content), null, 2);
 }
 
 export function stabilizeResponseOutput(text: unknown) {
@@ -281,6 +342,9 @@ export function stabilizeResponseOutput(text: unknown) {
 
   const localhostRegEx = /localhost:\d{5}/g;
   output = output.replaceAll(localhostRegEx, 'localhost:<port>');
+
+  const loopbackAddress = /127.0.0.1:\d{5}/g;
+  output = output.replaceAll(loopbackAddress, '127.0.0.1:<port>');
 
   const userAgentRegEx = /user-agent:.*\n/g;
   output = output.replaceAll(userAgentRegEx, 'user-agent:<user-agent>\n');
@@ -313,51 +377,31 @@ export function getMockAggregatedIssue(): sinon.SinonStubbedInstance<DevTools.Ag
   return mockAggregatedIssue;
 }
 
-export function mockListener() {
-  const listeners: Record<string, Array<(data: unknown) => void>> = {};
+export function getMockBrowser(options?: {
+  process?: ChildProcess | null;
+  wsEndpoint?: string;
+}): Browser {
+  const page = createMockPuppeteerPage();
+  const listener = mockListener();
+  page.on.callsFake((eventName, handler) => {
+    listener.on(eventName, handler);
+    return page;
+  });
+  page.off.callsFake((eventName, handler) => {
+    if (handler) {
+      listener.off(eventName, handler);
+    }
+    return page;
+  });
+  (page as unknown as {emit: typeof listener.emit}).emit = listener.emit;
+  const pages = [page as unknown as Page];
   return {
-    on(eventName: string, listener: (data: unknown) => void) {
-      if (listeners[eventName]) {
-        listeners[eventName].push(listener);
-      } else {
-        listeners[eventName] = [listener];
-      }
+    process() {
+      return options?.process ?? null;
     },
-    off(_eventName: string, _listener: (data: unknown) => void) {
-      // no-op
+    wsEndpoint() {
+      return options?.wsEndpoint ?? '';
     },
-    emit(eventName: string, data: unknown) {
-      for (const listener of listeners[eventName] ?? []) {
-        listener(data);
-      }
-    },
-  };
-}
-
-export function getMockPage(): Page {
-  const mainFrame = {} as Frame;
-  const cdpSession = {
-    ...mockListener(),
-    send: () => {
-      // no-op
-    },
-    target: () => ({_targetId: '<mock target ID>'}),
-  };
-  return {
-    mainFrame() {
-      return mainFrame;
-    },
-    ...mockListener(),
-    // @ts-expect-error internal API.
-    _client() {
-      return cdpSession;
-    },
-  } satisfies Page;
-}
-
-export function getMockBrowser(): Browser {
-  const pages = [getMockPage()];
-  return {
     pages() {
       return Promise.resolve(pages);
     },

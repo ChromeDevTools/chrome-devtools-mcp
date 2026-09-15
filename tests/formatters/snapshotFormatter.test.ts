@@ -143,6 +143,17 @@ describe('snapshotFormatter', () => {
             return null;
           },
         },
+        {
+          id: '1_4',
+          role: 'slider',
+          name: 'volume',
+          valuemin: 0,
+          valuemax: 100,
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
       ],
       elementHandle: async (): Promise<ElementHandle<Element> | null> => {
         return null;
@@ -156,6 +167,7 @@ describe('snapshotFormatter', () => {
       `uid=1_1 root "root"
   uid=1_2 button "button" disableable disabled focusable focused
   uid=1_3 textbox "textbox" value="value"
+  uid=1_4 slider "volume" valuemax="100" valuemin="0"
 `,
     );
   });
@@ -188,6 +200,9 @@ describe('snapshotFormatter', () => {
       idToNode: new Map(),
       hasSelectedElement: true,
       verbose: false,
+      resolveCdpElementId() {
+        return undefined;
+      },
     });
     const formatted = formatter.toString();
 
@@ -222,6 +237,9 @@ describe('snapshotFormatter', () => {
       idToNode: new Map(),
       hasSelectedElement: true,
       verbose: true,
+      resolveCdpElementId() {
+        return undefined;
+      },
     });
     const formatted = formatter.toString();
 
@@ -257,10 +275,44 @@ describe('snapshotFormatter', () => {
       hasSelectedElement: true,
       selectedElementUid: '1_1',
       verbose: false,
+      resolveCdpElementId() {
+        return '1_1';
+      },
     });
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);
+  });
+
+  it('formats a node with role "none" as ignored', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'none',
+      name: '',
+      children: [
+        {
+          id: '1_2',
+          role: 'statictext',
+          name: 'text',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    const formatted = formatter.toString();
+    assert.strictEqual(
+      formatted,
+      `uid=1_1 ignored
+  uid=1_2 statictext "text"
+`,
+    );
   });
 
   it('toJSON returns expected structure', () => {

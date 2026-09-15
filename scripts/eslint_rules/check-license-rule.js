@@ -29,7 +29,7 @@ export default {
   },
   defaultOptions: [],
   create(context) {
-    const sourceCode = context.getSourceCode();
+    const sourceCode = context.sourceCode;
     const comments = sourceCode.getAllComments();
     let insertAfter = [0, 0];
     let header = null;
@@ -55,7 +55,7 @@ export default {
 
     return {
       Program(node) {
-        if (context.getFilename().endsWith('.json')) {
+        if (context.filename.endsWith('.json')) {
           return;
         }
 

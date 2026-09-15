@@ -7,8 +7,7 @@
 import path from 'node:path';
 
 import {
-  snapshot,
-  navigation,
+  lighthouseRunner,
   generateReport,
   zod,
   type Flags,
@@ -44,7 +43,9 @@ export const lighthouseAudit = definePageTool({
       .describe('Directory for reports. If omitted, uses temporary files.'),
   },
   blockedByDialog: true,
-  verifyFilesSchema: ['outputDirPath'],
+  verifyFilesSchema: {
+    outputDirPath: true,
+  },
   handler: async (request, response, context) => {
     const page = request.page;
     const categories = [
@@ -90,11 +91,15 @@ export const lighthouseAudit = definePageTool({
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page.pptrPage, page.pptrPage.url(), {
-          flags,
-        });
+        result = await lighthouseRunner.navigation(
+          page.pptrPage,
+          page.pptrPage.url(),
+          {
+            flags,
+          },
+        );
       } else {
-        result = await snapshot(page.pptrPage, {
+        result = await lighthouseRunner.snapshot(page.pptrPage, {
           flags,
         });
       }
@@ -103,7 +108,7 @@ export const lighthouseAudit = definePageTool({
         throw new Error('Lighthouse audit failed.');
       }
     } finally {
-      await context.restoreEmulation(page);
+      await page.restoreEmulation();
     }
 
     const lhr = result.lhr;

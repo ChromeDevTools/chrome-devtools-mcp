@@ -47,7 +47,7 @@ const throttlingOptions: [string, ...string[]] = [
 
 export const emulate = definePageTool({
   name: 'emulate',
-  description: `Emulates various features on the selected page.`,
+  description: `Emulates various features on the target page.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -100,10 +100,10 @@ export const emulate = definePageTool({
       ),
   },
   blockedByDialog: true,
-  verifyFilesSchema: [],
-  handler: async (request, response, context) => {
+  verifyFilesSchema: {},
+  handler: async (request, response) => {
     const page = request.page;
-    await context.emulate(request.params, page.pptrPage);
+    await page.emulate(request.params);
     response.appendResponseLine('Emulation configured successfully');
   },
 });

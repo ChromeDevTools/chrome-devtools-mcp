@@ -4,18 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Mutex} from '../Mutex.js';
 import {DevTools} from '../third_party/index.js';
 import type {
-  Browser,
   CDPSession,
   ConsoleMessage,
-  Page,
   Protocol,
-  Target as PuppeteerTarget,
 } from '../third_party/index.js';
 
-import {PuppeteerDevToolsConnection} from './DevToolsConnectionAdapter.js';
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
 
 /**
@@ -40,6 +35,12 @@ export function overrideDevToolsGlobals({
 
   // DevTools CDP errors can get noisy.
   DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
+
+  const noopAgentCommand = () => {
+    return Promise.resolve({
+      getError: () => undefined,
+    });
+  };
 
   // Stub out Network emulation commands on the DevTools Agent prototype globally.
   // This prevents the DevTools Frontend from ever resetting/clearing Puppeteer's
@@ -68,42 +69,42 @@ export function overrideDevToolsGlobals({
       networkAgentPrototype,
       'invoke_overrideNetworkState',
       {
-        value: () => {
-          return Promise.resolve({
-            getError: () => undefined,
-          });
-        },
+        value: noopAgentCommand,
         writable: true,
         configurable: true,
         enumerable: true,
       },
     );
     Object.defineProperty(networkAgentPrototype, 'invoke_enable', {
-      value: () => {
-        return Promise.resolve({
-          getError: () => undefined,
-        });
-      },
+      value: noopAgentCommand,
       writable: true,
       configurable: true,
       enumerable: true,
     });
     Object.defineProperty(networkAgentPrototype, 'invoke_disable', {
-      value: () => {
-        return Promise.resolve({
-          getError: () => undefined,
-        });
-      },
+      value: noopAgentCommand,
       writable: true,
       configurable: true,
       enumerable: true,
     });
     Object.defineProperty(networkAgentPrototype, 'invoke_setBlockedURLs', {
-      value: () => {
-        return Promise.resolve({
-          getError: () => undefined,
-        });
-      },
+      value: noopAgentCommand,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+
+  // Puppeteer already collects issues from its own Audits subscription. Avoid
+  // enabling the DevTools Frontend's redundant subscription, which can replay
+  // a large retained issue backlog and delay unrelated page work.
+  const auditsAgentPrototype =
+    DevTools.ProtocolClient.InspectorBackend.inspectorBackend.agentPrototypes.get(
+      'Audits',
+    );
+  if (auditsAgentPrototype) {
+    Object.defineProperty(auditsAgentPrototype, 'invoke_enable', {
+      value: noopAgentCommand,
       writable: true,
       configurable: true,
       enumerable: true,
@@ -135,83 +136,15 @@ export interface TargetUniverse {
   /** The secondary session created for this page */
   session: CDPSession;
 }
-export type TargetUniverseFactoryFn = (page: Page) => Promise<TargetUniverse>;
 
-export class UniverseManager {
-  readonly #browser: Browser;
-  readonly #createUniverseFor: TargetUniverseFactoryFn;
-  readonly #universes = new WeakMap<Page, TargetUniverse>();
-
-  /** Guard access to #universes so we don't create unnecessary universes */
-  readonly #mutex = new Mutex();
-
-  constructor(
-    browser: Browser,
-    factory: TargetUniverseFactoryFn = DEFAULT_FACTORY,
-  ) {
-    this.#browser = browser;
-    this.#createUniverseFor = factory;
-  }
-
-  async init(pages: Page[]) {
-    try {
-      await this.#mutex.acquire();
-      const promises = [];
-      for (const page of pages) {
-        promises.push(
-          this.#createUniverseFor(page).then(targetUniverse =>
-            this.#universes.set(page, targetUniverse),
-          ),
-        );
-      }
-
-      this.#browser.on('targetcreated', this.#onTargetCreated);
-      this.#browser.on('targetdestroyed', this.#onTargetDestroyed);
-
-      await Promise.all(promises);
-    } finally {
-      this.#mutex.release();
-    }
-  }
-
-  get(page: Page): TargetUniverse | null {
-    return this.#universes.get(page) ?? null;
-  }
-
-  dispose() {
-    this.#browser.off('targetcreated', this.#onTargetCreated);
-    this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
-  }
-
-  #onTargetCreated = async (target: PuppeteerTarget) => {
-    const page = await target.page();
-    try {
-      await this.#mutex.acquire();
-      if (!page || this.#universes.has(page)) {
-        return;
-      }
-
-      this.#universes.set(page, await this.#createUniverseFor(page));
-    } finally {
-      this.#mutex.release();
-    }
-  };
-
-  #onTargetDestroyed = async (target: PuppeteerTarget) => {
-    const page = await target.page();
-    try {
-      await this.#mutex.acquire();
-      if (!page || !this.#universes.has(page)) {
-        return;
-      }
-      this.#universes.delete(page);
-    } finally {
-      this.#mutex.release();
-    }
-  };
+export interface CreateTargetUniverseOptions {
+  sourceMaps?: boolean;
 }
 
-const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
+export async function createTargetUniverse(
+  session: CDPSession,
+  options?: CreateTargetUniverseOptions,
+): Promise<TargetUniverse> {
   const settingStorage = new DevTools.Common.Settings.SettingsStorage({});
   const universe = new DevTools.Foundation.Universe.Universe({
     settingsCreationOptions: {
@@ -222,14 +155,38 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
         DevTools.Common.SettingRegistration.getRegisteredSettings(),
     },
     overrideAutoStartModels: new Set([DevTools.DebuggerModel]),
+    hostConfig: {},
+    inspectorFrontendHost:
+      DevTools.Host.InspectorFrontendHost.InspectorFrontendHostInstance,
+    supportsEmulation: false,
   });
 
-  const session = await page.createCDPSession();
-  const connection = new PuppeteerDevToolsConnection(session);
+  const sourceMaps = options?.sourceMaps ?? true;
+  const jsSourceMapsSetting = universe.settings.resolve(
+    DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor,
+  );
+  jsSourceMapsSetting.set(sourceMaps);
+
+  const cssSourceMapsSetting = universe.settings.resolve(
+    DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor,
+  );
+  cssSourceMapsSetting.set(sourceMaps);
+
+  const setting = universe.settings.resolve(
+    DevTools.SourceMapManager.lazyLoadingSettingDescriptor,
+  );
+  setting.set(true);
+
+  const skipAllPausesSetting = universe.settings.resolve(
+    DevTools.skipAllPausesSettingDescriptor,
+  );
+  skipAllPausesSetting.set(true);
+
+  // @ts-expect-error devtools-frontend has diffrent types.
+  const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
   const targetManager = universe.context.get(DevTools.TargetManager);
 
-  targetManager.observeModels(DevTools.DebuggerModel, SKIP_ALL_PAUSES);
   targetManager.observeModels(
     DevTools.NetworkManager.NetworkManager,
     DISABLE_NETWORK,
@@ -244,23 +201,9 @@ const DEFAULT_FACTORY: TargetUniverseFactoryFn = async (page: Page) => {
     undefined,
     connection,
   );
+
   return {target, universe, session};
-};
-
-// We don't want to pause any DevTools universe session ever on the MCP side.
-//
-// Note that calling `setSkipAllPauses` only affects the session on which it was
-// sent. This means DevTools can still pause, step and do whatever. We just won't
-// see the `Debugger.paused`/`Debugger.resumed` events on the MCP side.
-const SKIP_ALL_PAUSES = {
-  modelAdded(model: DevTools.DebuggerModel): void {
-    void model.agent.invoke_setSkipAllPauses({skip: true});
-  },
-
-  modelRemoved(): void {
-    // Do nothing.
-  },
-};
+}
 
 // Not recording network requests in the DevTools universe.
 //
@@ -275,6 +218,16 @@ const DISABLE_NETWORK = {
     // Do nothing.
   },
 };
+
+export type RemoteObjectLike =
+  Protocol.Runtime.RemoteObject | DevTools.Protocol.Runtime.RemoteObject;
+
+export type ExceptionDetailsLike =
+  | Protocol.Runtime.ExceptionDetails
+  | DevTools.Protocol.Runtime.ExceptionDetails;
+
+export type StackTraceLike =
+  Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
 /**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
@@ -300,7 +253,7 @@ export class SymbolizedError {
 
   static async fromDetails(opts: {
     devTools?: TargetUniverse;
-    details: Protocol.Runtime.ExceptionDetails;
+    details: ExceptionDetailsLike;
     targetId: string;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
@@ -358,7 +311,7 @@ export class SymbolizedError {
 
   static async fromError(opts: {
     devTools?: TargetUniverse;
-    error: Protocol.Runtime.RemoteObject;
+    error: RemoteObjectLike;
     targetId: string;
   }): Promise<SymbolizedError> {
     const details = await SymbolizedError.#getExceptionDetails(
@@ -380,7 +333,7 @@ export class SymbolizedError {
     );
   }
 
-  static #getMessage(details: Protocol.Runtime.ExceptionDetails): string {
+  static #getMessage(details: ExceptionDetailsLike): string {
     // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
     // we have to manually parse out the error text from the exception description.
     // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
@@ -393,18 +346,16 @@ export class SymbolizedError {
     return details.text;
   }
 
-  static #getMessageFromException(
-    error: Protocol.Runtime.RemoteObject,
-  ): string {
+  static #getMessageFromException(error: RemoteObjectLike): string {
     const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
     return messageWithRest[0] ?? '';
   }
 
   static async #getExceptionDetails(
     devTools: TargetUniverse | undefined,
-    error: Protocol.Runtime.RemoteObject,
+    error: RemoteObjectLike,
     targetId: string,
-  ): Promise<Protocol.Runtime.ExceptionDetails | null> {
+  ): Promise<DevTools.Protocol.Runtime.ExceptionDetails | null> {
     if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
       return null;
     }
@@ -423,9 +374,9 @@ export class SymbolizedError {
 
   static async #lookupCause(
     devTools: TargetUniverse | undefined,
-    error: Protocol.Runtime.RemoteObject,
+    error: RemoteObjectLike,
     targetId: string,
-  ): Promise<Protocol.Runtime.RemoteObject | null> {
+  ): Promise<DevTools.Protocol.Runtime.RemoteObject | null> {
     if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
       return null;
     }
@@ -471,7 +422,7 @@ export async function createStackTraceForConsoleMessage(
 
 export async function createStackTrace(
   devTools: TargetUniverse,
-  rawStackTrace: Protocol.Runtime.StackTrace,
+  rawStackTrace: StackTraceLike,
   targetId: string | undefined,
 ): Promise<DevTools.StackTrace.StackTrace.StackTrace> {
   const targetManager = devTools.universe.context.get(DevTools.TargetManager);
@@ -485,12 +436,12 @@ export async function createStackTrace(
   // work in the MCP case, so we'll collect all script IDs upfront and wait for any pending source map
   // loads before creating the stack trace. We might also have to wait for Debugger.ScriptParsed events if
   // the stack trace is created particularly early.
-  const scriptIds = new Set<Protocol.Runtime.ScriptId>();
+  const scriptIds = new Set<string>();
   for (const frame of rawStackTrace.callFrames) {
     scriptIds.add(frame.scriptId);
   }
   for (
-    let asyncStack = rawStackTrace.parent;
+    let asyncStack: StackTraceLike | undefined = rawStackTrace.parent;
     asyncStack;
     asyncStack = asyncStack.parent
   ) {
@@ -525,7 +476,7 @@ export async function createStackTrace(
 // Waits indefinitely for the script so pair it with Promise.race.
 async function waitForScript(
   model: DevTools.DebuggerModel,
-  scriptId: Protocol.Runtime.ScriptId,
+  scriptId: string,
   signal: AbortSignal,
 ) {
   while (true) {

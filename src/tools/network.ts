@@ -34,7 +34,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
 
 export const listNetworkRequests = definePageTool({
   name: 'list_network_requests',
-  description: `List all requests for the currently selected page since the last navigation.`,
+  description: `Lists the most recent requests for the target page since the last navigation.`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: true,
@@ -71,12 +71,12 @@ export const listNetworkRequests = definePageTool({
       ),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
-  handler: async (request, response, context) => {
+  verifyFilesSchema: {},
+  handler: async (request, response) => {
     const data = await request.page.getDevToolsData();
     response.attachDevToolsData(data);
     const reqid = data?.cdpRequestId
-      ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
+      ? request.page.resolveCdpRequestId(data.cdpRequestId)
       : undefined;
     response.setIncludeNetworkRequests(true, {
       pageSize: request.params.pageSize,
@@ -90,7 +90,7 @@ export const listNetworkRequests = definePageTool({
 
 export const getNetworkRequest = definePageTool({
   name: 'get_network_request',
-  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel.`,
+  description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).`,
   annotations: {
     category: ToolCategory.NETWORK,
     readOnlyHint: false,
@@ -116,8 +116,11 @@ export const getNetworkRequest = definePageTool({
       ),
   },
   blockedByDialog: true,
-  verifyFilesSchema: ['requestFilePath', 'responseFilePath'],
-  handler: async (request, response, context) => {
+  verifyFilesSchema: {
+    requestFilePath: true,
+    responseFilePath: true,
+  },
+  handler: async (request, response) => {
     if (request.params.reqid) {
       response.attachNetworkRequest(request.params.reqid, {
         requestFilePath: request.params.requestFilePath,
@@ -127,7 +130,7 @@ export const getNetworkRequest = definePageTool({
       const data = await request.page.getDevToolsData();
       response.attachDevToolsData(data);
       const reqid = data?.cdpRequestId
-        ? context.resolveCdpRequestId(request.page, data.cdpRequestId)
+        ? request.page.resolveCdpRequestId(data.cdpRequestId)
         : undefined;
       if (reqid) {
         response.attachNetworkRequest(reqid, {

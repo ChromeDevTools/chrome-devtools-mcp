@@ -17,14 +17,24 @@ import {definePageTool} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
 
+type SourceBox = BoundingBox & {
+  devicePixelRatio: number;
+};
+
 async function getSourceBox(
   page: Page,
   element: ElementHandle | undefined,
   fullPage: boolean,
-): Promise<BoundingBox | undefined> {
+): Promise<SourceBox | undefined> {
   if (element) {
-    const box = await element.boundingBox();
-    return box ?? undefined;
+    const viewport = page.viewport();
+    const [box, devicePixelRatio] = await Promise.all([
+      element.boundingBox(),
+      viewport
+        ? (viewport.deviceScaleFactor ?? 1)
+        : page.evaluate(() => window.devicePixelRatio),
+    ]);
+    return box ? {...box, devicePixelRatio} : undefined;
   }
   if (fullPage) {
     const dims = await page.evaluate(() => ({
@@ -36,34 +46,71 @@ async function getSourceBox(
         document.documentElement.scrollHeight,
         document.body?.scrollHeight ?? 0,
       ),
+      devicePixelRatio: window.devicePixelRatio,
     }));
     if (dims.width <= 0 || dims.height <= 0) {
       return undefined;
     }
-    return {x: 0, y: 0, width: dims.width, height: dims.height};
+    return {
+      x: 0,
+      y: 0,
+      width: dims.width,
+      height: dims.height,
+      devicePixelRatio: dims.devicePixelRatio,
+    };
   }
   const viewport = page.viewport();
-  if (!viewport) {
+  if (viewport) {
+    return {
+      x: 0,
+      y: 0,
+      width: viewport.width,
+      height: viewport.height,
+      devicePixelRatio: viewport.deviceScaleFactor ?? 1,
+    };
+  }
+  // The browser is launched and connected with `defaultViewport: null`, so
+  // `page.viewport()` stays null until something emulates one. Fall back to the
+  // window's own dimensions, which is the area a viewport screenshot captures.
+  const dims = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+  }));
+  if (dims.width <= 0 || dims.height <= 0) {
     return undefined;
   }
-  return {x: 0, y: 0, width: viewport.width, height: viewport.height};
+  return {
+    x: 0,
+    y: 0,
+    width: dims.width,
+    height: dims.height,
+    devicePixelRatio: dims.devicePixelRatio,
+  };
 }
 
 function computeDownscaleClip(
-  box: BoundingBox,
+  box: SourceBox,
   maxWidth: number | undefined,
   maxHeight: number | undefined,
 ): ScreenshotClip | undefined {
   const widthScale =
-    maxWidth !== undefined ? Math.min(1, maxWidth / box.width) : 1;
+    maxWidth !== undefined
+      ? Math.min(1, maxWidth / (box.width * box.devicePixelRatio))
+      : 1;
   const heightScale =
-    maxHeight !== undefined ? Math.min(1, maxHeight / box.height) : 1;
+    maxHeight !== undefined
+      ? Math.min(1, maxHeight / (box.height * box.devicePixelRatio))
+      : 1;
   const scale = Math.min(widthScale, heightScale);
   if (scale >= 1) {
     return undefined;
   }
   // Skip degenerate sub-pixel results.
-  if (Math.round(box.width * scale) < 1 || Math.round(box.height * scale) < 1) {
+  if (
+    Math.round(box.width * box.devicePixelRatio * scale) < 1 ||
+    Math.round(box.height * box.devicePixelRatio * scale) < 1
+  ) {
     return undefined;
   }
   return {
@@ -128,14 +175,16 @@ export const screenshot = definePageTool(args => {
         ),
     },
     blockedByDialog: true,
-    verifyFilesSchema: ['filePath'],
+    verifyFilesSchema: {
+      filePath: true,
+    },
     handler: async (request, response, context) => {
       if (request.params.uid && request.params.fullPage) {
         throw new Error('Providing both "uid" and "fullPage" is not allowed.');
       }
 
       const page = request.page.pptrPage;
-      const element = request.params.uid
+      using element = request.params.uid
         ? await request.page.getElementByUid(request.params.uid)
         : undefined;
 
@@ -145,6 +194,11 @@ export const screenshot = definePageTool(args => {
           ? undefined
           : (request.params.quality ?? screenshotQuality);
       const fullPage = request.params.fullPage ?? false;
+
+      // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
+      // once the capture is done to avoid leaking a remote object for the life
+      // of the page's execution context.
+      let screenshot: Uint8Array;
 
       // Compute a downscale clip when --screenshot-max-width or
       // --screenshot-max-height is set and the source exceeds either bound.
@@ -165,7 +219,6 @@ export const screenshot = definePageTool(args => {
         }
       }
 
-      let screenshot: Uint8Array;
       if (clip) {
         // page.screenshot with clip lets the CDP scale param downscale the
         // capture for viewport, full-page and element shots alike. We rely on

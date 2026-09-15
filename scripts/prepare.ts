@@ -4,22 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {readFileSync, writeFileSync} from 'node:fs';
-import {rm} from 'node:fs/promises';
+import {execSync} from 'node:child_process';
+import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 const projectRoot = process.cwd();
 
-const filesToRemove = [
-  'node_modules/chrome-devtools-frontend/package.json',
-  'node_modules/chrome-devtools-frontend/front_end/models/trace/lantern/testing',
-  'node_modules/chrome-devtools-frontend/front_end/third_party/intl-messageformat/package/package.json',
-];
-
 /**
  * Removes the conflicting global HTMLElementEventMap declaration from
  * @paulirish/trace_engine/models/trace/ModelImpl.d.ts to avoid TS2717 error
- * when both chrome-devtools-frontend and @paulirish/trace_engine declare
+ * when both devtools-frontend and @paulirish/trace_engine declare
  * the same property.
  */
 function removeConflictingGlobalDeclaration(): void {
@@ -27,6 +21,9 @@ function removeConflictingGlobalDeclaration(): void {
     projectRoot,
     'node_modules/@paulirish/trace_engine/models/trace/ModelImpl.d.ts',
   );
+  if (!existsSync(filePath)) {
+    return;
+  }
   console.log(
     'Removing conflicting global declaration from @paulirish/trace_engine...',
   );
@@ -41,21 +38,48 @@ function removeConflictingGlobalDeclaration(): void {
   console.log('Successfully removed conflicting global declaration.');
 }
 
-async function main() {
-  console.log('Running prepare script to clean up chrome-devtools-frontend...');
-  for (const file of filesToRemove) {
-    const fullPath = resolve(projectRoot, file);
-    console.log(`Removing: ${file}`);
+function ensureSubmodule(): void {
+  const devtoolsFrontendDir = resolve(
+    projectRoot,
+    'third_party',
+    'devtools-frontend',
+  );
+  const mcpEntry = resolve(devtoolsFrontendDir, 'mcp', 'mcp.ts');
+
+  if (existsSync(mcpEntry)) {
+    console.log('devtools-frontend submodule is ready.');
+    return;
+  }
+
+  console.log('Initializing devtools-frontend submodule...');
+  try {
+    execSync('git submodule update --init --depth 1', {
+      cwd: projectRoot,
+      stdio: 'inherit',
+    });
+  } catch (submoduleError) {
+    console.warn('git submodule update failed:', submoduleError);
+  }
+
+  if (!existsSync(mcpEntry)) {
+    console.log('Fetching devtools-frontend...');
     try {
-      await rm(fullPath, {recursive: true, force: true});
-    } catch (error) {
-      console.error(`Failed to remove ${file}:`, error);
-      process.exit(1);
+      execSync(
+        'git clone --depth 1 https://github.com/ChromeDevTools/devtools-frontend.git third_party/devtools-frontend',
+        {
+          cwd: projectRoot,
+          stdio: 'inherit',
+        },
+      );
+    } catch (cloneError) {
+      console.error('Failed to clone devtools-frontend:', cloneError);
     }
   }
-  console.log('Clean up of chrome-devtools-frontend complete.');
+}
 
+function main(): void {
+  ensureSubmodule();
   removeConflictingGlobalDeclaration();
 }
 
-void main();
+main();

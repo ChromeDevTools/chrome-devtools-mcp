@@ -8,11 +8,14 @@ import assert from 'node:assert';
 import {rm, stat, mkdir, chmod, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import {describe, it, afterEach} from 'node:test';
 
-import type {ParsedArguments} from '../../src/bin/chrome-devtools-mcp-cli-options.js';
+import sinon from 'sinon';
+
+import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
+import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {screenshots} from '../snapshot.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -33,11 +36,15 @@ function pngHeight(data: Buffer): number {
 }
 
 describe('screenshot', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   describe('browser_take_screenshot', () => {
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await screenshotTool.handler(
           {params: {format: 'png'}, page: context.getSelectedMcpPage()},
@@ -56,7 +63,7 @@ describe('screenshot', () => {
     it('ignores quality', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await screenshotTool.handler(
           {
@@ -110,7 +117,7 @@ describe('screenshot', () => {
     it('with full page', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.viewportOverflow;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await screenshotTool.handler(
           {
@@ -132,7 +139,7 @@ describe('screenshot', () => {
 
     it('with full page resulting in a large screenshot', async () => {
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(
           html`${`<div style="color:blue;">test</div>`.repeat(6500)}
@@ -171,7 +178,7 @@ describe('screenshot', () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.button;
 
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
@@ -197,12 +204,62 @@ describe('screenshot', () => {
       });
     });
 
+    it('disposes the element handle after an element screenshot', async () => {
+      await withMcpContext(async (response, context) => {
+        const fixture = screenshots.button;
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(fixture.html);
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const handle = await mcpPage.getElementByUid('1_1');
+        const disposeSpy = sinon.spy(handle, 'dispose');
+        sinon.stub(mcpPage, 'getElementByUid').resolves(handle);
+
+        await screenshotTool.handler(
+          {
+            params: {format: 'png', uid: '1_1'},
+            page: mcpPage,
+          },
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnce(disposeSpy);
+      });
+    });
+
+    it('disposes the element handle when the capture fails', async () => {
+      await withMcpContext(async (response, context) => {
+        const fixture = screenshots.button;
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(fixture.html);
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const handle = await mcpPage.getElementByUid('1_1');
+        const disposeSpy = sinon.spy(handle, 'dispose');
+        sinon.stub(handle, 'screenshot').rejects(new Error('Capture failed'));
+        sinon.stub(mcpPage, 'getElementByUid').resolves(handle);
+
+        await assert.rejects(
+          screenshotTool.handler(
+            {
+              params: {format: 'png', uid: '1_1'},
+              page: mcpPage,
+            },
+            response,
+            context,
+          ),
+          /Capture failed/,
+        );
+
+        sinon.assert.calledOnce(disposeSpy);
+      });
+    });
+
     it('with filePath', async () => {
       await withMcpContext(async (response, context) => {
         const filePath = join(tmpdir(), 'test-screenshot.png');
         try {
           const fixture = screenshots.basic;
-          const page = context.getSelectedPptrPage();
+          const page = context.getSelectedMcpPage().pptrPage;
           await page.setContent(fixture.html);
           await screenshotTool.handler(
             {
@@ -218,9 +275,10 @@ describe('screenshot', () => {
             response.responseLines.at(0),
             "Took a screenshot of the current page's viewport.",
           );
+          const canonicalFilePath = await resolveCanonicalPath(filePath);
           assert.equal(
             response.responseLines.at(1),
-            `Saved screenshot to ${filePath}.`,
+            `Saved screenshot to ${canonicalFilePath}.`,
           );
 
           const stats = await stat(filePath);
@@ -245,7 +303,7 @@ describe('screenshot', () => {
         try {
           await withMcpContext(async (response, context) => {
             const fixture = screenshots.basic;
-            const page = context.getSelectedPptrPage();
+            const page = context.getSelectedMcpPage().pptrPage;
             await page.setContent(fixture.html);
             await assert.rejects(
               screenshotTool.handler(
@@ -272,7 +330,7 @@ describe('screenshot', () => {
         try {
           await withMcpContext(async (response, context) => {
             const fixture = screenshots.basic;
-            const page = context.getSelectedPptrPage();
+            const page = context.getSelectedMcpPage().pptrPage;
             await page.setContent(fixture.html);
             await assert.rejects(
               screenshotTool.handler(
@@ -298,7 +356,7 @@ describe('screenshot', () => {
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         // No explicit format passed: zod should apply the CLI-driven default.
         await tool.handler(
@@ -325,7 +383,7 @@ describe('screenshot', () => {
         screenshotMaxWidth: 100,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(
           html`<div style="width:100vw;height:100vh;background:red"></div>`,
@@ -345,13 +403,89 @@ describe('screenshot', () => {
       });
     });
 
+    it('honors screenshotMaxWidth at device scale factors above 1', async () => {
+      const tool = screenshot({
+        screenshotMaxWidth: 100,
+      } as ParsedArguments);
+      await withMcpContext(
+        async (response, context) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          assert.equal(page.viewport(), null);
+          await page.setContent(
+            html`<div style="width:100vw;height:100vh;background:red"></div>`,
+          );
+          const source = await page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+          }));
+          assert.equal(source.devicePixelRatio, 2);
+
+          await tool.handler(
+            {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+            response,
+            context,
+          );
+
+          assert.equal(response.images.length, 1);
+          const buf = Buffer.from(response.images[0].data, 'base64');
+          assert.equal(pngWidth(buf), 100);
+          const expectedHeight = Math.round(
+            source.height * (100 / source.width),
+          );
+          assert.ok(
+            Math.abs(pngHeight(buf) - expectedHeight) <= 1,
+            `expected height ~${expectedHeight}, got ${pngHeight(buf)}`,
+          );
+        },
+        {args: ['--force-device-scale-factor=2']},
+      );
+    });
+
+    it('downscales viewport screenshot when no viewport is emulated', async () => {
+      const tool = screenshot({
+        screenshotMaxWidth: 100,
+      } as ParsedArguments);
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        // No setViewport call here: the browser is launched and connected with
+        // `defaultViewport: null`, so this is what a page looks like unless the
+        // emulate tool has set a viewport.
+        assert.equal(page.viewport(), null);
+        await page.setContent(
+          html`<div style="width:100vw;height:100vh;background:red"></div>`,
+        );
+        const source = await page.evaluate(() => ({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }));
+
+        await tool.handler(
+          {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        assert.equal(response.images.length, 1);
+        const buf = Buffer.from(response.images[0].data, 'base64');
+        assert.equal(pngWidth(buf), 100);
+        // The window size comes from the environment rather than an emulated
+        // viewport, so allow a pixel of rounding slack on the derived height.
+        const expectedHeight = Math.round(source.height * (100 / source.width));
+        assert.ok(
+          Math.abs(pngHeight(buf) - expectedHeight) <= 1,
+          `expected height ~${expectedHeight}, got ${pngHeight(buf)}`,
+        );
+      });
+    });
+
     it('downscales using the smaller scale when both max-width and max-height are set', async () => {
       const tool = screenshot({
         screenshotMaxWidth: 400,
         screenshotMaxHeight: 60,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(
           html`<div style="width:100vw;height:100vh"></div>`,
@@ -376,7 +510,7 @@ describe('screenshot', () => {
         screenshotMaxHeight: 4000,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(html`<div></div>`);
 
@@ -397,7 +531,7 @@ describe('screenshot', () => {
         screenshotMaxWidth: 200,
       } as ParsedArguments);
       await withMcpContext(async (response, context) => {
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setViewport({width: 800, height: 600});
         await page.setContent(
           html`<style>
@@ -435,7 +569,7 @@ describe('screenshot', () => {
         const invalidChar = process.platform === 'win32' ? '>' : '\0';
         const filePath = `malformed${invalidChar}path.png`;
         const fixture = screenshots.basic;
-        const page = context.getSelectedPptrPage();
+        const page = context.getSelectedMcpPage().pptrPage;
         await page.setContent(fixture.html);
         await assert.rejects(
           screenshotTool.handler(

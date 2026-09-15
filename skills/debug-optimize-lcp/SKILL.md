@@ -36,8 +36,8 @@ Follow these steps in order. Each step builds on the previous one.
 
 Navigate to the page, then record a trace with reload to capture the full page load including LCP:
 
-1. `navigate_page` to the target URL.
-2. `performance_start_trace` with `reload: true` and `autoStop: true`.
+1. `navigate_page` with `pageId` to the target URL.
+2. `performance_start_trace` with `pageId`, `reload: true` and `autoStop: true`.
 
 The trace results will include LCP timing and available insight sets. Note the insight set IDs from the output — you'll need them in the next step.
 
@@ -50,11 +50,11 @@ Use `performance_analyze_insight` to drill into LCP-specific insights. Look for 
 - **RenderBlocking** — Resources blocking the LCP element from rendering.
 - **LCPDiscovery** — Whether the LCP resource was discoverable early.
 
-Call `performance_analyze_insight` with the insight set ID and the insight name from the trace results.
+Call `performance_analyze_insight` with `pageId`, the insight set ID, and the insight name from the trace results.
 
 ### Step 3: Identify the LCP Element
 
-Use `evaluate_script` with the **"Identify LCP Element" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md) to reveal the LCP element's tag, resource URL, and raw timing data.
+Use `evaluate_script` (with `pageId`) and the **"Identify LCP Element" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md) to reveal the LCP element's tag, resource URL, and raw timing data.
 
 The `url` field tells you what resource to look for in the network waterfall. If `url` is empty, the LCP element is text-based (no resource to load).
 
@@ -62,8 +62,8 @@ The `url` field tells you what resource to look for in the network waterfall. If
 
 Use `list_network_requests` to see when the LCP resource loaded relative to other resources:
 
-- Call `list_network_requests` filtered by `resourceTypes: ["Image", "Font"]` (adjust based on Step 3).
-- Then use `get_network_request` with the LCP resource's request ID for full details.
+- Call `list_network_requests` with `pageId` filtered by `resourceTypes: ["Image", "Font"]` (adjust based on Step 3).
+- Then use `get_network_request` with `pageId` and the LCP resource's request ID for full details.
 
 **Key Checks:**
 
@@ -72,7 +72,7 @@ Use `list_network_requests` to see when the LCP resource loaded relative to othe
 
 ### Step 5: Inspect HTML for Common Issues
 
-Use `evaluate_script` with the **"Audit Common Issues" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md) to check for lazy-loaded images in the viewport, missing fetchpriority, and render-blocking scripts.
+Use `evaluate_script` (with `pageId`) and the **"Audit Common Issues" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md) to check for lazy-loaded images in the viewport, missing fetchpriority, and render-blocking scripts.
 
 ## Optimization Strategies
 
@@ -115,7 +115,7 @@ The HTML document itself takes too long to arrive.
 
 ## Verifying Fixes & Emulation
 
-- **Verification**: Re-run the trace (`performance_start_trace` with `reload: true`) and compare the new subpart breakdown. The bottleneck should shrink.
+- **Verification**: Re-run the trace (`performance_start_trace` with `pageId` and `reload: true`) and compare the new subpart breakdown. The bottleneck should shrink.
 - **Emulation**: Lab measurements differ from real-world experience. Use `emulate` to test under constraints:
-  - `emulate` with `networkConditions: "Fast 3G"` and `cpuThrottlingRate: 4`.
+  - `emulate` with `pageId`, `networkConditions: "Fast 3G"` and `cpuThrottlingRate: 4`.
   - This surfaces issues visible only on slower connections/devices.

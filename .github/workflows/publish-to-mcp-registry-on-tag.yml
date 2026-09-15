@@ -1,0 +1,91 @@
+name: publish-to-mcp-registry-on-tag
+
+on:
+  push:
+    tags:
+      - 'chrome-devtools-mcp-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-to-mcp-registry:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          submodules: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          cache: npm
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Ensure npm 11.5.1 or later is installed
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and bundle
+        run: npm run bundle
+        env:
+          NODE_ENV: 'production'
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Install MCP Publisher
+        run: |
+          export OS=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+          export VERSION=v1.8.0
+          # 1. Download the release archive and its sigstore bundle
+          curl -L -o mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${OS}.tar.gz"
+
+          curl -L -o mcp-publisher.tar.gz.sigstore.json \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${OS}.tar.gz.sigstore.json"
+
+          # 2. Verify using cosign verify-blob
+          cosign verify-blob mcp-publisher.tar.gz \
+            --bundle mcp-publisher.tar.gz.sigstore.json \
+            --certificate-identity-regexp="https://github.com/modelcontextprotocol/registry/\.github/workflows/.*" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          rm mcp-publisher.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for npm package availability
+        run: |
+          PKG=$(node -p "require('./package.json').name + '@' + require('./package.json').version")
+          echo "Waiting for $PKG to be available on npm..."
+          for i in {1..5}; do
+            if npm view "$PKG" version --prefer-online > /dev/null 2>&1; then
+              echo "$PKG is available on npm."
+              exit 0
+            fi
+            echo "Attempt $i: $PKG is not yet available. Waiting 60s..."
+            sleep 60
+          done
+          if npm view "$PKG" version --prefer-online > /dev/null 2>&1; then
+            echo "$PKG is available on npm."
+            exit 0
+          fi
+          echo "Timed out waiting for $PKG to be available on npm."
+          exit 1
+
+      - name: Login to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish

@@ -4,76 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {logger} from '../logger.js';
-import type {CdpPage, Dialog, HTTPRequest} from '../third_party/index.js';
+import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
+import {logger} from '../utils/logger.js';
+import {validateUrl} from '../utils/url.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
 import {
   CLOSE_PAGE_ERROR,
   definePageTool,
   defineTool,
   timeoutSchema,
 } from './ToolDefinition.js';
-
-async function navigateWithInterception(
-  page: ContextPage,
-  action: () => Promise<unknown>,
-  allowListString?: string,
-  timeout?: number,
-): Promise<void> {
-  const allowList = allowListString
-    ? allowListString.split(',').map((p: string) => new URLPattern(p.trim()))
-    : undefined;
-
-  const requestHandler = (interceptedRequest: HTTPRequest) => {
-    if (!interceptedRequest.isNavigationRequest()) {
-      void interceptedRequest.continue();
-      return;
-    }
-    const requestUrl = interceptedRequest.url();
-    const isAllowed = allowList!.some((pattern: URLPattern) =>
-      pattern.test(requestUrl),
-    );
-
-    if (isAllowed) {
-      void interceptedRequest.continue();
-    } else {
-      logger?.(`Blocking request to: ${requestUrl}`);
-      void interceptedRequest.abort('blockedbyclient');
-    }
-  };
-
-  const cleanupInterception = async () => {
-    if (allowList) {
-      page.pptrPage.off('request', requestHandler);
-      await page.pptrPage.setRequestInterception(false).catch(error => {
-        logger?.(`Failed to disable request interception`, error);
-      });
-    }
-  };
-
-  if (allowList) {
-    await page.pptrPage.setRequestInterception(true);
-    page.pptrPage.on('request', requestHandler);
-  }
-
-  try {
-    await page.waitForEventsAfterAction(
-      async () => {
-        try {
-          await action();
-        } finally {
-          await cleanupInterception();
-        }
-      },
-      {timeout},
-    );
-  } finally {
-    await cleanupInterception();
-  }
-}
 
 export const listPages = defineTool(args => {
   return {
@@ -85,7 +27,7 @@ export const listPages = defineTool(args => {
     },
     schema: {},
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (_request, response) => {
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();
@@ -113,7 +55,7 @@ export const selectPage = defineTool({
       .describe('Whether to focus the page and bring it to the top.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
     context.selectPage(page);
@@ -139,7 +81,7 @@ export const closePage = defineTool({
       .describe('The ID of the page to close. Call list_pages to list pages.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
+  verifyFilesSchema: {},
   handler: async (request, response, context) => {
     try {
       await context.closePage(request.params.pageId);
@@ -177,36 +119,30 @@ export const newPage = defineTool(args => {
         .describe(
           'If specified, the page is created in an isolated browser context with the given name. ' +
             'Pages in the same browser context share cookies and storage. ' +
-            'Pages in different browser contexts are fully isolated.',
+            'Pages in different browser contexts are fully isolated (useful for clean-slate testing of cookies and authentication).',
         ),
-      ...(args?.experimentalNavigationAllowlist
-        ? {
-            allowList: zod
-              .string()
-              .optional()
-              .describe(
-                'Optional comma-separated list of URL patterns to allow. If provided, all other navigations will be blocked.',
-              ),
-          }
-        : {}),
       ...timeoutSchema,
     },
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (request, response, context) => {
+      validateUrl(request.params.url, {
+        javascriptEvaluation: args?.javascriptEvaluation,
+        categoryExtensions: args?.categoryExtensions,
+      });
+
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
       );
 
-      await navigateWithInterception(
-        page,
-        () =>
-          page.pptrPage.goto(request.params.url, {
+      await page.waitForEventsAfterAction(
+        async () => {
+          await page.pptrPage.goto(request.params.url, {
             timeout: request.params.timeout,
-          }),
-        request.params.allowList,
-        request.params.timeout,
+          });
+        },
+        {timeout: request.params.timeout},
       );
 
       response.setIncludePages(true);
@@ -236,31 +172,25 @@ export const navigatePage = definePageTool(args => {
         .optional()
         .describe('Whether to ignore cache on reload.'),
       handleBeforeUnload: zod
-        .enum(['accept', 'decline'])
+        .enum(['accept', 'dismiss'])
         .optional()
         .describe(
           'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
         ),
-      initScript: zod
-        .string()
-        .optional()
-        .describe(
-          'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
-        ),
-      ...(args?.experimentalNavigationAllowlist
+      ...(args?.javascriptEvaluation !== false
         ? {
-            allowList: zod
+            initScript: zod
               .string()
               .optional()
               .describe(
-                'Optional comma-separated list of URL patterns to allow. If provided, all other navigations will be blocked.',
+                'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
               ),
           }
         : {}),
       ...timeoutSchema,
     },
     blockedByDialog: false,
-    verifyFilesSchema: [],
+    verifyFilesSchema: {},
     handler: async (request, response) => {
       const page = request.page;
       const options = {
@@ -275,20 +205,12 @@ export const navigatePage = definePageTool(args => {
         request.params.type = 'url';
       }
 
-      const handleBeforeUnload = request.params.handleBeforeUnload ?? 'accept';
-      const dialogHandler = (dialog: Dialog) => {
-        if (dialog.type() === 'beforeunload') {
-          if (handleBeforeUnload === 'accept') {
-            response.appendResponseLine(`Accepted a beforeunload dialog.`);
-            void dialog.accept();
-          } else {
-            response.appendResponseLine(`Declined a beforeunload dialog.`);
-            void dialog.dismiss();
-          }
-          // We are not going to report the dialog like regular dialogs.
-          page.clearDialog();
-        }
-      };
+      if (request.params.url) {
+        validateUrl(request.params.url, {
+          javascriptEvaluation: args?.javascriptEvaluation,
+          categoryExtensions: args?.categoryExtensions,
+        });
+      }
 
       let initScriptId: string | undefined;
       if (request.params.initScript) {
@@ -298,11 +220,9 @@ export const navigatePage = definePageTool(args => {
         initScriptId = identifier;
       }
 
-      page.pptrPage.on('dialog', dialogHandler);
-
       try {
-        await navigateWithInterception(
-          page,
+        const action = request.params.handleBeforeUnload ?? 'accept';
+        const result = await page.waitForEventsAfterAction(
           async () => {
             switch (request.params.type) {
               case 'url':
@@ -363,11 +283,18 @@ export const navigatePage = definePageTool(args => {
                 break;
             }
           },
-          request.params.allowList,
-          request.params.timeout,
+          {
+            timeout: request.params.timeout,
+            handleDialog: {beforeunload: action},
+          },
         );
+        if (result.dialogHandled) {
+          response.appendResponseLine(
+            `${action === 'dismiss' ? 'Dismissed' : 'Accepted'} a beforeunload dialog.`,
+          );
+          page.clearDialog();
+        }
       } finally {
-        page.pptrPage.off('dialog', dialogHandler);
         if (initScriptId) {
           await page.pptrPage
             .removeScriptToEvaluateOnNewDocument(initScriptId)
@@ -386,7 +313,7 @@ export const navigatePage = definePageTool(args => {
 
 export const resizePage = definePageTool({
   name: 'resize_page',
-  description: `Resizes the selected page's window so that the page has specified dimension`,
+  description: `Resizes the page's window so that the page has specified dimension`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -396,8 +323,8 @@ export const resizePage = definePageTool({
     height: zod.number().describe('Page height'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
-  handler: async (request, response, _context) => {
+  verifyFilesSchema: {},
+  handler: async (request, response) => {
     const page = request.page;
 
     try {
@@ -442,8 +369,8 @@ export const handleDialog = definePageTool({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   blockedByDialog: false,
-  verifyFilesSchema: [],
-  handler: async (request, response, _context) => {
+  verifyFilesSchema: {},
+  handler: async (request, response) => {
     const page = request.page;
     const dialog = page.getDialog();
     if (!dialog) {
@@ -486,18 +413,13 @@ export const getTabId = definePageTool({
     readOnlyHint: true,
     conditions: ['experimentalInteropTools'],
   },
-  schema: {
-    pageId: zod
-      .number()
-      .describe(
-        `The ID of the page to get the tab ID for. Call ${listPages().name} to get available pages.`,
-      ),
-  },
+  schema: {},
   blockedByDialog: false,
-  verifyFilesSchema: [],
-  handler: async (request, response, context) => {
-    const page = context.getPageById(request.params.pageId);
+  verifyFilesSchema: {},
+  handler: async (request, response) => {
+    const page = request.page;
     const tabId = (page.pptrPage as unknown as CdpPage)._tabId;
     response.setTabId(tabId);
+    response.appendResponseLine(`Tab ID: ${tabId}`);
   },
 });

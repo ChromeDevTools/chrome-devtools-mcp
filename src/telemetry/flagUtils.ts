@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {cliOptions} from '../bin/chrome-devtools-mcp-cli-options.js';
-import {toSnakeCase} from '../utils/string.js';
+import type {mcpOptions} from '../config/mcp-options.js';
+import {DevTools} from '../third_party/index.js';
 
 import {stripUnderscoreBeforeNumber} from './transformation.js';
 import type {FlagUsage} from './types.js';
 
-type CliOptions = typeof cliOptions;
+const {StringUtilities} = DevTools.Platform;
+
+type CliOptions = typeof mcpOptions;
 
 /**
  * For enums, log the value as uppercase.
@@ -44,7 +46,9 @@ export function computeFlagUsage(
 
   for (const [flagName, config] of Object.entries(options)) {
     const value = args[flagName];
-    const snakeCaseName = stripUnderscoreBeforeNumber(toSnakeCase(flagName));
+    const snakeCaseName = stripUnderscoreBeforeNumber(
+      StringUtilities.toSnakeCase(flagName),
+    );
 
     // If there isn't a default value provided for the flag,
     // we're going to log whether it's present on the args user
@@ -85,7 +89,9 @@ export function getPossibleFlagMetrics(options: CliOptions): FlagMetric[] {
   const metrics: FlagMetric[] = [];
 
   for (const [flagName, config] of Object.entries(options)) {
-    const snakeCaseName = stripUnderscoreBeforeNumber(toSnakeCase(flagName));
+    const snakeCaseName = stripUnderscoreBeforeNumber(
+      StringUtilities.toSnakeCase(flagName),
+    );
 
     // _present is always a possible metric
     metrics.push({

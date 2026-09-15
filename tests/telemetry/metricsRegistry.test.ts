@@ -47,7 +47,7 @@ describe('metricsRegistry', () => {
           uid: zod.string(), // Should be blocked
         },
         blockedByDialog: false,
-        verifyFilesSchema: [],
+        verifyFilesSchema: {},
         handler: async () => {
           // no-op
         },
@@ -73,7 +73,31 @@ describe('metricsRegistry', () => {
           argEnum: zod.enum(['foo', 'bar']),
         },
         blockedByDialog: false,
-        verifyFilesSchema: [],
+        verifyFilesSchema: {},
+        handler: async () => {
+          // no-op
+        },
+      };
+
+      const metrics = generateToolMetrics([mockTool]);
+      assert.strictEqual(metrics.length, 1);
+      assert.strictEqual(metrics[0].args[0].name, 'arg_enum');
+      assert.strictEqual(metrics[0].args[0].argType, 'string');
+    });
+
+    it('should handle enums wrapped in optional and default', () => {
+      const mockTool: ToolDefinition = {
+        name: 'wrapped_enum_tool',
+        description: 'test description',
+        annotations: {
+          category: ToolCategory.INPUT,
+          readOnlyHint: true,
+        },
+        schema: {
+          argEnum: zod.enum(['foo', 'bar']).default('foo').optional(),
+        },
+        blockedByDialog: false,
+        verifyFilesSchema: {},
         handler: async () => {
           // no-op
         },
@@ -95,7 +119,7 @@ describe('metricsRegistry', () => {
         },
         schema: {},
         blockedByDialog: false,
-        verifyFilesSchema: [],
+        verifyFilesSchema: {},
         handler: async () => {
           // no-op
         },

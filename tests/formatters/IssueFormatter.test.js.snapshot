@@ -32,6 +32,65 @@ Learn more:
 uid=1_1 data={"violatingNodeAttribute":"test"}
 `;
 
+exports[`IssueFormatter > formats a detailed issue with a resolved request id toJSONDetailed 1`] = `
+{
+  "id": 6,
+  "type": "issue",
+  "title": "Mock Issue Title",
+  "description": "# Mock Issue Title\\n\\nThis is a mock issue description",
+  "links": [],
+  "affectedResources": [
+    {
+      "data": {
+        "request": {
+          "url": "http://example.com/data.json"
+        }
+      },
+      "request": 42
+    }
+  ]
+}
+`;
+
+exports[`IssueFormatter > formats a detailed issue with a resolved request id toStringDetailed 1`] = `
+ID: 6
+Message: issue> Mock Issue Title
+
+This is a mock issue description
+### Affected resources
+reqid=42 data={"request":{"url":"http://example.com/data.json"}}
+`;
+
+exports[`IssueFormatter > formats a detailed issue with an unresolved request id toJSONDetailed 1`] = `
+{
+  "id": 7,
+  "type": "issue",
+  "title": "Mock Issue Title",
+  "description": "# Mock Issue Title\\n\\nThis is a mock issue description",
+  "links": [],
+  "affectedResources": [
+    {
+      "data": {
+        "request": {
+          "url": "http://example.com/data.json",
+          "requestId": "REQUEST-1"
+        }
+      },
+      "request": "http://example.com/data.json"
+    }
+  ]
+}
+`;
+
+exports[`IssueFormatter > formats a detailed issue with an unresolved request id toStringDetailed 1`] = `
+ID: 7
+Message: issue> Mock Issue Title
+
+This is a mock issue description
+### Affected resources
+url=http://example.com/data.json data={"request":{"url":"http://example.com/data.json","requestId":"REQUEST-1"}}
+`;
+
 exports[`IssueFormatter > formats a simplified issue toJSON 1`] = `
 {
   "type": "issue",
