@@ -487,6 +487,34 @@ describe('cli args parsing', () => {
     assert.strictEqual(args.categoryMemory, true);
   });
 
+  it('applies config coercion for viewport and wsHeaders', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc123',
+        wsHeaders: '{"Authorization":"Bearer token"}',
+        viewport: '1280x720',
+      }),
+      'cd4a.test.config.coercion.json',
+    );
+    const args = parseArguments(['--config', testConfig.path]);
+    assert.deepStrictEqual(args.viewport, {width: 1280, height: 720});
+    assert.deepStrictEqual(args.wsHeaders, {Authorization: 'Bearer token'});
+  });
+
+  it('lets cli options override coerced config values', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({viewport: '1280x720'}),
+      'cd4a.test.config.coercion-override.json',
+    );
+    const args = parseArguments([
+      '--config',
+      testConfig.path,
+      '--viewport',
+      '800x600',
+    ]);
+    assert.deepStrictEqual(args.viewport, {width: 800, height: 600});
+  });
+
   it('parses config should not allow no prefix', async () => {
     using testConfig = createTempFile(
       JSON.stringify({

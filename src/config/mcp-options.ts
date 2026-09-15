@@ -456,7 +456,7 @@ export function parser(
           throw new Error('Config must be a JSON object');
         }
 
-        return yargs()
+        yargs()
           .parserConfiguration({
             'strip-aliased': true,
             'camel-case-expansion': false,
@@ -467,6 +467,7 @@ export function parser(
           .fail(false)
           .exitProcess(false)
           .parseSync([]);
+        return parsed;
       } catch (err) {
         throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
       }
