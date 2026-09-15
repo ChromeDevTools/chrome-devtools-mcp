@@ -3,10 +3,10 @@
 ## Concurrent sessions
 
 Most MCP clients start one Chrome DevTools MCP server per conversation. If your
-client shares a single server instance across concurrent agents or subagents,
-start the server with `--experimentalPageIdRouting`. This exposes `pageId` on
-page-scoped tools so each agent can route tool calls to the tab it is working
-with.
+client shares a single server instance across concurrent sessions, page ID
+routing is enabled by default. This exposes `pageId` on page-scoped tools so
+each session can route tool calls to the tab it is working with. Use
+`--no-page-id-routing` to restore selected-page-only routing.
 
 ```json
 {
@@ -16,7 +16,7 @@ with.
       "args": [
         "-y",
         "chrome-devtools-mcp@latest",
-        "--experimentalPageIdRouting"
+        "--pageIdRouting"
       ]
     }
   }
