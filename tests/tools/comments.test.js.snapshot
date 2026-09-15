@@ -1,26 +1,5 @@
-exports[`comments tools > get_devtools_comments > omits target element and network request ID if resolution returns undefined 1`] = `
-Found 1 DevTools comment thread(s):
-
-### Thread: comment-2
-- Comment: Fix heading font size
-`;
-
-exports[`comments tools > get_devtools_comments > formats comment threads with text, targets, and editor location 1`] = `
-Found 1 DevTools comment thread(s):
-
-### Thread: comment-1
-- Comment: Fix the color contrast here
-- Target element (snapshot UID): element-uid-42
-- Network request ID (reqid): 7
-- Editor location: src/style.css:10
-`;
-
 exports[`comments tools > get_devtools_comments > reports error when DevTools window is not open 1`] = `
 DevTools window is not open for this page. Call open_devtools first to open DevTools.
-`;
-
-exports[`comments tools > get_devtools_comments > reports message when no comments are found 1`] = `
-No open DevTools comments found.
 `;
 
 exports[`comments tools > resolve_devtools_comment > reports error when DevTools window is not open 1`] = `
