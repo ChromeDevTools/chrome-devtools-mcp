@@ -73,11 +73,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
   - **Choices:** `canary`, `dev`, `beta`, `stable`
-    <<<<<<< HEAD
-    \=======
   - **Default:** `stable`
-
-> > > > > > > 62ec8bc (refactor: how we deal with config)
 
 - **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
