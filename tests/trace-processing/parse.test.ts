@@ -78,4 +78,36 @@ describe('Trace parsing', () => {
       error: 'No buffer was provided.',
     });
   });
+
+  it('does not clobber file metadata with undefined caller properties', async () => {
+    const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+    // The caller passes explicit undefined for networkThrottling (matching production behavior when conditions are null).
+    const result = await parseRawTraceBuffer(rawData, {
+      cpuThrottling: undefined,
+      networkThrottling: undefined,
+    });
+    if ('error' in result) {
+      assert.fail(`Unexpected parse failure: ${result.error}`);
+    }
+    const summary = getTraceSummary(result);
+    // Verify that throttling from file metadata is preserved rather than reverting to 'none'.
+    assert.ok(summary.includes('CPU throttling: 1x'));
+    assert.ok(summary.includes('Network throttling: No throttling'));
+  });
+
+  it('overrides file metadata when caller specifies defined throttling options', async () => {
+    const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+    // The caller passes explicit defined overrides.
+    const result = await parseRawTraceBuffer(rawData, {
+      cpuThrottling: 4,
+      networkThrottling: 'Slow 3G',
+    });
+    if ('error' in result) {
+      assert.fail(`Unexpected parse failure: ${result.error}`);
+    }
+    const summary = getTraceSummary(result);
+    // Verify that caller-specified throttling overrides file metadata.
+    assert.ok(summary.includes('CPU throttling: 4x'));
+    assert.ok(summary.includes('Network throttling: Slow 3G'));
+  });
 });
