@@ -487,6 +487,117 @@ describe('screenshot', () => {
       });
     }
 
+    for (const position of ['fixed', 'sticky']) {
+      for (const mode of ['emulated viewport', 'native viewport', 'element']) {
+        it(`preserves ${position} elements in scrolled ${mode} screenshots when downscaling`, async () => {
+          await withMcpContext(async (response, context) => {
+            const mcpPage = context.getSelectedMcpPage();
+            const pptrPage = mcpPage.pptrPage;
+            if (mode !== 'native viewport') {
+              await pptrPage.setViewport({width: 800, height: 600});
+            }
+            await pptrPage.setContent(html`
+              <style>
+                body {
+                  margin: 0;
+                  height: calc(100vh + 1000px);
+                  background: lime;
+                }
+                button {
+                  position: ${position};
+                  top: 0;
+                  left: 0;
+                  display: block;
+                  width: 100vw;
+                  height: 20vh;
+                  padding: 0;
+                  border: 0;
+                  background: linear-gradient(to right, blue 50%, yellow 50%);
+                }
+              </style>
+              <button aria-label="Header"></button>
+            `);
+            await pptrPage.evaluate(() => window.scrollTo(0, 1000));
+            assert.equal(await pptrPage.evaluate(() => window.scrollY), 1000);
+            if (mode === 'element') {
+              mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+            }
+
+            for (const screenshotMaxWidth of [undefined, 200]) {
+              const tool = screenshot({
+                ...parseArguments('1.0.0', ['node', 'test']),
+                screenshotMaxWidth,
+              });
+              await tool.handler(
+                {
+                  params: {
+                    format: 'png',
+                    uid: mode === 'element' ? '1_1' : undefined,
+                  },
+                  page: mcpPage,
+                },
+                response,
+                context,
+              );
+              const image = response.images.at(-1);
+              assert.ok(image);
+              if (screenshotMaxWidth) {
+                assert.equal(
+                  pngWidth(Buffer.from(image.data, 'base64')),
+                  screenshotMaxWidth,
+                );
+              }
+              const pixels = await pptrPage.evaluate(async data => {
+                const image = new Image();
+                image.src = `data:image/png;base64,${data}`;
+                await image.decode();
+                const canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                const context = canvas.getContext('2d');
+                if (!context) {
+                  throw new Error('Could not create a 2D canvas context');
+                }
+                context.drawImage(image, 0, 0);
+                const pixels = [];
+                // Sample the entire image to catch displaced or duplicated headers.
+                for (let row = 0; row < 10; row++) {
+                  for (let column = 0; column < 10; column++) {
+                    pixels.push([
+                      ...context.getImageData(
+                        Math.floor(((column + 0.5) * image.width) / 10),
+                        Math.floor(((row + 0.5) * image.height) / 10),
+                        1,
+                        1,
+                      ).data,
+                    ]);
+                  }
+                }
+                return pixels;
+              }, image.data);
+              for (let row = 0; row < 10; row++) {
+                for (let column = 0; column < 10; column++) {
+                  const expected =
+                    mode !== 'element' && row >= 2
+                      ? [0, 255, 0, 255]
+                      : column < 5
+                        ? [0, 0, 255, 255]
+                        : [255, 255, 0, 255];
+                  assert.deepStrictEqual(
+                    pixels[row * 10 + column],
+                    expected,
+                    `maxWidth=${screenshotMaxWidth}, row=${row}, column=${column}`,
+                  );
+                }
+              }
+              assert.equal(await pptrPage.evaluate(() => window.scrollY), 1000);
+            }
+            assert.equal(response.images.length, 2);
+          });
+        });
+      }
+    }
+
     it('honors screenshotMaxWidth at device scale factors above 1', async () => {
       const tool = screenshot({
         screenshotMaxWidth: 100,
