@@ -19,7 +19,7 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {createMockPuppeteerPage} from './mocks.js';
 import {serverHooks} from './server.js';
-import {html, withMcpContext} from './utils.js';
+import {getMockRequest, html, withMcpContext} from './utils.js';
 
 describe('replaceHtmlElementsWithUids', () => {
   it('does nothing for boolean schemas', () => {
@@ -574,6 +574,75 @@ describe('McpPage', () => {
 
       sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
       sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
+    });
+  });
+
+  describe('getNetworkRequests', () => {
+    it('delegates to networkCollector.getData with includePreservedRequests', () => {
+      const {mcpPage} = createMcpPage();
+      const stub = sinon.stub(mcpPage.networkCollector, 'getData').returns([]);
+
+      mcpPage.getNetworkRequests(true);
+      sinon.assert.calledOnceWithExactly(stub, true);
+
+      mcpPage.getNetworkRequests(false);
+      sinon.assert.calledWithExactly(stub.secondCall, false);
+
+      mcpPage.getNetworkRequests();
+      sinon.assert.calledWithExactly(stub.thirdCall, undefined);
+    });
+  });
+
+  describe('getNetworkRequestById', () => {
+    it('delegates to networkCollector.getById', () => {
+      const {mcpPage} = createMcpPage();
+      const mockRequest = getMockRequest();
+      const stub = sinon
+        .stub(mcpPage.networkCollector, 'getById')
+        .returns(mockRequest);
+
+      const result = mcpPage.getNetworkRequestById(42);
+      sinon.assert.calledOnceWithExactly(stub, 42);
+      assert.strictEqual(result, mockRequest);
+    });
+  });
+
+  describe('network collection with redirects', () => {
+    const server = serverHooks();
+
+    it('collects real browser requests across server-side and client-side redirects', async () => {
+      server.addRoute('/redirect', async (_req, res) => {
+        res.writeHead(302, {
+          Location: server.getRoute('/redirected'),
+        });
+        res.end();
+      });
+
+      server.addHtmlRoute(
+        '/redirected',
+        html`<script>
+          document.location.href = '/redirected-page';
+        </script>`,
+      );
+
+      server.addHtmlRoute('/redirected-page', html`<main>Redirected</main>`);
+
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.setUpNetworkCollectorForTesting();
+        const page = mcpPage.pptrPage;
+
+        await page.goto(server.getRoute('/redirect'), {
+          waitUntil: 'networkidle0',
+        });
+
+        const requests = mcpPage.getNetworkRequests(true);
+        const urls = requests.map(req => req.url());
+
+        assert.ok(urls.some(url => url.includes('/redirect')));
+        assert.ok(urls.some(url => url.includes('/redirected')));
+        assert.ok(urls.some(url => url.includes('/redirected-page')));
+      });
     });
   });
 

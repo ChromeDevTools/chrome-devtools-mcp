@@ -461,6 +461,26 @@ describe('NetworkFormatter', () => {
         ),
       );
     });
+
+    it('handles missing response body when inline', async () => {
+      const response = getMockResponse();
+      response.buffer = () => Promise.reject(new Error('Evicted'));
+      const request = getMockRequest({response});
+
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        fetchData: true,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      const result = formatter.toStringDetailed();
+      assert.ok(result.includes(`### Response Body\n<not available anymore>`));
+      assert.strictEqual(
+        formatter.toJSONDetailed().responseBody,
+        '<not available anymore>',
+      );
+    });
   });
 
   describe('toJSON', () => {
