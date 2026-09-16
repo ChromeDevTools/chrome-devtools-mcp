@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import type {Page} from '../../src/third_party/index.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -152,6 +153,31 @@ describe('WaitForHelper', () => {
       );
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
+    });
+  });
+
+  it('captures pages opened by the action', async () => {
+    await withMcpContext(async (response, context) => {
+      const mcpPage = context.getSelectedMcpPage();
+      const listenerCountBefore = mcpPage.pptrPage.listenerCount('popup');
+      const popup = Promise.withResolvers<Page | null>();
+      mcpPage.pptrPage.once('popup', page => popup.resolve(page));
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(() => {
+            window.open('about:blank');
+          });
+        },
+        {waitForStableDom: false},
+      );
+
+      assert.strictEqual(result.newPages?.length, 1);
+      assert.strictEqual(result.newPages[0], await popup.promise);
+      assert.strictEqual(
+        mcpPage.pptrPage.listenerCount('popup'),
+        listenerCountBefore,
+      );
     });
   });
 });

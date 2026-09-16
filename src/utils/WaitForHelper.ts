@@ -12,6 +12,7 @@ export type DialogAction = 'accept' | 'dismiss' | string;
 
 export class WaitForHelper {
   #abortController = new AbortController();
+  #sourcePage: Page;
   #page: CdpPage;
   #stableDomTimeout: number;
   #stableDomFor: number;
@@ -22,6 +23,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
+  #newPages: Page[] = [];
 
   constructor(
     page: Page,
@@ -32,6 +34,7 @@ export class WaitForHelper {
     this.#stableDomFor = 100 * cpuTimeoutMultiplier;
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
+    this.#sourcePage = page;
     this.#page = page as unknown as CdpPage;
     this.#initialUrl = page.url();
   }
@@ -153,6 +156,16 @@ export class WaitForHelper {
     this.#page.on('dialog', dialogHandler);
     this.#abortController.signal.addEventListener('abort', () => {
       this.#page.off('dialog', dialogHandler);
+    });
+
+    const popupHandler = (page: Page | null) => {
+      if (page) {
+        this.#newPages.push(page);
+      }
+    };
+    this.#sourcePage.on('popup', popupHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      this.#sourcePage.off('popup', popupHandler);
     });
 
     // A scoped AbortController used to clean up navigation probe listeners.
@@ -281,6 +294,7 @@ export class WaitForHelper {
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
+      ...(this.#newPages.length ? {newPages: this.#newPages} : {}),
     };
   }
 }
@@ -295,6 +309,8 @@ export interface WaitForEventsResult {
    * Whether a dialog was automatically handled during the action.
    */
   dialogHandled?: boolean;
+  /** Pages opened by the action. */
+  newPages?: Page[];
 }
 
 export function getNetworkMultiplierFromString(

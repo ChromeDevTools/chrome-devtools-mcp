@@ -89,6 +89,105 @@ describe('input', () => {
         assert.ok(await page.$('text/dblclicked'));
       });
     });
+
+    it('reports only pages opened by the click', async () => {
+      server.addHtmlRoute(
+        '/popup',
+        '<!DOCTYPE html><title>Opened by click</title>',
+      );
+
+      await withMcpContext(async (response, context) => {
+        const sourcePage = context.getSelectedMcpPage();
+        const page = sourcePage.pptrPage;
+        const popupUrl = server.getRoute('/popup');
+        const unrelatedPage = await context.newPage(true);
+        await unrelatedPage.pptrPage.setContent(
+          '<!DOCTYPE html><title>Unrelated page</title>',
+        );
+        context.selectPage(sourcePage);
+        await page.setContent(`<!DOCTYPE html>
+          <title>Original page</title>
+          <button onclick="window.open('${popupUrl}')">open</button>`);
+        sourcePage.textSnapshot = await TextSnapshot.create(sourcePage);
+
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: sourcePage,
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle(context);
+        const textContent = getTextContent(result.content[0]);
+        assert.match(textContent, /## New pages\n\d+: Opened by click \(/);
+        assert.ok(textContent.includes(popupUrl));
+        assert.ok(!textContent.includes('## Pages'));
+        assert.ok(!textContent.includes('Original page'));
+        assert.ok(!textContent.includes('Unrelated page'));
+
+        const newPages = getStructuredNewPages(result.structuredContent);
+        assert.deepStrictEqual(
+          newPages.map(({url, title}) => ({url, title})),
+          [{url: popupUrl, title: 'Opened by click'}],
+        );
+      });
+    });
+
+    it('reports multiple pages opened by one click in event order', async () => {
+      server.addHtmlRoute(
+        '/popup-one',
+        '<!DOCTYPE html><title>First popup</title>',
+      );
+      server.addHtmlRoute(
+        '/popup-two',
+        '<!DOCTYPE html><title>Second popup</title>',
+      );
+
+      await withMcpContext(async (response, context) => {
+        const sourcePage = context.getSelectedMcpPage();
+        const firstUrl = server.getRoute('/popup-one');
+        const secondUrl = server.getRoute('/popup-two');
+        await sourcePage.pptrPage.setContent(`<!DOCTYPE html>
+          <button onclick="window.open('${firstUrl}'); window.open('${secondUrl}')">
+            open two
+          </button>`);
+        sourcePage.textSnapshot = await TextSnapshot.create(sourcePage);
+
+        await click.handler(
+          {
+            params: {
+              uid: '1_1',
+            },
+            page: sourcePage,
+          },
+          response,
+          context,
+        );
+
+        const result = await response.handle(context);
+        const newPages = getStructuredNewPages(result.structuredContent);
+        assert.deepStrictEqual(
+          newPages.map(({url, title}) => ({url, title})),
+          [
+            {url: firstUrl, title: 'First popup'},
+            {url: secondUrl, title: 'Second popup'},
+          ],
+        );
+        assert.strictEqual(new Set(newPages.map(({id}) => id)).size, 2);
+
+        const textContent = getTextContent(result.content[0]);
+        assert.match(
+          textContent,
+          /## New pages\n\d+: First popup \([^\n]+\)\n\d+: Second popup \(/,
+        );
+        assert.ok(!textContent.includes('## Pages'));
+      });
+    });
+
     it('waits for navigation', async () => {
       const resolveNavigation = Promise.withResolvers<void>();
       server.addHtmlRoute(
@@ -1468,3 +1567,20 @@ describe('input', () => {
     });
   });
 });
+
+function getStructuredNewPages(
+  structuredContent: object,
+): Array<{id: number; url: string; title: string}> {
+  assert.ok('newPages' in structuredContent);
+  const newPages: unknown = structuredContent.newPages;
+  assert.ok(Array.isArray(newPages));
+  const entries: unknown[] = newPages;
+
+  return entries.map(entry => {
+    assert.ok(typeof entry === 'object' && entry !== null);
+    assert.ok('id' in entry && typeof entry.id === 'number');
+    assert.ok('url' in entry && typeof entry.url === 'string');
+    assert.ok('title' in entry && typeof entry.title === 'string');
+    return {id: entry.id, url: entry.url, title: entry.title};
+  });
+}
