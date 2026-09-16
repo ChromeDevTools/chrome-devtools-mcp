@@ -52,6 +52,13 @@ export const commands: Commands = {
           'Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.',
         required: false,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
@@ -535,6 +542,13 @@ export const commands: Commands = {
           'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
         required: false,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'number',
@@ -613,6 +627,13 @@ export const commands: Commands = {
         description: 'The node ID to get the dominator chain for.',
         required: true,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
     },
   },
   get_heapsnapshot_duplicate_strings: {
@@ -636,6 +657,13 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'number',
         description: 'The page size for pagination.',
+        required: false,
+      },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
         required: false,
       },
     },
@@ -678,6 +706,13 @@ export const commands: Commands = {
           'Whether to exclude primitive target nodes. Default is true.',
         required: false,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'number',
@@ -709,6 +744,13 @@ export const commands: Commands = {
         description: 'The node ID to get object details for.',
         required: true,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
     },
   },
   get_heapsnapshot_retainers: {
@@ -727,6 +769,13 @@ export const commands: Commands = {
         type: 'number',
         description: 'The node ID to get retainers for.',
         required: true,
+      },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -777,6 +826,13 @@ export const commands: Commands = {
         description: 'The maximum number of siblings to return.',
         required: false,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
     },
   },
   get_heapsnapshot_summary: {
@@ -789,6 +845,13 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+      },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
       },
     },
   },
@@ -1395,6 +1458,13 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'number',
         description: 'The page size for pagination.',
+        required: false,
+      },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
         required: false,
       },
     },

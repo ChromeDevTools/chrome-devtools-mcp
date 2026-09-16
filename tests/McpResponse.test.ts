@@ -1581,6 +1581,23 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(objectText.includes('name: Object'));
   });
 
+  it('truncates object details name in compact format', async () => {
+    const context = createMockMcpContext();
+    const toonResponse = new McpResponse(createMockParsedArguments());
+    const longNameObjectInfo = {
+      ...createMockObjectInfo(),
+      name: 'Object_' + 'x'.repeat(150),
+    };
+    toonResponse.setHeapSnapshotObjectDetails(longNameObjectInfo, {
+      maxNameLength: 10,
+    });
+
+    const toonResult = await toonResponse.handle(context, 'toon');
+    const toonText = getTextContent(toonResult.content[0]);
+    assert.ok(toonText.includes('### Object Details'));
+    assert.ok(toonText.includes('Object_xxx...'));
+  });
+
   it('renders the context field usage section for the filtered contexts', async () => {
     const response = new McpResponse(createMockParsedArguments());
     response.setHeapSnapshotContextAnalysis(createMockContextAnalysisResult(), {

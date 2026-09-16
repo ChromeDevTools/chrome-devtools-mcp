@@ -22,7 +22,9 @@ import {
   collectRankedContexts,
   type ContextAnalysisReport,
   type ContextFilterOptions,
+  formatName,
   HeapSnapshotFormatter,
+  type HeapSnapshotFormatOptions,
   isEdgeLike,
   isNodeLike,
 } from './formatters/HeapSnapshotFormatter.js';
@@ -81,7 +83,7 @@ interface TraceInsightData {
 }
 
 interface ContextAnalysisOptions
-  extends PaginationOptions, ContextFilterOptions {}
+  extends PaginationOptions, ContextFilterOptions, HeapSnapshotFormatOptions {}
 
 export class McpResponse implements Response {
   #includePages = false;
@@ -116,6 +118,7 @@ export class McpResponse implements Response {
     objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
     contextAnalysis?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult;
     contextAnalysisOptions?: ContextAnalysisOptions;
+    formatOptions?: HeapSnapshotFormatOptions;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -389,6 +392,7 @@ export class McpResponse implements Response {
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
+    options?: HeapSnapshotFormatOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
@@ -397,50 +401,57 @@ export class McpResponse implements Response {
       staticData,
       nativeContextSizes,
       retainedByContextSummary,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       nodes,
       pagination: options,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       duplicateStrings,
       pagination: options,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+    options?: HeapSnapshotFormatOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       retainingPaths,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+    options?: HeapSnapshotFormatOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       dominators,
+      formatOptions: options,
     };
   }
 
@@ -464,11 +475,13 @@ export class McpResponse implements Response {
 
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+    options?: HeapSnapshotFormatOptions,
   ) {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       objectInfo,
+      formatOptions: options,
     };
   }
 
@@ -481,6 +494,7 @@ export class McpResponse implements Response {
       include: true,
       contextAnalysis,
       contextAnalysisOptions: options,
+      formatOptions: options,
     };
   }
 
@@ -1191,6 +1205,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
 
     if (this.#heapSnapshotOptions?.include) {
       response.push('## Heap Snapshot Data');
+      const formatOptions = this.#heapSnapshotOptions.formatOptions ?? {};
       const stats = this.#heapSnapshotOptions.stats;
       const staticData = this.#heapSnapshotOptions.staticData;
       if (stats) {
@@ -1207,7 +1222,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       if (nativeContextSizes) {
         response.push('### Native Contexts');
         response.push(
-          HeapSnapshotFormatter.formatNativeContextSizes(nativeContextSizes),
+          HeapSnapshotFormatter.formatNativeContextSizes(
+            nativeContextSizes,
+            formatOptions,
+          ),
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
@@ -1277,7 +1295,12 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           this.#heapSnapshotOptions.pagination,
         );
 
-        response.push(HeapSnapshotFormatter.formatNodes(paginationData.items));
+        response.push(
+          HeapSnapshotFormatter.formatNodes(
+            paginationData.items,
+            formatOptions,
+          ),
+        );
 
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
@@ -1291,7 +1314,9 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         if (paths.length === 0) {
           response.push('No retaining paths found.');
         } else {
-          response.push(HeapSnapshotFormatter.formatRetainingPaths(paths));
+          response.push(
+            HeapSnapshotFormatter.formatRetainingPaths(paths, formatOptions),
+          );
         }
         const reached = Object.entries(limitsReached)
           .filter(([, hit]) => hit)
@@ -1310,7 +1335,9 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         if (dominators.length === 0) {
           response.push('No dominators found.');
         } else {
-          response.push(HeapSnapshotFormatter.formatDominators(dominators));
+          response.push(
+            HeapSnapshotFormatter.formatDominators(dominators, formatOptions),
+          );
         }
         structuredContent.heapSnapshotDominators = dominators;
       }
@@ -1347,6 +1374,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
 
         const formatted = HeapSnapshotFormatter.formatDuplicateStrings(
           paginationData.items,
+          formatOptions,
         );
         response.push(formatted);
 
@@ -1355,11 +1383,18 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       const objectInfo = this.#heapSnapshotOptions.objectInfo;
       if (objectInfo) {
         response.push('### Object Details');
-        response.push(
-          compactEncode
-            ? compactEncode(objectInfo)
-            : HeapSnapshotFormatter.formatObjectInfo(objectInfo),
-        );
+        if (compactEncode) {
+          response.push(
+            compactEncode({
+              ...objectInfo,
+              name: formatName(objectInfo.name, formatOptions),
+            }),
+          );
+        } else {
+          response.push(
+            HeapSnapshotFormatter.formatObjectInfo(objectInfo, formatOptions),
+          );
+        }
         structuredContent.heapSnapshotObjectDetails = objectInfo;
       }
       const contextAnalysis = this.#heapSnapshotOptions.contextAnalysis;
@@ -1385,7 +1420,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         response.push(
           compactEncode
             ? compactEncode(report)
-            : HeapSnapshotFormatter.formatContextAnalysis(report),
+            : HeapSnapshotFormatter.formatContextAnalysis(
+                report,
+                formatOptions,
+              ),
         );
         structuredContent.heapSnapshotContextAnalysis = report;
       }
