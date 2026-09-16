@@ -25,6 +25,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
+import {createHandlerMocks} from '../mocks.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -47,10 +48,15 @@ describe('pages', () => {
 
   describe('list_pages', () => {
     it('list pages', async () => {
-      await withMcpContext(async (response, context) => {
-        await listPages().handler({params: {}}, response, context);
-        assert.ok(response.includePages);
-      });
+      const {context, response} = createHandlerMocks();
+
+      await listPages().handler({params: {}}, response, context);
+
+      sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+      sinon.assert.calledOnceWithExactly(
+        response.setListThirdPartyDeveloperTools,
+      );
+      sinon.assert.calledOnceWithExactly(response.setListWebMcpTools);
     });
     it('list pages after selected page is closed', async () => {
       await withMcpContext(async (response, context) => {
@@ -253,119 +259,122 @@ describe('pages', () => {
       });
     });
     it('throws when navigating to a javascript URL and javascriptEvaluation is false', async () => {
-      await withMcpContext(async (response, context) => {
-        const disabledArgs = parseArguments(
-          '1.0.0',
-          ['node', 'script.js', '--no-javascript-evaluation'],
-          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
-        const tool = newPage(disabledArgs);
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'javascript:alert(1)'}},
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled.',
-          },
-        );
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'data:text/html,<div>test</div>'}},
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to data: URLs is not allowed when JavaScript evaluation is disabled.',
-          },
-        );
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'vbscript:msgbox(1)'}},
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
-          },
-        );
-      });
+      const {context, response} = createHandlerMocks();
+      const disabledArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', '--no-javascript-evaluation'],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+      const tool = newPage(disabledArgs);
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'javascript:alert(1)'}},
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'data:text/html,<div>test</div>'}},
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to data: URLs is not allowed when JavaScript evaluation is disabled.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'vbscript:msgbox(1)'}},
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
+        },
+      );
+
+      sinon.assert.notCalled(context.newPage);
     });
     it('throws when URL does not parse with new URL', async () => {
-      await withMcpContext(async (response, context) => {
-        const tool = newPage();
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'not a valid url'}},
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
-          },
-        );
-      });
+      const {context, response} = createHandlerMocks();
+      const tool = newPage();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'not a valid url'}},
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
+        },
+      );
+
+      sinon.assert.notCalled(context.newPage);
     });
     it('rejects chrome: and chrome-untrusted: URLs', async () => {
-      await withMcpContext(async (response, context) => {
-        const tool = newPage();
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'chrome://settings'}},
-              response,
-              context,
-            );
-          },
-          {
-            message: 'Navigating to chrome: URLs is not allowed.',
-          },
-        );
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'chrome-untrusted://terminal'}},
-              response,
-              context,
-            );
-          },
-          {
-            message: 'Navigating to chrome-untrusted: URLs is not allowed.',
-          },
-        );
-        assert.strictEqual(context.getPages().length, 1);
-      });
+      const {context, response} = createHandlerMocks();
+      const tool = newPage();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'chrome://settings'}},
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to chrome: URLs is not allowed.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'chrome-untrusted://terminal'}},
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to chrome-untrusted: URLs is not allowed.',
+        },
+      );
+
+      sinon.assert.notCalled(context.newPage);
     });
     it('rejects chrome-extension: URLs unless categoryExtensions is enabled', async () => {
-      await withMcpContext(async (response, context) => {
-        const tool = newPage();
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'chrome-extension://abcdef/popup.html'}},
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
-          },
-        );
-      });
+      const {context, response} = createHandlerMocks();
+      const tool = newPage();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'chrome-extension://abcdef/popup.html'}},
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
+        },
+      );
+
+      sinon.assert.notCalled(context.newPage);
     });
     it('allows chrome://newtab/', async () => {
       await withMcpContext(async (response, context) => {
@@ -1101,150 +1110,154 @@ describe('pages', () => {
     });
 
     it('throws when navigating to a javascript, data, or vbscript URL and javascriptEvaluation is false', async () => {
-      await withMcpContext(async (response, context) => {
-        const disabledArgs = parseArguments(
-          '1.0.0',
-          ['node', 'script.js', '--no-javascript-evaluation'],
-          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
-        const tool = navigatePage(disabledArgs);
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {
-                  url: 'javascript:alert(1)',
-                },
-                page: context.getSelectedMcpPage(),
+      const {page, context, response} = createHandlerMocks();
+      const disabledArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', '--no-javascript-evaluation'],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+      const tool = navigatePage(disabledArgs);
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {
+                url: 'javascript:alert(1)',
               },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled.',
-          },
-        );
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {
-                  url: 'data:text/html,<div>test</div>',
-                },
-                page: context.getSelectedMcpPage(),
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {
+                url: 'data:text/html,<div>test</div>',
               },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to data: URLs is not allowed when JavaScript evaluation is disabled.',
-          },
-        );
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {
-                  url: 'vbscript:msgbox(1)',
-                },
-                page: context.getSelectedMcpPage(),
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to data: URLs is not allowed when JavaScript evaluation is disabled.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {
+                url: 'vbscript:msgbox(1)',
               },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
-          },
-        );
-      });
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
+        },
+      );
+
+      sinon.assert.notCalled(page.pptrPage.goto);
     });
 
     it('throws when URL does not parse with new URL', async () => {
-      await withMcpContext(async (response, context) => {
-        const tool = navigatePage();
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {
-                  url: 'not a valid url',
-                },
-                page: context.getSelectedMcpPage(),
+      const {page, context, response} = createHandlerMocks();
+      const tool = navigatePage();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {
+                url: 'not a valid url',
               },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
-          },
-        );
-      });
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Invalid URL: "not a valid url". URLs must be valid according to the URL standard.',
+        },
+      );
+
+      sinon.assert.notCalled(page.pptrPage.goto);
     });
 
     it('rejects chrome: and chrome-untrusted: URLs', async () => {
-      await withMcpContext(async (response, context) => {
-        const tool = navigatePage();
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {url: 'chrome://settings'},
-                page: context.getSelectedMcpPage(),
-              },
-              response,
-              context,
-            );
-          },
-          {
-            message: 'Navigating to chrome: URLs is not allowed.',
-          },
-        );
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {url: 'chrome-untrusted://terminal'},
-                page: context.getSelectedMcpPage(),
-              },
-              response,
-              context,
-            );
-          },
-          {
-            message: 'Navigating to chrome-untrusted: URLs is not allowed.',
-          },
-        );
-      });
+      const {page, context, response} = createHandlerMocks();
+      const tool = navigatePage();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {url: 'chrome://settings'},
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to chrome: URLs is not allowed.',
+        },
+      );
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {url: 'chrome-untrusted://terminal'},
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to chrome-untrusted: URLs is not allowed.',
+        },
+      );
+
+      sinon.assert.notCalled(page.pptrPage.goto);
     });
 
     it('rejects chrome-extension: URLs unless categoryExtensions is enabled', async () => {
-      await withMcpContext(async (response, context) => {
-        const tool = navigatePage();
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {url: 'chrome-extension://abcdef/popup.html'},
-                page: context.getSelectedMcpPage(),
-              },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
-          },
-        );
-      });
+      const {page, context, response} = createHandlerMocks();
+      const tool = navigatePage();
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {url: 'chrome-extension://abcdef/popup.html'},
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message:
+            'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
+        },
+      );
+
+      sinon.assert.notCalled(page.pptrPage.goto);
     });
 
     it('allows chrome://newtab/', async () => {
