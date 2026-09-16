@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
 
@@ -18,6 +19,7 @@ import {zod} from '../../src/third_party/index.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
+import {createHandlerMocks} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
@@ -49,8 +51,8 @@ describe('script', () => {
       });
     });
     it('evaluates an inline classic script', async () => {
-      await withMcpContext(async (response, context) => {
-        await evaluateScript().handler(
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
           {
             params: {
               function: 'document.title = "Script title"; document.title',
@@ -65,18 +67,58 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), 'Script title');
       });
     });
+    it('evaluates a function ending with a single-line comment', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {
+              function: '() => document.title // get title',
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2);
+        assert.ok(lineEvaluation);
+        assert.strictEqual(JSON.parse(lineEvaluation), '');
+      });
+    });
+    it('serializes script results inside the browser', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {
+              function: 'new URL("https://example.com/path")',
+              format: 'script',
+            },
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2);
+        assert.ok(lineEvaluation);
+        assert.strictEqual(
+          JSON.parse(lineEvaluation),
+          'https://example.com/path',
+        );
+      });
+    });
     it('evaluates a function loaded from a local file', async () => {
       const directory = await fs.mkdtemp(
         path.join(os.tmpdir(), 'evaluate-script-function-'),
       );
       const sourcePath = path.join(directory, 'function.js');
       try {
-        await fs.writeFile(sourcePath, '() => document.title', 'utf8');
-        await withMcpContext(async (response, context) => {
+        await fs.writeFile(
+          sourcePath,
+          '() => document.title; // get title',
+          'utf8',
+        );
+        await withMcpContext(async (response, context, args) => {
           await context
             .getSelectedMcpPage()
             .pptrPage.setContent('<title>File function</title>');
-          await evaluateScript().handler(
+          await evaluateScript(args).handler(
             {params: {sourcePath}},
             response,
             context,
@@ -100,8 +142,8 @@ describe('script', () => {
           'document.body.dataset.source = "file"; document.body.dataset.source',
           'utf8',
         );
-        await withMcpContext(async (response, context) => {
-          await evaluateScript().handler(
+        await withMcpContext(async (response, context, args) => {
+          await evaluateScript(args).handler(
             {params: {sourcePath, format: 'script'}},
             response,
             context,
@@ -115,56 +157,57 @@ describe('script', () => {
       }
     });
     it('requires exactly one script source', async () => {
-      await withMcpContext(async (response, context) => {
-        await assert.rejects(
-          evaluateScript().handler({params: {}}, response, context),
-          /Specify exactly one of function or sourcePath/,
-        );
-        await assert.rejects(
-          evaluateScript().handler(
-            {
-              params: {
-                function: '() => true',
-                sourcePath: 'script.js',
-              },
+      const {response, context, args} = createHandlerMocks();
+      await assert.rejects(
+        evaluateScript(args).handler({params: {}}, response, context),
+        /Specify exactly one of function or sourcePath/,
+      );
+      await assert.rejects(
+        evaluateScript(args).handler(
+          {
+            params: {
+              function: '() => true',
+              sourcePath: 'script.js',
             },
-            response,
-            context,
-          ),
-          /Specify exactly one of function or sourcePath/,
-        );
-      });
+          },
+          response,
+          context,
+        ),
+        /Specify exactly one of function or sourcePath/,
+      );
     });
     it('rejects args for classic scripts', async () => {
-      await withMcpContext(async (response, context) => {
-        await assert.rejects(
-          evaluateScript().handler(
-            {
-              params: {
-                function: 'document.title',
-                format: 'script',
-                args: ['1_1'],
-              },
+      const {response, context, args} = createHandlerMocks();
+      await assert.rejects(
+        evaluateScript(args).handler(
+          {
+            params: {
+              function: 'document.title',
+              format: 'script',
+              args: ['1_1'],
             },
-            response,
-            context,
-          ),
-          /args cannot be used when format is "script"/,
-        );
-      });
+          },
+          response,
+          context,
+        ),
+        /args cannot be used when format is "script"/,
+      );
     });
     it('reports unreadable source files', async () => {
+      const {response, context, args} = createHandlerMocks();
       const sourcePath = path.join(
         os.tmpdir(),
         'missing-evaluate-script-source.js',
       );
-      await fs.rm(sourcePath, {force: true});
-      await withMcpContext(async (response, context) => {
-        await assert.rejects(
-          evaluateScript().handler({params: {sourcePath}}, response, context),
-          /Unable to read script source/,
-        );
-      });
+      context.loadResource.rejects(new Error('File not found'));
+      await assert.rejects(
+        evaluateScript(args).handler({params: {sourcePath}}, response, context),
+        /Unable to read script source/,
+      );
+      sinon.assert.calledOnceWithExactly(
+        context.loadResource,
+        pathToFileURL(sourcePath).href,
+      );
     });
     it('skips the stable DOM wait when waitForStableDom is false', async () => {
       await withMcpContext(async (response, context, args) => {
