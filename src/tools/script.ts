@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {readFile} from 'node:fs/promises';
-import {fileURLToPath} from 'node:url';
+import {pathToFileURL} from 'node:url';
 
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
@@ -117,7 +116,7 @@ Example with arguments: \`(el) => el.innerText\`
         waitForStableDom,
       } = request.params;
 
-      const source = await resolveScriptSource(fnString, sourcePath);
+      const source = await resolveScriptSource(fnString, sourcePath, context);
       if (format === 'script' && uidArgs && uidArgs.length > 0) {
         throw new Error('args cannot be used when format is "script".');
       }
@@ -192,6 +191,7 @@ Example with arguments: \`(el) => el.innerText\`
 const resolveScriptSource = async (
   inlineSource: string | undefined,
   sourcePath: string | undefined,
+  context: Context,
 ): Promise<string> => {
   if (inlineSource !== undefined) {
     if (sourcePath !== undefined) {
@@ -203,11 +203,11 @@ const resolveScriptSource = async (
     throw new Error('Specify exactly one of function or sourcePath.');
   }
 
-  const resolvedPath = sourcePath.startsWith('file:')
-    ? fileURLToPath(sourcePath)
-    : sourcePath;
+  const resourceUrl = sourcePath.startsWith('file:')
+    ? sourcePath
+    : pathToFileURL(sourcePath).href;
   try {
-    return await readFile(resolvedPath, 'utf8');
+    return await context.loadResource(resourceUrl);
   } catch (error) {
     throw new Error(`Unable to read script source from ${sourcePath}.`, {
       cause: error,
@@ -225,7 +225,7 @@ const performEvaluation = async (
 ) => {
   let result: string | undefined;
   if (format === 'function') {
-    using fn = await evaluatable.evaluateHandle(`(${source})`);
+    using fn = await evaluatable.evaluateHandle(`0,\n${source}\n`);
     result = await evaluatable.evaluate(
       async (fn, ...args) => {
         // @ts-expect-error no types for function fn
@@ -235,8 +235,8 @@ const performEvaluation = async (
       ...args,
     );
   } else {
-    const value = await evaluatable.evaluate(source);
-    result = JSON.stringify(value);
+    using value = await evaluatable.evaluateHandle(source);
+    result = await evaluatable.evaluate(value => JSON.stringify(value), value);
   }
 
   if (options.filePath) {

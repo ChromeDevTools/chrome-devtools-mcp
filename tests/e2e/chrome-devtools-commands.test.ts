@@ -10,6 +10,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
 import {
   assertDaemonIsNotRunning,
@@ -76,29 +77,38 @@ describe('chrome-devtools', () => {
   });
 
   it('can evaluate inline and local JavaScript', async () => {
-    const startResult = await runCli(['start'], sessionId);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
-
-    const inlineResult = await runCli(
-      ['evaluate_script', '() => 6 * 7', '--pageId', '1'],
-      sessionId,
-    );
-    assert.strictEqual(
-      inlineResult.status,
-      0,
-      `inline evaluation failed: ${inlineResult.stderr}`,
-    );
-    assert.match(inlineResult.stdout, /\b42\b/);
-
-    const directory = await fs.mkdtemp(
+    const rootDirectory = await fs.mkdtemp(
       path.join(os.tmpdir(), 'evaluate-script-cli-'),
     );
-    const sourcePath = path.join(directory, 'script.js');
+    const daemonDirectory = path.join(rootDirectory, 'daemon');
+    const clientDirectory = path.join(rootDirectory, 'client');
+    await fs.mkdir(daemonDirectory);
+    await fs.mkdir(clientDirectory);
+
+    const sourcePath = path.join(clientDirectory, 'script.js');
+    const outputPath = path.join(clientDirectory, 'result.json');
     try {
+      const startResult = await runCli(['start'], sessionId, {
+        cwd: daemonDirectory,
+      });
+      assert.strictEqual(
+        startResult.status,
+        0,
+        `start command failed: ${startResult.stderr}`,
+      );
+
+      const inlineResult = await runCli(
+        ['evaluate_script', '() => 6 * 7', '--pageId', '1'],
+        sessionId,
+        {cwd: clientDirectory},
+      );
+      assert.strictEqual(
+        inlineResult.status,
+        0,
+        `inline evaluation failed: ${inlineResult.stderr}`,
+      );
+      assert.match(inlineResult.stdout, /\b42\b/);
+
       await fs.writeFile(
         sourcePath,
         'document.title = "Local script"; document.title',
@@ -110,20 +120,47 @@ describe('chrome-devtools', () => {
           '--pageId',
           '1',
           '--sourcePath',
-          sourcePath,
+          'script.js',
           '--format',
           'script',
+          '--filePath',
+          'result.json',
         ],
         sessionId,
+        {cwd: clientDirectory},
       );
       assert.strictEqual(
         fileResult.status,
         0,
         `file evaluation failed: ${fileResult.stderr}`,
       );
-      assert.match(fileResult.stdout, /Local script/);
+      assert.strictEqual(
+        JSON.parse(await fs.readFile(outputPath, 'utf8')),
+        'Local script',
+      );
+
+      const fileUrlResult = await runCli(
+        [
+          'evaluate_script',
+          '--pageId',
+          '1',
+          '--sourcePath',
+          pathToFileURL(sourcePath).href,
+          '--format',
+          'script',
+        ],
+        sessionId,
+        {cwd: clientDirectory},
+      );
+      assert.strictEqual(
+        fileUrlResult.status,
+        0,
+        `file URL evaluation failed: ${fileUrlResult.stderr}`,
+      );
+      assert.match(fileUrlResult.stdout, /Local script/);
     } finally {
-      await fs.rm(directory, {recursive: true, force: true});
+      await runCli(['stop'], sessionId, {cwd: clientDirectory});
+      await fs.rm(rootDirectory, {recursive: true, force: true});
     }
   });
 
