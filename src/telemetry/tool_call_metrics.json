@@ -127,6 +127,14 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "source_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "format",
+        "argType": "string"
       }
     ]
   },

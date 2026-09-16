@@ -8,6 +8,7 @@
 
 process.title = 'chrome-devtools';
 
+import path from 'node:path';
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -42,6 +43,7 @@ await checkForUpdates(
 );
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
+const OPTIONAL_POSITIONAL_ARGS = new Set(['evaluate_script:function']);
 
 async function start(args: string[], sessionId: string) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
@@ -106,7 +108,10 @@ const y = yargs(hideBin(process.argv))
         );
         console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
         console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true).',
+          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title" --pageId 1',
+        );
+        console.error(
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except optional positional parameters shown in command help.',
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
@@ -217,12 +222,22 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
   );
 
   const optionalArgNames = Object.keys(args).filter(
-    name => !args[name].required,
+    name =>
+      !args[name].required &&
+      !OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${name}`),
+  );
+  const optionalPositionalArgNames = Object.keys(args).filter(
+    name =>
+      !args[name].required &&
+      OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${name}`),
   );
 
   let commandStr = commandName;
   for (const arg of requiredArgNames) {
     commandStr += ` <${arg}>`;
+  }
+  for (const arg of optionalPositionalArgNames) {
+    commandStr += ` [${arg}]`;
   }
 
   for (const arg of optionalArgNames) {
@@ -247,7 +262,10 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required) {
+        if (
+          opt.required ||
+          OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${argName}`)
+        ) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],
@@ -288,7 +306,17 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
         const commandArgs: Record<string, unknown> = {};
         for (const argName of Object.keys(args)) {
           if (argName in argv) {
-            commandArgs[argName] = argv[argName];
+            const value = argv[argName];
+            const isEvaluateScriptPath =
+              commandName === 'evaluate_script' &&
+              (argName === 'sourcePath' || argName === 'filePath');
+            commandArgs[argName] =
+              isEvaluateScriptPath &&
+              typeof value === 'string' &&
+              !path.isAbsolute(value) &&
+              !/^file:/i.test(value)
+                ? path.resolve(value)
+                : value;
           }
         }
 

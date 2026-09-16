@@ -24,6 +24,7 @@ import type {
   DevToolsData,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
+import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
 import {getMockBrowser} from './utils.js';
 import {Mutex} from '../src/third_party/index.js';
@@ -598,6 +599,36 @@ describe('ToolHandler', () => {
       /Access denied/,
     );
     assert.strictEqual(handlerCalled, false);
+  });
+
+  it('validates evaluate_script sourcePath before reading the file', async () => {
+    const tool = evaluateScript();
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.validatePath.rejects(
+      new Error('Access denied: path is outside roots'),
+    );
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseArguments('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      }),
+      async () => mockContext,
+      new Mutex(),
+    );
+    const sourcePath = path.resolve('/outside/workspace/script.js');
+
+    const result = await toolHandler.handle({sourcePath});
+
+    assert.strictEqual(result.isError, true);
+    assert.match(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      /Access denied/,
+    );
+    sinon.assert.calledOnceWithExactly(mockContext.validatePath, sourcePath);
+    sinon.assert.notCalled(mockContext.loadResource);
   });
 
   it('validates verifyFilesSchema when local: true and browser is running locally via process', async () => {
