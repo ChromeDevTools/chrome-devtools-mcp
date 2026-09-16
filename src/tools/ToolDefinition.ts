@@ -16,7 +16,10 @@ import type {
 import type {McpPage} from '../McpPage.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
-import type {ContextFilterOptions} from '../formatters/HeapSnapshotFormatter.js';
+import type {
+  ContextFilterOptions,
+  HeapSnapshotFormatOptions,
+} from '../formatters/HeapSnapshotFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -164,20 +167,23 @@ export interface Response {
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
   setHeapSnapshotDetailedClassDiff(
@@ -185,10 +191,13 @@ export interface Response {
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotContextAnalysis(
     analysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
-    options?: PaginationOptions & ContextFilterOptions,
+    options?: PaginationOptions &
+      ContextFilterOptions &
+      HeapSnapshotFormatOptions,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
