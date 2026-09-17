@@ -165,7 +165,6 @@ export function createMockMcpPage(
   options: {pptrPage?: sinon.SinonStubbedInstance<Page>} = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
-  page.emulationSettings = {};
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   return Object.assign(page, {pptrPage});
 }

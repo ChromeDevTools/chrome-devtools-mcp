@@ -443,6 +443,7 @@ describe('McpResponse', () => {
 
   it('forwards includePreservedRequests to page.getNetworkRequests', async () => {
     const {page, context} = createHandlerMocks();
+    page.emulationSettings = {};
     page.getNetworkRequests.returns([]);
 
     const responseWithPreserved = new McpResponse(createMockParsedArguments());
