@@ -786,8 +786,8 @@ exports[`McpResponse network pagination > trace summaries > includes the trace s
 ## Summary of Performance trace findings:
 URL: https://web.dev/
 Trace bounds: {min: 122410994891µs, max: 122416385853µs}
-CPU throttling: none
-Network throttling: none
+CPU throttling: 1x
+Network throttling: No throttling
 
 # Available insight sets
 
@@ -903,8 +903,8 @@ exports[`McpResponse network pagination > trace summaries > includes the trace s
 ## Summary of Performance trace findings:
 URL: https://web.dev/
 Trace bounds: {min: 122410994891µs, max: 122416385853µs}
-CPU throttling: none
-Network throttling: none
+CPU throttling: 1x
+Network throttling: No throttling
 
 # Available insight sets
 
