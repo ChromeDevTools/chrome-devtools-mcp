@@ -28,11 +28,29 @@ let browserMode: 'launched' | 'connected' | undefined;
  * actually dead (e.g. its CDP transport died without ever emitting a
  * `close`/`disconnected` event — as happens when an adb port-forward is torn
  * down mid-call rather than closed cleanly).
+ *
+ * Also actively tears `candidate` down in the background: closes it if we
+ * launched it (so the Chrome subprocess doesn't leak), or disconnects if we
+ * only connected to it (so the transport and its listeners don't leak).
+ * This also settles any CDP call still pending against it — Puppeteer's
+ * connection disposal synchronously rejects in-flight callbacks — instead
+ * of leaving a hung call to leak forever.
  */
 export function forgetBrowser(candidate: Browser): void {
-  if (browser === candidate) {
-    browser = undefined;
-    browserMode = undefined;
+  if (browser !== candidate) {
+    return;
+  }
+  const mode = browserMode;
+  browser = undefined;
+  browserMode = undefined;
+  if (mode === 'launched') {
+    void candidate.close().catch(err => {
+      logger?.('Failed to close forgotten browser', err);
+    });
+  } else {
+    void candidate.disconnect().catch(err => {
+      logger?.('Failed to disconnect forgotten browser', err);
+    });
   }
 }
 

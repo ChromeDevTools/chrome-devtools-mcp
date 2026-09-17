@@ -7,13 +7,15 @@
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
+import sinon from 'sinon';
 
 import {
   detectDisplay,
   ensureBrowserConnected,
+  ensureBrowserLaunched,
   forgetBrowser,
   launch,
   makeTargetFilter,
@@ -59,6 +61,10 @@ async function runWithRetry(fn: () => Promise<void>) {
 }
 
 describe('browser', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('detects display does not crash', () => {
     detectDisplay();
   });
@@ -227,6 +233,54 @@ describe('browser', () => {
         connectedBrowser.disconnect();
       } finally {
         await safeClose(browser);
+      }
+    });
+  });
+
+  it('forgetBrowser disconnects a connected browser instead of leaking it', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+        const connectedBrowser = await ensureBrowserConnected(connectOptions);
+        const disconnectSpy = sinon.spy(connectedBrowser, 'disconnect');
+
+        forgetBrowser(connectedBrowser);
+
+        sinon.assert.calledOnce(disconnectSpy);
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('forgetBrowser closes a launched browser instead of leaking the subprocess', async () => {
+    await runWithRetry(async () => {
+      const launchedBrowser = await ensureBrowserLaunched({
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+      });
+      const closeSpy = sinon.spy(launchedBrowser, 'close');
+      try {
+        forgetBrowser(launchedBrowser);
+
+        sinon.assert.calledOnce(closeSpy);
+      } finally {
+        await safeClose(launchedBrowser);
       }
     });
   });
