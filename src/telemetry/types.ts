@@ -10,6 +10,7 @@ import type {ErrorCode} from './errors.js';
 export interface ChromeDevToolsMcpExtension {
   os_type?: OsType;
   mcp_client?: McpClient;
+  raw_mcp_client_info?: RawMcpClientInfo;
   app_version?: string;
   session_id?: string;
   tool_invocation?: ToolInvocation;
@@ -18,6 +19,10 @@ export interface ChromeDevToolsMcpExtension {
   server_shutdown?: ServerShutdown;
   server_error?: ServerError;
   tool_active?: ToolActive;
+}
+
+export interface RawMcpClientInfo {
+  raw_client_name: string;
 }
 
 export interface ServerError {

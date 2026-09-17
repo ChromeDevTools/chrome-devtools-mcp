@@ -137,11 +137,12 @@ describe('ClearcutLogger', () => {
       {name: 'xai-sdk', expected: 8}, // MCP_CLIENT_GROK
       {name: 'github-copilot-developer', expected: 11}, // MCP_CLIENT_GITHUB_COPILOT
       {name: 'copilot-intellij', expected: 11}, // MCP_CLIENT_GITHUB_COPILOT
-      {name: 'unknown-client', expected: 3}, // MCP_CLIENT_OTHER
+      {name: 'unknown-client', expected: 3, rawName: 'unknown-client'}, // MCP_CLIENT_OTHER
+      {name: 'unknown client', expected: 3, rawName: '<redacted>'}, // MCP_CLIENT_OTHER
       {name: 'hermes-agent/1.0.0', expected: 12}, // MCP_CLIENT_HERMES
     ];
 
-    for (const {name, expected} of clients) {
+    for (const {name, expected, rawName} of clients) {
       it(`maps ${name} client correctly`, async () => {
         const logger = ClearcutLogger.initialize({
           persistence: mockPersistence,
@@ -156,6 +157,9 @@ describe('ClearcutLogger', () => {
           type: WatchdogMessageType.LOG_EVENT,
           payload: {
             mcp_client: expected,
+            ...(rawName
+              ? {raw_mcp_client_info: {raw_client_name: rawName}}
+              : {}),
             server_start: {
               flag_usage: {headless: true},
             },
