@@ -34,7 +34,8 @@ Note: For `evaluate_script`, `pageId` is required when targeting pages. However,
 
 - **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
-- **Additional details**: `evaluate_script` for data not in accessibility tree
+- **CSS & Styling inspection**: Use `get_css_styles` to inspect matched rules, cascade, and CSS variables.
+- **Additional details**: Use `evaluate_script` for final resolved values (`getComputedStyle`) or runtime DOM/JS data not in the accessibility tree.
 
 ### Parallel execution
 
