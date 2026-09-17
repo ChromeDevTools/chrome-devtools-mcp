@@ -33,6 +33,7 @@ import {
 import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
+  createHandlerMocks,
   createMockAggregatedInfo,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
@@ -438,6 +439,31 @@ describe('McpResponse', () => {
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
+  });
+
+  it('forwards includePreservedRequests to page.getNetworkRequests', async () => {
+    const {page, context} = createHandlerMocks();
+    page.emulationSettings = {};
+    page.getNetworkRequests.returns([]);
+
+    const responseWithPreserved = new McpResponse(createMockParsedArguments());
+    responseWithPreserved.setPage(page);
+    responseWithPreserved.setIncludeNetworkRequests(true, {
+      includePreservedRequests: true,
+    });
+    await responseWithPreserved.handle(context);
+
+    sinon.assert.calledOnceWithExactly(page.getNetworkRequests, true);
+
+    const responseDefault = new McpResponse(createMockParsedArguments());
+    responseDefault.setPage(page);
+    responseDefault.setIncludeNetworkRequests(true);
+    await responseDefault.handle(context);
+
+    sinon.assert.calledWithExactly(
+      page.getNetworkRequests.secondCall,
+      undefined,
+    );
   });
 
   it('add network request when attached with POST data', async t => {
