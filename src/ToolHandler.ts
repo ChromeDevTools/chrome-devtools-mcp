@@ -192,7 +192,9 @@ export class ToolHandler {
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
     // Injectable for tests; production callers rely on the default.
-    private readonly forgetBrowserOnTimeout: (browser: Browser) => void = forgetBrowser,
+    private readonly forgetBrowserOnTimeout: (
+      browser: Browser,
+    ) => void = forgetBrowser,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -229,7 +231,7 @@ export class ToolHandler {
     const timeoutError = new ToolCallTimeoutError(
       `Tool "${this.tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting on the browser connection. The connection may have been lost (for example, the debugged browser or app restarted). It will be re-established automatically on the next tool call.`,
     );
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(timeoutError), TOOL_CALL_TIMEOUT_MS);
       timer.unref?.();
@@ -242,7 +244,7 @@ export class ToolHandler {
       }
       throw err;
     } finally {
-      clearTimeout(timer!);
+      clearTimeout(timer);
     }
   }
 

@@ -21,6 +21,7 @@ import {
 import type {Browser} from '../src/third_party/index.js';
 
 import {serverHooks} from './server.js';
+import {getMockBrowser} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -219,7 +220,7 @@ describe('browser', () => {
         const connectOptions = {userDataDir: folderPath, devtools: false};
         const connectedBrowser = await ensureBrowserConnected(connectOptions);
 
-        forgetBrowser({} as Browser);
+        forgetBrowser(getMockBrowser());
 
         const sameBrowser = await ensureBrowserConnected(connectOptions);
         assert.strictEqual(sameBrowser, connectedBrowser);

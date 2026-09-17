@@ -1166,10 +1166,7 @@ describe('ToolHandler', () => {
         result.content[0].type === 'text' ? result.content[0].text : '',
         /timed out/,
       );
-      assert.strictEqual(
-        forgetBrowserSpy.calledOnceWith(mockContext.browser),
-        true,
-      );
+      sinon.assert.calledOnceWithExactly(forgetBrowserSpy, mockContext.browser);
     } finally {
       clock.restore();
     }
@@ -1216,6 +1213,6 @@ describe('ToolHandler', () => {
       result.content[0].type === 'text' ? result.content[0].text : '',
       /Something went wrong/,
     );
-    assert.strictEqual(forgetBrowserSpy.called, false);
+    sinon.assert.notCalled(forgetBrowserSpy);
   });
 });
