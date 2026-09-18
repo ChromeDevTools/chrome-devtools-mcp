@@ -7,9 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-
+import {Client, StdioClientTransport} from '../build/src/third_party/index.js';
 import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
 import {
   isCategoryOffByDefault,

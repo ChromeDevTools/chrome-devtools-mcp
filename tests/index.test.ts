@@ -11,18 +11,18 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  ListRootsRequestSchema,
-  RootsListChangedNotificationSchema,
-  type ClientCapabilities,
-  type TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
 import {executablePath} from 'puppeteer';
 
 import {mcpOptions} from '../src/config/mcp-options.js';
 import {getOffByDefaultCategories} from '../src/config/category-options.js';
+import {
+  Client,
+  ListRootsRequestSchema,
+  RootsListChangedNotificationSchema,
+  StdioClientTransport,
+  type ClientCapabilities,
+  type TextContent,
+} from '../src/third_party/index.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
@@ -520,13 +520,11 @@ async function getToolsWithFilteredCategories(
     }
     const fileTools = await import(`../src/tools/${file}`);
 
-    for (const maybeTool of Object.values<unknown>(fileTools)) {
-      let tool;
-      if (typeof maybeTool === 'function') {
-        tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
-      } else {
-        tool = maybeTool as ToolDefinition;
+    for (const maybeTool of Object.values(fileTools)) {
+      if (typeof maybeTool !== 'function') {
+        continue;
       }
+      const tool = maybeTool({});
 
       // Skipping all files that are not tool files
       if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
