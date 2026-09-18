@@ -891,8 +891,9 @@ describe('pages', () => {
 
     it('respects the timeout parameter', async () => {
       await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        const stub = sinon.stub(page, 'waitForNavigation').resolves(null);
+        const mcpPage = context.getSelectedMcpPage();
+        const waitForEventsSpy = sinon.spy(mcpPage, 'waitForEventsAfterAction');
+        const gotoSpy = sinon.spy(mcpPage.pptrPage, 'goto');
 
         try {
           await navigatePage(args).handler(
@@ -901,19 +902,25 @@ describe('pages', () => {
                 url: 'data:text/html,<html></html>',
                 timeout: 12345,
               },
-              page: context.getSelectedMcpPage(),
+              page: mcpPage,
             },
             response,
             context,
           );
         } finally {
-          stub.restore();
+          waitForEventsSpy.restore();
+          gotoSpy.restore();
         }
 
+        sinon.assert.calledOnceWithExactly(
+          gotoSpy,
+          'data:text/html,<html></html>',
+          {timeout: 12345},
+        );
         assert.strictEqual(
-          stub.firstCall.args[0]?.timeout,
+          waitForEventsSpy.firstCall.args[1]?.timeout,
           12345,
-          'The timeout parameter should be passed to waitForNavigation',
+          'The timeout parameter should be passed to waitForEventsAfterAction',
         );
       });
     });
