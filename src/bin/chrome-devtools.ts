@@ -9,6 +9,7 @@
 process.title = 'chrome-devtools';
 
 import process from 'node:process';
+import {readFileSync} from 'node:fs';
 
 import type {Options, PositionalOptions} from 'yargs';
 
@@ -129,6 +130,13 @@ y.command(
   y =>
     y
       .options(getCliOptions())
+      .config('config', 'Path to JSON configuration file', configPath => {
+        try {
+          return JSON.parse(readFileSync(configPath, 'utf8'));
+        } catch {
+          return {};
+        }
+      })
       .example(
         '$0 start --browserUrl http://localhost:9222',
         'Start the server connecting to an existing browser',
@@ -138,7 +146,6 @@ y.command(
     if (isDaemonRunning(argv.sessionId)) {
       await stopDaemon(argv.sessionId);
     }
-    // Defaults but we do not want to affect the yargs conflict resolution.
     if (
       argv.isolated === undefined &&
       argv.userDataDir === undefined &&

@@ -11,7 +11,6 @@ export interface CategoryOption {
   describe: string;
   default?: boolean;
   hidden?: boolean;
-  conflicts?: string[];
 }
 
 export type CategoryFlagName<T extends ToolCategory = ToolCategory> =
@@ -26,7 +25,6 @@ const categoryOverrides: Record<
   {
     describe?: string;
     hidden?: boolean;
-    conflicts?: string[];
     offByDefault?: boolean;
   }
 > = {
@@ -63,7 +61,6 @@ const categoryOverrides: Record<
   [ToolCategory.PWA]: {
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
-    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
     hidden: false,
     offByDefault: true,
   },
@@ -80,7 +77,7 @@ function createOption(category: ToolCategory): CategoryOption {
     describe,
     hidden: true,
     ...overrides,
-    ...(overrides.offByDefault ? {} : {default: true}),
+    default: !overrides.offByDefault,
   };
 }
 

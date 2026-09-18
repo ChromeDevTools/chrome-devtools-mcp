@@ -7,7 +7,6 @@
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
-import type {DataFormat} from './McpResponse.js';
 import {McpResponse} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
@@ -283,17 +282,9 @@ export class ToolHandler {
       }
       devToolsData = await context.getDevToolsData(page);
       pageUrl = context.getSelectedMcpPageUrl(page);
-      // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
-      let dataFormat: DataFormat = 'default';
-      if (this.serverArgs.experimentalDataFormat) {
-        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
-      } else if (this.serverArgs.experimentalToonFormat) {
-        dataFormat = 'toon';
-      }
-
       const {content, structuredContent} = await response.handle(
         context,
-        dataFormat,
+        this.serverArgs.experimentalDataFormat,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;

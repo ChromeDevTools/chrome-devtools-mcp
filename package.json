@@ -67,6 +67,7 @@
     "@types/semver": "^7.7.1",
     "@types/sinon": "^22.0.0",
     "@types/yargs": "^17.0.33",
+    "@types/yargs-parser": "^21.0.3",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
     "core-js": "3.50.0",

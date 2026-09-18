@@ -209,7 +209,7 @@ export class McpServer {
     if (this.#serverArgs.proxyServer) {
       chromeArgs.push(`--proxy-server=${this.#serverArgs.proxyServer}`);
     }
-    const devtools = this.#serverArgs.experimentalDevtools ?? false;
+    const devtools = this.#serverArgs.experimentalDevtools;
     const blocklist = this.#serverArgs.blockedUrlPattern
       ? this.#serverArgs.blockedUrlPattern.map(String)
       : undefined;

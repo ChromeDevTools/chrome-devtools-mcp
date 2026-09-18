@@ -16,6 +16,7 @@ export type {Flags, Result, RunnerResult, OutputMode};
 export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
+export {default as yargsParser} from 'yargs-parser';
 export {default as semver} from 'semver';
 export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
