@@ -154,7 +154,7 @@ export default defineConfig([
     files: ['src/tools/**/*.ts'],
     rules: {
       '@local/enforce-zod-schema': 'error',
-      // '@local/require-parsed-arguments': 'error',
+      '@local/require-parsed-arguments': 'error',
     },
   },
   {

@@ -109,40 +109,6 @@ export default {
                   }
                 },
               });
-            } else {
-              context.report({
-                node: arg,
-                messageId: 'missingAnnotation',
-                data: {name: node.callee.name},
-                fix(fixer) {
-                  const sourceCode =
-                    context.sourceCode || context.getSourceCode();
-                  const firstToken = sourceCode.getFirstToken(arg);
-                  if (firstToken.value === '(') {
-                    const secondToken = sourceCode.getTokenAfter(firstToken);
-                    if (secondToken.value === ')') {
-                      return fixer.replaceTextRange(
-                        [firstToken.range[0], secondToken.range[1]],
-                        '(_args: ParsedArguments)',
-                      );
-                    }
-                  }
-                  // Handle `async () =>`
-                  if (firstToken.value === 'async') {
-                    const secondToken = sourceCode.getTokenAfter(firstToken);
-                    if (secondToken.value === '(') {
-                      const thirdToken = sourceCode.getTokenAfter(secondToken);
-                      if (thirdToken.value === ')') {
-                        return fixer.replaceTextRange(
-                          [secondToken.range[0], thirdToken.range[1]],
-                          '(_args: ParsedArguments)',
-                        );
-                      }
-                    }
-                  }
-                  return null;
-                },
-              });
             }
           }
         }

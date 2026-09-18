@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../../config/mcp-options.js';
 import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
@@ -35,7 +36,7 @@ export const screenshot = definePageTool(() => ({
   },
 }));
 
-export const navigate = definePageTool(args => {
+export const navigate = definePageTool((args: ParsedArguments) => {
   return {
     name: 'navigate',
     description: `Loads a URL`,
