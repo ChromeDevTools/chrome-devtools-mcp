@@ -47,9 +47,17 @@ try {
   if (os.platform() !== 'win32') {
     // POSIX specific checks
     try {
-      const stats = fs.statSync(pidDir);
+      const stats = fs.lstatSync(pidDir);
 
-      // 1. Check Ownership: Ensure the directory is owned by the current user.
+      // 1. Reject symlinked runtime directories before checking ownership.
+      if (stats.isSymbolicLink()) {
+        console.error(
+          `[MCP Daemon] Critical error: PID directory ${pidDir} must not be a symbolic link. Possible tampering.`,
+        );
+        process.exit(1);
+      }
+
+      // 2. Check Ownership: Ensure the directory is owned by the current user.
       if (stats.uid !== currentUserUid) {
         console.error(
           `[MCP Daemon] Critical error: PID directory ${pidDir} is not owned by the current user (Expected: ${currentUserUid}, Found: ${stats.uid}). Possible tampering.`,
@@ -57,7 +65,7 @@ try {
         process.exit(1);
       }
 
-      // 2. Check Permissions: Ensure the directory is not group or world-writable.
+      // 3. Check Permissions: Ensure the directory is not group or world-writable.
       // Mode is a number, e.g., 0o700. We check if bits for group/world write are set.
       const mode = stats.mode;
       if (mode & constants.S_IWGRP || mode & constants.S_IWOTH) {

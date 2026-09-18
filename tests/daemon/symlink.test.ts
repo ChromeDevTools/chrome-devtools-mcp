@@ -89,6 +89,61 @@ describe('daemon security checks', () => {
     }
   });
 
+  it('should reject a symlinked runtime directory', async () => {
+    if (IS_WINDOWS) {
+      return;
+    }
+    const pidFilePath = getPidFilePath(sessionId);
+    const pidDir = path.dirname(pidFilePath);
+    const targetDir = path.join(
+      path.dirname(pidDir),
+      `chrome-devtools-mcp-symlink-target-${sessionId}`,
+    );
+    const targetPidFile = path.join(targetDir, 'daemon.pid');
+
+    try {
+      fs.mkdirSync(targetDir, {recursive: true, mode: 0o700});
+      fs.writeFileSync(targetPidFile, 'original content', 'utf-8');
+      fs.symlinkSync(targetDir, pidDir);
+
+      const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH], {
+        env: {
+          ...process.env,
+          XDG_RUNTIME_DIR: undefined,
+          CHROME_DEVTOOLS_MCP_SESSION_ID: sessionId,
+        },
+      });
+
+      const exitCode = await new Promise<number | null>(resolve => {
+        child.on('exit', code => {
+          resolve(code);
+        });
+      });
+
+      assert.strictEqual(exitCode, 1);
+      assert.strictEqual(
+        fs.readFileSync(targetPidFile, 'utf-8'),
+        'original content',
+      );
+    } finally {
+      try {
+        fs.unlinkSync(pidDir);
+      } catch {
+        // ignore
+      }
+      try {
+        fs.unlinkSync(targetPidFile);
+      } catch {
+        // ignore
+      }
+      try {
+        fs.rmdirSync(targetDir);
+      } catch {
+        // ignore
+      }
+    }
+  });
+
   it('should fail if directory has insecure permissions (group/world writable)', async () => {
     if (IS_WINDOWS) {
       return;
