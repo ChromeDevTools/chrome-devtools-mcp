@@ -15,6 +15,7 @@ import {
   launchPwa,
   getOsAppState,
 } from '../../src/tools/pwa.js';
+import {createHandlerMocks, createMockPuppeteerPage} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {getTextContent, withMcpContext} from '../utils.js';
 
@@ -129,36 +130,64 @@ describe('pwa', () => {
   });
 
   it('does not require a selected page for browser-scoped operations', async () => {
-    const {manifestId, startUrl} = setupPwaRoutes();
-    await withMcpContext(
-      async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        sinon
-          .stub(context, 'getSelectedMcpPage')
-          .throws(new Error('No page selected'));
-        const install = sinon.stub(context, 'installPWA').resolves(manifestId);
-        const launch = sinon.stub(context, 'launchPWA').resolves(page);
-        const getState = sinon
-          .stub(context, 'getPWAState')
-          .resolves({badgeCount: 0, fileHandlers: []});
-        const uninstall = sinon.stub(context, 'uninstallPWA').resolves();
+    const manifestId = 'https://example.com/pwa/';
+    const startUrl = 'https://example.com/pwa/index.html';
+    const {context, response} = createHandlerMocks();
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.url.returns(startUrl);
+    context.getSelectedMcpPage.throws(new Error('No page selected'));
+    context.installPWA.resolves(manifestId);
+    context.launchPWA.resolves(pptrPage);
+    context.getPWAState.resolves({badgeCount: 0, fileHandlers: []});
+    context.uninstallPWA.resolves();
 
-        await installPwa.handler(
-          {params: {manifestId, installUrlOrBundleUrl: startUrl}},
-          response,
-          context,
-        );
-        await launchPwa.handler({params: {manifestId}}, response, context);
-        await getOsAppState.handler({params: {manifestId}}, response, context);
-        await uninstallPwa.handler({params: {manifestId}}, response, context);
+    await installPwa.handler(
+      {params: {manifestId, installUrlOrBundleUrl: startUrl}},
+      response,
+      context,
+    );
+    await launchPwa.handler({params: {manifestId}}, response, context);
+    await getOsAppState.handler({params: {manifestId}}, response, context);
+    await uninstallPwa.handler({params: {manifestId}}, response, context);
 
-        assert.ok(install.calledOnce);
-        assert.ok(launch.calledOnce);
-        assert.ok(getState.calledOnce);
-        assert.ok(uninstall.calledOnce);
-      },
-      PWA_BROWSER_OPTIONS,
-      {categoryPwa: true},
+    sinon.assert.notCalled(context.getSelectedMcpPage);
+    sinon.assert.calledOnceWithExactly(context.installPWA, {
+      manifestId,
+      installUrlOrBundleUrl: startUrl,
+      displayMode: undefined,
+    });
+    sinon.assert.calledOnceWithExactly(context.launchPWA, {
+      manifestId,
+      url: undefined,
+    });
+    sinon.assert.calledOnceWithExactly(context.getPWAState, {manifestId});
+    sinon.assert.calledOnceWithExactly(context.uninstallPWA, {manifestId});
+    sinon.assert.calledTwice(response.setIncludePages);
+    sinon.assert.alwaysCalledWithExactly(response.setIncludePages, true);
+    sinon.assert.callCount(response.appendResponseLine, 6);
+    sinon.assert.calledWithExactly(
+      response.appendResponseLine.firstCall,
+      `Installed PWA with manifest ID: ${manifestId}`,
+    );
+    sinon.assert.calledWithExactly(
+      response.appendResponseLine.secondCall,
+      `Launched PWA with manifest ID: ${manifestId} (${startUrl})`,
+    );
+    sinon.assert.calledWithExactly(
+      response.appendResponseLine.thirdCall,
+      `OS app state for manifest ID: ${manifestId}`,
+    );
+    sinon.assert.calledWithExactly(
+      response.appendResponseLine.getCall(3),
+      'Badge count: 0',
+    );
+    sinon.assert.calledWithExactly(
+      response.appendResponseLine.getCall(4),
+      'File handlers: []',
+    );
+    sinon.assert.calledWithExactly(
+      response.appendResponseLine.getCall(5),
+      `Uninstalled PWA with manifest ID: ${manifestId}`,
     );
   });
 
