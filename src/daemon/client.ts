@@ -110,7 +110,11 @@ async function waitForDaemonReady(sessionId: string) {
   );
 }
 
-export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
+export async function startDaemon(
+  mcpArgs: string[] = [],
+  sessionId: string,
+  envOverrides: NodeJS.ProcessEnv = {},
+) {
   if (isDaemonRunning(sessionId)) {
     logger?.('Daemon is already running');
     await waitForDaemonReady(sessionId);
@@ -127,7 +131,11 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',
-    env: {...process.env, CHROME_DEVTOOLS_MCP_SESSION_ID: sessionId},
+    env: {
+      ...process.env,
+      ...envOverrides,
+      CHROME_DEVTOOLS_MCP_SESSION_ID: sessionId,
+    },
     cwd: process.cwd(),
     windowsHide: true,
   });

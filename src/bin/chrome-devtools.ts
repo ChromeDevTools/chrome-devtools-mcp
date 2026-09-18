@@ -22,7 +22,7 @@ import {
 import type {DaemonStatusResult} from '../daemon/types.js';
 import {
   isDaemonRunning,
-  serializeArgs,
+  serializeArgsForDaemon,
   assertValidSessionId,
 } from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
@@ -44,10 +44,16 @@ await checkForUpdates(
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
 
-async function start(args: string[], sessionId: string) {
+async function start(
+  args: string[],
+  sessionId: string,
+  envOverrides: NodeJS.ProcessEnv = {},
+) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
-  await startDaemon(combinedArgs, sessionId);
-  logDisclaimers(parseArguments(VERSION, combinedArgs));
+  await startDaemon(combinedArgs, sessionId, envOverrides);
+  logDisclaimers(
+    parseArguments(VERSION, combinedArgs, {...process.env, ...envOverrides}),
+  );
 }
 
 function getCliOptions() {
@@ -156,8 +162,8 @@ y.command(
     ) {
       argv.headless = true;
     }
-    const args = serializeArgs(getCliOptions(), argv);
-    await start(args, argv.sessionId);
+    const {args, env} = serializeArgsForDaemon(getCliOptions(), argv);
+    await start(args, argv.sessionId, env);
     process.exit(0);
   },
 ).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself
@@ -269,7 +275,11 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           : Promise.resolve(undefined);
 
         if (!isDaemonRunning(sessionId)) {
-          await start(serializeArgs(mcpOptions, argv), sessionId);
+          const {args: daemonArgs, env} = serializeArgsForDaemon(
+            mcpOptions,
+            argv,
+          );
+          await start(daemonArgs, sessionId, env);
         }
 
         const commandArgs: Record<string, unknown> = {};

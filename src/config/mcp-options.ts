@@ -13,6 +13,11 @@ export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
+import {
+  parseWsHeaders,
+  RESOLVED_WS_HEADERS_ENV_VAR,
+  WS_HEADERS_ENV_VAR,
+} from './ws-headers.js';
 
 export const mcpOptions = {
   ...getCategoryOptions(),
@@ -357,6 +362,24 @@ export function parser(
           "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
         );
         args.usageStatistics = false;
+      }
+
+      const resolvedWsHeadersFromEnv = env[RESOLVED_WS_HEADERS_ENV_VAR];
+      if (isViaCli && resolvedWsHeadersFromEnv !== undefined) {
+        if (!args.wsEndpoint) {
+          throw new Error(
+            `${RESOLVED_WS_HEADERS_ENV_VAR} requires --wsEndpoint.`,
+          );
+        }
+        args.wsHeaders = parseWsHeaders(resolvedWsHeadersFromEnv);
+      } else {
+        const wsHeadersFromEnv = env[WS_HEADERS_ENV_VAR];
+        if (wsHeadersFromEnv !== undefined && args.wsHeaders === undefined) {
+          if (!args.wsEndpoint) {
+            throw new Error(`${WS_HEADERS_ENV_VAR} requires --wsEndpoint.`);
+          }
+          args.wsHeaders = parseWsHeaders(wsHeadersFromEnv);
+        }
       }
 
       const cliOptionsAllowedArgs = [

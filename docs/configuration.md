@@ -48,7 +48,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** string
 
 - **`--wsHeaders`/ `--ws-headers`**
-  Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.
+  Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint. For credentials and other secrets, prefer the CHROME_DEVTOOLS_MCP_WS_HEADERS environment variable because command-line arguments may be visible to other local users through process inspection.
   - **Type:** string
 
 - **`--headless`**
@@ -235,6 +235,8 @@ Pass them via the `args` property in the JSON configuration. For example:
 
 You can connect directly to a Chrome WebSocket endpoint and include custom headers (e.g., for authentication):
 
+When headers contain credentials, pass them through `CHROME_DEVTOOLS_MCP_WS_HEADERS` instead of `--wsHeaders` so the secret is not stored in the MCP server's process arguments. The command-line option remains available for non-secret headers and backward compatibility.
+
 ```json
 {
   "mcpServers": {
@@ -242,9 +244,11 @@ You can connect directly to a Chrome WebSocket endpoint and include custom heade
       "command": "npx",
       "args": [
         "chrome-devtools-mcp@latest",
-        "--wsEndpoint=ws://127.0.0.1:9222/devtools/browser/<id>",
-        "--wsHeaders={\"Authorization\":\"Bearer YOUR_TOKEN\"}"
-      ]
+        "--wsEndpoint=ws://127.0.0.1:9222/devtools/browser/<id>"
+      ],
+      "env": {
+        "CHROME_DEVTOOLS_MCP_WS_HEADERS": "{\"Authorization\":\"Bearer YOUR_TOKEN\"}"
+      }
     }
   }
 }
