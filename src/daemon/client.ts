@@ -29,50 +29,6 @@ const FILE_TIMEOUT = 10_000;
 const READY_CHECK_INTERVAL = 100;
 const READY_CHECK_COMMAND_TIMEOUT = 1_000;
 
-/**
- * Waits for a file to be created and populated (removed = false) or removed (removed = true).
- */
-function waitForFile(filePath: string, removed = false) {
-  return new Promise<void>((resolve, reject) => {
-    const check = () => {
-      const exists = fs.existsSync(filePath);
-      if (removed) {
-        return !exists;
-      }
-      if (!exists) {
-        return false;
-      }
-      try {
-        return fs.statSync(filePath).size > 0;
-      } catch {
-        return false;
-      }
-    };
-
-    if (check()) {
-      resolve();
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      fs.unwatchFile(filePath);
-      reject(
-        new Error(
-          `Timeout: file ${filePath} ${removed ? 'not removed' : 'not found'} within ${FILE_TIMEOUT}ms`,
-        ),
-      );
-    }, FILE_TIMEOUT);
-
-    fs.watchFile(filePath, {interval: 500}, () => {
-      if (check()) {
-        clearTimeout(timer);
-        fs.unwatchFile(filePath);
-        resolve();
-      }
-    });
-  });
-}
-
 function delay(ms: number) {
   return new Promise<void>(resolve => {
     setTimeout(resolve, ms);
@@ -133,7 +89,6 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   });
   child.unref();
 
-  await waitForFile(pidFilePath);
   await waitForDaemonReady(sessionId);
 }
 
@@ -194,8 +149,9 @@ export async function stopDaemon(sessionId: string) {
   const pidFilePath = getPidFilePath(sessionId);
 
   await sendCommand({method: 'stop'}, sessionId);
-
-  await waitForFile(pidFilePath, /*removed=*/ true);
+  if (fs.existsSync(pidFilePath)) {
+    fs.unlinkSync(pidFilePath);
+  }
 }
 
 export async function verifyDaemonVersion(
