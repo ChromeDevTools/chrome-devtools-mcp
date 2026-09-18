@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,6 +16,7 @@ import {zod} from '../../src/third_party/index.js';
 import {installExtension} from '../../src/tools/extensions.js';
 import {evaluateScript} from '../../src/tools/script.js';
 import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
+import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
@@ -31,6 +32,8 @@ const EXTENSION_PATH = path.join(
 
 describe('script', () => {
   const server = serverHooks();
+
+  afterEach(() => sinon.restore());
 
   describe('browser_evaluate_script', () => {
     it('evaluates', async () => {
@@ -392,58 +395,91 @@ describe('script', () => {
     });
 
     it('throws error when both pageId and serviceWorkerId are provided', async () => {
-      await withMcpContext(
-        async (response, context) => {
-          await assert.rejects(
-            evaluateScript({
-              categoryExtensions: true,
-            } as ParsedArguments).handler(
-              {
-                params: {
-                  function: String(() => 'test'),
-                  serviceWorkerId: 'example_service_worker',
-                  pageId: 1,
-                },
-              },
-              response,
-              context,
-            ),
-            {
-              message: 'specify either a pageId or a serviceWorkerId.',
+      const {page, context, response} = createHandlerMocks();
+      await assert.rejects(
+        evaluateScript(
+          createMockParsedArguments({
+            categoryExtensions: true,
+          }),
+        ).handler(
+          {
+            params: {
+              function: String(() => 'test'),
+              serviceWorkerId: 'example_service_worker',
+              pageId: 1,
             },
-          );
+          },
+          response,
+          context,
+        ),
+        {
+          message: 'specify either a pageId or a serviceWorkerId.',
         },
-        {},
-        {categoryExtensions: true},
       );
+      sinon.assert.notCalled(context.getExtensionServiceWorkers);
+      sinon.assert.notCalled(context.getSelectedMcpPage);
+      sinon.assert.notCalled(context.getPageById);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
+      sinon.assert.notCalled(response.appendResponseLine);
     });
 
     it('throws error when args are provided with serviceWorkerId', async () => {
-      await withMcpContext(
-        async (response, context) => {
-          await assert.rejects(
-            evaluateScript({
-              categoryExtensions: true,
-            } as ParsedArguments).handler(
-              {
-                params: {
-                  function: String(() => 'test'),
-                  serviceWorkerId: 'example_service_worker',
-                  args: ['1_1'],
-                },
-              },
-              response,
-              context,
-            ),
-            {
-              message:
-                'args (element uids) cannot be used when evaluating in a service worker.',
+      const {page, context, response} = createHandlerMocks();
+      await assert.rejects(
+        evaluateScript(
+          createMockParsedArguments({
+            categoryExtensions: true,
+          }),
+        ).handler(
+          {
+            params: {
+              function: String(() => 'test'),
+              serviceWorkerId: 'example_service_worker',
+              args: ['1_1'],
             },
-          );
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'args (element uids) cannot be used when evaluating in a service worker.',
         },
-        {},
-        {categoryExtensions: true},
       );
+      sinon.assert.notCalled(context.getExtensionServiceWorkers);
+      sinon.assert.notCalled(context.getSelectedMcpPage);
+      sinon.assert.notCalled(context.getPageById);
+      sinon.assert.notCalled(page.getElementByUid);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
+
+    it('throws error when pageId and serviceWorkerId are omitted with pageIdRouting', async () => {
+      const {page, context, response} = createHandlerMocks();
+      await assert.rejects(
+        evaluateScript(
+          createMockParsedArguments({
+            categoryExtensions: true,
+            pageIdRouting: true,
+          }),
+        ).handler(
+          {
+            params: {
+              function: String(() => 'test'),
+            },
+          },
+          response,
+          context,
+        ),
+        {
+          message: 'specify either a pageId or a serviceWorkerId.',
+        },
+      );
+      sinon.assert.notCalled(context.getExtensionServiceWorkers);
+      sinon.assert.notCalled(context.getSelectedMcpPage);
+      sinon.assert.notCalled(context.getPageById);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
+      sinon.assert.notCalled(response.appendResponseLine);
     });
 
     it('makes pageId optional in schema when categoryExtensions is true and pageIdRouting is true', () => {
