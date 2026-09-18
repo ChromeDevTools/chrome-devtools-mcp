@@ -28,7 +28,12 @@ const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
 
 // Extend the MCP Tool type to include our annotations
-interface ToolWithAnnotations extends Tool {
+interface ToolWithAnnotations extends Omit<Tool, 'inputSchema'> {
+  inputSchema: {
+    type: 'object';
+    properties?: Record<string, TypeInfo>;
+    required?: string[];
+  };
   annotations?: {
     title?: string;
     category?: typeof ToolCategory;
