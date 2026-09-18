@@ -196,6 +196,8 @@ export class PageCollector<T> {
 export class ConsoleCollector extends PageCollector<
   ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
 > {
+  static readonly MAX_MESSAGES_PER_NAVIGATION = 1_000;
+
   #subscriber?: PageEventSubscriber;
 
   constructor(
@@ -205,8 +207,9 @@ export class ConsoleCollector extends PageCollector<
         item: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
       ) => void,
     ) => ListenerMap<PageEvents>,
+    maxMessagesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
   ) {
-    super(page, listeners);
+    super(page, listeners, maxMessagesPerNavigation);
     this.#subscriber = new PageEventSubscriber(this.pptrPage);
     this.#subscriber.subscribe();
   }

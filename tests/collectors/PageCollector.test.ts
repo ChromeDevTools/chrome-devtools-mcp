@@ -7,7 +7,12 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import type {Frame, HTTPRequest, Protocol} from 'puppeteer-core';
+import type {
+  ConsoleMessage,
+  Frame,
+  HTTPRequest,
+  Protocol,
+} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ListenerMap} from '../../src/collectors/PageCollector.js';
@@ -19,6 +24,14 @@ import {
 import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
 import {getMockRequest, getMockBrowser} from '../utils.js';
+
+function createMockConsoleMessage(text: string): ConsoleMessage {
+  return {
+    type: () => 'log',
+    text: () => text,
+    args: () => [],
+  } as unknown as ConsoleMessage;
+}
 
 describe('PageCollector', () => {
   it('works', async () => {
@@ -529,6 +542,61 @@ describe('ConsoleCollector', () => {
           e.details.stackTrace.callFrames.length === 0
         );
       }),
+    );
+  });
+
+  it('retains only the newest messages per navigation', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const cap = 5;
+    const collector = new ConsoleCollector(
+      page,
+      collect => {
+        return {
+          console: (msg: ConsoleMessage) => {
+            collect(msg);
+          },
+        } as ListenerMap;
+      },
+      cap,
+    );
+
+    const messages = Array.from({length: cap + 3}, (_, i) =>
+      createMockConsoleMessage(`msg-${i}`),
+    );
+
+    for (const msg of messages) {
+      page.emit('console', msg);
+    }
+
+    const retained = collector.getData();
+    assert.equal(retained.length, cap);
+    assert.deepEqual(retained, messages.slice(messages.length - cap));
+  });
+
+  it('uses MAX_MESSAGES_PER_NAVIGATION as the default cap', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const collector = new ConsoleCollector(page, collect => {
+      return {
+        console: (msg: ConsoleMessage) => {
+          collect(msg);
+        },
+      } as ListenerMap;
+    });
+
+    const messages = Array.from(
+      {length: ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION + 1},
+      (_, i) => createMockConsoleMessage(`msg-${i}`),
+    );
+
+    for (const msg of messages) {
+      page.emit('console', msg);
+    }
+
+    assert.equal(
+      collector.getData().length,
+      ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
     );
   });
 });
