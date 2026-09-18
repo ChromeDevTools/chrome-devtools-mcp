@@ -5,11 +5,10 @@
  */
 
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import process from 'node:process';
 
 import {logger} from '../utils/logger.js';
+import {getDataFolder} from '../utils/paths.js';
 
 import {ClearcutLogger} from './ClearcutLogger.js';
 import {ErrorCode} from './errors.js';
@@ -34,26 +33,6 @@ function isContextValid(state: LocalState): boolean {
 }
 
 const STATE_FILE_NAME = 'telemetry_state.json';
-function getDataFolder(): string {
-  const homedir = os.homedir();
-  const {env} = process;
-  const name = 'chrome-devtools-mcp';
-
-  if (process.platform === 'darwin') {
-    return path.join(homedir, 'Library', 'Application Support', name);
-  }
-
-  if (process.platform === 'win32') {
-    const localAppData =
-      env.LOCALAPPDATA || path.join(homedir, 'AppData', 'Local');
-    return path.join(localAppData, name, 'Data');
-  }
-
-  return path.join(
-    env.XDG_DATA_HOME || path.join(homedir, '.local', 'share'),
-    name,
-  );
-}
 
 export interface Persistence {
   loadState(): Promise<LocalState>;

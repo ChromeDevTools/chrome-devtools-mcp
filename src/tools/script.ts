@@ -7,6 +7,12 @@
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
+import {
+  deleteSecrets,
+  placeholderHint,
+  resolvePlaceholders,
+  scriptPlaceholderHint,
+} from '../utils/secrets.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -40,6 +46,8 @@ export const evaluateScript = defineTool(cliArgs => {
         `A JavaScript function declaration to be executed by the tool in the target page.
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
 Example with arguments: \`(el) => el.innerText\`
+${placeholderHint}
+${scriptPlaceholderHint}
 `,
       ),
       args: zod
@@ -89,12 +97,17 @@ Example with arguments: \`(el) => el.innerText\`
       const {
         serviceWorkerId,
         args: uidArgs,
-        function: fnString,
+        function: inlineFunction,
         pageId,
         dialogAction,
         filePath,
         waitForStableDom,
       } = request.params;
+
+      // Secrets are resolved here, on the server, so that the plaintext never
+      // has to be passed to this tool.
+      const secret = await resolvePlaceholders(inlineFunction);
+      const fnString = secret.value;
 
       if (cliArgs?.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
@@ -119,6 +132,7 @@ Example with arguments: \`(el) => el.innerText\`
             // Service workers cannot interact with the DOM, so never wait for it.
             {handleDialog: dialogAction ?? 'accept', waitForStableDom: false},
           );
+        await deleteSecrets(secret.consume);
         if (result.dialogHandled) {
           context.getSelectedMcpPage().clearDialog();
         }
@@ -158,6 +172,7 @@ Example with arguments: \`(el) => el.innerText\`
         },
         {handleDialog: dialogAction ?? 'accept', waitForStableDom},
       );
+      await deleteSecrets(secret.consume);
       response.attachWaitForResult(result);
     },
   };
