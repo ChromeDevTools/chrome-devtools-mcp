@@ -222,15 +222,17 @@ describe('getSocketPath', () => {
   });
 
   it(
-    'falls back to a /tmp socket with the uid when XDG_RUNTIME_DIR is unset',
+    'falls back to the private runtime directory when XDG_RUNTIME_DIR is unset',
     {skip: IS_WINDOWS},
     () => {
       delete process.env['XDG_RUNTIME_DIR'];
-      const uid = os.userInfo().uid;
-      assert.strictEqual(getSocketPath(''), `/tmp/${APP_NAME}-${uid}.sock`);
+      assert.strictEqual(
+        getSocketPath(''),
+        path.join(getRuntimeHome(''), 'server.sock'),
+      );
       assert.strictEqual(
         getSocketPath(SESSION_ID),
-        `/tmp/${APP_NAME}-${SESSION_ID}-${uid}.sock`,
+        path.join(getRuntimeHome(SESSION_ID), 'server.sock'),
       );
     },
   );
