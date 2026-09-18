@@ -11,6 +11,10 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {buildCommand} from '../src/config/cli-commands.js';
+import {
+  RESOLVED_WS_HEADERS_ENV_VAR,
+  WS_HEADERS_ENV_VAR,
+} from '../src/config/ws-headers.js';
 import {commands} from '../src/config/cli-options.js';
 import {
   DEFAULT_FILESYSTEM_ROOT,
@@ -276,6 +280,94 @@ describe('cli args parsing', () => {
       Authorization: 'Bearer token',
       'X-Custom': 'value',
     });
+  });
+
+  it('parses wsHeaders from the environment', async () => {
+    const env = {
+      [WS_HEADERS_ENV_VAR]:
+        '{"Authorization":"Bearer env-token","X-Custom":"value"}',
+    };
+    const args = parseArguments(
+      ['--wsEndpoint', 'wss://example.test/devtools/browser/abc123'],
+      env,
+    );
+
+    assert.deepStrictEqual(args.wsHeaders, {
+      Authorization: 'Bearer env-token',
+      'X-Custom': 'value',
+    });
+    assert.strictEqual(env[WS_HEADERS_ENV_VAR], undefined);
+  });
+
+  it('keeps explicit wsHeaders ahead of the environment outside CLI daemon mode', async () => {
+    const env = {
+      [WS_HEADERS_ENV_VAR]: '{"Authorization":"Bearer env-token"}',
+    };
+    const args = parseArguments(
+      [
+        '--wsEndpoint',
+        'wss://example.test/devtools/browser/abc123',
+        '--wsHeaders',
+        '{"Authorization":"Bearer flag-token"}',
+      ],
+      env,
+    );
+
+    assert.deepStrictEqual(args.wsHeaders, {
+      Authorization: 'Bearer flag-token',
+    });
+    assert.strictEqual(env[WS_HEADERS_ENV_VAR], undefined);
+  });
+
+  it('uses resolved wsHeaders from the environment in CLI daemon mode', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        wsEndpoint: 'wss://example.test/devtools/browser/abc123',
+        wsHeaders: '{"Authorization":"Bearer config-token"}',
+      }),
+      'cd4a.test.config.ws-headers-cli.json',
+    );
+
+    const env = {
+      [RESOLVED_WS_HEADERS_ENV_VAR]:
+        '{"Authorization":"Bearer resolved-token"}',
+    };
+    const args = parseArguments(['--viaCli', '--config', testConfig.path], env);
+
+    assert.deepStrictEqual(args.wsHeaders, {
+      Authorization: 'Bearer resolved-token',
+    });
+    assert.strictEqual(env[RESOLVED_WS_HEADERS_ENV_VAR], undefined);
+  });
+
+  it('keeps config wsHeaders ahead of the public environment in CLI daemon mode', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        wsEndpoint: 'wss://example.test/devtools/browser/abc123',
+        wsHeaders: '{"Authorization":"Bearer config-token"}',
+      }),
+      'cd4a.test.config.ws-headers-public-env.json',
+    );
+
+    const env = {
+      [WS_HEADERS_ENV_VAR]: '{"Authorization":"Bearer env-token"}',
+    };
+    const args = parseArguments(['--viaCli', '--config', testConfig.path], env);
+
+    assert.deepStrictEqual(args.wsHeaders, {
+      Authorization: 'Bearer config-token',
+    });
+    assert.strictEqual(env[WS_HEADERS_ENV_VAR], undefined);
+  });
+
+  it('requires wsEndpoint when wsHeaders are supplied through the environment', async () => {
+    assert.throws(
+      () =>
+        parseArguments([], {
+          [WS_HEADERS_ENV_VAR]: '{"Authorization":"Bearer token"}',
+        }),
+      new RegExp(`${WS_HEADERS_ENV_VAR} requires --wsEndpoint`),
+    );
   });
 
   it('parses disabled category', async () => {

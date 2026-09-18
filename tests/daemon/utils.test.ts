@@ -15,7 +15,12 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {
+  RESOLVED_WS_HEADERS_ENV_VAR,
+  WS_HEADERS_ENV_VAR,
+} from '../../src/config/ws-headers.js';
+import {
   serializeArgs,
+  serializeArgsForDaemon,
   assertValidSessionId,
   getSocketPath,
   getRuntimeHome,
@@ -137,6 +142,52 @@ describe('serializeArgs', () => {
       '--camel-case-key=value1',
       '--another-key',
     ]);
+  });
+});
+
+describe('serializeArgsForDaemon', () => {
+  it('keeps WebSocket headers out of argv and forwards them in env', () => {
+    const options: Record<string, YargsOptions> = {
+      wsEndpoint: {},
+      wsHeaders: {},
+      headless: {},
+    };
+    const argv = {
+      wsEndpoint: 'wss://example.test/devtools/browser/abc123',
+      wsHeaders: {
+        Authorization: 'Bearer IHB_CANARY_31337',
+        'X-Custom': 'value',
+      },
+      headless: true,
+      _: [],
+      $0: 'test',
+    } as unknown as ParsedArguments;
+
+    const result = serializeArgsForDaemon(options, argv);
+
+    assert.deepStrictEqual(result.args, [
+      '--ws-endpoint=wss://example.test/devtools/browser/abc123',
+      '--headless',
+    ]);
+    assert.strictEqual(
+      result.env[RESOLVED_WS_HEADERS_ENV_VAR],
+      JSON.stringify(argv.wsHeaders),
+    );
+    assert.strictEqual(result.env[WS_HEADERS_ENV_VAR], undefined);
+    assert.ok(!result.args.join(' ').includes('IHB_CANARY_31337'));
+  });
+
+  it('does not set the WebSocket header env when headers are absent', () => {
+    const result = serializeArgsForDaemon(
+      {wsEndpoint: {}},
+      {wsEndpoint: 'wss://example.test/devtools/browser/abc123'},
+    );
+
+    assert.deepStrictEqual(result.args, [
+      '--ws-endpoint=wss://example.test/devtools/browser/abc123',
+    ]);
+    assert.strictEqual(result.env[RESOLVED_WS_HEADERS_ENV_VAR], undefined);
+    assert.strictEqual(result.env[WS_HEADERS_ENV_VAR], undefined);
   });
 });
 

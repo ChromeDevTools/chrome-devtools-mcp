@@ -21,6 +21,22 @@ import {isAllowedUrl} from './utils/url.js';
 let browser: Browser | undefined;
 let browserMode: 'launched' | 'connected' | undefined;
 
+type PuppeteerConnectOptions = Parameters<typeof puppeteer.connect>[0];
+
+export function redactConnectOptionsForLogging(
+  options: PuppeteerConnectOptions,
+): PuppeteerConnectOptions {
+  if (!options.headers) {
+    return {...options};
+  }
+  return {
+    ...options,
+    headers: Object.fromEntries(
+      Object.keys(options.headers).map(name => [name, '[REDACTED]']),
+    ),
+  };
+}
+
 export function makeTargetFilter(enableExtensions = false) {
   return function targetFilter(target: {url(): string}): boolean {
     const url = target.url();
@@ -111,7 +127,10 @@ export async function ensureBrowserConnected(options: {
     );
   }
 
-  logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+  logger?.(
+    'Connecting Puppeteer to ',
+    JSON.stringify(redactConnectOptionsForLogging(connectOptions)),
+  );
   try {
     // Assign mode before browser so a concurrent closeBrowser() never sees
     // `browser` set with `browserMode` still undefined (would fall through
