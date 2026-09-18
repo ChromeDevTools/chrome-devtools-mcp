@@ -16,6 +16,7 @@ import {
   ensureBrowserConnected,
   launch,
   makeTargetFilter,
+  redactConnectOptionsForLogging,
   rootSandboxLaunchError,
 } from '../src/browser.js';
 import type {Browser} from '../src/third_party/index.js';
@@ -60,6 +61,30 @@ async function runWithRetry(fn: () => Promise<void>) {
 describe('browser', () => {
   it('detects display does not crash', () => {
     detectDisplay();
+  });
+
+  describe('redactConnectOptionsForLogging', () => {
+    it('redacts WebSocket header values without mutating the connection options', () => {
+      const options = {
+        browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser/test',
+        headers: {
+          Authorization: 'Bearer IHB_LOG_CANARY_31337',
+          'X-Test': 'visible',
+        },
+      };
+
+      const redacted = redactConnectOptionsForLogging(options);
+
+      assert.deepStrictEqual(redacted.headers, {
+        Authorization: '[REDACTED]',
+        'X-Test': '[REDACTED]',
+      });
+      assert.ok(!JSON.stringify(redacted).includes('IHB_LOG_CANARY_31337'));
+      assert.deepStrictEqual(options.headers, {
+        Authorization: 'Bearer IHB_LOG_CANARY_31337',
+        'X-Test': 'visible',
+      });
+    });
   });
 
   describe('rootSandboxLaunchError', () => {
