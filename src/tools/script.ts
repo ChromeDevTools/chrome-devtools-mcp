@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
@@ -14,7 +15,7 @@ import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
 
-export const evaluateScript = defineTool(cliArgs => {
+export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
   return {
     name: 'evaluate_script',
     description: `Evaluate a JavaScript function inside the target page${cliArgs.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,

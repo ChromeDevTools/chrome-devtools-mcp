@@ -165,7 +165,10 @@ async function validateToolFiles(
 
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
-  readonly registeredInputSchema: zod.ZodTypeAny;
+  readonly registeredInputSchema: zod.ZodObject<
+    zod.ZodRawShape,
+    zod.core.$loose
+  >;
   readonly shouldRegister: boolean;
   private readonly disabledReason?: string;
 
@@ -180,7 +183,7 @@ export class ToolHandler {
     this.shouldRegister = !(disabled && !serverArgs.viaCli);
 
     this.inputSchema = tool.schema;
-    this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
+    this.registeredInputSchema = zod.object(this.inputSchema).loose();
   }
 
   unknownArgumentNames(params: Record<string, unknown>): string[] {

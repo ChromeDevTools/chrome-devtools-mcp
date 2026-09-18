@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {
   BoundingBox,
@@ -122,7 +123,7 @@ function computeDownscaleClip(
   };
 }
 
-export const screenshot = definePageTool(args => {
+export const screenshot = definePageTool((args: ParsedArguments) => {
   const {
     screenshotFormat,
     screenshotQuality,

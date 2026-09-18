@@ -8,8 +8,7 @@ import assert from 'node:assert';
 import {spawn, type ChildProcess} from 'node:child_process';
 import path from 'node:path';
 
-import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
-
+import type {CallToolResult} from '@modelcontextprotocol/server';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
 import type {

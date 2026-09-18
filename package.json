@@ -56,7 +56,9 @@
     "@blackwell-systems/gcf": "^2.2.2",
     "@eslint/js": "^10.0.1",
     "@google/genai": "^2.0.1",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/core": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
@@ -84,7 +86,8 @@
     "sinon": "^22.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.43.0",
-    "yargs": "18.1.0"
+    "yargs": "18.1.0",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@blackwell-systems/gcf": "^2.2.2",
