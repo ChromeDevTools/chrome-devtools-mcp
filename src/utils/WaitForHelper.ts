@@ -212,7 +212,7 @@ export class WaitForHelper {
     // If no navigation occurs, this.#abortController will cancel it in the finally block.
     const navigationFinished = this.#page
       .waitForNavigation({
-        timeout: options?.timeout ?? this.#navigationTimeout,
+        timeout: 0,
         signal: this.#abortController.signal,
         ignoreSameDocumentNavigation: true,
       })
@@ -253,7 +253,10 @@ export class WaitForHelper {
       // Only await navigation if one was actually initiated; otherwise, the
       // pending waitForNavigation promise will be cancelled when this.#abortController aborts.
       if (navigationStarted) {
-        await navigationFinished;
+        await Promise.race([
+          navigationFinished,
+          this.timeout(options?.timeout ?? this.#navigationTimeout),
+        ]);
       }
 
       if (this.#dialogDetected) {
