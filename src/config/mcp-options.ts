@@ -365,6 +365,10 @@ export function parser(
       }
 
       const resolvedWsHeadersFromEnv = env[RESOLVED_WS_HEADERS_ENV_VAR];
+      const wsHeadersFromEnv = env[WS_HEADERS_ENV_VAR];
+      delete env[RESOLVED_WS_HEADERS_ENV_VAR];
+      delete env[WS_HEADERS_ENV_VAR];
+
       if (isViaCli && resolvedWsHeadersFromEnv !== undefined) {
         if (!args.wsEndpoint) {
           throw new Error(
@@ -372,14 +376,14 @@ export function parser(
           );
         }
         args.wsHeaders = parseWsHeaders(resolvedWsHeadersFromEnv);
-      } else {
-        const wsHeadersFromEnv = env[WS_HEADERS_ENV_VAR];
-        if (wsHeadersFromEnv !== undefined && args.wsHeaders === undefined) {
-          if (!args.wsEndpoint) {
-            throw new Error(`${WS_HEADERS_ENV_VAR} requires --wsEndpoint.`);
-          }
-          args.wsHeaders = parseWsHeaders(wsHeadersFromEnv);
+      } else if (
+        wsHeadersFromEnv !== undefined &&
+        args.wsHeaders === undefined
+      ) {
+        if (!args.wsEndpoint) {
+          throw new Error(`${WS_HEADERS_ENV_VAR} requires --wsEndpoint.`);
         }
+        args.wsHeaders = parseWsHeaders(wsHeadersFromEnv);
       }
 
       const cliOptionsAllowedArgs = [
