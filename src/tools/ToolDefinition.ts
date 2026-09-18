@@ -454,31 +454,6 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
-type OptionalSchemaKey<T> = {
-  [K in keyof T]-?: undefined extends T[K]
-    ? K
-    : T[K] extends zod.ZodOptional<zod.ZodType>
-      ? K
-      : never;
-}[keyof T];
-
-export function omitSchemaField<
-  T extends object,
-  K extends OptionalSchemaKey<T>,
->(schema: T, field: K): Omit<T, K> {
-  const {[field]: _omitted, ...rest} = schema;
-  Reflect.deleteProperty(schema, String(field));
-  return rest;
-}
-
-export function setSchemaField(
-  schema: object,
-  field: string,
-  value: unknown,
-): void {
-  Reflect.set(schema, field, value);
-}
-
 export const pageIdSchema = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
