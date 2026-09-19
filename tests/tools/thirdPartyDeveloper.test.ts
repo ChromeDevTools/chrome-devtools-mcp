@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,9 +18,14 @@ import {
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
 import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
+import {createHandlerMocks} from '../mocks.js';
 import {withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   describe('list_3p_developer_tools', () => {
     it('lists tools', async () => {
       await withMcpContext(
@@ -310,135 +315,123 @@ describe('thirdPartyDeveloperTools', () => {
     }
 
     it('executes a tool', async () => {
-      await withMcpContext(
-        async (response, context, args) => {
-          await setupThirdPartyDeveloperTools(response, context, args, () => {
-            const mockToolGroup = {
-              name: 'test-group',
-              description: 'test description',
-              tools: [
-                {
-                  name: 'test-tool',
-                  description: 'test tool description',
-                  inputSchema: {
-                    type: 'object',
-                    properties: {
-                      arg: {type: 'string'},
-                    },
-                    required: ['arg'],
-                  },
-                  execute: () => 'result',
-                },
-              ],
-            };
-            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-              // @ts-expect-error Event has `respondWith`
-              e.respondWith(mockToolGroup);
-            });
-          });
-
-          await executeThirdPartyDeveloperTool(args).handler(
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExperimentalThirdParty: true,
+      });
+      page.getThirdPartyDeveloperTools.returns([
+        {
+          name: 'test-group',
+          description: 'test description',
+          tools: [
             {
-              params: {
-                toolName: 'test-tool',
-                params: JSON.stringify({arg: 'value'}),
+              name: 'test-tool',
+              description: 'test tool description',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  arg: {type: 'string'},
+                },
+                required: ['arg'],
               },
-              page: context.getSelectedMcpPage(),
             },
-            response,
-            context,
-          );
-          assert.strictEqual(
-            response.responseLines[0],
-            JSON.stringify('result', null, 2),
-          );
+          ],
         },
-        undefined,
-        {categoryExperimentalThirdParty: true},
+      ]);
+
+      await executeThirdPartyDeveloperTool(args).handler(
+        {
+          params: {
+            toolName: 'test-tool',
+            params: JSON.stringify({arg: 'value'}),
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        page.executeThirdPartyDeveloperTool,
+        'test-tool',
+        {arg: 'value'},
+        response,
       );
     });
 
     it('throws if tool not found in list', async () => {
-      await withMcpContext(async (response, context, args) => {
-        await setupThirdPartyDeveloperTools(response, context, args, () => {
-          const mockToolGroup = {
-            name: 'test-group',
-            description: 'test description',
-            tools: [],
-          };
-          window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-            // @ts-expect-error Event has `respondWith`
-            e.respondWith(mockToolGroup);
-          });
-        });
-
-        await assert.rejects(
-          async () => {
-            await executeThirdPartyDeveloperTool(args).handler(
-              {
-                params: {
-                  toolName: 'missing-tool',
-                  params: JSON.stringify({}),
-                },
-                page: context.getSelectedMcpPage(),
-              },
-              response,
-              context,
-            );
-          },
-          {message: /Tool missing-tool not found/},
-        );
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExperimentalThirdParty: true,
       });
+      page.getThirdPartyDeveloperTools.returns([
+        {
+          name: 'test-group',
+          description: 'test description',
+          tools: [],
+        },
+      ]);
+
+      await assert.rejects(
+        async () => {
+          await executeThirdPartyDeveloperTool(args).handler(
+            {
+              params: {
+                toolName: 'missing-tool',
+                params: JSON.stringify({}),
+              },
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {message: /Tool missing-tool not found/},
+      );
+
+      sinon.assert.notCalled(page.executeThirdPartyDeveloperTool);
     });
 
     it('throws if parameters are invalid', async () => {
-      await withMcpContext(
-        async (response, context, args) => {
-          await setupThirdPartyDeveloperTools(response, context, args, () => {
-            const mockToolGroup = {
-              name: 'test-group',
-              description: 'test description',
-              tools: [
-                {
-                  name: 'test-tool',
-                  description: 'test tool description',
-                  inputSchema: {
-                    type: 'object',
-                    properties: {
-                      arg: {type: 'string'},
-                    },
-                    required: ['arg'],
-                  },
-                  execute: () => 'result',
+      const {page, context, response, args} = createHandlerMocks({
+        categoryExperimentalThirdParty: true,
+      });
+      page.getThirdPartyDeveloperTools.returns([
+        {
+          name: 'test-group',
+          description: 'test description',
+          tools: [
+            {
+              name: 'test-tool',
+              description: 'test tool description',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  arg: {type: 'string'},
                 },
-              ],
-            };
-            window.addEventListener('devtoolstooldiscovery', (e: Event) => {
-              // @ts-expect-error Event has `respondWith`
-              e.respondWith(mockToolGroup);
-            });
-          });
-
-          await assert.rejects(
-            async () => {
-              await executeThirdPartyDeveloperTool(args).handler(
-                {
-                  params: {
-                    toolName: 'test-tool',
-                    params: JSON.stringify({}), // Missing required 'arg'
-                  },
-                  page: context.getSelectedMcpPage(),
-                },
-                response,
-                context,
-              );
+                required: ['arg'],
+              },
             },
-            {message: /Invalid parameters for tool test-tool/},
+          ],
+        },
+      ]);
+
+      await assert.rejects(
+        async () => {
+          await executeThirdPartyDeveloperTool(args).handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}), // Missing required 'arg'
+              },
+              page,
+            },
+            response,
+            context,
           );
         },
-        undefined,
-        {categoryExperimentalThirdParty: true},
+        {message: /Invalid parameters for tool test-tool/},
       );
+
+      sinon.assert.notCalled(page.executeThirdPartyDeveloperTool);
     });
 
     it('handles JSON result', async () => {
