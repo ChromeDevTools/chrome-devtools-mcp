@@ -7,13 +7,17 @@
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
+import sinon from 'sinon';
 
 import {
+  abandonPendingBrowserAttempt,
   detectDisplay,
   ensureBrowserConnected,
+  ensureBrowserLaunched,
+  forgetBrowser,
   launch,
   makeTargetFilter,
   rootSandboxLaunchError,
@@ -21,6 +25,7 @@ import {
 import type {Browser} from '../src/third_party/index.js';
 
 import {serverHooks} from './server.js';
+import {getMockBrowser} from './utils.js';
 
 async function safeClose(browser: Browser) {
   try {
@@ -58,6 +63,10 @@ async function runWithRetry(fn: () => Promise<void>) {
 }
 
 describe('browser', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   it('detects display does not crash', () => {
     detectDisplay();
   });
@@ -207,6 +216,189 @@ describe('browser', () => {
         connectedBrowser.disconnect();
       } finally {
         await safeClose(browser);
+      }
+    });
+  });
+
+  it('reconnects after the browser transport disconnects cleanly', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+        const connectedBrowser = await ensureBrowserConnected(connectOptions);
+        assert.ok(connectedBrowser.connected);
+
+        const disconnected = new Promise<void>(resolve => {
+          connectedBrowser.once('disconnected', () => resolve());
+        });
+        connectedBrowser.disconnect();
+        await disconnected;
+
+        // The `disconnected` listener installed by ensureBrowserConnected
+        // should have forgotten the cached handle, so this reconnects
+        // instead of trying to reuse (or erroring out on) the dead one.
+        const reconnectedBrowser = await ensureBrowserConnected(connectOptions);
+        assert.notStrictEqual(reconnectedBrowser, connectedBrowser);
+        assert.ok(reconnectedBrowser.connected);
+        reconnectedBrowser.disconnect();
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('forgetBrowser only clears the cache on an exact match', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+        const connectedBrowser = await ensureBrowserConnected(connectOptions);
+
+        forgetBrowser(getMockBrowser());
+
+        const sameBrowser = await ensureBrowserConnected(connectOptions);
+        assert.strictEqual(sameBrowser, connectedBrowser);
+        connectedBrowser.disconnect();
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('forgetBrowser disconnects a connected browser instead of leaking it', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+        const connectedBrowser = await ensureBrowserConnected(connectOptions);
+        const disconnectSpy = sinon.spy(connectedBrowser, 'disconnect');
+
+        forgetBrowser(connectedBrowser);
+
+        sinon.assert.calledOnce(disconnectSpy);
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('forgetBrowser closes a launched browser instead of leaking the subprocess', async () => {
+    await runWithRetry(async () => {
+      const launchedBrowser = await ensureBrowserLaunched({
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+      });
+      const closeSpy = sinon.spy(launchedBrowser, 'close');
+      try {
+        forgetBrowser(launchedBrowser);
+
+        sinon.assert.calledOnce(closeSpy);
+      } finally {
+        await safeClose(launchedBrowser);
+      }
+    });
+  });
+
+  it('discards a connect() that resolves after being abandoned, instead of installing it', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+
+        // abandonPendingBrowserAttempt() runs synchronously right after the call
+        // starts, before ensureBrowserConnected() reaches its first await —
+        // so it always lands after the attempt's token is captured and
+        // before the real connect() has resolved, deterministically
+        // reproducing "abandoned while still connecting."
+        const abandonedAttempt = ensureBrowserConnected(connectOptions);
+        abandonPendingBrowserAttempt();
+
+        await assert.rejects(abandonedAttempt, /abandoned/);
+
+        // A subsequent, independent call must still succeed normally —
+        // proving the abandoned attempt didn't leave the module cache in a
+        // broken or clobbered state.
+        const freshBrowser = await ensureBrowserConnected(connectOptions);
+        assert.ok(freshBrowser.connected);
+        freshBrowser.disconnect();
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('discards a launch() that resolves after being abandoned, instead of installing it', async () => {
+    await runWithRetry(async () => {
+      const launchOptions = {
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+      };
+
+      const abandonedAttempt = ensureBrowserLaunched(launchOptions);
+      abandonPendingBrowserAttempt();
+
+      // The discarded browser is closed internally by ensureBrowserLaunched
+      // itself (see its abandonment branch) — nothing for this test to do
+      // with it, since the rejection carries an Error, not the instance.
+      await assert.rejects(abandonedAttempt, /abandoned/);
+
+      const freshBrowser = await ensureBrowserLaunched(launchOptions);
+      try {
+        assert.ok(freshBrowser.connected);
+      } finally {
+        await safeClose(freshBrowser);
       }
     });
   });

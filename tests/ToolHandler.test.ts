@@ -15,9 +15,10 @@ import sinon from 'sinon';
 import {parseArguments} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
+import {McpResponse} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
-import {ToolHandler} from '../src/ToolHandler.js';
+import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import {
   definePageTool,
@@ -1114,5 +1115,220 @@ describe('ToolHandler', () => {
     assert.deepStrictEqual(receivedParams, {
       filePath: canonicalFilePath,
     });
+  });
+
+  it('times out a hung tool handler, fails fast, and forgets the browser', async () => {
+    const tool: ToolDefinition = {
+      name: 'hanging_tool',
+      description: 'A tool whose handler never resolves',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        return new Promise<void>(() => {
+          // Simulates a tool call awaiting a CDP response on a transport
+          // that died silently: it never resolves or rejects on its own.
+        });
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const forgetBrowserSpy = sinon.spy();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      forgetBrowserSpy,
+    );
+
+    const clock = sinon.useFakeTimers();
+    try {
+      const resultPromise = toolHandler.handle({});
+      await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
+      const result = await resultPromise;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /timed out/,
+      );
+      sinon.assert.calledOnceWithExactly(forgetBrowserSpy, mockContext.browser);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('times out when response.handle() hangs, even if the tool handler resolves fast', async () => {
+    const tool: ToolDefinition = {
+      name: 'fast_handler_slow_response_tool',
+      description:
+        'A tool whose handler resolves immediately but whose CDP work happens in response.handle()',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        // Resolves immediately, like tools such as take_snapshot/list_pages
+        // whose actual CDP calls happen in response.handle() instead.
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const forgetBrowserSpy = sinon.spy();
+    const handleStub = sinon.stub(McpResponse.prototype, 'handle').returns(
+      new Promise(() => {
+        // Simulates response.handle() making a CDP call on a transport
+        // that died silently: it never resolves or rejects on its own.
+      }),
+    );
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      forgetBrowserSpy,
+    );
+
+    const clock = sinon.useFakeTimers();
+    try {
+      const resultPromise = toolHandler.handle({});
+      await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
+      const result = await resultPromise;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /timed out/,
+      );
+      sinon.assert.calledOnce(handleStub);
+      sinon.assert.calledOnceWithExactly(forgetBrowserSpy, mockContext.browser);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('times out when getContext() hangs, and abandons the pending connect', async () => {
+    const tool: ToolDefinition = {
+      name: 'hanging_context_tool',
+      description: 'A tool whose getContext() call never resolves',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        // Never reached: the timeout fires while still awaiting getContext().
+      },
+    };
+
+    const forgetBrowserSpy = sinon.spy();
+    const abandonPendingBrowserAttemptSpy = sinon.spy();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      () =>
+        new Promise(() => {
+          // Simulates puppeteer.connect() hanging on a half-open socket:
+          // it never resolves or rejects on its own.
+        }),
+      toolMutex,
+      forgetBrowserSpy,
+      abandonPendingBrowserAttemptSpy,
+    );
+
+    const clock = sinon.useFakeTimers();
+    try {
+      const resultPromise = toolHandler.handle({});
+      await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
+      const result = await resultPromise;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /timed out/,
+      );
+      sinon.assert.calledOnce(abandonPendingBrowserAttemptSpy);
+      // No resolved context/browser exists in this case, so it's
+      // abandonPendingBrowserAttempt that fires, not forgetBrowser.
+      sinon.assert.notCalled(forgetBrowserSpy);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('does not forget the browser when a tool handler rejects normally', async () => {
+    const tool: ToolDefinition = {
+      name: 'failing_tool',
+      description: 'A tool whose handler rejects immediately',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        throw new Error('Something went wrong');
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const forgetBrowserSpy = sinon.spy();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      forgetBrowserSpy,
+    );
+
+    const result = await toolHandler.handle({});
+
+    assert.strictEqual(result.isError, true);
+    assert.match(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      /Something went wrong/,
+    );
+    sinon.assert.notCalled(forgetBrowserSpy);
   });
 });
