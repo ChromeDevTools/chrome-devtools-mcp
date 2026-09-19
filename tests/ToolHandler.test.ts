@@ -15,6 +15,7 @@ import sinon from 'sinon';
 import {parseArguments} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
+import {McpResponse} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
 import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
@@ -1166,6 +1167,66 @@ describe('ToolHandler', () => {
         result.content[0].type === 'text' ? result.content[0].text : '',
         /timed out/,
       );
+      sinon.assert.calledOnceWithExactly(forgetBrowserSpy, mockContext.browser);
+    } finally {
+      clock.restore();
+    }
+  });
+
+  it('times out when response.handle() hangs, even if the tool handler resolves fast', async () => {
+    const tool: ToolDefinition = {
+      name: 'fast_handler_slow_response_tool',
+      description:
+        'A tool whose handler resolves immediately but whose CDP work happens in response.handle()',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        // Resolves immediately, like tools such as take_snapshot/list_pages
+        // whose actual CDP calls happen in response.handle() instead.
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const forgetBrowserSpy = sinon.spy();
+    const handleStub = sinon.stub(McpResponse.prototype, 'handle').returns(
+      new Promise(() => {
+        // Simulates response.handle() making a CDP call on a transport
+        // that died silently: it never resolves or rejects on its own.
+      }),
+    );
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      forgetBrowserSpy,
+    );
+
+    const clock = sinon.useFakeTimers();
+    try {
+      const resultPromise = toolHandler.handle({});
+      await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
+      const result = await resultPromise;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /timed out/,
+      );
+      sinon.assert.calledOnce(handleStub);
       sinon.assert.calledOnceWithExactly(forgetBrowserSpy, mockContext.browser);
     } finally {
       clock.restore();

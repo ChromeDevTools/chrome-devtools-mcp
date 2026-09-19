@@ -287,6 +287,14 @@ export class ToolHandler {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
+      // Deliberately not covered by #runToolWithTimeout: puppeteer.connect()
+      // has no cancellation mechanism (no `signal`/timeout option), so
+      // racing it would only stop us from awaiting it, not stop the attempt
+      // itself. An abandoned connect that later succeeds would still hit
+      // ensureBrowserConnected()'s unconditional `browser = connected;`,
+      // silently clobbering whatever connection is current by then. A hang
+      // here reproduces the original symptom (manual /mcp reconnect
+      // required) rather than the corrupted-state risk a timeout would add.
       const context = await this.getContext();
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
@@ -297,61 +305,62 @@ export class ToolHandler {
       if (context.consumeReconnectNotice()) {
         response.setReconnectNotice();
       }
-      let page: McpPage | undefined;
-      try {
-        await validateToolFiles(this.tool, params, context);
-        if (isPageScopedTool(this.tool)) {
-          const pageId =
-            typeof params.pageId === 'number' ? params.pageId : undefined;
-          page =
-            this.serverArgs.pageIdRouting &&
-            pageId !== undefined &&
-            !this.serverArgs.slim
-              ? context.getPageById(pageId)
-              : context.getSelectedMcpPage();
-          response.setPage(page);
-          if (this.tool.blockedByDialog) {
-            page.throwIfDialogOpen();
-          }
-          await this.#runToolWithTimeout(
-            context,
-            this.tool.handler(
-              {
-                params,
-                page,
-              },
-              response,
-              context,
-            ),
-          );
-        } else {
-          await this.#runToolWithTimeout(
-            context,
-            this.tool.handler(
-              {
-                params,
-              },
-              response,
-              context,
-            ),
-          );
-        }
-      } catch (err) {
-        response.setError(err);
-      }
-      devToolsData = await context.getDevToolsData(page);
-      pageUrl = context.getSelectedMcpPageUrl(page);
-      // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
-      let dataFormat: DataFormat = 'default';
-      if (this.serverArgs.experimentalDataFormat) {
-        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
-      } else if (this.serverArgs.experimentalToonFormat) {
-        dataFormat = 'toon';
-      }
-
-      const {content, structuredContent} = await response.handle(
+      // Shares one budget with tool.handler(): several tools' actual CDP
+      // calls happen in response.handle() instead (take_snapshot,
+      // list_pages, get_network_request, list_extensions), so it needs
+      // covering too. The closure below isn't cancelled on timeout — it
+      // keeps running abandoned — but nothing after this point observes
+      // its result.
+      const {content, structuredContent} = await this.#runToolWithTimeout(
         context,
-        dataFormat,
+        (async () => {
+          let page: McpPage | undefined;
+          try {
+            await validateToolFiles(this.tool, params, context);
+            if (isPageScopedTool(this.tool)) {
+              const pageId =
+                typeof params.pageId === 'number' ? params.pageId : undefined;
+              page =
+                this.serverArgs.pageIdRouting &&
+                pageId !== undefined &&
+                !this.serverArgs.slim
+                  ? context.getPageById(pageId)
+                  : context.getSelectedMcpPage();
+              response.setPage(page);
+              if (this.tool.blockedByDialog) {
+                page.throwIfDialogOpen();
+              }
+              await this.tool.handler(
+                {
+                  params,
+                  page,
+                },
+                response,
+                context,
+              );
+            } else {
+              await this.tool.handler(
+                {
+                  params,
+                },
+                response,
+                context,
+              );
+            }
+          } catch (err) {
+            response.setError(err);
+          }
+          devToolsData = await context.getDevToolsData(page);
+          pageUrl = context.getSelectedMcpPageUrl(page);
+          // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
+          let dataFormat: DataFormat = 'default';
+          if (this.serverArgs.experimentalDataFormat) {
+            dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
+          } else if (this.serverArgs.experimentalToonFormat) {
+            dataFormat = 'toon';
+          }
+          return await response.handle(context, dataFormat);
+        })(),
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;
