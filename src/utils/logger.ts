@@ -50,6 +50,12 @@ export const logger: Logger = (...args: unknown[]) => {
 };
 
 export const puppeteerLogger = (prefix: string) => {
+  const dbg = util.debuglog(prefix);
+
+  if (!dbg.enabled) {
+    return;
+  }
+
   if (logFileStream) {
     return (...args: unknown[]) => {
       logFileStream!.write(
@@ -58,10 +64,7 @@ export const puppeteerLogger = (prefix: string) => {
     };
   }
 
-  const dbg = util.debuglog(prefix);
-  return dbg.enabled
-    ? (...args: unknown[]) => {
-        dbg('%s %s', new Date().toISOString(), util.format(...args));
-      }
-    : undefined;
+  return (...args: unknown[]) => {
+    dbg('%s %s', new Date().toISOString(), util.format(...args));
+  };
 };

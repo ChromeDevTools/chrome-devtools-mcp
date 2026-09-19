@@ -20,7 +20,7 @@ export const mcpOptions = {
   logFile: {
     type: 'string',
     describe:
-      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
+      'Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
   viewport: {
     type: 'string',
@@ -49,6 +49,13 @@ export const mcpOptions = {
     describe:
       'Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.',
     default: true,
+  },
+  devtoolsComments: {
+    type: 'boolean',
+    describe:
+      'Whether to enable DevTools comments tools. Internal WIP feature.',
+    hidden: true,
+    default: false,
   },
   experimentalDevtools: {
     type: 'boolean',
@@ -449,7 +456,7 @@ export function parser(
           throw new Error('Config must be a JSON object');
         }
 
-        return yargs()
+        yargs()
           .parserConfiguration({
             'strip-aliased': true,
             'camel-case-expansion': false,
@@ -460,6 +467,7 @@ export function parser(
           .fail(false)
           .exitProcess(false)
           .parseSync([]);
+        return parsed;
       } catch (err) {
         throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
       }

@@ -13,6 +13,7 @@ import {
   buildContext,
   getEnumValues,
   MAX_ACTIVE_DAYS,
+  sanitizeClientName,
   sanitizeParams,
   stripUnderscoreBeforeNumber,
   transformArgName,
@@ -275,5 +276,34 @@ describe('buildContext', () => {
         },
       },
     );
+  });
+});
+
+describe('sanitizeClientName', () => {
+  it('returns valid alphanumeric client names with hyphens and underscores as is', () => {
+    const validNames = [
+      'a',
+      'my-custom_client123',
+      'Client_Name-1',
+      'a'.repeat(31),
+    ];
+    for (const name of validNames) {
+      assert.strictEqual(sanitizeClientName(name), name);
+    }
+  });
+
+  it('redacts invalid or overly long client names', () => {
+    const invalidNames = [
+      '',
+      'a'.repeat(32),
+      'a'.repeat(100),
+      'client with spaces',
+      'client/1.0',
+      'client.name',
+      'client@home',
+    ];
+    for (const name of invalidNames) {
+      assert.strictEqual(sanitizeClientName(name), '<redacted>');
+    }
   });
 });

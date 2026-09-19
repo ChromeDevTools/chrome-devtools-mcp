@@ -5,10 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {join} from 'node:path';
+import {describe, it, before, after} from 'node:test';
 
 import {HeapSnapshotFormatter} from '../../src/formatters/HeapSnapshotFormatter.js';
+import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
+import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -356,6 +359,242 @@ describe('HeapSnapshotFormatter', () => {
       ].join('\n');
 
       assert.strictEqual(result, expected);
+    });
+  });
+
+  describe('with real fixtures', () => {
+    let manager: HeapSnapshotManager;
+    const examplePath = join(
+      process.cwd(),
+      'tests/fixtures/example.heapsnapshot',
+    );
+    const heap1Path = join(process.cwd(), 'tests/fixtures/heap-1.heapsnapshot');
+    const heap2Path = join(process.cwd(), 'tests/fixtures/heap-2.heapsnapshot');
+    const heap3Path = join(process.cwd(), 'tests/fixtures/heap-3.heapsnapshot');
+
+    before(() => {
+      manager = new HeapSnapshotManager();
+    });
+
+    after(() => {
+      manager.dispose();
+    });
+
+    describe('toString with aggregates', () => {
+      it('formats aggregates with default options', async t => {
+        const data = await manager.getAggregates(examplePath);
+        const formatter = new HeapSnapshotFormatter(data.aggregates);
+        t.assert.snapshot(formatter.toString());
+      });
+
+      it('formats aggregates with objectsRetainedByContexts filterName', async t => {
+        const data = await manager.getAggregates(
+          examplePath,
+          'objectsRetainedByContexts',
+        );
+        const formatter = new HeapSnapshotFormatter(data.aggregates);
+        t.assert.snapshot(formatter.toString());
+      });
+
+      it('formats aggregates with sharedNativeContext filterName', async t => {
+        const data = await manager.getAggregates(
+          examplePath,
+          'sharedNativeContext',
+        );
+        const formatter = new HeapSnapshotFormatter(data.aggregates);
+        t.assert.snapshot(formatter.toString());
+      });
+
+      it('formats aggregates with attributedToSpecificNativeContext filterName and objectId', async t => {
+        const data = await manager.getAggregates(
+          examplePath,
+          'attributedToSpecificNativeContext',
+          7249,
+        );
+        const formatter = new HeapSnapshotFormatter(data.aggregates);
+        t.assert.snapshot(formatter.toString());
+      });
+    });
+
+    describe('formatNativeContextSizes', () => {
+      it('formats native context sizes from fixture', async t => {
+        const sizes = await manager.getNativeContextSizes(examplePath);
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNativeContextSizes(sizes),
+        );
+      });
+    });
+
+    describe('formatRetainedByContextSummary', () => {
+      it('formats retained by context summary from fixture', async t => {
+        const summary = await manager.getRetainedByContextSummary(examplePath);
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatRetainedByContextSummary(summary),
+        );
+      });
+    });
+
+    describe('formatNodes with class nodes', () => {
+      it('formats class nodes with default options', async t => {
+        await manager.getAggregates(examplePath);
+        const nodes = await manager.getNodesById(examplePath, 19);
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items));
+      });
+
+      it('formats class nodes with objectsRetainedByContexts filterName', async t => {
+        const aggregateData = await manager.getAggregates(
+          examplePath,
+          'objectsRetainedByContexts',
+        );
+        const aggregate = Object.values(aggregateData.aggregates).find(
+          a => a.name === 'Function',
+        );
+        assert.ok(aggregate);
+        const id = aggregate[stableIdSymbol];
+        if (id === undefined) {
+          assert.fail('Expected class ID to be defined');
+        }
+        const nodes = await manager.getNodesById(
+          examplePath,
+          id,
+          'objectsRetainedByContexts',
+        );
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items));
+      });
+    });
+
+    describe('formatNodes with retainers', () => {
+      it('formats retainers for a valid nodeId', async t => {
+        const retainers = await manager.getRetainers(examplePath, 25341);
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(retainers.items));
+      });
+    });
+
+    describe('formatObjectInfo', () => {
+      it('formats object details for a valid nodeId', async t => {
+        const objectInfo = await manager.getObjectInfo(examplePath, 25341);
+        t.assert.snapshot(HeapSnapshotFormatter.formatObjectInfo(objectInfo));
+      });
+    });
+
+    describe('formatRetainingPaths', () => {
+      it('formats retaining paths for a valid nodeId', async t => {
+        const retainingPaths = await manager.getRetainingPaths(
+          examplePath,
+          45901,
+        );
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatRetainingPaths(retainingPaths.paths),
+        );
+      });
+
+      it('reports when limits are reached', async () => {
+        const retainingPaths = await manager.getRetainingPaths(
+          examplePath,
+          45901,
+          1,
+        );
+        assert.strictEqual(retainingPaths.paths.length, 0);
+        assert.strictEqual(retainingPaths.limitsReached.depth, true);
+      });
+    });
+
+    describe('formatNodes with edges', () => {
+      it('formats outgoing edges for a valid nodeId', async t => {
+        const edges = await manager.getEdges(examplePath, 25341);
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(edges.items));
+      });
+
+      it('formats outgoing edges with pagination', async t => {
+        const edges = await manager.getEdges(examplePath, 25341);
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNodes(edges.items.slice(0, 2)),
+        );
+      });
+
+      it('formats outgoing edges with retainedSize range', async t => {
+        const range = parseByteSizeRange('100B-100B');
+        const edges = await manager.getEdges(examplePath, 25341, {
+          minRetainedSize: range?.min,
+        });
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(edges.items));
+      });
+    });
+
+    describe('formatDominators', () => {
+      it('formats dominator chain for a valid nodeId', async t => {
+        const dominators = await manager.getDominatorsOf(examplePath, 25341);
+        t.assert.snapshot(HeapSnapshotFormatter.formatDominators(dominators));
+      });
+    });
+
+    describe('formatDiffSummary and formatDiffDetails', () => {
+      it('formats diff summary comparing heap-1 to heap-2', async t => {
+        const diffs = await manager.getClassDiffs(heap1Path, heap2Path);
+        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs));
+      });
+
+      it('formats diff summary comparing heap-2 to heap-3', async t => {
+        const diffs = await manager.getClassDiffs(heap2Path, heap3Path);
+        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs));
+      });
+
+      it('formats detailed diff comparing heap-1 to heap-2 with classIndex filter', async t => {
+        const detailedDiff = await manager.getDetailedClassDiff(
+          heap1Path,
+          heap2Path,
+          2,
+        );
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatDiffDetails(detailedDiff),
+        );
+      });
+    });
+
+    describe('formatDuplicateStrings', () => {
+      it('formats duplicate strings with default options', async t => {
+        const duplicateStrings = await manager.getDuplicateStrings(examplePath);
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatDuplicateStrings(duplicateStrings),
+        );
+      });
+    });
+
+    describe('formatNodes with queryObjects', () => {
+      it('formats queried objects with default options', async t => {
+        const objects = await manager.queryObjects(examplePath, {});
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10)),
+        );
+      });
+
+      it('formats queried objects with className filter', async t => {
+        const objects = await manager.queryObjects(examplePath, {
+          className: 'Window',
+        });
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10)),
+        );
+      });
+
+      it('formats queried objects with an unbounded retainedSize filter', async t => {
+        const range = parseByteSizeRange('1KB');
+        const objects = await manager.queryObjects(examplePath, {
+          minRetainedSize: range?.min,
+        });
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10)),
+        );
+      });
+
+      it('formats queried objects with sortBy selfSize and pagination', async t => {
+        const objects = await manager.queryObjects(examplePath, {
+          sortBy: 'selfSize',
+        });
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 5)),
+        );
+      });
     });
   });
 });

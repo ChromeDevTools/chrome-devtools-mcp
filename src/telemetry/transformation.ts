@@ -27,6 +27,21 @@ export function bucketizeDaysSince(days: number): number {
   return Math.min(days, MAX_ACTIVE_DAYS);
 }
 
+export const REDACTED_CLIENT_NAME = '<redacted>';
+const VALID_CLIENT_NAME_REGEX = /^[a-zA-Z0-9_-]+$/;
+const MAX_CLIENT_NAME_LENGTH = 32;
+
+export function sanitizeClientName(clientName: string): string {
+  if (
+    clientName.length > 0 &&
+    clientName.length < MAX_CLIENT_NAME_LENGTH &&
+    VALID_CLIENT_NAME_REGEX.test(clientName)
+  ) {
+    return clientName;
+  }
+  return REDACTED_CLIENT_NAME;
+}
+
 export const PARAM_BLOCKLIST = new Set(['uid', 'reqid', 'msgid']);
 
 const SUPPORTED_ZOD_TYPES = [

@@ -266,6 +266,16 @@ export class McpServer {
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
+        onNotification: (message: string) => {
+          void this.server
+            .sendLoggingMessage({
+              level: 'info',
+              data: message,
+            })
+            .catch(e => {
+              logger?.('Failed to send MCP notification', e);
+            });
+        },
       });
       this.#context.setRoots(this.#combinedRoots());
       if (this.#lastClientRoots === undefined) {

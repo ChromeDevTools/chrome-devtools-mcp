@@ -36,7 +36,7 @@ export const listPages = defineTool(args => {
   };
 });
 
-export const selectPage = defineTool({
+export const selectPage = defineTool(args => ({
   name: 'select_page',
   description: `Select a page as a context for future tool calls.`,
   annotations: {
@@ -47,7 +47,7 @@ export const selectPage = defineTool({
     pageId: zod
       .number()
       .describe(
-        `The ID of the page to select. Call ${listPages().name} to get available pages.`,
+        `The ID of the page to select. Call ${listPages(args).name} to get available pages.`,
       ),
     bringToFront: zod
       .boolean()
@@ -66,9 +66,9 @@ export const selectPage = defineTool({
       await page.pptrPage.bringToFront();
     }
   },
-});
+}));
 
-export const closePage = defineTool({
+export const closePage = defineTool(() => ({
   name: 'close_page',
   description: `Closes the page by its index. The last open page cannot be closed.`,
   annotations: {
@@ -95,7 +95,7 @@ export const closePage = defineTool({
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
   },
-});
+}));
 
 export const newPage = defineTool(args => {
   return {
@@ -311,7 +311,7 @@ export const navigatePage = definePageTool(args => {
   };
 });
 
-export const resizePage = definePageTool({
+export const resizePage = definePageTool(() => ({
   name: 'resize_page',
   description: `Resizes the page's window so that the page has specified dimension`,
   annotations: {
@@ -350,9 +350,9 @@ export const resizePage = definePageTool({
 
     response.setIncludePages(true);
   },
-});
+}));
 
-export const handleDialog = definePageTool({
+export const handleDialog = definePageTool(() => ({
   name: 'handle_dialog',
   description: `If a browser dialog was opened, use this command to handle it`,
   annotations: {
@@ -403,9 +403,9 @@ export const handleDialog = definePageTool({
     page.clearDialog();
     response.setIncludePages(true);
   },
-});
+}));
 
-export const getTabId = definePageTool({
+export const getTabId = definePageTool(() => ({
   name: 'get_tab_id',
   description: `Get the tab ID of the page`,
   annotations: {
@@ -422,4 +422,4 @@ export const getTabId = definePageTool({
     response.setTabId(tabId);
     response.appendResponseLine(`Tab ID: ${tabId}`);
   },
-});
+}));

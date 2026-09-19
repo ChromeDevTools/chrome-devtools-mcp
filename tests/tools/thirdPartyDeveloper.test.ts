@@ -9,6 +9,7 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -23,7 +24,7 @@ describe('thirdPartyDeveloperTools', () => {
   describe('list_3p_developer_tools', () => {
     it('lists tools', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
 
@@ -51,7 +52,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -84,7 +85,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('handles empty response', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
           await page.pptrPage.evaluate(() => {
@@ -94,7 +95,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -118,7 +119,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('handles no response', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
           await page.pptrPage.evaluate(() => {
@@ -127,7 +128,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -151,10 +152,10 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('handles no eventListener', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -178,7 +179,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('lists multiple toolgroups', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
 
@@ -215,7 +216,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -237,7 +238,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('clears window.__dtmcp.toolGroups on subsequent getToolGroups calls', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
 
@@ -260,7 +261,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -272,7 +273,7 @@ describe('thirdPartyDeveloperTools', () => {
           );
           assert.strictEqual(groupsLength, 1);
 
-          await listThirdPartyDeveloperTools.handler(
+          await listThirdPartyDeveloperTools(args).handler(
             {params: {}, page},
             response,
             context,
@@ -294,12 +295,13 @@ describe('thirdPartyDeveloperTools', () => {
     async function setupThirdPartyDeveloperTools(
       response: McpResponse,
       context: McpContext,
+      args: ParsedArguments,
       evaluateFn: () => void,
     ) {
       const page = await context.newPage();
       response.setPage(page);
       await page.pptrPage.evaluate(evaluateFn);
-      await listThirdPartyDeveloperTools.handler(
+      await listThirdPartyDeveloperTools(args).handler(
         {params: {}, page},
         response,
         context,
@@ -309,8 +311,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('executes a tool', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             const mockToolGroup = {
               name: 'test-group',
               description: 'test description',
@@ -335,7 +337,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -357,8 +359,8 @@ describe('thirdPartyDeveloperTools', () => {
     });
 
     it('throws if tool not found in list', async () => {
-      await withMcpContext(async (response, context) => {
-        await setupThirdPartyDeveloperTools(response, context, () => {
+      await withMcpContext(async (response, context, args) => {
+        await setupThirdPartyDeveloperTools(response, context, args, () => {
           const mockToolGroup = {
             name: 'test-group',
             description: 'test description',
@@ -372,7 +374,7 @@ describe('thirdPartyDeveloperTools', () => {
 
         await assert.rejects(
           async () => {
-            await executeThirdPartyDeveloperTool.handler(
+            await executeThirdPartyDeveloperTool(args).handler(
               {
                 params: {
                   toolName: 'missing-tool',
@@ -391,8 +393,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('throws if parameters are invalid', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             const mockToolGroup = {
               name: 'test-group',
               description: 'test description',
@@ -419,7 +421,7 @@ describe('thirdPartyDeveloperTools', () => {
 
           await assert.rejects(
             async () => {
-              await executeThirdPartyDeveloperTool.handler(
+              await executeThirdPartyDeveloperTool(args).handler(
                 {
                   params: {
                     toolName: 'test-tool',
@@ -441,8 +443,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('handles JSON result', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             const mockToolGroup = {
               name: 'test-group',
               description: 'test description',
@@ -461,7 +463,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -483,7 +485,7 @@ describe('thirdPartyDeveloperTools', () => {
     });
 
     it('replaces uid with element handle in params', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = await context.newPage();
         response.setPage(page);
 
@@ -548,7 +550,7 @@ describe('thirdPartyDeveloperTools', () => {
           throw new Error('Not found');
         };
 
-        await executeThirdPartyDeveloperTool.handler(
+        await executeThirdPartyDeveloperTool(args).handler(
           {
             params: {
               toolName: 'test-tool',
@@ -577,8 +579,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('processToolResult replaces functions with "<Function object>"', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             const mockToolGroup = {
               name: 'test-group',
               description: 'test description',
@@ -600,7 +602,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -623,8 +625,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('processToolResult replaces circular references with "<Circular reference>"', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             const mockToolGroup = {
               name: 'test-group',
               description: 'test description',
@@ -647,7 +649,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -670,8 +672,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('processToolResult replaces non-plain objects with "<ConstructorName instance>"', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             class CustomClass {
               val = 'value';
             }
@@ -696,7 +698,7 @@ describe('thirdPartyDeveloperTools', () => {
             });
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -723,7 +725,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('stashDOMElement stashes elements and returns UID', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
 
@@ -752,7 +754,7 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -776,7 +778,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('creates a new snapshot if the third-party developer tool response contains a DOM element', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
 
@@ -805,7 +807,7 @@ describe('thirdPartyDeveloperTools', () => {
             };
           });
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -829,7 +831,7 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('does not create a new snapshot if the third-party developer tool response does not contain a DOM element', async () => {
       await withMcpContext(
-        async (response, context) => {
+        async (response, context, args) => {
           const page = await context.newPage();
           response.setPage(page);
 
@@ -859,7 +861,7 @@ describe('thirdPartyDeveloperTools', () => {
             .stub(TextSnapshot, 'create')
             .resolves({} as TextSnapshot);
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -889,8 +891,8 @@ describe('thirdPartyDeveloperTools', () => {
 
     it('disposes old handles when executing third party developer tools', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await setupThirdPartyDeveloperTools(response, context, () => {
+        async (response, context, args) => {
+          await setupThirdPartyDeveloperTools(response, context, args, () => {
             const mockToolGroup = {
               name: 'test-group',
               description: 'test description',
@@ -918,7 +920,7 @@ describe('thirdPartyDeveloperTools', () => {
             assert.fail('No page found');
           }
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',
@@ -935,7 +937,7 @@ describe('thirdPartyDeveloperTools', () => {
           // @ts-expect-error Internal Puppeteer API
           assert.ok(!firstHandles[0].disposed);
 
-          await executeThirdPartyDeveloperTool.handler(
+          await executeThirdPartyDeveloperTool(args).handler(
             {
               params: {
                 toolName: 'test-tool',

@@ -449,5 +449,13 @@
   {
     "name": "config_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "devtools_comments_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "devtools_comments",
+    "flagType": "boolean"
   }
 ]
