@@ -21,10 +21,14 @@ describe('network', () => {
 
   describe('list_network_requests', () => {
     it('handles default parameters', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       page.getDevToolsData.resolves({});
 
-      await listNetworkRequests.handler({params: {}, page}, response, context);
+      await listNetworkRequests(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
 
       sinon.assert.calledOnce(page.getDevToolsData);
       sinon.assert.calledOnceWithExactly(response.attachDevToolsData, {});
@@ -42,10 +46,10 @@ describe('network', () => {
     });
 
     it('passes custom filters and pagination options', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       page.getDevToolsData.resolves({});
 
-      await listNetworkRequests.handler(
+      await listNetworkRequests(args).handler(
         {
           params: {
             pageSize: 25,
@@ -73,14 +77,18 @@ describe('network', () => {
     });
 
     it('resolves cdpRequestId from DevTools data when present', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       const devToolsData = {
         cdpRequestId: 'req-cdp-123',
       };
       page.getDevToolsData.resolves(devToolsData);
       page.resolveCdpRequestId.withArgs('req-cdp-123').returns(42);
 
-      await listNetworkRequests.handler({params: {}, page}, response, context);
+      await listNetworkRequests(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
 
       sinon.assert.calledOnceWithExactly(
         response.attachDevToolsData,
@@ -106,9 +114,9 @@ describe('network', () => {
 
   describe('get_network_request', () => {
     it('attaches request with explicit reqid', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
 
-      await getNetworkRequest.handler(
+      await getNetworkRequest(args).handler(
         {params: {reqid: 10}, page},
         response,
         context,
@@ -122,9 +130,9 @@ describe('network', () => {
     });
 
     it('forwards requestFilePath and responseFilePath when reqid is provided', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
 
-      await getNetworkRequest.handler(
+      await getNetworkRequest(args).handler(
         {
           params: {
             reqid: 10,
@@ -144,14 +152,14 @@ describe('network', () => {
     });
 
     it('falls back to DevTools selected request when reqid is omitted', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       const devToolsData = {
         cdpRequestId: 'req-cdp-selected',
       };
       page.getDevToolsData.resolves(devToolsData);
       page.resolveCdpRequestId.withArgs('req-cdp-selected').returns(99);
 
-      await getNetworkRequest.handler(
+      await getNetworkRequest(args).handler(
         {
           params: {
             requestFilePath: '/path/req.txt',
@@ -179,10 +187,14 @@ describe('network', () => {
     });
 
     it('appends message when reqid is omitted and nothing is selected in DevTools', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       page.getDevToolsData.resolves({});
 
-      await getNetworkRequest.handler({params: {}, page}, response, context);
+      await getNetworkRequest(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
 
       sinon.assert.calledOnce(page.getDevToolsData);
       sinon.assert.calledOnceWithExactly(response.attachDevToolsData, {});
@@ -194,11 +206,15 @@ describe('network', () => {
     });
 
     it('appends message when DevTools data exists but cdpRequestId cannot be resolved', async () => {
-      const {page, context, response} = createHandlerMocks();
+      const {page, context, response, args} = createHandlerMocks();
       page.getDevToolsData.resolves({cdpRequestId: 'unknown-cdp-id'});
       page.resolveCdpRequestId.withArgs('unknown-cdp-id').returns(undefined);
 
-      await getNetworkRequest.handler({params: {}, page}, response, context);
+      await getNetworkRequest(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
 
       sinon.assert.calledOnceWithExactly(
         page.resolveCdpRequestId,

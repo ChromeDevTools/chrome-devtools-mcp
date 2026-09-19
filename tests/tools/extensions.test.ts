@@ -25,10 +25,10 @@ describe('extensions', () => {
 
   describe('install_extension', () => {
     it('installs an extension and appends response line', async () => {
-      const {context, response} = createHandlerMocks();
+      const {context, response, args} = createHandlerMocks();
       context.installExtension.resolves('ext-123');
 
-      await installExtension.handler(
+      await installExtension(args).handler(
         {params: {path: '/path/to/extension'}},
         response,
         context,
@@ -47,10 +47,10 @@ describe('extensions', () => {
 
   describe('uninstall_extension', () => {
     it('uninstalls an extension and appends response line', async () => {
-      const {context, response} = createHandlerMocks();
+      const {context, response, args} = createHandlerMocks();
       context.uninstallExtension.resolves();
 
-      await uninstallExtension.handler(
+      await uninstallExtension(args).handler(
         {params: {id: 'ext-123'}},
         response,
         context,
@@ -66,9 +66,9 @@ describe('extensions', () => {
 
   describe('list_extensions', () => {
     it('sets list extensions on response', async () => {
-      const {context, response} = createHandlerMocks();
+      const {context, response, args} = createHandlerMocks();
 
-      await listExtensions.handler({params: {}}, response, context);
+      await listExtensions(args).handler({params: {}}, response, context);
 
       sinon.assert.calledOnceWithExactly(response.setListExtensions);
     });
@@ -76,7 +76,7 @@ describe('extensions', () => {
 
   describe('reload_extension', () => {
     it('reloads an extension by reinstalling its path', async () => {
-      const {context, response} = createHandlerMocks();
+      const {context, response, args} = createHandlerMocks();
       const mockExtension = createMockExtension({
         id: 'ext-123',
         path: '/path/to/extension',
@@ -84,7 +84,7 @@ describe('extensions', () => {
       context.getExtension.resolves(mockExtension);
       context.installExtension.resolves('ext-123');
 
-      await reloadExtension.handler(
+      await reloadExtension(args).handler(
         {params: {id: 'ext-123'}},
         response,
         context,
@@ -102,12 +102,12 @@ describe('extensions', () => {
     });
 
     it('throws when extension is not found', async () => {
-      const {context, response} = createHandlerMocks();
+      const {context, response, args} = createHandlerMocks();
       context.getExtension.resolves(undefined);
 
       await assert.rejects(
         async () => {
-          await reloadExtension.handler(
+          await reloadExtension(args).handler(
             {params: {id: 'non-existent'}},
             response,
             context,
@@ -124,10 +124,10 @@ describe('extensions', () => {
 
   describe('trigger_extension_action', () => {
     it('triggers extension action and appends response line', async () => {
-      const {context, response} = createHandlerMocks();
+      const {context, response, args} = createHandlerMocks();
       context.triggerExtensionAction.resolves();
 
-      await triggerExtensionAction.handler(
+      await triggerExtensionAction(args).handler(
         {params: {id: 'ext-123'}},
         response,
         context,

@@ -9,7 +9,7 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
 
-export const getCssStyles = definePageTool({
+export const getCssStyles = definePageTool(() => ({
   name: 'get_css_styles',
   description: `Retrieve matched CSS rules, inline styles, inherited styles, and cascade information for an element identified by its UID.
 Use this tool to debug why specific CSS properties are applied, overridden, or conflicting. Supports pagination for elements with many matched rules. Requires a UID from take_snapshot.`,
@@ -52,4 +52,4 @@ Use this tool to debug why specific CSS properties are applied, overridden, or c
       pageIdx: request.params.pageIdx,
     });
   },
-});
+}));

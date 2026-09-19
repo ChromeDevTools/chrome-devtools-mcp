@@ -998,11 +998,12 @@ describe('third-party developer tools', () => {
     handlerAction: (
       response: McpResponse,
       context: McpContext,
+      args: ParsedArguments,
     ) => Promise<void>,
     toolName: string,
   ) {
     await withMcpContext(
-      async (response, context) => {
+      async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
         stubToolDiscovery(mcpPage.pptrPage);
 
@@ -1031,7 +1032,7 @@ describe('third-party developer tools', () => {
         await mcpPage.pptrPage.evaluateOnNewDocument(initScript);
         await mcpPage.pptrPage.evaluate(initScript);
 
-        await handlerAction(response, context);
+        await handlerAction(response, context, args);
 
         const {content} = await response.handle(context);
         const responseText = getTextContent(content[0]);
@@ -1046,54 +1047,67 @@ describe('third-party developer tools', () => {
   }
 
   it('includes third-party developer tools in list_pages response', async () => {
-    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const listPagesDef = listPages({
-        categoryExperimentalThirdParty: true,
-      } as ParsedArguments);
-      await listPagesDef.handler({params: {}}, response, context);
-    }, 'list_pages');
+    await testIncludesThirdPartyDeveloperTools(
+      async (response, context, args) => {
+        const listPagesDef = listPages(args);
+        await listPagesDef.handler({params: {}}, response, context);
+      },
+      'list_pages',
+    );
   });
 
   it('includes third-party developer tools in select_page response', async () => {
-    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const pageId = context.getSelectedMcpPage().id;
-      await selectPage.handler({params: {pageId}}, response, context);
-    }, 'select_page');
+    await testIncludesThirdPartyDeveloperTools(
+      async (response, context, args) => {
+        const pageId = context.getSelectedMcpPage().id;
+        await selectPage(args).handler({params: {pageId}}, response, context);
+      },
+      'select_page',
+    );
   });
 
   it('includes third-party developer tools in close_page response', async () => {
-    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      const pageId = context.getSelectedMcpPage().id;
-      await closePage.handler({params: {pageId}}, response, context);
-    }, 'close_page');
+    await testIncludesThirdPartyDeveloperTools(
+      async (response, context, args) => {
+        const pageId = context.getSelectedMcpPage().id;
+        await closePage(args).handler({params: {pageId}}, response, context);
+      },
+      'close_page',
+    );
   });
 
   it('includes third-party developer tools in navigate_page response', async () => {
-    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      await navigatePage().handler(
-        {
-          params: {type: 'url', url: 'about:blank'},
-          page: context.getSelectedMcpPage(),
-        },
-        response,
-        context,
-      );
-    }, 'navigate_page');
+    await testIncludesThirdPartyDeveloperTools(
+      async (response, context, args) => {
+        await navigatePage(args).handler(
+          {
+            params: {type: 'url', url: 'about:blank'},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+      },
+      'navigate_page',
+    );
   });
 
   it('includes third-party developer tools in new_page response', async () => {
-    await testIncludesThirdPartyDeveloperTools(async (response, context) => {
-      // Workaround to ensure the test environment's new page contain third-party developer tools
-      sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
+    await testIncludesThirdPartyDeveloperTools(
+      async (response, context, args) => {
+        // Workaround to ensure the test environment's new page contain third-party developer tools
+        sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
 
-      await newPage().handler(
-        {
-          params: {url: 'about:blank'},
-        },
-        response,
-        context,
-      );
-    }, 'new_page');
+        await newPage(args).handler(
+          {
+            params: {url: 'about:blank'},
+          },
+          response,
+          context,
+        );
+      },
+      'new_page',
+    );
   });
 });
 
@@ -1104,13 +1118,14 @@ describe('webmcp', () => {
     handlerAction: (
       response: McpResponse,
       context: McpContext,
+      args: ParsedArguments,
     ) => Promise<void>,
   ) {
     await withMcpContext(
-      async (response, context) => {
+      async (response, context, args) => {
         response.setListWebMcpTools();
 
-        await handlerAction(response, context);
+        await handlerAction(response, context, args);
 
         const page = context.getSelectedMcpPage().pptrPage;
         const {resolve, promise} = Promise.withResolvers();
@@ -1139,8 +1154,8 @@ describe('webmcp', () => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: true},
-      async (response, context) => {
-        await listPages().handler({params: {}}, response, context);
+      async (response, context, args) => {
+        await listPages(args).handler({params: {}}, response, context);
       },
     );
   });
@@ -1149,9 +1164,9 @@ describe('webmcp', () => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: true},
-      async (response, context) => {
+      async (response, context, args) => {
         const pageId = context.getSelectedMcpPage().id;
-        await selectPage.handler({params: {pageId}}, response, context);
+        await selectPage(args).handler({params: {pageId}}, response, context);
       },
     );
   });
@@ -1160,8 +1175,8 @@ describe('webmcp', () => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: true},
-      async (response, context) => {
-        await navigatePage().handler(
+      async (response, context, args) => {
+        await navigatePage(args).handler(
           {
             params: {type: 'url', url: 'about:blank'},
             page: context.getSelectedMcpPage(),
@@ -1191,8 +1206,8 @@ describe('webmcp', () => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: false},
-      async (response, context) => {
-        await navigatePage().handler(
+      async (response, context, args) => {
+        await navigatePage(args).handler(
           {
             params: {type: 'url', url: 'about:blank'},
             page: context.getSelectedMcpPage(),

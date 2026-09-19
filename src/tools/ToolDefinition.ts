@@ -54,6 +54,18 @@ export type FileVerificationOption =
       remote?: boolean;
     };
 
+type AllKeys<T> = T extends unknown ? keyof T : never;
+
+export type MergeSchema<Schema extends zod.ZodRawShape> = {
+  [K in AllKeys<Schema>]: Schema extends unknown
+    ? K extends keyof Schema
+      ? undefined extends Schema[K]
+        ? Exclude<Schema[K], undefined> | zod.ZodUndefined
+        : Schema[K]
+      : zod.ZodUndefined
+    : never;
+};
+
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > {
@@ -70,22 +82,24 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Partial<Record<keyof Schema, FileVerificationOption>>;
+  verifyFilesSchema: Partial<
+    Record<keyof MergeSchema<Schema>, FileVerificationOption>
+  >;
 }
 
 export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   schema: Schema;
-  handler: (
+  handler(
     request: Request<Schema>,
     response: Response,
     context: Context,
-  ) => Promise<void>;
+  ): Promise<void>;
 }
 
 export interface Request<Schema extends zod.ZodRawShape> {
-  params: zod.objectOutputType<Schema, zod.ZodTypeAny>;
+  params: zod.objectOutputType<MergeSchema<Schema>, zod.ZodTypeAny>;
 }
 
 export interface ImageContentData {
@@ -387,84 +401,46 @@ export type ContextPage = Readonly<{
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: ToolDefinition<Schema>,
-): ToolDefinition<Schema>;
-
-export function defineTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition: (args?: Args) => ToolDefinition<Schema>,
-): (args?: Args) => ToolDefinition<Schema>;
-
-export function defineTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition:
-    ToolDefinition<Schema> | ((args?: Args) => ToolDefinition<Schema>),
-) {
-  if (typeof definition === 'function') {
-    const factory = definition;
-    return (args: Args) => {
-      return factory(args);
-    };
-  }
+  definition: (args: ParsedArguments) => ToolDefinition<Schema>,
+): (args: ParsedArguments) => ToolDefinition<Schema> {
   return definition;
 }
 
 interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
-  handler: (
+  handler(
     request: Request<Schema> & {page: ContextPage},
     response: Response,
     context: Context,
-  ) => Promise<void>;
+  ): Promise<void>;
 }
 
 export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
-  PageToolDefinition<Schema> & {
+  Omit<PageToolDefinition<Schema>, 'schema'> & {
+    schema: Schema & Partial<typeof pageIdSchema>;
     pageScoped: true;
-    handler: (
+    handler(
       request: Request<Schema> & {page: ContextPage},
       response: Response,
       context: Context,
-    ) => Promise<void>;
+    ): Promise<void>;
   };
 
 export function definePageTool<Schema extends zod.ZodRawShape>(
-  definition: PageToolDefinition<Schema>,
-): DefinedPageTool<Schema>;
-
-export function definePageTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition: (args?: Args) => PageToolDefinition<Schema>,
-): (args?: Args) => DefinedPageTool<Schema>;
-
-export function definePageTool<
-  Schema extends zod.ZodRawShape,
-  Args extends ParsedArguments = ParsedArguments,
->(
-  definition:
-    PageToolDefinition<Schema> | ((args?: Args) => PageToolDefinition<Schema>),
-): DefinedPageTool<Schema> | ((args?: Args) => DefinedPageTool<Schema>) {
-  if (typeof definition === 'function') {
-    return (args?: Args): DefinedPageTool<Schema> => {
-      const tool = definition(args);
-      return {
-        ...tool,
-        pageScoped: true,
-      };
+  definition: (args: ParsedArguments) => PageToolDefinition<Schema>,
+): (args: ParsedArguments) => DefinedPageTool<Schema> {
+  return (args: ParsedArguments): DefinedPageTool<Schema> => {
+    const tool = definition(args);
+    return {
+      ...tool,
+      schema: {
+        ...(args.pageIdRouting && !args.slim ? pageIdSchema : {}),
+        ...tool.schema,
+      },
+      pageScoped: true,
     };
-  }
-
-  return {
-    ...definition,
-    pageScoped: true,
-  } as DefinedPageTool<Schema>;
+  };
 }
 
 export const CLOSE_PAGE_ERROR =

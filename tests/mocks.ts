@@ -188,15 +188,17 @@ export function createMockMcpResponse(): MockMcpResponse {
  *
  *   const {page, context, response} = createHandlerMocks();
  */
-export function createHandlerMocks(): {
+export function createHandlerMocks(options: Partial<ParsedArguments> = {}): {
   page: MockMcpPage;
   context: MockMcpContext;
   response: MockMcpResponse;
+  args: ParsedArguments;
 } {
   const page = createMockMcpPage();
   const context = createMockMcpContext({selectedPage: page});
   const response = createMockMcpResponse();
-  return {page, context, response};
+  const args = createMockParsedArguments(options);
+  return {page, context, response, args};
 }
 
 export function createMockRunnerResult(): RunnerResult {

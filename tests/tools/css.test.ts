@@ -18,13 +18,13 @@ describe('get_css_styles', () => {
   });
 
   it('retrieves matched styles for a uid and passes to response', async () => {
-    const {page, context, response} = createHandlerMocks();
+    const {page, context, response, args} = createHandlerMocks();
     const mockStyles = sinon.createStubInstance(
       DevTools.CSSMatchedStyles.CSSMatchedStyles,
     );
     page.getMatchedStylesForUid.resolves(mockStyles);
 
-    await getCssStyles.handler(
+    await getCssStyles(args).handler(
       {params: {uid: 'element-1'}, page},
       response,
       context,
@@ -46,13 +46,13 @@ describe('get_css_styles', () => {
   });
 
   it('passes pagination options to response', async () => {
-    const {page, context, response} = createHandlerMocks();
+    const {page, context, response, args} = createHandlerMocks();
     const mockStyles = sinon.createStubInstance(
       DevTools.CSSMatchedStyles.CSSMatchedStyles,
     );
     page.getMatchedStylesForUid.resolves(mockStyles);
 
-    await getCssStyles.handler(
+    await getCssStyles(args).handler(
       {params: {uid: 'element-1', pageSize: 10, pageIdx: 2}, page},
       response,
       context,

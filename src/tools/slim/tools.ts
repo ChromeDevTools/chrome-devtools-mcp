@@ -10,7 +10,7 @@ import {ToolCategory} from '../categories.js';
 import {definePageTool} from '../ToolDefinition.js';
 import {validateUrl} from '../../utils/url.js';
 
-export const screenshot = definePageTool({
+export const screenshot = definePageTool(() => ({
   name: 'screenshot',
   description: `Takes a screenshot`,
   annotations: {
@@ -33,7 +33,7 @@ export const screenshot = definePageTool({
     );
     response.appendResponseLine(filepath);
   },
-});
+}));
 
 export const navigate = definePageTool(args => {
   return {
@@ -81,7 +81,7 @@ export const navigate = definePageTool(args => {
   };
 });
 
-export const evaluate = definePageTool({
+export const evaluate = definePageTool(() => ({
   name: 'evaluate',
   description: `Evaluates a JavaScript script`,
   annotations: {
@@ -103,4 +103,4 @@ export const evaluate = definePageTool({
       response.appendResponseLine(String(err.message));
     }
   },
-});
+}));

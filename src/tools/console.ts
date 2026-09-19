@@ -106,7 +106,7 @@ export const listConsoleMessages = definePageTool(cliArgs => {
   };
 });
 
-export const getConsoleMessage = definePageTool({
+export const getConsoleMessage = definePageTool(() => ({
   name: 'get_console_message',
   description: `Gets a console message by its ID. You can get all messages by calling ${LIST_CONSOLE_MESSAGES_TOOL_NAME}.`,
   annotations: {
@@ -125,4 +125,4 @@ export const getConsoleMessage = definePageTool({
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);
   },
-});
+}));
