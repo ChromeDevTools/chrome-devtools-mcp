@@ -13,6 +13,7 @@ import {executablePath} from 'puppeteer';
 import sinon from 'sinon';
 
 import {
+  abandonPendingBrowserAttempt,
   detectDisplay,
   ensureBrowserConnected,
   ensureBrowserLaunched,
@@ -281,6 +282,72 @@ describe('browser', () => {
         sinon.assert.calledOnce(closeSpy);
       } finally {
         await safeClose(launchedBrowser);
+      }
+    });
+  });
+
+  it('discards a connect() that resolves after being abandoned, instead of installing it', async () => {
+    await runWithRetry(async () => {
+      const tmpDir = os.tmpdir();
+      const folderPath = path.join(
+        tmpDir,
+        `temp-folder-${crypto.randomUUID()}`,
+      );
+      const browser = await launch({
+        headless: true,
+        isolated: false,
+        userDataDir: folderPath,
+        executablePath: await executablePath(),
+        devtools: false,
+        chromeArgs: ['--remote-debugging-port=0'],
+      });
+      try {
+        const connectOptions = {userDataDir: folderPath, devtools: false};
+
+        // abandonPendingBrowserAttempt() runs synchronously right after the call
+        // starts, before ensureBrowserConnected() reaches its first await —
+        // so it always lands after the attempt's token is captured and
+        // before the real connect() has resolved, deterministically
+        // reproducing "abandoned while still connecting."
+        const abandonedAttempt = ensureBrowserConnected(connectOptions);
+        abandonPendingBrowserAttempt();
+
+        await assert.rejects(abandonedAttempt, /abandoned/);
+
+        // A subsequent, independent call must still succeed normally —
+        // proving the abandoned attempt didn't leave the module cache in a
+        // broken or clobbered state.
+        const freshBrowser = await ensureBrowserConnected(connectOptions);
+        assert.ok(freshBrowser.connected);
+        freshBrowser.disconnect();
+      } finally {
+        await safeClose(browser);
+      }
+    });
+  });
+
+  it('discards a launch() that resolves after being abandoned, instead of installing it', async () => {
+    await runWithRetry(async () => {
+      const launchOptions = {
+        headless: true,
+        isolated: true,
+        executablePath: await executablePath(),
+        devtools: false,
+      };
+
+      const abandonedAttempt = ensureBrowserLaunched(launchOptions);
+      abandonPendingBrowserAttempt();
+
+      // The discarded browser is closed internally by ensureBrowserLaunched
+      // itself (see its abandonment branch) — nothing for this test to do
+      // with it, since the rejection carries an Error, not the instance.
+      await assert.rejects(abandonedAttempt, /abandoned/);
+
+      const freshBrowser = await ensureBrowserLaunched(launchOptions);
+      try {
+        assert.ok(freshBrowser.connected);
+      } finally {
+        await safeClose(freshBrowser);
       }
     });
   });

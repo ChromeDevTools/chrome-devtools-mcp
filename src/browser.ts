@@ -21,6 +21,25 @@ import {isAllowedUrl} from './utils/url.js';
 let browser: Browser | undefined;
 let browserMode: 'launched' | 'connected' | undefined;
 
+// Identity token for the in-flight connect/launch attempt, if any. Compared
+// by reference, never by value — see abandonPendingBrowserAttempt().
+let currentBrowserAttempt: object = {};
+
+/**
+ * Signals that whoever was waiting on the in-flight connect/launch attempt
+ * has given up (e.g. a timeout). Puppeteer gives no way to cancel a pending
+ * `connect()`/launch, so the attempt keeps running in the background; this
+ * doesn't stop it, it only replaces the shared token with a fresh, distinct
+ * one. If the abandoned attempt succeeds later anyway,
+ * ensureBrowserConnected()/ensureBrowserLaunched() will see their captured
+ * token no longer matches and discard the result instead of installing it —
+ * otherwise a stale, no-longer-wanted connection could silently overwrite
+ * whatever a subsequent, independent attempt already established.
+ */
+export function abandonPendingBrowserAttempt(): void {
+  currentBrowserAttempt = {};
+}
+
 /**
  * Clears the cached browser handle if it still matches `candidate`, so the
  * next ensureBrowserConnected()/ensureBrowserLaunched() call establishes a
@@ -86,6 +105,7 @@ export async function ensureBrowserConnected(options: {
   if (browser?.connected) {
     return browser;
   }
+  const currentAttempt = currentBrowserAttempt;
 
   const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
     targetFilter: makeTargetFilter(enableExtensions),
@@ -152,14 +172,9 @@ export async function ensureBrowserConnected(options: {
   }
 
   logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+  let connected: Browser;
   try {
-    // Assign mode before browser so a concurrent closeBrowser() never sees
-    // `browser` set with `browserMode` still undefined (would fall through
-    // to the disconnect() path and orphan a launched Chrome).
-    const connected = await puppeteer.connect(connectOptions);
-    browserMode = 'connected';
-    browser = connected;
-    trackDisconnect(connected);
+    connected = await puppeteer.connect(connectOptions);
   } catch (err) {
     throw new Error(
       `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
@@ -168,6 +183,23 @@ export async function ensureBrowserConnected(options: {
       },
     );
   }
+  if (currentAttempt !== currentBrowserAttempt) {
+    // Abandoned (see abandonPendingBrowserAttempt()) while connecting — a newer,
+    // independent attempt may already be installed. Don't clobber it.
+    logger?.(
+      'Discarding a Chrome connection that resolved after being abandoned',
+    );
+    void connected.disconnect().catch(err => {
+      logger?.('Failed to disconnect an abandoned connection', err);
+    });
+    throw new Error('Connection attempt was abandoned before it completed');
+  }
+  // Assign mode before browser so a concurrent closeBrowser() never sees
+  // `browser` set with `browserMode` still undefined (would fall through
+  // to the disconnect() path and orphan a launched Chrome).
+  browserMode = 'connected';
+  browser = connected;
+  trackDisconnect(connected);
   logger?.('Connected Puppeteer');
   return browser;
 }
@@ -310,8 +342,26 @@ export async function ensureBrowserLaunched(
   if (browser?.connected) {
     return browser;
   }
-  // Assign mode before browser; see the connect path above for rationale.
+  const currentAttempt = currentBrowserAttempt;
   const launched = await launch(options);
+  if (currentAttempt !== currentBrowserAttempt) {
+    // Defensive, not currently load-bearing: unlike puppeteer.connect(),
+    // puppeteer.launch() has its own bounded startup timeout (defaultValue
+    // 30s, not overridden here), so it settles well before the 60s outer
+    // timeout (TOOL_CALL_TIMEOUT_MS) could ever abandon it — this branch
+    // can't be reached with today's values. Kept anyway, symmetric with the
+    // matching check in ensureBrowserConnected(), so a future change to
+    // either timeout can't silently reopen the race one of them was fixed
+    // to prevent.
+    logger?.(
+      'Discarding a launched Chrome that resolved after being abandoned',
+    );
+    void launched.close().catch(err => {
+      logger?.('Failed to close an abandoned launched browser', err);
+    });
+    throw new Error('Browser launch was abandoned before it completed');
+  }
+  // Assign mode before browser; see the connect path above for rationale.
   browserMode = 'launched';
   browser = launched;
   trackDisconnect(launched);

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {forgetBrowser} from './browser.js';
+import {abandonPendingBrowserAttempt, forgetBrowser} from './browser.js';
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
@@ -195,6 +195,7 @@ export class ToolHandler {
     private readonly forgetBrowserOnTimeout: (
       browser: Browser,
     ) => void = forgetBrowser,
+    private readonly abandonPendingBrowserAttemptOnTimeout: () => void = abandonPendingBrowserAttempt,
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
@@ -217,16 +218,14 @@ export class ToolHandler {
   }
 
   /**
-   * Races a tool handler invocation against TOOL_CALL_TIMEOUT_MS. On timeout,
-   * forgets the cached browser handle (see forgetBrowser()) so the next tool
-   * call re-establishes the connection instead of hanging on the same dead
-   * one. The loser of the race (a genuinely hung handler) is left running;
-   * there is no way to cancel a pending Puppeteer call, but since nothing is
-   * left awaiting it, it cannot block subsequent tool calls.
+   * Races a promise against TOOL_CALL_TIMEOUT_MS, calling onTimeout() if the
+   * timer wins. The loser of the race is left running — there is no way to
+   * cancel a pending Puppeteer call — but since nothing is left awaiting it,
+   * it cannot block subsequent tool calls.
    */
-  async #runToolWithTimeout<T>(
-    context: McpContext,
-    handlerPromise: Promise<T>,
+  async #raceWithTimeout<T>(
+    promise: Promise<T>,
+    onTimeout: () => void,
   ): Promise<T> {
     const timeoutError = new ToolCallTimeoutError(
       `Tool "${this.tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting on the browser connection. The connection may have been lost (for example, the debugged browser or app restarted). It will be re-established automatically on the next tool call.`,
@@ -237,10 +236,10 @@ export class ToolHandler {
       timer.unref?.();
     });
     try {
-      return await Promise.race([handlerPromise, timeout]);
+      return await Promise.race([promise, timeout]);
     } catch (err) {
       if (err === timeoutError) {
-        this.forgetBrowserOnTimeout(context.browser);
+        onTimeout();
       }
       throw err;
     } finally {
@@ -287,15 +286,15 @@ export class ToolHandler {
       logger?.(
         `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
       );
-      // Deliberately not covered by #runToolWithTimeout: puppeteer.connect()
-      // has no cancellation mechanism (no `signal`/timeout option), so
-      // racing it would only stop us from awaiting it, not stop the attempt
-      // itself. An abandoned connect that later succeeds would still hit
-      // ensureBrowserConnected()'s unconditional `browser = connected;`,
-      // silently clobbering whatever connection is current by then. A hang
-      // here reproduces the original symptom (manual /mcp reconnect
-      // required) rather than the corrupted-state risk a timeout would add.
-      const context = await this.getContext();
+      // puppeteer.connect() has no cancellation mechanism, so this timeout
+      // only stops us from waiting — the attempt itself keeps running
+      // abandoned. abandonPendingBrowserAttemptOnTimeout() tells browser.ts to
+      // discard that attempt if it succeeds later instead of installing it,
+      // so it can't silently clobber whatever a subsequent call establishes
+      // — see abandonPendingBrowserAttempt()'s doc comment for the full mechanism.
+      const context = await this.#raceWithTimeout(this.getContext(), () =>
+        this.abandonPendingBrowserAttemptOnTimeout(),
+      );
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
@@ -311,8 +310,7 @@ export class ToolHandler {
       // covering too. The closure below isn't cancelled on timeout — it
       // keeps running abandoned — but nothing after this point observes
       // its result.
-      const {content, structuredContent} = await this.#runToolWithTimeout(
-        context,
+      const {content, structuredContent} = await this.#raceWithTimeout(
         (async () => {
           let page: McpPage | undefined;
           try {
@@ -361,6 +359,7 @@ export class ToolHandler {
           }
           return await response.handle(context, dataFormat);
         })(),
+        () => this.forgetBrowserOnTimeout(context.browser),
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;

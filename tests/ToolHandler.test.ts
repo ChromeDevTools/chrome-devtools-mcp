@@ -1233,6 +1233,63 @@ describe('ToolHandler', () => {
     }
   });
 
+  it('times out when getContext() hangs, and abandons the pending connect', async () => {
+    const tool: ToolDefinition = {
+      name: 'hanging_context_tool',
+      description: 'A tool whose getContext() call never resolves',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        // Never reached: the timeout fires while still awaiting getContext().
+      },
+    };
+
+    const forgetBrowserSpy = sinon.spy();
+    const abandonPendingBrowserAttemptSpy = sinon.spy();
+
+    const toolMutex = new Mutex();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      () =>
+        new Promise(() => {
+          // Simulates puppeteer.connect() hanging on a half-open socket:
+          // it never resolves or rejects on its own.
+        }),
+      toolMutex,
+      forgetBrowserSpy,
+      abandonPendingBrowserAttemptSpy,
+    );
+
+    const clock = sinon.useFakeTimers();
+    try {
+      const resultPromise = toolHandler.handle({});
+      await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
+      const result = await resultPromise;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0].type === 'text' ? result.content[0].text : '',
+        /timed out/,
+      );
+      sinon.assert.calledOnce(abandonPendingBrowserAttemptSpy);
+      // No resolved context/browser exists in this case, so it's
+      // abandonPendingBrowserAttempt that fires, not forgetBrowser.
+      sinon.assert.notCalled(forgetBrowserSpy);
+    } finally {
+      clock.restore();
+    }
+  });
+
   it('does not forget the browser when a tool handler rejects normally', async () => {
     const tool: ToolDefinition = {
       name: 'failing_tool',
