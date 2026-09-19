@@ -51,6 +51,27 @@ describe('WaitForHelper', () => {
     });
   });
 
+  it('awaits a navigation scheduled after the action returns', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/scheduled-nav-target', html`<main>scheduled</main>`);
+      const targetUrl = server.getRoute('/scheduled-nav-target');
+      const mcpPage = context.getSelectedMcpPage();
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(url => {
+            setTimeout(() => {
+              location.href = url;
+            }, 0);
+          }, targetUrl);
+        },
+        {waitForStableDom: false},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, targetUrl);
+    });
+  });
+
   it('awaits navigation when action takes longer than expectNavigationIn', async () => {
     await withMcpContext(async (response, context) => {
       server.addHtmlRoute('/nav-target', html`<main>navigated</main>`);
