@@ -22,7 +22,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {createMockParsedArguments} from '../mocks.js';
+import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -1302,6 +1302,54 @@ describe('pages', () => {
     });
   });
   describe('resize', () => {
+    it('rejects non-positive dimensions', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+
+      await assert.rejects(
+        resizePage(args).handler(
+          {
+            params: {width: 0, height: 500},
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Invalid page width "0". Width must be a positive finite number.',
+        },
+      );
+      await assert.rejects(
+        resizePage(args).handler(
+          {
+            params: {width: 800, height: -1},
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Invalid page height "-1". Height must be a positive finite number.',
+        },
+      );
+      await assert.rejects(
+        resizePage(args).handler(
+          {
+            params: {width: Number.POSITIVE_INFINITY, height: 600},
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Invalid page width "Infinity". Width must be a positive finite number.',
+        },
+      );
+      sinon.assert.notCalled(page.pptrPage.resize);
+    });
+
     it('resize the page', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
