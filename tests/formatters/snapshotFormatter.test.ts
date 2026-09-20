@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 import type {ElementHandle} from 'puppeteer-core';
 
 import {SnapshotFormatter} from '../../src/formatters/SnapshotFormatter.js';
-import type {TextSnapshot} from '../../src/TextSnapshot.js';
+import {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../../src/types.js';
 
 describe('snapshotFormatter', () => {
@@ -194,16 +194,16 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({
-      snapshotId: '1',
-      root: node,
-      idToNode: new Map(),
-      hasSelectedElement: true,
-      verbose: false,
-      resolveCdpElementId() {
-        return undefined;
-      },
-    });
+    const formatter = new SnapshotFormatter(
+      new TextSnapshot({
+        snapshotId: '1',
+        root: node,
+        idToNode: new Map(),
+        hasSelectedElement: true,
+        verbose: false,
+        nodesByFrame: new Map(),
+      }),
+    );
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);
@@ -231,16 +231,16 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({
-      snapshotId: '1',
-      root: node,
-      idToNode: new Map(),
-      hasSelectedElement: true,
-      verbose: true,
-      resolveCdpElementId() {
-        return undefined;
-      },
-    });
+    const formatter = new SnapshotFormatter(
+      new TextSnapshot({
+        snapshotId: '1',
+        root: node,
+        idToNode: new Map(),
+        hasSelectedElement: true,
+        verbose: true,
+        nodesByFrame: new Map(),
+      }),
+    );
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);
@@ -268,17 +268,17 @@ describe('snapshotFormatter', () => {
       },
     };
 
-    const formatter = new SnapshotFormatter({
-      snapshotId: '1',
-      root: node,
-      idToNode: new Map(),
-      hasSelectedElement: true,
-      selectedElementUid: '1_1',
-      verbose: false,
-      resolveCdpElementId() {
-        return '1_1';
-      },
-    });
+    const formatter = new SnapshotFormatter(
+      new TextSnapshot({
+        snapshotId: '1',
+        root: node,
+        idToNode: new Map(),
+        hasSelectedElement: true,
+        selectedElementUid: '1_1',
+        verbose: false,
+        nodesByFrame: new Map(),
+      }),
+    );
     const formatted = formatter.toString();
 
     t.assert.snapshot(formatted);

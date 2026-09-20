@@ -643,8 +643,10 @@ export class McpPage implements ContextPage {
           );
           return `stashed-${index}`;
         }
-        const cdpElementId =
-          this.textSnapshot?.resolveCdpElementId(backendNodeId);
+        const cdpElementId = this.textSnapshot?.resolveCdpElementId(
+          backendNodeId,
+          elementHandle.frame,
+        );
         if (!cdpElementId) {
           logger?.(
             `Could not get cdpElementId for backend node ${backendNodeId}`,
