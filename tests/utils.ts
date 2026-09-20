@@ -194,7 +194,7 @@ export async function withMcpContext(
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
         sourceMaps: options.sourceMaps ?? true,
-        allowList: options.allowedUrlPattern,
+        allowlist: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
         allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
         navigationTimeout:

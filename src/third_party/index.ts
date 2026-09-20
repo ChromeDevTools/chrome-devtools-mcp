@@ -56,6 +56,7 @@ export {
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';

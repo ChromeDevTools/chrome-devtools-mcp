@@ -129,12 +129,14 @@ export const mcpOptions = {
   },
   blockedUrlPattern: {
     type: 'array',
+    string: true,
     describe:
       "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['allowedUrlPattern'],
   },
   allowedUrlPattern: {
     type: 'array',
+    string: true,
     describe:
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
     conflicts: ['blockedUrlPattern'],
@@ -261,6 +263,7 @@ export const mcpOptions = {
   },
   filesystemRoot: {
     type: 'array',
+    string: true,
     alias: 'workspace',
     default: DEFAULT_FILESYSTEM_ROOT,
     defaultDescription: 'OS temp directory',

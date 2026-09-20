@@ -8,7 +8,7 @@ import '../utils/polyfill.js';
 
 import process from 'node:process';
 
-import {closeBrowser} from '../browser.js';
+import {BrowserManager} from '../BrowserManager.js';
 import {McpServer, logDisclaimers} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
@@ -33,6 +33,14 @@ if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] !== 'true') {
   });
 }
 
+logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
+const browserManager = new BrowserManager(args, {
+  logFile,
+});
+const serverPromise = McpServer.from(args, {
+  browserManager,
+});
+
 // Shutdown on stdin EOF (stdio MCP convention — the client closes the
 // transport to signal exit) and on standard termination signals. Without
 // this, an active Chrome subprocess keeps the Node event loop ref'd after
@@ -52,7 +60,8 @@ async function shutdown(reason: string): Promise<void> {
     logger?.('Shutdown timeout exceeded, forcing exit');
     process.exit(0);
   }, 5000).unref();
-  await closeBrowser();
+  const server = await serverPromise;
+  await server.close();
   process.exit(0);
 }
 process.stdin.on('end', () => {
@@ -71,10 +80,7 @@ process.on('SIGHUP', () => {
   void shutdown('SIGHUP');
 });
 
-logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const server = await McpServer.from(args, {
-  logFile,
-});
+const server = await serverPromise;
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger?.('Chrome DevTools MCP Server connected');

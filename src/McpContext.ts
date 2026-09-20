@@ -60,7 +60,7 @@ interface McpContextOptions {
   // Whether source maps are enabled in DevTools.
   sourceMaps?: boolean;
   // The allow list of URL patterns to allow loading resources.
-  allowList?: string[];
+  allowlist?: string[];
   // The block list of URL patterns to block loading resources.
   blocklist?: string[];
   // Whether to skip path validation when the client did not negotiate the roots
@@ -369,7 +369,7 @@ export class McpContext implements Context {
   }
 
   get #hasNetworkBlockOrAllowlist(): boolean {
-    return !!(this.#options.allowList || this.#options.blocklist);
+    return !!(this.#options.allowlist || this.#options.blocklist);
   }
 
   installPWA(options: InstallPWAOptions): Promise<string> {
@@ -898,10 +898,10 @@ export class McpContext implements Context {
   }
 
   #validateUrlAllowed(url: URL): void {
-    if (!this.#options.allowList) {
+    if (!this.#options.allowlist) {
       return;
     }
-    for (const allow of this.#options.allowList) {
+    for (const allow of this.#options.allowlist) {
       const pattern = new URLPattern(allow);
       if (pattern.test(url)) {
         return;

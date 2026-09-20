@@ -38,12 +38,14 @@ import type {
 } from '../src/processors/HeapSnapshotManager.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 import {
+  CdpBrowser,
   CdpExtension,
   CdpFrame,
   CdpPage,
   DevTools,
 } from '../src/third_party/index.js';
 import type {
+  Browser,
   Extension,
   Page,
   Result,
@@ -114,6 +116,18 @@ export function mockListener() {
       }
     },
   };
+}
+
+export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser> {
+  const browser = sinon.createStubInstance(
+    CdpBrowser,
+  ) as unknown as sinon.SinonStubbedInstance<Browser>;
+  sinon.stub(browser, 'connected').get(() => true);
+  browser.close.resolves();
+  browser.disconnect.resolves();
+  browser.pages.resolves([]);
+  browser.process.returns(null);
+  return browser;
 }
 
 export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
