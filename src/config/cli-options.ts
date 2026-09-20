@@ -1528,13 +1528,13 @@ export const commands: Commands = {
       },
       width: {
         name: 'width',
-        type: 'number',
+        type: 'integer',
         description: 'Page width',
         required: true,
       },
       height: {
         name: 'height',
-        type: 'number',
+        type: 'integer',
         description: 'Page height',
         required: true,
       },

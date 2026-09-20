@@ -301,9 +301,9 @@
 
 **Parameters:**
 
-- **height** (number) **(required)**: Page height
+- **height** (integer) **(required)**: Page height
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **width** (number) **(required)**: Page width
+- **width** (integer) **(required)**: Page width
 
 ---
 
