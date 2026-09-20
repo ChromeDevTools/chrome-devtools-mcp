@@ -5,14 +5,21 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
+
+import sinon from 'sinon';
 
 import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
+import {createHandlerMocks} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   describe('list_webmcp_tools', () => {
     it('list webmcp tools in navigate_page response', async () => {
       await withMcpContext(async (response, context, args) => {
@@ -107,6 +114,21 @@ describe('webmcp', () => {
         },
         {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
         {categoryExperimentalWebmcp: true},
+      );
+    });
+
+    it('rejects JSON array input', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await assert.rejects(
+        executeWebMcpTool(args).handler(
+          {
+            params: {toolName: 'test_tool', input: '[]'},
+            page,
+          },
+          response,
+          context,
+        ),
+        {message: /Parsed input is not an object/},
       );
     });
 
