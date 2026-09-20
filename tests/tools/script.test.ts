@@ -46,6 +46,20 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
       });
     });
+    it('reports undefined results without wrapping invalid JSON', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {function: '() => undefined'},
+          },
+          response,
+          context,
+        );
+        assert.deepStrictEqual(response.responseLines, [
+          'Script ran on page and returned undefined.',
+        ]);
+      });
+    });
     it('skips the stable DOM wait when waitForStableDom is false', async () => {
       await withMcpContext(async (response, context, args) => {
         const spy = sinon.spy(WaitForHelper.prototype, 'waitForStableDom');
