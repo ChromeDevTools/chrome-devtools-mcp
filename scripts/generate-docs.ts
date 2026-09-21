@@ -16,7 +16,7 @@ import {
   isCategoryOffByDefault,
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
-import type {Tool, zod} from '../src/third_party/index.js';
+import {zod} from '../build/src/third_party/index.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import type {
   DefinedPageTool,
@@ -27,48 +27,27 @@ import {createTools} from '../build/src/tools/tools.js';
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
 
-// Extend the MCP Tool type to include our annotations
-interface ToolWithAnnotations extends Omit<Tool, 'inputSchema'> {
+interface TypeInfo {
+  type?: string;
+  enum?: string[];
+  items?: TypeInfo;
+  description?: string;
+  default?: unknown;
+}
+
+interface ToolWithAnnotations {
+  name: string;
+  description: string;
   inputSchema: {
-    type: 'object';
+    type?: string;
     properties?: Record<string, TypeInfo>;
     required?: string[];
   };
   annotations?: {
     title?: string;
-    category?: typeof ToolCategory;
+    category?: ToolCategory;
     conditions?: string[];
   };
-}
-
-interface ZodCheck {
-  kind: string;
-}
-
-interface ZodDef {
-  typeName?: string;
-  checks?: ZodCheck[];
-  values?: string[];
-  entries?: Record<string, string>;
-  type?: string | ZodSchema;
-  innerType?: ZodSchema;
-  schema?: ZodSchema;
-  in?: ZodSchema;
-  defaultValue?: (() => unknown) | unknown;
-}
-
-interface ZodSchema {
-  _def: ZodDef;
-  description?: string;
-  isInt?: boolean;
-}
-
-interface TypeInfo {
-  type: string;
-  enum?: string[];
-  items?: TypeInfo;
-  description?: string;
-  default?: unknown;
 }
 
 function escapeHtmlTags(text: string): string {
@@ -204,111 +183,6 @@ function updateConfigurationWithOptionsMarkdown(optionsMarkdown: string): void {
 
   fs.writeFileSync(configPath, updatedContent);
   console.log('Updated configuration.md with options markdown');
-}
-
-// Helper to convert Zod schema to JSON schema-like object for docs
-function getZodTypeInfo(schema: ZodSchema): TypeInfo {
-  let description = schema.description;
-  let def = schema._def;
-  let defaultValue: unknown;
-
-  let typeName = def.typeName;
-  if (!typeName && typeof def.type === 'string') {
-    typeName = 'Zod' + def.type.charAt(0).toUpperCase() + def.type.slice(1);
-  }
-
-  // Unwrap optional/default/effects
-  while (
-    typeName === 'ZodOptional' ||
-    typeName === 'ZodDefault' ||
-    typeName === 'ZodEffects' ||
-    typeName === 'ZodPipeline' ||
-    typeName === 'ZodPipe'
-  ) {
-    if (typeName === 'ZodDefault' && def.defaultValue !== undefined) {
-      defaultValue =
-        typeof def.defaultValue === 'function'
-          ? (def.defaultValue as () => unknown)()
-          : def.defaultValue;
-    }
-    const next = def.innerType || def.schema || def.in;
-    if (!next) {
-      break;
-    }
-    schema = next;
-    def = schema._def;
-    typeName = def.typeName;
-    if (!typeName && typeof def.type === 'string') {
-      typeName = 'Zod' + def.type.charAt(0).toUpperCase() + def.type.slice(1);
-    }
-    if (!description && schema.description) {
-      description = schema.description;
-    }
-  }
-
-  const result: TypeInfo = {type: 'unknown'};
-  if (description) {
-    result.description = description;
-  }
-  if (defaultValue !== undefined) {
-    result.default = defaultValue;
-  }
-
-  switch (typeName) {
-    case 'ZodString':
-      result.type = 'string';
-      break;
-    case 'ZodNumber':
-      result.type =
-        schema.isInt || def.checks?.some((c: ZodCheck) => c.kind === 'int')
-          ? 'integer'
-          : 'number';
-      break;
-    case 'ZodBoolean':
-      result.type = 'boolean';
-      break;
-    case 'ZodEnum':
-      result.type = 'string';
-      result.enum = def.values;
-      if (!result.enum && def.entries) {
-        result.enum = Object.values(def.entries);
-      }
-      break;
-    case 'ZodArray':
-      result.type = 'array';
-      if (typeof def.type !== 'string' && def.type) {
-        result.items = getZodTypeInfo(def.type);
-      }
-      break;
-    default:
-      result.type = 'unknown';
-  }
-  return result;
-}
-
-function isRequired(schema: ZodSchema): boolean {
-  let def = schema._def;
-  let typeName = def.typeName;
-  if (!typeName && typeof def.type === 'string') {
-    typeName = 'Zod' + def.type.charAt(0).toUpperCase() + def.type.slice(1);
-  }
-  while (
-    typeName === 'ZodEffects' ||
-    typeName === 'ZodPipeline' ||
-    typeName === 'ZodPipe'
-  ) {
-    const next = def.schema || def.in;
-    if (!next) {
-      break;
-    }
-    schema = next;
-    def = schema._def;
-    typeName = def.typeName;
-    if (!typeName && typeof def.type === 'string') {
-      typeName = 'Zod' + def.type.charAt(0).toUpperCase() + def.type.slice(1);
-    }
-  }
-  return typeName !== 'ZodOptional' && typeName !== 'ZodDefault';
 }
 
 async function generateReference(
@@ -475,27 +349,14 @@ function getToolsAndCategories(
       return true;
     })
     .map(tool => {
-      const properties: Record<string, TypeInfo> = {};
-      const required: string[] = [];
-
-      for (const [key, schema] of Object.entries(
-        tool.schema as unknown as Record<string, ZodSchema>,
-      )) {
-        const info = getZodTypeInfo(schema);
-        properties[key] = info;
-        if (isRequired(schema)) {
-          required.push(key);
-        }
-      }
+      const inputSchema = zod.toJSONSchema(zod.object(tool.schema), {
+        io: 'input',
+      }) as ToolWithAnnotations['inputSchema'];
 
       return {
         name: tool.name,
         description: tool.description,
-        inputSchema: {
-          type: 'object',
-          properties,
-          required,
-        },
+        inputSchema,
         annotations: tool.annotations,
       };
     });
