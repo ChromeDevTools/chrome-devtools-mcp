@@ -588,6 +588,40 @@ describe('input', () => {
       });
     });
 
+    it('reports why filling out a select failed', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<select
+            ><option value="v1">one</option
+            ><option value="v2">two</option></select
+          >`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await assert.rejects(
+          () =>
+            fill(args).handler(
+              {
+                params: {
+                  // Options are matched by their text, not their value.
+                  uid: '1_1',
+                  value: 'v2',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            ),
+          {
+            message:
+              'Failed to interact with the element with uid 1_1. Could not find option with text "v2"',
+          },
+        );
+      });
+    });
+
     it('fills out a select option with an empty value by text', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

@@ -5,7 +5,7 @@
  */
 
 import type {McpContext} from '../McpContext.js';
-import {zod} from '../third_party/index.js';
+import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
@@ -35,8 +35,14 @@ const submitKeySchema = zod
 
 function handleActionError(error: unknown, uid: string) {
   logger?.('failed to act using a locator', error);
+  const reason =
+    error instanceof TimeoutError
+      ? 'The element did not become interactive within the configured timeout.'
+      : error instanceof Error
+        ? error.message
+        : String(error);
   throw new Error(
-    `Failed to interact with the element with uid ${uid}. The element did not become interactive within the configured timeout.`,
+    `Failed to interact with the element with uid ${uid}. ${reason}`,
     {
       cause: error,
     },
