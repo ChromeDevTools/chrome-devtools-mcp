@@ -15,6 +15,7 @@ import sinon from 'sinon';
 import {parseArguments} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
+import {McpResponse, type DataFormat} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
@@ -165,6 +166,57 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
   });
+
+  const dataFormatCases: Array<{argv: string[]; expected: DataFormat}> = [
+    {argv: [], expected: 'default'},
+    {argv: ['--experimentalToonFormat'], expected: 'toon'},
+    {argv: ['--experimentalDataFormat=gcf'], expected: 'gcf'},
+    {
+      argv: ['--experimentalToonFormat', '--experimentalDataFormat=default'],
+      expected: 'default',
+    },
+    {
+      argv: ['--experimentalToonFormat', '--experimentalDataFormat=gcf'],
+      expected: 'gcf',
+    },
+  ];
+  for (const {argv, expected} of dataFormatCases) {
+    it(`resolves data format ${expected} from [${argv.join(' ')}]`, async () => {
+      const tool: ToolDefinition = {
+        name: 'global_tool',
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: async () => undefined,
+      };
+      const mockContext = sinon.createStubInstance(McpContext);
+      mockContext.browser = getMockBrowser({
+        process: sinon.createStubInstance(ChildProcess),
+      });
+      const handleStub = sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const serverArgs = parseArguments(
+        '1.0.0',
+        ['node', 'script.js', ...argv],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      );
+
+      await new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        new Mutex(),
+      ).handle({});
+
+      sinon.assert.calledOnceWithExactly(handleStub, mockContext, expected);
+    });
+  }
 
   it('passes devToolsData and pageUrl to logger', async () => {
     const baseTool: ToolDefinition = {

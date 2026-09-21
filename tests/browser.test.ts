@@ -103,6 +103,25 @@ describe('browser', () => {
       sinon.assert.notCalled(pptrBrowser.disconnect);
     });
 
+    it('does not pass a channel to Puppeteer when executablePath is set', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
+
+      const args = createMockParsedArguments({
+        isolated: true,
+        channel: 'stable',
+        executablePath: '/path/to/chrome',
+      });
+      const manager = new BrowserManager(args);
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(launchStub, {
+        channel: undefined,
+        executablePath: '/path/to/chrome',
+      });
+    });
+
     it('connects to a browser when browserUrl is set and disconnects on close()', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch');

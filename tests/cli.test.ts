@@ -16,6 +16,7 @@ import {
   mcpOptions,
   parser,
 } from '../src/config/mcp-options.js';
+import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 
 import {createTempFile} from './utils.js';
 
@@ -34,17 +35,29 @@ describe('cli args parsing', () => {
     categoryNetwork: true,
     categoryDebugging: true,
     categoryMemory: true,
-    autoConnect: undefined,
+    autoConnect: false,
+    headless: false,
+    acceptInsecureCerts: false,
     performanceCrux: true,
     usageStatistics: true,
     javascriptEvaluation: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
     filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
+    experimentalDevtools: false,
+    experimentalVision: false,
+    experimentalToonFormat: false,
+    experimentalIncludeAllPages: false,
+    experimentalInteropTools: false,
+    experimentalScreencast: false,
     memoryDebugging: false,
     experimentalStructuredContent: false,
     pageIdRouting: true,
     sourceMaps: true,
+    clearcutIncludePidHeader: false,
+    screenshotFormat: 'png',
+    slim: false,
+    viaCli: false,
     devtoolsComments: false,
   };
 
@@ -53,7 +66,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
     });
@@ -75,7 +87,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       browserUrl: 'http://localhost:3000',
     });
@@ -106,7 +117,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       userDataDir: '/tmp/chrome-profile',
@@ -118,10 +128,9 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
-      browserUrl: undefined,
       channel: 'stable',
+      browserUrl: undefined,
     });
   });
 
@@ -130,7 +139,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       executablePath: '/tmp/test 123/chrome',
     });
@@ -141,7 +149,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       viewport: {
@@ -159,7 +166,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       chromeArg: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -214,7 +220,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       ignoreDefaultChromeArg: [
@@ -232,7 +237,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc123',
     });
@@ -246,7 +250,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       wsEndpoint: 'wss://example.com:9222/devtools/browser/abc123',
     });
@@ -270,7 +273,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       categoryEmulation: false,
@@ -281,7 +283,6 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       _: [],
-      headless: false,
       $0: 'npx chrome-devtools-mcp@latest',
       channel: 'stable',
       autoConnect: true,
@@ -629,6 +630,282 @@ describe('cli args parsing', () => {
       cliOptions.filesystemRoot?.defaultDescription,
       'OS temp directory',
     );
+    assert.strictEqual(
+      cliOptions.isolated?.defaultDescription,
+      'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
+    );
+    assert.strictEqual(
+      cliOptions.categoryExtensions?.defaultDescription,
+      'true unless autoConnect, browserUrl or wsEndpoint is set',
+    );
+  });
+
+  describe('mutual exclusivity', () => {
+    it('rejects isolated with userDataDir', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--isolated',
+            '--user-data-dir',
+            '/tmp/chrome-profile',
+          ]),
+        /Arguments userDataDir and isolated are mutually exclusive/,
+      );
+    });
+
+    it('rejects isolated with autoConnect', async () => {
+      assert.throws(
+        () => parseArguments(['--isolated', '--auto-connect']),
+        /Arguments autoConnect and isolated are mutually exclusive/,
+      );
+    });
+
+    it('rejects autoConnect with executablePath', async () => {
+      assert.throws(
+        () =>
+          parseArguments(['--auto-connect', '--executablePath', '/bin/chrome']),
+        /Arguments autoConnect and executablePath are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryPwa with autoConnect', async () => {
+      assert.throws(
+        () => parseArguments(['--category-pwa', '--auto-connect']),
+        /Arguments categoryPwa and autoConnect are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryPwa with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--category-pwa',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments categoryPwa and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryPwa with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--category-pwa',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments categoryPwa and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects explicit channel with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--channel=canary',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments channel and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects explicit channel with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--channel',
+            'canary',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments channel and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects explicit channel with executablePath', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--channel',
+            'canary',
+            '--executablePath',
+            '/bin/chrome',
+          ]),
+        /Arguments channel and executablePath are mutually exclusive/,
+      );
+    });
+
+    it('rejects browserUrl with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--browserUrl',
+            'http://localhost:9222',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments browserUrl and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects executablePath with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--executablePath',
+            '/bin/chrome',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments executablePath and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects executablePath with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--executablePath',
+            '/bin/chrome',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments executablePath and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects userDataDir with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--user-data-dir',
+            '/tmp/dir',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments userDataDir and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects userDataDir with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--user-data-dir',
+            '/tmp/dir',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments userDataDir and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects blockedUrlPattern with allowedUrlPattern', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--blocked-url-pattern',
+            'https://a.com/*',
+            '--allowed-url-pattern',
+            'https://a.com/*',
+          ]),
+        /Arguments blockedUrlPattern and allowedUrlPattern are mutually exclusive/,
+      );
+    });
+
+    it('rejects config-based channel with browserUrl', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({channel: 'canary'}),
+        'cd4a.test.config.channel.json',
+      );
+      assert.throws(
+        () =>
+          parseArguments([
+            '--config',
+            testConfig.path,
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments channel and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryExtensions with autoConnect', async () => {
+      assert.throws(
+        () => parseArguments(['--category-extensions', '--auto-connect']),
+        /Arguments categoryExtensions and autoConnect are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryExtensions with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--category-extensions',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryExtensions with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--category-extensions',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments categoryExtensions and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    for (const connectArgs of [
+      ['--browserUrl', 'http://localhost:9222'],
+      ['--wsEndpoint', 'ws://localhost:9222'],
+      ['--executablePath', '/tmp/chrome'],
+    ]) {
+      it(`does not default channel with ${connectArgs[0]}`, async () => {
+        const args = parseArguments(connectArgs);
+        assert.strictEqual(args.channel, undefined);
+      });
+    }
+
+    for (const connectArgs of [
+      ['--browserUrl', 'http://localhost:9222'],
+      ['--wsEndpoint', 'ws://localhost:9222'],
+      ['--auto-connect'],
+    ]) {
+      it(`allows viaCli with ${connectArgs[0]} without enabling extensions`, async () => {
+        const args = parseArguments(['--viaCli', ...connectArgs]);
+        assert.strictEqual(args.categoryExtensions, undefined);
+        assert.strictEqual(args.isolated, undefined);
+      });
+    }
+
+    it('rejects explicit categoryExtensions with browserUrl in viaCli', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--viaCli',
+            '--category-extensions',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
+      );
+    });
+  });
+
+  describe('dataFormat', () => {
+    it('keeps experimentalToonFormat and experimentalDataFormat separate', () => {
+      const args = parseArguments(['--experimentalToonFormat']);
+      assert.strictEqual(args.experimentalToonFormat, true);
+      assert.strictEqual(args.experimentalDataFormat, undefined);
+    });
   });
 });
 
@@ -692,5 +969,37 @@ describe('cli command strings', () => {
         }
       }
     }
+  });
+});
+
+describe('flag usage telemetry', () => {
+  it('reports the stable channel for a default launch', async () => {
+    const usage = computeFlagUsage(parseArguments([]), mcpOptions);
+    assert.strictEqual(usage.isolated_present, false);
+    assert.strictEqual(usage.channel_present, true);
+    assert.strictEqual(usage.channel, 'CHANNEL_STABLE');
+  });
+
+  for (const connectArgs of [
+    ['--browserUrl', 'http://localhost:9222'],
+    ['--wsEndpoint', 'ws://localhost:9222'],
+    ['--executablePath', '/tmp/chrome'],
+  ]) {
+    it(`does not report channel with ${connectArgs[0]}`, async () => {
+      const usage = computeFlagUsage(parseArguments(connectArgs), mcpOptions);
+      assert.strictEqual(usage.isolated_present, false);
+      assert.strictEqual(usage.channel_present, false);
+      assert.strictEqual(usage.channel, undefined);
+    });
+  }
+
+  it('does not report experimentalDataFormat for legacy experimentalToonFormat', async () => {
+    const usage = computeFlagUsage(
+      parseArguments(['--experimentalToonFormat']),
+      mcpOptions,
+    );
+    assert.strictEqual(usage.experimental_toon_format, true);
+    assert.strictEqual(usage.experimental_data_format_present, false);
+    assert.strictEqual(usage.experimental_data_format, undefined);
   });
 });

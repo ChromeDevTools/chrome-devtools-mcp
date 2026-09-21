@@ -10,8 +10,8 @@ export interface CategoryOption {
   type: 'boolean';
   describe: string;
   default?: boolean;
+  defaultDescription?: string;
   hidden?: boolean;
-  conflicts?: string[];
 }
 
 export type CategoryFlagName<T extends ToolCategory = ToolCategory> =
@@ -25,8 +25,7 @@ const categoryOverrides: Record<
   ToolCategory,
   {
     describe?: string;
-    hidden?: true;
-    conflicts?: string[];
+    hidden?: boolean;
     offByDefault?: boolean;
   }
 > = {
@@ -55,7 +54,6 @@ const categoryOverrides: Record<
   [ToolCategory.PWA]: {
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
-    conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
     offByDefault: true,
   },
 };
@@ -70,6 +68,9 @@ function createOption(category: ToolCategory): CategoryOption {
     type: 'boolean',
     describe,
     ...overrides,
+    // Off-by-default categories have no default so that they stay unset unless
+    // passed explicitly. This keeps them out of conflict checks and lets
+    // --viaCli apply its own categoryExtensions default.
     ...(overrides.offByDefault ? {} : {default: true}),
   };
 }
