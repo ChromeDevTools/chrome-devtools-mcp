@@ -42,10 +42,14 @@ import {
   CdpFrame,
   CdpPage,
   DevTools,
+  Dialog,
+  ElementHandle,
+  Locator,
 } from '../src/third_party/index.js';
 import type {
   Extension,
   Page,
+  Protocol,
   Result,
   RunnerResult,
 } from '../src/third_party/index.js';
@@ -166,7 +170,33 @@ export function createMockMcpPage(
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
+  page.waitForEventsAfterAction.callsFake(async action => {
+    await action();
+    return {};
+  });
   return Object.assign(page, {pptrPage});
+}
+
+export function createMockDialog(
+  options: {type?: Protocol.Page.DialogType; message?: string} = {},
+): sinon.SinonStubbedInstance<Dialog> {
+  const dialog = sinon.createStubInstance(Dialog);
+  dialog.type.returns(options.type ?? 'alert');
+  dialog.message.returns(options.message ?? '');
+  return dialog;
+}
+
+export function createMockElementHandle(): {
+  handle: sinon.SinonStubbedInstance<ElementHandle<Element>>;
+  locator: sinon.SinonStubbedInstance<Locator<Element>>;
+} {
+  const handle =
+    sinon.createStubInstance<ElementHandle<Element>>(ElementHandle);
+  handle.dispose.resolves();
+  const locator = sinon.createStubInstance<Locator<Element>>(Locator);
+  locator.setTimeout.returns(locator);
+  handle.asLocator.returns(locator);
+  return {handle, locator};
 }
 
 export function createMockMcpContext(

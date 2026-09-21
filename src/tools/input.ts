@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {McpContext} from '../McpContext.js';
+
 import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
@@ -33,7 +33,32 @@ const submitKeySchema = zod
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
   );
 
-function handleActionError(error: unknown, uid: string) {
+function createDialogAbortSignal(page: ContextPage) {
+  const controller = new AbortController();
+  const onDialog = () => {
+    controller.abort(new Error('Action interrupted by a dialog'));
+  };
+  page.pptrPage.on('dialog', onDialog);
+  return {
+    signal: controller.signal,
+    [Symbol.dispose]() {
+      page.pptrPage.off('dialog', onDialog);
+    },
+  };
+}
+
+/**
+ * Locator actions abort or time out while the page is blocked by a JavaScript
+ * dialog, even though the action itself was dispatched and opened that dialog.
+ * The open dialog is already reported in the response, so treat this as an
+ * interruption instead of a failure.
+ */
+function handleActionError(error: unknown, uid: string, page: ContextPage) {
+  if (page.getDialog()) {
+    logger?.('action interrupted by a dialog', error);
+    return;
+  }
+
   logger?.('failed to act using a locator', error);
   const reason =
     error instanceof TimeoutError
@@ -49,7 +74,10 @@ function handleActionError(error: unknown, uid: string) {
   );
 }
 
-async function selectNativeSelectOption(handle: ElementHandle<Element>) {
+async function selectNativeSelectOption(
+  handle: ElementHandle<Element>,
+  signal: AbortSignal,
+) {
   using selectHandle = await handle.evaluateHandle(node => {
     if (!(node instanceof HTMLOptionElement)) {
       return null;
@@ -82,7 +110,7 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
   if (typeof value !== 'string') {
     return false;
   }
-  await select.asLocator().fill(value);
+  await select.asLocator().fill(value, {signal});
 
   return true;
 }
@@ -112,16 +140,18 @@ export const click = definePageTool(() => ({
     const shouldSelectNativeOption =
       !request.params.dblClick && aXNode?.role === 'option';
     try {
+      using dialogAbort = createDialogAbortSignal(request.page);
       const result = await request.page.waitForEventsAfterAction(async () => {
         if (
           shouldSelectNativeOption &&
-          (await selectNativeSelectOption(handle))
+          (await selectNativeSelectOption(handle, dialogAbort.signal))
         ) {
           return;
         }
 
         await handle.asLocator().click({
           count: request.params.dblClick ? 2 : 1,
+          signal: dialogAbort.signal,
         });
       });
       response.appendResponseLine(
@@ -134,7 +164,12 @@ export const click = definePageTool(() => ({
         response.includeSnapshot();
       }
     } catch (error) {
-      handleActionError(error, uid);
+      handleActionError(error, uid, request.page);
+      response.appendResponseLine(
+        request.params.dblClick
+          ? `The element was double clicked and it opened a dialog.`
+          : `The element was clicked and it opened a dialog.`,
+      );
     }
   },
 }));
@@ -195,8 +230,9 @@ export const hover = definePageTool(() => ({
     const uid = request.params.uid;
     using handle = await request.page.getElementByUid(uid);
     try {
+      using dialogAbort = createDialogAbortSignal(request.page);
       const result = await request.page.waitForEventsAfterAction(async () => {
-        await handle.asLocator().hover();
+        await handle.asLocator().hover({signal: dialogAbort.signal});
       });
       response.appendResponseLine(`Successfully hovered over the element`);
       response.attachWaitForResult(result);
@@ -204,7 +240,10 @@ export const hover = definePageTool(() => ({
         response.includeSnapshot();
       }
     } catch (error) {
-      handleActionError(error, uid);
+      handleActionError(error, uid, request.page);
+      response.appendResponseLine(
+        `The element was hovered and it opened a dialog.`,
+      );
     }
   },
 }));
@@ -217,6 +256,7 @@ async function selectOption(
   handle: ElementHandle,
   aXNode: TextSnapshotNode,
   value: string,
+  signal: AbortSignal,
 ) {
   let optionFound = false;
   for (const child of aXNode.children) {
@@ -228,7 +268,7 @@ async function selectOption(
 
         const childValue = await childValueHandle.jsonValue();
         if (typeof childValue === 'string') {
-          await handle.asLocator().fill(childValue);
+          await handle.asLocator().fill(childValue, {signal});
         }
 
         break;
@@ -244,46 +284,59 @@ function hasOptionChildren(aXNode: TextSnapshotNode) {
   return aXNode.children.some(child => child.role === 'option');
 }
 
+/**
+ * Fills a single form element and waits for resulting page events.
+ * Returns the wait result, or `null` if the action was interrupted by a
+ * JavaScript dialog (which has to be handled before continuing).
+ */
 async function fillFormElement(
   uid: string,
   value: string,
-  context: McpContext,
   page: ContextPage,
-) {
+): Promise<WaitForEventsResult | null> {
   using handle = await page.getElementByUid(uid);
   try {
-    const aXNode = page.getAXNodeByUid(uid);
-    // We assume that combobox needs to be handled as select if it has
-    // role='combobox' and option children.
-    if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
-      await selectOption(handle, aXNode, value);
-    } else {
-      const isToggle = await handle.evaluate(el => {
-        if (el instanceof HTMLInputElement) {
-          return el.type === 'checkbox' || el.type === 'radio';
-        }
-        const role = el.getAttribute('role');
-        return role === 'checkbox' || role === 'radio' || role === 'switch';
-      });
-
-      if (isToggle) {
-        if (['true', 'false'].includes(value)) {
-          await handle.asLocator().fill(value === 'true');
-        } else {
-          throw new Error(
-            `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
-          );
-        }
+    using dialogAbort = createDialogAbortSignal(page);
+    return await page.waitForEventsAfterAction(async () => {
+      const aXNode = page.getAXNodeByUid(uid);
+      // We assume that combobox needs to be handled as select if it has
+      // role='combobox' and option children.
+      if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
+        await selectOption(handle, aXNode, value, dialogAbort.signal);
       } else {
-        // Increase timeout for longer input values.
-        const timeoutPerChar = 10; // ms
-        const fillTimeout =
-          page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
-        await handle.asLocator().setTimeout(fillTimeout).fill(value);
+        const isToggle = await handle.evaluate(el => {
+          if (el instanceof HTMLInputElement) {
+            return el.type === 'checkbox' || el.type === 'radio';
+          }
+          const role = el.getAttribute('role');
+          return role === 'checkbox' || role === 'radio' || role === 'switch';
+        });
+
+        if (isToggle) {
+          if (['true', 'false'].includes(value)) {
+            await handle
+              .asLocator()
+              .fill(value === 'true', {signal: dialogAbort.signal});
+          } else {
+            throw new Error(
+              `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+            );
+          }
+        } else {
+          // Increase timeout for longer input values.
+          const timeoutPerChar = 10; // ms
+          const fillTimeout =
+            page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
+          await handle
+            .asLocator()
+            .setTimeout(fillTimeout)
+            .fill(value, {signal: dialogAbort.signal});
+        }
       }
-    }
+    });
   } catch (error) {
-    handleActionError(error, uid);
+    handleActionError(error, uid, page);
+    return null;
   }
 }
 
@@ -309,16 +362,18 @@ export const fill = definePageTool(() => ({
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
-  handler: async (request, response, context) => {
-    const page = request.page;
-    const result = await page.waitForEventsAfterAction(async () => {
-      await fillFormElement(
-        request.params.uid,
-        request.params.value,
-        context as McpContext,
-        page,
+  handler: async (request, response) => {
+    const result = await fillFormElement(
+      request.params.uid,
+      request.params.value,
+      request.page,
+    );
+    if (!result) {
+      response.appendResponseLine(
+        `The element was filled out and it opened a dialog.`,
       );
-    });
+      return;
+    }
     response.appendResponseLine(`Successfully filled out the element`);
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
@@ -418,18 +473,24 @@ export const fillForm = definePageTool(() => ({
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
-  handler: async (request, response, context) => {
-    const page = request.page;
+  handler: async (request, response) => {
     let lastResult: WaitForEventsResult = {};
     for (const element of request.params.elements) {
-      lastResult = await page.waitForEventsAfterAction(async () => {
-        await fillFormElement(
-          element.uid,
-          element.value,
-          context as McpContext,
-          page,
+      const result = await fillFormElement(
+        element.uid,
+        element.value,
+        request.page,
+      );
+      if (!result) {
+        // The page is blocked by a dialog, so the remaining elements cannot be
+        // filled out until it is handled.
+        response.appendResponseLine(
+          `Filling out the element with uid ${element.uid} opened a dialog. The remaining elements were not filled out.`,
         );
-      });
+        response.attachWaitForResult(lastResult);
+        return;
+      }
+      lastResult = result;
     }
     response.appendResponseLine(`Successfully filled out the form`);
     response.attachWaitForResult(lastResult);

@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -24,11 +24,20 @@ import {
   clickAt,
   typeText,
 } from '../../src/tools/input.js';
+import {
+  createHandlerMocks,
+  createMockDialog,
+  createMockElementHandle,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext, getTextContent} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
+
+  afterEach(() => {
+    sinon.restore();
+  });
 
   describe('click', () => {
     it('clicks', async () => {
@@ -426,6 +435,59 @@ describe('input', () => {
         );
       });
     });
+
+    it('does not fail when the click opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      locator.click.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Are you sure?'}));
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was clicked and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('does not fail when the double click opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      locator.click.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Are you sure?'}));
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            dblClick: true,
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was double clicked and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
   });
 
   describe('hover', () => {
@@ -455,6 +517,32 @@ describe('input', () => {
         assert.ok(response.includeSnapshot);
         assert.ok(await page.$('text/hovered'));
       });
+    });
+
+    it('does not fail when the hover opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      locator.hover.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Hovered!'}));
+
+      await hover(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was hovered and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
     });
   });
 
@@ -1068,6 +1156,34 @@ describe('input', () => {
         assert.strictEqual(r2Checked, true);
       });
     });
+
+    it('does not fail when filling opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Invalid input'}));
+
+      await fill(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            value: 'test',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was filled out and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
   });
 
   describe('drags', () => {
@@ -1239,6 +1355,44 @@ describe('input', () => {
           true,
         );
       });
+    });
+
+    it('stops filling remaining elements when an element opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Confirm input'}));
+
+      await fillForm(args).handler(
+        {
+          params: {
+            elements: [
+              {
+                uid: '1_1',
+                value: 'first',
+              },
+              {
+                uid: '1_2',
+                value: 'second',
+              },
+            ],
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.',
+      );
+      sinon.assert.calledOnceWithExactly(response.attachWaitForResult, {});
+      sinon.assert.notCalled(response.includeSnapshot);
     });
   });
 
