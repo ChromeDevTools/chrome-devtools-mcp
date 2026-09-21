@@ -12,4 +12,4 @@ description: Use this skill to open the Chrome DevTools window for a given page,
 5. If visual context or DOM / network inspection is needed, use `reveal_in_devtools` specifying the target `panelName` (e.g. `elements`, `network`, `sources`, `console`) along with `uid` (snapshot element UID) or `reqid` (network request ID).
 6. Inspect the comments, target elements, and code locations, diagnose the developer's feedback, and perform the necessary code changes in the workspace.
 7. Once edits are applied, call `resolve_devtools_comment` with the `threadId` and an explanatory `replyText` to reply to the developer and mark the thread as resolved.
-8. If waiting for further developer comments or reviews, inform the user that DevTools is active and you are awaiting new comments (which trigger MCP notifications or can be checked with `get_devtools_comments`).
+8. If waiting for further developer comments or reviews, inform the user that DevTools is active and you are awaiting new comments. Monitor for updates via MCP notifications and by regularly polling `get_devtools_comments`.
