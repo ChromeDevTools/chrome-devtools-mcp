@@ -119,4 +119,21 @@ describe('DevToolsCommentBridge', () => {
     sinon.assert.notCalled(onNotification);
     sinon.assert.calledTwice(devtoolsPage.evaluate);
   });
+
+  it('retrieves comments via getComments', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    const bridge = new DevToolsCommentBridge();
+    const mockThreads = [
+      {
+        id: 'comment-1',
+        text: 'Check alignment',
+      },
+    ];
+    devtoolsPage.evaluate.resolves(mockThreads);
+
+    const threads = await bridge.getComments(devtoolsPage);
+
+    sinon.assert.calledOnce(devtoolsPage.evaluate);
+    assert.deepStrictEqual(threads, mockThreads);
+  });
 });

@@ -380,13 +380,16 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
-  async ensureDevToolsCommentBridge(devtoolsPage: Page): Promise<void> {
+  async ensureDevToolsCommentBridge(
+    devtoolsPage: Page,
+  ): Promise<DevToolsCommentBridge> {
     if (!this.#commentBridge) {
       this.#commentBridge = new DevToolsCommentBridge({
         onNotification: this.#onNotification,
       });
     }
     await this.#commentBridge.attach(devtoolsPage);
+    return this.#commentBridge;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {

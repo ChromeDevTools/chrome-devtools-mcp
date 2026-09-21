@@ -68,6 +68,7 @@ export enum CD4ABridgeEvents {
 
 export interface CD4ABridge {
   dispose?(): void;
+  setAgentAttached(value: boolean): void;
   getCommentThreads(): CD4ACommentThread[];
   takeComments(): CD4ACommentThread[];
   resolveCommentThread(threadId: string, replyText?: string): boolean;

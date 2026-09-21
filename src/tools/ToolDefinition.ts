@@ -14,6 +14,7 @@ import type {
   HeapQueryOptions,
 } from '../processors/HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
+import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
@@ -398,6 +399,9 @@ export type ContextPage = Readonly<{
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;
+  ensureDevToolsCommentBridge(
+    devtoolsPage: Page,
+  ): Promise<DevToolsCommentBridge>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
