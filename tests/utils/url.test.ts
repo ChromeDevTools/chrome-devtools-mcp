@@ -7,7 +7,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {isAllowedUrl, isLocalhost, validateUrl} from '../../src/utils/url.js';
+import {
+  findUnenforceableHostnamePattern,
+  isAllowedUrl,
+  isLocalhost,
+  validateUrl,
+} from '../../src/utils/url.js';
 
 describe('isLocalhost', () => {
   it('should return true for valid localhost and loopback URLs', () => {
@@ -427,5 +432,66 @@ describe('isAllowedUrl', () => {
       isAllowedUrl('://', {categoryExtensions: undefined}),
       false,
     );
+  });
+});
+
+describe('findUnenforceableHostnamePattern', () => {
+  it('flags a hostname regexp group', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern([
+        String.raw`*://(127\.\d+\.\d+\.\d+):*/*`,
+      ]),
+      String.raw`*://(127\.\d+\.\d+\.\d+):*/*`,
+    );
+  });
+
+  it('returns the first offending pattern among several', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern([
+        '*://127.0.0.1:*/*',
+        '*://*.example.com/*',
+        String.raw`*://(localhost|127\.0\.0\.1):*/*`,
+      ]),
+      String.raw`*://(localhost|127\.0\.0\.1):*/*`,
+    );
+  });
+
+  it('allows an exact hostname', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern(['*://127.0.0.1:*/*']),
+      undefined,
+    );
+  });
+
+  it('allows a wildcard hostname', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern(['*://*.example.com/*']),
+      undefined,
+    );
+  });
+
+  it('allows a named group hostname', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern(['*://:sub.example.com/*']),
+      undefined,
+    );
+  });
+
+  it('ignores a regexp group outside the hostname', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern(['*://example.com/(foo|bar)']),
+      undefined,
+    );
+  });
+
+  it('skips patterns that fail to construct', () => {
+    assert.strictEqual(
+      findUnenforceableHostnamePattern(['*://example.com/(unterminated']),
+      undefined,
+    );
+  });
+
+  it('returns undefined for an empty list', () => {
+    assert.strictEqual(findUnenforceableHostnamePattern([]), undefined);
   });
 });

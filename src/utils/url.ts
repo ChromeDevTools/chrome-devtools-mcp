@@ -121,6 +121,36 @@ const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
  * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed,
  * or if navigating to a restricted scheme.
  */
+/**
+ * Finds the first pattern whose hostname uses a URLPattern regexp group
+ * (for example `(127\.\d+\.\d+\.\d+)`), which network-level enforcement
+ * (`Network.emulateNetworkConditionsByRule`) does not reliably apply to
+ * redirects and subresources, unlike the initial navigation check. A plain
+ * wildcard (`*`) or named group (`:name`) hostname does not use `(` and is
+ * unaffected.
+ *
+ * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
+ * @returns The first unenforceable pattern, or undefined if all are safe.
+ */
+export function findUnenforceableHostnamePattern(
+  patterns: string[],
+): string | undefined {
+  for (const raw of patterns) {
+    let parsed: URLPattern;
+    try {
+      parsed = new URLPattern(raw);
+    } catch {
+      // Invalid patterns are reported by URLPattern's own constructor error
+      // when chrome-devtools-mcp starts; this check only looks at valid ones.
+      continue;
+    }
+    if (parsed.hostname.includes('(')) {
+      return raw;
+    }
+  }
+  return undefined;
+}
+
 export function validateUrl(url: string, options: ValidateUrlOptions): URL {
   const {javascriptEvaluation, categoryExtensions} = options;
 
