@@ -43,6 +43,7 @@ export const mcpOptions = {
   },
   acceptInsecureCerts: {
     type: 'boolean',
+    default: false,
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
   pageIdRouting: {
@@ -60,10 +61,12 @@ export const mcpOptions = {
   },
   experimentalDevtools: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable automation over DevTools targets',
   },
   experimentalVision: {
     type: 'boolean',
+    default: false,
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
   },
@@ -80,12 +83,14 @@ export const mcpOptions = {
   },
   experimentalToonFormat: {
     type: 'boolean',
+    default: false,
     describe:
       'Deprecated: use --experimentalDataFormat=toon instead. Whether to format structured data using TOON (requires @toon-format/toon).',
     hidden: true,
   },
   experimentalDataFormat: {
     type: 'string',
+    default: 'default' as const,
     describe:
       'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
     choices: ['default', 'toon', 'gcf'] as const,
@@ -93,16 +98,19 @@ export const mcpOptions = {
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
+    default: false,
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
   },
   experimentalInteropTools: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable interoperability tools',
     hidden: true,
   },
   experimentalScreencast: {
     type: 'boolean',
+    default: false,
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
   },
@@ -133,14 +141,12 @@ export const mcpOptions = {
     string: true,
     describe:
       "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
-    conflicts: ['allowedUrlPattern'],
   },
   allowedUrlPattern: {
     type: 'array',
     string: true,
     describe:
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
-    conflicts: ['blockedUrlPattern'],
   },
   performanceCrux: {
     type: 'boolean',
@@ -178,11 +184,13 @@ export const mcpOptions = {
   },
   clearcutIncludePidHeader: {
     type: 'boolean',
+    default: false,
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
   screenshotFormat: {
     type: 'string',
+    default: 'png' as const,
     description:
       'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
     choices: ['jpeg', 'png', 'webp'] as const,
@@ -237,11 +245,13 @@ export const mcpOptions = {
   },
   slim: {
     type: 'boolean',
+    default: false,
     describe:
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
   },
   viaCli: {
     type: 'boolean',
+    default: false,
     describe:
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
@@ -293,9 +303,6 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
     throw new Error(
       'experimentalStructuredContent cli option unexpectedly does not have a default',
     );
-  }
-  if ('default' in mcpOptions.isolated) {
-    throw new Error('isolated cli option unexpectedly has a default');
   }
 
   return {
@@ -373,7 +380,44 @@ export function parser(
     })
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
+    .check(args => {
+      const activeArgs = new Set<string>();
+
+      for (const [key, val] of Object.entries(args)) {
+        if (val !== undefined && val !== false) {
+          activeArgs.add(key);
+        }
+      }
+
+      const CONFLICTS: string[][] = [
+        ['channel', 'executablePath', 'browserUrl', 'wsEndpoint'],
+        ['userDataDir', 'browserUrl', 'wsEndpoint'],
+        ['userDataDir', 'isolated'],
+        ['autoConnect', 'isolated'],
+        ['autoConnect', 'executablePath'],
+        ['blockedUrlPattern', 'allowedUrlPattern'],
+        ['categoryPwa', 'autoConnect'],
+        ['categoryPwa', 'browserUrl', 'wsEndpoint'],
+        ['categoryExtensions', 'autoConnect'],
+        ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
+      ];
+
+      for (const group of CONFLICTS) {
+        // Find all active arguments within this conflict group
+        const activeInGroup = group.filter(arg => activeArgs.has(arg));
+
+        if (activeInGroup.length > 1) {
+          const [arg1, arg2] = activeInGroup;
+          throw new Error(
+            `Arguments ${arg1} and ${arg2} are mutually exclusive`,
+          );
+        }
+      }
+
+      return true;
+    })
     .middleware(args => {
+      args.channel = args.channel ?? 'stable';
       if (isViaCli) {
         if (args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
           const cliFilesystemArgs: {
@@ -394,15 +438,12 @@ export function parser(
           args.isolated = true;
         }
       }
-      // We can't set default in the options else
-      // Yargs will complain
+      args.isolated = args.isolated ?? false;
       if (
-        !args.channel &&
-        !args.browserUrl &&
-        !args.wsEndpoint &&
-        !args.executablePath
+        args.experimentalToonFormat &&
+        args.experimentalDataFormat === 'default'
       ) {
-        args.channel = 'stable';
+        args.experimentalDataFormat = 'toon';
       }
       if (env['CI'] || env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
         console.error(
