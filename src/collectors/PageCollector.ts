@@ -196,7 +196,7 @@ export class PageCollector<T> {
 export class ConsoleCollector extends PageCollector<
   ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError
 > {
-  static readonly MAX_MESSAGES_PER_NAVIGATION = 1_000;
+  static readonly MAX_MESSAGES_PER_NAVIGATION = 10_000;
 
   #subscriber?: PageEventSubscriber;
 
