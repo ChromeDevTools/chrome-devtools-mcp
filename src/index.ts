@@ -15,6 +15,7 @@ import {McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
+  type CallToolResult,
   McpServer as SdkMcpServer,
   type Root,
   type Transport,
@@ -57,6 +58,7 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
+  #tools = new Map<string, ToolHandler>();
 
   private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
     this.#serverArgs = serverArgs;
@@ -116,6 +118,43 @@ export class McpServer {
 
   async connect(transport: Transport): Promise<void> {
     return await this.server.connect(transport);
+  }
+
+  async callTool(
+    name: string,
+    args: Record<string, unknown> = {},
+  ): Promise<CallToolResult> {
+    const toolHandler = this.#tools.get(name);
+    if (!toolHandler) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Tool ${name} not found`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    const parseResult =
+      await toolHandler.registeredInputSchema.safeParseAsync(args);
+    if (!parseResult.success) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Input validation error: Invalid arguments for tool ${name}: ${parseResult.error.issues
+              .map(
+                issue =>
+                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`
+              )
+              .join(', ')}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    return await toolHandler.handle(parseResult.data);
   }
 
   /**
@@ -251,6 +290,8 @@ export class McpServer {
       () => this.#getContext(),
       this.#toolMutex,
     );
+
+    this.#tools.set(tool.name, toolHandler);
 
     const registeredTool = this.server.registerTool(
       tool.name,
