@@ -22,7 +22,7 @@ import {
 import type {DaemonStatusResult} from '../daemon/types.js';
 import {
   isDaemonRunning,
-  serializeArgs,
+  serializeArgsForDaemon,
   assertValidSessionId,
 } from '../daemon/utils.js';
 import {logDisclaimers} from '../index.js';
@@ -156,7 +156,11 @@ y.command(
     ) {
       argv.headless = true;
     }
-    const args = serializeArgs(getCliOptions(), argv);
+    const args = serializeArgsForDaemon(
+      getCliOptions(),
+      argv,
+      hideBin(process.argv),
+    );
     await start(args, argv.sessionId);
     process.exit(0);
   },
@@ -269,7 +273,10 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           : Promise.resolve(undefined);
 
         if (!isDaemonRunning(sessionId)) {
-          await start(serializeArgs(mcpOptions, argv), sessionId);
+          await start(
+            serializeArgsForDaemon(mcpOptions, argv, hideBin(process.argv)),
+            sessionId,
+          );
         }
 
         const commandArgs: Record<string, unknown> = {};
