@@ -12,7 +12,7 @@ import {definePageTool} from './ToolDefinition.js';
 export const getCssStyles = definePageTool(() => ({
   name: 'get_css_styles',
   description: `Retrieve matched CSS rules, inline styles, inherited styles, and cascade information for an element identified by its UID.
-Use this tool to debug why specific CSS properties are applied, overridden, or conflicting. Supports pagination for elements with many matched rules. Requires a UID from take_snapshot.`,
+Use this tool to debug why specific CSS properties are applied, overridden, or conflicting. Results are paginated and return 10 rules per page by default; use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
@@ -27,17 +27,17 @@ Use this tool to debug why specific CSS properties are applied, overridden, or c
       .number()
       .int()
       .positive()
-      .optional()
+      .default(10)
       .describe(
-        'Maximum number of CSS rules to return per page. When omitted, returns all rules.',
+        'Maximum number of CSS rules to return per page. Defaults to 10.',
       ),
     pageIdx: zod
       .number()
       .int()
       .min(0)
-      .optional()
+      .default(0)
       .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
+        'Page number to return (0-based). Defaults to 0 (the first page).',
       ),
   },
   blockedByDialog: true,
