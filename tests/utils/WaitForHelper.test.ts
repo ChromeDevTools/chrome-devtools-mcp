@@ -43,6 +43,21 @@ describe('WaitForHelper', () => {
     );
   });
 
+  it('resolves timeout immediately when dialog aborts during an action that does not throw', async () => {
+    const clock = sinon.useFakeTimers();
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.url.returns('https://example.com');
+    pptrPage.waitForNavigation.returns(Promise.withResolvers<null>().promise);
+    const helper = new WaitForHelper(pptrPage, 1, 1);
+
+    const result = await helper.waitForEventsAfterAction(async () => {
+      pptrPage.emit('dialog', createMockDialog({message: 'Leave site?'}));
+    });
+
+    assert.strictEqual(result.dialogHandled, false);
+    assert.strictEqual(clock.countTimers(), 0);
+  });
+
   it('does not stall when an action opens a dialog without handleDialog', async () => {
     await withMcpContext(async (response, context) => {
       const mcpPage = context.getSelectedMcpPage();

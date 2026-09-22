@@ -100,6 +100,9 @@ export class WaitForHelper {
   }
 
   timeout(time: number): Promise<void> {
+    if (this.#abortController.signal.aborted) {
+      return Promise.resolve();
+    }
     return new Promise<void>(res => {
       const id = setTimeout(res, time);
       this.#abortController.signal.addEventListener('abort', () => {

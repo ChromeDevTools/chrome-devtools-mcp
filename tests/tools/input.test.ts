@@ -1395,6 +1395,88 @@ describe('input', () => {
       sinon.assert.notCalled(response.attachWaitForResult);
       sinon.assert.notCalled(response.includeSnapshot);
     });
+
+    it('does not mention remaining elements when the last element opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.onFirstCall().resolves();
+      locator.fill.onSecondCall().rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Confirm input'}));
+
+      await fillForm(args).handler(
+        {
+          params: {
+            elements: [
+              {
+                uid: '1_1',
+                value: 'first',
+              },
+              {
+                uid: '1_2',
+                value: 'second',
+              },
+            ],
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(page.waitForEventsAfterAction);
+      sinon.assert.calledTwice(page.getElementByUid);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Filling out the element with uid 1_2 opened a dialog.',
+      );
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('stops before advancing to the next element when signal aborts as locator.fill resolves', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      page.getDialog.returns(createMockDialog({message: 'Confirm input'}));
+      page.waitForEventsAfterAction.callsFake(async action => {
+        const abortController = new AbortController();
+        locator.fill.callsFake(async () => {
+          abortController.abort(new Error('Action interrupted by a dialog'));
+        });
+        await action(abortController.signal);
+        return {};
+      });
+
+      await fillForm(args).handler(
+        {
+          params: {
+            elements: [
+              {
+                uid: '1_1',
+                value: 'first',
+              },
+              {
+                uid: '1_2',
+                value: 'second',
+              },
+            ],
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.',
+      );
+    });
   });
 
   describe('uploadFile', () => {

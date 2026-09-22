@@ -235,6 +235,31 @@ export const hover = definePageTool(() => ({
   },
 }));
 
+function raceWithSignal<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, {once: true});
+    Promise.resolve(promise).then(
+      value => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 // The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
 // If the form is a combobox, we need to find the correct option by its text value.
 // To do that, loop through the children while checking which child's text matches the requested value (requested value is actually the text content).
@@ -249,11 +274,17 @@ async function selectOption(
   for (const child of aXNode.children) {
     if (child.role === 'option' && child.name === value && child.value) {
       optionFound = true;
-      using childHandle = await child.elementHandle();
+      using childHandle = await raceWithSignal(child.elementHandle(), signal);
       if (childHandle) {
-        using childValueHandle = await childHandle.getProperty('value');
+        using childValueHandle = await raceWithSignal(
+          childHandle.getProperty('value'),
+          signal,
+        );
 
-        const childValue = await childValueHandle.jsonValue();
+        const childValue = await raceWithSignal(
+          childValueHandle.jsonValue(),
+          signal,
+        );
         if (typeof childValue === 'string') {
           await handle.asLocator().fill(childValue, {signal});
         }
@@ -285,22 +316,39 @@ async function fillFormElements(
   try {
     const result = await page.waitForEventsAfterAction(async signal => {
       for (const {uid, value} of elements) {
+        const previousUid = currentUid;
         currentUid = undefined;
-        using handle = await page.getElementByUid(uid);
+        using handle = await raceWithSignal(
+          page.getElementByUid(uid),
+          signal,
+        ).catch(error => {
+          if (signal.aborted && previousUid) {
+            currentUid = previousUid;
+          }
+          throw error;
+        });
         currentUid = uid;
         const aXNode = page.getAXNodeByUid(uid);
         // We assume that combobox needs to be handled as select if it has
         // role='combobox' and option children.
         if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
-          await selectOption(handle, aXNode, value, signal);
+          await raceWithSignal(
+            selectOption(handle, aXNode, value, signal),
+            signal,
+          );
         } else {
-          const isToggle = await handle.evaluate(el => {
-            if (el instanceof HTMLInputElement) {
-              return el.type === 'checkbox' || el.type === 'radio';
-            }
-            const role = el.getAttribute('role');
-            return role === 'checkbox' || role === 'radio' || role === 'switch';
-          });
+          const isToggle = await raceWithSignal(
+            handle.evaluate(el => {
+              if (el instanceof HTMLInputElement) {
+                return el.type === 'checkbox' || el.type === 'radio';
+              }
+              const role = el.getAttribute('role');
+              return (
+                role === 'checkbox' || role === 'radio' || role === 'switch'
+              );
+            }),
+            signal,
+          );
 
           if (isToggle) {
             if (['true', 'false'].includes(value)) {
@@ -321,6 +369,7 @@ async function fillFormElements(
               .fill(value, {signal});
           }
         }
+        signal.throwIfAborted();
       }
     });
     return {result};
@@ -473,8 +522,14 @@ export const fillForm = definePageTool(() => ({
     if (!result) {
       // The page is blocked by a dialog, so the remaining elements cannot be
       // filled out until it is handled.
+      const hasRemainingElements =
+        interruptedUid !== request.params.elements.at(-1)?.uid;
       response.appendResponseLine(
-        `Filling out the element with uid ${interruptedUid} opened a dialog. The remaining elements were not filled out.`,
+        `Filling out the element with uid ${interruptedUid} opened a dialog.${
+          hasRemainingElements
+            ? ' The remaining elements were not filled out.'
+            : ''
+        }`,
       );
       return;
     }
