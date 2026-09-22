@@ -910,6 +910,39 @@ export class McpContext implements Context {
     throw new Error(`Not allowed by allowlist: ${url}`);
   }
 
+  async #loadNetworkResource(url: URL): Promise<string> {
+    const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+    const maxRedirects = 20;
+    let currentUrl = url;
+
+    for (let redirectCount = 0; ; redirectCount++) {
+      this.#validateUrlNotBlocked(currentUrl);
+      this.#validateUrlAllowed(currentUrl);
+
+      const response = await fetch(currentUrl, {redirect: 'manual'});
+      if (!redirectStatuses.has(response.status)) {
+        if (!response.ok) {
+          throw new Error(`Failed to load resource: ${currentUrl}`);
+        }
+        return response.text();
+      }
+
+      const location = response.headers.get('location');
+      if (!location) {
+        throw new Error(`Failed to load resource: ${currentUrl}`);
+      }
+      if (redirectCount >= maxRedirects) {
+        throw new Error(`Too many redirects loading resource: ${url}`);
+      }
+
+      await response.body?.cancel();
+      currentUrl = new URL(location, currentUrl);
+      if (currentUrl.protocol !== 'https:' && currentUrl.protocol !== 'http:') {
+        throw new Error(`Unsupported protocol for: ${currentUrl}`);
+      }
+    }
+  }
+
   async loadResource(path: string): Promise<string> {
     const url = new URL(path);
 
@@ -918,13 +951,7 @@ export class McpContext implements Context {
     switch (url.protocol) {
       case 'https:':
       case 'http:': {
-        this.#validateUrlAllowed(url);
-
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Failed to load resource: ${url}`);
-        }
-        return response.text();
+        return await this.#loadNetworkResource(url);
       }
 
       case 'file:': {

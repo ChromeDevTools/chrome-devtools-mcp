@@ -22,9 +22,10 @@ import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
-import {serverHooks} from './server.js';
+import {serverHooks, TestServer} from './server.js';
 import {
   assertNoServiceWorkerReported,
+  getMockBrowser,
   getMockRequest,
   html,
   withBrowser,
@@ -777,6 +778,40 @@ describe('McpContext', () => {
     });
 
     describe('https protocol', () => {
+      async function createNetworkPolicyContext(options: {
+        allowList?: string[];
+        blocklist?: string[];
+      }) {
+        const browser = getMockBrowser();
+        browser.pages = async () => [];
+        browser.targets = () => [];
+        return await McpContext.from(
+          browser,
+          undefined,
+          {
+            experimentalDevToolsDebugging: false,
+            performanceCrux: false,
+            ...options,
+          },
+          Locator,
+        );
+      }
+
+      async function withServers<T>(
+        servers: TestServer[],
+        callback: () => Promise<T>,
+      ): Promise<T> {
+        for (const server of servers) {
+          await server.start();
+        }
+        try {
+          return await callback();
+        } finally {
+          for (const server of servers.reverse()) {
+            await server.stop();
+          }
+        }
+      }
       it('respects blocklist by throwing if blocked', async () => {
         await withMcpContext(
           async (_response, context) => {
@@ -839,6 +874,123 @@ describe('McpContext', () => {
             allowedUrlPattern: ['https://example.com/allowed*'],
           },
         );
+      });
+
+      it('rejects redirects outside the allowlist', async () => {
+        const allowedServer = new TestServer(TestServer.randomPort());
+        const forbiddenServer = new TestServer(TestServer.randomPort());
+        forbiddenServer.addRoute('/secret', (_req, res) => {
+          res.end('FORBIDDEN_BODY');
+        });
+        allowedServer.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: forbiddenServer.getRoute('/secret'),
+          });
+          res.end();
+        });
+        await withServers([allowedServer, forbiddenServer], async () => {
+          const context = await createNetworkPolicyContext({
+            allowList: [allowedServer.getRoute('/redirect')],
+          });
+          try {
+            await assert.rejects(
+              () => context.loadResource(allowedServer.getRoute('/redirect')),
+              /Not allowed by allowlist/,
+            );
+          } finally {
+            context.dispose();
+          }
+        });
+      });
+
+      it('rejects redirects into the blocklist', async () => {
+        const allowedServer = new TestServer(TestServer.randomPort());
+        const forbiddenServer = new TestServer(TestServer.randomPort());
+        forbiddenServer.addRoute('/secret', (_req, res) => {
+          res.end('FORBIDDEN_BODY');
+        });
+        allowedServer.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: forbiddenServer.getRoute('/secret'),
+          });
+          res.end();
+        });
+        await withServers([allowedServer, forbiddenServer], async () => {
+          const context = await createNetworkPolicyContext({
+            blocklist: [forbiddenServer.getRoute('/secret')],
+          });
+          try {
+            await assert.rejects(
+              () => context.loadResource(allowedServer.getRoute('/redirect')),
+              /Blocked by blocklist/,
+            );
+          } finally {
+            context.dispose();
+          }
+        });
+      });
+
+      it('rejects a blocked intermediate redirect hop', async () => {
+        const startServer = new TestServer(TestServer.randomPort());
+        const blockedServer = new TestServer(TestServer.randomPort());
+        const finalServer = new TestServer(TestServer.randomPort());
+        finalServer.addRoute('/final', (_req, res) => {
+          res.end('FINAL_BODY');
+        });
+        blockedServer.addRoute('/bounce', (_req, res) => {
+          res.writeHead(302, {
+            Location: finalServer.getRoute('/final'),
+          });
+          res.end();
+        });
+        startServer.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: blockedServer.getRoute('/bounce'),
+          });
+          res.end();
+        });
+        await withServers(
+          [startServer, blockedServer, finalServer],
+          async () => {
+            const context = await createNetworkPolicyContext({
+              blocklist: [blockedServer.getRoute('/bounce')],
+            });
+            try {
+              await assert.rejects(
+                () => context.loadResource(startServer.getRoute('/redirect')),
+                /Blocked by blocklist/,
+              );
+            } finally {
+              context.dispose();
+            }
+          },
+        );
+      });
+
+      it('follows redirects when every hop is allowed', async () => {
+        const server = new TestServer(TestServer.randomPort());
+        server.addRoute('/final', (_req, res) => {
+          res.end('ALLOWED_BODY');
+        });
+        server.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: server.getRoute('/final'),
+          });
+          res.end();
+        });
+        await withServers([server], async () => {
+          const context = await createNetworkPolicyContext({
+            allowList: [server.baseUrl + '/*'],
+          });
+          try {
+            assert.strictEqual(
+              await context.loadResource(server.getRoute('/redirect')),
+              'ALLOWED_BODY',
+            );
+          } finally {
+            context.dispose();
+          }
+        });
       });
     });
 
