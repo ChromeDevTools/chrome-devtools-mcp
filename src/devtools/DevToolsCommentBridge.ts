@@ -5,6 +5,7 @@
  */
 
 import type {Page} from '../third_party/index.js';
+import type {CD4ACommentThread} from '../types.js';
 import {logger} from '../utils/logger.js';
 
 export interface DevToolsCommentBridgeOptions {
@@ -59,10 +60,18 @@ export class DevToolsCommentBridge {
           'CommentThreadsChanged',
           window.__onDevToolsCommentListener,
         );
+        window.universe?.cd4aBridge?.setAgentAttached(true);
       });
     } catch (e) {
       logger?.('DevToolsCommentBridge: evaluate failed', e);
     }
+  }
+
+  async getComments(devtoolsPage: Page): Promise<CD4ACommentThread[]> {
+    return await devtoolsPage.evaluate(() => {
+      window.universe?.cd4aBridge?.setAgentAttached(true);
+      return window.universe?.cd4aBridge?.getCommentThreads() ?? [];
+    });
   }
 
   #handleCommentEvent(): void {
@@ -89,6 +98,7 @@ export class DevToolsCommentBridge {
             );
             delete window.__onDevToolsCommentListener;
           }
+          window.universe?.cd4aBridge?.setAgentAttached(false);
         });
         if (result && typeof result.catch === 'function') {
           void result.catch(e => {

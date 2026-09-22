@@ -404,14 +404,14 @@
 ### `get_css_styles`
 
 **Description:** Retrieve matched CSS rules, inline styles, inherited styles, and cascade information for an element identified by its UID.
-Use this tool to debug why specific CSS properties are applied, overridden, or conflicting. Supports pagination for elements with many matched rules. Requires a UID from [`take_snapshot`](#take_snapshot).
+Use this tool to debug why specific CSS properties are applied, overridden, or conflicting. Results are paginated and return 10 rules per page by default; use pageIdx to page through the remaining rules. Requires a UID from [`take_snapshot`](#take_snapshot).
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **uid** (string) **(required)**: The uid of the element on the page from the page content snapshot to inspect CSS styles for
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of CSS rules to return per page. When omitted, returns all rules.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: Maximum number of CSS rules to return per page. Defaults to 10.
 
 ---
 

@@ -14,6 +14,7 @@ import type {
   HeapQueryOptions,
 } from '../processors/HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
+import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
@@ -56,14 +57,18 @@ export type FileVerificationOption =
 
 type AllKeys<T> = T extends unknown ? keyof T : never;
 
+type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
+  ? K extends keyof Schema
+    ? Exclude<Schema[K], undefined>
+    : never
+  : never;
+
 export type MergeSchema<Schema extends zod.ZodRawShape> = {
-  [K in AllKeys<Schema>]: Schema extends unknown
-    ? K extends keyof Schema
-      ? undefined extends Schema[K]
-        ? Exclude<Schema[K], undefined> | zod.ZodUndefined
-        : Schema[K]
-      : zod.ZodUndefined
-    : never;
+  [K in AllKeys<Schema>]: K extends keyof Schema
+    ? undefined extends Schema[K]
+      ? zod.ZodOptional<ExtractSchemaField<Schema, K>>
+      : Schema[K]
+    : zod.ZodOptional<ExtractSchemaField<Schema, K>>;
 };
 
 export interface BaseToolDefinition<
@@ -98,8 +103,12 @@ export interface ToolDefinition<
   ): Promise<void>;
 }
 
+export type SchemaType<T extends zod.ZodRawShape> = zod.output<
+  zod.ZodObject<MergeSchema<T>>
+>;
+
 export interface Request<Schema extends zod.ZodRawShape> {
-  params: zod.objectOutputType<MergeSchema<Schema>, zod.ZodTypeAny>;
+  params: SchemaType<Schema>;
 }
 
 export interface ImageContentData {
@@ -398,6 +407,9 @@ export type ContextPage = Readonly<{
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;
+  ensureDevToolsCommentBridge(
+    devtoolsPage: Page,
+  ): Promise<DevToolsCommentBridge>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
@@ -454,13 +466,13 @@ export const timeoutSchema = {
   timeout: zod
     .number()
     .int()
+    .transform(value => {
+      return value <= 0 ? undefined : value;
+    })
     .optional()
     .describe(
       `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
-    )
-    .transform(value => {
-      return value && value <= 0 ? undefined : value;
-    }),
+    ),
 };
 
 export function viewportTransform(arg: string | undefined):

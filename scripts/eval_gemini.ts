@@ -10,9 +10,8 @@ import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 
 import {GoogleGenAI, mcpToTool} from '@google/genai';
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 
+import {Client, StdioClientTransport} from '../build/src/third_party/index.js';
 import {TestServer} from '../build/tests/server.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');

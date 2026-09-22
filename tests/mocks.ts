@@ -201,12 +201,16 @@ export function createHandlerMocks(options: Partial<ParsedArguments> = {}): {
   return {page, context, response, args};
 }
 
-export function createMockRunnerResult(): RunnerResult {
+export function createMockRunnerResult(
+  lhrOverrides: Partial<Result> = {},
+): RunnerResult {
   const lhr = {
+    finalDisplayedUrl: 'http://localhost',
     mainDocumentUrl: 'http://localhost',
     categories: {},
     audits: {},
     timing: {total: 0},
+    ...lhrOverrides,
   };
   return {
     lhr: lhr as unknown as Result,

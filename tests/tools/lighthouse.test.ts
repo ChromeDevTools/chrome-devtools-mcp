@@ -108,6 +108,84 @@ describe('lighthouse', () => {
       sinon.assert.calledOnceWithExactly(page.restoreEmulation);
     });
 
+    it('emulates a desktop user agent for desktop audits', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.saveTemporaryFile.resolves({filepath: 'report.json'});
+      const navigation = sinon
+        .stub(lighthouseRunner, 'navigation')
+        .resolves(createMockRunnerResult());
+
+      await lighthouseAudit(args).handler(
+        {
+          params: {
+            mode: 'navigation',
+            device: 'desktop',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      const {flags} = navigation.firstCall.args[2];
+      assert.equal(flags?.formFactor, 'desktop');
+      assert.match(String(flags?.emulatedUserAgent), /Macintosh/);
+      assert.doesNotMatch(String(flags?.emulatedUserAgent), /Mobile/);
+    });
+
+    it('emulates a mobile user agent for mobile audits', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.saveTemporaryFile.resolves({filepath: 'report.json'});
+      const snapshot = sinon
+        .stub(lighthouseRunner, 'snapshot')
+        .resolves(createMockRunnerResult());
+
+      await lighthouseAudit(args).handler(
+        {
+          params: {
+            mode: 'snapshot',
+            device: 'mobile',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      const {flags} = snapshot.firstCall.args[1];
+      assert.equal(flags?.formFactor, 'mobile');
+      assert.match(String(flags?.emulatedUserAgent), /Mobile Safari/);
+    });
+
+    it('reports the URL in snapshot mode, where mainDocumentUrl is unset', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.saveTemporaryFile.resolves({filepath: 'report.json'});
+      sinon.stub(lighthouseRunner, 'snapshot').resolves(
+        createMockRunnerResult({
+          mainDocumentUrl: undefined,
+          finalDisplayedUrl: 'https://example.com/page',
+        }),
+      );
+
+      await lighthouseAudit(args).handler(
+        {
+          params: {
+            mode: 'snapshot',
+            device: 'mobile',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(response.attachLighthouseResult);
+      assert.equal(
+        response.attachLighthouseResult.firstCall.args[0].summary.url,
+        'https://example.com/page',
+      );
+    });
+
     it('runs Lighthouse in snapshot mode with mobile device', async () => {
       server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
 

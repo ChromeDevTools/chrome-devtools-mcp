@@ -17,12 +17,8 @@ import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
   McpServer as SdkMcpServer,
-  type CallToolResult,
   type Root,
   type Transport,
-  SetLevelRequestSchema,
-  ListRootsResultSchema,
-  RootsListChangedNotificationSchema,
   Mutex,
   puppeteer,
 } from './third_party/index.js';
@@ -90,7 +86,7 @@ export class McpServer {
       {capabilities: {logging: {}}},
     );
 
-    this.server.server.setRequestHandler(SetLevelRequestSchema, () => {
+    this.server.server.setRequestHandler('logging/setLevel', () => {
       return {};
     });
 
@@ -102,7 +98,7 @@ export class McpServer {
       if (this.server.server.getClientCapabilities()?.roots) {
         void this.#updateRoots();
         this.server.server.setNotificationHandler(
-          RootsListChangedNotificationSchema,
+          'notifications/roots/list_changed',
           () => {
             void this.#updateRoots();
           },
@@ -189,12 +185,11 @@ export class McpServer {
       return;
     }
     try {
-      const roots = await this.server.server.request(
+      const result = await this.server.server.request(
         {method: 'roots/list'},
-        ListRootsResultSchema,
         timeout === undefined ? undefined : {timeout},
       );
-      this.#lastClientRoots = roots.roots;
+      this.#lastClientRoots = result.roots;
       this.#context?.setRoots(this.#combinedRoots());
     } catch (e) {
       logger?.('Failed to list roots', e);
@@ -299,21 +294,19 @@ export class McpServer {
       this.#toolMutex,
     );
 
-    if (!toolHandler.shouldRegister) {
-      return;
-    }
-
-    this.server.registerTool(
+    const registeredTool = this.server.registerTool(
       tool.name,
       {
         description: tool.description,
         inputSchema: toolHandler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      async (params): Promise<CallToolResult> => {
-        return await toolHandler.handle(params);
-      },
+      toolHandler.handle,
     );
+
+    if (toolHandler.disabled) {
+      registeredTool.disable();
+    }
   }
 }
 

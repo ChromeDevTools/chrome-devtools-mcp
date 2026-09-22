@@ -165,8 +165,11 @@ async function validateToolFiles(
 
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
-  readonly registeredInputSchema: zod.ZodTypeAny;
-  readonly shouldRegister: boolean;
+  readonly registeredInputSchema: zod.ZodObject<
+    zod.ZodRawShape,
+    zod.core.$loose
+  >;
+  readonly disabled: boolean;
   private readonly disabledReason?: string;
 
   constructor(
@@ -177,10 +180,10 @@ export class ToolHandler {
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
-    this.shouldRegister = !(disabled && !serverArgs.viaCli);
+    this.disabled = disabled && !serverArgs.viaCli;
 
     this.inputSchema = tool.schema;
-    this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
+    this.registeredInputSchema = zod.object(this.inputSchema).loose();
   }
 
   unknownArgumentNames(params: Record<string, unknown>): string[] {
@@ -189,7 +192,9 @@ export class ToolHandler {
     );
   }
 
-  async handle(params: Record<string, unknown>): Promise<CallToolResult> {
+  handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
+    using _guard = await this.toolMutex.acquire();
+
     if (this.disabledReason) {
       return {
         content: [
@@ -219,7 +224,6 @@ export class ToolHandler {
       };
     }
 
-    const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
@@ -326,7 +330,6 @@ export class ToolHandler {
         devToolsData,
         pageUrl,
       });
-      guard[Symbol.dispose]();
     }
-  }
+  };
 }

@@ -175,7 +175,7 @@ describe('slim', () => {
       const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(fixture.html);
       await screenshot(args).handler(
-        {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+        {params: {}, page: context.getSelectedMcpPage()},
         response,
         context,
       );
