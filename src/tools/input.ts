@@ -277,7 +277,7 @@ function hasOptionChildren(aXNode: TextSnapshotNode) {
  * If an element opens a JavaScript dialog, returns the `interruptedUid` of that
  * element so the caller can report it without filling remaining elements.
  */
-async function fillFormElement(
+async function fillFormElements(
   elements: Array<{uid: string; value: string}>,
   page: ContextPage,
 ): Promise<{result?: WaitForEventsResult; interruptedUid?: string}> {
@@ -356,7 +356,7 @@ export const fill = definePageTool(() => ({
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const {result} = await fillFormElement(
+    const {result} = await fillFormElements(
       [{uid: request.params.uid, value: request.params.value}],
       request.page,
     );
@@ -466,7 +466,7 @@ export const fillForm = definePageTool(() => ({
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const {result, interruptedUid} = await fillFormElement(
+    const {result, interruptedUid} = await fillFormElements(
       request.params.elements,
       request.page,
     );
