@@ -39,7 +39,6 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
@@ -75,6 +74,8 @@ interface McpContextOptions {
   navigationTimeout?: number;
   // Whether extension tools and targets are enabled.
   categoryExtensions?: boolean;
+  // Callback when a notification should be emitted to MCP client.
+  onNotification?: (message: string) => void;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -420,7 +421,7 @@ export class McpContext implements Context {
     }
     if (page.pptrPage.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages().name} to see open pages.`,
+        'The selected page has been closed. Call list_pages to see open pages.',
       );
     }
     return page;
@@ -570,6 +571,7 @@ export class McpContext implements Context {
         ),
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
+        onNotification: this.#options.onNotification,
       });
       this.#mcpPages.set(page, mcpPage);
       await mcpPage.init();

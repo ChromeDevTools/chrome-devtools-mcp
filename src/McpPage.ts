@@ -55,6 +55,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
   type TargetUniverse,
@@ -77,16 +78,16 @@ import {
   type Page,
   type ConsoleMessage,
   type HTTPRequest,
-  type DevTools,
+  DevTools,
   type JSONSchema7Definition,
 } from './third_party/index.js';
-import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 import type {
   ContextPage,
   DevToolsData,
+  MatchedStyles,
   Response,
 } from './tools/ToolDefinition.js';
 import type {
@@ -101,6 +102,12 @@ import {
   type WaitForEventsResult,
   type DialogAction,
 } from './utils/WaitForHelper.js';
+
+function isBackendNodeId(
+  id: unknown,
+): id is DevTools.Protocol.DOM.BackendNodeId {
+  return typeof id === 'number';
+}
 
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
@@ -139,6 +146,8 @@ export class McpPage implements ContextPage {
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
   #sourceMaps: boolean;
+  #commentBridge?: DevToolsCommentBridge;
+  #onNotification?: (message: string) => void;
 
   constructor(
     page: Page,
@@ -149,12 +158,14 @@ export class McpPage implements ContextPage {
       isolatedContextName?: string;
       navigationTimeout?: number;
       sourceMaps?: boolean;
+      onNotification?: (message: string) => void;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
+    this.#onNotification = options.onNotification;
     this.pptrPage = page;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -352,8 +363,33 @@ export class McpPage implements ContextPage {
     return this.networkCollector.getIdForResource(request);
   }
 
+  resolveReqidToCdpRequestId(reqid: number): string | undefined {
+    const request = this.networkCollector.getById(reqid);
+    if (!request) {
+      return undefined;
+    }
+    // @ts-expect-error id is internal.
+    return request.id;
+  }
+
   getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
     return this.networkCollector.getData(includePreservedRequests);
+  }
+
+  get commentBridge(): DevToolsCommentBridge | undefined {
+    return this.#commentBridge;
+  }
+
+  async ensureDevToolsCommentBridge(
+    devtoolsPage: Page,
+  ): Promise<DevToolsCommentBridge> {
+    if (!this.#commentBridge) {
+      this.#commentBridge = new DevToolsCommentBridge({
+        onNotification: this.#onNotification,
+      });
+    }
+    await this.#commentBridge.attach(devtoolsPage);
+    return this.#commentBridge;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {
@@ -368,6 +404,12 @@ export class McpPage implements ContextPage {
       // Fall back to not exposing DevTools at all.
       return undefined;
     }
+  }
+
+  async openDevTools(): Promise<Page | undefined> {
+    const devtoolsPage = await this.pptrPage.openDevTools();
+    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    return devtoolsPage;
   }
 
   getConsoleData(
@@ -436,6 +478,8 @@ export class McpPage implements ContextPage {
   }
 
   dispose(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
     this.pptrPage.off('dialog', this.#dialogHandler);
     this.networkCollector.dispose();
     this.consoleCollector.dispose();
@@ -644,7 +688,7 @@ export class McpPage implements ContextPage {
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.textSnapshot) {
       throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
       );
     }
     const node = this.textSnapshot.idToNode.get(uid);
@@ -674,6 +718,108 @@ export class McpPage implements ContextPage {
 
   getAXNodeByUid(uid: string) {
     return this.textSnapshot?.idToNode.get(uid);
+  }
+
+  async resolveBackendNodeId(
+    backendNodeId: number,
+  ): Promise<string | undefined> {
+    if (!this.textSnapshot) {
+      this.textSnapshot = await TextSnapshot.create(this);
+    }
+    let id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    if (!id) {
+      this.textSnapshot = await TextSnapshot.create(this);
+      id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    }
+    return id;
+  }
+
+  async resolveUidToBackendNodeId(
+    uid: string,
+  ): Promise<{backendNodeId: number; targetId?: string} | undefined> {
+    const target = this.pptrPage.target();
+    const targetId =
+      Boolean(target) &&
+      '_targetId' in target &&
+      typeof target._targetId === 'string'
+        ? target._targetId
+        : undefined;
+    const node = this.getAXNodeByUid(uid);
+    if (node?.backendNodeId !== undefined) {
+      return {backendNodeId: node.backendNodeId, targetId};
+    }
+    try {
+      const handle = await this.getElementByUid(uid);
+      const backendNodeId = await handle.backendNodeId();
+      return backendNodeId ? {backendNodeId, targetId} : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+    if (!this.textSnapshot) {
+      throw new Error(
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
+      );
+    }
+    const node = this.textSnapshot.idToNode.get(uid);
+    if (!node) {
+      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
+    }
+
+    const backendNodeId = node.backendNodeId;
+    if (!isBackendNodeId(backendNodeId)) {
+      throw new Error(
+        `Failed to resolve backend node ID for element with uid "${uid}".`,
+      );
+    }
+
+    if (!this.#devtoolsUniverse) {
+      throw new Error(
+        `DevTools universe is not available for page ${this.id ?? '?'}.`,
+      );
+    }
+
+    const targetManager = this.#devtoolsUniverse.universe.context.get(
+      DevTools.TargetManager,
+    );
+    let domNode: DevTools.DOMModel.DOMNode | undefined;
+    let cssModel: DevTools.CSSModel.CSSModel | null = null;
+
+    for (const dom of targetManager.models(DevTools.DOMModel.DOMModel)) {
+      const nodeMap = await dom.pushNodesByBackendIdsToFrontend(
+        new Set([backendNodeId]),
+      );
+      const frontendNode = nodeMap?.get(backendNodeId);
+      if (frontendNode) {
+        domNode = frontendNode;
+        cssModel = dom.target().model(DevTools.CSSModel.CSSModel);
+        break;
+      }
+    }
+
+    if (!domNode || !cssModel) {
+      throw new Error(
+        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
+      );
+    }
+
+    const targetElement = domNode.enclosingElementOrSelf();
+    if (!targetElement) {
+      throw new Error(
+        `Element with uid "${uid}" is not an element node and has no parent element.`,
+      );
+    }
+
+    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    if (!matchedStyles) {
+      throw new Error(
+        `Could not retrieve matched styles for element with uid "${uid}".`,
+      );
+    }
+
+    return matchedStyles;
   }
 
   async getDevToolsData(): Promise<DevToolsData> {

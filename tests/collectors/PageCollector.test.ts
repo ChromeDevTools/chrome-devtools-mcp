@@ -7,7 +7,12 @@
 import assert from 'node:assert';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
-import type {Frame, HTTPRequest, Protocol} from 'puppeteer-core';
+import type {
+  ConsoleMessage,
+  Frame,
+  HTTPRequest,
+  Protocol,
+} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import type {ListenerMap} from '../../src/collectors/PageCollector.js';
@@ -16,9 +21,17 @@ import {
   NetworkCollector,
   PageCollector,
 } from '../../src/collectors/PageCollector.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
 import {getMockRequest, getMockBrowser} from '../utils.js';
+
+function createMockConsoleMessage(text: string): ConsoleMessage {
+  return {
+    type: () => 'log',
+    text: () => text,
+    args: () => [],
+  } as unknown as ConsoleMessage;
+}
 
 describe('PageCollector', () => {
   it('works', async () => {
@@ -56,6 +69,56 @@ describe('PageCollector', () => {
     assert.equal(collector.getData()[0], request);
     page.emit('framenavigated', mainFrame);
 
+    assert.equal(collector.getData().length, 0);
+  });
+
+  it('does not clean up after same-document navigation', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const request = getMockRequest();
+    const collector = new PageCollector(page, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+
+    page.emit('request', request);
+
+    assert.equal(collector.getData()[0], request);
+
+    // Simulate a same-document (SPA) navigation: Puppeteer emits
+    // `FrameNavigatedWithinDocument` right before `framenavigated`.
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
+    page.emit('framenavigated', mainFrame);
+
+    assert.equal(collector.getData()[0], request);
+  });
+
+  it('cleans up after a cross-document navigation following a same-document one', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const request = getMockRequest();
+    const collector = new PageCollector(page, collect => {
+      return {
+        request: req => {
+          collect(req);
+        },
+      } as ListenerMap;
+    });
+
+    page.emit('request', request);
+
+    // Same-document navigation: history is kept.
+    mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
+    page.emit('framenavigated', mainFrame);
+    assert.equal(collector.getData()[0], request);
+
+    // A real cross-document navigation must still rotate the history.
+    page.emit('framenavigated', mainFrame);
     assert.equal(collector.getData().length, 0);
   });
 
@@ -479,6 +542,61 @@ describe('ConsoleCollector', () => {
           e.details.stackTrace.callFrames.length === 0
         );
       }),
+    );
+  });
+
+  it('retains only the newest messages per navigation', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const cap = 5;
+    const collector = new ConsoleCollector(
+      page,
+      collect => {
+        return {
+          console: (msg: ConsoleMessage) => {
+            collect(msg);
+          },
+        } as ListenerMap;
+      },
+      cap,
+    );
+
+    const messages = Array.from({length: cap + 3}, (_, i) =>
+      createMockConsoleMessage(`msg-${i}`),
+    );
+
+    for (const msg of messages) {
+      page.emit('console', msg);
+    }
+
+    const retained = collector.getData();
+    assert.equal(retained.length, cap);
+    assert.deepEqual(retained, messages.slice(messages.length - cap));
+  });
+
+  it('uses MAX_MESSAGES_PER_NAVIGATION as the default cap', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const collector = new ConsoleCollector(page, collect => {
+      return {
+        console: (msg: ConsoleMessage) => {
+          collect(msg);
+        },
+      } as ListenerMap;
+    });
+
+    const messages = Array.from(
+      {length: ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION + 1},
+      (_, i) => createMockConsoleMessage(`msg-${i}`),
+    );
+
+    for (const msg of messages) {
+      page.emit('console', msg);
+    }
+
+    assert.equal(
+      collector.getData().length,
+      ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
     );
   });
 });

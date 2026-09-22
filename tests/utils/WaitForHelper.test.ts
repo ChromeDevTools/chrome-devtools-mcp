@@ -53,9 +53,12 @@ describe('WaitForHelper', () => {
 
   it('awaits navigation when action takes longer than expectNavigationIn', async () => {
     await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-initial', html`<main>initial</main>`);
       server.addHtmlRoute('/nav-target', html`<main>navigated</main>`);
+      const startUrl = server.getRoute('/nav-initial');
       const url = server.getRoute('/nav-target');
       const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(startUrl);
 
       const result = await mcpPage.waitForEventsAfterAction(
         async () => {

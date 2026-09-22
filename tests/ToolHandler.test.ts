@@ -19,10 +19,11 @@ import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
 import {ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
-import type {
-  DefinedPageTool,
-  DevToolsData,
-  ToolDefinition,
+import {
+  definePageTool,
+  type DefinedPageTool,
+  type DevToolsData,
+  type ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {createTools} from '../src/tools/tools.js';
 import {getMockBrowser} from './utils.js';
@@ -36,7 +37,10 @@ describe('ToolHandler', () => {
 
   it('calls getPageById for page scoped tools when pageId is provided', async () => {
     let handlerCalled = false;
-    const tool: DefinedPageTool = {
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+    const tool = definePageTool(() => ({
       name: 'page_tool',
       description: 'A page scoped tool',
       annotations: {
@@ -46,11 +50,10 @@ describe('ToolHandler', () => {
       schema: {},
       blockedByDialog: false,
       verifyFilesSchema: {},
-      pageScoped: true,
       handler: async () => {
         handlerCalled = true;
       },
-    };
+    }))(serverArgs);
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -59,9 +62,6 @@ describe('ToolHandler', () => {
     mockContext.getPageById.returns(mockPage);
 
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
 
     const toolHandler = new ToolHandler(
       tool,
@@ -70,7 +70,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, true);
+    assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({pageId: 1});
 
     assert.strictEqual(mockContext.getPageById.calledOnce, true);
@@ -80,7 +80,12 @@ describe('ToolHandler', () => {
 
   it('calls getSelectedMcpPage for page scoped tools when pageIdRouting is disabled', async () => {
     let handlerCalled = false;
-    const tool: DefinedPageTool = {
+    const serverArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--no-page-id-routing'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+    const tool = definePageTool(() => ({
       name: 'page_tool',
       description: 'A page scoped tool',
       annotations: {
@@ -90,11 +95,10 @@ describe('ToolHandler', () => {
       schema: {},
       blockedByDialog: false,
       verifyFilesSchema: {},
-      pageScoped: true,
       handler: async () => {
         handlerCalled = true;
       },
-    };
+    }))(serverArgs);
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -103,11 +107,6 @@ describe('ToolHandler', () => {
     mockContext.getSelectedMcpPage.returns(mockPage);
 
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments(
-      '1.0.0',
-      ['node', 'script.js', '--no-page-id-routing'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    );
 
     const toolHandler = new ToolHandler(
       tool,
@@ -116,7 +115,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, true);
+    assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
@@ -156,7 +155,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, true);
+    assert.strictEqual(toolHandler.disabled, false);
     const result = await toolHandler.handle({});
 
     assert.strictEqual(mockContext.getDevToolsData.calledOnce, true);
@@ -182,17 +181,20 @@ describe('ToolHandler', () => {
       },
     };
 
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
     const testCases: Array<{
       tool: ToolDefinition | DefinedPageTool;
       devToolsData: DevToolsData;
       pageUrl?: string;
     }> = [
       {
-        tool: {
+        tool: definePageTool(() => ({
           ...baseTool,
           name: 'page_tool',
-          pageScoped: true,
-        },
+        }))(serverArgs),
         devToolsData: {cdpBackendNodeId: 1},
         pageUrl: 'http://localhost:9222/',
       },
@@ -226,9 +228,6 @@ describe('ToolHandler', () => {
       } as unknown as ClearcutLogger);
 
       const toolMutex = new Mutex();
-      const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-      });
 
       const toolHandler = new ToolHandler(
         testCase.tool,
@@ -301,7 +300,7 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, false);
   });
 
-  it('sets shouldRegister to false and returns disabled reason when category is disabled', async () => {
+  it('sets disabled to true and returns disabled reason when category is disabled', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'disabled_tool',
@@ -333,7 +332,7 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    assert.strictEqual(toolHandler.shouldRegister, false);
+    assert.strictEqual(toolHandler.disabled, true);
 
     const result = await toolHandler.handle({});
     assert.strictEqual(result.isError, true);
@@ -363,7 +362,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(defaultHandler.shouldRegister, true);
+    assert.strictEqual(defaultHandler.disabled, false);
 
     const disabledServerArgs = parseArguments(
       '1.0.0',
@@ -382,7 +381,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(disabledHandler.shouldRegister, false);
+    assert.strictEqual(disabledHandler.disabled, true);
 
     const disabledResult = await disabledHandler.handle({function: '() => 1'});
     assert.strictEqual(disabledResult.isError, true);
@@ -410,7 +409,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(cliHandler.shouldRegister, true);
+    assert.strictEqual(cliHandler.disabled, false);
     const cliResult = await cliHandler.handle({function: '() => 1'});
     assert.strictEqual(cliResult.isError, true);
     assert.match(
@@ -440,7 +439,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(defaultHandler.shouldRegister, true);
+    assert.strictEqual(defaultHandler.disabled, false);
 
     const disabledServerArgs = parseArguments(
       '1.0.0',
@@ -459,7 +458,7 @@ describe('ToolHandler', () => {
       async () => mockContext,
       toolMutex,
     );
-    assert.strictEqual(disabledHandler.shouldRegister, false);
+    assert.strictEqual(disabledHandler.disabled, true);
   });
 
   it('validates files specified in verifyFilesSchema and rewrites input with validated paths/URLs', async () => {
@@ -1055,7 +1054,10 @@ describe('ToolHandler', () => {
 
   it('rewrites file paths in params for page scoped tools', async () => {
     let receivedParams: Record<string, unknown> | undefined;
-    const tool: DefinedPageTool = {
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+    const tool = definePageTool(() => ({
       name: 'page_file_tool',
       description: 'A page scoped tool with file verification',
       annotations: {
@@ -1069,11 +1071,10 @@ describe('ToolHandler', () => {
       verifyFilesSchema: {
         filePath: true,
       },
-      pageScoped: true,
       handler: async request => {
         receivedParams = request.params;
       },
-    };
+    }))(serverArgs);
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -1092,9 +1093,6 @@ describe('ToolHandler', () => {
     mockContext.validatePath.resolves(canonicalFilePath);
 
     const toolMutex = new Mutex();
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
 
     const toolHandler = new ToolHandler(
       tool,

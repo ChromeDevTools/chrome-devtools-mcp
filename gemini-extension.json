@@ -1,11 +1,11 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@1.8.0"
+        "chrome-devtools-mcp@1.9.0"
       ]
     }
   }

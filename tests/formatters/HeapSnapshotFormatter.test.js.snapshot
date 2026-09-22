@@ -3,3 +3,590 @@ id,name,count,selfSize,retainedSize
 1,ObjectA,10,0.1 kB,1.0 kB
 2,ObjectB,5,0.1 kB,0.5 kB
 `;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatDiffSummary and formatDiffDetails > formats detailed diff comparing heap-1 to heap-2 with classIndex filter 1`] = `
+NewObject: # new: 2, # deleted: 0, # delta: +2, alloc size: +0.1 kB, freed size: 0.0 kB, size delta: +0.1 kB
+Objects:
+  + @35179 (self_size: 0.1 kB)
+  + @35181 (self_size: 0.1 kB)
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatDiffSummary and formatDiffDetails > formats diff summary comparing heap-1 to heap-2 1`] = `
+index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta
+0,(object shape),11,1,10,0.4 kB,0.0 kB,0.4 kB
+1,(compiled code),7,1,6,0.3 kB,0.0 kB,0.2 kB
+2,NewObject,2,0,2,0.1 kB,0.0 kB,0.1 kB
+3,(concatenated string),45,43,2,0.9 kB,0.9 kB,0.0 kB
+4,Array,2,0,2,0.0 kB,0.0 kB,0.0 kB
+5,{constructor},1,0,1,0.0 kB,0.0 kB,0.0 kB
+6,(string),4,4,0,0.1 kB,0.1 kB,0.0 kB
+7,(number),0,2,-2,0.0 kB,0.0 kB,-0.0 kB
+8,Object,0,2,-2,0.0 kB,0.0 kB,-0.0 kB
+9,InitialObject,0,2,-2,0.0 kB,0.1 kB,-0.1 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatDiffSummary and formatDiffDetails > formats diff summary comparing heap-2 to heap-3 1`] = `
+index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta
+0,(concatenated string),105,0,105,2.1 kB,0.0 kB,2.1 kB
+1,(object shape),7,1,6,0.3 kB,0.1 kB,0.3 kB
+2,(string),10,0,10,0.2 kB,0.0 kB,0.2 kB
+3,NewObject,5,0,5,0.1 kB,0.0 kB,0.1 kB
+4,Array,5,0,5,0.1 kB,0.0 kB,0.1 kB
+5,system / PropertyArray,1,0,1,0.0 kB,0.0 kB,0.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatDominators > formats dominator chain for a valid nodeId 1`] = `
+nodeId,nodeName,selfSize,retainedSize
+25341,String,0.2 kB,1.6 kB
+7199,system / NativeContext,1.2 kB,84.4 kB
+1,,0.0 kB,802 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatDuplicateStrings > formats duplicate strings with default options 1`] = `
+value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds
+"get disposed",8,0.2 kB,0.2 kB,false,@30685 @30731 @33713 @33781 @42891 @42947 @45203 @45233
+"WebAssembly.Suspending",4,0.1 kB,0.1 kB,false,@44967 @45473 @46069 @46195
+"extensions::SafeBuiltins",2,0.1 kB,0.1 kB,false,@25155 @26209
+"WebAssembly",2,0.0 kB,0.0 kB,false,@7495 @15037
+"EventTarget",2,0.0 kB,0.0 kB,false,@25089 @26185
+"v8/LoadTimes",2,0.0 kB,0.0 kB,false,@25159 @26365
+"Document",2,0.0 kB,0.0 kB,false,@25969 @26603
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNativeContextSizes > formats native context sizes from fixture 1`] = `
+nodeId,nodeName,selfSize,retainedSize,attributedSize
+7249,system / NativeContext / https://example.com,1.2 kB,350 kB,350 kB
+7195,system / NativeContext / https://example.com,1.2 kB,60.1 kB,215 kB
+7307,system / NativeContext,1.2 kB,84.4 kB,84.6 kB
+7199,system / NativeContext,1.2 kB,84.4 kB,84.4 kB
+Shared Size: 22.9 kB
+Unattributed Size: 44.8 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with class nodes > formats class nodes with default options 1`] = `
+nodeId,nodeName,type,distance,selfSize,retainedSize
+25307,Array,object,2,0.2 kB,2.1 kB
+33187,Array,object,2,0.2 kB,1.7 kB
+36255,Array,object,2,0.2 kB,1.7 kB
+45899,Array,object,5,0.1 kB,0.1 kB
+45901,Array,object,5,0.1 kB,0.1 kB
+46149,Array,object,5,0.1 kB,0.1 kB
+46151,Array,object,5,0.1 kB,0.1 kB
+46355,Array,object,2,0.2 kB,2.1 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with class nodes > formats class nodes with objectsRetainedByContexts filterName 1`] = `
+nodeId,nodeName,type,distance,selfSize,retainedSize
+45893,Apply,closure,5,0.0 kB,0.0 kB
+45895,Save,closure,5,0.0 kB,0.0 kB
+45897,makeCallable,closure,5,0.0 kB,0.2 kB
+46143,Apply,closure,5,0.0 kB,0.0 kB
+46145,Save,closure,5,0.0 kB,0.0 kB
+46147,makeCallable,closure,5,0.0 kB,0.2 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with edges > formats outgoing edges for a valid nodeId 1`] = `
+name,type,nodeId,nodeName,selfSize,retainedSize
+constructor,property,25575,String,0.1 kB,0.4 kB
+anchor,property,29295,anchor,0.0 kB,0.0 kB
+at,property,29297,at,0.0 kB,0.0 kB
+big,property,29299,big,0.0 kB,0.0 kB
+blink,property,29301,blink,0.0 kB,0.0 kB
+bold,property,29303,bold,0.0 kB,0.0 kB
+charAt,property,29305,charAt,0.0 kB,0.0 kB
+charCodeAt,property,29307,charCodeAt,0.0 kB,0.0 kB
+codePointAt,property,29309,codePointAt,0.0 kB,0.0 kB
+concat,property,29311,concat,0.0 kB,0.0 kB
+endsWith,property,29313,endsWith,0.0 kB,0.0 kB
+fontcolor,property,29315,fontcolor,0.0 kB,0.0 kB
+fontsize,property,29317,fontsize,0.0 kB,0.0 kB
+fixed,property,29319,fixed,0.0 kB,0.0 kB
+includes,property,29321,includes,0.0 kB,0.0 kB
+indexOf,property,29323,indexOf,0.0 kB,0.0 kB
+isWellFormed,property,29325,isWellFormed,0.0 kB,0.0 kB
+italics,property,29327,italics,0.0 kB,0.0 kB
+lastIndexOf,property,29329,lastIndexOf,0.0 kB,0.0 kB
+link,property,29331,link,0.0 kB,0.0 kB
+localeCompare,property,29333,localeCompare,0.0 kB,0.0 kB
+match,property,29335,match,0.0 kB,0.0 kB
+matchAll,property,29337,matchAll,0.0 kB,0.0 kB
+normalize,property,29339,normalize,0.0 kB,0.0 kB
+padEnd,property,29341,padEnd,0.0 kB,0.0 kB
+padStart,property,29343,padStart,0.0 kB,0.0 kB
+repeat,property,29345,repeat,0.0 kB,0.0 kB
+replace,property,29347,replace,0.0 kB,0.0 kB
+replaceAll,property,29349,replaceAll,0.0 kB,0.0 kB
+search,property,29351,search,0.0 kB,0.0 kB
+slice,property,29353,slice,0.0 kB,0.0 kB
+small,property,29355,small,0.0 kB,0.0 kB
+split,property,29357,split,0.0 kB,0.0 kB
+strike,property,29359,strike,0.0 kB,0.0 kB
+sub,property,29361,sub,0.0 kB,0.0 kB
+substr,property,29363,substr,0.0 kB,0.0 kB
+substring,property,29365,substring,0.0 kB,0.0 kB
+sup,property,29367,sup,0.0 kB,0.0 kB
+startsWith,property,29369,startsWith,0.0 kB,0.0 kB
+toString,property,29371,toString,0.0 kB,0.0 kB
+toWellFormed,property,29373,toWellFormed,0.0 kB,0.0 kB
+trim,property,29375,trim,0.0 kB,0.0 kB
+trimStart,property,29377,trimStart,0.0 kB,0.0 kB
+trimLeft,property,29377,trimStart,0.0 kB,0.0 kB
+trimEnd,property,29379,trimEnd,0.0 kB,0.0 kB
+trimRight,property,29379,trimEnd,0.0 kB,0.0 kB
+toLocaleLowerCase,property,29381,toLocaleLowerCase,0.0 kB,0.0 kB
+toLocaleUpperCase,property,29383,toLocaleUpperCase,0.0 kB,0.0 kB
+toLowerCase,property,29385,toLowerCase,0.0 kB,0.0 kB
+toUpperCase,property,29387,toUpperCase,0.0 kB,0.0 kB
+valueOf,property,29389,valueOf,0.0 kB,0.0 kB
+<symbol Symbol.iterator>,property,29391,[Symbol.iterator],0.0 kB,0.0 kB
+__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString},0.1 kB,0.3 kB
+properties,internal,29393,system / PropertyArray,0.0 kB,0.0 kB
+map,internal,25577,system / Map,0.0 kB,0.7 kB
+1,hidden,71,,0.0 kB,0.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with edges > formats outgoing edges with pagination 1`] = `
+name,type,nodeId,nodeName,selfSize,retainedSize
+constructor,property,25575,String,0.1 kB,0.4 kB
+anchor,property,29295,anchor,0.0 kB,0.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with edges > formats outgoing edges with retainedSize range 1`] = `
+name,type,nodeId,nodeName,selfSize,retainedSize
+constructor,property,25575,String,0.1 kB,0.4 kB
+__proto__,property,25329,{constructor, __defineGetter__, __defineSetter__, …, get __proto__, set __proto__, toLocaleString},0.1 kB,0.3 kB
+map,internal,25577,system / Map,0.0 kB,0.7 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with queryObjects > formats queried objects with an unbounded retainedSize filter 1`] = `
+nodeId,nodeName,type,distance,selfSize,retainedSize
+1,,synthetic,100000000,0.0 kB,802 kB
+7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
+7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+3,(GC roots),synthetic,100000001,0.0 kB,45.6 kB
+49547,,array,2,4.1 kB,41.0 kB
+36241,,array,2,4.1 kB,41.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with queryObjects > formats queried objects with className filter 1`] = `
+nodeId,nodeName,type,distance,selfSize,retainedSize
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+30967,Window (prototype) / https://example.com,object,4,26.6 kB,26.7 kB
+42085,Window (prototype) / https://example.com,object,4,26.6 kB,26.7 kB
+32995,Window (internal cache) / https://example.com,object,3,0.2 kB,10.1 kB
+41995,Window (internal cache) / https://example.com,object,3,0.2 kB,10.1 kB
+16321,Window / https://example.com,native,2,0.9 kB,1.9 kB
+16329,Window,closure,3,0.1 kB,0.4 kB
+16341,Window,closure,3,0.1 kB,0.4 kB
+30975,Window (prototype) / https://example.com,object,3,0.0 kB,0.2 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with queryObjects > formats queried objects with default options 1`] = `
+nodeId,nodeName,type,distance,selfSize,retainedSize
+1,,synthetic,100000000,0.0 kB,802 kB
+7249,system / NativeContext / https://example.com,hidden,1,1.2 kB,350 kB
+7199,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7307,system / NativeContext,hidden,1,1.2 kB,84.4 kB
+7195,system / NativeContext / https://example.com,hidden,1,1.2 kB,60.1 kB
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+3,(GC roots),synthetic,100000001,0.0 kB,45.6 kB
+49547,,array,2,4.1 kB,41.0 kB
+36241,,array,2,4.1 kB,41.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with queryObjects > formats queried objects with sortBy selfSize and pagination 1`] = `
+nodeId,nodeName,type,distance,selfSize,retainedSize
+27635,Window (global*) / https://example.com,object,2,40.5 kB,51.0 kB
+30887,Window (global*) / https://example.com,object,2,40.5 kB,50.9 kB
+30967,Window (prototype) / https://example.com,object,4,26.6 kB,26.7 kB
+42085,Window (prototype) / https://example.com,object,4,26.6 kB,26.7 kB
+32657,system / DescriptorArray,object shape,5,9.8 kB,9.8 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with retainers > formats retainers for a valid nodeId 1`] = `
+name,type,nodeId,nodeName,selfSize,retainedSize
+prototype,internal,29287,system / Map,0.0 kB,0.1 kB
+prototype,property,25575,String,0.1 kB,0.4 kB
+initial_string_prototype,internal,7199,system / NativeContext,1.2 kB,84.4 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatObjectInfo > formats object details for a valid nodeId 1`] = `
+id: @25341
+name: String
+type: object
+detachedness: unknown
+selfSize: 0.2 kB
+retainedSize: 1.6 kB
+distance: 2
+edgeCount: 56
+retainerCount: 3
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatRetainedByContextSummary > formats retained by context summary from fixture 1`] = `
+Context count: 116
+Retained by context size: 3.5 kB (148 objects)
+Not retained by context size: 798 kB (11792 objects)
+Total size: 802 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > formatRetainingPaths > formats retaining paths for a valid nodeId 1`] = `
+<- @45891 system / Context via context builtinToJSONs (distance: 4)
+  <- @34237 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Promise> (distance: 2)
+    <- @34235 system / PropertyCell via internal value (distance: 4)
+      <- @50423 (object properties) via internal 1912 (distance: 3)
+        <- @27635 Window (global*) / https://example.com via internal properties (distance: 2)
+  <- @34213 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Error> (distance: 2)
+  <- @34197 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::RegExp> (distance: 2)
+  <- @34185 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::String> (distance: 2)
+  <- @34145 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Array> (distance: 2)
+  <- @34069 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Function> (distance: 2)
+  <- @34047 safe via internal context (distance: 3)
+    <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::Object> (distance: 2)
+  <- @46063 stringify via internal context (distance: 4)
+    <- @34247 {parse, stringify} via property stringify (distance: 3)
+      <- @27635 Window (global*) / https://example.com via property <symbol extensions::SafeBuiltins::JSON> (distance: 2)
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > toString with aggregates > formats aggregates with attributedToSpecificNativeContext filterName and objectId 1`] = `
+id,name,count,selfSize,retainedSize
+2,(system),1739,115 kB,350 kB
+11,Function,1095,34.9 kB,72.2 kB
+16,(object shape),769,52.6 kB,53.3 kB
+42,Window (global*) / https://example.com,1,40.5 kB,51.0 kB
+3,(array),6,9.1 kB,46.0 kB
+94,Window (prototype) / https://example.com,2,26.7 kB,26.9 kB
+1,(compiled code),323,19.3 kB,19.4 kB
+6,(string),376,10.5 kB,10.5 kB
+96,Window (internal cache) / https://example.com,2,0.2 kB,10.1 kB
+109,Document,1,8.4 kB,8.7 kB
+10,HTMLDocument,1,3.3 kB,6.2 kB
+105,HTMLElement,1,4.7 kB,4.8 kB
+104,Element,1,4.2 kB,4.5 kB
+55,{constructor, toString, toDateString, toTimeString, toISOString, toUTCString, toGMTString, getDate, setDate, getDay},1,0.2 kB,2.2 kB
+49,TypedArray,12,0.4 kB,2.2 kB
+50,Error,12,0.3 kB,2.0 kB
+47,Math,1,0.2 kB,1.9 kB
+9,Window / https://example.com,1,0.9 kB,1.9 kB
+44,console,1,0.1 kB,1.8 kB
+19,Array,3,0.3 kB,1.8 kB
+103,Node,1,1.8 kB,1.8 kB
+126,Performance,1,1.0 kB,1.8 kB
+39,{constructor, buffer, get buffer, byteLength, get byteLength, byteOffset, get byteOffset, length, get length},1,0.2 kB,1.8 kB
+89,system / Context,57,1.3 kB,1.7 kB
+32,String,1,0.2 kB,1.4 kB
+68,DataView,1,0.1 kB,1.4 kB
+106,HTMLBodyElement (prototype) / https://example.com,1,1.2 kB,1.2 kB
+62,Intl.Locale,1,0.1 kB,1.2 kB
+76,{constructor, getColumnNumber, getEnclosingColumnNumber, getEnclosingLineNumber, getEvalOrigin, getFileName, getFunction},1,0.1 kB,1.1 kB
+130,StyleEngine,1,0.9 kB,1.1 kB
+45,Intl,1,0.1 kB,1.0 kB
+118,CSSStyleRule,8,0.6 kB,1.0 kB
+119,CSSStyleSheet,3,0.5 kB,1.0 kB
+25,{<symbol Symbol.iterator>, constructor, get constructor, set constructor, reduce, toArray, forEach, some, every, find},1,0.1 kB,0.9 kB
+43,Atomics,1,0.1 kB,0.8 kB
+91,DisposableStack,1,0.1 kB,0.8 kB
+92,AsyncDisposableStack,1,0.1 kB,0.8 kB
+54,Object,11,0.6 kB,0.7 kB
+46,Reflect,1,0.1 kB,0.6 kB
+72,ArrayBuffer,1,0.0 kB,0.5 kB
+110,Text,6,0.5 kB,0.5 kB
+37,WebAssembly,1,0.1 kB,0.5 kB
+58,{constructor, <symbol Symbol.toStringTag>, resolvedOptions, adoptText, get adoptText, first, get first, next, get next},1,0.0 kB,0.5 kB
+40,{constructor},4,0.1 kB,0.4 kB
+30,Set,1,0.1 kB,0.4 kB
+135,EventListener,10,0.4 kB,0.4 kB
+90,SharedArrayBuffer,1,0.0 kB,0.4 kB
+56,Intl.NumberFormat,1,0.0 kB,0.4 kB
+66,Intl.DateTimeFormat,1,0.0 kB,0.4 kB
+127,Navigation,1,0.2 kB,0.4 kB
+27,Map,1,0.1 kB,0.4 kB
+48,Number,1,0.1 kB,0.4 kB
+70,Symbol,1,0.0 kB,0.3 kB
+67,{at, copyWithin, entries, fill, find, findIndex, findLast, findLastIndex, flat, flatMap, includes, keys, toReversed},1,0.1 kB,0.3 kB
+134,FontFaceSet,1,0.3 kB,0.3 kB
+133,StylePropertyMap,8,0.3 kB,0.3 kB
+139,MutationObserver,2,0.3 kB,0.3 kB
+100,{loadTimes, csi},1,0.0 kB,0.3 kB
+69,BigInt,1,0.0 kB,0.3 kB
+59,Intl.PluralRules,1,0.0 kB,0.3 kB
+60,Intl.RelativeTimeFormat,1,0.0 kB,0.3 kB
+61,Intl.ListFormat,1,0.0 kB,0.3 kB
+65,Intl.DurationFormat,1,0.0 kB,0.3 kB
+17,{isTraceCategoryEnabled, trace, getContinuationPreservedEmbedderData, setContinuationPreservedEmbedderData, console},1,0.0 kB,0.3 kB
+28,{constructor, __defineGetter__, __defineSetter__, hasOwnProperty, __lookupGetter__, __lookupSetter__, isPrototypeOf},1,0.1 kB,0.3 kB
+115,<style>,1,0.1 kB,0.3 kB
+21,Generator,1,0.0 kB,0.3 kB
+23,AsyncGenerator,1,0.0 kB,0.3 kB
+57,Intl.Collator,1,0.0 kB,0.2 kB
+33,WeakMap,1,0.1 kB,0.2 kB
+123,IntersectionObserver,1,0.2 kB,0.2 kB
+35,Promise,1,0.0 kB,0.2 kB
+52,FinalizationRegistry,1,0.0 kB,0.2 kB
+63,Intl.DisplayNames,1,0.0 kB,0.2 kB
+64,Intl.Segmenter,1,0.0 kB,0.2 kB
+34,JSON,1,0.0 kB,0.2 kB
+132,MutationObserver::Delegate,2,0.1 kB,0.2 kB
+73,Async-from-Sync Iterator,1,0.0 kB,0.2 kB
+101,EventTarget,1,0.0 kB,0.2 kB
+22,{<symbol Symbol.asyncIterator>, <symbol Symbol.asyncDispose>},1,0.0 kB,0.2 kB
+85,{containing, <symbol Symbol.iterator>},1,0.0 kB,0.2 kB
+131,ScriptedAnimationController,1,0.2 kB,0.2 kB
+95,MutationObserver (prototype) / https://example.com,1,0.2 kB,0.2 kB
+80,WebAssembly.Memory,1,0.0 kB,0.2 kB
+99,{parse, stringify},1,0.0 kB,0.2 kB
+51,WeakRef,1,0.0 kB,0.2 kB
+79,WebAssembly.Table,1,0.0 kB,0.2 kB
+120,NavigationHistoryEntry,1,0.2 kB,0.2 kB
+129,StyleSheetCollection,1,0.2 kB,0.2 kB
+147,<a>,1,0.1 kB,0.2 kB
+71,Boolean,1,0.0 kB,0.2 kB
+146,DocumentTimeline,1,0.2 kB,0.2 kB
+18,Array Iterator,1,0.0 kB,0.2 kB
+24,Iterator Helper,1,0.0 kB,0.2 kB
+26,Map Iterator,1,0.0 kB,0.2 kB
+29,Set Iterator,1,0.0 kB,0.2 kB
+31,String Iterator,1,0.0 kB,0.2 kB
+86,Segmenter String Iterator,1,0.0 kB,0.2 kB
+88,RegExp String Iterator,1,0.0 kB,0.2 kB
+4,{<symbol handler_function>, <symbol feature_name>},4,0.1 kB,0.2 kB
+20,{constructor, name, message, toString},1,0.0 kB,0.2 kB
+114,<title>,1,0.1 kB,0.2 kB
+116,PerformancePaintTiming,2,0.2 kB,0.2 kB
+145,<p>,2,0.2 kB,0.2 kB
+87,{next, return},1,0.0 kB,0.2 kB
+111,<div>,1,0.1 kB,0.2 kB
+122,ServiceWorkerContainer,1,0.2 kB,0.2 kB
+125,Navigator,1,0.2 kB,0.2 kB
+155,PerformanceNavigationTiming,1,0.2 kB,0.2 kB
+84,GeneratorFunction,1,0.0 kB,0.2 kB
+75,AsyncGeneratorFunction,1,0.0 kB,0.2 kB
+74,AsyncFunction,1,0.0 kB,0.2 kB
+113,<head>,1,0.1 kB,0.2 kB
+81,WebAssembly.Global,1,0.0 kB,0.1 kB
+98,HTMLDocument (prototype) / https://example.com,1,0.1 kB,0.1 kB
+93,WebAssembly.Suspending,1,0.0 kB,0.1 kB
+36,{constructor, exec, dotAll, get dotAll, flags, get flags, global, get global, hasIndices, get hasIndices, ignoreCase},1,0.1 kB,0.1 kB
+102,WindowProperties,1,0.0 kB,0.1 kB
+83,WebAssembly.Exception,1,0.0 kB,0.1 kB
+78,WebAssembly.Instance,1,0.0 kB,0.1 kB
+117,PerformanceResourceTiming,1,0.1 kB,0.1 kB
+152,LargestContentfulPaint,1,0.1 kB,0.1 kB
+136,CustomElementRegistry,1,0.1 kB,0.1 kB
+138,CSSRuleList,4,0.1 kB,0.1 kB
+141,Storage,2,0.1 kB,0.1 kB
+13,<body>,1,0.1 kB,0.1 kB
+82,WebAssembly.Tag,1,0.0 kB,0.1 kB
+77,WebAssembly.Module,1,0.0 kB,0.1 kB
+121,DOMTokenList,2,0.1 kB,0.1 kB
+53,WeakSet,1,0.0 kB,0.1 kB
+148,HTMLCollection,1,0.1 kB,0.1 kB
+150,ScriptRunner,1,0.1 kB,0.1 kB
+112,<meta>,1,0.1 kB,0.1 kB
+140,<html>,1,0.1 kB,0.1 kB
+144,<h1>,1,0.1 kB,0.1 kB
+149,Screen,1,0.1 kB,0.1 kB
+153,DocumentType,1,0.1 kB,0.1 kB
+156,VisibilityStateEntry,1,0.1 kB,0.1 kB
+137,MutationObserverRegistration,1,0.1 kB,0.1 kB
+151,FragmentDirective,1,0.1 kB,0.1 kB
+124,IntersectionObserverDelegate,1,0.0 kB,0.0 kB
+128,NavigationActivation,1,0.0 kB,0.0 kB
+154,PerformanceTiming,1,0.0 kB,0.0 kB
+38,Tag,1,0.0 kB,0.0 kB
+142,VisualViewport,1,0.0 kB,0.0 kB
+143,Viewport,1,0.0 kB,0.0 kB
+12,HTMLBodyElement,1,0.0 kB,0.0 kB
+97,HTMLDocument (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+107,MutationObserver (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > toString with aggregates > formats aggregates with default options 1`] = `
+id,name,count,selfSize,retainedSize
+2,(system),3205,199 kB,655 kB
+11,Function,3581,111 kB,237 kB
+16,(object shape),2878,181 kB,184 kB
+3,(array),34,41.4 kB,117 kB
+42,Window (global*) / https://example.com,2,81.1 kB,102 kB
+94,Window (prototype) / https://example.com,4,53.3 kB,53.7 kB
+1,(compiled code),713,42.8 kB,47.0 kB
+6,(string),846,27.9 kB,27.9 kB
+96,Window (internal cache) / https://example.com,4,0.4 kB,20.3 kB
+15,Object (global*),2,3.9 kB,13.5 kB
+55,{constructor, toString, toDateString, toTimeString, toISOString, toUTCString, toGMTString, getDate, setDate, getDay},4,0.8 kB,8.8 kB
+49,TypedArray,48,1.4 kB,8.8 kB
+109,Document,1,8.4 kB,8.7 kB
+50,Error,48,1.3 kB,7.9 kB
+47,Math,4,0.8 kB,7.8 kB
+19,Array,8,1.1 kB,7.7 kB
+39,{constructor, buffer, get buffer, byteLength, get byteLength, byteOffset, get byteOffset, length, get length},4,0.6 kB,7.0 kB
+10,HTMLDocument,1,3.3 kB,6.2 kB
+44,console,4,0.5 kB,6.2 kB
+32,String,4,1.0 kB,6.1 kB
+68,DataView,4,0.5 kB,5.5 kB
+105,HTMLElement,1,4.7 kB,4.8 kB
+62,Intl.Locale,4,0.3 kB,4.7 kB
+104,Element,1,4.2 kB,4.5 kB
+76,{constructor, getColumnNumber, getEnclosingColumnNumber, getEnclosingLineNumber, getEvalOrigin, getFileName, getFunction},4,0.5 kB,4.4 kB
+45,Intl,4,0.3 kB,4.2 kB
+25,{<symbol Symbol.iterator>, constructor, get constructor, set constructor, reduce, toArray, forEach, some, every, find},4,0.3 kB,3.6 kB
+89,system / Context,116,2.5 kB,3.5 kB
+43,Atomics,4,0.3 kB,3.1 kB
+91,DisposableStack,4,0.2 kB,3.0 kB
+92,AsyncDisposableStack,4,0.2 kB,3.0 kB
+46,Reflect,4,0.3 kB,2.5 kB
+72,ArrayBuffer,4,0.2 kB,2.2 kB
+9,Window / https://example.com,1,0.9 kB,1.9 kB
+37,WebAssembly,4,0.4 kB,1.9 kB
+58,{constructor, <symbol Symbol.toStringTag>, resolvedOptions, adoptText, get adoptText, first, get first, next, get next},4,0.1 kB,1.8 kB
+103,Node,1,1.8 kB,1.8 kB
+126,Performance,1,1.0 kB,1.8 kB
+30,Set,4,0.4 kB,1.6 kB
+40,{constructor},14,0.4 kB,1.6 kB
+90,SharedArrayBuffer,4,0.1 kB,1.6 kB
+56,Intl.NumberFormat,4,0.2 kB,1.5 kB
+66,Intl.DateTimeFormat,4,0.2 kB,1.5 kB
+27,Map,4,0.3 kB,1.5 kB
+48,Number,4,0.2 kB,1.5 kB
+70,Symbol,4,0.2 kB,1.4 kB
+67,{at, copyWithin, entries, fill, find, findIndex, findLast, findLastIndex, flat, flatMap, includes, keys, toReversed},4,0.3 kB,1.3 kB
+106,HTMLBodyElement (prototype) / https://example.com,1,1.2 kB,1.2 kB
+54,Object,22,0.9 kB,1.2 kB
+59,Intl.PluralRules,4,0.2 kB,1.2 kB
+60,Intl.RelativeTimeFormat,4,0.2 kB,1.2 kB
+61,Intl.ListFormat,4,0.2 kB,1.2 kB
+65,Intl.DurationFormat,4,0.2 kB,1.2 kB
+69,BigInt,4,0.2 kB,1.2 kB
+28,{constructor, __defineGetter__, __defineSetter__, hasOwnProperty, __lookupGetter__, __lookupSetter__, isPrototypeOf},4,0.3 kB,1.1 kB
+17,{isTraceCategoryEnabled, trace, getContinuationPreservedEmbedderData, setContinuationPreservedEmbedderData, console},4,0.2 kB,1.1 kB
+130,StyleEngine,1,0.9 kB,1.1 kB
+118,CSSStyleRule,8,0.6 kB,1.0 kB
+21,Generator,4,0.2 kB,1.0 kB
+23,AsyncGenerator,4,0.2 kB,1.0 kB
+34,JSON,4,0.2 kB,1.0 kB
+35,Promise,4,0.2 kB,1.0 kB
+57,Intl.Collator,4,0.1 kB,1.0 kB
+119,CSSStyleSheet,3,0.5 kB,1.0 kB
+33,WeakMap,4,0.2 kB,1.0 kB
+52,FinalizationRegistry,4,0.1 kB,0.9 kB
+63,Intl.DisplayNames,4,0.1 kB,0.9 kB
+64,Intl.Segmenter,4,0.1 kB,0.9 kB
+73,Async-from-Sync Iterator,4,0.1 kB,0.9 kB
+22,{<symbol Symbol.asyncIterator>, <symbol Symbol.asyncDispose>},4,0.1 kB,0.9 kB
+85,{containing, <symbol Symbol.iterator>},4,0.1 kB,0.8 kB
+51,WeakRef,4,0.1 kB,0.8 kB
+79,WebAssembly.Table,4,0.2 kB,0.8 kB
+80,WebAssembly.Memory,4,0.2 kB,0.8 kB
+71,Boolean,4,0.1 kB,0.8 kB
+18,Array Iterator,4,0.1 kB,0.7 kB
+24,Iterator Helper,4,0.1 kB,0.7 kB
+26,Map Iterator,4,0.1 kB,0.7 kB
+29,Set Iterator,4,0.1 kB,0.7 kB
+31,String Iterator,4,0.1 kB,0.7 kB
+86,Segmenter String Iterator,4,0.1 kB,0.7 kB
+88,RegExp String Iterator,4,0.1 kB,0.7 kB
+20,{constructor, name, message, toString},4,0.1 kB,0.7 kB
+87,{next, return},4,0.1 kB,0.7 kB
+75,AsyncGeneratorFunction,4,0.1 kB,0.7 kB
+84,GeneratorFunction,4,0.1 kB,0.7 kB
+74,AsyncFunction,4,0.1 kB,0.6 kB
+81,WebAssembly.Global,4,0.1 kB,0.6 kB
+93,WebAssembly.Suspending,4,0.1 kB,0.6 kB
+100,{loadTimes, csi},2,0.1 kB,0.6 kB
+36,{constructor, exec, dotAll, get dotAll, flags, get flags, global, get global, hasIndices, get hasIndices, ignoreCase},4,0.2 kB,0.6 kB
+78,WebAssembly.Instance,4,0.1 kB,0.5 kB
+83,WebAssembly.Exception,4,0.1 kB,0.5 kB
+110,Text,6,0.5 kB,0.5 kB
+77,WebAssembly.Module,4,0.1 kB,0.4 kB
+82,WebAssembly.Tag,4,0.1 kB,0.4 kB
+101,EventTarget,2,0.1 kB,0.4 kB
+53,WeakSet,4,0.2 kB,0.4 kB
+135,EventListener,10,0.4 kB,0.4 kB
+99,{parse, stringify},2,0.0 kB,0.4 kB
+127,Navigation,1,0.2 kB,0.4 kB
+4,{<symbol handler_function>, <symbol feature_name>},8,0.2 kB,0.4 kB
+134,FontFaceSet,1,0.3 kB,0.3 kB
+133,StylePropertyMap,8,0.3 kB,0.3 kB
+139,MutationObserver,2,0.3 kB,0.3 kB
+102,WindowProperties,2,0.1 kB,0.3 kB
+115,<style>,1,0.1 kB,0.3 kB
+123,IntersectionObserver,1,0.2 kB,0.2 kB
+132,MutationObserver::Delegate,2,0.1 kB,0.2 kB
+131,ScriptedAnimationController,1,0.2 kB,0.2 kB
+95,MutationObserver (prototype) / https://example.com,1,0.2 kB,0.2 kB
+7,(number),16,0.2 kB,0.2 kB
+120,NavigationHistoryEntry,1,0.2 kB,0.2 kB
+129,StyleSheetCollection,1,0.2 kB,0.2 kB
+147,<a>,1,0.1 kB,0.2 kB
+146,DocumentTimeline,1,0.2 kB,0.2 kB
+5,RegExp,1,0.1 kB,0.2 kB
+114,<title>,1,0.1 kB,0.2 kB
+116,PerformancePaintTiming,2,0.2 kB,0.2 kB
+145,<p>,2,0.2 kB,0.2 kB
+111,<div>,1,0.1 kB,0.2 kB
+122,ServiceWorkerContainer,1,0.2 kB,0.2 kB
+125,Navigator,1,0.2 kB,0.2 kB
+155,PerformanceNavigationTiming,1,0.2 kB,0.2 kB
+113,<head>,1,0.1 kB,0.2 kB
+98,HTMLDocument (prototype) / https://example.com,1,0.1 kB,0.1 kB
+117,PerformanceResourceTiming,1,0.1 kB,0.1 kB
+152,LargestContentfulPaint,1,0.1 kB,0.1 kB
+38,Tag,4,0.1 kB,0.1 kB
+136,CustomElementRegistry,1,0.1 kB,0.1 kB
+138,CSSRuleList,4,0.1 kB,0.1 kB
+141,Storage,2,0.1 kB,0.1 kB
+13,<body>,1,0.1 kB,0.1 kB
+14,Object (global),2,0.0 kB,0.1 kB
+121,DOMTokenList,2,0.1 kB,0.1 kB
+148,HTMLCollection,1,0.1 kB,0.1 kB
+150,ScriptRunner,1,0.1 kB,0.1 kB
+112,<meta>,1,0.1 kB,0.1 kB
+41,(concatenated string),2,0.0 kB,0.1 kB
+140,<html>,1,0.1 kB,0.1 kB
+144,<h1>,1,0.1 kB,0.1 kB
+149,Screen,1,0.1 kB,0.1 kB
+153,DocumentType,1,0.1 kB,0.1 kB
+156,VisibilityStateEntry,1,0.1 kB,0.1 kB
+137,MutationObserverRegistration,1,0.1 kB,0.1 kB
+8,Window (global) / https://example.com,1,0.0 kB,0.1 kB
+151,FragmentDirective,1,0.1 kB,0.1 kB
+124,IntersectionObserverDelegate,1,0.0 kB,0.0 kB
+128,NavigationActivation,1,0.0 kB,0.0 kB
+154,PerformanceTiming,1,0.0 kB,0.0 kB
+157,Pending activities,1,0.0 kB,0.0 kB
+142,VisualViewport,1,0.0 kB,0.0 kB
+143,Viewport,1,0.0 kB,0.0 kB
+12,HTMLBodyElement,1,0.0 kB,0.0 kB
+97,HTMLDocument (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+107,MutationObserver (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+108,HTMLBodyElement (internal cache) / https://example.com,1,0.0 kB,0.0 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > toString with aggregates > formats aggregates with objectsRetainedByContexts filterName 1`] = `
+id,name,count,selfSize,retainedSize
+89,system / Context,116,2.5 kB,3.5 kB
+11,Function,6,0.2 kB,0.7 kB
+1,(compiled code),22,0.5 kB,0.5 kB
+19,Array,4,0.3 kB,0.3 kB
+`;
+
+exports[`HeapSnapshotFormatter > with real fixtures > toString with aggregates > formats aggregates with sharedNativeContext filterName 1`] = `
+id,name,count,selfSize,retainedSize
+6,(string),443,16.6 kB,16.6 kB
+1,(compiled code),85,5.9 kB,9.8 kB
+2,(system),12,0.2 kB,0.6 kB
+7,(number),16,0.2 kB,0.2 kB
+41,(concatenated string),2,0.0 kB,0.1 kB
+`;

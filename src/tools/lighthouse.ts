@@ -6,9 +6,10 @@
 
 import path from 'node:path';
 
+import type {ParsedArguments} from '../config/mcp-options.js';
+
 import {
-  snapshot,
-  navigation,
+  lighthouseRunner,
   generateReport,
   zod,
   type Flags,
@@ -20,9 +21,19 @@ import {ToolCategory} from './categories.js';
 import {startTrace} from './performance.js';
 import {definePageTool} from './ToolDefinition.js';
 
-export const lighthouseAudit = definePageTool({
+// Kept in sync with `constants.userAgents` in Lighthouse's
+// core/config/constants.js, which `lighthouse:default` and the `desktop`
+// preset use. The bundle in src/third_party only re-exports the runner
+// entrypoints, so these cannot be imported and are mirrored here alongside the
+// screen emulation metrics below. Refresh via scripts/update-lighthouse.ts.
+const MOBILE_USER_AGENT =
+  'Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36';
+const DESKTOP_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
+
+export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace.name}`,
+  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace(args).name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -78,6 +89,7 @@ export const lighthouseAudit = definePageTool({
         deviceScaleFactor: 1,
         disabled: false,
       };
+      flags.emulatedUserAgent = DESKTOP_USER_AGENT;
     } else {
       flags.formFactor = 'mobile';
       flags.screenEmulation = {
@@ -87,16 +99,21 @@ export const lighthouseAudit = definePageTool({
         deviceScaleFactor: 1.75,
         disabled: false,
       };
+      flags.emulatedUserAgent = MOBILE_USER_AGENT;
     }
 
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await navigation(page.pptrPage, page.pptrPage.url(), {
-          flags,
-        });
+        result = await lighthouseRunner.navigation(
+          page.pptrPage,
+          page.pptrPage.url(),
+          {
+            flags,
+          },
+        );
       } else {
-        result = await snapshot(page.pptrPage, {
+        result = await lighthouseRunner.snapshot(page.pptrPage, {
           flags,
         });
       }
@@ -157,7 +174,9 @@ export const lighthouseAudit = definePageTool({
       summary: {
         mode,
         device,
-        url: lhr.mainDocumentUrl,
+        // `mainDocumentUrl` is only set for navigations, whereas
+        // `finalDisplayedUrl` is populated for every gather mode.
+        url: lhr.finalDisplayedUrl,
         scores: categoryScores,
         audits: {
           failed: failedAudits,
@@ -172,4 +191,4 @@ export const lighthouseAudit = definePageTool({
 
     response.attachLighthouseResult(output);
   },
-});
+}));

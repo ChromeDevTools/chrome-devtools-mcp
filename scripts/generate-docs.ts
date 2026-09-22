@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 
-import type {Tool} from '@modelcontextprotocol/sdk/types.js';
+import type {Options as YargsOptions} from 'yargs';
 
 import {
   mcpOptions,
@@ -16,47 +16,38 @@ import {
   isCategoryOffByDefault,
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
+import {zod} from '../build/src/third_party/index.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
-import {pageIdSchema} from '../build/src/tools/ToolDefinition.js';
+import type {
+  DefinedPageTool,
+  ToolDefinition,
+} from '../src/tools/ToolDefinition.js';
 import {createTools} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
 
-// Extend the MCP Tool type to include our annotations
-interface ToolWithAnnotations extends Tool {
-  annotations?: {
-    title?: string;
-    category?: typeof ToolCategory;
-    conditions?: string[];
-  };
-}
-
-interface ZodCheck {
-  kind: string;
-}
-
-interface ZodDef {
-  typeName: string;
-  checks?: ZodCheck[];
-  values?: string[];
-  type?: ZodSchema;
-  innerType?: ZodSchema;
-  schema?: ZodSchema;
-  defaultValue?: () => unknown;
-}
-
-interface ZodSchema {
-  _def: ZodDef;
-  description?: string;
-}
-
 interface TypeInfo {
-  type: string;
+  type?: string;
   enum?: string[];
   items?: TypeInfo;
   description?: string;
   default?: unknown;
+}
+
+interface ToolWithAnnotations {
+  name: string;
+  description: string;
+  inputSchema: {
+    type?: string;
+    properties?: Record<string, TypeInfo>;
+    required?: string[];
+  };
+  annotations?: {
+    title?: string;
+    category?: ToolCategory;
+    conditions?: string[];
+  };
 }
 
 function escapeHtmlTags(text: string): string {
@@ -117,21 +108,11 @@ function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
   return a.name.localeCompare(b.name);
 }
 
-interface OptionConfig {
-  hidden?: boolean;
-  alias?: string;
-  description?: string;
-  describe?: string;
-  type?: string;
-  choices?: string[];
-  default?: unknown;
-}
-
 function generateConfigOptionsMarkdown(): string {
   let markdown = '';
 
   for (const [optionName, optionConfig] of Object.entries(
-    mcpOptions as Record<string, OptionConfig>,
+    mcpOptions as Record<string, Partial<YargsOptions>>,
   )) {
     // Skip hidden options
     if (optionConfig.hidden) {
@@ -164,8 +145,13 @@ function generateConfigOptionsMarkdown(): string {
       markdown += `  - **Choices:** ${optionConfig.choices.map(c => `\`${c}\``).join(', ')}\n`;
     }
 
-    // Add default if available
-    markdown += `  - **Default:** \`${optionConfig.defaultDescription ?? optionConfig.default ?? 'false'}\`\n`;
+    const defaultValue =
+      optionConfig.defaultDescription ?? optionConfig.default;
+    if (defaultValue !== undefined) {
+      markdown += `  - **Default:** \`${defaultValue}\`\n`;
+    } else if (optionConfig.type === 'boolean') {
+      markdown += `  - **Default:** \`false\`\n`;
+    }
 
     markdown += '\n';
   }
@@ -197,80 +183,6 @@ function updateConfigurationWithOptionsMarkdown(optionsMarkdown: string): void {
 
   fs.writeFileSync(configPath, updatedContent);
   console.log('Updated configuration.md with options markdown');
-}
-
-// Helper to convert Zod schema to JSON schema-like object for docs
-function getZodTypeInfo(schema: ZodSchema): TypeInfo {
-  let description = schema.description;
-  let def = schema._def;
-  let defaultValue: unknown;
-
-  // Unwrap optional/default/effects
-  while (
-    def.typeName === 'ZodOptional' ||
-    def.typeName === 'ZodDefault' ||
-    def.typeName === 'ZodEffects'
-  ) {
-    if (def.typeName === 'ZodDefault' && def.defaultValue) {
-      defaultValue = def.defaultValue();
-    }
-    const next = def.innerType || def.schema;
-    if (!next) {
-      break;
-    }
-    schema = next;
-    def = schema._def;
-    if (!description && schema.description) {
-      description = schema.description;
-    }
-  }
-
-  const result: TypeInfo = {type: 'unknown'};
-  if (description) {
-    result.description = description;
-  }
-  if (defaultValue !== undefined) {
-    result.default = defaultValue;
-  }
-
-  switch (def.typeName) {
-    case 'ZodString':
-      result.type = 'string';
-      break;
-    case 'ZodNumber':
-      result.type = def.checks?.some((c: ZodCheck) => c.kind === 'int')
-        ? 'integer'
-        : 'number';
-      break;
-    case 'ZodBoolean':
-      result.type = 'boolean';
-      break;
-    case 'ZodEnum':
-      result.type = 'string';
-      result.enum = def.values;
-      break;
-    case 'ZodArray':
-      result.type = 'array';
-      if (def.type) {
-        result.items = getZodTypeInfo(def.type);
-      }
-      break;
-    default:
-      result.type = 'unknown';
-  }
-  return result;
-}
-
-function isRequired(schema: ZodSchema): boolean {
-  let def = schema._def;
-  while (def.typeName === 'ZodEffects') {
-    if (!def.schema) {
-      break;
-    }
-    schema = def.schema;
-    def = schema._def;
-  }
-  return def.typeName !== 'ZodOptional' && def.typeName !== 'ZodDefault';
 }
 
 async function generateReference(
@@ -417,8 +329,9 @@ async function generateReference(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getToolsAndCategories(tools: any, slim = false) {
+function getToolsAndCategories(
+  tools: Array<ToolDefinition<zod.ZodRawShape> | DefinedPageTool>,
+) {
   // Convert ToolDefinitions to ToolWithAnnotations
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {
@@ -436,31 +349,14 @@ function getToolsAndCategories(tools: any, slim = false) {
       return true;
     })
     .map(tool => {
-      const properties: Record<string, TypeInfo> = {};
-      const required: string[] = [];
-
-      const toolSchema = {
-        ...tool.schema,
-        ...(tool.pageScoped && !slim ? pageIdSchema : {}),
-      };
-      for (const [key, schema] of Object.entries(
-        toolSchema as unknown as Record<string, ZodSchema>,
-      )) {
-        const info = getZodTypeInfo(schema);
-        properties[key] = info;
-        if (isRequired(schema)) {
-          required.push(key);
-        }
-      }
+      const inputSchema = zod.toJSONSchema(zod.object(tool.schema), {
+        io: 'input',
+      }) as ToolWithAnnotations['inputSchema'];
 
       return {
         name: tool.name,
         description: tool.description,
-        inputSchema: {
-          type: 'object',
-          properties,
-          required,
-        },
+        inputSchema,
         annotations: tool.annotations,
       };
     });
@@ -522,10 +418,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(
-          createTools({slim: true} as ParsedArguments),
-          true,
-        );
+        getToolsAndCategories(createTools({slim: true} as ParsedArguments));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,

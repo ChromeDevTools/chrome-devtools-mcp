@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';
@@ -14,17 +15,17 @@ import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
 
-export const evaluateScript = defineTool(cliArgs => {
+export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
   return {
     name: 'evaluate_script',
-    description: `Evaluate a JavaScript function inside the target page${cliArgs?.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
+    description: `Evaluate a JavaScript function inside the target page${cliArgs.categoryExtensions ? ' or service worker' : ''}. Returns the response as JSON, so returned values have to be JSON-serializable.`,
     annotations: {
       category: ToolCategory.DEBUGGING,
       readOnlyHint: false,
       conditions: ['javascriptEvaluation'],
     },
     schema: {
-      ...(cliArgs?.pageIdRouting
+      ...(cliArgs.pageIdRouting
         ? cliArgs.categoryExtensions
           ? {
               pageId: zod
@@ -70,7 +71,7 @@ Example with arguments: \`(el) => el.innerText\`
         .describe(
           'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
         ),
-      ...(cliArgs?.categoryExtensions
+      ...(cliArgs.categoryExtensions
         ? {
             serviceWorkerId: zod
               .string()
@@ -96,7 +97,7 @@ Example with arguments: \`(el) => el.innerText\`
         waitForStableDom,
       } = request.params;
 
-      if (cliArgs?.categoryExtensions && serviceWorkerId) {
+      if (cliArgs.categoryExtensions && serviceWorkerId) {
         if (uidArgs && uidArgs.length > 0) {
           throw new Error(
             'args (element uids) cannot be used when evaluating in a service worker.',
@@ -126,12 +127,12 @@ Example with arguments: \`(el) => el.innerText\`
         return;
       }
 
-      if (cliArgs?.categoryExtensions && cliArgs?.pageIdRouting && !pageId) {
+      if (cliArgs.categoryExtensions && cliArgs.pageIdRouting && !pageId) {
         throw new Error('specify either a pageId or a serviceWorkerId.');
       }
 
       const mcpPage =
-        cliArgs?.pageIdRouting && request.params.pageId
+        cliArgs.pageIdRouting && request.params.pageId
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
       const page: Page = mcpPage.pptrPage;
@@ -168,7 +169,7 @@ const performEvaluation = async (
   fnString: string,
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options?: {filePath: string; context: Context},
+  options?: {filePath?: string; context: Context},
 ) => {
   using fn = await evaluatable.evaluateHandle(`(${fnString})`);
 

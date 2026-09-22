@@ -30,6 +30,7 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
+import {buildCommand} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {
   mcpOptions,
@@ -75,7 +76,7 @@ const y = yargs(hideBin(process.argv))
   .option('sessionId', {
     type: 'string',
     description: 'Session ID for daemon scoping',
-    default: '',
+    default: process.env.CD4A_INTERNAL_DAEMON_SESSION_ID || '',
     hidden: true,
     coerce: (sessionId: string) => {
       assertValidSessionId(sessionId);
@@ -155,7 +156,7 @@ y.command(
     ) {
       argv.headless = true;
     }
-    const args = serializeArgs(mcpOptions, argv);
+    const args = serializeArgs(getCliOptions(), argv);
     await start(args, argv.sessionId);
     process.exit(0);
   },
@@ -212,27 +213,13 @@ y.command(
 
 for (const [commandName, commandDef] of Object.entries(commands)) {
   const args = commandDef.args;
-  const requiredArgNames = Object.keys(args).filter(
-    name => args[name].required,
-  );
-
-  const optionalArgNames = Object.keys(args).filter(
-    name => !args[name].required,
-  );
-
-  let commandStr = commandName;
-  for (const arg of requiredArgNames) {
-    commandStr += ` <${arg}>`;
-  }
-
-  for (const arg of optionalArgNames) {
-    commandStr += ` [--${arg}]`;
-  }
+  const {command, usage} = buildCommand(commandName, args);
 
   y.command(
-    commandStr,
+    command,
     commandDef.description,
     y => {
+      y.usage(usage);
       y.option('output-format', {
         choices: ['md', 'json'],
         default: 'md',

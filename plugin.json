@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "chrome-devtools",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Reliable Chrome automation, debugging, and performance analysis for AI agents.",
   "author": {
     "name": "Google Chrome",
@@ -10,5 +10,11 @@
   "homepage": "https://developer.chrome.com/docs/devtools/agents",
   "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
   "license": "Apache-2.0",
-  "keywords": ["browser", "chrome", "debugging", "mcp", "performance"]
+  "keywords": [
+    "browser",
+    "chrome",
+    "debugging",
+    "mcp",
+    "performance"
+  ]
 }

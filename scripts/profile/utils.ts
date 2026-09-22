@@ -65,3 +65,58 @@ export function selectedPageIdFromToolResult(result: unknown): number {
 export function isScenarioModule(value: unknown): value is ProfileScenario {
   return isObject(value) && typeof value.get === 'function';
 }
+
+export function uidsFromSnapshotResult(result: unknown): string[] {
+  if (isObject(result) && isObject(result.structuredContent)) {
+    const snapshot = result.structuredContent.snapshot;
+    if (isObject(snapshot)) {
+      const uids: string[] = [];
+      const collectUids = (node: Record<string, unknown>): void => {
+        if (
+          typeof node.id === 'string' &&
+          node.id.length > 0 &&
+          node.role !== 'RootWebArea' &&
+          node.role !== 'StaticText'
+        ) {
+          uids.push(node.id);
+        }
+        if (Array.isArray(node.children)) {
+          for (const child of node.children) {
+            if (isObject(child)) {
+              collectUids(child);
+            }
+          }
+        }
+      };
+      collectUids(snapshot);
+      if (uids.length > 0) {
+        return uids;
+      }
+    }
+  }
+
+  if (isObject(result) && Array.isArray(result.content)) {
+    const uids: string[] = [];
+    for (const item of result.content) {
+      if (isObject(item) && typeof item.text === 'string') {
+        for (const line of item.text.split('\n')) {
+          if (line.includes('RootWebArea') || line.includes('StaticText')) {
+            continue;
+          }
+          const match = /\buid=([^\s]+)/.exec(line);
+          const uid = match?.[1];
+          if (uid !== undefined && uid.length > 0) {
+            uids.push(uid);
+          }
+        }
+      }
+    }
+    if (uids.length > 0) {
+      return uids;
+    }
+  }
+
+  throw new Error(
+    'take_snapshot did not return any inspectable element UIDs in its response',
+  );
+}

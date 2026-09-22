@@ -8,10 +8,10 @@ import assert from 'node:assert';
 import {spawn, type ChildProcess} from 'node:child_process';
 import path from 'node:path';
 
-import type {CallToolResult} from '@modelcontextprotocol/sdk/types.js';
-
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
+
+import type {CallToolResult} from '../src/third_party/index.js';
 import type {
   Frame,
   HTTPRequest,
@@ -29,7 +29,11 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
-import {createMockPuppeteerPage, mockListener} from './mocks.js';
+import {
+  createMockParsedArguments,
+  createMockPuppeteerPage,
+  mockListener,
+} from './mocks.js';
 
 export function assertNoServiceWorkerReported(targets: Target[], id: string) {
   const target = targets.find(target => {
@@ -156,7 +160,11 @@ export async function withBrowser(
 }
 
 export async function withMcpContext(
-  cb: (response: McpResponse, context: McpContext) => Promise<void>,
+  cb: (
+    response: McpResponse,
+    context: McpContext,
+    args: ParsedArguments,
+  ) => Promise<void>,
   options: {
     debug?: boolean;
     autoOpenDevTools?: boolean;
@@ -174,7 +182,8 @@ export async function withMcpContext(
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
     McpContext.resetPageIdsForTesting();
-    const response = new McpResponse(args as ParsedArguments);
+    const parsedArgs = createMockParsedArguments(args);
+    const response = new McpResponse(parsedArgs);
     if (context) {
       context.dispose();
     }
@@ -191,14 +200,14 @@ export async function withMcpContext(
         navigationTimeout:
           options.navigationTimeout ??
           (process.platform === 'win32' ? 20000 : undefined),
-        categoryExtensions: args?.categoryExtensions,
+        categoryExtensions: parsedArgs.categoryExtensions,
       },
       Locator,
     );
 
     response.setPage(context.getSelectedMcpPage());
 
-    await cb(response, context);
+    await cb(response, context, parsedArgs);
   }, options);
 }
 

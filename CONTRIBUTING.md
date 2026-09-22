@@ -114,7 +114,7 @@ To write debug logs to `log.txt` in the working directory, run with the followin
 npx @modelcontextprotocol/inspector node ./build/src/bin/chrome-devtools-mcp.js --log-file=/your/desired/path/log.txt
 ```
 
-You can use the `DEBUG` environment variable as usual to control categories that are logged.
+You can use the `NODE_DEBUG` environment variable as usual to control categories that are logged.
 
 ### Updating documentation
 

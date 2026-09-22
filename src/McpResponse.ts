@@ -7,7 +7,17 @@
 import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './config/mcp-options.js';
+import {
+  CommentFormatter,
+  type StructuredCommentThread,
+} from './formatters/CommentFormatter.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
+import {
+  type CascadeRule,
+  CssFormatter,
+  type CssFormatterOptions,
+  resolveContainerQueries,
+} from './formatters/CssFormatter.js';
 import {
   HeapSnapshotFormatter,
   isEdgeLike,
@@ -42,6 +52,7 @@ import type {
   DevToolsData,
   ImageContentData,
   LighthouseData,
+  MatchedStyles,
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
@@ -51,7 +62,7 @@ import {
   getInsightOutput,
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
-import type {PaginationOptions} from './types.js';
+import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
@@ -114,6 +125,10 @@ export class McpResponse implements Response {
     includeStackTraces?: boolean;
     serviceWorkerId?: string;
   };
+  #cssStylesData?: {
+    matchedStyles: MatchedStyles;
+    options: CssFormatterOptions & PaginationOptions;
+  };
   #listExtensions?: boolean;
   #listThirdPartyDeveloperTools?: boolean;
   #listWebMcpTools?: boolean;
@@ -125,6 +140,7 @@ export class McpResponse implements Response {
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
+  #devToolsComments?: CD4ACommentThread[];
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -243,6 +259,16 @@ export class McpResponse implements Response {
     };
   }
 
+  setIncludeCssStyles(
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions & PaginationOptions,
+  ): void {
+    this.#cssStylesData = {
+      matchedStyles,
+      options,
+    };
+  }
+
   setError(error: Error): void {
     this.#error = error;
   }
@@ -325,6 +351,14 @@ export class McpResponse implements Response {
 
   attachWaitForResult(result: WaitForEventsResult): void {
     this.#attachedWaitForResult = result;
+  }
+
+  setDevToolsComments(threads: CD4ACommentThread[]): void {
+    this.#devToolsComments = threads;
+  }
+
+  get devToolsComments(): readonly CD4ACommentThread[] | undefined {
+    return this.#devToolsComments;
   }
 
   setHeapSnapshotAggregates(
@@ -668,6 +702,22 @@ export class McpResponse implements Response {
     );
   }
 
+  async #handleComments(): Promise<CommentFormatter | undefined> {
+    const comments = this.#devToolsComments;
+    if (!comments) {
+      return undefined;
+    }
+    const page = this.#page;
+    return await CommentFormatter.from(comments, {
+      resolveBackendNodeId: page
+        ? (id: number) => page.resolveBackendNodeId(id)
+        : undefined,
+      resolveCdpRequestId: page
+        ? (id: string) => page.resolveCdpRequestId(id)
+        : undefined,
+    });
+  }
+
   async handle(
     context: McpContext,
     dataFormat: DataFormat = 'default',
@@ -683,6 +733,7 @@ export class McpResponse implements Response {
       webmcpTools,
       consoleMessages,
       networkRequests,
+      comments,
     ] = await Promise.all([
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
@@ -691,6 +742,7 @@ export class McpResponse implements Response {
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
+      this.#handleComments(),
     ]);
 
     if (this.#includeExtensionServiceWorkers) {
@@ -716,6 +768,7 @@ export class McpResponse implements Response {
         lighthouseResult: this.#attachedLighthouseResult,
         thirdPartyDeveloperTools,
         webmcpTools,
+        comments,
         errorMessage: this.#error?.message,
       },
       dataFormat,
@@ -746,6 +799,7 @@ export class McpResponse implements Response {
       lighthouseResult?: LighthouseData;
       thirdPartyDeveloperTools?: ToolGroups;
       webmcpTools?: WebMCPTool[];
+      comments?: CommentFormatter;
       errorMessage?: string;
     },
     dataFormat: DataFormat = 'default',
@@ -805,6 +859,8 @@ export class McpResponse implements Response {
       heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
+      comments?: StructuredCommentThread[];
+      matchedStyles?: object;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -840,7 +896,7 @@ export class McpResponse implements Response {
     if (this.#reconnectNotice) {
       structuredContent.reconnected = true;
       response.push(
-        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages().name} to see open pages.`,
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#args).name} to see open pages.`,
       );
     }
     if (this.#textResponseLines.length) {
@@ -907,7 +963,7 @@ export class McpResponse implements Response {
           : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog.name} to handle it before continuing.`);
+Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       structuredContent.dialog = {
         type: dialog.type(),
         message: dialog.message(),
@@ -1389,6 +1445,64 @@ Call ${handleDialog.name} to handle it before continuing.`);
         }
       } else {
         response.push('<no console messages found>');
+      }
+    }
+
+    if (data.comments) {
+      const commentsJson = data.comments.toJSON();
+      structuredContent.comments = commentsJson;
+      response.push(
+        compactEncode ? compactEncode(commentsJson) : data.comments.toString(),
+      );
+    }
+
+    if (this.#cssStylesData) {
+      const resolveUid = (backendNodeId: number) =>
+        this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
+
+      const containerDetails = await resolveContainerQueries(
+        this.#cssStylesData.matchedStyles,
+        resolveUid,
+      );
+
+      const options = {
+        ...this.#cssStylesData.options,
+        resolveUid,
+        containerDetails,
+      };
+
+      const allRules = CssFormatter.collectRules(
+        this.#cssStylesData.matchedStyles,
+        options,
+      );
+
+      let rules: readonly CascadeRule[] = allRules;
+
+      const hasPagination =
+        this.#cssStylesData.options.pageSize !== undefined ||
+        this.#cssStylesData.options.pageIdx !== undefined;
+
+      if (hasPagination) {
+        const paginationData = this.#dataWithPagination(
+          allRules,
+          this.#cssStylesData.options,
+        );
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+        rules = paginationData.items;
+      }
+
+      const formatter = new CssFormatter(
+        this.#cssStylesData.matchedStyles,
+        options,
+        rules,
+      );
+
+      structuredContent.matchedStyles = formatter.toJSON();
+      if (compactEncode) {
+        response.push(compactEncode(structuredContent.matchedStyles));
+      } else {
+        response.push(formatter.toString());
       }
     }
 

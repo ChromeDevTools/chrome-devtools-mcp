@@ -7,6 +7,7 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 import os from 'node:os';
+import {readFileSync} from 'node:fs';
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
@@ -19,7 +20,7 @@ export const mcpOptions = {
   logFile: {
     type: 'string',
     describe:
-      'Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
+      'Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
   },
   viewport: {
     type: 'string',
@@ -48,6 +49,13 @@ export const mcpOptions = {
     describe:
       'Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.',
     default: true,
+  },
+  devtoolsComments: {
+    type: 'boolean',
+    describe:
+      'Whether to enable DevTools comments tools. Internal WIP feature.',
+    hidden: true,
+    default: false,
   },
   experimentalDevtools: {
     type: 'boolean',
@@ -259,6 +267,10 @@ export const mcpOptions = {
     describe:
       'A directory that filesystem tools are allowed to access. May be specified more than once.',
   },
+  config: {
+    type: 'string',
+    describe: 'Path to JSON configuration file.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export type ParsedArguments = ReturnType<typeof parseArguments>;
@@ -433,6 +445,33 @@ export function parser(
     ]);
 
   return yargsInstance
+    .config('config', 'Path to JSON configuration file', configPath => {
+      try {
+        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
+          throw new Error('Config must be a JSON object');
+        }
+
+        yargs()
+          .parserConfiguration({
+            'strip-aliased': true,
+            'camel-case-expansion': false,
+          })
+          .options(options)
+          .config(parsed)
+          .strict()
+          .fail(false)
+          .exitProcess(false)
+          .parseSync([]);
+        return parsed;
+      } catch (err) {
+        throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
+      }
+    })
     .wrap(Math.min(120, yargsInstance.terminalWidth()))
     .help()
     .version(version);
