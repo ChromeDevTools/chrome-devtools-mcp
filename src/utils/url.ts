@@ -126,8 +126,8 @@ const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
  * (for example `(127\.\d+\.\d+\.\d+)`), which network-level enforcement
  * (`Network.emulateNetworkConditionsByRule`) does not reliably apply to
  * redirects and subresources, unlike the initial navigation check. A plain
- * wildcard (`*`) or named group (`:name`) hostname does not use `(` and is
- * unaffected.
+ * wildcard (`*`) or named group (`:name`) hostname has no regexp group and
+ * is unaffected.
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
  * @returns The first unenforceable pattern, or undefined if all are safe.
@@ -144,7 +144,10 @@ export function findUnenforceableHostnamePattern(
       // when chrome-devtools-mcp starts; this check only looks at valid ones.
       continue;
     }
-    if (parsed.hostname.includes('(')) {
+    // Isolate the hostname component so hasRegExpGroups only reflects a
+    // regexp group in the hostname, not elsewhere in the pattern.
+    const hostnamePattern = new URLPattern({hostname: parsed.hostname});
+    if (hostnamePattern.hasRegExpGroups) {
       return raw;
     }
   }
