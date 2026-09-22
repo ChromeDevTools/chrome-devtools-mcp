@@ -787,6 +787,28 @@ describe('McpPage', () => {
         assert.strictEqual(mcpPage.commentBridge, undefined);
       }
     });
+
+    it('creates and attaches commentBridge when getDevToolsData is called', async () => {
+      const {mcpPage, pptrPage} = createMcpPage();
+      pptrPage.hasDevTools.resolves(true);
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves({
+        cdpRequestId: 'req-1',
+        cdpBackendNodeId: 10,
+      });
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const data = await mcpPage.getDevToolsData();
+      assert.deepStrictEqual(data, {
+        cdpRequestId: 'req-1',
+        cdpBackendNodeId: 10,
+      });
+      assert.notStrictEqual(mcpPage.commentBridge, undefined);
+      sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+      sinon.assert.calledTwice(devtoolsPage.evaluate);
+    });
   });
 
   describe('getMatchedStylesForUid()', () => {
