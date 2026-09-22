@@ -13,14 +13,11 @@ import {pathToFileURL} from 'node:url';
 
 import {executablePath} from 'puppeteer';
 
+import {Client, type ClientCapabilities} from '@modelcontextprotocol/client';
+import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {mcpOptions} from '../src/config/mcp-options.js';
 import {getOffByDefaultCategories} from '../src/config/category-options.js';
-import {
-  Client,
-  StdioClientTransport,
-  type ClientCapabilities,
-  type TextContent,
-} from '../src/third_party/index.js';
+import type {TextContent} from '../src/third_party/index.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
