@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
+import {RESOLVED_WS_HEADERS_ENV_VAR} from '../config/ws-headers.js';
 import type {YargsOptions} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 
@@ -155,4 +156,23 @@ export function serializeArgs(
     }
   }
   return args;
+}
+
+export function serializeArgsForDaemon(
+  options: Record<string, YargsOptions>,
+  argv: Record<string, unknown>,
+): {args: string[]; env: NodeJS.ProcessEnv} {
+  const serializableArgv = {...argv};
+  const env: NodeJS.ProcessEnv = {};
+  const wsHeaders = serializableArgv.wsHeaders;
+
+  if (wsHeaders !== undefined && wsHeaders !== null) {
+    env[RESOLVED_WS_HEADERS_ENV_VAR] = JSON.stringify(wsHeaders);
+    delete serializableArgv.wsHeaders;
+  }
+
+  return {
+    args: serializeArgs(options, serializableArgv),
+    env,
+  };
 }

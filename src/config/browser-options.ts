@@ -6,6 +6,8 @@
 
 import type {YargsOptions} from '../third_party/index.js';
 
+import {parseWsHeaders} from './ws-headers.js';
+
 export const browserOptions = {
   autoConnect: {
     type: 'boolean',
@@ -67,24 +69,9 @@ export const browserOptions = {
   wsHeaders: {
     type: 'string',
     description:
-      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
+      'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint. For credentials and other secrets, prefer the CHROME_DEVTOOLS_MCP_WS_HEADERS environment variable because command-line arguments may be visible to other local users through process inspection.',
     implies: 'wsEndpoint',
-    coerce: (val: string | undefined) => {
-      if (!val) {
-        return;
-      }
-      try {
-        const parsed = JSON.parse(val);
-        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-          throw new Error('Headers must be a JSON object');
-        }
-        return parsed as Record<string, string>;
-      } catch (error) {
-        throw new Error(
-          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
-        );
-      }
-    },
+    coerce: parseWsHeaders,
   },
   headless: {
     type: 'boolean',
