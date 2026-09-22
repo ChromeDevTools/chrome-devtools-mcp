@@ -166,7 +166,7 @@ async function runSingleScenario(
     debugLog(`\n--- Response ---\n${result.text}`);
 
     debugLog('\nVerifying expectations...');
-    scenario.expectations(new Result(allCalls, args));
+    scenario.expectations(new Result(allCalls, args, result.text ?? ''));
   } finally {
     try {
       await client?.close();
