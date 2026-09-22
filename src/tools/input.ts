@@ -272,55 +272,64 @@ function hasOptionChildren(aXNode: TextSnapshotNode) {
 }
 
 /**
- * Fills a single form element and waits for resulting page events.
- * Returns the wait result, or `null` if the action was interrupted by a
- * JavaScript dialog (which has to be handled before continuing).
+ * Fills one or more form elements and waits for resulting page events in a
+ * single `waitForEventsAfterAction` call.
+ * If an element opens a JavaScript dialog, returns the `interruptedUid` of that
+ * element so the caller can report it without filling remaining elements.
  */
 async function fillFormElement(
-  uid: string,
-  value: string,
+  elements: Array<{uid: string; value: string}>,
   page: ContextPage,
-): Promise<WaitForEventsResult | null> {
-  using handle = await page.getElementByUid(uid);
+): Promise<{result?: WaitForEventsResult; interruptedUid?: string}> {
+  let currentUid: string | undefined;
   try {
-    return await page.waitForEventsAfterAction(async signal => {
-      const aXNode = page.getAXNodeByUid(uid);
-      // We assume that combobox needs to be handled as select if it has
-      // role='combobox' and option children.
-      if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
-        await selectOption(handle, aXNode, value, signal);
-      } else {
-        const isToggle = await handle.evaluate(el => {
-          if (el instanceof HTMLInputElement) {
-            return el.type === 'checkbox' || el.type === 'radio';
-          }
-          const role = el.getAttribute('role');
-          return role === 'checkbox' || role === 'radio' || role === 'switch';
-        });
-
-        if (isToggle) {
-          if (['true', 'false'].includes(value)) {
-            await handle.asLocator().fill(value === 'true', {signal});
-          } else {
-            throw new Error(
-              `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
-            );
-          }
+    const result = await page.waitForEventsAfterAction(async signal => {
+      for (const {uid, value} of elements) {
+        currentUid = undefined;
+        using handle = await page.getElementByUid(uid);
+        currentUid = uid;
+        const aXNode = page.getAXNodeByUid(uid);
+        // We assume that combobox needs to be handled as select if it has
+        // role='combobox' and option children.
+        if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
+          await selectOption(handle, aXNode, value, signal);
         } else {
-          // Increase timeout for longer input values.
-          const timeoutPerChar = 10; // ms
-          const fillTimeout =
-            page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
-          await handle
-            .asLocator()
-            .setTimeout(fillTimeout)
-            .fill(value, {signal});
+          const isToggle = await handle.evaluate(el => {
+            if (el instanceof HTMLInputElement) {
+              return el.type === 'checkbox' || el.type === 'radio';
+            }
+            const role = el.getAttribute('role');
+            return role === 'checkbox' || role === 'radio' || role === 'switch';
+          });
+
+          if (isToggle) {
+            if (['true', 'false'].includes(value)) {
+              await handle.asLocator().fill(value === 'true', {signal});
+            } else {
+              throw new Error(
+                `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+              );
+            }
+          } else {
+            // Increase timeout for longer input values.
+            const timeoutPerChar = 10; // ms
+            const fillTimeout =
+              page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
+            await handle
+              .asLocator()
+              .setTimeout(fillTimeout)
+              .fill(value, {signal});
+          }
         }
       }
     });
+    return {result};
   } catch (error) {
-    handleActionError(error, uid, page);
-    return null;
+    if (!currentUid) {
+      throw error;
+    }
+    handleActionError(error, currentUid, page);
+    return {interruptedUid: currentUid};
   }
 }
 
@@ -347,9 +356,8 @@ export const fill = definePageTool(() => ({
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const result = await fillFormElement(
-      request.params.uid,
-      request.params.value,
+    const {result} = await fillFormElement(
+      [{uid: request.params.uid, value: request.params.value}],
       request.page,
     );
     if (!result) {
@@ -458,26 +466,20 @@ export const fillForm = definePageTool(() => ({
   blockedByDialog: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    let lastResult: WaitForEventsResult = {};
-    for (const element of request.params.elements) {
-      const result = await fillFormElement(
-        element.uid,
-        element.value,
-        request.page,
+    const {result, interruptedUid} = await fillFormElement(
+      request.params.elements,
+      request.page,
+    );
+    if (!result) {
+      // The page is blocked by a dialog, so the remaining elements cannot be
+      // filled out until it is handled.
+      response.appendResponseLine(
+        `Filling out the element with uid ${interruptedUid} opened a dialog. The remaining elements were not filled out.`,
       );
-      if (!result) {
-        // The page is blocked by a dialog, so the remaining elements cannot be
-        // filled out until it is handled.
-        response.appendResponseLine(
-          `Filling out the element with uid ${element.uid} opened a dialog. The remaining elements were not filled out.`,
-        );
-        response.attachWaitForResult(lastResult);
-        return;
-      }
-      lastResult = result;
+      return;
     }
     response.appendResponseLine(`Successfully filled out the form`);
-    response.attachWaitForResult(lastResult);
+    response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }

@@ -1386,12 +1386,13 @@ describe('input', () => {
         context,
       );
 
+      sinon.assert.calledOnce(page.waitForEventsAfterAction);
       sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.',
       );
-      sinon.assert.calledOnceWithExactly(response.attachWaitForResult, {});
+      sinon.assert.notCalled(response.attachWaitForResult);
       sinon.assert.notCalled(response.includeSnapshot);
     });
   });
