@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
@@ -32,20 +31,6 @@ const submitKeySchema = zod
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
   );
-
-function createDialogAbortSignal(page: ContextPage) {
-  const controller = new AbortController();
-  const onDialog = () => {
-    controller.abort(new Error('Action interrupted by a dialog'));
-  };
-  page.pptrPage.on('dialog', onDialog);
-  return {
-    signal: controller.signal,
-    [Symbol.dispose]() {
-      page.pptrPage.off('dialog', onDialog);
-    },
-  };
-}
 
 /**
  * Locator actions abort or time out while the page is blocked by a JavaScript
@@ -140,20 +125,21 @@ export const click = definePageTool(() => ({
     const shouldSelectNativeOption =
       !request.params.dblClick && aXNode?.role === 'option';
     try {
-      using dialogAbort = createDialogAbortSignal(request.page);
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        if (
-          shouldSelectNativeOption &&
-          (await selectNativeSelectOption(handle, dialogAbort.signal))
-        ) {
-          return;
-        }
+      const result = await request.page.waitForEventsAfterAction(
+        async signal => {
+          if (
+            shouldSelectNativeOption &&
+            (await selectNativeSelectOption(handle, signal))
+          ) {
+            return;
+          }
 
-        await handle.asLocator().click({
-          count: request.params.dblClick ? 2 : 1,
-          signal: dialogAbort.signal,
-        });
-      });
+          await handle.asLocator().click({
+            count: request.params.dblClick ? 2 : 1,
+            signal,
+          });
+        },
+      );
       response.appendResponseLine(
         request.params.dblClick
           ? `Successfully double clicked on the element`
@@ -230,10 +216,11 @@ export const hover = definePageTool(() => ({
     const uid = request.params.uid;
     using handle = await request.page.getElementByUid(uid);
     try {
-      using dialogAbort = createDialogAbortSignal(request.page);
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        await handle.asLocator().hover({signal: dialogAbort.signal});
-      });
+      const result = await request.page.waitForEventsAfterAction(
+        async signal => {
+          await handle.asLocator().hover({signal});
+        },
+      );
       response.appendResponseLine(`Successfully hovered over the element`);
       response.attachWaitForResult(result);
       if (request.params.includeSnapshot) {
@@ -296,13 +283,12 @@ async function fillFormElement(
 ): Promise<WaitForEventsResult | null> {
   using handle = await page.getElementByUid(uid);
   try {
-    using dialogAbort = createDialogAbortSignal(page);
-    return await page.waitForEventsAfterAction(async () => {
+    return await page.waitForEventsAfterAction(async signal => {
       const aXNode = page.getAXNodeByUid(uid);
       // We assume that combobox needs to be handled as select if it has
       // role='combobox' and option children.
       if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
-        await selectOption(handle, aXNode, value, dialogAbort.signal);
+        await selectOption(handle, aXNode, value, signal);
       } else {
         const isToggle = await handle.evaluate(el => {
           if (el instanceof HTMLInputElement) {
@@ -314,9 +300,7 @@ async function fillFormElement(
 
         if (isToggle) {
           if (['true', 'false'].includes(value)) {
-            await handle
-              .asLocator()
-              .fill(value === 'true', {signal: dialogAbort.signal});
+            await handle.asLocator().fill(value === 'true', {signal});
           } else {
             throw new Error(
               `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
@@ -330,7 +314,7 @@ async function fillFormElement(
           await handle
             .asLocator()
             .setTimeout(fillTimeout)
-            .fill(value, {signal: dialogAbort.signal});
+            .fill(value, {signal});
         }
       }
     });

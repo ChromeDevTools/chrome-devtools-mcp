@@ -5,13 +5,43 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
+import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
+import {createMockDialog, createMockPuppeteerPage} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('WaitForHelper', () => {
   const server = serverHooks();
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('aborts the action signal when an unhandled dialog opens', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.url.returns('https://example.com');
+    pptrPage.waitForNavigation.returns(Promise.withResolvers<null>().promise);
+    const helper = new WaitForHelper(pptrPage, 1, 1);
+
+    await assert.rejects(
+      helper.waitForEventsAfterAction(async signal => {
+        const aborted = new Promise<never>((_, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), {
+            once: true,
+          });
+        });
+        pptrPage.emit('dialog', createMockDialog({message: 'Alert!'}));
+        await aborted;
+      }),
+      {
+        message: 'Action interrupted by a dialog',
+      },
+    );
+  });
 
   it('does not stall when an action opens a dialog without handleDialog', async () => {
     await withMcpContext(async (response, context) => {

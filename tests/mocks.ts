@@ -124,6 +124,19 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   const page = sinon.createStubInstance(
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
+  const pageListener = mockListener();
+  page.on.callsFake((eventName, handler) => {
+    pageListener.on(eventName, handler);
+    return page;
+  });
+  page.off.callsFake((eventName, handler) => {
+    pageListener.off(eventName, handler);
+    return page;
+  });
+  page.emit.callsFake((eventName, data) => {
+    pageListener.emit(eventName, data);
+    return true;
+  });
 
   // mainFrame() must return a stable object so tests can pass it back into
   // page.emit('framenavigated', mainFrame) and have it recognized as the
@@ -171,7 +184,7 @@ export function createMockMcpPage(
   const page = sinon.createStubInstance(McpPage);
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   page.waitForEventsAfterAction.callsFake(async action => {
-    await action();
+    await action(new AbortController().signal);
     return {};
   });
   return Object.assign(page, {pptrPage});

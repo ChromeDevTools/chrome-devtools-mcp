@@ -461,7 +461,7 @@ export class McpPage implements ContextPage {
   }
 
   waitForEventsAfterAction(
-    action: () => Promise<unknown>,
+    action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;

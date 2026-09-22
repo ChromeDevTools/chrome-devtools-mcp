@@ -379,7 +379,7 @@ export type ContextPage = Readonly<{
   clearDialog(): void;
   throwIfDialogOpen(): void;
   waitForEventsAfterAction(
-    action: () => Promise<unknown>,
+    action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;
