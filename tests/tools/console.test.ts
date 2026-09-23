@@ -58,7 +58,7 @@ describe('console', () => {
           t => t.type() === 'service_worker' && t.url().includes(extensionId),
         );
 
-        const swList = await context.createExtensionServiceWorkersSnapshot();
+        const swList = context.createWorkersSnapshot();
         const sw = swList.find(s => s.target === swTarget);
         assert(sw, 'Service worker not found in context list');
 
