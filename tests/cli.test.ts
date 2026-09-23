@@ -11,6 +11,7 @@ import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {
   DEFAULT_FILESYSTEM_ROOT,
+  getCliOptions,
   mcpOptions,
   parser,
 } from '../src/config/mcp-options.js';
@@ -61,6 +62,7 @@ describe('cli args parsing', () => {
     const args = parseArguments(['--viaCli']);
     assert.strictEqual(args.allowUnrestrictedPaths, true);
     assert.strictEqual(args.headless, true);
+    assert.strictEqual(args.isolated, true);
     assert.strictEqual(args.memoryDebugging, true);
     assert.strictEqual(args.categoryExtensions, true);
     assert.strictEqual(args.experimentalStructuredContent, true);
@@ -501,6 +503,33 @@ describe('cli args parsing', () => {
     assert.deepStrictEqual(args.viewport, {width: 800, height: 600});
   });
 
+  it('resolves relative config path and respects config with viaCli', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        userDataDir: '/tmp/custom-profile',
+        headless: false,
+      }),
+      'cd4a.test.config.viacli.json',
+    );
+    const relativePath = path.relative(process.cwd(), testConfig.path);
+    const args = parseArguments(['--viaCli', '--config', relativePath]);
+    assert.strictEqual(args.config, testConfig.path);
+    assert.strictEqual(args.userDataDir, '/tmp/custom-profile');
+    assert.strictEqual(args.isolated, undefined);
+    assert.strictEqual(args.headless, false);
+  });
+
+  it('respects isolated=false in config with viaCli', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({
+        isolated: false,
+      }),
+      'cd4a.test.config.viacli-isolated.json',
+    );
+    const args = parseArguments(['--viaCli', '--config', testConfig.path]);
+    assert.strictEqual(args.isolated, false);
+  });
+
   it('parses config should not allow no prefix', async () => {
     using testConfig = createTempFile(
       JSON.stringify({
@@ -532,6 +561,29 @@ describe('cli args parsing', () => {
   it('parses with devtoolsComments enabled', async () => {
     const args = parseArguments(['--devtoolsComments']);
     assert.strictEqual(args.devtoolsComments, true);
+  });
+
+  it('clears default values and populates defaultDescription in getCliOptions', () => {
+    const cliOptions = getCliOptions();
+
+    assert.strictEqual(cliOptions.viewport, undefined);
+    assert.strictEqual(cliOptions.experimentalStructuredContent, undefined);
+    assert.strictEqual(cliOptions.experimentalInteropTools, undefined);
+
+    for (const [key, option] of Object.entries(cliOptions)) {
+      assert.strictEqual(
+        option && 'default' in option,
+        false,
+        `Expected 'default' property for ${key} to be omitted`,
+      );
+    }
+
+    assert.strictEqual(cliOptions.headless?.defaultDescription, 'true');
+    assert.strictEqual(cliOptions.memoryDebugging?.defaultDescription, 'true');
+    assert.strictEqual(
+      cliOptions.filesystemRoot?.defaultDescription,
+      'OS temp directory',
+    );
   });
 });
 

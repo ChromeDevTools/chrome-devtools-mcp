@@ -111,4 +111,69 @@ describe('chrome-devtools', () => {
       `workspace was not forwarded: ${statusResult.stdout}`,
     );
   });
+
+  it('can start the daemon with a config file', async () => {
+    const userDataDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'chrome-devtools-config-profile-'),
+    );
+    const configPath = path.join(
+      os.tmpdir(),
+      `chrome-devtools-config-${crypto.randomUUID()}.json`,
+    );
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        userDataDir,
+        headless: true,
+      }),
+    );
+
+    try {
+      const relativeConfigPath = path.relative(process.cwd(), configPath);
+      const startResult = await runCli(
+        ['start', '--config', relativeConfigPath],
+        sessionId,
+      );
+      assert.strictEqual(
+        startResult.status,
+        0,
+        `start command failed: ${startResult.stderr}`,
+      );
+
+      const statusResult = await runCli(['status'], sessionId);
+      assert.strictEqual(statusResult.status, 0);
+      assert.ok(
+        statusResult.stdout.includes(JSON.stringify(`--config=${configPath}`)),
+        `resolved config path was not forwarded: ${statusResult.stdout}`,
+      );
+      assert.ok(
+        !statusResult.stdout.includes('--headless'),
+        `default --headless should not be forwarded when not specified on CLI: ${statusResult.stdout}`,
+      );
+      assert.ok(
+        !statusResult.stdout.includes('--filesystem-root'),
+        `default --filesystem-root should not be forwarded when not specified on CLI: ${statusResult.stdout}`,
+      );
+
+      const overrideResult = await runCli(
+        ['start', '--config', relativeConfigPath, '--headless'],
+        sessionId,
+      );
+      assert.strictEqual(
+        overrideResult.status,
+        0,
+        `start command with --headless override failed: ${overrideResult.stderr}`,
+      );
+
+      const overrideStatusResult = await runCli(['status'], sessionId);
+      assert.strictEqual(overrideStatusResult.status, 0);
+      assert.ok(
+        overrideStatusResult.stdout.includes('"--headless"'),
+        `explicit --headless CLI flag was not forwarded: ${overrideStatusResult.stdout}`,
+      );
+    } finally {
+      fs.rmSync(configPath, {force: true});
+      fs.rmSync(userDataDir, {recursive: true, force: true});
+    }
+  });
 });
