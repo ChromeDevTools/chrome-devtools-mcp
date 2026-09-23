@@ -296,9 +296,16 @@ export class McpContext implements Context {
 
       if (result.status === 'fulfilled') {
         const canonicalRoot = result.value;
+        // A canonical root can already end with the separator: the filesystem
+        // root is `/` on POSIX and `C:\` on Windows. Appending the separator
+        // again would turn it into `//`, which no path starts with, so every
+        // path below such a root would be rejected.
+        const rootPrefix = canonicalRoot.endsWith(path.sep)
+          ? canonicalRoot
+          : canonicalRoot + path.sep;
         if (
           canonicalPath === canonicalRoot ||
-          canonicalPath.startsWith(canonicalRoot + path.sep)
+          canonicalPath.startsWith(rootPrefix)
         ) {
           allowed = true;
           break;
