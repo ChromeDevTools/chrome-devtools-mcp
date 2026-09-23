@@ -283,9 +283,21 @@ describe('ToolHandler', () => {
       toolMutex,
     );
 
-    const params = {url: 'https://example.com', description: 'open the page'};
+    const params = {
+      url: 123,
+      description: 'open the page',
+      extra: true,
+    };
     const parseResult = toolHandler.registeredInputSchema.safeParse(params);
     assert.strictEqual(parseResult.success, false);
+    assert.strictEqual(parseResult.error.issues.length, 2);
+    assert.deepStrictEqual(
+      parseResult.error.issues.map(issue => issue.message),
+      [
+        'Invalid input: expected string, received number',
+        'Unrecognized keys: "description", "extra"',
+      ],
+    );
 
     const jsonSchema = zod.toJSONSchema(toolHandler.registeredInputSchema, {
       io: 'input',
