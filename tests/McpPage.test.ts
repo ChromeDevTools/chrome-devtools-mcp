@@ -350,7 +350,7 @@ describe('McpPage', () => {
       assert.strictEqual(mcpPage.pptrPage, pptrPage);
     });
 
-    it('disposes safely before init() is called', () => {
+    it('disposes safely before init() is called and rejects subsequent init()', async () => {
       const target = createMockPuppeteerTarget();
       const mcpPage = new McpPage(target, 1, {
         hasNetworkBlockOrAllowlist: false,
@@ -360,7 +360,28 @@ describe('McpPage', () => {
       assert.strictEqual(mcpPage.isClosed(), false);
       mcpPage.dispose();
       assert.strictEqual(mcpPage.isClosed(), true);
+      await assert.rejects(
+        () => mcpPage.init(),
+        /McpPage \(id=1\) has already been disposed/,
+      );
       sinon.assert.notCalled(target.page);
+    });
+
+    it('closes the underlying page without running init()', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+
+      await mcpPage.close();
+
+      assert.strictEqual(mcpPage.isClosed(), true);
+      sinon.assert.calledOnceWithExactly(pptrPage.close, {
+        runBeforeUnload: false,
+      });
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
     });
   });
 

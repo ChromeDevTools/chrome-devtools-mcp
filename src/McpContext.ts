@@ -160,6 +160,7 @@ export class McpContext implements Context {
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
+    this.#selectedPage?.dispose();
     this.#mcpPages.clear();
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
@@ -342,10 +343,8 @@ export class McpContext implements Context {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageById(pageId);
-    await page.init();
-    page.dispose();
     this.#mcpPages.delete(page.target);
-    await page.pptrPage.close({runBeforeUnload: false});
+    await page.close();
   }
 
   get #hasNetworkBlockOrAllowlist(): boolean {
@@ -465,6 +464,13 @@ export class McpContext implements Context {
   }
 
   selectPage(newPage: McpPage): void {
+    if (
+      this.#selectedPage &&
+      this.#selectedPage !== newPage &&
+      !this.#mcpPages.has(this.#selectedPage.target)
+    ) {
+      this.#selectedPage.dispose();
+    }
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -541,7 +547,9 @@ export class McpContext implements Context {
   }
 
   #createMcpPage(target: Target): McpPage {
-    let mcpPage = this.#mcpPages.get(target);
+    let mcpPage =
+      this.#mcpPages.get(target) ??
+      (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     if (!mcpPage) {
       mcpPage = new McpPage(target, nextPageId++, {
         locatorClass: this.#locatorClass,
@@ -553,8 +561,8 @@ export class McpContext implements Context {
         sourceMaps: this.#options.sourceMaps,
         onNotification: this.#options.onNotification,
       });
-      this.#mcpPages.set(target, mcpPage);
     }
+    this.#mcpPages.set(target, mcpPage);
     return mcpPage;
   }
 

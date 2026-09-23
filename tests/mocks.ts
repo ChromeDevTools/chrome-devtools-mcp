@@ -258,6 +258,9 @@ export function createMockMcpPage(
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
+  page.close.callsFake(async () => {
+    await pptrPage.close({runBeforeUnload: false});
+  });
   page.url.callsFake(() => pptrPage.url());
   page.getTitle.callsFake(async () => (await pptrPage.title()) ?? '');
   page.isClosed.callsFake(() => Boolean(pptrPage.isClosed()));

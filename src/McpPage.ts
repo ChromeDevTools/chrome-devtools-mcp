@@ -125,6 +125,7 @@ export class McpPage implements ContextPage {
   #pptrPage?: Page;
   #initPromise?: Promise<void>;
   #disposed = false;
+  #closed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -240,13 +241,29 @@ export class McpPage implements ContextPage {
   }
 
   isClosed(): boolean {
+    if (this.#closed) {
+      return true;
+    }
     if (this.#pptrPage) {
       return this.#pptrPage.isClosed();
     }
     return this.#disposed;
   }
 
+  async close(): Promise<void> {
+    this.#closed = true;
+    const page =
+      this.#pptrPage ??
+      (await this.target.page()) ??
+      (await this.target.asPage());
+    this.dispose();
+    await page?.close({runBeforeUnload: false});
+  }
+
   async init(): Promise<void> {
+    if (this.#disposed) {
+      throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
+    }
     if (this.#initPromise) {
       return this.#initPromise;
     }
@@ -266,6 +283,9 @@ export class McpPage implements ContextPage {
         throw new Error(
           `Failed to initialize Puppeteer Page for target ${this.target.url()}`,
         );
+      }
+      if (this.#disposed) {
+        return;
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
@@ -289,6 +309,9 @@ export class McpPage implements ContextPage {
       this.#initDevToolsUniverseNoThrow(),
       this.#initFocusEmulationNoThrow(),
     ]);
+    if (this.#disposed) {
+      this.dispose();
+    }
   }
 
   async #initFocusEmulationNoThrow(): Promise<void> {
