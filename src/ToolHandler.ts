@@ -71,26 +71,6 @@ function isPageScopedTool(
   return 'pageScoped' in tool && tool.pageScoped === true;
 }
 
-function formatArgumentNames(names: string[]): string {
-  return names.map(name => `"${name}"`).join(', ');
-}
-
-function buildUnknownArgumentsMessage(
-  toolName: string,
-  unknownArgumentNames: string[],
-  expectedArgumentNames: string[],
-): string {
-  const unknownLabel =
-    unknownArgumentNames.length === 1 ? 'argument' : 'arguments';
-  const expectedArguments = expectedArgumentNames.length
-    ? `Expected arguments: ${formatArgumentNames(expectedArgumentNames)}.`
-    : 'This tool does not accept any arguments.';
-  const correction =
-    unknownArgumentNames.length === 1 ? 'Remove it' : 'Remove them';
-
-  return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
-}
-
 async function validateAndResolvePathOrUrl(
   filePathOrUrl: string,
   context: McpContext,
@@ -167,7 +147,7 @@ export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodObject<
     zod.ZodRawShape,
-    zod.core.$loose
+    zod.core.$strict
   >;
   readonly disabled: boolean;
   private readonly disabledReason?: string;
@@ -183,13 +163,7 @@ export class ToolHandler {
     this.disabled = disabled && !serverArgs.viaCli;
 
     this.inputSchema = tool.schema;
-    this.registeredInputSchema = zod.object(this.inputSchema).loose();
-  }
-
-  unknownArgumentNames(params: Record<string, unknown>): string[] {
-    return Object.keys(params).filter(
-      key => !Object.hasOwn(this.inputSchema, key),
-    );
+    this.registeredInputSchema = zod.object(this.inputSchema).strict();
   }
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
@@ -201,23 +175,6 @@ export class ToolHandler {
           {
             type: 'text',
             text: this.disabledReason,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    const unknownArgumentNames = this.unknownArgumentNames(params);
-    if (unknownArgumentNames.length) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: buildUnknownArgumentsMessage(
-              this.tool.name,
-              unknownArgumentNames,
-              Object.keys(this.inputSchema),
-            ),
           },
         ],
         isError: true,

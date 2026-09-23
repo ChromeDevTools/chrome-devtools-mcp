@@ -251,10 +251,9 @@ describe('ToolHandler', () => {
     }
   });
 
-  it('reports unknown registered tool arguments clearly', async () => {
-    let handlerCalled = false;
+  it('rejects unknown registered tool arguments and sets additionalProperties to false', () => {
     const tool: ToolDefinition = {
-      name: 'lenient_tool',
+      name: 'strict_tool',
       description: 'A tool with a required argument',
       annotations: {
         category: ToolCategory.NAVIGATION,
@@ -266,7 +265,7 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: {},
       handler: async () => {
-        handlerCalled = true;
+        return;
       },
     };
 
@@ -285,19 +284,13 @@ describe('ToolHandler', () => {
     );
 
     const params = {url: 'https://example.com', description: 'open the page'};
-    assert.strictEqual(
-      toolHandler.registeredInputSchema.safeParse(params).success,
-      true,
-    );
+    const parseResult = toolHandler.registeredInputSchema.safeParse(params);
+    assert.strictEqual(parseResult.success, false);
 
-    const result = await toolHandler.handle(params);
-
-    assert.strictEqual(result.isError, true);
-    assert.match(
-      result.content[0].type === 'text' ? result.content[0].text : '',
-      /Unknown argument for tool "lenient_tool": "description"\. Expected arguments: "url"\./,
-    );
-    assert.strictEqual(handlerCalled, false);
+    const jsonSchema = zod.toJSONSchema(toolHandler.registeredInputSchema, {
+      io: 'input',
+    });
+    assert.strictEqual(jsonSchema.additionalProperties, false);
   });
 
   it('sets disabled to true and returns disabled reason when category is disabled', async () => {

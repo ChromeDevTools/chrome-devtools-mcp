@@ -144,7 +144,7 @@ describe('chrome-devtools', () => {
     assert.strictEqual(initScriptResult.status, 0);
     assert(
       initScriptResult.stdout.includes(
-        'Unknown argument for tool "navigate_page": "initScript"',
+        'Input validation error: Invalid arguments for tool navigate_page: Unrecognized key: "initScript"',
       ),
       'error message is unexpected: ' + initScriptResult.stdout,
     );
