@@ -111,6 +111,12 @@ export class McpServer {
             '--allow-unrestricted-paths.',
         );
       }
+
+      if (this.#serverArgs.autoConnect) {
+        void this.#browserManager.ensureBrowser().catch(err => {
+          logger?.('Failed to connect to Chrome during initialization', err);
+        });
+      }
     };
   }
 
@@ -202,6 +208,14 @@ export class McpServer {
   }
 
   async #getContext(): Promise<McpContext> {
+    if (
+      this.#serverArgs.autoConnect &&
+      this.#browserManager.isBrowserInitializing()
+    ) {
+      throw new Error(
+        'Chrome is still waiting for the remote debugging connection to be approved. Approve the request in Chrome, then retry this tool call.',
+      );
+    }
     const browser = await this.#browserManager.ensureBrowser();
 
     if (this.#context?.browser !== browser) {
