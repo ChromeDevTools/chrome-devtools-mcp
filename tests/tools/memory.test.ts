@@ -6,8 +6,6 @@
 
 import assert from 'node:assert';
 import {existsSync} from 'node:fs';
-import {rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it, afterEach} from 'node:test';
 
@@ -45,7 +43,7 @@ import {
   createMockRetainedByContextSummary,
   createMockRetainingPaths,
 } from '../mocks.js';
-import {withMcpContext} from '../utils.js';
+import {createTempDir, withMcpContext} from '../utils.js';
 
 describe('memory', () => {
   afterEach(() => {
@@ -54,23 +52,20 @@ describe('memory', () => {
 
   describe('take_heapsnapshot', () => {
     it('with default options', async () => {
+      using tmpDir = createTempDir();
       await withMcpContext(async (response, context, args) => {
-        const filePath = join(tmpdir(), 'test-screenshot.heapsnapshot');
-        try {
-          await takeHeapSnapshot(args).handler(
-            {params: {filePath}, page: context.getSelectedMcpPage()},
-            response,
-            context,
-          );
-          const canonicalFilePath = await resolveCanonicalPath(filePath);
-          assert.equal(
-            response.responseLines.at(0),
-            `Heap snapshot saved to ${canonicalFilePath}`,
-          );
-          assert.ok(existsSync(filePath));
-        } finally {
-          await rm(filePath, {force: true});
-        }
+        const filePath = join(tmpDir.path, 'test-screenshot.heapsnapshot');
+        await takeHeapSnapshot(args).handler(
+          {params: {filePath}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const canonicalFilePath = await resolveCanonicalPath(filePath);
+        assert.equal(
+          response.responseLines.at(0),
+          `Heap snapshot saved to ${canonicalFilePath}`,
+        );
+        assert.ok(existsSync(filePath));
       });
     });
 

@@ -5,8 +5,6 @@
  */
 
 import assert from 'node:assert';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -30,7 +28,12 @@ import {
   createMockElementHandle,
 } from '../mocks.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext, getTextContent} from '../utils.js';
+import {
+  createTempFile,
+  html,
+  withMcpContext,
+  getTextContent,
+} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
@@ -1481,8 +1484,7 @@ describe('input', () => {
 
   describe('uploadFile', () => {
     it('uploads a file to a file input', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
+      using testFile = createTempFile('test file content', 'test.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1501,7 +1503,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePaths: [testFilePath],
+              filePaths: [testFile.path],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1511,18 +1513,14 @@ describe('input', () => {
         assert.ok(response.includeSnapshot);
         assert.strictEqual(
           response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
+          `File uploaded from ${testFile.path}.`,
         );
       });
-
-      await fs.unlink(testFilePath);
     });
 
     it('uploads multiple files to a file input', async () => {
-      const firstFilePath = path.join(process.cwd(), 'first.txt');
-      const secondFilePath = path.join(process.cwd(), 'second.txt');
-      await fs.writeFile(firstFilePath, 'first file content');
-      await fs.writeFile(secondFilePath, 'second file content');
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1542,7 +1540,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePaths: [firstFilePath, secondFilePath],
+              filePaths: [firstFile.path, secondFile.path],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1551,7 +1549,7 @@ describe('input', () => {
         );
         assert.strictEqual(
           response.responseLines[0],
-          `File uploaded from ${firstFilePath}, ${secondFilePath}.`,
+          `File uploaded from ${firstFile.path}, ${secondFile.path}.`,
         );
         const uploadedFileNames = await page.$eval('#file-input', el => {
           const input = el as HTMLInputElement;
@@ -1559,14 +1557,10 @@ describe('input', () => {
         });
         assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
       });
-
-      await fs.unlink(firstFilePath);
-      await fs.unlink(secondFilePath);
     });
 
     it('uploads a file when clicking an element opens a file uploader', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
+      using testFile = createTempFile('test file content', 'test.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1592,7 +1586,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_1',
-              filePaths: [testFilePath],
+              filePaths: [testFile.path],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1602,21 +1596,18 @@ describe('input', () => {
         assert.ok(response.includeSnapshot);
         assert.strictEqual(
           response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
+          `File uploaded from ${testFile.path}.`,
         );
         const uploadedFileName = await page.$eval('#file-input', el => {
           const input = el as HTMLInputElement;
           return input.files?.[0]?.name;
         });
         assert.strictEqual(uploadedFileName, 'test.txt');
-
-        await fs.unlink(testFilePath);
       });
     });
 
     it('throws an error if the element is not a file input and does not open a file chooser', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
+      using testFile = createTempFile('test file content', 'test.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1630,7 +1621,7 @@ describe('input', () => {
             {
               params: {
                 uid: '1_1',
-                filePaths: [testFilePath],
+                filePaths: [testFile.path],
               },
               page: context.getSelectedMcpPage(),
             },
@@ -1645,8 +1636,6 @@ describe('input', () => {
 
         assert.strictEqual(response.responseLines.length, 0);
         assert.strictEqual(response.snapshotParams, undefined);
-
-        await fs.unlink(testFilePath);
       });
     });
   });

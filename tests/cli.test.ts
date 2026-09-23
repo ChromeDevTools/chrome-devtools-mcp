@@ -6,9 +6,6 @@
 
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
@@ -18,25 +15,12 @@ import {
   parser,
 } from '../src/config/mcp-options.js';
 
+import {createTempFile} from './utils.js';
+
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return parser('0.0.0', ['node', 'main.js', ...argv], env)
     .exitProcess(false)
     .parseSync();
-}
-
-function createTempFile(content: string, fileName: string) {
-  const filePath = path.join(os.tmpdir(), fileName);
-  fs.writeFileSync(filePath, content);
-  return {
-    path: filePath,
-    [Symbol.dispose]() {
-      try {
-        fs.unlinkSync(filePath);
-      } catch {
-        // ignore
-      }
-    },
-  };
 }
 
 describe('cli args parsing', () => {

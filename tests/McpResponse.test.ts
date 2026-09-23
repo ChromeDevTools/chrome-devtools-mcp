@@ -5,8 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {readFile, rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
@@ -50,6 +49,7 @@ import {
   createMockParsedArguments,
 } from './mocks.js';
 import {
+  createTempDir,
   getImageContent,
   getMockAggregatedIssue,
   getMockRequest,
@@ -171,25 +171,22 @@ describe('McpResponse', () => {
   });
 
   it('saves snapshot to file and returns structured content', async t => {
-    const filePath = join(tmpdir(), 'test-snapshot.txt');
-    try {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(html`<aside>test</aside>`);
-        response.includeSnapshot({
-          verbose: true,
-          filePath,
-        });
-        const {content, structuredContent} = await response.handle(context);
-        assert.equal(content[0].type, 'text');
-        t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    using tmpDir = createTempDir();
+    const filePath = join(tmpDir.path, 'test-snapshot.txt');
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage().pptrPage;
+      await page.setContent(html`<aside>test</aside>`);
+      response.includeSnapshot({
+        verbose: true,
+        filePath,
       });
-      const content = await readFile(filePath, 'utf-8');
-      t.assert.snapshot(stabilizeResponseOutput(content));
-    } finally {
-      await rm(filePath, {force: true});
-    }
+      const {content, structuredContent} = await response.handle(context);
+      assert.equal(content[0].type, 'text');
+      t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    });
+    const content = await readFile(filePath, 'utf-8');
+    t.assert.snapshot(stabilizeResponseOutput(content));
   });
 
   it('preserves mapping ids across multiple snapshots', async () => {
