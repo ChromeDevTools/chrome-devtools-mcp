@@ -7,7 +7,6 @@
 import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
-import type {ExtensionServiceWorker} from '../types.js';
 
 import {ToolCategory} from './categories.js';
 import type {Context, Response} from './ToolDefinition.js';
@@ -220,22 +219,16 @@ const getWebWorker = async (
   context: Context,
   serviceWorkerId: string,
 ): Promise<WebWorker> => {
-  const serviceWorkers = context.getExtensionServiceWorkers();
+  const serviceWorker = context.getWorkerById(serviceWorkerId);
 
-  const serviceWorker = serviceWorkers.find(
-    (sw: ExtensionServiceWorker) =>
-      context.getExtensionServiceWorkerId(sw) === serviceWorkerId,
-  );
-
-  if (serviceWorker && serviceWorker.target) {
-    const worker = await serviceWorker.target.worker();
-
-    if (!worker) {
-      throw new Error('Service worker target not found.');
-    }
-
-    return worker;
-  } else {
+  if (!serviceWorker || serviceWorker.type !== 'service_worker') {
     throw new Error('Service worker not found.');
   }
+
+  const worker = await serviceWorker.worker();
+  if (!worker) {
+    throw new Error('Service worker target not found.');
+  }
+
+  return worker;
 };

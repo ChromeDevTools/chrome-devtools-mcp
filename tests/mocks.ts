@@ -29,6 +29,7 @@ import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {McpWorker, type WorkerType} from '../src/McpWorker.js';
 import type {
   AggregatedInfoWithId,
   DuplicateStringGroup,
@@ -42,10 +43,12 @@ import {
   CdpExtension,
   CdpFrame,
   CdpPage,
+  CdpTarget,
   DevTools,
   Dialog,
   ElementHandle,
   Locator,
+  WebWorker,
 } from '../src/third_party/index.js';
 import type {
   Browser,
@@ -54,6 +57,7 @@ import type {
   Protocol,
   Result,
   RunnerResult,
+  Target,
 } from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -224,6 +228,41 @@ export function createMockElementHandle(): {
   locator.setTimeout.returns(locator);
   handle.asLocator.returns(locator);
   return {handle, locator};
+}
+
+// Stubs of Puppeteer's abstract Target / WebWorker via their concrete Cdp*
+// subclasses. The `as unknown as` bridges Puppeteer's nominal class types, the
+// same way createMockPuppeteerPage above stubs a Page through CdpPage.
+export function createMockTarget(): sinon.SinonStubbedInstance<Target> {
+  return sinon.createStubInstance(
+    CdpTarget,
+  ) as unknown as sinon.SinonStubbedInstance<Target>;
+}
+
+export function createMockWebWorker(): WebWorker {
+  return sinon.createStubInstance(WebWorker) as unknown as WebWorker;
+}
+
+export function createMockMcpWorker(
+  options: {
+    id?: string;
+    type?: WorkerType;
+    url?: string;
+    worker?: WebWorker;
+  } = {},
+): McpWorker {
+  // A real McpWorker over a stubbed Target, so `url`/`worker()` resolve through
+  // the same code paths as in production rather than through stubbed getters.
+  const target = createMockTarget();
+  target.url.returns(
+    options.url ?? 'chrome-extension://mock-extension-id/sw.js',
+  );
+  target.worker.resolves(options.worker ?? null);
+  return new McpWorker(
+    options.id ?? 'sw-1',
+    options.type ?? 'service_worker',
+    target,
+  );
 }
 
 export function createMockMcpContext(

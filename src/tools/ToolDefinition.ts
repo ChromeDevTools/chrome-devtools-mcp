@@ -37,9 +37,9 @@ import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
-  ExtensionServiceWorker,
   CD4ACommentThread,
 } from '../types.js';
+import type {McpWorker} from '../McpWorker.js';
 import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
@@ -287,10 +287,8 @@ export type Context = Readonly<{
   listExtensions(): Promise<Map<string, Extension>>;
   getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
-  getExtensionServiceWorkers(): ExtensionServiceWorker[];
-  getExtensionServiceWorkerId(
-    extensionServiceWorker: ExtensionServiceWorker,
-  ): string | undefined;
+  getWorkers(): McpWorker[];
+  getWorkerById(id: string): McpWorker | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,

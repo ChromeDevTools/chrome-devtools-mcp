@@ -351,15 +351,15 @@ describe('script', () => {
             t => t.type() === 'service_worker' && t.url().includes(extensionId),
           );
 
-          await context.createExtensionServiceWorkersSnapshot();
-          const swList = context.getExtensionServiceWorkers();
+          context.createWorkersSnapshot();
+          const swList = context.getWorkers();
           const sw = swList.find(s => s.target === swTarget);
 
           if (!sw) {
             assert.fail('Service worker not found in context list');
           }
 
-          const swId = context.getExtensionServiceWorkerId(sw);
+          const swId = sw.id;
 
           await context.triggerExtensionAction(extensionId);
 
