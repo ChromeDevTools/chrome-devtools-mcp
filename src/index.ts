@@ -289,6 +289,8 @@ export class McpServer {
       this.#serverArgs,
       () => this.#getContext(),
       this.#toolMutex,
+      browser => this.#browserManager.forget(browser),
+      () => this.#browserManager.abandonPendingAttempt(),
     );
 
     this.#tools.set(tool.name, toolHandler);
