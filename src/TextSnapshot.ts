@@ -5,14 +5,31 @@
  */
 
 import type {McpPage} from './McpPage.js';
+import {CdpFrame} from './third_party/index.js';
 import type {
   Protocol,
   SerializedAXNode,
   ElementHandle,
+  Frame,
 } from './third_party/index.js';
 import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';
+
+function stableNodeKey(
+  node: SerializedAXNode & {loaderId?: string; backendNodeId?: number},
+  sessionId: string,
+): string | undefined {
+  if (
+    !sessionId ||
+    !node.loaderId ||
+    !node.backendNodeId ||
+    node.backendNodeId < 0
+  ) {
+    return;
+  }
+  return `${sessionId}_${node.loaderId}_${node.backendNodeId}`;
+}
 
 export class TextSnapshot {
   static nextSnapshotId = 1;
@@ -27,6 +44,7 @@ export class TextSnapshot {
   selectedElementUid?: string;
   hasSelectedElement: boolean;
   verbose: boolean;
+  #nodesByFrame: Map<Frame, Map<number, TextSnapshotNode>>;
 
   constructor(data: {
     root: TextSnapshotNode;
@@ -35,6 +53,7 @@ export class TextSnapshot {
     selectedElementUid?: string;
     hasSelectedElement: boolean;
     verbose: boolean;
+    nodesByFrame: Map<Frame, Map<number, TextSnapshotNode>>;
   }) {
     this.root = data.root;
     this.idToNode = data.idToNode;
@@ -42,6 +61,7 @@ export class TextSnapshot {
     this.selectedElementUid = data.selectedElementUid;
     this.hasSelectedElement = data.hasSelectedElement;
     this.verbose = data.verbose;
+    this.#nodesByFrame = data.nodesByFrame;
   }
 
   static async create(
@@ -53,6 +73,32 @@ export class TextSnapshot {
     } = {},
   ): Promise<TextSnapshot> {
     const verbose = options.verbose ?? false;
+    const mainFrame = page.pptrPage.mainFrame();
+    const frameStates = new Map<
+      Frame,
+      {client: CdpFrame['client']; loaderId: string}
+    >();
+    for (const frame of page.pptrPage.frames()) {
+      if (frame instanceof CdpFrame) {
+        frameStates.set(frame, {
+          client: frame.client,
+          loaderId: frame._loaderId,
+        });
+      }
+    }
+    const currentClient = (frame: Frame): CdpFrame['client'] => {
+      const state = frameStates.get(frame);
+      if (
+        !state ||
+        !(frame instanceof CdpFrame) ||
+        frame.detached ||
+        frame.client !== state.client ||
+        frame._loaderId !== state.loaderId
+      ) {
+        throw new Error('Snapshot document changed. Take a new snapshot.');
+      }
+      return state.client;
+    };
     const rootNode = await page.pptrPage.accessibility.snapshot({
       includeIframes: true,
       interestingOnly: !verbose,
@@ -68,25 +114,59 @@ export class TextSnapshot {
     let idCounter = 0;
     const idToNode = new Map<string, TextSnapshotNode>();
     const seenUniqueIds = new Set<string>();
-    const seenBackendNodeIds = new Set<number>();
+    const nodeFrames = new Map<SerializedAXNode, Frame>();
+    const documentIds = new Map<Frame, string | undefined>();
+    const nodesByFrame = new Map<Frame, Map<number, TextSnapshotNode>>();
+    const keyCounts = new Map<string, number>();
+    const pending = [{node: rootNode, frame: mainFrame}];
+    for (const entry of pending) {
+      const node: SerializedAXNode & {loaderId?: string} = entry.node;
+      let frame = entry.frame;
+      if (node !== rootNode && node.role === 'RootWebArea') {
+        using handle = await node.elementHandle();
+        if (!handle) {
+          throw new Error(
+            'Snapshot document disappeared. Take a new snapshot.',
+          );
+        }
+        frame = handle.frame;
+      }
+      const key = stableNodeKey(node, currentClient(frame).id());
+      if (key !== undefined) {
+        keyCounts.set(key, (keyCounts.get(key) ?? 0) + 1);
+      }
+      if (node.role === 'RootWebArea') {
+        documentIds.set(frame, node.loaderId);
+      }
+      nodeFrames.set(node, frame);
+      for (const child of node.children ?? []) {
+        pending.push({node: child, frame});
+      }
+    }
+
+    // A repeated backend identity cannot identify either occurrence across captures.
+    for (const [key, count] of keyCounts) {
+      if (count > 1) {
+        uniqueBackendNodeIdToMcpId.delete(key);
+      }
+    }
 
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
-      let id = '';
-      // @ts-expect-error untyped backendNodeId.
-      const backendNodeId: number = node.backendNodeId;
-      // @ts-expect-error untyped loaderId.
-      const uniqueBackendId = `${node.loaderId}_${backendNodeId}`;
-      const existingMcpId = uniqueBackendNodeIdToMcpId.get(uniqueBackendId);
-      if (existingMcpId !== undefined) {
-        // Re-use MCP exposed ID if the uniqueId is the same.
-        id = existingMcpId;
-      } else {
-        // Only generate a new ID if we have not seen the node before.
-        id = `${snapshotId}_${idCounter++}`;
-        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+      const frame = nodeFrames.get(node);
+      if (!frame) {
+        throw new Error('Snapshot node has no frame');
       }
-      seenUniqueIds.add(uniqueBackendId);
-      seenBackendNodeIds.add(backendNodeId);
+      const key = stableNodeKey(node, currentClient(frame).id());
+      const stableKey =
+        key !== undefined && keyCounts.get(key) === 1 ? key : undefined;
+      const id =
+        (stableKey !== undefined
+          ? uniqueBackendNodeIdToMcpId.get(stableKey)
+          : undefined) ?? `${snapshotId}_${idCounter++}`;
+      if (stableKey !== undefined) {
+        uniqueBackendNodeIdToMcpId.set(stableKey, id);
+        seenUniqueIds.add(stableKey);
+      }
 
       const nodeWithId: TextSnapshotNode = {
         ...node,
@@ -94,7 +174,26 @@ export class TextSnapshot {
         children: node.children
           ? node.children.map(child => assignIds(child))
           : [],
+        elementHandle: async () => {
+          currentClient(frame);
+          const handle = await node.elementHandle();
+          try {
+            currentClient(frame);
+            return handle;
+          } catch (error) {
+            await handle?.dispose();
+            throw error;
+          }
+        },
       };
+      if (nodeWithId.backendNodeId) {
+        let nodes = nodesByFrame.get(frame);
+        if (!nodes) {
+          nodes = new Map();
+          nodesByFrame.set(frame, nodes);
+        }
+        nodes.set(nodeWithId.backendNodeId, nodeWithId);
+      }
 
       // The AXNode for an option doesn't contain its `value`.
       // Therefore, set text content of the option as value.
@@ -117,8 +216,9 @@ export class TextSnapshot {
       seenUniqueIds,
       snapshotId,
       idCounter,
-      rootNodeWithId,
-      seenBackendNodeIds,
+      nodesByFrame,
+      documentIds,
+      currentClient,
       options.extraHandles ?? [],
     );
 
@@ -128,6 +228,7 @@ export class TextSnapshot {
       idToNode,
       hasSelectedElement: false,
       verbose,
+      nodesByFrame,
     });
 
     const data = options.devtoolsData ?? (await page.getDevToolsData());
@@ -148,23 +249,32 @@ export class TextSnapshot {
     return snapshot;
   }
 
-  resolveCdpElementId(cdpBackendNodeId: number): string | undefined {
+  resolveCdpElementId(
+    cdpBackendNodeId: number,
+    frame?: Frame,
+  ): string | undefined {
     if (!cdpBackendNodeId) {
       logger?.('no cdpBackendNodeId');
       return;
     }
-    // TODO: index by backendNodeId instead.
+    if (frame) {
+      return this.#nodesByFrame.get(frame)?.get(cdpBackendNodeId)?.id;
+    }
+    let match: string | undefined;
     const queue = [this.root];
     while (queue.length) {
       const current = queue.pop()!;
       if (current.backendNodeId === cdpBackendNodeId) {
-        return current.id;
+        if (match !== undefined) {
+          return;
+        }
+        match = current.id;
       }
       for (const child of current.children) {
         queue.push(child);
       }
     }
-    return;
+    return match;
   }
 
   // ExtraHandles represent DOM nodes which might not be part of the accessibility tree, e.g. DOM nodes
@@ -176,8 +286,9 @@ export class TextSnapshot {
     seenUniqueIds: Set<string>,
     snapshotId: number,
     idCounter: number,
-    rootNodeWithId: TextSnapshotNode,
-    seenBackendNodeIds: Set<number>,
+    nodesByFrame: Map<Frame, Map<number, TextSnapshotNode>>,
+    documentIds: Map<Frame, string | undefined>,
+    currentClient: (frame: Frame) => CdpFrame['client'],
     extraHandles: ElementHandle[],
   ): Promise<void> {
     const {uniqueBackendNodeIdToMcpId} = page;
@@ -185,35 +296,44 @@ export class TextSnapshot {
     const createExtraNode = async (
       handle: ElementHandle,
     ): Promise<TextSnapshotNode | null> => {
+      const frame = handle.frame;
+      const client = currentClient(frame);
       const backendNodeId = await handle.backendNodeId();
-      if (!backendNodeId || seenBackendNodeIds.has(backendNodeId)) {
+      let nodes = nodesByFrame.get(frame);
+      if (!backendNodeId || nodes?.has(backendNodeId)) {
         return null;
       }
-      const uniqueBackendId = `custom_${backendNodeId}`;
-      if (seenUniqueIds.has(uniqueBackendId)) {
-        return null;
-      }
-      seenBackendNodeIds.add(backendNodeId);
+      const documentId = documentIds.get(frame);
+      const uniqueBackendId = documentId
+        ? `custom_${client.id()}_${documentId}_${backendNodeId}`
+        : undefined;
 
-      let id = '';
-      const mcpId = uniqueBackendNodeIdToMcpId.get(uniqueBackendId);
-      if (mcpId !== undefined) {
-        id = mcpId;
-      } else {
-        id = `${snapshotId}_${idCounter++}`;
+      const id =
+        (uniqueBackendId !== undefined
+          ? uniqueBackendNodeIdToMcpId.get(uniqueBackendId)
+          : undefined) ?? `${snapshotId}_${idCounter++}`;
+      if (uniqueBackendId !== undefined) {
         uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+        seenUniqueIds.add(uniqueBackendId);
       }
-      seenUniqueIds.add(uniqueBackendId);
 
-      const tagHandle = await handle.getProperty('localName');
+      using tagHandle = await handle.getProperty('localName');
       const tagValue = await tagHandle.jsonValue();
       const extraNode: TextSnapshotNode = {
         role: tagValue,
         id,
         backendNodeId,
         children: [],
-        elementHandle: async () => handle,
+        elementHandle: async () => {
+          currentClient(frame);
+          return await handle.evaluateHandle(element => element);
+        },
       };
+      if (!nodes) {
+        nodes = new Map();
+        nodesByFrame.set(frame, nodes);
+      }
+      nodes.set(backendNodeId, extraNode);
       return extraNode;
     };
 
@@ -233,9 +353,9 @@ export class TextSnapshot {
 
         const ancestorBackendId = await ancestorElement.backendNodeId();
         if (ancestorBackendId) {
-          const ancestorNode = idToNode
-            .values()
-            .find(node => node.backendNodeId === ancestorBackendId);
+          const ancestorNode = nodesByFrame
+            .get(handle.frame)
+            ?.get(ancestorBackendId);
           if (ancestorNode) {
             return ancestorNode;
           }
@@ -250,6 +370,7 @@ export class TextSnapshot {
     };
 
     const findDescendantNodes = async (
+      frame: Frame,
       backendNodeId?: number,
     ): Promise<Set<number>> => {
       const descendantIds = new Set<number>();
@@ -257,29 +378,26 @@ export class TextSnapshot {
         return descendantIds;
       }
       try {
-        // @ts-expect-error internal API
-        const client = page.pptrPage._client();
-        if (client) {
-          const {node}: {node: Protocol.DOM.Node} = await client.send(
-            'DOM.describeNode',
-            {
-              backendNodeId,
-              depth: -1,
-              pierce: true,
-            },
-          );
-          const collect = (node: Protocol.DOM.Node) => {
-            if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
-              descendantIds.add(node.backendNodeId);
+        const client = currentClient(frame);
+        const {node}: {node: Protocol.DOM.Node} = await client.send(
+          'DOM.describeNode',
+          {
+            backendNodeId,
+            depth: -1,
+            pierce: true,
+          },
+        );
+        const collect = (node: Protocol.DOM.Node) => {
+          if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
+            descendantIds.add(node.backendNodeId);
+          }
+          if (node.children) {
+            for (const child of node.children) {
+              collect(child);
             }
-            if (node.children) {
-              for (const child of node.children) {
-                collect(child);
-              }
-            }
-          };
-          collect(node);
-        }
+          }
+        };
+        collect(node);
       } catch (e) {
         logger?.(
           `Failed to collect descendants for backend node ${backendNodeId}`,
@@ -331,8 +449,21 @@ export class TextSnapshot {
         continue;
       }
       idToNode.set(extraNode.id, extraNode);
-      const attachTarget = (await findAncestorNode(handle)) || rootNodeWithId;
-      const descendantIds = await findDescendantNodes(extraNode.backendNodeId);
+      const attachTarget =
+        (await findAncestorNode(handle)) ??
+        nodesByFrame
+          .get(handle.frame)
+          ?.values()
+          .find(node => node.role === 'RootWebArea');
+      if (!attachTarget) {
+        throw new Error(
+          'Extra node has no snapshot document. Take a new snapshot.',
+        );
+      }
+      const descendantIds = await findDescendantNodes(
+        handle.frame,
+        extraNode.backendNodeId,
+      );
       reorgInfo.push({extraNode, attachTarget, descendantIds});
     }
 

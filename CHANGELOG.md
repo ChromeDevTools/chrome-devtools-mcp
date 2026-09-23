@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Keep snapshot element IDs distinct when document metadata is missing or ambiguous, scope extra DOM nodes to their frames, and reject stale references after document replacement.
+
 ## [1.9.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.8.0...chrome-devtools-mcp-v1.9.0) (2026-09-08)
 
 

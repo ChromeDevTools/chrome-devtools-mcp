@@ -838,6 +838,7 @@ describe('McpPage', () => {
       mcpPage.textSnapshot = new TextSnapshot({
         root: rootNode,
         idToNode: new Map<string, TextSnapshotNode>(),
+        nodesByFrame: new Map(),
         snapshotId: '1',
         hasSelectedElement: false,
         verbose: false,
@@ -860,6 +861,7 @@ describe('McpPage', () => {
       mcpPage.textSnapshot = new TextSnapshot({
         root: node,
         idToNode,
+        nodesByFrame: new Map(),
         snapshotId: '1',
         hasSelectedElement: false,
         verbose: false,

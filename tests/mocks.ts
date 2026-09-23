@@ -22,7 +22,7 @@
  *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
-import type {Frame} from 'puppeteer-core';
+import {CDPSession, type Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
@@ -158,6 +158,11 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   // PageCollector can subscribe to FrameNavigatedWithinDocument and tests
   // can trigger it.
   const mainFrameStub = sinon.createStubInstance(CdpFrame);
+  const mainFrameSession = Object.assign(sinon.createStubInstance(CDPSession), {
+    id: sinon.stub().returns('main-session'),
+  });
+  sinon.stub(mainFrameStub, 'client').get(() => mainFrameSession);
+  sinon.stub(mainFrameStub, 'detached').get(() => false);
   const mainFrameListener = mockListener();
   mainFrameStub.on.callsFake((eventName, handler) => {
     mainFrameListener.on(eventName, handler);
@@ -173,6 +178,7 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   });
   // SinonStubbedInstance<CdpFrame> is not assignable to Frame due to private fields.
   page.mainFrame.returns(mainFrameStub as unknown as Frame);
+  page.frames.returns([page.mainFrame()]);
 
   // _client() is a private internal Puppeteer API used by ConsoleCollector
   // in the McpPage constructor. Not on the CdpPage prototype, so added
