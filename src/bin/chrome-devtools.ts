@@ -8,7 +8,6 @@
 
 process.title = 'chrome-devtools';
 
-import path from 'node:path';
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -279,17 +278,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
         const commandArgs: Record<string, unknown> = {};
         for (const argName of Object.keys(args)) {
           if (argName in argv) {
-            const value = argv[argName];
-            const isEvaluateScriptPath =
-              commandName === 'evaluate_script' &&
-              (argName === 'sourcePath' || argName === 'filePath');
-            commandArgs[argName] =
-              isEvaluateScriptPath &&
-              typeof value === 'string' &&
-              !path.isAbsolute(value) &&
-              !/^file:/i.test(value)
-                ? path.resolve(value)
-                : value;
+            commandArgs[argName] = argv[argName];
           }
         }
 

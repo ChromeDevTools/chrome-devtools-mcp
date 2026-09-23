@@ -210,9 +210,11 @@ const resolveScriptSource = async (
   try {
     return await context.loadResource(resourceUrl);
   } catch (error) {
-    throw new Error(`Unable to read script source from ${sourcePath}.`, {
-      cause: error,
-    });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Unable to read script source from ${sourcePath}: ${errorMessage}`,
+      {cause: error},
+    );
   }
 };
 
@@ -226,10 +228,13 @@ const performEvaluation = async (
 ) => {
   let result: string | undefined;
   if (format === 'function') {
-    using fn = await evaluatable.evaluateHandle(`0,\n${source}\n`);
+    const functionSource = source.trimEnd().replace(/;$/, '');
+    using fn = await evaluatable.evaluateHandle<
+      [],
+      () => (...args: unknown[]) => unknown
+    >(`(\n${functionSource}\n)`);
     result = await evaluatable.evaluate(
       async (fn, ...args) => {
-        // @ts-expect-error no types for function fn
         return JSON.stringify(await fn(...args));
       },
       fn,
