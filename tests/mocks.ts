@@ -46,9 +46,13 @@ import {
   Dialog,
   ElementHandle,
   Locator,
+  Target,
+  TargetType,
 } from '../src/third_party/index.js';
 import type {
   Browser,
+  BrowserContext,
+  CDPSession,
   Extension,
   Page,
   Protocol,
@@ -58,6 +62,7 @@ import type {
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
   pptrPage: sinon.SinonStubbedInstance<Page>;
+  target: sinon.SinonStubbedInstance<MockTarget>;
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
@@ -192,16 +197,85 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   return page;
 }
 
+export class MockTarget extends Target {
+  override asPage(): Promise<Page> {
+    throw new Error('Not implemented');
+  }
+  override url(): string {
+    return '';
+  }
+  override createCDPSession(): Promise<CDPSession> {
+    throw new Error('Not implemented');
+  }
+  override type(): TargetType {
+    return TargetType.PAGE;
+  }
+  override browser(): Browser {
+    throw new Error('Not implemented');
+  }
+  override browserContext(): BrowserContext {
+    throw new Error('Not implemented');
+  }
+  override opener(): Target | undefined {
+    return undefined;
+  }
+  _getTargetInfo(): Protocol.Target.TargetInfo {
+    throw new Error('Not implemented');
+  }
+}
+
+export function createMockPuppeteerTarget(
+  options: {
+    page?: sinon.SinonStubbedInstance<Page>;
+    url?: string;
+    title?: string;
+  } = {},
+): sinon.SinonStubbedInstance<MockTarget> {
+  const target = sinon.createStubInstance(MockTarget);
+  const page = options.page ?? createMockPuppeteerPage();
+  page.target.returns(target);
+  target.page.resolves(page);
+  target.asPage.resolves(page);
+  target.url.returns(options.url ?? 'https://example.com');
+  target._getTargetInfo.returns({
+    targetId: '<mock-target-id>',
+    type: 'page',
+    title: options.title ?? '',
+    url: options.url ?? 'https://example.com',
+    attached: true,
+    canAccessOpener: false,
+  });
+  return target;
+}
+
 export function createMockMcpPage(
-  options: {pptrPage?: sinon.SinonStubbedInstance<Page>} = {},
+  options: {
+    pptrPage?: sinon.SinonStubbedInstance<Page>;
+    target?: sinon.SinonStubbedInstance<MockTarget>;
+  } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
+  const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
+  page.init.resolves();
+  page.url.callsFake(() => pptrPage.url());
+  page.getTitle.callsFake(async () => (await pptrPage.title()) ?? '');
+  page.isClosed.callsFake(() => Boolean(pptrPage.isClosed()));
   page.waitForEventsAfterAction.callsFake(async action => {
     await action(new AbortController().signal);
     return {};
   });
-  return Object.assign(page, {pptrPage});
+  Object.defineProperty(page, 'pptrPage', {
+    value: pptrPage,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(page, 'target', {
+    value: target,
+    writable: true,
+    configurable: true,
+  });
+  return Object.assign(page, {pptrPage, target});
 }
 
 export function createMockDialog(

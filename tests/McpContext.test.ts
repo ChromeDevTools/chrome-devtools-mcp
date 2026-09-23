@@ -308,12 +308,12 @@ describe('McpContext', () => {
       const page = await context.newPage();
       assert.ok(context.isPageSelected(page));
 
-      // A live page that is temporarily missing from the pages list must keep
+      // A live page that is temporarily missing from the targets list must keep
       // its selection — only a genuinely closed page is replaced.
-      const pages = await context.browser.pages();
+      const targets = context.browser.targets();
       const stub = sinon
-        .stub(context.browser, 'pages')
-        .resolves(pages.filter(otherPage => otherPage !== page.pptrPage));
+        .stub(context.browser, 'targets')
+        .returns(targets.filter(otherTarget => otherTarget !== page.target));
       try {
         await context.createPagesSnapshot();
       } finally {
@@ -325,6 +325,27 @@ describe('McpContext', () => {
         'a still-open page should keep its selection',
       );
       assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('enumerates page targets without initializing unselected pages', async () => {
+    await withMcpContext(async (_response, context) => {
+      const selectedPage = context.getSelectedMcpPage();
+      const unselectedPptrPage = await context.browser.newPage();
+      const unselectedTarget = unselectedPptrPage.target();
+
+      await context.createPagesSnapshot();
+
+      const unselectedMcpPage = context
+        .getPages()
+        .find(p => p.target === unselectedTarget);
+      assert.ok(unselectedMcpPage, 'unselected target should be discovered');
+      assert.notStrictEqual(unselectedMcpPage, selectedPage);
+      assert.throws(() => unselectedMcpPage.pptrPage, /is not initialized/);
+
+      await unselectedMcpPage.init();
+      assert.strictEqual(unselectedMcpPage.pptrPage, unselectedPptrPage);
+      await unselectedPptrPage.close();
     });
   });
 

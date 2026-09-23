@@ -43,7 +43,6 @@ import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
-  Page,
   ResourceType,
   TextContent,
   Extension,
@@ -1000,7 +999,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           acc: {regularPages: McpPage[]; extensionPages: McpPage[]},
           mcpPage: McpPage,
         ) => {
-          if (mcpPage.pptrPage.url().startsWith('chrome-extension://')) {
+          if (mcpPage.url().startsWith('chrome-extension://')) {
             acc.extensionPages.push(mcpPage);
           } else {
             acc.regularPages.push(mcpPage);
@@ -1030,10 +1029,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await fetchPageTitle(mcpPage.pptrPage);
+          const title = await mcpPage.getTitle();
           const pageLabel = title
-            ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
-            : mcpPage.pptrPage.url();
+            ? `${truncateTitle(title)} (${mcpPage.url()})`
+            : mcpPage.url();
           parts.push(
             `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
           );
@@ -1052,10 +1051,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await fetchPageTitle(mcpPage.pptrPage);
+            const title = await mcpPage.getTitle();
             const pageLabel = title
-              ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
-              : mcpPage.pptrPage.url();
+              ? `${truncateTitle(title)} (${mcpPage.url()})`
+              : mcpPage.url();
             response.push(
               `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
             );
@@ -1623,13 +1622,6 @@ function truncateTitle(title: string, maxLength = 50): string {
   return title.slice(0, maxLength - 3) + '...';
 }
 
-async function fetchPageTitle(page: Page): Promise<string> {
-  return Promise.race([
-    page.title().catch(() => ''),
-    new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
-  ]);
-}
-
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
@@ -1645,7 +1637,7 @@ function createStructuredPage(
     isolatedContext?: string;
   } = {
     id: mcpPage.id,
-    url: mcpPage.pptrPage.url(),
+    url: mcpPage.url(),
     title,
     selected: context.isPageSelected(mcpPage),
   };

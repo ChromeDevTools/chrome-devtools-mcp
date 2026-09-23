@@ -74,8 +74,8 @@ describe('ToolHandler', () => {
     assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({pageId: 1});
 
-    assert.strictEqual(mockContext.getPageById.calledOnce, true);
-    assert.strictEqual(mockContext.getPageById.calledWith(1), true);
+    sinon.assert.calledOnceWithExactly(mockContext.getPageById, 1);
+    sinon.assert.calledOnceWithExactly(mockPage.init);
     assert.strictEqual(handlerCalled, true);
   });
 
@@ -119,7 +119,8 @@ describe('ToolHandler', () => {
     assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({});
 
-    assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+    sinon.assert.calledOnceWithExactly(mockContext.getSelectedMcpPage);
+    sinon.assert.calledOnceWithExactly(mockPage.init);
     assert.strictEqual(handlerCalled, true);
   });
 

@@ -59,6 +59,7 @@ export const selectPage = defineTool((args: ParsedArguments) => ({
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
+    await page.init();
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
