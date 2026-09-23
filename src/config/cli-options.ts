@@ -247,7 +247,7 @@ export const commands: Commands = {
   },
   evaluate_script: {
     description:
-      'Evaluate a JavaScript function inside the target page or service worker. Returns the response as JSON, so returned values have to be JSON-serializable.',
+      'Evaluate JavaScript inside the target page or service worker. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -261,8 +261,23 @@ export const commands: Commands = {
         name: 'function',
         type: 'string',
         description:
-          'A JavaScript function declaration to be executed by the tool in the target page.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
-        required: true,
+          'JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
+        required: false,
+      },
+      sourcePath: {
+        name: 'sourcePath',
+        type: 'string',
+        description:
+          "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
+        required: false,
+      },
+      format: {
+        name: 'format',
+        type: 'string',
+        description:
+          'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
+        required: false,
+        enum: ['function', 'script'],
       },
       args: {
         name: 'args',

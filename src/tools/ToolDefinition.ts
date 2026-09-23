@@ -271,6 +271,7 @@ export type Context = Readonly<{
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}>;
+  loadResource(path: string): Promise<string>;
 
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
