@@ -16,6 +16,7 @@ import {afterEach, beforeEach, describe, it} from 'node:test';
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {
   serializeArgs,
+  serializeArgsForDaemon,
   assertValidSessionId,
   getSocketPath,
   getRuntimeHome,
@@ -136,6 +137,53 @@ describe('serializeArgs', () => {
     assert.deepStrictEqual(result, [
       '--camel-case-key=value1',
       '--another-key',
+    ]);
+  });
+});
+
+describe('serializeArgsForDaemon', () => {
+  it('leaves config-backed WebSocket headers out of daemon argv', () => {
+    const options: Record<string, YargsOptions> = {
+      config: {},
+      wsHeaders: {},
+    };
+    const argv = {
+      config: '/tmp/chrome-devtools.json',
+      wsHeaders: {
+        Authorization: 'Bearer IHB_CANARY_31337',
+      },
+    };
+
+    const result = serializeArgsForDaemon(options, argv, [
+      'start',
+      '--config=/tmp/chrome-devtools.json',
+    ]);
+
+    assert.deepStrictEqual(result, ['--config=/tmp/chrome-devtools.json']);
+    assert.ok(!result.join(' ').includes('IHB_CANARY_31337'));
+  });
+
+  it('preserves an explicit WebSocket header override', () => {
+    const options: Record<string, YargsOptions> = {
+      config: {},
+      wsHeaders: {},
+    };
+    const argv = {
+      config: '/tmp/chrome-devtools.json',
+      wsHeaders: {
+        Authorization: 'Bearer explicit-token',
+      },
+    };
+
+    const result = serializeArgsForDaemon(options, argv, [
+      'start',
+      '--config=/tmp/chrome-devtools.json',
+      '--wsHeaders={"Authorization":"Bearer explicit-token"}',
+    ]);
+
+    assert.deepStrictEqual(result, [
+      '--config=/tmp/chrome-devtools.json',
+      '--ws-headers={"Authorization":"Bearer explicit-token"}',
     ]);
   });
 });

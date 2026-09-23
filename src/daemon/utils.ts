@@ -156,3 +156,31 @@ export function serializeArgs(
   }
   return args;
 }
+
+function hasExplicitWsHeaders(rawArgs: readonly string[]): boolean {
+  return rawArgs.some(
+    arg =>
+      arg === '--wsHeaders' ||
+      arg.startsWith('--wsHeaders=') ||
+      arg === '--ws-headers' ||
+      arg.startsWith('--ws-headers='),
+  );
+}
+
+export function serializeArgsForDaemon(
+  options: Record<string, YargsOptions>,
+  argv: Record<string, unknown>,
+  rawArgs: readonly string[],
+): string[] {
+  const daemonArgv = {...argv};
+
+  if (daemonArgv.wsHeaders !== undefined) {
+    if (daemonArgv.config !== undefined && !hasExplicitWsHeaders(rawArgs)) {
+      delete daemonArgv.wsHeaders;
+    } else if (typeof daemonArgv.wsHeaders === 'object') {
+      daemonArgv.wsHeaders = JSON.stringify(daemonArgv.wsHeaders);
+    }
+  }
+
+  return serializeArgs(options, daemonArgv);
+}
