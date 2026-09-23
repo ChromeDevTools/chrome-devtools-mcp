@@ -1,3 +1,20 @@
+exports[`HeapSnapshotFormatter > formatContextAnalysis > formats contexts in ranked order with their scope 1`] = `
+#### Context @101 in \`createClosure (test.js)\` — 2.0 kB
+Script @301, ScopeInfo @303, offsets 14-104, 2 context fields
+- \`dead\` (Object @202) — 2.0 kB
+
+#### Context @111 in \`createOtherClosure (other-scope.js)\` — 1.5 kB
+Script @311, ScopeInfo @313, offsets 20-60, 1 context field
+- \`captured\` (Map @206) — 1.5 kB
+
+#### Context @102 in \`createClosure (test.js)\` — 0.5 kB
+Script @301, ScopeInfo @303, offsets 14-104, 2 context fields
+- \`alsoDead\` (Array @204) — 0.5 kB
+
+Scripts without scope metadata could not be analyzed:
+- \`other.js\` (@401) — 2 contexts
+`;
+
 exports[`HeapSnapshotFormatter > toString > formats data as CSV and sorts by retained size 1`] = `
 id,name,count,selfSize,retainedSize
 1,ObjectA,10,0.1 kB,1.0 kB

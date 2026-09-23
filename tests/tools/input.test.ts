@@ -5,9 +5,7 @@
  */
 
 import assert from 'node:assert';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -24,11 +22,25 @@ import {
   clickAt,
   typeText,
 } from '../../src/tools/input.js';
+import {
+  createHandlerMocks,
+  createMockDialog,
+  createMockElementHandle,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
-import {html, withMcpContext, getTextContent} from '../utils.js';
+import {
+  createTempFile,
+  html,
+  withMcpContext,
+  getTextContent,
+} from '../utils.js';
 
 describe('input', () => {
   const server = serverHooks();
+
+  afterEach(() => {
+    sinon.restore();
+  });
 
   describe('click', () => {
     it('clicks', async () => {
@@ -426,6 +438,59 @@ describe('input', () => {
         );
       });
     });
+
+    it('does not fail when the click opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      locator.click.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Are you sure?'}));
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was clicked and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('does not fail when the double click opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      locator.click.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Are you sure?'}));
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            dblClick: true,
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was double clicked and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
   });
 
   describe('hover', () => {
@@ -455,6 +520,32 @@ describe('input', () => {
         assert.ok(response.includeSnapshot);
         assert.ok(await page.$('text/hovered'));
       });
+    });
+
+    it('does not fail when the hover opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      locator.hover.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Hovered!'}));
+
+      await hover(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was hovered and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
     });
   });
 
@@ -585,6 +676,40 @@ describe('input', () => {
           () => document.querySelector('select')!.value,
         );
         assert.strictEqual(selectedValue, 'v2');
+      });
+    });
+
+    it('reports why filling out a select failed', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<select
+            ><option value="v1">one</option
+            ><option value="v2">two</option></select
+          >`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await assert.rejects(
+          () =>
+            fill(args).handler(
+              {
+                params: {
+                  // Options are matched by their text, not their value.
+                  uid: '1_1',
+                  value: 'v2',
+                },
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            ),
+          {
+            message:
+              'Failed to interact with the element with uid 1_1. Could not find option with text "v2"',
+          },
+        );
       });
     });
 
@@ -1034,6 +1159,34 @@ describe('input', () => {
         assert.strictEqual(r2Checked, true);
       });
     });
+
+    it('does not fail when filling opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Invalid input'}));
+
+      await fill(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            value: 'test',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'The element was filled out and it opened a dialog.',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
   });
 
   describe('drags', () => {
@@ -1206,12 +1359,132 @@ describe('input', () => {
         );
       });
     });
+
+    it('stops filling remaining elements when an element opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Confirm input'}));
+
+      await fillForm(args).handler(
+        {
+          params: {
+            elements: [
+              {
+                uid: '1_1',
+                value: 'first',
+              },
+              {
+                uid: '1_2',
+                value: 'second',
+              },
+            ],
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(page.waitForEventsAfterAction);
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.',
+      );
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('does not mention remaining elements when the last element opens a dialog', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.onFirstCall().resolves();
+      locator.fill.onSecondCall().rejects(new Error('Timed out'));
+      page.getDialog.returns(createMockDialog({message: 'Confirm input'}));
+
+      await fillForm(args).handler(
+        {
+          params: {
+            elements: [
+              {
+                uid: '1_1',
+                value: 'first',
+              },
+              {
+                uid: '1_2',
+                value: 'second',
+              },
+            ],
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(page.waitForEventsAfterAction);
+      sinon.assert.calledTwice(page.getElementByUid);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Filling out the element with uid 1_2 opened a dialog.',
+      );
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('stops before advancing to the next element when signal aborts as locator.fill resolves', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      page.getDialog.returns(createMockDialog({message: 'Confirm input'}));
+      page.waitForEventsAfterAction.callsFake(async action => {
+        const abortController = new AbortController();
+        locator.fill.callsFake(async () => {
+          abortController.abort(new Error('Action interrupted by a dialog'));
+        });
+        await action(abortController.signal);
+        return {};
+      });
+
+      await fillForm(args).handler(
+        {
+          params: {
+            elements: [
+              {
+                uid: '1_1',
+                value: 'first',
+              },
+              {
+                uid: '1_2',
+                value: 'second',
+              },
+            ],
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.',
+      );
+    });
   });
 
   describe('uploadFile', () => {
     it('uploads a file to a file input', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
+      using testFile = createTempFile('test file content', 'test.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1230,7 +1503,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePaths: [testFilePath],
+              filePaths: [testFile.path],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1240,18 +1513,14 @@ describe('input', () => {
         assert.ok(response.includeSnapshot);
         assert.strictEqual(
           response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
+          `File uploaded from ${testFile.path}.`,
         );
       });
-
-      await fs.unlink(testFilePath);
     });
 
     it('uploads multiple files to a file input', async () => {
-      const firstFilePath = path.join(process.cwd(), 'first.txt');
-      const secondFilePath = path.join(process.cwd(), 'second.txt');
-      await fs.writeFile(firstFilePath, 'first file content');
-      await fs.writeFile(secondFilePath, 'second file content');
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1271,7 +1540,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_2',
-              filePaths: [firstFilePath, secondFilePath],
+              filePaths: [firstFile.path, secondFile.path],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1280,7 +1549,7 @@ describe('input', () => {
         );
         assert.strictEqual(
           response.responseLines[0],
-          `File uploaded from ${firstFilePath}, ${secondFilePath}.`,
+          `File uploaded from ${firstFile.path}, ${secondFile.path}.`,
         );
         const uploadedFileNames = await page.$eval('#file-input', el => {
           const input = el as HTMLInputElement;
@@ -1288,14 +1557,10 @@ describe('input', () => {
         });
         assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
       });
-
-      await fs.unlink(firstFilePath);
-      await fs.unlink(secondFilePath);
     });
 
     it('uploads a file when clicking an element opens a file uploader', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
+      using testFile = createTempFile('test file content', 'test.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1321,7 +1586,7 @@ describe('input', () => {
           {
             params: {
               uid: '1_1',
-              filePaths: [testFilePath],
+              filePaths: [testFile.path],
             },
             page: context.getSelectedMcpPage(),
           },
@@ -1331,21 +1596,18 @@ describe('input', () => {
         assert.ok(response.includeSnapshot);
         assert.strictEqual(
           response.responseLines[0],
-          `File uploaded from ${testFilePath}.`,
+          `File uploaded from ${testFile.path}.`,
         );
         const uploadedFileName = await page.$eval('#file-input', el => {
           const input = el as HTMLInputElement;
           return input.files?.[0]?.name;
         });
         assert.strictEqual(uploadedFileName, 'test.txt');
-
-        await fs.unlink(testFilePath);
       });
     });
 
     it('throws an error if the element is not a file input and does not open a file chooser', async () => {
-      const testFilePath = path.join(process.cwd(), 'test.txt');
-      await fs.writeFile(testFilePath, 'test file content');
+      using testFile = createTempFile('test file content', 'test.txt');
 
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1359,7 +1621,7 @@ describe('input', () => {
             {
               params: {
                 uid: '1_1',
-                filePaths: [testFilePath],
+                filePaths: [testFile.path],
               },
               page: context.getSelectedMcpPage(),
             },
@@ -1374,8 +1636,6 @@ describe('input', () => {
 
         assert.strictEqual(response.responseLines.length, 0);
         assert.strictEqual(response.snapshotParams, undefined);
-
-        await fs.unlink(testFilePath);
       });
     });
   });

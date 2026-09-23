@@ -25,6 +25,8 @@ import {resolveCanonicalPath} from '../src/utils/files.js';
 import {serverHooks} from './server.js';
 import {
   assertNoServiceWorkerReported,
+  createTempDir,
+  createTempFile,
   getMockRequest,
   html,
   withBrowser,
@@ -504,52 +506,39 @@ describe('McpContext', () => {
   });
 
   it('validatePath allows paths within roots', async () => {
+    using workspace = createTempDir('workspace-test-', os.homedir());
     await withMcpContext(async (_response, context) => {
-      const workspacePath = path.resolve(os.homedir(), 'workspace-test');
-      await fs.mkdir(workspacePath, {recursive: true});
-      try {
-        const roots = [
-          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
-        ];
-        context.setRoots(roots);
-        // Valid path within root
-        const targetPath = path.join(workspacePath, 'test.txt');
-        const resolved = await context.validatePath(targetPath);
-        assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
-        const resolvedWorkspace = await context.validatePath(workspacePath);
-        assert.strictEqual(
-          resolvedWorkspace,
-          await resolveCanonicalPath(workspacePath),
-        );
+      const roots = [
+        {uri: pathToFileURL(workspace.path).href, name: 'workspace'},
+      ];
+      context.setRoots(roots);
+      // Valid path within root
+      const targetPath = path.join(workspace.path, 'test.txt');
+      const resolved = await context.validatePath(targetPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
+      const resolvedWorkspace = await context.validatePath(workspace.path);
+      assert.strictEqual(
+        resolvedWorkspace,
+        await resolveCanonicalPath(workspace.path),
+      );
 
-        // Invalid path outside root and outside temp dir
-        const outsidePath = path.resolve(os.homedir(), 'outside-test.txt');
-        await assert.rejects(
-          context.validatePath(outsidePath),
-          /Access denied/,
-        );
-      } finally {
-        await fs.rm(workspacePath, {recursive: true, force: true});
-      }
+      // Invalid path outside root and outside temp dir
+      const outsidePath = path.resolve(os.homedir(), 'outside-test.txt');
+      await assert.rejects(context.validatePath(outsidePath), /Access denied/);
     });
   });
 
   it('validatePath allows non-existent nested paths within roots', async () => {
+    using workspace = createTempDir('workspace-test-nested-', os.homedir());
     await withMcpContext(async (_response, context) => {
-      const workspacePath = path.resolve(os.homedir(), 'workspace-test-nested');
-      await fs.mkdir(workspacePath, {recursive: true});
-      try {
-        const roots = [
-          {uri: pathToFileURL(workspacePath).href, name: 'workspace'},
-        ];
-        context.setRoots(roots);
-        // Valid path within root with non-existent intermediate directories
-        const targetPath = path.join(workspacePath, 'dir1', 'dir2', 'test.txt');
-        const resolved = await context.validatePath(targetPath);
-        assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
-      } finally {
-        await fs.rm(workspacePath, {recursive: true, force: true});
-      }
+      const roots = [
+        {uri: pathToFileURL(workspace.path).href, name: 'workspace'},
+      ];
+      context.setRoots(roots);
+      // Valid path within root with non-existent intermediate directories
+      const targetPath = path.join(workspace.path, 'dir1', 'dir2', 'test.txt');
+      const resolved = await context.validatePath(targetPath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(targetPath));
     });
   });
 
@@ -619,118 +608,97 @@ describe('McpContext', () => {
     }
 
     it('validatePath resolves symlinks and returns the canonical path', async () => {
+      using tmpDir = createTempDir('validate-symlink-test-');
       await withMcpContext(async (_response, context) => {
-        const tmpDir = await fs.mkdtemp(
-          path.join(os.tmpdir(), 'validate-symlink-test-'),
-        );
-        try {
-          const targetDir = path.join(tmpDir, 'target');
-          await fs.mkdir(targetDir);
-          const targetFile = path.join(targetDir, 'file.txt');
-          await fs.writeFile(targetFile, 'hello');
+        const targetDir = path.join(tmpDir.path, 'target');
+        await fs.mkdir(targetDir);
+        const targetFile = path.join(targetDir, 'file.txt');
+        await fs.writeFile(targetFile, 'hello');
 
-          const symlinkDir = path.join(tmpDir, 'symlink_dir');
-          await fs.symlink(targetDir, symlinkDir, 'dir');
+        const symlinkDir = path.join(tmpDir.path, 'symlink_dir');
+        await fs.symlink(targetDir, symlinkDir, 'dir');
 
-          const canonicalTarget = await fs.realpath(targetDir);
-          context.setRoots([
-            {uri: pathToFileURL(canonicalTarget).href, name: 'target'},
-          ]);
+        const canonicalTarget = await fs.realpath(targetDir);
+        context.setRoots([
+          {uri: pathToFileURL(canonicalTarget).href, name: 'target'},
+        ]);
 
-          const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
-          const resolved = await context.validatePath(filePathWithSymlink);
-          assert.strictEqual(resolved, path.join(canonicalTarget, 'file.txt'));
-        } finally {
-          await fs.rm(tmpDir, {recursive: true, force: true});
-        }
+        const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
+        const resolved = await context.validatePath(filePathWithSymlink);
+        assert.strictEqual(resolved, path.join(canonicalTarget, 'file.txt'));
       });
     });
 
     it('saveFile allows writing to a symlinked file if it resolves to an allowed path', async () => {
+      using tmpDir = createTempDir('mcp-symlink-test-');
       await withMcpContext(async (_response, context) => {
-        const tmpDir = await fs.mkdtemp(
-          path.join(os.tmpdir(), 'mcp-symlink-test-'),
-        );
-        try {
-          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
+        context.setRoots([
+          {uri: pathToFileURL(tmpDir.path).href, name: 'temp'},
+        ]);
 
-          const targetPath = path.join(tmpDir, 'target.txt');
-          await fs.writeFile(targetPath, 'original content', 'utf-8');
+        const targetPath = path.join(tmpDir.path, 'target.txt');
+        await fs.writeFile(targetPath, 'original content', 'utf-8');
 
-          const symlinkPath = path.join(tmpDir, 'symlink.txt');
-          await fs.symlink(targetPath, symlinkPath);
+        const symlinkPath = path.join(tmpDir.path, 'symlink.txt');
+        await fs.symlink(targetPath, symlinkPath);
 
-          const data = new TextEncoder().encode('content');
-          await context.saveFile(data, symlinkPath, '.txt');
-          await context.saveFile(data, targetPath, '.txt');
+        const data = new TextEncoder().encode('content');
+        await context.saveFile(data, symlinkPath, '.txt');
+        await context.saveFile(data, targetPath, '.txt');
 
-          const content = await fs.readFile(targetPath, 'utf-8');
-          assert.strictEqual(content, 'content');
-        } finally {
-          await fs.rm(tmpDir, {recursive: true, force: true});
-        }
+        const content = await fs.readFile(targetPath, 'utf-8');
+        assert.strictEqual(content, 'content');
       });
     });
 
     it('saveFile refuses to write through a dangling symlink to a non-existent file', async () => {
+      using tmpDir = createTempDir('mcp-symlink-test-');
+      using outsideDir = createTempDir('mcp-outside-test-');
       await withMcpContext(async (_response, context) => {
-        const tmpDir = await fs.mkdtemp(
-          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        context.setRoots([
+          {uri: pathToFileURL(tmpDir.path).href, name: 'temp'},
+        ]);
+
+        const outsideTarget = path.join(outsideDir.path, 'target.txt');
+        const symlinkPath = path.join(tmpDir.path, 'symlink.txt');
+        await fs.symlink(outsideTarget, symlinkPath);
+
+        const data = new TextEncoder().encode('malicious content');
+        await assert.rejects(
+          context.saveFile(data, symlinkPath, '.txt'),
+          /Could not write/,
         );
-        const outsideDir = await fs.mkdtemp(
-          path.join(os.tmpdir(), 'mcp-outside-test-'),
-        );
-        try {
-          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
 
-          const outsideTarget = path.join(outsideDir, 'target.txt');
-          const symlinkPath = path.join(tmpDir, 'symlink.txt');
-          await fs.symlink(outsideTarget, symlinkPath);
-
-          const data = new TextEncoder().encode('malicious content');
-          await assert.rejects(
-            context.saveFile(data, symlinkPath, '.txt'),
-            /Could not write/,
-          );
-
-          await assert.rejects(fs.stat(outsideTarget));
-        } finally {
-          await fs.rm(tmpDir, {recursive: true, force: true});
-          await fs.rm(outsideDir, {recursive: true, force: true});
-        }
+        await assert.rejects(fs.stat(outsideTarget));
       });
     });
 
     it('saveFile allows writing to a file within an allowed symlinked directory', async () => {
+      using tmpDir = createTempDir('mcp-symlink-test-');
       await withMcpContext(async (_response, context) => {
-        const tmpDir = await fs.mkdtemp(
-          path.join(os.tmpdir(), 'mcp-symlink-test-'),
+        context.setRoots([
+          {uri: pathToFileURL(tmpDir.path).href, name: 'temp'},
+        ]);
+
+        const realDir = path.join(tmpDir.path, 'real_dir');
+        await fs.mkdir(realDir, {recursive: true});
+
+        const symlinkedDir = path.join(tmpDir.path, 'symlinked_dir');
+        await fs.symlink(realDir, symlinkedDir);
+
+        const targetFilePath = path.join(symlinkedDir, 'test.txt');
+        const data = new TextEncoder().encode('allowed content');
+
+        const result = await context.saveFile(data, targetFilePath, '.txt');
+        assert.strictEqual(
+          result.filename,
+          await resolveCanonicalPath(targetFilePath),
         );
-        try {
-          context.setRoots([{uri: pathToFileURL(tmpDir).href, name: 'temp'}]);
-
-          const realDir = path.join(tmpDir, 'real_dir');
-          await fs.mkdir(realDir, {recursive: true});
-
-          const symlinkedDir = path.join(tmpDir, 'symlinked_dir');
-          await fs.symlink(realDir, symlinkedDir);
-
-          const targetFilePath = path.join(symlinkedDir, 'test.txt');
-          const data = new TextEncoder().encode('allowed content');
-
-          const result = await context.saveFile(data, targetFilePath, '.txt');
-          assert.strictEqual(
-            result.filename,
-            await resolveCanonicalPath(targetFilePath),
-          );
-          const content = await fs.readFile(
-            path.join(realDir, 'test.txt'),
-            'utf-8',
-          );
-          assert.strictEqual(content, 'allowed content');
-        } finally {
-          await fs.rm(tmpDir, {recursive: true, force: true});
-        }
+        const content = await fs.readFile(
+          path.join(realDir, 'test.txt'),
+          'utf-8',
+        );
+        assert.strictEqual(content, 'allowed content');
       });
     });
   });
@@ -738,41 +706,34 @@ describe('McpContext', () => {
   describe('loadResource', () => {
     describe('file protocol', () => {
       it('calls validatePath', async () => {
+        using testFile = createTempFile(
+          'test content',
+          'load-resource-test.txt',
+        );
         await withMcpContext(async (_response, context) => {
           const validatePathSpy = sinon.spy(context, 'validatePath');
-          const testFilePath = path.join(os.tmpdir(), 'load-resource-test.txt');
-          await fs.writeFile(testFilePath, 'test content');
-          try {
-            const url = pathToFileURL(testFilePath).href;
-            const content = await context.loadResource(url);
-            assert.strictEqual(content, 'test content');
-            sinon.assert.calledWith(validatePathSpy, testFilePath);
-          } finally {
-            await fs.rm(testFilePath, {force: true});
-          }
+          const url = pathToFileURL(testFile.path).href;
+          const content = await context.loadResource(url);
+          assert.strictEqual(content, 'test content');
+          sinon.assert.calledWith(validatePathSpy, testFile.path);
         });
       });
 
       it('is not blocked by allowlist', async () => {
-        const testFilePath = path.join(
-          os.tmpdir(),
+        using testFile = createTempFile(
+          'test content',
           'load-resource-test-allow.txt',
         );
-        await fs.writeFile(testFilePath, 'test content');
-        try {
-          await withMcpContext(
-            async (_response, context) => {
-              const url = pathToFileURL(testFilePath).href;
-              const content = await context.loadResource(url);
-              assert.strictEqual(content, 'test content');
-            },
-            {
-              allowedUrlPattern: ['https://example.com/allowed*'],
-            },
-          );
-        } finally {
-          await fs.rm(testFilePath, {force: true});
-        }
+        await withMcpContext(
+          async (_response, context) => {
+            const url = pathToFileURL(testFile.path).href;
+            const content = await context.loadResource(url);
+            assert.strictEqual(content, 'test content');
+          },
+          {
+            allowedUrlPattern: ['https://example.com/allowed*'],
+          },
+        );
       });
     });
 

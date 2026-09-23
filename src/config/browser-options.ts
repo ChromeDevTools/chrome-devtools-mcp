@@ -121,11 +121,13 @@ export const browserOptions = {
   },
   chromeArg: {
     type: 'array',
+    string: true,
     describe:
       'Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
   ignoreDefaultChromeArg: {
     type: 'array',
+    string: true,
     describe:
       'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },

@@ -10,6 +10,7 @@ import 'core-js/proposals/iterator-helpers.js';
 
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
+import {z as zod} from 'zod';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
@@ -17,34 +18,47 @@ export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
-export {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-export {type ShapeOutput} from '@modelcontextprotocol/sdk/server/zod-compat.js';
-export {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
-export {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-export {Client} from '@modelcontextprotocol/sdk/client/index.js';
-export type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
+export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
+export {
+  StdioServerTransport,
+  serveStdio,
+} from '@modelcontextprotocol/server/stdio';
+export type {Transport} from '@modelcontextprotocol/server';
+export {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
+export {Client, type ClientCapabilities} from '@modelcontextprotocol/client';
 export {
   type CallToolResult,
-  SetLevelRequestSchema,
   type ImageContent,
   type TextContent,
+  type Tool,
   type Root,
+} from '@modelcontextprotocol/server';
+export {
+  SetLevelRequestSchema,
   ListRootsRequestSchema,
   RootsListChangedNotificationSchema,
   ListRootsResultSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-export {z as zod} from 'zod';
+} from '@modelcontextprotocol/core';
+export {zod};
+export type ShapeOutput<T extends zod.ZodRawShape> = zod.output<
+  zod.ZodObject<T>
+>;
+
 export {default as ajv} from 'ajv';
 export {
+  Dialog,
+  ElementHandle,
   Locator,
   PredefinedNetworkConditions,
   KnownDevices,
   CDPSessionEvent,
   ScreenRecorder,
+  TimeoutError,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';

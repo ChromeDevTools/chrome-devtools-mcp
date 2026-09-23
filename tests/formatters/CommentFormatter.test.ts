@@ -43,21 +43,6 @@ describe('CommentFormatter', () => {
       text: 'Fix the color contrast here',
       elementUid: 'element-uid-42',
       reqid: 7,
-      editor: {
-        filePath: 'src/style.css',
-        lineNumber: 10,
-      },
-    };
-    return new CommentFormatter([thread]);
-  });
-
-  formatterTest('formats editor location when filePath is missing', () => {
-    const thread: StructuredCommentThread = {
-      id: 'comment-2',
-      text: 'Review this script line',
-      editor: {
-        lineNumber: 25,
-      },
     };
     return new CommentFormatter([thread]);
   });

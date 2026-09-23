@@ -242,6 +242,22 @@ droid mcp add chrome-devtools "npx -y chrome-devtools-mcp@latest"
 </details>
 
 <details>
+  <summary>FLUJO</summary>
+
+To connect [FLUJO](https://flujo.com.co/) to an existing Chrome instance, first
+[start Chrome with remote debugging enabled](./advanced-usage.md#manual-connection-using-port-forwarding).
+Use the debugging port from that setup in the argument below.
+
+1. With Node.js installed, run `npm install chrome-devtools-mcp@latest` in a local directory.
+2. In FLUJO, open **Connected Apps > Connect App > I'm an expert > Configure & Test**.
+3. Set **Server name** to `chrome-devtools` and **MCP server root path** to the directory containing the installed package.
+4. Select **Standard IO** and set **Run command** to `npx`. Use **Add argument** to enter `-y`, `chrome-devtools-mcp@latest`, and `--browser-url=http://127.0.0.1:9222` as separate arguments, adjusting the port if needed.
+5. Click **3) Test run**. After the MCP handshake succeeds, click **Add server**.
+6. Open the saved server's **Tools** tab. Use **Test tool** to call `new_page` with the URL you want to debug, then call `take_snapshot` with the returned page ID to verify browser access.
+
+</details>
+
+<details>
   <summary>Gemini CLI</summary>
 Install the Chrome DevTools MCP server using the Gemini CLI.
 

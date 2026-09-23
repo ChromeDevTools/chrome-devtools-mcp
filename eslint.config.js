@@ -154,6 +154,7 @@ export default defineConfig([
     files: ['src/tools/**/*.ts'],
     rules: {
       '@local/enforce-zod-schema': 'error',
+      '@local/require-parsed-arguments': 'error',
     },
   },
   {
@@ -163,6 +164,7 @@ export default defineConfig([
       // With the Node.js test runner, `describe` and `it` are technically
       // promises, but we don't need to await them.
       '@typescript-eslint/no-floating-promises': 'off',
+      '@local/enforce-using': 'error',
     },
   },
 ]);

@@ -64,9 +64,8 @@ export const getDevtoolsComments = definePageTool(() => ({
       return;
     }
 
-    const threads = await devtoolsPage.evaluate(() => {
-      return window.universe?.cd4aBridge?.getCommentThreads() ?? [];
-    });
+    const bridge = await page.ensureDevToolsCommentBridge(devtoolsPage);
+    const threads = await bridge.getComments(devtoolsPage);
 
     response.setDevToolsComments(threads);
   },

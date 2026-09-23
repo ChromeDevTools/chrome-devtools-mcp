@@ -5,8 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {readFile, rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
@@ -16,6 +15,7 @@ import type {ParsedArguments} from '../src/config/mcp-options.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
+import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
@@ -33,12 +33,14 @@ import {
 import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
+  createHandlerMocks,
   createMockAggregatedInfo,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
   createMockCSSStyleRule,
   createMockClassDiffs,
+  createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
@@ -49,6 +51,7 @@ import {
   createMockParsedArguments,
 } from './mocks.js';
 import {
+  createTempDir,
   getImageContent,
   getMockAggregatedIssue,
   getMockRequest,
@@ -170,25 +173,22 @@ describe('McpResponse', () => {
   });
 
   it('saves snapshot to file and returns structured content', async t => {
-    const filePath = join(tmpdir(), 'test-snapshot.txt');
-    try {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(html`<aside>test</aside>`);
-        response.includeSnapshot({
-          verbose: true,
-          filePath,
-        });
-        const {content, structuredContent} = await response.handle(context);
-        assert.equal(content[0].type, 'text');
-        t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    using tmpDir = createTempDir();
+    const filePath = join(tmpDir.path, 'test-snapshot.txt');
+    await withMcpContext(async (response, context) => {
+      const page = context.getSelectedMcpPage().pptrPage;
+      await page.setContent(html`<aside>test</aside>`);
+      response.includeSnapshot({
+        verbose: true,
+        filePath,
       });
-      const content = await readFile(filePath, 'utf-8');
-      t.assert.snapshot(stabilizeResponseOutput(content));
-    } finally {
-      await rm(filePath, {force: true});
-    }
+      const {content, structuredContent} = await response.handle(context);
+      assert.equal(content[0].type, 'text');
+      t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    });
+    const content = await readFile(filePath, 'utf-8');
+    t.assert.snapshot(stabilizeResponseOutput(content));
   });
 
   it('preserves mapping ids across multiple snapshots', async () => {
@@ -438,6 +438,31 @@ describe('McpResponse', () => {
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
+  });
+
+  it('forwards includePreservedRequests to page.getNetworkRequests', async () => {
+    const {page, context} = createHandlerMocks();
+    page.emulationSettings = {};
+    page.getNetworkRequests.returns([]);
+
+    const responseWithPreserved = new McpResponse(createMockParsedArguments());
+    responseWithPreserved.setPage(page);
+    responseWithPreserved.setIncludeNetworkRequests(true, {
+      includePreservedRequests: true,
+    });
+    await responseWithPreserved.handle(context);
+
+    sinon.assert.calledOnceWithExactly(page.getNetworkRequests, true);
+
+    const responseDefault = new McpResponse(createMockParsedArguments());
+    responseDefault.setPage(page);
+    responseDefault.setIncludeNetworkRequests(true);
+    await responseDefault.handle(context);
+
+    sinon.assert.calledWithExactly(
+      page.getNetworkRequests.secondCall,
+      undefined,
+    );
   });
 
   it('add network request when attached with POST data', async t => {
@@ -1550,5 +1575,23 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(objectText.includes('### Object Details'));
     assert.ok(objectText.includes('id: @1'));
     assert.ok(objectText.includes('name: Object'));
+  });
+
+  it('renders the context field usage section for the filtered contexts', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    response.setHeapSnapshotContextAnalysis(createMockContextAnalysisResult(), {
+      retainedSize: parseByteSizeRange('1000'),
+    });
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('### Context Analysis'));
+    assert.ok(text.includes('Showing 1-2 of 2 (Page 1 of 1).'));
+    assert.ok(text.includes('Context @101'));
+    assert.ok(text.includes('Context @111'));
+    assert.ok(!text.includes('Context @102'));
+    assert.ok('heapSnapshotContextAnalysis' in structuredContent);
   });
 });

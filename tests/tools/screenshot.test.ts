@@ -5,8 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {rm, stat, mkdir, chmod, writeFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {stat, chmod, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {describe, it, afterEach} from 'node:test';
 
@@ -17,7 +16,7 @@ import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {screenshots} from '../snapshot.js';
-import {html, withMcpContext} from '../utils.js';
+import {createTempDir, html, withMcpContext} from '../utils.js';
 
 const screenshotTool = screenshot({} as ParsedArguments);
 
@@ -255,45 +254,43 @@ describe('screenshot', () => {
     });
 
     it('with filePath', async () => {
+      using tmpDir = createTempDir();
       await withMcpContext(async (response, context) => {
-        const filePath = join(tmpdir(), 'test-screenshot.png');
-        try {
-          const fixture = screenshots.basic;
-          const page = context.getSelectedMcpPage().pptrPage;
-          await page.setContent(fixture.html);
-          await screenshotTool.handler(
-            {
-              params: {format: 'png', filePath},
-              page: context.getSelectedMcpPage(),
-            },
-            response,
-            context,
-          );
+        const filePath = join(tmpDir.path, 'test-screenshot.png');
+        const fixture = screenshots.basic;
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(fixture.html);
+        await screenshotTool.handler(
+          {
+            params: {format: 'png', filePath},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
 
-          assert.equal(response.images.length, 0);
-          assert.equal(
-            response.responseLines.at(0),
-            "Took a screenshot of the current page's viewport.",
-          );
-          const canonicalFilePath = await resolveCanonicalPath(filePath);
-          assert.equal(
-            response.responseLines.at(1),
-            `Saved screenshot to ${canonicalFilePath}.`,
-          );
+        assert.equal(response.images.length, 0);
+        assert.equal(
+          response.responseLines.at(0),
+          "Took a screenshot of the current page's viewport.",
+        );
+        const canonicalFilePath = await resolveCanonicalPath(filePath);
+        assert.equal(
+          response.responseLines.at(1),
+          `Saved screenshot to ${canonicalFilePath}.`,
+        );
 
-          const stats = await stat(filePath);
-          assert.ok(stats.isFile());
-          assert.ok(stats.size > 0);
-        } finally {
-          await rm(filePath, {force: true});
-        }
+        const stats = await stat(filePath);
+        assert.ok(stats.isFile());
+        assert.ok(stats.size > 0);
       });
     });
 
     it('with unwritable filePath', async () => {
       if (process.platform === 'win32') {
+        using tmpDir = createTempDir();
         const filePath = join(
-          tmpdir(),
+          tmpDir.path,
           'readonly-file-for-screenshot-test.png',
         );
         // Create the file and make it read-only.
@@ -319,13 +316,11 @@ describe('screenshot', () => {
         } finally {
           // Make the file writable again so it can be deleted.
           await chmod(filePath, 0o600);
-          await rm(filePath, {force: true});
         }
       } else {
-        const dir = join(tmpdir(), 'readonly-dir-for-screenshot-test');
-        await mkdir(dir, {recursive: true});
-        await chmod(dir, 0o500);
-        const filePath = join(dir, 'test-screenshot.png');
+        using dir = createTempDir('readonly-dir-for-screenshot-test-');
+        await chmod(dir.path, 0o500);
+        const filePath = join(dir.path, 'test-screenshot.png');
 
         try {
           await withMcpContext(async (response, context) => {
@@ -344,8 +339,7 @@ describe('screenshot', () => {
             );
           });
         } finally {
-          await chmod(dir, 0o700);
-          await rm(dir, {recursive: true, force: true});
+          await chmod(dir.path, 0o700);
         }
       }
     });

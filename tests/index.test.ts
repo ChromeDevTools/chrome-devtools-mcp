@@ -11,26 +11,29 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  ListRootsRequestSchema,
-  RootsListChangedNotificationSchema,
-  type ClientCapabilities,
-  type TextContent,
-} from '@modelcontextprotocol/sdk/types.js';
 import {executablePath} from 'puppeteer';
 
 import {mcpOptions} from '../src/config/mcp-options.js';
 import {getOffByDefaultCategories} from '../src/config/category-options.js';
+import {
+  Client,
+  StdioClientTransport,
+  type ClientCapabilities,
+  type TextContent,
+} from '../src/third_party/index.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
+
+import {createTempDir} from './utils.js';
 
 describe('e2e', () => {
   async function withClient(
     cb: (client: Client) => Promise<void>,
     extraArgs: string[] = [],
-    options: {capabilities?: ClientCapabilities} = {},
+    options: {
+      capabilities?: ClientCapabilities;
+      versionNegotiation?: {mode: 'auto' | 'legacy' | {pin: string}};
+    } = {},
   ) {
     let attempt = 1;
     while (attempt <= 3) {
@@ -53,6 +56,9 @@ describe('e2e', () => {
         },
         {
           capabilities: options.capabilities ?? {},
+          ...(options.versionNegotiation
+            ? {versionNegotiation: options.versionNegotiation}
+            : {}),
         },
       );
 
@@ -80,6 +86,20 @@ describe('e2e', () => {
       }
     }
   }
+  it('connects and negotiates 2026-07-28 era', async () => {
+    await withClient(
+      async client => {
+        const result = await client.callTool({
+          name: 'list_pages',
+          arguments: {},
+        });
+        assert.ok(result.content);
+      },
+      [],
+      {versionNegotiation: {mode: 'auto'}},
+    );
+  });
+
   it('calls a tool', async t => {
     await withClient(async client => {
       const result = await client.callTool({
@@ -225,13 +245,13 @@ describe('e2e', () => {
 
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           resolvePromise();
           return {roots};
         });
 
         await client.notification({
-          method: RootsListChangedNotificationSchema.shape.method.value,
+          method: 'notifications/roots/list_changed',
         });
 
         // Wait for the server to process the notification and request roots
@@ -247,54 +267,45 @@ describe('e2e', () => {
   });
 
   it('combines configured filesystem roots with client roots', async () => {
-    const configuredRoot = await fs.promises.mkdtemp(
-      path.join(os.homedir(), '.configured-root-'),
-    );
-    const clientRoot = await fs.promises.mkdtemp(
-      path.join(os.homedir(), '.client-root-'),
-    );
+    using configuredRoot = createTempDir('.configured-root-', os.homedir());
+    using clientRoot = createTempDir('.client-root-', os.homedir());
 
-    try {
-      await withClient(
-        async client => {
-          client.setRequestHandler(ListRootsRequestSchema, () => {
-            return {
-              roots: [
-                {uri: pathToFileURL(clientRoot).href, name: 'client-root'},
-              ],
-            };
+    await withClient(
+      async client => {
+        client.setRequestHandler('roots/list', () => {
+          return {
+            roots: [
+              {uri: pathToFileURL(clientRoot.path).href, name: 'client-root'},
+            ],
+          };
+        });
+
+        for (const outputPath of [
+          path.join(configuredRoot.path, 'configured.png'),
+          path.join(clientRoot.path, 'client.png'),
+        ]) {
+          const result = await client.callTool({
+            name: 'take_screenshot',
+            arguments: {pageId: 1, filePath: outputPath},
           });
-
-          for (const outputPath of [
-            path.join(configuredRoot, 'configured.png'),
-            path.join(clientRoot, 'client.png'),
-          ]) {
-            const result = await client.callTool({
-              name: 'take_screenshot',
-              arguments: {pageId: 1, filePath: outputPath},
-            });
-            assert.strictEqual(result.isError, undefined);
-            const content = result.content as TextContent[];
-            assert.match(content[0].text, /Saved screenshot to/);
-          }
+          assert.strictEqual(result.isError, undefined);
+          const content = result.content as TextContent[];
+          assert.match(content[0].text, /Saved screenshot to/);
+        }
+      },
+      [`--filesystem-root=${configuredRoot.path}`],
+      {
+        capabilities: {
+          roots: {listChanged: true},
         },
-        [`--filesystem-root=${configuredRoot}`],
-        {
-          capabilities: {
-            roots: {listChanged: true},
-          },
-        },
-      );
-    } finally {
-      await fs.promises.rm(configuredRoot, {recursive: true, force: true});
-      await fs.promises.rm(clientRoot, {recursive: true, force: true});
-    }
+      },
+    );
   });
 
   it('denies file access if roots list is empty', async () => {
     await withClient(
       async client => {
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           return {roots: []};
         });
 
@@ -320,6 +331,7 @@ describe('e2e', () => {
   });
 
   it('allows file access if roots capability is missing', async () => {
+    using tempDir = createTempDir();
     await withClient(
       async client => {
         // Use os.tmpdir() rather than a hardcoded /tmp path.
@@ -330,7 +342,7 @@ describe('e2e', () => {
           name: 'take_screenshot',
           arguments: {
             pageId: 1,
-            filePath: path.join(os.tmpdir(), 'test.png'),
+            filePath: path.join(tempDir.path, 'test.png'),
           },
         });
 
@@ -351,7 +363,7 @@ describe('e2e', () => {
         // A client that negotiates roots but never responds. getContext()
         // awaits updateRoots() while holding the tool mutex, so an unbounded
         // request would stall this call for the SDK default of 60s.
-        client.setRequestHandler(ListRootsRequestSchema, () => {
+        client.setRequestHandler('roots/list', () => {
           return new Promise<never>(() => {
             // Intentionally never settles
           });
@@ -365,7 +377,6 @@ describe('e2e', () => {
             name: 'list_pages',
             arguments: {},
           },
-          undefined,
           {timeout: 90_000},
         );
         const elapsed = Date.now() - start;
@@ -388,47 +399,43 @@ describe('e2e', () => {
   });
 
   it('still applies roots from a client slower than the bound', async () => {
-    const workspace = await fs.promises.mkdtemp(
-      path.join(os.homedir(), '.roots-slow-client-'),
-    );
-    try {
-      await withClient(
-        async client => {
-          // Answers after the bound the blocking call uses, so the roots only
-          // arrive via the background listing
-          client.setRequestHandler(ListRootsRequestSchema, async () => {
-            await new Promise(resolve => setTimeout(resolve, 8_000));
-            return {
-              roots: [{uri: pathToFileURL(workspace).href, name: 'workspace'}],
-            };
-          });
+    using workspace = createTempDir('.roots-slow-client-', os.homedir());
+    await withClient(
+      async client => {
+        // Answers after the bound the blocking call uses, so the roots only
+        // arrive via the background listing
+        client.setRequestHandler('roots/list', async () => {
+          await new Promise(resolve => setTimeout(resolve, 8_000));
+          return {
+            roots: [
+              {uri: pathToFileURL(workspace.path).href, name: 'workspace'},
+            ],
+          };
+        });
 
-          await client.callTool({name: 'list_pages', arguments: {}});
-          await new Promise(resolve => setTimeout(resolve, 5_000));
+        await client.callTool({name: 'list_pages', arguments: {}});
+        await new Promise(resolve => setTimeout(resolve, 5_000));
 
-          const result = await client.callTool({
-            name: 'take_screenshot',
-            arguments: {
-              pageId: 1,
-              filePath: path.join(workspace, 'shot.png'),
-            },
-          });
-
-          // Asserted before isError so a denial reports the path it rejected
-          const content = result.content as TextContent[];
-          assert.match(content[0].text, /Saved screenshot to/);
-          assert.strictEqual(result.isError, undefined);
-        },
-        [],
-        {
-          capabilities: {
-            roots: {listChanged: true},
+        const result = await client.callTool({
+          name: 'take_screenshot',
+          arguments: {
+            pageId: 1,
+            filePath: path.join(workspace.path, 'shot.png'),
           },
+        });
+
+        // Asserted before isError so a denial reports the path it rejected
+        const content = result.content as TextContent[];
+        assert.match(content[0].text, /Saved screenshot to/);
+        assert.strictEqual(result.isError, undefined);
+      },
+      [],
+      {
+        capabilities: {
+          roots: {listChanged: true},
         },
-      );
-    } finally {
-      await fs.promises.rm(workspace, {recursive: true, force: true});
-    }
+      },
+    );
   });
 
   describe('Dialogs', () => {
@@ -520,13 +527,11 @@ async function getToolsWithFilteredCategories(
     }
     const fileTools = await import(`../src/tools/${file}`);
 
-    for (const maybeTool of Object.values<unknown>(fileTools)) {
-      let tool;
-      if (typeof maybeTool === 'function') {
-        tool = (maybeTool as (val: boolean) => ToolDefinition)(false);
-      } else {
-        tool = maybeTool as ToolDefinition;
+    for (const maybeTool of Object.values(fileTools)) {
+      if (typeof maybeTool !== 'function') {
+        continue;
       }
+      const tool = maybeTool({});
 
       // Skipping all files that are not tool files
       if (tool === null || typeof tool !== 'object' || !('name' in tool)) {

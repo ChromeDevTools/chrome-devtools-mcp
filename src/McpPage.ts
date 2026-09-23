@@ -380,13 +380,16 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
-  async ensureDevToolsCommentBridge(devtoolsPage: Page): Promise<void> {
+  async ensureDevToolsCommentBridge(
+    devtoolsPage: Page,
+  ): Promise<DevToolsCommentBridge> {
     if (!this.#commentBridge) {
       this.#commentBridge = new DevToolsCommentBridge({
         onNotification: this.#onNotification,
       });
     }
     await this.#commentBridge.attach(devtoolsPage);
+    return this.#commentBridge;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {
@@ -458,7 +461,7 @@ export class McpPage implements ContextPage {
   }
 
   waitForEventsAfterAction(
-    action: () => Promise<unknown>,
+    action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;
@@ -827,8 +830,10 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
+      await this.ensureDevToolsCommentBridge(devtoolsPage);
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
+          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types

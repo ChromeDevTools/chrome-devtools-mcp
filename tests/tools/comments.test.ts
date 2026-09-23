@@ -8,6 +8,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {DevToolsCommentBridge} from '../../src/devtools/DevToolsCommentBridge.js';
 import type {CommentThreadPayload} from '../../src/tools/comments.js';
 import {
   getDevtoolsComments,
@@ -56,7 +57,9 @@ describe('comments tools', () => {
     it('fetches comments and sets them on response', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
 
       const mockThread: CommentThreadPayload = {
         id: 'comment-1',
@@ -69,7 +72,7 @@ describe('comments tools', () => {
         },
       };
 
-      devtoolsPage.evaluate.resolves([mockThread]);
+      bridge.getComments.resolves([mockThread]);
 
       await getDevtoolsComments(args).handler(
         {params: {}, page},
@@ -78,7 +81,11 @@ describe('comments tools', () => {
       );
 
       sinon.assert.calledOnce(page.getDevToolsPage);
-      sinon.assert.calledOnce(devtoolsPage.evaluate);
+      sinon.assert.calledOnceWithExactly(
+        page.ensureDevToolsCommentBridge,
+        devtoolsPage,
+      );
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
         mockThread,
       ]);
@@ -87,8 +94,10 @@ describe('comments tools', () => {
     it('sets empty comments list when no comments are found', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
       page.getDevToolsPage.resolves(devtoolsPage);
-      devtoolsPage.evaluate.resolves([]);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      bridge.getComments.resolves([]);
 
       await getDevtoolsComments(args).handler(
         {params: {}, page},
@@ -97,7 +106,11 @@ describe('comments tools', () => {
       );
 
       sinon.assert.calledOnce(page.getDevToolsPage);
-      sinon.assert.calledOnce(devtoolsPage.evaluate);
+      sinon.assert.calledOnceWithExactly(
+        page.ensureDevToolsCommentBridge,
+        devtoolsPage,
+      );
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
     });
   });

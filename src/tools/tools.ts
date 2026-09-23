@@ -56,9 +56,7 @@ export const createTools = (args: ParsedArguments) => {
     tools.push(tool(args));
   }
 
-  tools.sort((a, b) => {
-    return a.name.localeCompare(b.name);
-  });
+  tools.sort((a, b) => a.name.localeCompare(b.name));
 
   return tools;
 };
