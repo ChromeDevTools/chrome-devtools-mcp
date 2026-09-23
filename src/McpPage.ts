@@ -76,6 +76,7 @@ import {
   type WebMCPTool,
   type Protocol,
   type Page,
+  type Target,
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
@@ -115,11 +116,15 @@ function isBackendNodeId(
  *
  * Internal class consumed only by McpContext. Fields are public for direct
  * read/write access. The dialog field is private because it requires an
- * event listener lifecycle managed by the constructor/dispose pair.
+ * event listener lifecycle managed by the init/dispose pair.
  */
 export class McpPage implements ContextPage {
-  readonly pptrPage: Page;
+  readonly target: Target;
   readonly id: number;
+
+  #pptrPage?: Page;
+  #initPromise?: Promise<void>;
+  #disposed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -139,8 +144,8 @@ export class McpPage implements ContextPage {
 
   thirdPartyDeveloperTools: ToolGroups = [];
 
-  networkCollector: NetworkCollector;
-  consoleCollector: ConsoleCollector;
+  #networkCollector?: NetworkCollector;
+  #consoleCollector?: ConsoleCollector;
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
@@ -150,7 +155,7 @@ export class McpPage implements ContextPage {
   #onNotification?: (message: string) => void;
 
   constructor(
-    page: Page,
+    target: Target,
     id: number,
     options: {
       hasNetworkBlockOrAllowlist: boolean;
@@ -166,31 +171,120 @@ export class McpPage implements ContextPage {
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
     this.#onNotification = options.onNotification;
-    this.pptrPage = page;
+    this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
-    page.on('dialog', this.#dialogHandler);
+  }
 
-    this.networkCollector = new NetworkCollector(page);
-    this.consoleCollector = new ConsoleCollector(page, collect => {
-      return {
-        console: event => {
-          collect(event);
-        },
-        uncaughtError: event => {
-          collect(event);
-        },
-        devtoolsAggregatedIssue: event => {
-          collect(event);
-        },
-      } as ListenerMap;
-    });
+  get pptrPage(): Page {
+    if (!this.#pptrPage) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#pptrPage;
+  }
+
+  get networkCollector(): NetworkCollector {
+    if (!this.#networkCollector) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#networkCollector;
+  }
+
+  set networkCollector(collector: NetworkCollector) {
+    this.#networkCollector = collector;
+  }
+
+  get consoleCollector(): ConsoleCollector {
+    if (!this.#consoleCollector) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#consoleCollector;
+  }
+
+  url(): string {
+    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+  }
+
+  async getTitle(): Promise<string> {
+    if (this.#pptrPage) {
+      return Promise.race([
+        this.#pptrPage.title().catch(() => ''),
+        new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
+      ]);
+    }
+    if (
+      '_getTargetInfo' in this.target &&
+      typeof this.target._getTargetInfo === 'function'
+    ) {
+      const info = this.target._getTargetInfo();
+      if (
+        info &&
+        typeof info === 'object' &&
+        'title' in info &&
+        typeof info.title === 'string' &&
+        info.title !== this.target.url()
+      ) {
+        return info.title;
+      }
+    }
+    return '';
+  }
+
+  isClosed(): boolean {
+    if (this.#pptrPage) {
+      return this.#pptrPage.isClosed();
+    }
+    return this.#disposed;
   }
 
   async init(): Promise<void> {
+    if (this.#initPromise) {
+      return this.#initPromise;
+    }
+    this.#initPromise = this.#doInit();
+    try {
+      await this.#initPromise;
+    } catch (err) {
+      this.#initPromise = undefined;
+      throw err;
+    }
+  }
+
+  async #doInit(): Promise<void> {
+    if (!this.#pptrPage) {
+      const page = (await this.target.page()) ?? (await this.target.asPage());
+      if (!page) {
+        throw new Error(
+          `Failed to initialize Puppeteer Page for target ${this.target.url()}`,
+        );
+      }
+      this.#pptrPage = page;
+      page.on('dialog', this.#dialogHandler);
+      this.#networkCollector = new NetworkCollector(page);
+      this.#consoleCollector = new ConsoleCollector(page, collect => {
+        return {
+          console: event => {
+            collect(event);
+          },
+          uncaughtError: event => {
+            collect(event);
+          },
+          devtoolsAggregatedIssue: event => {
+            collect(event);
+          },
+        };
+      });
+    }
+    this.updateTimeouts();
     await Promise.allSettled([
       this.#initDevToolsUniverseNoThrow(),
       this.#initFocusEmulationNoThrow(),
@@ -478,11 +572,12 @@ export class McpPage implements ContextPage {
   }
 
   dispose(): void {
+    this.#disposed = true;
     this.#commentBridge?.dispose();
     this.#commentBridge = undefined;
-    this.pptrPage.off('dialog', this.#dialogHandler);
-    this.networkCollector.dispose();
-    this.consoleCollector.dispose();
+    this.#pptrPage?.off('dialog', this.#dialogHandler);
+    this.#networkCollector?.dispose();
+    this.#consoleCollector?.dispose();
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     devtoolsUniverse?.universe.dispose();
@@ -737,7 +832,7 @@ export class McpPage implements ContextPage {
   async resolveUidToBackendNodeId(
     uid: string,
   ): Promise<{backendNodeId: number; targetId?: string} | undefined> {
-    const target = this.pptrPage.target();
+    const target = this.target;
     const targetId =
       Boolean(target) &&
       '_targetId' in target &&
@@ -976,17 +1071,20 @@ export class McpPage implements ContextPage {
   }
 
   updateTimeouts() {
+    if (!this.#pptrPage) {
+      return;
+    }
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.pptrPage.setDefaultNavigationTimeout(
+    this.#pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }

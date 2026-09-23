@@ -361,6 +361,7 @@ export type ContextPage = Readonly<{
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
+  init(): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;

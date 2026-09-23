@@ -309,9 +309,10 @@ describe('pwa', () => {
         );
         await context.createPagesSnapshot();
         const appPage = context.getPages().find(page => {
-          return page.pptrPage.url() === startUrl;
+          return page.url() === startUrl;
         });
         assert.ok(appPage, 'the launched app page should be listed');
+        await appPage.init();
         context.selectPage(appPage);
 
         response.resetResponseLineForTesting();

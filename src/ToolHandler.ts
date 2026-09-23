@@ -254,6 +254,7 @@ export class ToolHandler {
             !this.serverArgs.slim
               ? context.getPageById(pageId)
               : context.getSelectedMcpPage();
+          await page?.init();
           response.setPage(page);
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();
