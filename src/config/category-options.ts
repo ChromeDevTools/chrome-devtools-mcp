@@ -30,8 +30,12 @@ const categoryOverrides: Record<
     offByDefault?: boolean;
   }
 > = {
-  [ToolCategory.INPUT]: {},
-  [ToolCategory.NAVIGATION]: {},
+  [ToolCategory.INPUT]: {
+    hidden: false,
+  },
+  [ToolCategory.NAVIGATION]: {
+    hidden: false,
+  },
   [ToolCategory.EMULATION]: {
     hidden: false,
   },
@@ -41,12 +45,17 @@ const categoryOverrides: Record<
   [ToolCategory.NETWORK]: {
     hidden: false,
   },
-  [ToolCategory.DEBUGGING]: {},
-  [ToolCategory.MEMORY]: {},
+  [ToolCategory.DEBUGGING]: {
+    hidden: false,
+  },
+  [ToolCategory.MEMORY]: {
+    hidden: false,
+  },
   [ToolCategory.WEBMCP]: {
     describe:
       'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
     offByDefault: true,
+    hidden: false,
   },
   [ToolCategory.EXTENSIONS]: {
     describe:
