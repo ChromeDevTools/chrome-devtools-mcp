@@ -15,6 +15,7 @@ export interface ArgDef {
   type: string;
   description: string;
   required: boolean;
+  isFilePath?: boolean;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
@@ -107,6 +108,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to the .heapsnapshot file to close.',
         required: true,
+        isFilePath: true,
       },
     },
   },
@@ -135,6 +137,7 @@ export const commands: Commands = {
         description:
           'A path to the base .heapsnapshot file (earlier snapshot).',
         required: true,
+        isFilePath: true,
       },
       currentFilePath: {
         name: 'currentFilePath',
@@ -142,6 +145,7 @@ export const commands: Commands = {
         description:
           'A path to the current .heapsnapshot file (later snapshot).',
         required: true,
+        isFilePath: true,
       },
       classIndex: {
         name: 'classIndex',
@@ -276,6 +280,7 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
         required: false,
+        isFilePath: true,
       },
       dialogAction: {
         name: 'dialogAction',
@@ -451,6 +456,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       id: {
         name: 'id',
@@ -504,6 +510,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       filterName: {
         name: 'filterName',
@@ -551,6 +558,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -570,6 +578,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -595,6 +604,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -647,6 +657,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -666,6 +677,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -697,6 +709,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       nodeId: {
         name: 'nodeId',
@@ -734,6 +747,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
     },
   },
@@ -761,6 +775,7 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
         required: false,
+        isFilePath: true,
       },
       responseFilePath: {
         name: 'responseFilePath',
@@ -768,6 +783,7 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -847,6 +863,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
+        isFilePath: true,
       },
     },
   },
@@ -868,6 +885,7 @@ export const commands: Commands = {
         description:
           'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
         required: true,
+        isFilePath: true,
       },
       displayMode: {
         name: 'displayMode',
@@ -933,6 +951,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'Directory for reports. If omitted, uses temporary files.',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -1222,6 +1241,7 @@ export const commands: Commands = {
         description:
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -1242,6 +1262,7 @@ export const commands: Commands = {
         description:
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -1282,6 +1303,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        isFilePath: true,
       },
       className: {
         name: 'className',
@@ -1399,6 +1421,7 @@ export const commands: Commands = {
         description:
           'Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -1451,6 +1474,7 @@ export const commands: Commands = {
         description:
           'A path to a .heapsnapshot file to save the heapsnapshot to.',
         required: true,
+        isFilePath: true,
       },
     },
   },
@@ -1500,6 +1524,7 @@ export const commands: Commands = {
         description:
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -1527,6 +1552,7 @@ export const commands: Commands = {
         description:
           'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
         required: false,
+        isFilePath: true,
       },
     },
   },
@@ -1618,6 +1644,7 @@ export const commands: Commands = {
         description:
           'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
         required: true,
+        isFilePath: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',

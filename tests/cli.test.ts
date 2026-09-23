@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {buildCommand} from '../src/config/cli-commands.js';
+import {buildCommand, buildCommandArgs} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {
   DEFAULT_FILESYSTEM_ROOT,
@@ -599,5 +599,77 @@ describe('cli command strings', () => {
         }
       }
     }
+  });
+});
+
+describe('cli command args', () => {
+  it('marks file arguments from verifyFilesSchema', () => {
+    assert.strictEqual(
+      commands['take_screenshot'].args.filePath.isFilePath,
+      true,
+    );
+    assert.strictEqual(commands['upload_file'].args.filePaths.isFilePath, true);
+    assert.strictEqual(commands['click'].args.uid.isFilePath, undefined);
+  });
+
+  it('resolves relative file paths against the CLI working directory', () => {
+    const args = buildCommandArgs(
+      commands['take_screenshot'].args,
+      {pageId: 1, filePath: 'screenshots/page.png'},
+      path.join(path.sep, 'client'),
+    );
+
+    assert.deepStrictEqual(args, {
+      pageId: 1,
+      filePath: path.join(path.sep, 'client', 'screenshots', 'page.png'),
+    });
+  });
+
+  it('resolves arrays of relative file paths', () => {
+    const args = buildCommandArgs(
+      commands['upload_file'].args,
+      {pageId: 1, uid: '1_1', filePaths: ['one.txt', 'dir/two.txt']},
+      path.join(path.sep, 'client'),
+    );
+
+    assert.deepStrictEqual(args, {
+      pageId: 1,
+      uid: '1_1',
+      filePaths: [
+        path.join(path.sep, 'client', 'one.txt'),
+        path.join(path.sep, 'client', 'dir', 'two.txt'),
+      ],
+    });
+  });
+
+  it('preserves absolute paths and supported URLs', () => {
+    const absolutePath = path.join(path.sep, 'tmp', 'result.json');
+    const fileUrl = 'file:///tmp/result.json';
+    const httpsUrl = 'https://example.com/app.swbn';
+
+    assert.strictEqual(
+      buildCommandArgs(
+        commands['take_screenshot'].args,
+        {filePath: absolutePath},
+        path.join(path.sep, 'client'),
+      ).filePath,
+      absolutePath,
+    );
+    assert.strictEqual(
+      buildCommandArgs(
+        commands['take_screenshot'].args,
+        {filePath: fileUrl},
+        path.join(path.sep, 'client'),
+      ).filePath,
+      fileUrl,
+    );
+    assert.strictEqual(
+      buildCommandArgs(
+        commands['install_pwa'].args,
+        {installUrlOrBundleUrl: httpsUrl},
+        path.join(path.sep, 'client'),
+      ).installUrlOrBundleUrl,
+      httpsUrl,
+    );
   });
 });
