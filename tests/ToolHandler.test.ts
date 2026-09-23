@@ -746,9 +746,9 @@ describe('ToolHandler', () => {
   });
 
   it('validates evaluate_script sourcePath before reading the file', async () => {
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
+    }).parse();
     const tool = evaluateScript(serverArgs);
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -762,6 +762,8 @@ describe('ToolHandler', () => {
       serverArgs,
       async () => mockContext,
       new Mutex(),
+      sinon.spy(),
+      sinon.spy(),
     );
     const sourcePath = path.resolve('/outside/workspace/script.js');
 

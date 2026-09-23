@@ -7,7 +7,6 @@
 import assert from 'node:assert';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 import {pathToFileURL} from 'node:url';
@@ -15,6 +14,7 @@ import {pathToFileURL} from 'node:url';
 import {
   assertDaemonIsNotRunning,
   assertDaemonIsRunning,
+  createTempDir,
   runCli,
 } from '../utils.js';
 
@@ -77,11 +77,9 @@ describe('chrome-devtools', () => {
   });
 
   it('can evaluate inline and local JavaScript', async () => {
-    const rootDirectory = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'evaluate-script-cli-'),
-    );
-    const daemonDirectory = path.join(rootDirectory, 'daemon');
-    const clientDirectory = path.join(rootDirectory, 'client');
+    using rootDirectory = createTempDir('evaluate-script-cli-');
+    const daemonDirectory = path.join(rootDirectory.path, 'daemon');
+    const clientDirectory = path.join(rootDirectory.path, 'client');
     await fs.mkdir(daemonDirectory);
     await fs.mkdir(clientDirectory);
 
@@ -120,11 +118,11 @@ describe('chrome-devtools', () => {
           '--pageId',
           '1',
           '--sourcePath',
-          'script.js',
+          sourcePath,
           '--format',
           'script',
           '--filePath',
-          'result.json',
+          outputPath,
         ],
         sessionId,
         {cwd: clientDirectory},
@@ -160,7 +158,6 @@ describe('chrome-devtools', () => {
       assert.match(fileUrlResult.stdout, /Local script/);
     } finally {
       await runCli(['stop'], sessionId, {cwd: clientDirectory});
-      await fs.rm(rootDirectory, {recursive: true, force: true});
     }
   });
 
