@@ -260,7 +260,7 @@ export class McpContext implements Context {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(
-        `[MCP Context] Error resolving real path for ${filePath}: ${errMsg}`,
+        `[MCP Context] Error resolving real path for ${JSON.stringify(filePath)}: ${JSON.stringify(errMsg)}`,
       );
       throw new Error(
         `Access denied: Cannot resolve base path for ${filePath}.`,
@@ -308,7 +308,7 @@ export class McpContext implements Context {
         const errMsg =
           rootErr instanceof Error ? rootErr.message : String(rootErr);
         console.warn(
-          `[MCP Context] Could not resolve configured root ${root.uri}: ${errMsg}`,
+          `[MCP Context] Could not resolve configured root ${JSON.stringify(root.uri)}: ${JSON.stringify(errMsg)}`,
         );
         // Skip this root if it cannot be resolved.
       }

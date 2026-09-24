@@ -5,13 +5,18 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
+import sinon from 'sinon';
+
+import {McpContext} from '../src/McpContext.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
+import {createMockPuppeteerBrowser} from './mocks.js';
 import {createTempDir, withMcpContext} from './utils.js';
 
 describe('McpContext Roots', () => {
@@ -137,5 +142,58 @@ describe('McpContext Roots', () => {
         /Access denied/,
       );
     });
+  });
+});
+
+describe('McpContext path validation logging', () => {
+  afterEach(() => sinon.restore());
+
+  async function createContext(): Promise<McpContext> {
+    const browser = createMockPuppeteerBrowser();
+    browser.targets.returns([]);
+    return await McpContext.from(browser, undefined, {
+      experimentalDevToolsDebugging: false,
+      performanceCrux: false,
+    });
+  }
+
+  it('escapes the file path when it cannot be resolved', async () => {
+    const context = await createContext();
+    const filePath = path.join(
+      os.tmpdir(),
+      'file.txt',
+      'x\n[MCP Context] injected line',
+    );
+    const errMsg = `ENOTDIR: not a directory, realpath '${filePath}'`;
+    sinon
+      .stub(fs, 'realpath')
+      .rejects(Object.assign(new Error(errMsg), {code: 'ENOTDIR'}));
+    const errorStub = sinon.stub(console, 'error');
+
+    await assert.rejects(context.validatePath(filePath), /Access denied/);
+
+    sinon.assert.calledOnceWithExactly(
+      errorStub,
+      `[MCP Context] Error resolving real path for ${JSON.stringify(filePath)}: ${JSON.stringify(errMsg)}`,
+    );
+  });
+
+  it('escapes the root URI when a root cannot be resolved', async () => {
+    const context = await createContext();
+    const uri = 'file:///nonexistent-root\n[MCP Context] injected line';
+    context.setRoots([{uri, name: 'unresolvable'}]);
+    const warnStub = sinon.stub(console, 'warn');
+
+    await context.validatePath(path.join(os.tmpdir(), 'test-file.txt'));
+
+    sinon.assert.calledOnceWithMatch(
+      warnStub,
+      sinon.match(
+        (message: string) =>
+          message.startsWith(
+            `[MCP Context] Could not resolve configured root ${JSON.stringify(uri)}: "`,
+          ) && !message.includes('\n'),
+      ),
+    );
   });
 });
