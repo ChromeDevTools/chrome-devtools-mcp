@@ -13,6 +13,7 @@ import type {
   HeapEdgesQueryOptions,
   HeapQueryOptions,
 } from '../processors/HeapSnapshotManager.js';
+import type {McpContext} from '../McpContext.js';
 import type {McpPage} from '../McpPage.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
@@ -358,7 +359,8 @@ export type Context = Readonly<{
     filePath: string,
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
-}>;
+}> &
+  McpContext;
 
 export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
 
@@ -366,6 +368,7 @@ export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
  * Only add methods used by tools/*.
  */
 export type ContextPage = Readonly<{
+  readonly id: number;
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;

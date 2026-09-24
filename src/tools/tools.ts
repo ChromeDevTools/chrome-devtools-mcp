@@ -18,12 +18,14 @@ import * as networkTools from './network.js';
 import * as pagesTools from './pages.js';
 import * as performanceTools from './performance.js';
 import * as pwaTools from './pwa.js';
+import * as replTools from './repl.js';
 import * as screencastTools from './screencast.js';
 import * as screenshotTools from './screenshot.js';
 import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
+import {getToolStatusInfo} from '../ToolHandler.js';
 import type {DefinedPageTool, ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
 
@@ -57,6 +59,15 @@ export const createTools = (args: ParsedArguments) => {
   }
 
   tools.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (args.repl && !args.slim) {
+    const enabledTools = tools.filter(
+      tool =>
+        tool.name !== 'evaluate_script' &&
+        !getToolStatusInfo(tool, args).disabled,
+    );
+    return [replTools.evaluateScript(args, enabledTools)];
+  }
 
   return tools;
 };

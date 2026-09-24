@@ -457,5 +457,13 @@
   {
     "name": "devtools_comments",
     "flagType": "boolean"
+  },
+  {
+    "name": "repl_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "repl",
+    "flagType": "boolean"
   }
 ]

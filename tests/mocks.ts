@@ -196,6 +196,7 @@ export function createMockMcpPage(
   options: {pptrPage?: sinon.SinonStubbedInstance<Page>} = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
+  page.emulationSettings = {};
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   page.waitForEventsAfterAction.callsFake(async action => {
     await action(new AbortController().signal);

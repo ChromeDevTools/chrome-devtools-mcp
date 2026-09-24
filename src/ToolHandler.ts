@@ -38,7 +38,7 @@ function buildDisabledMessage(
   return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
 
-function getToolStatusInfo(
+export function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ParsedArguments,
 ): {disabled: boolean; reason?: string} {
@@ -168,7 +168,21 @@ export class ToolHandler {
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
     using _guard = await this.toolMutex.acquire();
+    return await this.execute(params);
+  };
 
+  async execute(
+    rawParams: Record<string, unknown>,
+    options?: {
+      defaultPageId?: number;
+      validateSchema?: boolean;
+      alwaysIncludeStructuredContent?: boolean;
+    },
+  ): Promise<
+    CallToolResult & {
+      structuredContent?: Record<string, unknown>;
+    }
+  > {
     if (this.disabledReason) {
       return {
         content: [
@@ -179,6 +193,15 @@ export class ToolHandler {
         ],
         isError: true,
       };
+    }
+
+    const params: Record<string, unknown> = {...rawParams};
+    if (
+      options?.defaultPageId !== undefined &&
+      'pageId' in this.inputSchema &&
+      params.pageId === undefined
+    ) {
+      params.pageId = options.defaultPageId;
     }
 
     const startTime = Date.now();
@@ -201,6 +224,13 @@ export class ToolHandler {
       }
       let page: McpPage | undefined;
       try {
+        if (options?.validateSchema) {
+          const parsed = this.registeredInputSchema.parse(params);
+          for (const key of Object.keys(params)) {
+            delete params[key];
+          }
+          Object.assign(params, parsed);
+        }
         await validateToolFiles(this.tool, params, context);
         if (isPageScopedTool(this.tool)) {
           const pageId =
@@ -239,8 +269,11 @@ export class ToolHandler {
       pageUrl = context.getSelectedMcpPageUrl(page);
       // Resolve data format: --experimentalDataFormat takes precedence, fall back to legacy --experimentalToonFormat
       let dataFormat: DataFormat = 'default';
-      if (this.serverArgs.experimentalDataFormat) {
-        dataFormat = this.serverArgs.experimentalDataFormat as DataFormat;
+      if (
+        this.serverArgs.experimentalDataFormat === 'toon' ||
+        this.serverArgs.experimentalDataFormat === 'gcf'
+      ) {
+        dataFormat = this.serverArgs.experimentalDataFormat;
       } else if (this.serverArgs.experimentalToonFormat) {
         dataFormat = 'toon';
       }
@@ -258,8 +291,13 @@ export class ToolHandler {
         result.isError = true;
       }
       success = true;
-      if (this.serverArgs.experimentalStructuredContent) {
-        result.structuredContent = structuredContent as Record<string, unknown>;
+      if (
+        this.serverArgs.experimentalStructuredContent ||
+        options?.alwaysIncludeStructuredContent
+      ) {
+        result.structuredContent = Object.fromEntries(
+          Object.entries(structuredContent),
+        );
       }
       return result;
     } catch (err) {
@@ -288,5 +326,5 @@ export class ToolHandler {
         pageUrl,
       });
     }
-  };
+  }
 }
