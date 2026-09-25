@@ -21,6 +21,7 @@ import {
   traceResultIsSuccess,
 } from '../../src/processors/PerformanceTrace.js';
 import {DevTools} from '../../src/third_party/index.js';
+import {createHandlerMocks} from '../mocks.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withMcpContext} from '../utils.js';
 
@@ -157,25 +158,21 @@ describe('performance', () => {
     });
 
     it('errors if a recording is already active', async () => {
-      await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(true);
-        const selectedPage = context.getSelectedMcpPage().pptrPage;
-        const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
-        await startTrace(args).handler(
-          {
-            params: {reload: true, autoStop: false},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        sinon.assert.notCalled(startTracingStub);
-        assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(/a performance trace is already running/),
-        );
-      });
+      const {page, context, response, args} = createHandlerMocks();
+      context.isRunningPerformanceTrace.returns(true);
+
+      await startTrace(args).handler(
+        {params: {reload: true, autoStop: false}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
+      );
+      sinon.assert.notCalled(context.setIsRunningPerformanceTrace);
+      sinon.assert.notCalled(page.pptrPage.goto);
     });
 
     it('resets the running flag if a setup step throws', async () => {
@@ -278,64 +275,63 @@ describe('performance', () => {
 
     it('returns the information on the insight', async () => {
       const trace = await parseTrace('web-dev-with-commit.json.gz');
-      await withMcpContext(async (response, context, args) => {
-        context.storeTraceRecording(trace);
-        context.setIsRunningPerformanceTrace(false);
+      const {page, context, response, args} = createHandlerMocks();
+      context.recordedTraces.returns([trace]);
 
-        await analyzeInsight(args).handler(
-          {
-            params: {
-              insightSetId: 'NAVIGATION_0',
-              insightName: 'LCPBreakdown',
-            },
-            page: context.getSelectedMcpPage(),
+      await analyzeInsight(args).handler(
+        {
+          params: {
+            insightSetId: 'NAVIGATION_0',
+            insightName: 'LCPBreakdown',
           },
-          response,
-          context,
-        );
+          page,
+        },
+        response,
+        context,
+      );
 
-        assert.ok(response.attachedTracedInsight);
-      });
+      sinon.assert.calledOnceWithExactly(
+        response.attachTraceInsight,
+        trace,
+        'NAVIGATION_0',
+        'LCPBreakdown',
+      );
     });
 
     it('returns an error if no trace has been recorded', async () => {
-      await withMcpContext(async (response, context, args) => {
-        await analyzeInsight(args).handler(
-          {
-            params: {
-              insightSetId: '8463DF94CD61B265B664E7F768183DE3',
-              insightName: 'LCPBreakdown',
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      context.recordedTraces.returns([]);
+
+      await analyzeInsight(args).handler(
+        {
+          params: {
+            insightSetId: '8463DF94CD61B265B664E7F768183DE3',
+            insightName: 'LCPBreakdown',
           },
-          response,
-          context,
-        );
-        assert.ok(
-          response.responseLines
-            .join('\n')
-            .match(
-              /No recorded traces found. Record a performance trace so you have Insights to analyze./,
-            ),
-        );
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'No recorded traces found. Record a performance trace so you have Insights to analyze.',
+      );
+      sinon.assert.notCalled(response.attachTraceInsight);
     });
   });
 
   describe('performance_stop_trace', () => {
     it('does nothing if the trace is not running and does not error', async () => {
-      await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(false);
-        const selectedPage = context.getSelectedMcpPage().pptrPage;
-        const stopTracingStub = sinon.stub(selectedPage.tracing, 'stop');
-        await stopTrace(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        sinon.assert.notCalled(stopTracingStub);
-        assert.strictEqual(context.isRunningPerformanceTrace(), false);
-      });
+      const {page, context, response, args} = createHandlerMocks();
+      context.isRunningPerformanceTrace.returns(false);
+
+      await stopTrace(args).handler({params: {}, page}, response, context);
+
+      sinon.assert.notCalled(context.setIsRunningPerformanceTrace);
+      sinon.assert.notCalled(context.storeTraceRecording);
+      sinon.assert.notCalled(response.appendResponseLine);
     });
 
     it('will stop the trace and return trace info when a trace is running', async () => {
