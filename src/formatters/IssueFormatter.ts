@@ -152,64 +152,61 @@ export class IssueFormatter {
     return this.#getTitle() !== undefined;
   }
 
-  // Helper to extract title
-  #getTitle(): string | undefined {
+  #parsedDescription?: {title?: string; description?: string};
+
+  #getParsedDescription(): {title?: string; description?: string} {
+    if (this.#parsedDescription !== undefined) {
+      return this.#parsedDescription;
+    }
+
     const markdownDescription = this.#issue.getDescription();
     const filename = markdownDescription?.file;
     if (!filename) {
       logger?.(`no description found for issue:` + this.#issue.code());
-      return undefined;
+      this.#parsedDescription = {};
+      return this.#parsedDescription;
     }
-
-    // We already have the description logic in #getDescription, but title extraction is separate
-    // We can reuse the logic or cache it.
-    // Ideally we should process markdown once.
 
     const rawMarkdown = ISSUE_UTILS.getIssueDescription(filename);
     if (!rawMarkdown) {
       logger?.(`no markdown ${filename} found for issue:` + this.#issue.code());
-      return undefined;
+      this.#parsedDescription = {};
+      return this.#parsedDescription;
     }
 
     try {
-      const processedMarkdown = substitutePlaceholders(
-        rawMarkdown,
-        markdownDescription?.substitutions,
-      );
-      const markdownAst = DevTools.Marked.Marked.lexer(processedMarkdown);
-      const title =
-        DevTools.MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
-      if (!title) {
-        logger?.('cannot read issue title from ' + filename);
-        return undefined;
-      }
-      return title;
+      const description =
+        DevTools.MarkdownIssueDescription.createIssueDescriptionFromRawMarkdown(
+          rawMarkdown,
+          {
+            file: filename,
+            links: markdownDescription?.links || [],
+            substitutions: markdownDescription?.substitutions,
+          },
+        );
+
+      this.#parsedDescription = {
+        title: description.title,
+        description: substitutePlaceholders(
+          rawMarkdown,
+          markdownDescription?.substitutions,
+        ),
+      };
     } catch {
       logger?.('error parsing markdown for issue ' + this.#issue.code());
-      return undefined;
+      this.#parsedDescription = {};
     }
+
+    return this.#parsedDescription;
+  }
+
+  // Helper to extract title
+  #getTitle(): string | undefined {
+    return this.#getParsedDescription().title;
   }
 
   #getDescription(): string | undefined {
-    const markdownDescription = this.#issue.getDescription();
-    const filename = markdownDescription?.file;
-    if (!filename) {
-      return undefined;
-    }
-
-    const rawMarkdown = ISSUE_UTILS.getIssueDescription(filename);
-    if (!rawMarkdown) {
-      return undefined;
-    }
-
-    try {
-      return substitutePlaceholders(
-        rawMarkdown,
-        markdownDescription?.substitutions,
-      );
-    } catch {
-      return undefined;
-    }
+    return this.#getParsedDescription().description;
   }
 }
 
