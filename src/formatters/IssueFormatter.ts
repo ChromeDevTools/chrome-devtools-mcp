@@ -171,11 +171,10 @@ export class IssueFormatter {
     }
 
     try {
-      const processedMarkdown =
-        DevTools.MarkdownIssueDescription.substitutePlaceholders(
-          rawMarkdown,
-          markdownDescription?.substitutions,
-        );
+      const processedMarkdown = substitutePlaceholders(
+        rawMarkdown,
+        markdownDescription?.substitutions,
+      );
       const markdownAst = DevTools.Marked.Marked.lexer(processedMarkdown);
       const title =
         DevTools.MarkdownIssueDescription.findTitleFromMarkdownAst(markdownAst);
@@ -203,7 +202,7 @@ export class IssueFormatter {
     }
 
     try {
-      return DevTools.MarkdownIssueDescription.substitutePlaceholders(
+      return substitutePlaceholders(
         rawMarkdown,
         markdownDescription?.substitutions,
       );
@@ -211,6 +210,20 @@ export class IssueFormatter {
       return undefined;
     }
   }
+}
+
+function substitutePlaceholders(
+  rawMarkdown: string,
+  substitutions?: Map<string, string>,
+): string {
+  if (!substitutions) {
+    return rawMarkdown;
+  }
+  let result = rawMarkdown;
+  for (const [key, value] of substitutions) {
+    result = result.replaceAll(`{${key}}`, value);
+  }
+  return result;
 }
 
 function convertIssueConciseToString(issue: IssueConcise): string {
