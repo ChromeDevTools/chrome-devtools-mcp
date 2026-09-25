@@ -5,7 +5,7 @@
  */
 
 import {execSync} from 'node:child_process';
-import {existsSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, readFileSync, writeFileSync, rmSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 const projectRoot = process.cwd();
@@ -55,6 +55,22 @@ function ensureSubmodule(): void {
     'Initializing devtools-frontend submodule with sparse checkout...',
   );
   try {
+    const gitModuleDir = resolve(
+      projectRoot,
+      '.git',
+      'modules',
+      'devtools-frontend',
+    );
+    // If the submodule was previously initialized (e.g. as a full checkout), 
+    // the existing directories will cause `git clone` or `absorbgitdirs` to fail.
+    // We clean them up here to ensure the sparse checkout initialization succeeds.
+    if (existsSync(devtoolsFrontendDir)) {
+      rmSync(devtoolsFrontendDir, {recursive: true, force: true});
+    }
+    if (existsSync(gitModuleDir)) {
+      rmSync(gitModuleDir, {recursive: true, force: true});
+    }
+
     // 1. Clone only the tree structure of the default branch (no blobs)
     execSync(
       'git clone --no-checkout --depth 1 --filter=blob:none https://github.com/ChromeDevTools/devtools-frontend.git third_party/devtools-frontend',
