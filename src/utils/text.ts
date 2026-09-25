@@ -5,6 +5,9 @@
  */
 
 
+const VALID_PLACEHOLDER_MATCH_PATTERN =
+  /\{(PLACEHOLDER_[a-zA-Z][a-zA-Z0-9_]*)\}/g;
+
 export function substitutePlaceholders(
   rawMarkdown: string,
   substitutions?: Map<string, string>,
@@ -13,9 +16,10 @@ export function substitutePlaceholders(
     return rawMarkdown;
   }
 
-  let result = rawMarkdown;
-  for (const [key, value] of substitutions) {
-    result = result.replaceAll(`{${key}}`, value);
-  }
-  return result;
+  return rawMarkdown.replace(
+    VALID_PLACEHOLDER_MATCH_PATTERN,
+    (_, placeholder) => {
+      return substitutions.get(placeholder) ?? '';
+    },
+  );
 }

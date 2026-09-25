@@ -37,6 +37,11 @@ interface IssueDetailed extends IssueConcise {
   affectedResources: AffectedResource[];
 }
 
+const parsedDescriptionCache = new WeakMap<
+  DevTools.AggregatedIssue,
+  {title?: string; description?: string}
+>();
+
 export class IssueFormatter {
   #issue: DevTools.AggregatedIssue;
   #options: IssueFormatterOptions;
@@ -152,26 +157,26 @@ export class IssueFormatter {
     return this.#getTitle() !== undefined;
   }
 
-  #parsedDescription?: {title?: string; description?: string};
-
   #getParsedDescription(): {title?: string; description?: string} {
-    if (this.#parsedDescription !== undefined) {
-      return this.#parsedDescription;
+    if (parsedDescriptionCache.has(this.#issue)) {
+      return parsedDescriptionCache.get(this.#issue)!;
     }
 
     const markdownDescription = this.#issue.getDescription();
     const filename = markdownDescription?.file;
     if (!filename) {
       logger?.(`no description found for issue:` + this.#issue.code());
-      this.#parsedDescription = {};
-      return this.#parsedDescription;
+      const empty = {};
+      parsedDescriptionCache.set(this.#issue, empty);
+      return empty;
     }
 
     const rawMarkdown = ISSUE_UTILS.getIssueDescription(filename);
     if (!rawMarkdown) {
       logger?.(`no markdown ${filename} found for issue:` + this.#issue.code());
-      this.#parsedDescription = {};
-      return this.#parsedDescription;
+      const empty = {};
+      parsedDescriptionCache.set(this.#issue, empty);
+      return empty;
     }
 
     try {
@@ -185,19 +190,21 @@ export class IssueFormatter {
           },
         );
 
-      this.#parsedDescription = {
+      const parsed = {
         title: description.title,
         description: substitutePlaceholders(
           rawMarkdown,
           markdownDescription?.substitutions,
         ),
       };
+      parsedDescriptionCache.set(this.#issue, parsed);
+      return parsed;
     } catch {
       logger?.('error parsing markdown for issue ' + this.#issue.code());
-      this.#parsedDescription = {};
+      const empty = {};
+      parsedDescriptionCache.set(this.#issue, empty);
+      return empty;
     }
-
-    return this.#parsedDescription;
   }
 
   // Helper to extract title
