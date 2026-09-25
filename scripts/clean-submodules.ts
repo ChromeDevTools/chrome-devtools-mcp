@@ -27,4 +27,6 @@ for (const dir of directoriesToRemove) {
   }
 }
 
-console.log('Submodules cleaned. You can now run `npm run prepare` to re-initialize them.');
+console.log(
+  'Submodules cleaned. You can now run `npm run prepare` to re-initialize them.',
+);

@@ -61,7 +61,7 @@ function ensureSubmodule(): void {
       'modules',
       'devtools-frontend',
     );
-    // If the submodule was previously initialized (e.g. as a full checkout), 
+    // If the submodule was previously initialized (e.g. as a full checkout),
     // the existing directories will cause `git clone` or `absorbgitdirs` to fail.
     // We clean them up here to ensure the sparse checkout initialization succeeds.
     if (existsSync(devtoolsFrontendDir)) {
