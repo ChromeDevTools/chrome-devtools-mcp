@@ -1009,6 +1009,17 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         },
         {regularPages: [], extensionPages: []},
       );
+      const pageTitles = new Map(
+        await Promise.all(
+          [
+            ...regularPages,
+            ...(this.#includeExtensionPages ? extensionPages : []),
+          ].map(async (page): Promise<[McpPage, string]> => [
+            page,
+            await fetchPageTitle(page.pptrPage),
+          ]),
+        ),
+      );
 
       const selectionFallback = context.getSelectedPageFallback();
       if (selectionFallback) {
@@ -1030,7 +1041,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await fetchPageTitle(mcpPage.pptrPage);
+          const title = pageTitles.get(mcpPage) ?? '';
           const pageLabel = title
             ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
             : mcpPage.pptrPage.url();
@@ -1052,7 +1063,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await fetchPageTitle(mcpPage.pptrPage);
+            const title = pageTitles.get(mcpPage) ?? '';
             const pageLabel = title
               ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
               : mcpPage.pptrPage.url();
