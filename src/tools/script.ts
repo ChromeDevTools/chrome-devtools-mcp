@@ -135,6 +135,7 @@ Example with arguments: \`(el) => el.innerText\`
         cliArgs.pageIdRouting && request.params.pageId
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
+      await mcpPage.init();
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];

@@ -14,10 +14,9 @@ import {McpPage} from '../src/McpPage.js';
 import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
-import type {Page} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
-import {createMockPuppeteerPage} from './mocks.js';
+import {createMockPuppeteerPage, createMockPuppeteerTarget} from './mocks.js';
 import {serverHooks} from './server.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
@@ -270,9 +269,13 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
-  function createMcpPage(options: {hasNetworkBlockOrAllowlist?: boolean} = {}) {
+  async function createMcpPage(
+    options: {hasNetworkBlockOrAllowlist?: boolean} = {},
+  ) {
     const pptrPage = createMockPuppeteerPage();
-    const mcpPage = new McpPage(pptrPage as unknown as Page, 1, {
+    pptrPage.emulateFocusedPage.resolves();
+    const target = createMockPuppeteerTarget({page: pptrPage});
+    const mcpPage = new McpPage(target, 1, {
       hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
       locatorClass: Locator,
     });
@@ -282,7 +285,8 @@ describe('McpPage', () => {
     sinon
       .stub(mcpPage, 'devtoolsUniverse')
       .get(() => ({session: mockSession}) as unknown as TargetUniverse);
-    return {mcpPage, pptrPage, mockSession};
+    await mcpPage.init();
+    return {mcpPage, pptrPage, target, mockSession};
   }
 
   function getUidForNode(mcpPage: McpPage, matcher: string): string {
@@ -298,13 +302,96 @@ describe('McpPage', () => {
     throw new Error(`Target element "${matcher}" not found in snapshot`);
   }
 
+  describe('lazy initialization', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('does not initialize Puppeteer Page in constructor and throws if pptrPage is accessed before init()', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      const target = createMockPuppeteerTarget({
+        page: pptrPage,
+        url: 'https://target-only.example.com',
+        title: 'Target Title',
+      });
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+
+      sinon.assert.notCalled(target.page);
+      sinon.assert.notCalled(target.asPage);
+      assert.throws(() => mcpPage.pptrPage, /not initialized/);
+      assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
+      assert.strictEqual(await mcpPage.getTitle(), 'Target Title');
+
+      await mcpPage.init();
+
+      sinon.assert.calledOnce(target.page);
+      assert.strictEqual(mcpPage.pptrPage, pptrPage);
+    });
+
+    it('falls back to target.asPage() when target.page() returns null', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      target.page.resolves(null);
+
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+
+      await mcpPage.init();
+
+      sinon.assert.calledOnce(target.page);
+      sinon.assert.calledOnce(target.asPage);
+      assert.strictEqual(mcpPage.pptrPage, pptrPage);
+    });
+
+    it('disposes safely before init() is called and rejects subsequent init()', async () => {
+      const target = createMockPuppeteerTarget();
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+
+      assert.strictEqual(mcpPage.isClosed(), false);
+      mcpPage.dispose();
+      assert.strictEqual(mcpPage.isClosed(), true);
+      await assert.rejects(
+        () => mcpPage.init(),
+        /McpPage \(id=1\) has already been disposed/,
+      );
+      sinon.assert.notCalled(target.page);
+    });
+
+    it('closes the underlying page without running init()', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+
+      await mcpPage.close();
+
+      assert.strictEqual(mcpPage.isClosed(), true);
+      sinon.assert.calledOnceWithExactly(pptrPage.close, {
+        runBeforeUnload: false,
+      });
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+    });
+  });
+
   describe('emulate()', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('calls emulateNetworkConditions with offline settings', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Offline'});
       assert.strictEqual(mcpPage.networkConditions, 'Offline');
       sinon.assert.calledOnceWithExactly(pptrPage.emulateNetworkConditions, {
@@ -316,7 +403,7 @@ describe('McpPage', () => {
     });
 
     it('calls emulateNetworkConditions with the predefined condition', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Slow 3G'});
       assert.strictEqual(mcpPage.networkConditions, 'Slow 3G');
       sinon.assert.calledOnceWithExactly(pptrPage.emulateNetworkConditions, {
@@ -327,7 +414,7 @@ describe('McpPage', () => {
     });
 
     it('calls emulateNetworkConditions(null) when networkConditions is omitted', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Slow 3G'});
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.networkConditions, null);
@@ -339,14 +426,14 @@ describe('McpPage', () => {
     });
 
     it('does not call emulateNetworkConditions for unknown values', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Slow 11G'});
       assert.strictEqual(mcpPage.networkConditions, null);
       sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
     });
 
     it('throws when networkConditions is set with network blocking enabled', async () => {
-      const {mcpPage, pptrPage} = createMcpPage({
+      const {mcpPage, pptrPage} = await createMcpPage({
         hasNetworkBlockOrAllowlist: true,
       });
       await assert.rejects(
@@ -357,14 +444,14 @@ describe('McpPage', () => {
     });
 
     it('calls emulateCPUThrottling with the given rate', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({cpuThrottlingRate: 4});
       assert.strictEqual(mcpPage.cpuThrottlingRate, 4);
       sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
     });
 
     it('calls emulateCPUThrottling(1) to reset throttling', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({cpuThrottlingRate: 4});
       await mcpPage.emulate({cpuThrottlingRate: 1});
       assert.strictEqual(mcpPage.cpuThrottlingRate, 1);
@@ -376,7 +463,7 @@ describe('McpPage', () => {
     });
 
     it('sends Emulation.setCPUThrottlingRate to secondary session if present', async () => {
-      const {mcpPage, pptrPage, mockSession} = createMcpPage();
+      const {mcpPage, pptrPage, mockSession} = await createMcpPage();
       await mcpPage.emulate({cpuThrottlingRate: 4});
       sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
       sinon.assert.calledOnceWithExactly(
@@ -387,7 +474,7 @@ describe('McpPage', () => {
     });
 
     it('sends Emulation.setCPUThrottlingRate with rate 1 to secondary session when cpuThrottlingRate is omitted', async () => {
-      const {mcpPage, pptrPage, mockSession} = createMcpPage();
+      const {mcpPage, pptrPage, mockSession} = await createMcpPage();
       await mcpPage.emulate({});
       sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 1);
       sinon.assert.calledOnceWithExactly(
@@ -398,7 +485,7 @@ describe('McpPage', () => {
     });
 
     it('calls setGeolocation with the given coordinates', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         geolocation: {latitude: 48.137154, longitude: 11.576124},
       });
@@ -413,7 +500,7 @@ describe('McpPage', () => {
     });
 
     it('calls setGeolocation with (0, 0) when geolocation is omitted', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         geolocation: {latitude: 48.137154, longitude: 11.576124},
       });
@@ -427,7 +514,7 @@ describe('McpPage', () => {
     });
 
     it('calls setUserAgent with the given user agent', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({userAgent: 'TestUA/1.0'});
       assert.strictEqual(mcpPage.userAgent, 'TestUA/1.0');
       sinon.assert.calledOnceWithExactly(pptrPage.setUserAgent, {
@@ -436,7 +523,7 @@ describe('McpPage', () => {
     });
 
     it('calls setUserAgent with undefined to clear the user agent', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({userAgent: 'TestUA/1.0'});
       await mcpPage.emulate({userAgent: ''});
       assert.strictEqual(mcpPage.userAgent, null);
@@ -447,7 +534,7 @@ describe('McpPage', () => {
     });
 
     it('calls emulateMediaFeatures with dark color scheme', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({colorScheme: 'dark'});
       assert.strictEqual(mcpPage.colorScheme, 'dark');
       sinon.assert.calledOnceWithExactly(pptrPage.emulateMediaFeatures, [
@@ -456,7 +543,7 @@ describe('McpPage', () => {
     });
 
     it('calls emulateMediaFeatures with empty string to reset color scheme', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({colorScheme: 'dark'});
       await mcpPage.emulate({colorScheme: 'auto'});
       assert.strictEqual(mcpPage.colorScheme, null);
@@ -467,7 +554,7 @@ describe('McpPage', () => {
     });
 
     it('calls setViewport with the given dimensions merged with defaults', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         viewport: {
           width: 400,
@@ -493,7 +580,7 @@ describe('McpPage', () => {
     });
 
     it('calls setViewport(null) when viewport is omitted', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({viewport: {width: 400, height: 400}});
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.viewport, null);
@@ -502,7 +589,7 @@ describe('McpPage', () => {
     });
 
     it('calls setExtraHTTPHeaders with the given headers', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         extraHttpHeaders: {'X-Custom-Header': 'test-value'},
       });
@@ -515,7 +602,7 @@ describe('McpPage', () => {
     });
 
     it('clears extraHttpHeaders when empty object is passed', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         extraHttpHeaders: {'X-Custom-Header': 'test-value'},
       });
@@ -535,7 +622,7 @@ describe('McpPage', () => {
     });
 
     it('re-applies previously configured viewport emulation', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         viewport: {
           width: 400,
@@ -562,7 +649,7 @@ describe('McpPage', () => {
     });
 
     it('re-applies previously configured network and cpu throttling emulation', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         networkConditions: 'Slow 3G',
         cpuThrottlingRate: 4,
@@ -578,8 +665,8 @@ describe('McpPage', () => {
   });
 
   describe('getNetworkRequests', () => {
-    it('delegates to networkCollector.getData with includePreservedRequests', () => {
-      const {mcpPage} = createMcpPage();
+    it('delegates to networkCollector.getData with includePreservedRequests', async () => {
+      const {mcpPage} = await createMcpPage();
       const stub = sinon.stub(mcpPage.networkCollector, 'getData').returns([]);
 
       mcpPage.getNetworkRequests(true);
@@ -594,8 +681,8 @@ describe('McpPage', () => {
   });
 
   describe('getNetworkRequestById', () => {
-    it('delegates to networkCollector.getById', () => {
-      const {mcpPage} = createMcpPage();
+    it('delegates to networkCollector.getById', async () => {
+      const {mcpPage} = await createMcpPage();
       const mockRequest = getMockRequest();
       const stub = sinon
         .stub(mcpPage.networkCollector, 'getById')
@@ -745,7 +832,7 @@ describe('McpPage', () => {
     });
 
     it('does not create commentBridge on construction or getDevToolsPage', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
@@ -758,7 +845,7 @@ describe('McpPage', () => {
     });
 
     it('creates and attaches commentBridge when openDevTools is called', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
@@ -771,7 +858,7 @@ describe('McpPage', () => {
     });
 
     it('disposes commentBridge on mcpPage.dispose()', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       const devtoolsPage = createMockPuppeteerPage();
       pptrPage.openDevTools.resolves(devtoolsPage);
 
@@ -842,7 +929,7 @@ describe('McpPage', () => {
     });
 
     it('throws when snapshot has not been captured', async () => {
-      const {mcpPage} = createMcpPage();
+      const {mcpPage} = await createMcpPage();
       await assert.rejects(
         () => mcpPage.getMatchedStylesForUid('node_1'),
         /No snapshot found for page/,
@@ -850,7 +937,7 @@ describe('McpPage', () => {
     });
 
     it('throws when element uid is not found in snapshot', async () => {
-      const {mcpPage} = createMcpPage();
+      const {mcpPage} = await createMcpPage();
       const rootNode: TextSnapshotNode = {
         id: '1_0',
         role: 'root',
@@ -871,7 +958,7 @@ describe('McpPage', () => {
     });
 
     it('throws when element has no backendNodeId', async () => {
-      const {mcpPage} = createMcpPage();
+      const {mcpPage} = await createMcpPage();
       const node: TextSnapshotNode = {
         id: '1_1',
         role: 'button',
