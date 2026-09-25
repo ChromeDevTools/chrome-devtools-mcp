@@ -615,10 +615,7 @@ describe('cli command strings', () => {
   });
 
   it('lists optional args in the usage line, not the command', () => {
-    const {command, usage} = buildCommand(
-      'dummy_cmd',
-      dummyArgsOptional,
-    );
+    const {command, usage} = buildCommand('dummy_cmd', dummyArgsOptional);
     assert.ok(!command.includes('--'));
     assert.ok(usage.startsWith(`$0 ${command} `));
     assert.ok(usage.includes('[--optArg]'));
