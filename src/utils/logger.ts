@@ -40,9 +40,10 @@ export function flushLogs(
 }
 
 /**
- * Encodes a value for interpolation into a one-line log message. The result is
- * a JSON string literal that also escapes DEL, C1 controls and U+2028/U+2029,
- * which JSON.stringify leaves raw but terminals and line readers act on.
+ * Encodes a value for interpolation into a one-line log or error message. The
+ * result is a JSON string literal that also escapes DEL, C1 controls and
+ * U+2028/U+2029, which JSON.stringify leaves raw but terminals and line
+ * readers act on.
  */
 export function escapeForLog(value: string): string {
   return JSON.stringify(value).replace(

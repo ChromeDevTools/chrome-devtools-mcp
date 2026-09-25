@@ -264,7 +264,7 @@ export class McpContext implements Context {
         `[MCP Context] Error resolving real path for ${escapeForLog(filePath)}: ${escapeForLog(errMsg)}`,
       );
       throw new Error(
-        `Access denied: Cannot resolve base path for ${filePath}.`,
+        `Access denied: Cannot resolve base path for ${escapeForLog(filePath)}.`,
       );
     }
 
@@ -317,7 +317,7 @@ export class McpContext implements Context {
 
     if (!allowed) {
       throw new Error(
-        `Access denied: path ${filePath} (canonical: ${canonicalPath}) is not within any of the configured workspace roots.`,
+        `Access denied: path ${escapeForLog(filePath)} (canonical: ${escapeForLog(canonicalPath)}) is not within any of the configured workspace roots.`,
       );
     }
 
@@ -699,7 +699,9 @@ export class McpContext implements Context {
         mode: 0o600,
       });
     } catch (err) {
-      throw new Error(`Could not write ${filepath}`, {cause: err});
+      throw new Error(`Could not write ${escapeForLog(filepath)}`, {
+        cause: err,
+      });
     }
   }
 
