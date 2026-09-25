@@ -6,18 +6,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import '../utils/polyfill.js';
+
 import fs, {constants, openSync, writeSync, closeSync} from 'node:fs';
 import {createServer, type Server} from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import {
-  Client,
-  PipeTransport,
-  StdioClientTransport,
-} from '../third_party/index.js';
-import {logger, puppeteerLogger} from '../utils/logger.js';
+import {BrowserManager} from '../BrowserManager.js';
+import {mcpOptions, parseArguments} from '../config/mcp-options.js';
+import {McpServer} from '../index.js';
+import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
+import {computeFlagUsage} from '../telemetry/flagUtils.js';
+import {PipeTransport} from '../third_party/index.js';
+import {logger, puppeteerLogger, saveLogsToFile} from '../utils/logger.js';
+import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
@@ -25,7 +29,6 @@ import {
   DAEMON_CLIENT_NAME,
   getPidFilePath,
   getSocketPath,
-  INDEX_SCRIPT_PATH,
   IS_WINDOWS,
   isDaemonRunning,
   assertValidSessionId,
@@ -122,54 +125,35 @@ const socketPath = getSocketPath(sessionId);
 const startDate = new Date();
 const mcpServerArgs = process.argv.slice(2);
 
-let mcpClient: Client | null = null;
-let mcpTransport: StdioClientTransport | null = null;
+let mcpServer: McpServer | null = null;
 let server: Server | null = null;
 
-async function setupMCPClient() {
-  console.log('Setting up MCP client connection...');
-
-  // Create stdio transport for chrome-devtools-mcp
-  mcpTransport = new StdioClientTransport({
-    command: process.execPath,
-    args: [INDEX_SCRIPT_PATH, ...mcpServerArgs],
-    env: process.env as Record<string, string>,
+async function setupMCPServer() {
+  logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
+  const args = parseArguments(VERSION);
+  const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
+  const browserManager = new BrowserManager(args, {
+    logFile,
   });
-  mcpClient = new Client(
-    {
-      name: DAEMON_CLIENT_NAME,
-      version: VERSION,
-    },
-    {
-      capabilities: {},
-    },
-  );
-  await mcpClient.connect(mcpTransport);
-
-  console.log('MCP client connected');
+  mcpServer = await McpServer.from(args, {
+    browserManager,
+    logFile,
+  });
+  ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
+  void ClearcutLogger.get()?.logDailyActiveIfNeeded();
+  void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));
 }
 
-interface McpContent {
-  type: string;
-  text?: string;
-}
-
-interface McpResult {
-  content?: McpContent[] | string;
-  text?: string;
-}
 async function handleRequest(msg: DaemonMessage) {
   try {
     if (msg.method === 'invoke_tool') {
-      if (!mcpClient) {
-        throw new Error('MCP client not initialized');
+      await started;
+      if (!mcpServer) {
+        throw new Error('MCP server not initialized');
       }
       const {tool, args} = msg;
 
-      const result = (await mcpClient.callTool({
-        name: tool,
-        arguments: args || {},
-      })) as McpResult | McpContent[];
+      const result = await mcpServer.callTool(tool, args);
 
       return {
         success: true,
@@ -249,8 +233,7 @@ async function startSocketServer() {
         console.log(`Daemon server listening on ${socketPath}`);
 
         try {
-          // Setup MCP client
-          await setupMCPClient();
+          await setupMCPServer();
           resolve();
         } catch (err) {
           reject(err);
@@ -269,14 +252,9 @@ async function cleanup(exitCode = 0) {
   console.log('Cleaning up daemon...');
 
   try {
-    await mcpClient?.close();
+    await mcpServer?.close();
   } catch (error) {
-    logger?.('Error closing MCP client:', error);
-  }
-  try {
-    await mcpTransport?.close();
-  } catch (error) {
-    logger?.('Error closing MCP transport:', error);
+    logger?.('Error closing MCP server:', error);
   }
   if (server) {
     await new Promise<void>(resolve => {
@@ -313,8 +291,7 @@ process.on('uncaughtException', error => {
   logger?.('Uncaught exception:', error);
   void cleanup(1);
 });
-process.on('unhandledRejection', error => {
-  logger?.('Unhandled rejection:', error);
+setupUnhandledRejectionHandler(() => {
   void cleanup(1);
 });
 

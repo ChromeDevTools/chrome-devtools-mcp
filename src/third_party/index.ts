@@ -24,8 +24,6 @@ export {
   serveStdio,
 } from '@modelcontextprotocol/server/stdio';
 export type {Transport} from '@modelcontextprotocol/server';
-export {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
-export {Client, type ClientCapabilities} from '@modelcontextprotocol/client';
 export {
   type CallToolResult,
   type ImageContent,
@@ -54,6 +52,7 @@ export {
   CDPSessionEvent,
   ScreenRecorder,
   TimeoutError,
+  PuppeteerError,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';

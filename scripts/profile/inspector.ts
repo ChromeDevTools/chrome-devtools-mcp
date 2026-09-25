@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 
-import type {StdioClientTransport} from '../../build/src/third_party/index.js';
+import type {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 
 import {isObject} from './utils.ts';
 

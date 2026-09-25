@@ -13,6 +13,17 @@ import tseslint from 'typescript-eslint';
 
 import localPlugin from './scripts/eslint_rules/local-plugin.js';
 
+const RESTRICTED_IMPORT_DEVTOOLS_MCP = {
+  regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
+  message:
+    'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
+};
+const RESTRICTED_IMPORT_MCP_CLIENT = {
+  group: ['@modelcontextprotocol/client', '@modelcontextprotocol/client/*'],
+  message:
+    'Do not import @modelcontextprotocol/client in src/; it is only for tests and scripts.',
+};
+
 export default defineConfig([
   globalIgnores([
     '**/node_modules',
@@ -131,13 +142,7 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
-            {
-              regex: '.*devtools-frontend/(?!mcp/mcp.js$).*',
-              message:
-                'Import only the devtools-frontend code exported via devtools-frontend/mcp/mcp.js',
-            },
-          ],
+          patterns: [RESTRICTED_IMPORT_DEVTOOLS_MCP],
         },
       ],
     },
@@ -147,6 +152,15 @@ export default defineConfig([
     files: ['src/**/*.ts'],
     rules: {
       '@local/no-direct-third-party-imports': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            RESTRICTED_IMPORT_DEVTOOLS_MCP,
+            RESTRICTED_IMPORT_MCP_CLIENT,
+          ],
+        },
+      ],
     },
   },
   {
