@@ -7,6 +7,7 @@
 import {ISSUE_UTILS} from '../devtools/issueDescriptions.js';
 import {DevTools} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {substitutePlaceholders} from '../utils/text.js';
 
 export interface IssueFormatterOptions {
   requestIdResolver?: (requestId: string) => number | undefined;
@@ -210,20 +211,6 @@ export class IssueFormatter {
       return undefined;
     }
   }
-}
-
-function substitutePlaceholders(
-  rawMarkdown: string,
-  substitutions?: Map<string, string>,
-): string {
-  if (!substitutions) {
-    return rawMarkdown;
-  }
-  let result = rawMarkdown;
-  for (const [key, value] of substitutions) {
-    result = result.replaceAll(`{${key}}`, value);
-  }
-  return result;
 }
 
 function convertIssueConciseToString(issue: IssueConcise): string {
