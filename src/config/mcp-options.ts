@@ -390,6 +390,89 @@ export function getCliOptions(): Partial<
   return options;
 }
 
+const CLI_EXAMPLES: Array<[string, string]> = [
+  [
+    '$0 --browserUrl http://127.0.0.1:9222',
+    'Connect to an existing browser instance via HTTP',
+  ],
+  [
+    '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
+    'Connect to an existing browser instance via WebSocket',
+  ],
+  [
+    `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
+    'Connect via WebSocket with custom headers',
+  ],
+  ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
+  ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
+  ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
+  ['$0 --channel stable', 'Use stable Chrome installed on this system'],
+  ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
+  ['$0 --help', 'Print CLI options'],
+  [
+    '$0 --viewport 1280x720',
+    'Launch Chrome with the initial viewport size of 1280x720px',
+  ],
+  [
+    `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
+    'Launch Chrome without sandboxes. Use with caution.',
+  ],
+  [
+    `$0 --ignore-default-chrome-arg='--disable-extensions'`,
+    'Disable the default arguments provided by Puppeteer. Use with caution.',
+  ],
+  ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
+  ['$0 --no-category-performance', 'Disable tools in the performance category'],
+  ['$0 --no-category-network', 'Disable tools in the network category'],
+  ['$0 --user-data-dir=/tmp/user-data-dir', 'Use a custom user data directory'],
+  [
+    '$0 --auto-connect',
+    'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
+  ],
+  [
+    '$0 --auto-connect --channel=canary',
+    'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
+  ],
+  [
+    '$0 --no-usage-statistics',
+    'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
+  ],
+  [
+    '$0 --no-performance-crux',
+    'Disable CrUX (field data) integration in performance tools.',
+  ],
+  ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
+  [
+    '$0 --no-javascript-evaluation',
+    'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
+  ],
+  [
+    '$0 --slim',
+    'Only 3 tools: navigation, JavaScript execution and screenshot',
+  ],
+];
+
+const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
+  ['channel', 'executablePath', 'browserUrl', 'wsEndpoint'],
+  ['userDataDir', 'browserUrl', 'wsEndpoint'],
+  ['userDataDir', 'isolated'],
+  ['autoConnect', 'isolated'],
+  ['autoConnect', 'executablePath'],
+  ['blockedUrlPattern', 'allowedUrlPattern'],
+  ['categoryPwa', 'autoConnect'],
+  ['categoryPwa', 'browserUrl', 'wsEndpoint'],
+  ['categoryExtensions', 'autoConnect'],
+  ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
+];
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 /**
  * Exported only for testing to not trigger process exit.
  */
@@ -418,20 +501,7 @@ export function parser(
         }
       }
 
-      const CONFLICTS: Array<Array<keyof typeof mcpOptions>> = [
-        ['channel', 'executablePath', 'browserUrl', 'wsEndpoint'],
-        ['userDataDir', 'browserUrl', 'wsEndpoint'],
-        ['userDataDir', 'isolated'],
-        ['autoConnect', 'isolated'],
-        ['autoConnect', 'executablePath'],
-        ['blockedUrlPattern', 'allowedUrlPattern'],
-        ['categoryPwa', 'autoConnect'],
-        ['categoryPwa', 'browserUrl', 'wsEndpoint'],
-        ['categoryExtensions', 'autoConnect'],
-        ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
-      ];
-
-      for (const group of CONFLICTS) {
+      for (const group of CONFLICTING_ARGS) {
         // Find all active arguments within this conflict group
         const activeInGroup = group.filter(arg => activeArgs.has(arg));
 
@@ -507,83 +577,13 @@ export function parser(
         );
       }
     })
-    .example([
-      [
-        '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance via HTTP',
-      ],
-      [
-        '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
-        'Connect to an existing browser instance via WebSocket',
-      ],
-      [
-        `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
-        'Connect via WebSocket with custom headers',
-      ],
-      ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-      ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-      ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-      ['$0 --channel stable', 'Use stable Chrome installed on this system'],
-      ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
-      ['$0 --help', 'Print CLI options'],
-      [
-        '$0 --viewport 1280x720',
-        'Launch Chrome with the initial viewport size of 1280x720px',
-      ],
-      [
-        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
-        'Launch Chrome without sandboxes. Use with caution.',
-      ],
-      [
-        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
-        'Disable the default arguments provided by Puppeteer. Use with caution.',
-      ],
-      ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
-      [
-        '$0 --no-category-performance',
-        'Disable tools in the performance category',
-      ],
-      ['$0 --no-category-network', 'Disable tools in the network category'],
-      [
-        '$0 --user-data-dir=/tmp/user-data-dir',
-        'Use a custom user data directory',
-      ],
-      [
-        '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --no-usage-statistics',
-        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
-      ],
-      [
-        '$0 --no-performance-crux',
-        'Disable CrUX (field data) integration in performance tools.',
-      ],
-      ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
-      [
-        '$0 --no-javascript-evaluation',
-        'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
-      ],
-      [
-        '$0 --slim',
-        'Only 3 tools: navigation, JavaScript execution and screenshot',
-      ],
-    ]);
+    .example(CLI_EXAMPLES);
 
   return yargsInstance
     .config('config', 'Path to JSON configuration file', configPath => {
       try {
-        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
-        if (
-          typeof parsed !== 'object' ||
-          parsed === null ||
-          Array.isArray(parsed)
-        ) {
+        const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (!isPlainObject(parsed)) {
           throw new Error('Config must be a JSON object');
         }
 
@@ -600,7 +600,7 @@ export function parser(
           .parseSync([]);
         return parsed;
       } catch (err) {
-        throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
+        throw new Error(`Invalid JSON config file: ${getErrorMessage(err)}`);
       }
     })
     .wrap(Math.min(120, yargsInstance.terminalWidth()))
