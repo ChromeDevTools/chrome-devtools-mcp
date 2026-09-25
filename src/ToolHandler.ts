@@ -125,7 +125,11 @@ async function validateToolFiles(
     if (shouldValidateFile(option, isLocal)) {
       const val = params[key];
       if (typeof val === 'string') {
-        params[key] = await validateAndResolvePathOrUrl(val, context);
+        if (val.trim().length > 0) {
+          params[key] = await validateAndResolvePathOrUrl(val, context);
+        } else {
+          params[key] = undefined;
+        }
       } else if (Array.isArray(val)) {
         const updated: unknown[] = [];
         for (const item of val) {
