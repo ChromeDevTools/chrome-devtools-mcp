@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.10.1...chrome-devtools-mcp-v1.11.0) (2026-09-25)
+
+
+### 🎉 Features
+
+* Add analyze_heapsnapshot_contexts MCP tool ([#2791](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2791)) ([190aeee](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/190aeee80f91f2a9797b8e686e3cfefc436bf0e0))
+
+
+### 🛠️ Fixes
+
+* better config support for chrome-devtools CLI ([#2819](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2819)) ([9624e64](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9624e64aada58a4a2e32c13c402b6bfb18acfac2))
+* reject --blockedUrlPattern/--allowedUrlPattern hostname regexp groups ([#2796](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2796)) ([ae0aaef](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/ae0aaef884c41445d83f86f099ef211f4584b791))
+* set empty filePath to undefined instead of empty string ([#2836](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2836)) ([adfc1ff](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/adfc1ffa80fd371e50be166d5e510bc8266552c8)), closes [#2825](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2825)
+
+
+### 📄 Documentation
+
+* update documentation and SKILL for get_css_styles tool ([#2824](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2824)) ([3c12a91](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3c12a91c38386485164e2605c4cbac3adf2911d9))
+
+
+### 🏗️ Refactor
+
+* enable categories by default ([#2811](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2811)) ([e33ee48](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/e33ee4868d6b5381c493036f1eb922b2b4920d7a))
+* use default Error for toolSchema ([#2822](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2822)) ([8b2768d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8b2768ddbbace5c47860f2a73fd0ff7f020255cc))
+
 ## [1.10.1](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.10.0...chrome-devtools-mcp-v1.10.1) (2026-09-23)
 
 
