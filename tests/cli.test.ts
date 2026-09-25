@@ -589,24 +589,36 @@ describe('cli args parsing', () => {
 });
 
 describe('cli command strings', () => {
+  const dummyArgsVariadic = {
+    arg1: {name: 'arg1', type: 'string', description: '', required: true},
+    arrArg: {name: 'arrArg', type: 'array', description: '', required: true},
+  };
+
+  const dummyArgsPlain = {
+    arg1: {name: 'arg1', type: 'string', description: '', required: true},
+    arg2: {name: 'arg2', type: 'string', description: '', required: true},
+  };
+
+  const dummyArgsOptional = {
+    arg1: {name: 'arg1', type: 'string', description: '', required: true},
+    optArg: {name: 'optArg', type: 'boolean', description: '', required: false},
+  };
+
   it('renders a required array arg as a variadic positional', () => {
-    const {command} = buildCommand('upload_file', commands['upload_file'].args);
-    assert.strictEqual(command, 'upload_file <pageId> <uid> <filePaths..>');
+    const {command} = buildCommand('dummy_cmd', dummyArgsVariadic);
+    assert.strictEqual(command, 'dummy_cmd <arg1> <arrArg..>');
   });
 
   it('renders required non-array args as plain positionals', () => {
-    const {command} = buildCommand('click', commands['click'].args);
-    assert.strictEqual(command, 'click <pageId> <uid>');
+    const {command} = buildCommand('dummy_cmd', dummyArgsPlain);
+    assert.strictEqual(command, 'dummy_cmd <arg1> <arg2>');
   });
 
   it('lists optional args in the usage line, not the command', () => {
-    const {command, usage} = buildCommand(
-      'upload_file',
-      commands['upload_file'].args,
-    );
+    const {command, usage} = buildCommand('dummy_cmd', dummyArgsOptional);
     assert.ok(!command.includes('--'));
     assert.ok(usage.startsWith(`$0 ${command} `));
-    assert.ok(usage.includes('[--includeSnapshot]'));
+    assert.ok(usage.includes('[--optArg]'));
   });
 
   it('keeps every generated command parsable by yargs', () => {
