@@ -14,15 +14,13 @@ import {
   DEFAULT_FILESYSTEM_ROOT,
   getCliOptions,
   mcpOptions,
-  parser,
+  parseArguments as parseArgumentsImpl,
 } from '../src/config/mcp-options.js';
 
 import {createTempFile} from './utils.js';
 
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
-  return parser('0.0.0', ['node', 'main.js', ...argv], env)
-    .exitProcess(false)
-    .parseSync();
+  return parseArgumentsImpl('0.0.0', ['node', 'main.js', ...argv], env);
 }
 
 describe('cli args parsing', () => {
@@ -558,6 +556,33 @@ describe('cli args parsing', () => {
     );
   });
 
+  it('rejects a config file with malformed JSON', async () => {
+    using testConfig = createTempFile(
+      '{"headless": true,',
+      'cd4a.test.config.malformed.json',
+    );
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file:/,
+    );
+  });
+
+  it('rejects a config file that is not a JSON object', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify(['--headless']),
+      'cd4a.test.config.array.json',
+    );
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file: Config must be a JSON object/,
+    );
+  });
+
+  it('lets explicit cli flags override viaCli dynamic defaults', async () => {
+    const args = parseArguments(['--viaCli', '--no-headless']);
+    assert.strictEqual(args.headless, false);
+  });
+
   it('parses with devtoolsComments enabled', async () => {
     const args = parseArguments(['--devtoolsComments']);
     assert.strictEqual(args.devtoolsComments, true);
@@ -683,133 +708,169 @@ describe('cli args parsing', () => {
       );
     });
 
+    it('rejects browserUrl with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--browserUrl',
+            'http://localhost:9222',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments browserUrl and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects executablePath with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--executablePath',
+            '/bin/chrome',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments executablePath and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects executablePath with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--executablePath',
+            '/bin/chrome',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments executablePath and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects userDataDir with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--user-data-dir',
+            '/tmp/dir',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments userDataDir and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects userDataDir with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--user-data-dir',
+            '/tmp/dir',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments userDataDir and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('rejects blockedUrlPattern with allowedUrlPattern', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--blocked-url-pattern',
+            '*',
+            '--allowed-url-pattern',
+            '*',
+          ]),
+        /Arguments blockedUrlPattern and allowedUrlPattern are mutually exclusive/,
+      );
+    });
+
+    it('rejects config-based channel with browserUrl', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({channel: 'canary'}),
+        'cd4a.test.config.channel.json',
+      );
+      assert.throws(
+        () =>
+          parseArguments([
+            '--config',
+            testConfig.path,
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments channel and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects cli channel with config-based browserUrl', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({browserUrl: 'http://localhost:9222'}),
+        'cd4a.test.config.browser-url.json',
+      );
+      assert.throws(
+        () =>
+          parseArguments(['--config', testConfig.path, '--channel', 'canary']),
+        /Arguments channel and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects conflicting arguments within a config file', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({
+          browserUrl: 'http://localhost:9222',
+          wsEndpoint: 'ws://localhost:9222',
+        }),
+        'cd4a.test.config.conflict.json',
+      );
+      assert.throws(
+        () => parseArguments(['--config', testConfig.path]),
+        /Arguments browserUrl and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('allows explicitly disabled isolated with userDataDir', async () => {
+      const args = parseArguments([
+        '--isolated=false',
+        '--user-data-dir',
+        '/tmp/chrome-profile',
+      ]);
+      assert.strictEqual(args.isolated, false);
+      assert.strictEqual(args.userDataDir, '/tmp/chrome-profile');
+    });
+
+    it('rejects categoryExtensions with autoConnect', async () => {
+      assert.throws(
+        () => parseArguments(['--category-extensions', '--auto-connect']),
+        /Arguments categoryExtensions and autoConnect are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryExtensions with browserUrl', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--category-extensions',
+            '--browserUrl',
+            'http://localhost:9222',
+          ]),
+        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects categoryExtensions with wsEndpoint', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--category-extensions',
+            '--wsEndpoint',
+            'ws://localhost:9222',
+          ]),
+        /Arguments categoryExtensions and wsEndpoint are mutually exclusive/,
+      );
+    });
+
     it('allows default channel with browserUrl without conflict', async () => {
-      it('rejects browserUrl with wsEndpoint', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--browserUrl',
-              'http://localhost:9222',
-              '--wsEndpoint',
-              'ws://localhost:9222',
-            ]),
-          /Arguments browserUrl and wsEndpoint are mutually exclusive/,
-        );
-      });
-
-      it('rejects executablePath with browserUrl', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--executablePath',
-              '/bin/chrome',
-              '--browserUrl',
-              'http://localhost:9222',
-            ]),
-          /Arguments executablePath and browserUrl are mutually exclusive/,
-        );
-      });
-
-      it('rejects executablePath with wsEndpoint', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--executablePath',
-              '/bin/chrome',
-              '--wsEndpoint',
-              'ws://localhost:9222',
-            ]),
-          /Arguments executablePath and wsEndpoint are mutually exclusive/,
-        );
-      });
-
-      it('rejects userDataDir with browserUrl', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--user-data-dir',
-              '/tmp/dir',
-              '--browserUrl',
-              'http://localhost:9222',
-            ]),
-          /Arguments userDataDir and browserUrl are mutually exclusive/,
-        );
-      });
-
-      it('rejects userDataDir with wsEndpoint', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--user-data-dir',
-              '/tmp/dir',
-              '--wsEndpoint',
-              'ws://localhost:9222',
-            ]),
-          /Arguments userDataDir and wsEndpoint are mutually exclusive/,
-        );
-      });
-
-      it('rejects blockedUrlPattern with allowedUrlPattern', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--blocked-url-pattern',
-              '*',
-              '--allowed-url-pattern',
-              '*',
-            ]),
-          /Arguments blockedUrlPattern and allowedUrlPattern are mutually exclusive/,
-        );
-      });
-
-      it('rejects config-based channel with browserUrl', async () => {
-        using testConfig = createTempFile(
-          JSON.stringify({channel: 'canary'}),
-          'cd4a.test.config.channel.json',
-        );
-        assert.throws(
-          () =>
-            parseArguments([
-              '--config',
-              testConfig.path,
-              '--browserUrl',
-              'http://localhost:9222',
-            ]),
-          /Arguments channel and browserUrl are mutually exclusive/,
-        );
-      });
-
-      it('rejects categoryExtensions with autoConnect', async () => {
-        assert.throws(
-          () => parseArguments(['--category-extensions', '--auto-connect']),
-          /Arguments categoryExtensions and autoConnect are mutually exclusive/,
-        );
-      });
-
-      it('rejects categoryExtensions with browserUrl', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--category-extensions',
-              '--browserUrl',
-              'http://localhost:9222',
-            ]),
-          /Arguments categoryExtensions and browserUrl are mutually exclusive/,
-        );
-      });
-
-      it('rejects categoryExtensions with wsEndpoint', async () => {
-        assert.throws(
-          () =>
-            parseArguments([
-              '--category-extensions',
-              '--wsEndpoint',
-              'ws://localhost:9222',
-            ]),
-          /Arguments categoryExtensions and wsEndpoint are mutually exclusive/,
-        );
-      });
-
       const args = parseArguments(['--browserUrl', 'http://localhost:9222']);
       assert.strictEqual(args.channel, 'stable');
       assert.strictEqual(args.browserUrl, 'http://localhost:9222');
