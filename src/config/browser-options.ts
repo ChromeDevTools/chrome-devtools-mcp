@@ -91,7 +91,7 @@ export const browserOptions = {
     type: 'boolean',
     description:
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
-    defaultDescription: 'false',
+    default: false,
   },
   userDataDir: {
     type: 'string',
@@ -103,7 +103,7 @@ export const browserOptions = {
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
     choices: ['canary', 'dev', 'beta', 'stable'] as const,
-    defaultDescription: 'stable',
+    default: 'stable' as const,
   },
   proxyServer: {
     type: 'string',
