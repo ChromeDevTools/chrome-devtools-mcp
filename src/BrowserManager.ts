@@ -122,6 +122,10 @@ export class BrowserManager {
     }
   }
 
+  isBrowserInitializing(): boolean {
+    return this.#initPromise !== undefined;
+  }
+
   async #ensureBrowserLocked(): Promise<Browser> {
     if (this.#closingCount > 0) {
       throw new Error('Browser was closed while initializing.');

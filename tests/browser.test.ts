@@ -152,6 +152,25 @@ describe('browser', () => {
       sinon.assert.calledOnce(launchStub);
     });
 
+    it('reports whether browser initialization is in flight', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const {promise, resolve} = Promise.withResolvers<Browser>();
+      sinon.stub(puppeteer, 'launch').returns(promise);
+
+      const manager = new BrowserManager(
+        createMockParsedArguments({headless: true, isolated: true}),
+      );
+
+      assert.strictEqual(manager.isBrowserInitializing(), false);
+      const ensurePromise = manager.ensureBrowser();
+      assert.strictEqual(manager.isBrowserInitializing(), true);
+
+      resolve(pptrBrowser);
+      await ensurePromise;
+
+      assert.strictEqual(manager.isBrowserInitializing(), false);
+    });
+
     it('clears pending state on launch failure so subsequent ensureBrowser() retries', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon
