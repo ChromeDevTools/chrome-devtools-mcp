@@ -11,7 +11,7 @@ import type {TextContent, ImageContent} from './third_party/index.js';
 export class SlimMcpResponse extends McpResponse {
   override async handle(_context: McpContext): Promise<{
     content: Array<TextContent | ImageContent>;
-    structuredContent: object;
+    structuredContent: Record<string, unknown>;
   }> {
     const text: TextContent = {
       type: 'text',
@@ -19,7 +19,10 @@ export class SlimMcpResponse extends McpResponse {
     };
     return {
       content: [text],
-      structuredContent: text,
+      structuredContent: {
+        type: text.type,
+        text: text.text,
+      },
     };
   }
 }

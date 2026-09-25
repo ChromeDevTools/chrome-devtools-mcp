@@ -1120,4 +1120,83 @@ describe('ToolHandler', () => {
       filePath: canonicalFilePath,
     });
   });
+
+  it('registers only evaluate_script with exposed tool docs when repl mode is enabled', () => {
+    const serverArgs = parseArguments(
+      '1.0.0',
+      ['node', 'script.js', '--repl', '--no-category-emulation'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    );
+    const tools = createTools(serverArgs);
+
+    assert.strictEqual(tools.length, 1);
+    assert.strictEqual(tools[0]?.name, 'evaluate_script');
+    assert.match(tools[0]?.description ?? '', /Available MCP tool functions:/);
+    assert.match(tools[0]?.description ?? '', /await click\(/);
+    assert.match(tools[0]?.description ?? '', /await take_snapshot\(/);
+    assert.doesNotMatch(tools[0]?.description ?? '', /await evaluate_script\(/);
+    assert.doesNotMatch(tools[0]?.description ?? '', /await emulate\(/);
+  });
+
+  it('supports defaultPageId, schema validation, and alwaysIncludeStructuredContent in execute()', async () => {
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+    const tool = definePageTool(() => ({
+      name: 'click',
+      description: 'Clicks an element',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {
+        uid: zod.string(),
+      },
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async (request, response) => {
+        response.appendResponseLine(`Clicked ${request.params.uid}`);
+      },
+    }))(serverArgs);
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    const mockPage = sinon.createStubInstance(McpPage);
+    mockPage.emulationSettings = {};
+    mockContext.getPageById.returns(mockPage);
+
+    const toolMutex = new Mutex();
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+    );
+
+    const result = await toolHandler.execute(
+      {uid: '1_2'},
+      {
+        defaultPageId: 7,
+        validateSchema: true,
+        alwaysIncludeStructuredContent: true,
+      },
+    );
+
+    sinon.assert.calledOnceWithExactly(mockContext.getPageById, 7);
+    assert.strictEqual(result.isError, undefined);
+    assert.deepStrictEqual(result.structuredContent, {
+      message: 'Clicked 1_2',
+    });
+
+    const invalidResult = await toolHandler.execute(
+      {},
+      {
+        defaultPageId: 7,
+        validateSchema: true,
+        alwaysIncludeStructuredContent: true,
+      },
+    );
+    assert.strictEqual(invalidResult.isError, true);
+  });
 });
