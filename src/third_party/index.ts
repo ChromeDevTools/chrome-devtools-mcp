@@ -54,6 +54,7 @@ export {
   CDPSessionEvent,
   ScreenRecorder,
   TimeoutError,
+  WebWorker,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
@@ -61,6 +62,7 @@ export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
 export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {CdpTarget} from 'puppeteer-core/internal/cdp/Target.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
