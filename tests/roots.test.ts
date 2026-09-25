@@ -67,6 +67,23 @@ describe('McpContext Roots', () => {
     });
   });
 
+  it('should allow access below a root that already ends with a separator', async () => {
+    await withMcpContext(async (_response, context) => {
+      // The filesystem root is `/` on POSIX and `C:\` on Windows.
+      const filesystemRoot = path.parse(process.cwd()).root;
+      context.setRoots([
+        {uri: pathToFileURL(filesystemRoot).href, name: 'filesystem-root'},
+      ]);
+
+      const outsidePath = path.resolve(
+        os.homedir(),
+        'a_very_unlikely_path_name_filesystem_root',
+      );
+      const resolved = await context.validatePath(outsidePath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(outsidePath));
+    });
+  });
+
   it('should enforce extensions and validate the output path', async () => {
     using workspace = createTempDir('workspace-root-');
     await withMcpContext(async (_response, context) => {
