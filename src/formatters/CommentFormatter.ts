@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {CD4ACommentThread, CD4AEditorAnchorSignature} from '../types.js';
+import type {CD4ACommentThread} from '../types.js';
 
 export interface CommentFormatterOptions {
   resolveBackendNodeId?: (backendNodeId: number) => Promise<string | undefined>;
@@ -16,7 +16,6 @@ export interface StructuredCommentThread {
   text: string;
   elementUid?: string;
   reqid?: number;
-  editor?: CD4AEditorAnchorSignature;
 }
 
 function formatCommentThread(thread: StructuredCommentThread): string {
@@ -25,16 +24,10 @@ function formatCommentThread(thread: StructuredCommentThread): string {
     `- Comment: ${thread.text}`,
   ];
   if (thread.elementUid) {
-    lines.push(`- Target element (snapshot UID): ${thread.elementUid}`);
+    lines.push(`- Related element uid: ${thread.elementUid}`);
   }
   if (thread.reqid !== undefined) {
-    lines.push(`- Network request ID (reqid): ${thread.reqid}`);
-  }
-  if (thread.editor) {
-    const location = thread.editor.filePath
-      ? `${thread.editor.filePath}:${thread.editor.lineNumber}`
-      : `line ${thread.editor.lineNumber}`;
-    lines.push(`- Editor location: ${location}`);
+    lines.push(`- Related network reqid: ${thread.reqid}`);
   }
   return lines.join('\n');
 }
@@ -86,9 +79,6 @@ export class CommentFormatter {
       }
       if (reqid !== undefined) {
         item.reqid = reqid;
-      }
-      if (thread.editor) {
-        item.editor = thread.editor;
       }
       structuredThreads.push(item);
     }

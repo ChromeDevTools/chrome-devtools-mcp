@@ -25,22 +25,16 @@ const categoryOverrides: Record<
   ToolCategory,
   {
     describe?: string;
-    hidden?: boolean;
+    hidden?: true;
     conflicts?: string[];
     offByDefault?: boolean;
   }
 > = {
   [ToolCategory.INPUT]: {},
   [ToolCategory.NAVIGATION]: {},
-  [ToolCategory.EMULATION]: {
-    hidden: false,
-  },
-  [ToolCategory.PERFORMANCE]: {
-    hidden: false,
-  },
-  [ToolCategory.NETWORK]: {
-    hidden: false,
-  },
+  [ToolCategory.EMULATION]: {},
+  [ToolCategory.PERFORMANCE]: {},
+  [ToolCategory.NETWORK]: {},
   [ToolCategory.DEBUGGING]: {},
   [ToolCategory.MEMORY]: {},
   [ToolCategory.WEBMCP]: {
@@ -51,20 +45,17 @@ const categoryOverrides: Record<
   [ToolCategory.EXTENSIONS]: {
     describe:
       'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
-    hidden: false,
     offByDefault: true,
   },
   [ToolCategory.THIRD_PARTY]: {
     describe:
       'Set to true to enable third-party developer tools exposed by the inspected page itself',
-    hidden: false,
     offByDefault: true,
   },
   [ToolCategory.PWA]: {
     describe:
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
     conflicts: ['autoConnect', 'browserUrl', 'wsEndpoint'],
-    hidden: false,
     offByDefault: true,
   },
 };
@@ -78,7 +69,6 @@ function createOption(category: ToolCategory): CategoryOption {
   return {
     type: 'boolean',
     describe,
-    hidden: true,
     ...overrides,
     ...(overrides.offByDefault ? {} : {default: true}),
   };

@@ -6,6 +6,8 @@
 
 import assert from 'node:assert';
 import {spawn, type ChildProcess} from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import type {Browser} from 'puppeteer';
@@ -194,7 +196,7 @@ export async function withMcpContext(
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,
         sourceMaps: options.sourceMaps ?? true,
-        allowList: options.allowedUrlPattern,
+        allowlist: options.allowedUrlPattern,
         blocklist: options.blockedUrlPattern,
         allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
         navigationTimeout:
@@ -478,4 +480,43 @@ export async function waitExecutionFor(
   }
 
   throw new Error(`Timeout of ${timeout} reached.`);
+}
+
+export function createTempDir(
+  prefix = 'chrome-devtools-test-',
+  baseDir = os.tmpdir(),
+) {
+  const dirPath = fs.mkdtempSync(path.join(baseDir, prefix));
+  return {
+    path: dirPath,
+    [Symbol.dispose]() {
+      try {
+        fs.rmSync(dirPath, {recursive: true, force: true});
+      } catch {
+        // ignore
+      }
+    },
+  };
+}
+
+export function createTempFile(
+  content: string,
+  fileName: string,
+  baseDir = os.tmpdir(),
+) {
+  const dirPath = fs.mkdtempSync(
+    path.join(baseDir, 'chrome-devtools-test-file-'),
+  );
+  const filePath = path.join(dirPath, fileName);
+  fs.writeFileSync(filePath, content);
+  return {
+    path: filePath,
+    [Symbol.dispose]() {
+      try {
+        fs.rmSync(dirPath, {recursive: true, force: true});
+      } catch {
+        // ignore
+      }
+    },
+  };
 }

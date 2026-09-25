@@ -533,3 +533,55 @@ export const queryHeapSnapshotObjects = defineTool(() => ({
     });
   },
 }));
+
+export const analyzeHeapSnapshotContexts = defineTool(() => ({
+  name: 'analyze_heapsnapshot_contexts',
+  description:
+    'Loads a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  blockedByDialog: false,
+  verifyFilesSchema: {
+    filePath: true,
+  },
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    retainedSize: byteSizeRangeSchema(
+      'Inclusive range for the dead-field score of a context (e.g. "10KB", "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+    ).optional(),
+    scopeInfoNodeId: zod
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.',
+      ),
+    pageIdx: zod
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe('The zero-based page index. Defaults to 0.'),
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('The number of contexts to return per page. Defaults to 20.'),
+  },
+  handler: async (request, response, context) => {
+    const analysis = await context.analyzeHeapSnapshotContexts(
+      request.params.filePath,
+    );
+
+    response.setHeapSnapshotContextAnalysis(analysis, {
+      retainedSize: request.params.retainedSize,
+      scopeInfoNodeId: request.params.scopeInfoNodeId,
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+}));

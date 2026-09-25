@@ -38,14 +38,20 @@ import type {
 } from '../src/processors/HeapSnapshotManager.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 import {
+  CdpBrowser,
   CdpExtension,
   CdpFrame,
   CdpPage,
   DevTools,
+  Dialog,
+  ElementHandle,
+  Locator,
 } from '../src/third_party/index.js';
 import type {
+  Browser,
   Extension,
   Page,
+  Protocol,
   Result,
   RunnerResult,
 } from '../src/third_party/index.js';
@@ -116,10 +122,35 @@ export function mockListener() {
   };
 }
 
+export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser> {
+  const browser = sinon.createStubInstance(
+    CdpBrowser,
+  ) as unknown as sinon.SinonStubbedInstance<Browser>;
+  sinon.stub(browser, 'connected').get(() => true);
+  browser.close.resolves();
+  browser.disconnect.resolves();
+  browser.pages.resolves([]);
+  browser.process.returns(null);
+  return browser;
+}
+
 export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   const page = sinon.createStubInstance(
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
+  const pageListener = mockListener();
+  page.on.callsFake((eventName, handler) => {
+    pageListener.on(eventName, handler);
+    return page;
+  });
+  page.off.callsFake((eventName, handler) => {
+    pageListener.off(eventName, handler);
+    return page;
+  });
+  page.emit.callsFake((eventName, data) => {
+    pageListener.emit(eventName, data);
+    return true;
+  });
 
   // mainFrame() must return a stable object so tests can pass it back into
   // page.emit('framenavigated', mainFrame) and have it recognized as the
@@ -166,7 +197,33 @@ export function createMockMcpPage(
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
+  page.waitForEventsAfterAction.callsFake(async action => {
+    await action(new AbortController().signal);
+    return {};
+  });
   return Object.assign(page, {pptrPage});
+}
+
+export function createMockDialog(
+  options: {type?: Protocol.Page.DialogType; message?: string} = {},
+): sinon.SinonStubbedInstance<Dialog> {
+  const dialog = sinon.createStubInstance(Dialog);
+  dialog.type.returns(options.type ?? 'alert');
+  dialog.message.returns(options.message ?? '');
+  return dialog;
+}
+
+export function createMockElementHandle(): {
+  handle: sinon.SinonStubbedInstance<ElementHandle<Element>>;
+  locator: sinon.SinonStubbedInstance<Locator<Element>>;
+} {
+  const handle =
+    sinon.createStubInstance<ElementHandle<Element>>(ElementHandle);
+  handle.dispose.resolves();
+  const locator = sinon.createStubInstance<Locator<Element>>(Locator);
+  locator.setTimeout.returns(locator);
+  handle.asLocator.returns(locator);
+  return {handle, locator};
 }
 
 export function createMockMcpContext(
@@ -817,6 +874,98 @@ export function createMockObjectInfo(): DevTools.HeapSnapshotModel.HeapSnapshotM
     retainerCount: 1,
     detachedness:
       DevTools.HeapSnapshotModel.HeapSnapshotModel.DOMLinkState.ATTACHED,
+  };
+}
+
+export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult {
+  return {
+    scopes: [
+      {
+        scopeInfoNodeIndex: 30,
+        scopeInfoNodeId: 303,
+        scriptNodeIndex: 7,
+        scriptNodeId: 301,
+        scriptName: 'test.js',
+        scopeName: 'createClosure',
+        scopeStart: 14,
+        scopeEnd: 104,
+        contextFieldCount: 2,
+        contexts: [
+          {
+            contextNodeIndex: 10,
+            contextNodeId: 101,
+            retainedSize: 5000,
+            deadFieldsRetainedSizeSum: 2000,
+            deadFields: [
+              {
+                name: 'dead',
+                valueNodeIndex: 50,
+                valueNodeId: 202,
+                valueName: 'Object',
+                valueType: 'object',
+                selfSize: 200,
+                retainedSize: 2000,
+              },
+            ],
+          },
+          {
+            contextNodeIndex: 11,
+            contextNodeId: 102,
+            retainedSize: 1000,
+            deadFieldsRetainedSizeSum: 500,
+            deadFields: [
+              {
+                name: 'alsoDead',
+                valueNodeIndex: 60,
+                valueNodeId: 204,
+                valueName: 'Array',
+                valueType: 'object',
+                selfSize: 100,
+                retainedSize: 500,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        scopeInfoNodeIndex: 40,
+        scopeInfoNodeId: 313,
+        scriptNodeIndex: 8,
+        scriptNodeId: 311,
+        scriptName: 'other-scope.js',
+        scopeName: 'createOtherClosure',
+        scopeStart: 20,
+        scopeEnd: 60,
+        contextFieldCount: 1,
+        contexts: [
+          {
+            contextNodeIndex: 12,
+            contextNodeId: 111,
+            retainedSize: 3000,
+            deadFieldsRetainedSizeSum: 1500,
+            deadFields: [
+              {
+                name: 'captured',
+                valueNodeIndex: 70,
+                valueNodeId: 206,
+                valueName: 'Map',
+                valueType: 'object',
+                selfSize: 150,
+                retainedSize: 1500,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    scriptsWithoutScopes: [
+      {
+        scriptNodeIndex: 9,
+        scriptNodeId: 401,
+        scriptName: 'other.js',
+        contextCount: 2,
+      },
+    ],
   };
 }
 

@@ -11,8 +11,15 @@ on:
 
 jobs:
   pre-release:
-    name: 'Verify artifacts before release'
-    runs-on: ubuntu-latest
+    name: 'Verify artifacts before release (${{ matrix.os }})'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,18 +36,36 @@ jobs:
 
       # Ensure npm 11.5.1 or later is installed
       - name: Update npm
+        shell: bash
         run: npm install -g npm@latest
 
       - name: Install dependencies
+        shell: bash
         run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
 
       - name: Build and bundle
+        shell: bash
         run: npm run bundle
         env:
           NODE_ENV: 'production'
 
       - name: Verify server.json
+        if: runner.os == 'Linux'
+        shell: bash
         run: npm run verify-server-json-version
 
       - name: Verify npm package
+        shell: bash
         run: npm run verify-npm-package
+
+      - name: Remove node_modules
+        shell: bash
+        run: rm -rf node_modules
+
+      - name: Smoke test bundled binaries
+        shell: bash
+        run: |
+          node ./build/src/bin/chrome-devtools-mcp.js --version
+          node ./build/src/bin/chrome-devtools.js --version

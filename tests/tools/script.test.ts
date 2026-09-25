@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import {readFile} from 'node:fs/promises';
 
 import sinon from 'sinon';
 
@@ -19,6 +20,7 @@ import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
+  createTempDir,
   extractExtensionId,
   html,
   withMcpContext,
@@ -310,33 +312,30 @@ describe('script', () => {
       });
     });
     it('saves output to file when filePath is provided', async () => {
-      const {rm, readFile} = await import('node:fs/promises');
-      const {tmpdir} = await import('node:os');
-      const {join} = await import('node:path');
-      const filePath = join(tmpdir(), 'test-evaluate-script-output.json');
-      try {
-        await withMcpContext(async (response, context, args) => {
-          await evaluateScript(args).handler(
-            {
-              params: {
-                function: String(() => ({hello: 'world'})),
-                filePath,
-              },
+      using tmpDir = createTempDir();
+      const filePath = path.join(
+        tmpDir.path,
+        'test-evaluate-script-output.json',
+      );
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {
+              function: String(() => ({hello: 'world'})),
+              filePath,
             },
-            response,
-            context,
-          );
-          assert.strictEqual(response.responseLines.length, 1);
-          assert.ok(
-            response.responseLines[0]?.includes('Output saved to'),
-            `Expected "Output saved to" but got: ${response.responseLines[0]}`,
-          );
-        });
-        const content = await readFile(filePath, 'utf-8');
-        assert.deepStrictEqual(JSON.parse(content), {hello: 'world'});
-      } finally {
-        await rm(filePath, {force: true});
-      }
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(response.responseLines.length, 1);
+        assert.ok(
+          response.responseLines[0]?.includes('Output saved to'),
+          `Expected "Output saved to" but got: ${response.responseLines[0]}`,
+        );
+      });
+      const content = await readFile(filePath, 'utf-8');
+      assert.deepStrictEqual(JSON.parse(content), {hello: 'world'});
     });
     it('evaluates inside extension service worker', async () => {
       await withMcpContext(

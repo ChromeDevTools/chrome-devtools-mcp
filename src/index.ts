@@ -8,8 +8,7 @@ import type fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-import type {Channel} from './browser.js';
-import {ensureBrowserConnected, ensureBrowserLaunched} from './browser.js';
+import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/mcp-options.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
@@ -41,13 +40,14 @@ puppeteer.setFollowSymlinks(false);
 const ROOTS_REQUEST_TIMEOUT = 5_000;
 
 export interface McpServerOptions {
+  browserManager: BrowserManager;
   logFile?: fs.WriteStream;
 }
 
 export class McpServer {
   readonly server: SdkMcpServer;
   #serverArgs: ParsedArguments;
-  #options: McpServerOptions;
+  #browserManager: BrowserManager;
   #context?: McpContext;
 
   /**
@@ -58,12 +58,9 @@ export class McpServer {
   #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
 
-  private constructor(
-    serverArgs: ParsedArguments,
-    options: McpServerOptions = {},
-  ) {
+  private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
     this.#serverArgs = serverArgs;
-    this.#options = options;
+    this.#browserManager = options.browserManager;
 
     if (this.#serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -125,14 +122,22 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
-    this.#context?.dispose();
-    this.#context = undefined;
-    await this.server.close();
+    try {
+      this.#context?.dispose();
+    } catch (err) {
+      logger?.('Failed to dispose context', err);
+    } finally {
+      this.#context = undefined;
+    }
+    await Promise.allSettled([
+      this.#browserManager.close(),
+      this.server.close(),
+    ]);
   }
 
   [Symbol.dispose](): void {
-    this.close().catch(() => {
-      // TODO: wire up the logger
+    this.close().catch(err => {
+      logger?.('Failed to dispose McpServer', err);
     });
   }
 
@@ -142,7 +147,7 @@ export class McpServer {
 
   static async from(
     serverArgs: ParsedArguments,
-    options: McpServerOptions = {},
+    options: McpServerOptions,
   ): Promise<McpServer> {
     const server = new McpServer(serverArgs, options);
     await server.#init();
@@ -163,7 +168,7 @@ export class McpServer {
         ? []
         : (this.#serverArgs.filesystemRoot ?? [])
     ).map(root => {
-      const rootPath = path.resolve(String(root));
+      const rootPath = path.resolve(root);
       return {
         uri: pathToFileURL(rootPath).href,
         name: path.basename(rootPath) || rootPath,
@@ -197,66 +202,19 @@ export class McpServer {
   }
 
   async #getContext(): Promise<McpContext> {
-    const chromeArgs: string[] = (this.#serverArgs.chromeArg ?? []).map(String);
-    const ignoreDefaultChromeArgs: string[] = (
-      this.#serverArgs.ignoreDefaultChromeArg ?? []
-    ).map(String);
-    if (this.#serverArgs.proxyServer) {
-      chromeArgs.push(`--proxy-server=${this.#serverArgs.proxyServer}`);
-    }
-    const devtools = this.#serverArgs.experimentalDevtools ?? false;
-    const blocklist = this.#serverArgs.blockedUrlPattern
-      ? this.#serverArgs.blockedUrlPattern.map(String)
-      : undefined;
-    const allowlist = this.#serverArgs.allowedUrlPattern
-      ? this.#serverArgs.allowedUrlPattern.map(String)
-      : undefined;
-
-    const channel = this.#serverArgs.channel as Channel | undefined;
-
-    const browser =
-      this.#serverArgs.browserUrl ||
-      this.#serverArgs.wsEndpoint ||
-      this.#serverArgs.autoConnect
-        ? await ensureBrowserConnected({
-            browserURL: this.#serverArgs.browserUrl,
-            wsEndpoint: this.#serverArgs.wsEndpoint,
-            wsHeaders: this.#serverArgs.wsHeaders,
-            // Important: only pass channel, if autoConnect is true.
-            channel: this.#serverArgs.autoConnect ? channel : undefined,
-            userDataDir: this.#serverArgs.userDataDir,
-            devtools,
-            blocklist,
-            allowlist,
-          })
-        : await ensureBrowserLaunched({
-            headless: this.#serverArgs.headless,
-            executablePath: this.#serverArgs.executablePath,
-            channel,
-            isolated: this.#serverArgs.isolated ?? false,
-            userDataDir: this.#serverArgs.userDataDir,
-            logFile: this.#options.logFile,
-            viewport: this.#serverArgs.viewport,
-            chromeArgs,
-            ignoreDefaultChromeArgs,
-            acceptInsecureCerts: this.#serverArgs.acceptInsecureCerts,
-            devtools,
-            enableExtensions: this.#serverArgs.categoryExtensions,
-            viaCli: this.#serverArgs.viaCli,
-            blocklist,
-            allowlist,
-          });
+    const browser = await this.#browserManager.ensureBrowser();
 
     if (this.#context?.browser !== browser) {
       this.#context?.dispose();
       this.#context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging: devtools,
+        experimentalDevToolsDebugging:
+          this.#serverArgs.experimentalDevtools ?? false,
         experimentalIncludeAllPages:
           this.#serverArgs.experimentalIncludeAllPages,
         performanceCrux: this.#serverArgs.performanceCrux,
         sourceMaps: this.#serverArgs.sourceMaps,
-        allowList: allowlist,
-        blocklist: blocklist,
+        allowlist: this.#serverArgs.allowedUrlPattern,
+        blocklist: this.#serverArgs.blockedUrlPattern,
         allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
@@ -294,21 +252,19 @@ export class McpServer {
       this.#toolMutex,
     );
 
-    if (!toolHandler.shouldRegister) {
-      return;
-    }
-
-    this.server.registerTool(
+    const registeredTool = this.server.registerTool(
       tool.name,
       {
         description: tool.description,
         inputSchema: toolHandler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      async params => {
-        return await toolHandler.handle(params);
-      },
+      toolHandler.handle,
     );
+
+    if (toolHandler.disabled) {
+      registeredTool.disable();
+    }
   }
 }
 
@@ -321,9 +277,17 @@ export class McpServer {
  */
 export async function createMcpServer(
   serverArgs: ParsedArguments,
-  options: McpServerOptions = {},
+  options: {
+    logFile?: fs.WriteStream;
+  },
 ): Promise<{server: SdkMcpServer}> {
-  const server = await McpServer.from(serverArgs, options);
+  const browserManager = new BrowserManager(serverArgs, {
+    logFile: options.logFile,
+  });
+  const server = await McpServer.from(serverArgs, {
+    browserManager,
+    ...options,
+  });
   return {server: server.server};
 }
 

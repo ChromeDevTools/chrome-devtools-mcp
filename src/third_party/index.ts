@@ -18,7 +18,7 @@ export type {Options as YargsOptions} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
-export {McpServer} from '@modelcontextprotocol/server';
+export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
 export {
   StdioServerTransport,
   serveStdio,
@@ -46,15 +46,19 @@ export type ShapeOutput<T extends zod.ZodRawShape> = zod.output<
 
 export {default as ajv} from 'ajv';
 export {
+  Dialog,
+  ElementHandle,
   Locator,
   PredefinedNetworkConditions,
   KnownDevices,
   CDPSessionEvent,
   ScreenRecorder,
+  TimeoutError,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';

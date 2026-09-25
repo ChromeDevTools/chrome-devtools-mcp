@@ -6,8 +6,6 @@
 
 import assert from 'node:assert';
 import {existsSync} from 'node:fs';
-import {rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, it, afterEach} from 'node:test';
 
@@ -27,12 +25,14 @@ import {
   getHeapSnapshotDuplicateStrings,
   getHeapSnapshotObjectDetails,
   queryHeapSnapshotObjects,
+  analyzeHeapSnapshotContexts,
 } from '../../src/tools/memory.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {
   createHandlerMocks,
   createMockClassDiffs,
+  createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockDominatorChain,
   createMockDuplicateStrings,
@@ -45,7 +45,7 @@ import {
   createMockRetainedByContextSummary,
   createMockRetainingPaths,
 } from '../mocks.js';
-import {withMcpContext} from '../utils.js';
+import {createTempDir, withMcpContext} from '../utils.js';
 
 describe('memory', () => {
   afterEach(() => {
@@ -54,23 +54,20 @@ describe('memory', () => {
 
   describe('take_heapsnapshot', () => {
     it('with default options', async () => {
+      using tmpDir = createTempDir();
       await withMcpContext(async (response, context, args) => {
-        const filePath = join(tmpdir(), 'test-screenshot.heapsnapshot');
-        try {
-          await takeHeapSnapshot(args).handler(
-            {params: {filePath}, page: context.getSelectedMcpPage()},
-            response,
-            context,
-          );
-          const canonicalFilePath = await resolveCanonicalPath(filePath);
-          assert.equal(
-            response.responseLines.at(0),
-            `Heap snapshot saved to ${canonicalFilePath}`,
-          );
-          assert.ok(existsSync(filePath));
-        } finally {
-          await rm(filePath, {force: true});
-        }
+        const filePath = join(tmpDir.path, 'test-screenshot.heapsnapshot');
+        await takeHeapSnapshot(args).handler(
+          {params: {filePath}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const canonicalFilePath = await resolveCanonicalPath(filePath);
+        assert.equal(
+          response.responseLines.at(0),
+          `Heap snapshot saved to ${canonicalFilePath}`,
+        );
+        assert.ok(existsSync(filePath));
       });
     });
 
@@ -339,6 +336,43 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotObjectDetails,
         objectInfo,
+      );
+    });
+  });
+
+  describe('analyze_heapsnapshot_contexts', () => {
+    it('delegates to analyzeHeapSnapshotContexts and forwards options', async () => {
+      const {context, response, args} = createHandlerMocks();
+      const analysis = createMockContextAnalysisResult();
+      context.analyzeHeapSnapshotContexts.resolves(analysis);
+
+      await analyzeHeapSnapshotContexts(args).handler(
+        {
+          params: {
+            filePath: 'test.heapsnapshot',
+            retainedSize: parseByteSizeRange('10KB'),
+            scopeInfoNodeId: 303,
+            pageIdx: 1,
+            pageSize: 5,
+          },
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        context.analyzeHeapSnapshotContexts,
+        'test.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotContextAnalysis,
+        analysis,
+        {
+          retainedSize: {min: 10000, max: undefined},
+          scopeInfoNodeId: 303,
+          pageIdx: 1,
+          pageSize: 5,
+        },
       );
     });
   });

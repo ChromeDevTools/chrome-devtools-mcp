@@ -6,14 +6,14 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
   assertDaemonIsNotRunning,
   assertDaemonIsRunning,
+  createTempDir,
+  createTempFile,
   runCli,
 } from '../utils.js';
 
@@ -54,14 +54,10 @@ describe('chrome-devtools', () => {
   });
 
   it('can start the daemon with userDataDir', async () => {
-    const userDataDir = path.join(
-      os.tmpdir(),
-      `chrome-devtools-test-${crypto.randomUUID()}`,
-    );
-    fs.mkdirSync(userDataDir, {recursive: true});
+    using userDataDir = createTempDir('chrome-devtools-test-');
 
     const startResult = await runCli(
-      ['start', '--userDataDir', userDataDir],
+      ['start', '--userDataDir', userDataDir.path],
       sessionId,
     );
     assert.strictEqual(
@@ -96,30 +92,80 @@ describe('chrome-devtools', () => {
   });
 
   it('can start the daemon with a workspace', async () => {
-    const workspace = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'chrome-devtools-workspace-'),
+    using workspace = createTempDir('chrome-devtools-workspace-');
+
+    const startResult = await runCli(
+      ['start', '--workspace', workspace.path],
+      sessionId,
+    );
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
     );
 
-    try {
-      const startResult = await runCli(
-        ['start', '--workspace', workspace],
-        sessionId,
-      );
-      assert.strictEqual(
-        startResult.status,
-        0,
-        `start command failed: ${startResult.stderr}`,
-      );
+    const statusResult = await runCli(['status'], sessionId);
+    assert.strictEqual(statusResult.status, 0);
+    assert.ok(
+      statusResult.stdout.includes('--filesystem-root=') &&
+        statusResult.stdout.includes(path.basename(workspace.path)),
+      `workspace was not forwarded: ${statusResult.stdout}`,
+    );
+  });
 
-      const statusResult = await runCli(['status'], sessionId);
-      assert.strictEqual(statusResult.status, 0);
-      assert.ok(
-        statusResult.stdout.includes('--filesystem-root=') &&
-          statusResult.stdout.includes(path.basename(workspace)),
-        `workspace was not forwarded: ${statusResult.stdout}`,
-      );
-    } finally {
-      fs.rmSync(workspace, {recursive: true, force: true});
-    }
+  it('can start the daemon with a config file', async () => {
+    using userDataDir = createTempDir('chrome-devtools-config-profile-');
+    using configFile = createTempFile(
+      JSON.stringify({
+        userDataDir: userDataDir.path,
+        headless: true,
+      }),
+      'chrome-devtools-config.json',
+    );
+
+    const relativeConfigPath = path.relative(process.cwd(), configFile.path);
+    const startResult = await runCli(
+      ['start', '--config', relativeConfigPath],
+      sessionId,
+    );
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+
+    const statusResult = await runCli(['status'], sessionId);
+    assert.strictEqual(statusResult.status, 0);
+    assert.ok(
+      statusResult.stdout.includes(
+        JSON.stringify(`--config=${configFile.path}`),
+      ),
+      `resolved config path was not forwarded: ${statusResult.stdout}`,
+    );
+    assert.ok(
+      !statusResult.stdout.includes('--headless'),
+      `default --headless should not be forwarded when not specified on CLI: ${statusResult.stdout}`,
+    );
+    assert.ok(
+      !statusResult.stdout.includes('--filesystem-root'),
+      `default --filesystem-root should not be forwarded when not specified on CLI: ${statusResult.stdout}`,
+    );
+
+    const overrideResult = await runCli(
+      ['start', '--config', relativeConfigPath, '--headless'],
+      sessionId,
+    );
+    assert.strictEqual(
+      overrideResult.status,
+      0,
+      `start command with --headless override failed: ${overrideResult.stderr}`,
+    );
+
+    const overrideStatusResult = await runCli(['status'], sessionId);
+    assert.strictEqual(overrideStatusResult.status, 0);
+    assert.ok(
+      overrideStatusResult.stdout.includes('"--headless"'),
+      `explicit --headless CLI flag was not forwarded: ${overrideStatusResult.stdout}`,
+    );
   });
 });

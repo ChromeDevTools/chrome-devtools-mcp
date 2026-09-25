@@ -229,6 +229,13 @@ export class HeapSnapshotManager {
     return await snapshot.getObjectInfo(nodeIndex);
   }
 
+  async analyzeContexts(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult> {
+    const snapshot = await this.getSnapshot(filePath);
+    return await snapshot.analyzeContexts();
+  }
+
   async getRetainingPaths(
     filePath: string,
     nodeId: number,

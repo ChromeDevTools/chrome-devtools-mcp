@@ -100,6 +100,9 @@ export class WaitForHelper {
   }
 
   timeout(time: number): Promise<void> {
+    if (this.#abortController.signal.aborted) {
+      return Promise.resolve();
+    }
     return new Promise<void>(res => {
       const id = setTimeout(res, time);
       this.#abortController.signal.addEventListener('abort', () => {
@@ -110,7 +113,7 @@ export class WaitForHelper {
   }
 
   async waitForEventsAfterAction(
-    action: () => Promise<unknown>,
+    action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;
@@ -127,16 +130,12 @@ export class WaitForHelper {
     ) => {
       this.#dialogDetected = true;
 
-      if (!options?.handleDialog) {
-        return;
-      }
-
       let actionToTake: DialogAction | undefined;
 
-      if (typeof options.handleDialog === 'object') {
+      if (typeof options?.handleDialog === 'object') {
         actionToTake = options.handleDialog[dialog.type()];
       } else {
-        actionToTake = options.handleDialog;
+        actionToTake = options?.handleDialog;
       }
 
       if (actionToTake) {
@@ -148,6 +147,10 @@ export class WaitForHelper {
         } else {
           void dialog.accept(actionToTake);
         }
+      } else {
+        this.#abortController.abort(
+          new Error('Action interrupted by a dialog'),
+        );
       }
     };
     this.#page.on('dialog', dialogHandler);
@@ -231,7 +234,7 @@ export class WaitForHelper {
       });
 
     try {
-      await action();
+      await action(this.#abortController.signal);
     } catch (error) {
       // Clear up pending promises
       this.#abortController.abort();
