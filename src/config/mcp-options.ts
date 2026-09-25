@@ -34,8 +34,15 @@ export const mcpOptions = {
         return;
       }
       const [width, height] = arg.split('x').map(Number);
-      if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
-        throw new Error('Invalid viewport. Expected format is `1280x720`.');
+      if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        throw new Error(
+          'Invalid viewport. Expected format is `1280x720` with positive width and height.',
+        );
       }
       return {
         width,

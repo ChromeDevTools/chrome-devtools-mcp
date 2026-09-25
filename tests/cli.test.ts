@@ -151,6 +151,27 @@ describe('cli args parsing', () => {
     });
   });
 
+  it('rejects non-positive viewport dimensions', async () => {
+    const coerce = mcpOptions.viewport.coerce;
+    assert.ok(coerce);
+
+    assert.strictEqual(coerce(undefined), undefined);
+
+    for (const value of [
+      '800x-1',
+      '-100x800',
+      '800x0',
+      '0x800',
+      'Infinityx600',
+      '800xInfinity',
+    ]) {
+      assert.throws(
+        () => coerce(value),
+        /Invalid viewport\. Expected format is `1280x720` with positive width and height\./,
+      );
+    }
+  });
+
   it('parses chrome args', async () => {
     const args = parseArguments([
       `--chrome-arg='--no-sandbox'`,
