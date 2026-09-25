@@ -327,6 +327,17 @@ export const resizePage = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const {width, height} = request.params;
+    if (!Number.isFinite(width) || width <= 0) {
+      throw new Error(
+        `Invalid page width "${width}". Width must be a positive finite number.`,
+      );
+    }
+    if (!Number.isFinite(height) || height <= 0) {
+      throw new Error(
+        `Invalid page height "${height}". Height must be a positive finite number.`,
+      );
+    }
 
     try {
       const browser = page.pptrPage.browser();
