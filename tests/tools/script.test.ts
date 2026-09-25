@@ -48,6 +48,19 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
       });
     });
+    it('evaluates a function declaration with a trailing semicolon', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {function: '() => 2 * 5;'},
+          },
+          response,
+          context,
+        );
+        const lineEvaluation = response.responseLines.at(2)!;
+        assert.strictEqual(JSON.parse(lineEvaluation), 10);
+      });
+    });
     it('skips the stable DOM wait when waitForStableDom is false', async () => {
       await withMcpContext(async (response, context, args) => {
         const spy = sinon.spy(WaitForHelper.prototype, 'waitForStableDom');

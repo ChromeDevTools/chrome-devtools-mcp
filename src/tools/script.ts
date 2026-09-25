@@ -171,7 +171,9 @@ const performEvaluation = async (
   response: Response,
   options?: {filePath?: string; context: Context},
 ) => {
-  using fn = await evaluatable.evaluateHandle(`(${fnString})`);
+  // `(() => 1;)` is a SyntaxError; strip trailing statement terminators.
+  const fnSource = fnString.trim().replace(/;+\s*$/, '');
+  using fn = await evaluatable.evaluateHandle(`(${fnSource})`);
 
   const result = await evaluatable.evaluate(
     async (fn, ...args) => {
