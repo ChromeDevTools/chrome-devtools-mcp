@@ -98,6 +98,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
   - **Choices:** `canary`, `dev`, `beta`, `stable`
+  - **Default:** `stable`
 
 - **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
@@ -199,6 +200,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").
   - **Type:** string
   - **Choices:** `jpeg`, `png`, `webp`
+  - **Default:** `png`
 
 - **`--screenshotQuality`/ `--screenshot-quality`**
   Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.

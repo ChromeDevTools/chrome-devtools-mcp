@@ -5,7 +5,7 @@
  */
 
 import type {YargsOptions} from '../third_party/index.js';
-import {yargs, hideBin} from '../third_party/index.js';
+import {yargs, hideBin, zod as z} from '../third_party/index.js';
 import os from 'node:os';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -43,6 +43,7 @@ export const mcpOptions = {
   },
   acceptInsecureCerts: {
     type: 'boolean',
+    default: false,
     description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
   pageIdRouting: {
@@ -60,10 +61,12 @@ export const mcpOptions = {
   },
   experimentalDevtools: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable automation over DevTools targets',
   },
   experimentalVision: {
     type: 'boolean',
+    default: false,
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
   },
@@ -80,12 +83,14 @@ export const mcpOptions = {
   },
   experimentalToonFormat: {
     type: 'boolean',
+    default: false,
     describe:
       'Deprecated: use --experimentalDataFormat=toon instead. Whether to format structured data using TOON (requires @toon-format/toon).',
     hidden: true,
   },
   experimentalDataFormat: {
     type: 'string',
+    default: 'default' as const,
     describe:
       'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
     choices: ['default', 'toon', 'gcf'] as const,
@@ -93,16 +98,19 @@ export const mcpOptions = {
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
+    default: false,
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
   },
   experimentalInteropTools: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable interoperability tools',
     hidden: true,
   },
   experimentalScreencast: {
     type: 'boolean',
+    default: false,
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
   },
@@ -133,14 +141,12 @@ export const mcpOptions = {
     string: true,
     describe:
       "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
-    conflicts: ['allowedUrlPattern'],
   },
   allowedUrlPattern: {
     type: 'array',
     string: true,
     describe:
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
-    conflicts: ['blockedUrlPattern'],
   },
   performanceCrux: {
     type: 'boolean',
@@ -178,11 +184,13 @@ export const mcpOptions = {
   },
   clearcutIncludePidHeader: {
     type: 'boolean',
+    default: false,
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
   screenshotFormat: {
     type: 'string',
+    default: 'png' as const,
     description:
       'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
     choices: ['jpeg', 'png', 'webp'] as const,
@@ -237,11 +245,13 @@ export const mcpOptions = {
   },
   slim: {
     type: 'boolean',
+    default: false,
     describe:
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
   },
   viaCli: {
     type: 'boolean',
+    default: false,
     describe:
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
@@ -283,7 +293,9 @@ export const mcpOptions = {
   },
 } satisfies Record<string, YargsOptions>;
 
-export type ParsedArguments = ReturnType<typeof parseArguments>;
+export type ParsedArguments = ReturnType<
+  ReturnType<typeof parser>['parseSync']
+>;
 
 export function getMcpOptionsForViaCli(): typeof mcpOptions {
   if (!('default' in mcpOptions.headless)) {
@@ -293,9 +305,6 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
     throw new Error(
       'experimentalStructuredContent cli option unexpectedly does not have a default',
     );
-  }
-  if ('default' in mcpOptions.isolated) {
-    throw new Error('isolated cli option unexpectedly has a default');
   }
 
   return {
@@ -354,14 +363,8 @@ export function getCliOptions(): Partial<
   return options;
 }
 
-/**
- * Exported only for testing to not trigger process exit.
- */
-export function parser(
-  version: string,
-  argv = process.argv,
-  env = process.env,
-) {
+export function parser(version: string, argv = process.argv) {
+  // Used to derive the ParsedArguments type and for help output.
   const isViaCli = argv.includes('--viaCli') || argv.includes('--via-cli');
   const options = isViaCli ? getMcpOptionsForViaCli() : mcpOptions;
 
@@ -369,164 +372,16 @@ export function parser(
     .scriptName('npx chrome-devtools-mcp@latest')
     .parserConfiguration({
       'strip-aliased': true,
+
       'strip-dashed': true,
     })
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
-    .middleware(args => {
-      if (isViaCli) {
-        if (args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
-          const cliFilesystemArgs: {
-            allowUnrestrictedPaths?: boolean;
-            filesystemRoot?: unknown;
-          } = args;
-          cliFilesystemArgs.allowUnrestrictedPaths = true;
-          cliFilesystemArgs.filesystemRoot = undefined;
-        }
-        // Defaults that cannot be set in options without affecting yargs conflict resolution.
-        if (
-          args.isolated === undefined &&
-          args.userDataDir === undefined &&
-          !args.autoConnect &&
-          !args.browserUrl &&
-          !args.wsEndpoint
-        ) {
-          args.isolated = true;
-        }
-      }
-      // We can't set default in the options else
-      // Yargs will complain
-      if (
-        !args.channel &&
-        !args.browserUrl &&
-        !args.wsEndpoint &&
-        !args.executablePath
-      ) {
-        args.channel = 'stable';
-      }
-      if (env['CI'] || env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-        console.error(
-          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-        );
-        args.usageStatistics = false;
-      }
-
-      const cliOptionsAllowedArgs = [
-        ...Object.keys(options),
-        // Yargs populated with positional args
-        '_',
-        '$0',
-      ];
-
-      const unknownArgs = Object.keys(args).filter(
-        arg => !cliOptionsAllowedArgs.includes(arg),
-      );
-
-      if (unknownArgs.length > 0) {
-        console.error(
-          `Unknown arguments: ${unknownArgs.map(arg => `--${arg}`)}`,
-        );
-      }
-    })
-    .example([
-      [
-        '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance via HTTP',
-      ],
-      [
-        '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
-        'Connect to an existing browser instance via WebSocket',
-      ],
-      [
-        `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
-        'Connect via WebSocket with custom headers',
-      ],
-      ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-      ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-      ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-      ['$0 --channel stable', 'Use stable Chrome installed on this system'],
-      ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
-      ['$0 --help', 'Print CLI options'],
-      [
-        '$0 --viewport 1280x720',
-        'Launch Chrome with the initial viewport size of 1280x720px',
-      ],
-      [
-        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
-        'Launch Chrome without sandboxes. Use with caution.',
-      ],
-      [
-        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
-        'Disable the default arguments provided by Puppeteer. Use with caution.',
-      ],
-      ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
-      [
-        '$0 --no-category-performance',
-        'Disable tools in the performance category',
-      ],
-      ['$0 --no-category-network', 'Disable tools in the network category'],
-      [
-        '$0 --user-data-dir=/tmp/user-data-dir',
-        'Use a custom user data directory',
-      ],
-      [
-        '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --no-usage-statistics',
-        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
-      ],
-      [
-        '$0 --no-performance-crux',
-        'Disable CrUX (field data) integration in performance tools.',
-      ],
-      ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
-      [
-        '$0 --no-javascript-evaluation',
-        'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
-      ],
-      [
-        '$0 --slim',
-        'Only 3 tools: navigation, JavaScript execution and screenshot',
-      ],
-    ]);
-
-  return yargsInstance
-    .config('config', 'Path to JSON configuration file', configPath => {
-      try {
-        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
-        if (
-          typeof parsed !== 'object' ||
-          parsed === null ||
-          Array.isArray(parsed)
-        ) {
-          throw new Error('Config must be a JSON object');
-        }
-
-        yargs()
-          .parserConfiguration({
-            'strip-aliased': true,
-            'camel-case-expansion': false,
-          })
-          .options(options)
-          .config(parsed)
-          .strict()
-          .fail(false)
-          .exitProcess(false)
-          .parseSync([]);
-        return parsed;
-      } catch (err) {
-        throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
-      }
-    })
-    .wrap(Math.min(120, yargsInstance.terminalWidth()))
+    .wrap(Math.min(120, yargs(hideBin(argv)).terminalWidth()))
     .help()
     .version(version);
+
+  return yargsInstance;
 }
 
 export function parseArguments(
@@ -534,5 +389,179 @@ export function parseArguments(
   argv = process.argv,
   env = process.env,
 ) {
-  return parser(version, argv, env).parseSync();
+  const isViaCli = argv.includes('--viaCli') || argv.includes('--via-cli');
+  const baseOptions = isViaCli ? getMcpOptionsForViaCli() : mcpOptions;
+
+  // Step 1 & 2: Independent Parsing (Bypassing yargs Defaults)
+  const optionsWithoutDefaults: Record<string, YargsOptions> = {};
+  for (const [key, option] of Object.entries(baseOptions)) {
+    const copy: YargsOptions = {...option};
+    if (copy.default !== undefined) {
+      copy.defaultDescription ??= JSON.stringify(copy.default);
+      delete copy.default;
+    }
+    optionsWithoutDefaults[key] = copy;
+  }
+
+  const yargsInstance = yargs(hideBin(argv))
+    .scriptName('npx chrome-devtools-mcp@latest')
+    .parserConfiguration({
+      'strip-aliased': true,
+      'strip-dashed': true,
+    })
+    .options(optionsWithoutDefaults)
+    .fail(false)
+    .exitProcess(false)
+    .version(version);
+
+  let rawCli: Record<string, unknown> = {};
+  try {
+    rawCli = yargsInstance.parseSync();
+  } catch (err) {
+    throw new Error(
+      `Unknown arguments or invalid CLI usage: ${getErrorMessage(err)}`,
+    );
+  }
+
+  // Config file parsing
+  let parsedConfigFile: Record<string, unknown> = {};
+  if (typeof rawCli.config === 'string') {
+    try {
+      const fileContent: unknown = JSON.parse(
+        readFileSync(rawCli.config, 'utf-8'),
+      );
+      if (!isPlainObject(fileContent)) {
+        throw new Error('Config must be a JSON object');
+      }
+
+      // Run the config through yargs to reject unknown keys and apply
+      // coercions, but without defaults.
+      parsedConfigFile = yargs([])
+        .parserConfiguration({
+          'strip-aliased': true,
+          'camel-case-expansion': false,
+        })
+        .options(optionsWithoutDefaults)
+        .config(fileContent)
+        .strict()
+        .fail(false)
+        .exitProcess(false)
+        .parseSync([]);
+    } catch (err) {
+      throw new Error(`Invalid JSON config file: ${getErrorMessage(err)}`);
+    }
+  }
+
+  // Step 3: Cascade Merge of Explicit Inputs
+  const explicitConfig = {...parsedConfigFile, ...rawCli};
+
+  // Step 4: Dynamic Default Resolution
+  const resolvedConfig = {...explicitConfig};
+
+  for (const [key, option] of Object.entries(baseOptions)) {
+    if (resolvedConfig[key] === undefined && 'default' in option) {
+      resolvedConfig[key] = option.default;
+    }
+  }
+
+  resolvedConfig.channel = resolvedConfig.channel ?? 'stable';
+  if (isViaCli) {
+    if (resolvedConfig.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
+      resolvedConfig.allowUnrestrictedPaths = true;
+      resolvedConfig.filesystemRoot = undefined;
+    }
+    if (
+      resolvedConfig.isolated === undefined &&
+      resolvedConfig.userDataDir === undefined &&
+      !resolvedConfig.autoConnect &&
+      !resolvedConfig.browserUrl &&
+      !resolvedConfig.wsEndpoint
+    ) {
+      resolvedConfig.isolated = true;
+    }
+  }
+  resolvedConfig.isolated = resolvedConfig.isolated ?? false;
+
+  if (
+    resolvedConfig.experimentalToonFormat &&
+    resolvedConfig.experimentalDataFormat === 'default'
+  ) {
+    resolvedConfig.experimentalDataFormat = 'toon';
+  }
+  if (env['CI'] || env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
+    console.error(
+      "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+    );
+    resolvedConfig.usageStatistics = false;
+  }
+
+  const cliOptionsAllowedArgs = [...Object.keys(baseOptions), '_', '$0'];
+
+  const unknownArgs = Object.keys(rawCli).filter(
+    arg => !cliOptionsAllowedArgs.includes(arg),
+  );
+
+  if (unknownArgs.length > 0) {
+    console.error(`Unknown arguments: ${unknownArgs.map(arg => `--${arg}`)}`);
+  }
+
+  // Step 5: Final Schema Validation & Type Safety. Conflicts are only checked
+  // against explicit user input so that dynamic defaults never conflict.
+  const ConfigSchema = z
+    .object({})
+    .passthrough()
+    .superRefine((_config, ctx) => {
+      const activeArgs = new Set<string>();
+      for (const [key, val] of Object.entries(explicitConfig)) {
+        if (val !== undefined && val !== false) {
+          activeArgs.add(key);
+        }
+      }
+
+      for (const group of CONFLICTING_ARGS) {
+        const activeInGroup = group.filter(arg => activeArgs.has(arg));
+        if (activeInGroup.length > 1) {
+          const [arg1, arg2] = activeInGroup;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Arguments ${arg1} and ${arg2} are mutually exclusive`,
+            path: [arg1, arg2],
+          });
+        }
+      }
+    });
+
+  const result = ConfigSchema.safeParse(resolvedConfig);
+  if (!result.success) {
+    throw new Error(result.error.issues[0].message);
+  }
+  if (!isParsedArguments(result.data)) {
+    throw new Error('Failed to resolve configuration');
+  }
+  return result.data;
+}
+
+const CONFLICTING_ARGS: string[][] = [
+  ['channel', 'executablePath', 'browserUrl', 'wsEndpoint'],
+  ['userDataDir', 'browserUrl', 'wsEndpoint'],
+  ['userDataDir', 'isolated'],
+  ['autoConnect', 'isolated'],
+  ['autoConnect', 'executablePath'],
+  ['blockedUrlPattern', 'allowedUrlPattern'],
+  ['categoryPwa', 'autoConnect'],
+  ['categoryPwa', 'browserUrl', 'wsEndpoint'],
+  ['categoryExtensions', 'autoConnect'],
+  ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
+];
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isParsedArguments(value: unknown): value is ParsedArguments {
+  return isPlainObject(value) && Array.isArray(value['_']);
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
