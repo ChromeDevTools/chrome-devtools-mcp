@@ -15,6 +15,7 @@ import sinon from 'sinon';
 
 import {McpContext} from '../src/McpContext.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
+import {escapeForLog} from '../src/utils/logger.js';
 
 import {createMockPuppeteerBrowser} from './mocks.js';
 import {createTempDir, withMcpContext} from './utils.js';
@@ -145,6 +146,8 @@ describe('McpContext Roots', () => {
   });
 });
 
+const UNESCAPED_LINE_BREAK = /[\n\r\u2028\u2029]/;
+
 describe('McpContext path validation logging', () => {
   afterEach(() => sinon.restore());
 
@@ -162,7 +165,7 @@ describe('McpContext path validation logging', () => {
     const filePath = path.join(
       os.tmpdir(),
       'file.txt',
-      'x\n[MCP Context] injected line',
+      'x\n\u2028[MCP Context] injected line',
     );
     const errMsg = `ENOTDIR: not a directory, realpath '${filePath}'`;
     sinon
@@ -172,15 +175,19 @@ describe('McpContext path validation logging', () => {
 
     await assert.rejects(context.validatePath(filePath), /Access denied/);
 
+    sinon.assert.calledWithMatch(
+      errorStub,
+      sinon.match((message: string) => !UNESCAPED_LINE_BREAK.test(message)),
+    );
     sinon.assert.calledOnceWithExactly(
       errorStub,
-      `[MCP Context] Error resolving real path for ${JSON.stringify(filePath)}: ${JSON.stringify(errMsg)}`,
+      `[MCP Context] Error resolving real path for ${escapeForLog(filePath)}: ${escapeForLog(errMsg)}`,
     );
   });
 
   it('escapes the root URI when a root cannot be resolved', async () => {
     const context = await createContext();
-    const uri = 'file:///nonexistent-root\n[MCP Context] injected line';
+    const uri = 'file:///nonexistent-root\n\u2028[MCP Context] injected line';
     context.setRoots([{uri, name: 'unresolvable'}]);
     const warnStub = sinon.stub(console, 'warn');
 
@@ -191,8 +198,8 @@ describe('McpContext path validation logging', () => {
       sinon.match(
         (message: string) =>
           message.startsWith(
-            `[MCP Context] Could not resolve configured root ${JSON.stringify(uri)}: "`,
-          ) && !message.includes('\n'),
+            `[MCP Context] Could not resolve configured root ${escapeForLog(uri)}: "`,
+          ) && !UNESCAPED_LINE_BREAK.test(message),
       ),
     );
   });

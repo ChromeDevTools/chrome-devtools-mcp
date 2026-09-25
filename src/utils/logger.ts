@@ -39,6 +39,18 @@ export function flushLogs(
   });
 }
 
+/**
+ * Encodes a value for interpolation into a one-line log message. The result is
+ * a JSON string literal that also escapes DEL, C1 controls and U+2028/U+2029,
+ * which JSON.stringify leaves raw but terminals and line readers act on.
+ */
+export function escapeForLog(value: string): string {
+  return JSON.stringify(value).replace(
+    /[\u007f-\u009f\u2028\u2029]/g,
+    char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
+}
+
 export const logger: Logger = (...args: unknown[]) => {
   if (logFileStream) {
     logFileStream.write(
