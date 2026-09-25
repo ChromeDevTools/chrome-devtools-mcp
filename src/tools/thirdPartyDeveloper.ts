@@ -85,7 +85,11 @@ export const executeThirdPartyDeveloperTool = definePageTool(() => ({
     if (request.params.params) {
       try {
         const parsed = JSON.parse(request.params.params);
-        if (typeof parsed === 'object' && parsed !== null) {
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          !Array.isArray(parsed)
+        ) {
           params = parsed;
         } else {
           throw new Error('Parsed params is not an object');

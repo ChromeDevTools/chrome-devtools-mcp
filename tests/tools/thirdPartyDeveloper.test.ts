@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,9 +18,14 @@ import {
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
 import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
+import {createHandlerMocks} from '../mocks.js';
 import {withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
   describe('list_3p_developer_tools', () => {
     it('lists tools', async () => {
       await withMcpContext(
@@ -389,6 +394,24 @@ describe('thirdPartyDeveloperTools', () => {
           {message: /Tool missing-tool not found/},
         );
       });
+    });
+
+    it('rejects JSON array params', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await assert.rejects(
+        executeThirdPartyDeveloperTool(args).handler(
+          {
+            params: {
+              toolName: 'test-tool',
+              params: '[]',
+            },
+            page,
+          },
+          response,
+          context,
+        ),
+        {message: /Parsed params is not an object/},
+      );
     });
 
     it('throws if parameters are invalid', async () => {
