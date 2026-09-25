@@ -191,6 +191,9 @@ const performEvaluation = async (
     response.appendResponseLine(
       `Script ran on page. Output saved to ${filename}.`,
     );
+  } else if (result === undefined) {
+    // JSON.stringify(undefined) is undefined, which is not valid JSON.
+    response.appendResponseLine('Script ran on page and returned undefined.');
   } else {
     response.appendResponseLine('Script ran on page and returned:');
     response.appendResponseLine('```json');
