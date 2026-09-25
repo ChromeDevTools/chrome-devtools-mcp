@@ -21,6 +21,7 @@ import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
 import {PipeTransport} from '../third_party/index.js';
 import {logger, puppeteerLogger, saveLogsToFile} from '../utils/logger.js';
+import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {VERSION} from '../version.js';
 
 import type {DaemonMessage, DaemonStatusResult} from './types.js';
@@ -290,11 +291,8 @@ process.on('uncaughtException', error => {
   logger?.('Uncaught exception:', error);
   void cleanup(1);
 });
-process.on('unhandledRejection', (reason, promise) => {
-  logger?.('Unhandled promise rejection', promise, reason);
-  if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] === 'true') {
-    void cleanup(1);
-  }
+setupUnhandledRejectionHandler(() => {
+  void cleanup(1);
 });
 
 // Start the server

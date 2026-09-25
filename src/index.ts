@@ -146,7 +146,7 @@ export class McpServer {
             text: `Input validation error: Invalid arguments for tool ${name}: ${parseResult.error.issues
               .map(
                 issue =>
-                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`
+                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
               )
               .join(', ')}`,
           },
