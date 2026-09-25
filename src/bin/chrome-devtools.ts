@@ -30,7 +30,7 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand} from '../config/cli-commands.js';
+import {buildCommand, buildCommandArgs} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {
   mcpOptions,
@@ -244,12 +244,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           await start(serializeArgs(mcpOptions, argv), sessionId);
         }
 
-        const commandArgs: Record<string, unknown> = {};
-        for (const argName of Object.keys(args)) {
-          if (argName in argv) {
-            commandArgs[argName] = argv[argName];
-          }
-        }
+        const commandArgs = buildCommandArgs(args, argv);
 
         const response = await sendCommand(
           {

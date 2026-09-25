@@ -6,6 +6,9 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
@@ -70,6 +73,51 @@ describe('chrome-devtools', () => {
       result.stdout.includes('.png'),
       'take_screenshot output is unexpected',
     );
+  });
+
+  it('resolves relative file paths before sending commands to the daemon', async () => {
+    const rootDirectory = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'cli-file-path-'),
+    );
+    const daemonDirectory = path.join(rootDirectory, 'daemon');
+    const clientDirectory = path.join(rootDirectory, 'client');
+    await fs.mkdir(daemonDirectory);
+    await fs.mkdir(clientDirectory);
+
+    try {
+      const startResult = await runCli(['start'], sessionId, {
+        cwd: daemonDirectory,
+      });
+      assert.strictEqual(
+        startResult.status,
+        0,
+        `start command failed: ${startResult.stderr}`,
+      );
+
+      const result = await runCli(
+        ['take_screenshot', '1', '--filePath', 'screenshot.png'],
+        sessionId,
+        {cwd: clientDirectory},
+      );
+      assert.strictEqual(
+        result.status,
+        0,
+        `take_screenshot command failed: ${result.stderr}`,
+      );
+      assert.strictEqual(
+        await fs
+          .stat(path.join(clientDirectory, 'screenshot.png'))
+          .then(stat => stat.isFile()),
+        true,
+      );
+      await assert.rejects(
+        fs.stat(path.join(daemonDirectory, 'screenshot.png')),
+        {code: 'ENOENT'},
+      );
+    } finally {
+      await runCli(['stop'], sessionId, {cwd: clientDirectory});
+      await fs.rm(rootDirectory, {recursive: true, force: true});
+    }
   });
 
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {
