@@ -25,7 +25,10 @@
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
+import {
+  type ParsedArguments,
+  parseArguments,
+} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -972,7 +975,7 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = parser('0.0.0', ['node', 'main.js']).parseSync();
+  const defaultArgs = parseArguments('0.0.0', ['node', 'main.js']);
   return {...defaultArgs, ...options};
 }
 

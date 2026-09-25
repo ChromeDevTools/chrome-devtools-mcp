@@ -14,6 +14,7 @@ import {
   DEFAULT_FILESYSTEM_ROOT,
   getCliOptions,
   mcpOptions,
+  parseArguments as parseArgumentsImpl,
   parser,
 } from '../src/config/mcp-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
@@ -21,9 +22,7 @@ import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {createTempFile} from './utils.js';
 
 function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
-  return parser('0.0.0', ['node', 'main.js', ...argv], env)
-    .exitProcess(false)
-    .parseSync();
+  return parseArgumentsImpl('0.0.0', ['node', 'main.js', ...argv], env);
 }
 
 describe('cli args parsing', () => {
@@ -37,6 +36,7 @@ describe('cli args parsing', () => {
     categoryMemory: true,
     autoConnect: false,
     headless: false,
+    isolated: false,
     acceptInsecureCerts: false,
     performanceCrux: true,
     usageStatistics: true,
@@ -470,6 +470,44 @@ describe('cli args parsing', () => {
     );
   });
 
+  it('strips an empty blocked-url-pattern', async () => {
+    const args = parseArguments(['--blocked-url-pattern']);
+    assert.strictEqual(args.blockedUrlPattern, undefined);
+  });
+
+  it('allows an empty config blockedUrlPattern with allowed-url-pattern', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({blockedUrlPattern: []}),
+      'cd4a.test.config.empty-blocked.json',
+    );
+    const args = parseArguments([
+      '--config',
+      testConfig.path,
+      '--allowed-url-pattern',
+      'https://a.com/*',
+    ]);
+    assert.strictEqual(args.blockedUrlPattern, undefined);
+    assert.deepStrictEqual(args.allowedUrlPattern, ['https://a.com/*']);
+  });
+
+  it('rejects an empty allowed-url-pattern', async () => {
+    assert.throws(
+      () => parseArguments(['--allowed-url-pattern']),
+      /Invalid --allowedUrlPattern: at least one pattern is required/,
+    );
+  });
+
+  it('rejects an empty config allowedUrlPattern', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({allowedUrlPattern: []}),
+      'cd4a.test.config.empty-allowed.json',
+    );
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file: Invalid --allowedUrlPattern: at least one pattern is required/,
+    );
+  });
+
   it('parses source-maps flag', async () => {
     const defaultParsed = parseArguments(['main.js']);
     assert.strictEqual(defaultParsed.sourceMaps, true);
@@ -561,7 +599,7 @@ describe('cli args parsing', () => {
     const args = parseArguments(['--viaCli', '--config', relativePath]);
     assert.strictEqual(args.config, testConfig.path);
     assert.strictEqual(args.userDataDir, '/tmp/custom-profile');
-    assert.strictEqual(args.isolated, undefined);
+    assert.strictEqual(args.isolated, false);
     assert.strictEqual(args.headless, false);
   });
 
@@ -604,9 +642,139 @@ describe('cli args parsing', () => {
     );
   });
 
+  it('rejects a config file with malformed JSON', async () => {
+    using testConfig = createTempFile(
+      '{"headless": true,',
+      'cd4a.test.config.malformed.json',
+    );
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file:/,
+    );
+  });
+
+  it('rejects a config file that is not a JSON object', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify(['--headless']),
+      'cd4a.test.config.array.json',
+    );
+    assert.throws(
+      () => parseArguments(['--config', testConfig.path]),
+      /Invalid JSON config file: Config must be a JSON object/,
+    );
+  });
+
+  it('rejects a missing config file', async () => {
+    assert.throws(
+      () => parseArguments(['--config', 'cd4a.test.config.missing.json']),
+      /Invalid JSON config file: ENOENT/,
+    );
+  });
+
+  it('replaces config arrays with cli arrays instead of merging', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({chromeArg: ['--a']}),
+      'cd4a.test.config.array-replace.json',
+    );
+    const args = parseArguments([
+      '--config',
+      testConfig.path,
+      '--chrome-arg=--b',
+    ]);
+    assert.deepStrictEqual(args.chromeArg, ['--b']);
+  });
+
+  it('lets the CI env disable usage statistics enabled in config', async () => {
+    using testConfig = createTempFile(
+      JSON.stringify({usageStatistics: true}),
+      'cd4a.test.config.usage-statistics.json',
+    );
+    const args = parseArguments(['--config', testConfig.path], {CI: 'true'});
+    assert.strictEqual(args.usageStatistics, false);
+  });
+
+  it('lets explicit cli flags override viaCli dynamic defaults', async () => {
+    const args = parseArguments(['--viaCli', '--no-headless']);
+    assert.strictEqual(args.headless, false);
+  });
+
+  describe('viaCli defaults', () => {
+    for (const flag of ['--viaCli=true', '--via-cli=true']) {
+      it(`applies viaCli defaults for ${flag}`, async () => {
+        const args = parseArguments([flag]);
+        assert.strictEqual(args.viaCli, true);
+        assert.strictEqual(args.headless, true);
+        assert.strictEqual(args.isolated, true);
+        assert.strictEqual(args.memoryDebugging, true);
+      });
+    }
+
+    it('does not apply viaCli defaults for --viaCli false', async () => {
+      const args = parseArguments(['--viaCli', 'false']);
+      assert.strictEqual(args.viaCli, false);
+      assert.strictEqual(args.headless, false);
+      assert.strictEqual(args.isolated, false);
+      assert.strictEqual(args.memoryDebugging, false);
+    });
+
+    it('applies viaCli defaults when viaCli is set in the config file', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({viaCli: true}),
+        'cd4a.test.config.via-cli.json',
+      );
+      const args = parseArguments(['--config', testConfig.path]);
+      assert.strictEqual(args.viaCli, true);
+      assert.strictEqual(args.headless, true);
+      assert.strictEqual(args.isolated, true);
+    });
+
+    it('lets cli viaCli=false override config viaCli', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({viaCli: true}),
+        'cd4a.test.config.via-cli-override.json',
+      );
+      const args = parseArguments([
+        '--config',
+        testConfig.path,
+        '--viaCli=false',
+      ]);
+      assert.strictEqual(args.viaCli, false);
+      assert.strictEqual(args.headless, false);
+      assert.strictEqual(args.isolated, false);
+    });
+
+    for (const connectArgs of [
+      ['--auto-connect'],
+      ['--browserUrl', 'http://localhost:9222'],
+      ['--wsEndpoint', 'ws://localhost:9222'],
+      ['--user-data-dir', '/tmp/chrome-profile'],
+    ]) {
+      it(`does not default to isolated with ${connectArgs[0]}`, async () => {
+        const args = parseArguments(['--viaCli', ...connectArgs]);
+        assert.strictEqual(args.isolated, false);
+      });
+    }
+
+    it('does not default to isolated with autoConnect from the config file', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({autoConnect: true}),
+        'cd4a.test.config.via-cli-auto-connect.json',
+      );
+      const args = parseArguments(['--viaCli', '--config', testConfig.path]);
+      assert.strictEqual(args.autoConnect, true);
+      assert.strictEqual(args.isolated, false);
+    });
+  });
+
   it('parses with devtoolsComments enabled', async () => {
     const args = parseArguments(['--devtoolsComments']);
     assert.strictEqual(args.devtoolsComments, true);
+  });
+
+  it('includes usage examples in help output', async () => {
+    const help = await parser('0.0.0', ['node', 'main.js']).getHelp();
+    assert.match(help, /Examples:/);
+    assert.match(help, /--browserUrl http:\/\/127\.0\.0\.1:9222/);
   });
 
   it('clears default values and populates defaultDescription in getCliOptions', () => {
@@ -832,6 +1000,73 @@ describe('cli args parsing', () => {
       );
     });
 
+    it('rejects cli channel with config-based browserUrl', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({browserUrl: 'http://localhost:9222'}),
+        'cd4a.test.config.browser-url.json',
+      );
+      assert.throws(
+        () =>
+          parseArguments(['--config', testConfig.path, '--channel', 'canary']),
+        /Arguments channel and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('rejects conflicting arguments within a config file', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({
+          browserUrl: 'http://localhost:9222',
+          wsEndpoint: 'ws://localhost:9222',
+        }),
+        'cd4a.test.config.conflict.json',
+      );
+      assert.throws(
+        () => parseArguments(['--config', testConfig.path]),
+        /Arguments browserUrl and wsEndpoint are mutually exclusive/,
+      );
+    });
+
+    it('allows explicitly disabled isolated with userDataDir', async () => {
+      const args = parseArguments([
+        '--isolated=false',
+        '--user-data-dir',
+        '/tmp/chrome-profile',
+      ]);
+      assert.strictEqual(args.isolated, false);
+      assert.strictEqual(args.userDataDir, '/tmp/chrome-profile');
+    });
+
+    it('allows a config value set to false alongside a conflicting arg', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({autoConnect: false}),
+        'cd4a.test.config.false-no-conflict.json',
+      );
+      const args = parseArguments([
+        '--config',
+        testConfig.path,
+        '--executablePath',
+        '/bin/chrome',
+      ]);
+      assert.strictEqual(args.autoConnect, false);
+      assert.strictEqual(args.executablePath, '/bin/chrome');
+    });
+
+    it('lets a cli false override a conflicting config value', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({autoConnect: true}),
+        'cd4a.test.config.false-override.json',
+      );
+      const args = parseArguments([
+        '--config',
+        testConfig.path,
+        '--autoConnect=false',
+        '--executablePath',
+        '/bin/chrome',
+      ]);
+      assert.strictEqual(args.autoConnect, false);
+      assert.strictEqual(args.executablePath, '/bin/chrome');
+    });
+
     it('rejects categoryExtensions with autoConnect', async () => {
       assert.throws(
         () => parseArguments(['--category-extensions', '--auto-connect']),
@@ -882,7 +1117,7 @@ describe('cli args parsing', () => {
       it(`allows viaCli with ${connectArgs[0]} without enabling extensions`, async () => {
         const args = parseArguments(['--viaCli', ...connectArgs]);
         assert.strictEqual(args.categoryExtensions, undefined);
-        assert.strictEqual(args.isolated, undefined);
+        assert.strictEqual(args.isolated, false);
       });
     }
 
@@ -975,8 +1210,8 @@ describe('cli command strings', () => {
 describe('flag usage telemetry', () => {
   it('reports the stable channel for a default launch', async () => {
     const usage = computeFlagUsage(parseArguments([]), mcpOptions);
-    assert.strictEqual(usage.isolated_present, false);
-    assert.strictEqual(usage.channel_present, true);
+    assert.strictEqual(usage.isolated_present, undefined);
+    assert.strictEqual(usage.channel_present, undefined);
     assert.strictEqual(usage.channel, 'CHANNEL_STABLE');
   });
 
@@ -987,7 +1222,7 @@ describe('flag usage telemetry', () => {
   ]) {
     it(`does not report channel with ${connectArgs[0]}`, async () => {
       const usage = computeFlagUsage(parseArguments(connectArgs), mcpOptions);
-      assert.strictEqual(usage.isolated_present, false);
+      assert.strictEqual(usage.isolated_present, undefined);
       assert.strictEqual(usage.channel_present, false);
       assert.strictEqual(usage.channel, undefined);
     });
