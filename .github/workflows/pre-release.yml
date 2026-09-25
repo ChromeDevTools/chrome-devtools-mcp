@@ -52,6 +52,7 @@ jobs:
           NODE_ENV: 'production'
 
       - name: Verify server.json
+        if: runner.os == 'Linux'
         shell: bash
         run: npm run verify-server-json-version
 
