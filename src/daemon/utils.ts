@@ -35,7 +35,6 @@ export function assertValidSessionId(sessionId: string): void {
 // Using these paths due to strict limits on the POSIX socket path length.
 export function getSocketPath(sessionId: string): string {
   assertValidSessionId(sessionId);
-  const uid = os.userInfo().uid;
   const username = os.userInfo().username;
   const suffix = sessionId ? `-${sessionId}` : '';
   const appName = APP_NAME + suffix;
@@ -52,10 +51,10 @@ export function getSocketPath(sessionId: string): string {
     return path.join(process.env.XDG_RUNTIME_DIR, appName, 'server.sock');
   }
 
-  // 2. macOS/Unix Fallback: Use /tmp/
-  // We use /tmp/ because it is much shorter than ~/Library/Application Support/
-  // and keeps us well under the 104-character limit.
-  return path.join('/tmp', `${appName}-${uid}.sock`);
+  // 2. macOS/Unix fallback: keep the socket inside the daemon runtime
+  // directory. The daemon creates and validates this directory as user-owned
+  // and non-group/world-writable before binding the socket.
+  return path.join(getRuntimeHome(sessionId), 'server.sock');
 }
 
 export function getRuntimeHome(sessionId: string): string {
