@@ -46,14 +46,6 @@ export function getSocketPath(sessionId: string): string {
     return path.join('\\\\.\\pipe', `${appName}-${username}`, 'server.sock');
   }
 
-  // 1. Try XDG_RUNTIME_DIR (Linux standard, sometimes macOS)
-  if (process.env.XDG_RUNTIME_DIR) {
-    return path.join(process.env.XDG_RUNTIME_DIR, appName, 'server.sock');
-  }
-
-  // 2. macOS/Unix fallback: keep the socket inside the daemon runtime
-  // directory. The daemon creates and validates this directory as user-owned
-  // and non-group/world-writable before binding the socket.
   return path.join(getRuntimeHome(sessionId), 'server.sock');
 }
 
