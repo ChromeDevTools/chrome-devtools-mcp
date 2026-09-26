@@ -9,8 +9,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
-import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {
+  resolveCanonicalPath,
+  resolveFileUriPath,
+} from '../../src/utils/files.js';
 import {createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
@@ -159,5 +163,62 @@ describe('resolveCanonicalPath', () => {
       resolved,
       path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
     );
+  });
+});
+
+describe('resolveFileUriPath', () => {
+  const isWindows = os.platform() === 'win32';
+
+  it('should resolve a file URI built from a local path', () => {
+    const target = path.resolve(os.tmpdir(), 'project');
+    assert.strictEqual(resolveFileUriPath(pathToFileURL(target).href), target);
+  });
+
+  it('should keep percent-encoded characters decoded', () => {
+    assert.strictEqual(
+      resolveFileUriPath('file:///tmp/my%20project'),
+      path.resolve('/tmp/my project'),
+    );
+  });
+
+  // A WSL2 client driving a Windows-side server through WSL interop advertises
+  // POSIX roots, which fileURLToPath() rejects on Windows with
+  // ERR_INVALID_FILE_URL_PATH and validatePath() then drops.
+  it('should resolve a POSIX file URI instead of throwing on Windows', () => {
+    const resolved = resolveFileUriPath('file:///home/user/project');
+
+    assert.ok(
+      path.isAbsolute(resolved),
+      `expected an absolute path, got ${resolved}`,
+    );
+    assert.ok(
+      resolved.endsWith(path.join('home', 'user', 'project')),
+      `expected the POSIX segments to be preserved, got ${resolved}`,
+    );
+  });
+
+  it('should not reinterpret a drive-letter file URI as POSIX', () => {
+    const resolved = resolveFileUriPath('file:///C:/src');
+
+    if (isWindows) {
+      assert.strictEqual(resolved, path.resolve('C:\\src'));
+    } else {
+      // A POSIX host has no drive semantics, so this keeps Node's default
+      // handling rather than guessing at a drive letter.
+      assert.strictEqual(resolved, '/C:/src');
+    }
+  });
+
+  it('should not reinterpret a UNC file URI as POSIX', () => {
+    if (isWindows) {
+      assert.strictEqual(
+        resolveFileUriPath('file://server/share'),
+        path.resolve('\\\\server\\share'),
+      );
+    } else {
+      assert.throws(() => resolveFileUriPath('file://server/share'), {
+        code: 'ERR_INVALID_FILE_URL_HOST',
+      });
+    }
   });
 });
