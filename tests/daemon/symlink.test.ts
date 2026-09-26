@@ -12,6 +12,7 @@ import path from 'node:path';
 import process from 'node:process';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
+import {startDaemon} from '../../src/daemon/client.js';
 import {
   DAEMON_SCRIPT_PATH,
   getPidFilePath,
@@ -86,6 +87,50 @@ describe('daemon security checks', () => {
       fs.unlinkSync(targetPath);
     } catch {
       // ignore
+    }
+  });
+
+  it('startDaemon should reject a symlinked runtime directory before unlinking a stale PID file', async () => {
+    if (IS_WINDOWS) {
+      return;
+    }
+    const pidFilePath = getPidFilePath(sessionId);
+    const pidDir = path.dirname(pidFilePath);
+    const targetDir = path.join(
+      path.dirname(pidDir),
+      `chrome-devtools-mcp-client-symlink-target-${sessionId}`,
+    );
+    const targetPidFile = path.join(targetDir, 'daemon.pid');
+
+    try {
+      fs.mkdirSync(targetDir, {recursive: true, mode: 0o700});
+      fs.writeFileSync(targetPidFile, 'original content', 'utf-8');
+      fs.symlinkSync(targetDir, pidDir);
+
+      await assert.rejects(
+        startDaemon([], sessionId),
+        /symbolic link/,
+      );
+      assert.strictEqual(
+        fs.readFileSync(targetPidFile, 'utf-8'),
+        'original content',
+      );
+    } finally {
+      try {
+        fs.unlinkSync(pidDir);
+      } catch {
+        // ignore
+      }
+      try {
+        fs.unlinkSync(targetPidFile);
+      } catch {
+        // ignore
+      }
+      try {
+        fs.rmdirSync(targetDir);
+      } catch {
+        // ignore
+      }
     }
   });
 
