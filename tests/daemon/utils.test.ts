@@ -122,6 +122,21 @@ describe('serializeArgs', () => {
     assert.deepStrictEqual(result, ['--foo=string', '--bar=42']);
   });
 
+  it('should serialize object values as JSON', () => {
+    const options: Record<string, YargsOptions> = {wsHeaders: {}};
+    const argv = {
+      wsHeaders: {
+        Authorization: 'Bearer token',
+      },
+      _: [],
+      $0: 'test',
+    } as unknown as ParsedArguments;
+    const result = serializeArgs(options, argv);
+    assert.deepStrictEqual(result, [
+      '--ws-headers={"Authorization":"Bearer token"}',
+    ]);
+  });
+
   it('should convert camelCase keys to kebab-case', () => {
     const options: Record<string, YargsOptions> = {
       camelCaseKey: {},
