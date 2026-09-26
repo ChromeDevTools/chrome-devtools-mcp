@@ -7,6 +7,7 @@
 import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import path from 'node:path';
 
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
@@ -120,6 +121,17 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
   const pidFilePath = getPidFilePath(sessionId);
 
   if (fs.existsSync(pidFilePath)) {
+    if (process.platform !== 'win32') {
+      const pidDir = path.dirname(pidFilePath);
+      if (
+        fs.lstatSync(pidDir).isSymbolicLink() ||
+        fs.lstatSync(pidFilePath).isSymbolicLink()
+      ) {
+        throw new Error(
+          `Refusing to remove daemon PID file through a symbolic link: ${pidFilePath}`,
+        );
+      }
+    }
     fs.unlinkSync(pidFilePath);
   }
 
