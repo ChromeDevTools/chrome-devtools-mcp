@@ -48,7 +48,11 @@ import type {
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import type {ExtensionServiceWorker} from './types.js';
-import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {
+  getTempFilePath,
+  resolveCanonicalPath,
+  resolveFileUriPath,
+} from './utils/files.js';
 import {isAllowedUrl} from './utils/url.js';
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -284,9 +288,7 @@ export class McpContext implements Context {
     let allowed = false;
     const resolvedRoots = await Promise.allSettled(
       roots.map(async root => {
-        const rootPathUri = root.uri;
-        const rootPath = path.resolve(fileURLToPath(rootPathUri));
-        return await fs.realpath(rootPath);
+        return await fs.realpath(resolveFileUriPath(root.uri));
       }),
     );
 
