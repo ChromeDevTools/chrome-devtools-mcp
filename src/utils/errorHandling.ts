@@ -6,23 +6,14 @@
 
 import process from 'node:process';
 import {logger} from './logger.js';
-import {PuppeteerError} from '../third_party/index.js';
 
 export function setupUnhandledRejectionHandler(onCrash: () => void) {
   process.on('unhandledRejection', (reason, promise) => {
-    logger?.('Unhandled promise rejection', promise, reason);
+    logger?.('Unhandled promise rejection:', promise, reason);
+    console.error('Unhandled promise rejection:', reason);
+
     if (process.env['CHROME_DEVTOOLS_MCP_CRASH_ON_UNCAUGHT'] === 'true') {
-      console.error('Unhandled promise rejection:', reason);
       onCrash();
-      return;
     }
-
-    if (reason instanceof PuppeteerError) {
-      logger?.('Swallowing benign PuppeteerError:', reason);
-      return;
-    }
-
-    console.error('Unhandled promise rejection (swallowed):', reason);
-    logger?.('Unhandled promise rejection (swallowed):', reason);
   });
 }

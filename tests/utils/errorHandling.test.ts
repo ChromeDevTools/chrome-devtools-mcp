@@ -9,7 +9,6 @@ import process from 'node:process';
 import {afterEach, beforeEach, describe, it, mock} from 'node:test';
 
 import {setupUnhandledRejectionHandler} from '../../src/utils/errorHandling.js';
-import {PuppeteerError} from '../../src/third_party/index.js';
 
 describe('setupUnhandledRejectionHandler', () => {
   let originalEnvValue: string | undefined;
@@ -62,25 +61,6 @@ describe('setupUnhandledRejectionHandler', () => {
     assert.strictEqual(onCrash.mock.calls.length, 1);
   });
 
-  it('swallows benign PuppeteerError', () => {
-    const onCrash = mock.fn();
-    const consoleError = mock.method(console, 'error', () => undefined);
-    const processOn = mock.method(process, 'on', () => process);
-
-    setupUnhandledRejectionHandler(onCrash);
-
-    const handler = processOn.mock.calls[0].arguments[1] as (
-      reason: unknown,
-      promise: Promise<unknown>,
-    ) => void;
-
-    const reason = new PuppeteerError('Puppeteer went boom');
-    handler(reason, Promise.resolve());
-
-    assert.strictEqual(consoleError.mock.calls.length, 0);
-    assert.strictEqual(onCrash.mock.calls.length, 0);
-  });
-
   it('logs and swallows other errors', () => {
     const onCrash = mock.fn();
     const consoleError = mock.method(console, 'error', () => undefined);
@@ -99,7 +79,7 @@ describe('setupUnhandledRejectionHandler', () => {
     assert.strictEqual(consoleError.mock.calls.length, 1);
     assert.strictEqual(
       consoleError.mock.calls[0].arguments[0],
-      'Unhandled promise rejection (swallowed):',
+      'Unhandled promise rejection:',
     );
     assert.strictEqual(consoleError.mock.calls[0].arguments[1], reason);
 
