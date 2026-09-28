@@ -5,6 +5,7 @@
  */
 
 import {describe, it} from 'node:test';
+import {strictEqual, deepStrictEqual} from 'node:assert/strict';
 
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
@@ -803,5 +804,72 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+  });
+  describe('console templates', () => {
+    it('substitutes text and numbers while discarding styles', async () => {
+      const message = createMockMessage({
+        text: () => '%cHello%c %s: %d color: red color: blue world 4',
+        args: () => [
+          {
+            jsonValue: async () => '%cHello%c %s: %d',
+            remoteObject: () => ({type: 'string', value: '%cHello%c %s: %d'}),
+          },
+          {
+            jsonValue: async () => 'color: red',
+            remoteObject: () => ({type: 'string', value: 'color: red'}),
+          },
+          {
+            jsonValue: async () => 'color: blue',
+            remoteObject: () => ({type: 'string', value: 'color: blue'}),
+          },
+          {
+            jsonValue: async () => 'world',
+            remoteObject: () => ({type: 'string', value: 'world'}),
+          },
+          {
+            jsonValue: async () => 4,
+            remoteObject: () => ({type: 'number', value: 4}),
+          },
+        ],
+      });
+      const concise = await ConsoleFormatter.from(message, {id: 1});
+      const detailed = await ConsoleFormatter.from(message, {
+        id: 1,
+        fetchDetailedData: true,
+      });
+
+      strictEqual(concise.toJSON().text, 'Hello world: 4');
+      strictEqual(concise.toJSON().argsCount, 5);
+      strictEqual(detailed.toJSONDetailed().text, 'Hello world: 4');
+      deepStrictEqual(detailed.toJSONDetailed().args, []);
+    });
+
+    it('keeps object substitutions and unused arguments', async () => {
+      const message = createMockMessage({
+        text: () => 'Result: %o Object tail',
+        args: () => [
+          {
+            jsonValue: async () => 'Result: %o',
+            remoteObject: () => ({type: 'string', value: 'Result: %o'}),
+          },
+          {
+            jsonValue: async () => ({answer: 42}),
+            remoteObject: () => ({type: 'object', description: 'Object'}),
+          },
+          {
+            jsonValue: async () => 'tail',
+            remoteObject: () => ({type: 'string', value: 'tail'}),
+          },
+        ],
+      });
+      const concise = await ConsoleFormatter.from(message, {id: 2});
+      const detailed = await ConsoleFormatter.from(message, {
+        id: 2,
+        fetchDetailedData: true,
+      });
+
+      strictEqual(concise.toJSON().text, 'Result: Object tail');
+      deepStrictEqual(detailed.toJSONDetailed().args, ['tail']);
+    });
   });
 });

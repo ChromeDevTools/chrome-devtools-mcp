@@ -174,12 +174,15 @@ export class ConsoleFormatter {
       }
     }
 
+    const formatted = formatConsoleTemplate(msg);
     return new ConsoleFormatter({
       id: options.id,
       type: msg.type(),
-      text: msg.text(),
+      text: formatted?.text ?? msg.text(),
       argCount: resolvedArgs.length || msg.args().length,
-      resolvedArgs,
+      resolvedArgs: formatted
+        ? resolvedArgs.slice(formatted.consumedArgs + 1)
+        : resolvedArgs,
       stack,
       includeStackInConcise: options.fetchStackTrace,
       isIgnored,
@@ -290,6 +293,54 @@ export class ConsoleFormatter {
         : undefined,
     };
   }
+}
+
+function formatConsoleTemplate(
+  message: ConsoleMessage,
+): {text: string; consumedArgs: number} | undefined {
+  const [firstArg, ...otherArgs] = message.args();
+  const template = firstArg?.remoteObject().value;
+  if (typeof template !== 'string' || !/%[%_Oocsdfi]/.test(template)) {
+    return undefined;
+  }
+
+  let text = '';
+  let position = 0;
+  let consumedArgs = 0;
+  for (const match of template.matchAll(/%([%_Oocsdfi])/g)) {
+    text += template.slice(position, match.index);
+    position = match.index + match[0].length;
+    const specifier = match[1];
+    if (specifier === '%') {
+      text += '%';
+      continue;
+    }
+    const argument = otherArgs[consumedArgs]?.remoteObject();
+    if (!argument) {
+      text += match[0];
+      continue;
+    }
+    consumedArgs++;
+    if (specifier === 's' || specifier === 'o' || specifier === 'O') {
+      text += argument.description ?? String(argument.value ?? '');
+    } else if (specifier === 'd' || specifier === 'i' || specifier === 'f') {
+      const value = typeof argument.value === 'number' ? argument.value : NaN;
+      text += specifier === 'f' ? value : Math.floor(value);
+    }
+  }
+  text += template.slice(position);
+  return {
+    text: [
+      text,
+      ...otherArgs.slice(consumedArgs).map(arg => {
+        const remoteObject = arg.remoteObject();
+        return remoteObject.description ?? String(remoteObject.value ?? '');
+      }),
+    ]
+      .filter(part => part !== '')
+      .join(' '),
+    consumedArgs,
+  };
 }
 
 export class GroupedConsoleFormatter extends ConsoleFormatter {
