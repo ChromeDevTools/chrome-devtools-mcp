@@ -7,11 +7,14 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
+<<<<<<< HEAD
 import sinon from 'sinon';
 
 import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
 import {createMockDialog, createMockPuppeteerPage} from '../mocks.js';
 import type {Page} from '../../src/third_party/index.js';
+=======
+>>>>>>> 2647b63 (Address review feedback for opened pages)
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -208,7 +211,7 @@ describe('WaitForHelper', () => {
     await withMcpContext(async (response, context) => {
       const mcpPage = context.getSelectedMcpPage();
       const listenerCountBefore = mcpPage.pptrPage.listenerCount('popup');
-      const popup = Promise.withResolvers<Page | null>();
+      const popup = Promise.withResolvers<object | null>();
       mcpPage.pptrPage.once('popup', page => popup.resolve(page));
 
       const result = await mcpPage.waitForEventsAfterAction(
@@ -220,8 +223,9 @@ describe('WaitForHelper', () => {
         {waitForStableDom: false},
       );
 
-      assert.strictEqual(result.newPages?.length, 1);
-      assert.strictEqual(result.newPages[0], await popup.promise);
+      const openedPage = await popup.promise;
+      assert.ok(openedPage);
+      assert.strictEqual(result.openedPages?.has(openedPage), true);
       assert.strictEqual(
         mcpPage.pptrPage.listenerCount('popup'),
         listenerCountBefore,

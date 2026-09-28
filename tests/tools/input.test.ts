@@ -107,7 +107,7 @@ describe('input', () => {
         '<!DOCTYPE html><title>Opened by click</title>',
       );
 
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const sourcePage = context.getSelectedMcpPage();
         const page = sourcePage.pptrPage;
         const popupUrl = server.getRoute('/popup');
@@ -121,7 +121,7 @@ describe('input', () => {
           <button onclick="window.open('${popupUrl}')">open</button>`);
         sourcePage.textSnapshot = await TextSnapshot.create(sourcePage);
 
-        await click.handler(
+        await click(args).handler(
           {
             params: {
               uid: '1_1',
@@ -134,21 +134,21 @@ describe('input', () => {
 
         const result = await response.handle(context);
         const textContent = getTextContent(result.content[0]);
-        assert.match(textContent, /## New pages\n\d+: Opened by click \(/);
+        assert.match(textContent, /## Opened pages\n\d+: Opened by click \(/);
         assert.ok(textContent.includes(popupUrl));
         assert.ok(!textContent.includes('## Pages'));
         assert.ok(!textContent.includes('Original page'));
         assert.ok(!textContent.includes('Unrelated page'));
 
-        const newPages = getStructuredNewPages(result.structuredContent);
+        const openedPages = getStructuredOpenedPages(result.structuredContent);
         assert.deepStrictEqual(
-          newPages.map(({url, title}) => ({url, title})),
+          openedPages.map(({url, title}) => ({url, title})),
           [{url: popupUrl, title: 'Opened by click'}],
         );
       });
     });
 
-    it('reports multiple pages opened by one click in event order', async () => {
+    it('reports multiple pages opened by one click', async () => {
       server.addHtmlRoute(
         '/popup-one',
         '<!DOCTYPE html><title>First popup</title>',
@@ -158,7 +158,7 @@ describe('input', () => {
         '<!DOCTYPE html><title>Second popup</title>',
       );
 
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const sourcePage = context.getSelectedMcpPage();
         const firstUrl = server.getRoute('/popup-one');
         const secondUrl = server.getRoute('/popup-two');
@@ -168,7 +168,7 @@ describe('input', () => {
           </button>`);
         sourcePage.textSnapshot = await TextSnapshot.create(sourcePage);
 
-        await click.handler(
+        await click(args).handler(
           {
             params: {
               uid: '1_1',
@@ -180,21 +180,17 @@ describe('input', () => {
         );
 
         const result = await response.handle(context);
-        const newPages = getStructuredNewPages(result.structuredContent);
+        const openedPages = getStructuredOpenedPages(result.structuredContent);
         assert.deepStrictEqual(
-          newPages.map(({url, title}) => ({url, title})),
-          [
-            {url: firstUrl, title: 'First popup'},
-            {url: secondUrl, title: 'Second popup'},
-          ],
+          new Set(openedPages.map(({url, title}) => `${url}: ${title}`)),
+          new Set([`${firstUrl}: First popup`, `${secondUrl}: Second popup`]),
         );
-        assert.strictEqual(new Set(newPages.map(({id}) => id)).size, 2);
+        assert.strictEqual(new Set(openedPages.map(({id}) => id)).size, 2);
 
         const textContent = getTextContent(result.content[0]);
-        assert.match(
-          textContent,
-          /## New pages\n\d+: First popup \([^\n]+\)\n\d+: Second popup \(/,
-        );
+        assert.match(textContent, /## Opened pages/);
+        assert.ok(textContent.includes(`First popup (${firstUrl})`));
+        assert.ok(textContent.includes(`Second popup (${secondUrl})`));
         assert.ok(!textContent.includes('## Pages'));
       });
     });
@@ -1827,13 +1823,13 @@ describe('input', () => {
   });
 });
 
-function getStructuredNewPages(
+function getStructuredOpenedPages(
   structuredContent: object,
 ): Array<{id: number; url: string; title: string}> {
-  assert.ok('newPages' in structuredContent);
-  const newPages: unknown = structuredContent.newPages;
-  assert.ok(Array.isArray(newPages));
-  const entries: unknown[] = newPages;
+  assert.ok('openedPages' in structuredContent);
+  const openedPages: unknown = structuredContent.openedPages;
+  assert.ok(Array.isArray(openedPages));
+  const entries: unknown[] = openedPages;
 
   return entries.map(entry => {
     assert.ok(typeof entry === 'object' && entry !== null);
