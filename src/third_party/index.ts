@@ -54,7 +54,6 @@ export {
   Target,
   TargetType,
   TimeoutError,
-  PuppeteerError,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
