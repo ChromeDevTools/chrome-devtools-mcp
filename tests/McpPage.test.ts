@@ -876,7 +876,7 @@ describe('McpPage', () => {
     });
 
     it('creates and attaches commentBridge when getDevToolsData is called', async () => {
-      const {mcpPage, pptrPage} = createMcpPage();
+      const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
       const devtoolsPage = createMockPuppeteerPage();
       devtoolsPage.evaluate.resolves({
