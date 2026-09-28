@@ -11,8 +11,10 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const getCssStyles = definePageTool(() => ({
   name: 'get_css_styles',
-  description: `Retrieve matched CSS rules, inline styles, inherited styles, and cascade information for an element identified by its UID.
-Use this tool to debug why specific CSS properties are applied, overridden, or conflicting. Results are paginated and return 10 rules per page by default; use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.`,
+  description: `Retrieve matched CSS rules, inline styles (element.style), inherited styles, custom properties, and cascade wrappers (@layer, @media, @container, @scope) for an element identified by its UID.
+Rules are ordered from highest to lowest cascade precedence and include source line numbers (e.g. index:196). Active (winning) declarations have no prefix tag, while (losing) overridden declarations are prefixed with [overloaded].
+Treat the output as authoritative and complete.
+Results are paginated (10 rules per page by default); use pageIdx to page through the remaining rules. Requires a UID from take_snapshot.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,

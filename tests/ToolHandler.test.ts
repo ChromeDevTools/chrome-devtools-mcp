@@ -26,6 +26,7 @@ import {
   type ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {createTools} from '../src/tools/tools.js';
+import {createMockMcpContext} from './mocks.js';
 import {getMockBrowser} from './utils.js';
 import {Mutex} from '../src/third_party/index.js';
 
@@ -73,8 +74,8 @@ describe('ToolHandler', () => {
     assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({pageId: 1});
 
-    assert.strictEqual(mockContext.getPageById.calledOnce, true);
-    assert.strictEqual(mockContext.getPageById.calledWith(1), true);
+    sinon.assert.calledOnceWithExactly(mockContext.getPageById, 1);
+    sinon.assert.calledOnceWithExactly(mockPage.init);
     assert.strictEqual(handlerCalled, true);
   });
 
@@ -118,7 +119,8 @@ describe('ToolHandler', () => {
     assert.strictEqual(toolHandler.disabled, false);
     await toolHandler.handle({});
 
-    assert.strictEqual(mockContext.getSelectedMcpPage.calledOnce, true);
+    sinon.assert.calledOnceWithExactly(mockContext.getSelectedMcpPage);
+    sinon.assert.calledOnceWithExactly(mockPage.init);
     assert.strictEqual(handlerCalled, true);
   });
 
@@ -1118,6 +1120,55 @@ describe('ToolHandler', () => {
     );
     assert.deepStrictEqual(receivedParams, {
       filePath: canonicalFilePath,
+    });
+  });
+
+  it('skips validation and clears empty or whitespace-only file paths in params', async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const tool: ToolDefinition = {
+      name: 'file_tool',
+      description: 'A tool with file verification',
+      annotations: {
+        category: ToolCategory.DEBUGGING,
+        readOnlyHint: false,
+      },
+      schema: {
+        filePath: zod.string().optional(),
+        filePaths: zod.array(zod.string()).optional(),
+      },
+      blockedByDialog: false,
+      verifyFilesSchema: {
+        filePath: true,
+        filePaths: true,
+      },
+      handler: async request => {
+        receivedParams = request.params;
+      },
+    };
+
+    const mockContext = createMockMcpContext();
+    mockContext.browser = getMockBrowser();
+    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    });
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      new Mutex(),
+    );
+
+    const result = await toolHandler.handle({
+      filePath: '     ',
+      filePaths: ['   ', ''],
+    });
+
+    assert.strictEqual(result.isError, undefined);
+    sinon.assert.notCalled(mockContext.validatePath);
+    assert.deepStrictEqual(receivedParams, {
+      filePath: undefined,
+      filePaths: [],
     });
   });
 });

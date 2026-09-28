@@ -35,7 +35,7 @@ import {commands} from '../config/cli-options.js';
 import {
   mcpOptions,
   parseArguments,
-  getMcpOptionsForViaCli,
+  getCliOptions,
 } from '../config/mcp-options.js';
 
 await checkForUpdates(
@@ -44,25 +44,18 @@ await checkForUpdates(
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
 
-async function start(args: string[], sessionId: string) {
+async function start(args: string[], sessionId: string, stopExisting = false) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
+  const parsedArgs = parseArguments(VERSION, [
+    process.execPath,
+    process.argv[1],
+    ...combinedArgs,
+  ]);
+  if (stopExisting && isDaemonRunning(sessionId)) {
+    await stopDaemon(sessionId);
+  }
   await startDaemon(combinedArgs, sessionId);
-  logDisclaimers(parseArguments(VERSION, combinedArgs));
-}
-
-function getCliOptions() {
-  const options: Partial<typeof mcpOptions> = {
-    ...getMcpOptionsForViaCli(),
-  };
-
-  // Missing CLI serialization.
-  delete options.viewport;
-
-  // Change the defaults for the CLI.
-  delete options.experimentalStructuredContent;
-  delete options.experimentalInteropTools;
-
-  return options;
+  logDisclaimers(parsedArgs);
 }
 
 const y = yargs(hideBin(process.argv))
@@ -135,29 +128,8 @@ y.command(
       )
       .strict(),
   async argv => {
-    if (isDaemonRunning(argv.sessionId)) {
-      await stopDaemon(argv.sessionId);
-    }
-    // Defaults but we do not want to affect the yargs conflict resolution.
-    if (
-      argv.isolated === undefined &&
-      argv.userDataDir === undefined &&
-      !argv.autoConnect &&
-      !argv.browserUrl &&
-      !argv.wsEndpoint
-    ) {
-      argv.isolated = true;
-    }
-    if (
-      argv.headless === undefined &&
-      !argv.autoConnect &&
-      !argv.browserUrl &&
-      !argv.wsEndpoint
-    ) {
-      argv.headless = true;
-    }
     const args = serializeArgs(getCliOptions(), argv);
-    await start(args, argv.sessionId);
+    await start(args, argv.sessionId, /* stopExisting= */ true);
     process.exit(0);
   },
 ).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself

@@ -74,7 +74,10 @@ function isPageScopedTool(
 async function validateAndResolvePathOrUrl(
   filePathOrUrl: string,
   context: McpContext,
-): Promise<string> {
+): Promise<string | undefined> {
+  if (filePathOrUrl.trim().length === 0) {
+    return undefined;
+  }
   try {
     const url = new URL(filePathOrUrl);
     if (url.protocol === 'file:') {
@@ -130,7 +133,10 @@ async function validateToolFiles(
         const updated: unknown[] = [];
         for (const item of val) {
           if (typeof item === 'string') {
-            updated.push(await validateAndResolvePathOrUrl(item, context));
+            const resolved = await validateAndResolvePathOrUrl(item, context);
+            if (resolved !== undefined) {
+              updated.push(resolved);
+            }
           } else {
             throw new Error(
               'Unexpected non-string value as a file path or URL',
@@ -211,6 +217,7 @@ export class ToolHandler {
             !this.serverArgs.slim
               ? context.getPageById(pageId)
               : context.getSelectedMcpPage();
+          await page?.init();
           response.setPage(page);
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();

@@ -8,8 +8,11 @@ import type {YargsOptions} from '../third_party/index.js';
 import {yargs, hideBin} from '../third_party/index.js';
 import os from 'node:os';
 import {readFileSync} from 'node:fs';
+import path from 'node:path';
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+
+import {findUnenforceablePattern} from '../utils/url.js';
 
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
@@ -131,15 +134,39 @@ export const mcpOptions = {
     type: 'array',
     string: true,
     describe:
-      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
+      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\\.\\d+\\.\\d+\\.\\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.",
     conflicts: ['allowedUrlPattern'],
+    coerce: (arg: string[] | undefined) => {
+      if (arg === undefined) {
+        return undefined;
+      }
+      const pattern = findUnenforceablePattern(arg);
+      if (pattern) {
+        throw new Error(
+          `Invalid --blockedUrlPattern "${pattern}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*"/":name" wildcard instead.`,
+        );
+      }
+      return arg;
+    },
   },
   allowedUrlPattern: {
     type: 'array',
     string: true,
     describe:
-      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.",
+      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\\.\\d+\\.\\d+\\.\\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.",
     conflicts: ['blockedUrlPattern'],
+    coerce: (arg: string[] | undefined) => {
+      if (arg === undefined) {
+        return undefined;
+      }
+      const pattern = findUnenforceablePattern(arg);
+      if (pattern) {
+        throw new Error(
+          `Invalid --allowedUrlPattern "${pattern}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*"/":name" wildcard instead.`,
+        );
+      }
+      return arg;
+    },
   },
   performanceCrux: {
     type: 'boolean',
@@ -273,6 +300,12 @@ export const mcpOptions = {
   config: {
     type: 'string',
     describe: 'Path to JSON configuration file.',
+    coerce: (configPath: string | undefined) => {
+      if (!configPath) {
+        return;
+      }
+      return path.resolve(configPath);
+    },
   },
 } satisfies Record<string, YargsOptions>;
 
@@ -317,6 +350,36 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
   };
 }
 
+export function getCliOptions(): Partial<
+  Record<keyof typeof mcpOptions, YargsOptions>
+> {
+  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> = {
+    ...getMcpOptionsForViaCli(),
+  };
+
+  // Missing CLI serialization.
+  delete options.viewport;
+
+  // Change the defaults for the CLI.
+  delete options.experimentalStructuredContent;
+  delete options.experimentalInteropTools;
+
+  const recordOptions: Record<string, YargsOptions | undefined> = options;
+  for (const [key, option] of Object.entries(recordOptions)) {
+    if (option?.default !== undefined) {
+      const copy: YargsOptions = {
+        ...option,
+        defaultDescription:
+          option.defaultDescription ?? JSON.stringify(option.default),
+      };
+      delete copy.default;
+      recordOptions[key] = copy;
+    }
+  }
+
+  return options;
+}
+
 /**
  * Exported only for testing to not trigger process exit.
  */
@@ -337,13 +400,25 @@ export function parser(
     .options(options)
     .showHelpOnFail(false, 'Specify --help for available options')
     .middleware(args => {
-      if (isViaCli && args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
-        const cliFilesystemArgs: {
-          allowUnrestrictedPaths?: boolean;
-          filesystemRoot?: unknown;
-        } = args;
-        cliFilesystemArgs.allowUnrestrictedPaths = true;
-        cliFilesystemArgs.filesystemRoot = undefined;
+      if (isViaCli) {
+        if (args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
+          const cliFilesystemArgs: {
+            allowUnrestrictedPaths?: boolean;
+            filesystemRoot?: unknown;
+          } = args;
+          cliFilesystemArgs.allowUnrestrictedPaths = true;
+          cliFilesystemArgs.filesystemRoot = undefined;
+        }
+        // Defaults that cannot be set in options without affecting yargs conflict resolution.
+        if (
+          args.isolated === undefined &&
+          args.userDataDir === undefined &&
+          !args.autoConnect &&
+          !args.browserUrl &&
+          !args.wsEndpoint
+        ) {
+          args.isolated = true;
+        }
       }
       // We can't set default in the options else
       // Yargs will complain
