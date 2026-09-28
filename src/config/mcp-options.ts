@@ -5,7 +5,7 @@
  */
 
 import type {YargsOptions} from '../third_party/index.js';
-import {yargs, hideBin} from '../third_party/index.js';
+import {yargs, hideBin, zod as z} from '../third_party/index.js';
 import os from 'node:os';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -627,24 +627,38 @@ export function parseArguments(
     console.error(`Unknown arguments: ${unknownArgs.map(arg => `--${arg}`)}`);
   }
 
-  // Step 5: Validation. Conflicts are only checked against explicit user input
-  // so that dynamic defaults never conflict.
-  const activeArgs = new Set<string>();
-  for (const [key, val] of Object.entries(explicitConfig)) {
-    if (val !== undefined && val !== false) {
-      activeArgs.add(key);
-    }
-  }
-  for (const group of CONFLICTING_ARGS) {
-    const activeInGroup = group.filter(arg => activeArgs.has(arg));
-    if (activeInGroup.length > 1) {
-      const [arg1, arg2] = activeInGroup;
-      throw new Error(`Arguments ${arg1} and ${arg2} are mutually exclusive`);
-    }
-  }
+  // Step 5: Final Schema Validation & Type Safety. Conflicts are only checked
+  // against explicit user input so that dynamic defaults never conflict.
+  const ConfigSchema = z
+    .object({})
+    .passthrough()
+    .superRefine((_config, ctx) => {
+      const activeArgs = new Set<string>();
+      for (const [key, val] of Object.entries(explicitConfig)) {
+        if (val !== undefined && val !== false) {
+          activeArgs.add(key);
+        }
+      }
 
+      for (const group of CONFLICTING_ARGS) {
+        const activeInGroup = group.filter(arg => activeArgs.has(arg));
+        if (activeInGroup.length > 1) {
+          const [arg1, arg2] = activeInGroup;
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Arguments ${arg1} and ${arg2} are mutually exclusive`,
+            path: [arg1, arg2],
+          });
+        }
+      }
+    });
+
+  const result = ConfigSchema.safeParse(resolvedConfig);
+  if (!result.success) {
+    throw new Error(result.error.issues[0].message);
+  }
   // The merge and the default loop lose the static type that yargs infers from
   // `mcpOptions`. Every value was produced by the same option definitions (CLI
   // parser, strict config-file parser, option defaults), so the shape matches.
-  return resolvedConfig as ParsedArguments;
+  return result.data as ParsedArguments;
 }
