@@ -100,6 +100,9 @@ export class WaitForHelper {
   }
 
   timeout(time: number): Promise<void> {
+    if (this.#abortController.signal.aborted) {
+      return Promise.resolve();
+    }
     return new Promise<void>(res => {
       const id = setTimeout(res, time);
       this.#abortController.signal.addEventListener('abort', () => {
@@ -110,7 +113,7 @@ export class WaitForHelper {
   }
 
   async waitForEventsAfterAction(
-    action: () => Promise<unknown>,
+    action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;
@@ -127,16 +130,12 @@ export class WaitForHelper {
     ) => {
       this.#dialogDetected = true;
 
-      if (!options?.handleDialog) {
-        return;
-      }
-
       let actionToTake: DialogAction | undefined;
 
-      if (typeof options.handleDialog === 'object') {
+      if (typeof options?.handleDialog === 'object') {
         actionToTake = options.handleDialog[dialog.type()];
       } else {
-        actionToTake = options.handleDialog;
+        actionToTake = options?.handleDialog;
       }
 
       if (actionToTake) {
@@ -148,6 +147,10 @@ export class WaitForHelper {
         } else {
           void dialog.accept(actionToTake);
         }
+      } else {
+        this.#abortController.abort(
+          new Error('Action interrupted by a dialog'),
+        );
       }
     };
     this.#page.on('dialog', dialogHandler);
@@ -212,7 +215,7 @@ export class WaitForHelper {
     // If no navigation occurs, this.#abortController will cancel it in the finally block.
     const navigationFinished = this.#page
       .waitForNavigation({
-        timeout: options?.timeout ?? this.#navigationTimeout,
+        timeout: 0,
         signal: this.#abortController.signal,
         ignoreSameDocumentNavigation: true,
       })
@@ -231,7 +234,7 @@ export class WaitForHelper {
       });
 
     try {
-      await action();
+      await action(this.#abortController.signal);
     } catch (error) {
       // Clear up pending promises
       this.#abortController.abort();
@@ -253,7 +256,10 @@ export class WaitForHelper {
       // Only await navigation if one was actually initiated; otherwise, the
       // pending waitForNavigation promise will be cancelled when this.#abortController aborts.
       if (navigationStarted) {
-        await navigationFinished;
+        await Promise.race([
+          navigationFinished,
+          this.timeout(options?.timeout ?? this.#navigationTimeout),
+        ]);
       }
 
       if (this.#dialogDetected) {

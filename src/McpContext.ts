@@ -39,7 +39,6 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import {listPages} from './tools/pages.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
@@ -61,7 +60,7 @@ interface McpContextOptions {
   // Whether source maps are enabled in DevTools.
   sourceMaps?: boolean;
   // The allow list of URL patterns to allow loading resources.
-  allowList?: string[];
+  allowlist?: string[];
   // The block list of URL patterns to block loading resources.
   blocklist?: string[];
   // Whether to skip path validation when the client did not negotiate the roots
@@ -75,6 +74,8 @@ interface McpContextOptions {
   navigationTimeout?: number;
   // Whether extension tools and targets are enabled.
   categoryExtensions?: boolean;
+  // Callback when a notification should be emitted to MCP client.
+  onNotification?: (message: string) => void;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -94,7 +95,7 @@ export class McpContext implements Context {
 
   #extensionServiceWorkers: ExtensionServiceWorker[] = [];
 
-  #mcpPages = new Map<Page, McpPage>();
+  #mcpPages = new Map<Target, McpPage>();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
 
@@ -105,7 +106,6 @@ export class McpContext implements Context {
     null;
 
   #reconnectNotice = false;
-  #extensionPages = new WeakMap<Target, Page>();
 
   #extensionServiceWorkerMap = new WeakMap<Target, string>();
   #nextExtensionServiceWorkerId = 1;
@@ -160,6 +160,7 @@ export class McpContext implements Context {
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
+    this.#selectedPage?.dispose();
     this.#mcpPages.clear();
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
@@ -167,21 +168,12 @@ export class McpContext implements Context {
     this.#isolatedContexts.clear();
   }
 
-  #onTargetCreated = async (target: Target) => {
+  #onTargetCreated = (target: Target) => {
     try {
-      const url = target.url();
-      if (
-        !isAllowedUrl(url, {
-          categoryExtensions: this.#options.categoryExtensions,
-        })
-      ) {
+      if (!this.#isPageTarget(target)) {
         return;
       }
-      const page = await target.page();
-      if (!page) {
-        return;
-      }
-      void this.#createMcpPage(page);
+      this.#createMcpPage(target);
     } catch (err) {
       this.logger?.('Error handling targetcreated', err);
     }
@@ -189,20 +181,10 @@ export class McpContext implements Context {
 
   #onTargetDestroyed = (target: Target) => {
     try {
-      let foundPage: Page | undefined;
-      for (const page of this.#mcpPages.keys()) {
-        if (page.target() === target) {
-          foundPage = page;
-          break;
-        }
-      }
-      if (!foundPage) {
-        return;
-      }
-      const mcpPage = this.#mcpPages.get(foundPage);
+      const mcpPage = this.#mcpPages.get(target);
       if (mcpPage) {
         mcpPage.dispose();
-        this.#mcpPages.delete(foundPage);
+        this.#mcpPages.delete(target);
       }
     } catch (err) {
       this.logger?.('Error handling targetdestroyed', err);
@@ -350,9 +332,10 @@ export class McpContext implements Context {
     } else {
       page = await this.browser.newPage({background});
     }
-    const mcpPage = await this.#createMcpPage(page);
-    await this.createPagesSnapshot();
+    const mcpPage = this.#createMcpPage(page.target());
+    await mcpPage.init();
     this.selectPage(mcpPage);
+    await this.createPagesSnapshot();
     return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
@@ -360,15 +343,12 @@ export class McpContext implements Context {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageById(pageId);
-    if (page) {
-      page.dispose();
-      this.#mcpPages.delete(page.pptrPage);
-    }
-    await page.pptrPage.close({runBeforeUnload: false});
+    this.#mcpPages.delete(page.target);
+    await page.close();
   }
 
   get #hasNetworkBlockOrAllowlist(): boolean {
-    return !!(this.#options.allowList || this.#options.blocklist);
+    return !!(this.#options.allowlist || this.#options.blocklist);
   }
 
   installPWA(options: InstallPWAOptions): Promise<string> {
@@ -418,9 +398,9 @@ export class McpContext implements Context {
     if (!page) {
       throw new Error('No page selected');
     }
-    if (page.pptrPage.isClosed()) {
+    if (page.isClosed()) {
       throw new Error(
-        `The selected page has been closed. Call ${listPages().name} to see open pages.`,
+        'The selected page has been closed. Call list_pages to see open pages.',
       );
     }
     return page;
@@ -435,8 +415,8 @@ export class McpContext implements Context {
         return undefined;
       }
     }
-    if (targetPage?.pptrPage?.isClosed() === false) {
-      return targetPage.pptrPage.url();
+    if (targetPage && !targetPage.isClosed()) {
+      return targetPage.url();
     }
     return undefined;
   }
@@ -484,6 +464,13 @@ export class McpContext implements Context {
   }
 
   selectPage(newPage: McpPage): void {
+    if (
+      this.#selectedPage &&
+      this.#selectedPage !== newPage &&
+      !this.#mcpPages.has(this.#selectedPage.target)
+    ) {
+      this.#selectedPage.dispose();
+    }
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -559,35 +546,41 @@ export class McpContext implements Context {
     return contextToName;
   }
 
-  async #createMcpPage(page: Page): Promise<McpPage> {
-    let mcpPage = this.#mcpPages.get(page);
+  #createMcpPage(target: Target): McpPage {
+    let mcpPage =
+      this.#mcpPages.get(target) ??
+      (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     if (!mcpPage) {
-      mcpPage = new McpPage(page, nextPageId++, {
+      mcpPage = new McpPage(target, nextPageId++, {
         locatorClass: this.#locatorClass,
         hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
         isolatedContextName: this.#getBrowserContextToNameMap().get(
-          page.browserContext(),
+          target.browserContext(),
         ),
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
+        onNotification: this.#options.onNotification,
       });
-      this.#mcpPages.set(page, mcpPage);
-      await mcpPage.init();
     }
+    this.#mcpPages.set(target, mcpPage);
     return mcpPage;
   }
 
-  async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.#fetchBrowserPages();
+  async createPagesSnapshot(): Promise<McpPage[]> {
+    const allTargets = this.#fetchPageTargets();
 
-    await Promise.allSettled(allPages.map(page => this.#createMcpPage(page)));
+    for (const target of allTargets) {
+      this.#createMcpPage(target);
+    }
 
-    // Prune orphaned #mcpPages entries (pages that no longer exist).
-    const currentPages = new Set(allPages);
-    for (const [page, mcpPage] of this.#mcpPages) {
-      if (!currentPages.has(page)) {
-        mcpPage.dispose();
-        this.#mcpPages.delete(page);
+    // Prune orphaned #mcpPages entries (targets that no longer exist).
+    const currentTargets = new Set(allTargets);
+    for (const [target, mcpPage] of this.#mcpPages) {
+      if (!currentTargets.has(target)) {
+        if (mcpPage !== this.#selectedPage || mcpPage.isClosed()) {
+          mcpPage.dispose();
+        }
+        this.#mcpPages.delete(target);
       }
     }
 
@@ -597,70 +590,62 @@ export class McpContext implements Context {
     // `isClosed()` instead of `pages` membership avoids silently swapping a
     // live page that is momentarily missing from the snapshot.
     this.#selectedPageFallback = undefined;
-    if (
-      (!this.#selectedPage || this.#selectedPage.pptrPage.isClosed()) &&
-      pages[0]
-    ) {
+    if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
       if (this.#selectedPage) {
         this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.pptrPage.isClosed(),
+          wasClosed: this.#selectedPage.isClosed(),
         };
       }
       this.selectPage(pages[0]);
     }
 
-    return pages.map(p => p.pptrPage);
-  }
-
-  async #fetchBrowserPages(): Promise<Page[]> {
-    const allPages = (
-      await this.browser.pages(this.#options.experimentalIncludeAllPages)
-    ).filter(page => {
-      if (
-        !this.#options.experimentalDevToolsDebugging &&
-        page.url().startsWith('devtools://')
-      ) {
-        return false;
-      }
-      return isAllowedUrl(page.url(), {
-        categoryExtensions: this.#options.categoryExtensions,
-      });
-    });
-
-    if (this.#options.categoryExtensions) {
-      const allTargets = this.browser.targets();
-      const extensionTargets = allTargets.filter(target => {
-        return (
-          target.url().startsWith('chrome-extension://') &&
-          target.type() === 'page'
-        );
-      });
-
-      await Promise.allSettled(
-        extensionTargets.map(async target => {
-          try {
-            let page = await target.page();
-            if (!page) {
-              page = await target.asPage();
-            }
-            this.#extensionPages.set(target, page);
-            if (
-              page &&
-              isAllowedUrl(page.url(), {categoryExtensions: true}) &&
-              !allPages.includes(page)
-            ) {
-              allPages.push(page);
-            }
-          } catch (e) {
-            this.logger?.('Failed to get page for extension target', e);
-          }
-        }),
-      );
+    if (this.#selectedPage && !this.#selectedPage.isClosed()) {
+      await this.#selectedPage.init();
     }
 
-    return allPages;
+    return pages;
+  }
+
+  #isPageTarget(target: Target): boolean {
+    const existingMcpPage = this.#mcpPages.get(target);
+    const url = existingMcpPage ? existingMcpPage.url() : target.url();
+    if (
+      !this.#options.experimentalDevToolsDebugging &&
+      url.startsWith('devtools://')
+    ) {
+      return false;
+    }
+    if (
+      !isAllowedUrl(url, {
+        categoryExtensions: this.#options.categoryExtensions,
+      })
+    ) {
+      return false;
+    }
+    const type = target.type();
+    if (type === 'page') {
+      return true;
+    }
+    if (
+      this.#options.experimentalIncludeAllPages &&
+      (type === 'background_page' || type === 'webview')
+    ) {
+      return true;
+    }
+    if (
+      this.#options.experimentalDevToolsDebugging &&
+      type === 'other' &&
+      url.startsWith('devtools://')
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  #fetchPageTargets(): Target[] {
+    return this.browser.targets().filter(target => this.#isPageTarget(target));
   }
 
   getExtensionServiceWorkers(): ExtensionServiceWorker[] {
@@ -852,6 +837,12 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.getObjectInfo(filePath, nodeId);
   }
 
+  async analyzeHeapSnapshotContexts(
+    filePath: string,
+  ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult> {
+    return await this.#heapSnapshotManager.analyzeContexts(filePath);
+  }
+
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
     return this.#heapSnapshotManager.disposeSnapshot(filePath);
   }
@@ -896,10 +887,10 @@ export class McpContext implements Context {
   }
 
   #validateUrlAllowed(url: URL): void {
-    if (!this.#options.allowList) {
+    if (!this.#options.allowlist) {
       return;
     }
-    for (const allow of this.#options.allowList) {
+    for (const allow of this.#options.allowlist) {
       const pattern = new URLPattern(allow);
       if (pattern.test(url)) {
         return;

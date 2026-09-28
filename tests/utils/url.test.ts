@@ -7,7 +7,12 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {isAllowedUrl, isLocalhost, validateUrl} from '../../src/utils/url.js';
+import {
+  findUnenforceablePattern,
+  isAllowedUrl,
+  isLocalhost,
+  validateUrl,
+} from '../../src/utils/url.js';
 
 describe('isLocalhost', () => {
   it('should return true for valid localhost and loopback URLs', () => {
@@ -427,5 +432,88 @@ describe('isAllowedUrl', () => {
       isAllowedUrl('://', {categoryExtensions: undefined}),
       false,
     );
+  });
+});
+
+describe('findUnenforceablePattern', () => {
+  it('flags a hostname regexp group', () => {
+    assert.strictEqual(
+      findUnenforceablePattern([String.raw`*://(127\.\d+\.\d+\.\d+):*/*`]),
+      String.raw`*://(127\.\d+\.\d+\.\d+):*/*`,
+    );
+  });
+
+  it('returns the first offending pattern among several', () => {
+    assert.strictEqual(
+      findUnenforceablePattern([
+        '*://127.0.0.1:*/*',
+        '*://*.example.com/*',
+        String.raw`*://(localhost|127\.0\.0\.1):*/*`,
+      ]),
+      String.raw`*://(localhost|127\.0\.0\.1):*/*`,
+    );
+  });
+
+  it('allows an exact hostname', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['*://127.0.0.1:*/*']),
+      undefined,
+    );
+  });
+
+  it('allows a wildcard hostname', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['*://*.example.com/*']),
+      undefined,
+    );
+  });
+
+  it('allows a named group hostname', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['*://:sub.example.com/*']),
+      undefined,
+    );
+  });
+
+  it('flags a regexp group in the pathname', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['*://example.com/(foo|bar)']),
+      '*://example.com/(foo|bar)',
+    );
+  });
+
+  it('flags a regexp group in the protocol', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['(http|https)://example.com/*']),
+      '(http|https)://example.com/*',
+    );
+  });
+
+  it('flags a regexp group in the port', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['*://example.com:(80|443)/*']),
+      '*://example.com:(80|443)/*',
+    );
+  });
+
+  it('flags a regexp group in the search or hash', () => {
+    assert.strictEqual(
+      findUnenforceablePattern(['*://example.com/*?(foo|bar)']),
+      '*://example.com/*?(foo|bar)',
+    );
+    assert.strictEqual(
+      findUnenforceablePattern(['*://example.com/*#(foo|bar)']),
+      '*://example.com/*#(foo|bar)',
+    );
+  });
+
+  it('throws for a pattern that fails to construct', () => {
+    assert.throws(() =>
+      findUnenforceablePattern(['*://example.com/(unterminated']),
+    );
+  });
+
+  it('returns undefined for an empty list', () => {
+    assert.strictEqual(findUnenforceablePattern([]), undefined);
   });
 });

@@ -5,26 +5,15 @@
  */
 
 import assert from 'node:assert';
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {readFile, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
 import type {HTTPRequest} from '../../src/third_party/index.js';
-import {getMockRequest, getMockResponse} from '../utils.js';
+import {createTempDir, getMockRequest, getMockResponse} from '../utils.js';
 
 describe('NetworkFormatter', () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'network-formatter-test-'));
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, {recursive: true, force: true});
-  });
-
   describe('toString', () => {
     it('works', async () => {
       const request = getMockRequest();
@@ -253,8 +242,9 @@ describe('NetworkFormatter', () => {
         fetchPostData: async () => undefined,
       } as unknown as HTTPRequest;
 
-      const reqPath = join(tmpDir, 'test_req_' + Date.now());
-      const resPath = join(tmpDir, 'test_res_' + Date.now());
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'test_req_' + Date.now());
+      const resPath = join(tmpDir.path, 'test_res_' + Date.now());
 
       const formatter = await NetworkFormatter.from(request, {
         fetchData: true,
@@ -297,8 +287,9 @@ describe('NetworkFormatter', () => {
         fetchPostData: async () => undefined,
       } as unknown as HTTPRequest;
 
-      const reqPath = join(tmpDir, 'test_req_large_' + Date.now());
-      const resPath = join(tmpDir, 'test_res_large_' + Date.now());
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'test_req_large_' + Date.now());
+      const resPath = join(tmpDir.path, 'test_res_large_' + Date.now());
 
       await NetworkFormatter.from(request, {
         fetchData: true,
@@ -400,8 +391,9 @@ describe('NetworkFormatter', () => {
         fetchPostData: async () => undefined,
       } as unknown as HTTPRequest;
 
-      const reqPath = join(tmpDir, 'req.txt');
-      const resPath = join(tmpDir, 'res.txt');
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'req.txt');
+      const resPath = join(tmpDir.path, 'res.txt');
 
       const formatter = await NetworkFormatter.from(request, {
         fetchData: true,
@@ -440,8 +432,9 @@ describe('NetworkFormatter', () => {
         },
       } as unknown as HTTPRequest;
 
-      const reqPath = join(tmpDir, 'req_missing.txt');
-      const resPath = join(tmpDir, 'res_missing.txt');
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'req_missing.txt');
+      const resPath = join(tmpDir.path, 'res_missing.txt');
 
       const formatter = await NetworkFormatter.from(request, {
         fetchData: true,
@@ -459,6 +452,26 @@ describe('NetworkFormatter', () => {
         result.includes(
           `### Response Body\n<Response body not available anymore>`,
         ),
+      );
+    });
+
+    it('handles missing response body when inline', async () => {
+      const response = getMockResponse();
+      response.buffer = () => Promise.reject(new Error('Evicted'));
+      const request = getMockRequest({response});
+
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        fetchData: true,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      const result = formatter.toStringDetailed();
+      assert.ok(result.includes(`### Response Body\n<not available anymore>`));
+      assert.strictEqual(
+        formatter.toJSONDetailed().responseBody,
+        '<not available anymore>',
       );
     });
   });
@@ -567,8 +580,9 @@ describe('NetworkFormatter', () => {
         fetchPostData: async () => undefined,
       } as unknown as HTTPRequest;
 
-      const reqPath = join(tmpDir, 'req_json.txt');
-      const resPath = join(tmpDir, 'res_json.txt');
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'req_json.txt');
+      const resPath = join(tmpDir.path, 'res_json.txt');
 
       const formatter = await NetworkFormatter.from(request, {
         fetchData: true,

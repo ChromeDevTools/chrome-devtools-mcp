@@ -293,8 +293,19 @@ const bundleDependency = (
     listBundledDeps(),
     commonjs(),
     json(),
-    nodeResolve(),
+    nodeResolve({
+      exportConditions: ['node'],
+      preferBuiltins: true,
+    }),
   ],
+  onwarn(warning, warn) {
+    if (warning.code === 'UNRESOLVED_IMPORT') {
+      throw new Error(
+        `Unresolved import: ${warning.message}. All third-party dependencies must be bundled or explicitly marked as external.`,
+      );
+    }
+    warn(warning);
+  },
   external,
 });
 
@@ -305,10 +316,19 @@ export default [
       inlineDynamicImports: true,
     },
     (source, importer, _isResolved) => {
+      const normalizedImporter = importer?.replaceAll('\\', '/');
       if (
         source === 'yargs' &&
-        importer &&
-        importer.includes('puppeteer-core')
+        normalizedImporter &&
+        normalizedImporter.includes('puppeteer-core')
+      ) {
+        return true;
+      }
+
+      if (
+        (source === 'proxy-agent' || source === 'yauzl') &&
+        normalizedImporter &&
+        normalizedImporter.includes('@puppeteer/browsers')
       ) {
         return true;
       }

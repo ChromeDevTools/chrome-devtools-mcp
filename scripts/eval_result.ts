@@ -15,10 +15,13 @@ export class Result {
   private nextCallIndex = 0;
   public readonly calls: CapturedFunctionCall[];
   public readonly serverArgs: string[];
+  /** The model's final response text. */
+  public readonly text: string;
 
-  constructor(calls: CapturedFunctionCall[], serverArgs: string[]) {
+  constructor(calls: CapturedFunctionCall[], serverArgs: string[], text = '') {
     this.calls = calls;
     this.serverArgs = serverArgs;
+    this.text = text;
   }
 
   get hasPageIdRouting(): boolean {
@@ -95,6 +98,20 @@ export class Result {
 
     this.nextCallIndex++;
     return call;
+  }
+
+  /**
+   * Asserts that the model's response contains every given substring,
+   * ignoring case.
+   */
+  assertTextIncludes(...substrings: string[]): void {
+    const textInLowerCase = this.text.toLowerCase();
+    for (const substring of substrings) {
+      assert.ok(
+        textInLowerCase.includes(substring.toLowerCase()),
+        `Expected response to mention '${substring}'. Response: ${this.text}`,
+      );
+    }
   }
 }
 

@@ -5,13 +5,17 @@
  */
 
 import checkLicenseRule from './check-license-rule.js';
+import enforceUsingRule from './enforce-using-rule.js';
 import enforceZodSchemaRule from './enforce-zod-schema-rule.js';
+import requireParsedArgumentsRule from './require-parsed-arguments-rule.js';
 import noDirectThirdPartyImportsRule from './no-direct-third-party-imports-rule.js';
 
 export default {
   rules: {
     'check-license': checkLicenseRule,
+    'enforce-using': enforceUsingRule,
     'no-direct-third-party-imports': noDirectThirdPartyImportsRule,
     'enforce-zod-schema': enforceZodSchemaRule,
+    'require-parsed-arguments': requireParsedArgumentsRule,
   },
 };

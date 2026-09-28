@@ -32,7 +32,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
-export const listNetworkRequests = definePageTool({
+export const listNetworkRequests = definePageTool(() => ({
   name: 'list_network_requests',
   description: `Lists the most recent requests for the target page since the last navigation.`,
   annotations: {
@@ -86,9 +86,9 @@ export const listNetworkRequests = definePageTool({
       networkRequestIdInDevToolsUI: reqid,
     });
   },
-});
+}));
 
-export const getNetworkRequest = definePageTool({
+export const getNetworkRequest = definePageTool(() => ({
   name: 'get_network_request',
   description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).`,
   annotations: {
@@ -144,4 +144,4 @@ export const getNetworkRequest = definePageTool({
       }
     }
   },
-});
+}));

@@ -9,8 +9,10 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 
-import {Client} from '@modelcontextprotocol/sdk/client/index.js';
-import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+import {
+  Client,
+  StdioClientTransport,
+} from '../../build/src/third_party/index.js';
 
 import {
   InspectorClient,

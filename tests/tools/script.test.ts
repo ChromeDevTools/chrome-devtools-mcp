@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
+import {readFile} from 'node:fs/promises';
 
 import sinon from 'sinon';
 
@@ -19,6 +20,7 @@ import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
 import {serverHooks} from '../server.js';
 import {
   assertNoServiceWorkerReported,
+  createTempDir,
   extractExtensionId,
   html,
   withMcpContext,
@@ -34,8 +36,8 @@ describe('script', () => {
 
   describe('browser_evaluate_script', () => {
     it('evaluates', async () => {
-      await withMcpContext(async (response, context) => {
-        await evaluateScript().handler(
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
           {
             params: {function: String(() => 2 * 5)},
           },
@@ -47,10 +49,10 @@ describe('script', () => {
       });
     });
     it('skips the stable DOM wait when waitForStableDom is false', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const spy = sinon.spy(WaitForHelper.prototype, 'waitForStableDom');
         try {
-          await evaluateScript().handler(
+          await evaluateScript(args).handler(
             {
               params: {function: String(() => 1), waitForStableDom: false},
             },
@@ -59,7 +61,7 @@ describe('script', () => {
           );
           sinon.assert.notCalled(spy);
 
-          await evaluateScript().handler(
+          await evaluateScript(args).handler(
             {
               params: {function: String(() => 1)},
             },
@@ -73,8 +75,8 @@ describe('script', () => {
       });
     });
     it('runs in selected page', async () => {
-      await withMcpContext(async (response, context) => {
-        await evaluateScript().handler(
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
           {
             params: {function: String(() => document.title)},
           },
@@ -93,7 +95,7 @@ describe('script', () => {
         `);
 
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {function: String(() => document.title)},
           },
@@ -107,12 +109,12 @@ describe('script', () => {
     });
 
     it('work for complex objects', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String(() => {
@@ -135,12 +137,12 @@ describe('script', () => {
     });
 
     it('work for scripts that trigger dialogs', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String(() => {
@@ -158,12 +160,12 @@ describe('script', () => {
     });
 
     it('work for scripts that trigger dialogs and dismiss them', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String(() => {
@@ -181,12 +183,12 @@ describe('script', () => {
     });
 
     it('work for scripts that trigger prompts and fill them', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String(() => {
@@ -204,12 +206,12 @@ describe('script', () => {
     });
 
     it('work for async functions', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<script src="./scripts.js"></script> `);
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String(async () => {
@@ -227,7 +229,7 @@ describe('script', () => {
     });
 
     it('work with one argument', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
@@ -236,7 +238,7 @@ describe('script', () => {
           context.getSelectedMcpPage(),
         );
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String(async (el: Element) => {
@@ -254,7 +256,7 @@ describe('script', () => {
     });
 
     it('work with multiple args', async () => {
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
 
         await page.setContent(html`<button id="test">test</button>`);
@@ -263,7 +265,7 @@ describe('script', () => {
           context.getSelectedMcpPage(),
         );
 
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String((container: Element, child: Element) => {
@@ -287,13 +289,13 @@ describe('script', () => {
       );
       server.addHtmlRoute('/main', html`<iframe src="/iframe"></iframe>`);
 
-      await withMcpContext(async (response, context) => {
+      await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/main'));
         context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
           context.getSelectedMcpPage(),
         );
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: String((element: Element) => {
@@ -310,38 +312,35 @@ describe('script', () => {
       });
     });
     it('saves output to file when filePath is provided', async () => {
-      const {rm, readFile} = await import('node:fs/promises');
-      const {tmpdir} = await import('node:os');
-      const {join} = await import('node:path');
-      const filePath = join(tmpdir(), 'test-evaluate-script-output.json');
-      try {
-        await withMcpContext(async (response, context) => {
-          await evaluateScript().handler(
-            {
-              params: {
-                function: String(() => ({hello: 'world'})),
-                filePath,
-              },
+      using tmpDir = createTempDir();
+      const filePath = path.join(
+        tmpDir.path,
+        'test-evaluate-script-output.json',
+      );
+      await withMcpContext(async (response, context, args) => {
+        await evaluateScript(args).handler(
+          {
+            params: {
+              function: String(() => ({hello: 'world'})),
+              filePath,
             },
-            response,
-            context,
-          );
-          assert.strictEqual(response.responseLines.length, 1);
-          assert.ok(
-            response.responseLines[0]?.includes('Output saved to'),
-            `Expected "Output saved to" but got: ${response.responseLines[0]}`,
-          );
-        });
-        const content = await readFile(filePath, 'utf-8');
-        assert.deepStrictEqual(JSON.parse(content), {hello: 'world'});
-      } finally {
-        await rm(filePath, {force: true});
-      }
+          },
+          response,
+          context,
+        );
+        assert.strictEqual(response.responseLines.length, 1);
+        assert.ok(
+          response.responseLines[0]?.includes('Output saved to'),
+          `Expected "Output saved to" but got: ${response.responseLines[0]}`,
+        );
+      });
+      const content = await readFile(filePath, 'utf-8');
+      assert.deepStrictEqual(JSON.parse(content), {hello: 'world'});
     });
     it('evaluates inside extension service worker', async () => {
       await withMcpContext(
-        async (response, context) => {
-          await installExtension.handler(
+        async (response, context, args) => {
+          await installExtension(args).handler(
             {params: {path: EXTENSION_PATH}},
             response,
             context,

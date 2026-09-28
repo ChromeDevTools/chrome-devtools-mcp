@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod} from '../third_party/index.js';
 import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
 
@@ -23,7 +24,7 @@ type SupportedVideoExtension = '.webm' | '.mp4';
 
 const supportedExtensions: SupportedVideoExtension[] = ['.webm', '.mp4'];
 
-export const startScreencast = definePageTool(args => ({
+export const startScreencast = definePageTool((args: ParsedArguments) => ({
   name: 'screencast_start',
   description: `Starts recording a screencast (video) of the target page in specified format.`,
   annotations: {
@@ -117,12 +118,12 @@ export const startScreencast = definePageTool(args => ({
     context.setScreenRecorder({recorder, filePath: resolvedPath});
 
     response.appendResponseLine(
-      `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast.name} to stop recording.`,
+      `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast(args).name} to stop recording.`,
     );
   },
 }));
 
-export const stopScreencast = definePageTool({
+export const stopScreencast = definePageTool(() => ({
   name: 'screencast_stop',
   description: 'Stops the active screencast recording on the target page.',
   annotations: {
@@ -150,4 +151,4 @@ export const stopScreencast = definePageTool({
       context.setScreenRecorder(null);
     }
   },
-});
+}));

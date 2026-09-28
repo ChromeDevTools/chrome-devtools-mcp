@@ -55,6 +55,7 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
   type TargetUniverse,
@@ -75,18 +76,19 @@ import {
   type WebMCPTool,
   type Protocol,
   type Page,
+  type Target,
   type ConsoleMessage,
   type HTTPRequest,
-  type DevTools,
+  DevTools,
   type JSONSchema7Definition,
 } from './third_party/index.js';
-import {takeSnapshot} from './tools/snapshot.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 import type {
   ContextPage,
   DevToolsData,
+  MatchedStyles,
   Response,
 } from './tools/ToolDefinition.js';
 import type {
@@ -102,17 +104,28 @@ import {
   type DialogAction,
 } from './utils/WaitForHelper.js';
 
+function isBackendNodeId(
+  id: unknown,
+): id is DevTools.Protocol.DOM.BackendNodeId {
+  return typeof id === 'number';
+}
+
 /**
  * Per-page state wrapper. Consolidates dialog, snapshot, emulation,
  * and metadata that were previously scattered across Maps in McpContext.
  *
  * Internal class consumed only by McpContext. Fields are public for direct
  * read/write access. The dialog field is private because it requires an
- * event listener lifecycle managed by the constructor/dispose pair.
+ * event listener lifecycle managed by the init/dispose pair.
  */
 export class McpPage implements ContextPage {
-  readonly pptrPage: Page;
+  readonly target: Target;
   readonly id: number;
+
+  #pptrPage?: Page;
+  #initPromise?: Promise<void>;
+  #disposed = false;
+  #closed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -132,16 +145,18 @@ export class McpPage implements ContextPage {
 
   thirdPartyDeveloperTools: ToolGroups = [];
 
-  networkCollector: NetworkCollector;
-  consoleCollector: ConsoleCollector;
+  #networkCollector?: NetworkCollector;
+  #consoleCollector?: ConsoleCollector;
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
   #sourceMaps: boolean;
+  #commentBridge?: DevToolsCommentBridge;
+  #onNotification?: (message: string) => void;
 
   constructor(
-    page: Page,
+    target: Target,
     id: number,
     options: {
       hasNetworkBlockOrAllowlist: boolean;
@@ -149,41 +164,154 @@ export class McpPage implements ContextPage {
       isolatedContextName?: string;
       navigationTimeout?: number;
       sourceMaps?: boolean;
+      onNotification?: (message: string) => void;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
-    this.pptrPage = page;
+    this.#onNotification = options.onNotification;
+    this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
-    page.on('dialog', this.#dialogHandler);
+  }
 
-    this.networkCollector = new NetworkCollector(page);
-    this.consoleCollector = new ConsoleCollector(page, collect => {
-      return {
-        console: event => {
-          collect(event);
-        },
-        uncaughtError: event => {
-          collect(event);
-        },
-        devtoolsAggregatedIssue: event => {
-          collect(event);
-        },
-      } as ListenerMap;
-    });
+  get pptrPage(): Page {
+    if (!this.#pptrPage) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#pptrPage;
+  }
+
+  get networkCollector(): NetworkCollector {
+    if (!this.#networkCollector) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#networkCollector;
+  }
+
+  set networkCollector(collector: NetworkCollector) {
+    this.#networkCollector = collector;
+  }
+
+  get consoleCollector(): ConsoleCollector {
+    if (!this.#consoleCollector) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#consoleCollector;
+  }
+
+  url(): string {
+    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+  }
+
+  async getTitle(): Promise<string> {
+    if (this.#pptrPage) {
+      return Promise.race([
+        this.#pptrPage.title().catch(() => ''),
+        new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
+      ]);
+    }
+    if (
+      '_getTargetInfo' in this.target &&
+      typeof this.target._getTargetInfo === 'function'
+    ) {
+      const info = this.target._getTargetInfo();
+      if (
+        info &&
+        typeof info === 'object' &&
+        'title' in info &&
+        typeof info.title === 'string' &&
+        info.title !== this.target.url()
+      ) {
+        return info.title;
+      }
+    }
+    return '';
+  }
+
+  isClosed(): boolean {
+    if (this.#closed) {
+      return true;
+    }
+    if (this.#pptrPage) {
+      return this.#pptrPage.isClosed();
+    }
+    return this.#disposed;
+  }
+
+  async close(): Promise<void> {
+    this.#closed = true;
+    const page =
+      this.#pptrPage ??
+      (await this.target.page()) ??
+      (await this.target.asPage());
+    this.dispose();
+    await page?.close({runBeforeUnload: false});
   }
 
   async init(): Promise<void> {
+    if (this.#disposed) {
+      throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
+    }
+    if (this.#initPromise) {
+      return this.#initPromise;
+    }
+    this.#initPromise = this.#doInit();
+    try {
+      await this.#initPromise;
+    } catch (err) {
+      this.#initPromise = undefined;
+      throw err;
+    }
+  }
+
+  async #doInit(): Promise<void> {
+    if (!this.#pptrPage) {
+      const page = (await this.target.page()) ?? (await this.target.asPage());
+      if (!page) {
+        throw new Error(
+          `Failed to initialize Puppeteer Page for target ${this.target.url()}`,
+        );
+      }
+      if (this.#disposed) {
+        return;
+      }
+      this.#pptrPage = page;
+      page.on('dialog', this.#dialogHandler);
+      this.#networkCollector = new NetworkCollector(page);
+      this.#consoleCollector = new ConsoleCollector(page, collect => {
+        return {
+          console: event => {
+            collect(event);
+          },
+          uncaughtError: event => {
+            collect(event);
+          },
+          devtoolsAggregatedIssue: event => {
+            collect(event);
+          },
+        };
+      });
+    }
+    this.updateTimeouts();
     await Promise.allSettled([
       this.#initDevToolsUniverseNoThrow(),
       this.#initFocusEmulationNoThrow(),
     ]);
+    if (this.#disposed) {
+      this.dispose();
+    }
   }
 
   async #initFocusEmulationNoThrow(): Promise<void> {
@@ -352,8 +480,33 @@ export class McpPage implements ContextPage {
     return this.networkCollector.getIdForResource(request);
   }
 
+  resolveReqidToCdpRequestId(reqid: number): string | undefined {
+    const request = this.networkCollector.getById(reqid);
+    if (!request) {
+      return undefined;
+    }
+    // @ts-expect-error id is internal.
+    return request.id;
+  }
+
   getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
     return this.networkCollector.getData(includePreservedRequests);
+  }
+
+  get commentBridge(): DevToolsCommentBridge | undefined {
+    return this.#commentBridge;
+  }
+
+  async ensureDevToolsCommentBridge(
+    devtoolsPage: Page,
+  ): Promise<DevToolsCommentBridge> {
+    if (!this.#commentBridge) {
+      this.#commentBridge = new DevToolsCommentBridge({
+        onNotification: this.#onNotification,
+      });
+    }
+    await this.#commentBridge.attach(devtoolsPage);
+    return this.#commentBridge;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {
@@ -368,6 +521,12 @@ export class McpPage implements ContextPage {
       // Fall back to not exposing DevTools at all.
       return undefined;
     }
+  }
+
+  async openDevTools(): Promise<Page | undefined> {
+    const devtoolsPage = await this.pptrPage.openDevTools();
+    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    return devtoolsPage;
   }
 
   getConsoleData(
@@ -419,7 +578,7 @@ export class McpPage implements ContextPage {
   }
 
   waitForEventsAfterAction(
-    action: () => Promise<unknown>,
+    action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
       timeout?: number;
       waitForStableDom?: boolean;
@@ -436,9 +595,12 @@ export class McpPage implements ContextPage {
   }
 
   dispose(): void {
-    this.pptrPage.off('dialog', this.#dialogHandler);
-    this.networkCollector.dispose();
-    this.consoleCollector.dispose();
+    this.#disposed = true;
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
+    this.#pptrPage?.off('dialog', this.#dialogHandler);
+    this.#networkCollector?.dispose();
+    this.#consoleCollector?.dispose();
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     devtoolsUniverse?.universe.dispose();
@@ -644,7 +806,7 @@ export class McpPage implements ContextPage {
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
     if (!this.textSnapshot) {
       throw new Error(
-        `No snapshot found for page ${this.id ?? '?'}. Use ${takeSnapshot.name} to capture one.`,
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
       );
     }
     const node = this.textSnapshot.idToNode.get(uid);
@@ -676,6 +838,108 @@ export class McpPage implements ContextPage {
     return this.textSnapshot?.idToNode.get(uid);
   }
 
+  async resolveBackendNodeId(
+    backendNodeId: number,
+  ): Promise<string | undefined> {
+    if (!this.textSnapshot) {
+      this.textSnapshot = await TextSnapshot.create(this);
+    }
+    let id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    if (!id) {
+      this.textSnapshot = await TextSnapshot.create(this);
+      id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    }
+    return id;
+  }
+
+  async resolveUidToBackendNodeId(
+    uid: string,
+  ): Promise<{backendNodeId: number; targetId?: string} | undefined> {
+    const target = this.target;
+    const targetId =
+      Boolean(target) &&
+      '_targetId' in target &&
+      typeof target._targetId === 'string'
+        ? target._targetId
+        : undefined;
+    const node = this.getAXNodeByUid(uid);
+    if (node?.backendNodeId !== undefined) {
+      return {backendNodeId: node.backendNodeId, targetId};
+    }
+    try {
+      const handle = await this.getElementByUid(uid);
+      const backendNodeId = await handle.backendNodeId();
+      return backendNodeId ? {backendNodeId, targetId} : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getMatchedStylesForUid(uid: string): Promise<MatchedStyles> {
+    if (!this.textSnapshot) {
+      throw new Error(
+        `No snapshot found for page ${this.id ?? '?'}. Use take_snapshot to capture one.`,
+      );
+    }
+    const node = this.textSnapshot.idToNode.get(uid);
+    if (!node) {
+      throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
+    }
+
+    const backendNodeId = node.backendNodeId;
+    if (!isBackendNodeId(backendNodeId)) {
+      throw new Error(
+        `Failed to resolve backend node ID for element with uid "${uid}".`,
+      );
+    }
+
+    if (!this.#devtoolsUniverse) {
+      throw new Error(
+        `DevTools universe is not available for page ${this.id ?? '?'}.`,
+      );
+    }
+
+    const targetManager = this.#devtoolsUniverse.universe.context.get(
+      DevTools.TargetManager,
+    );
+    let domNode: DevTools.DOMModel.DOMNode | undefined;
+    let cssModel: DevTools.CSSModel.CSSModel | null = null;
+
+    for (const dom of targetManager.models(DevTools.DOMModel.DOMModel)) {
+      const nodeMap = await dom.pushNodesByBackendIdsToFrontend(
+        new Set([backendNodeId]),
+      );
+      const frontendNode = nodeMap?.get(backendNodeId);
+      if (frontendNode) {
+        domNode = frontendNode;
+        cssModel = dom.target().model(DevTools.CSSModel.CSSModel);
+        break;
+      }
+    }
+
+    if (!domNode || !cssModel) {
+      throw new Error(
+        `Element with uid "${uid}" was detached or no longer exists on the page. Please take a new snapshot with take_snapshot.`,
+      );
+    }
+
+    const targetElement = domNode.enclosingElementOrSelf();
+    if (!targetElement) {
+      throw new Error(
+        `Element with uid "${uid}" is not an element node and has no parent element.`,
+      );
+    }
+
+    const matchedStyles = await cssModel.getMatchedStyles(targetElement.id);
+    if (!matchedStyles) {
+      throw new Error(
+        `Could not retrieve matched styles for element with uid "${uid}".`,
+      );
+    }
+
+    return matchedStyles;
+  }
+
   async getDevToolsData(): Promise<DevToolsData> {
     try {
       logger?.('Getting DevTools UI data');
@@ -684,8 +948,10 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
+      await this.ensureDevToolsCommentBridge(devtoolsPage);
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
+          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
@@ -830,17 +1096,20 @@ export class McpPage implements ContextPage {
   }
 
   updateTimeouts() {
+    if (!this.#pptrPage) {
+      return;
+    }
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.pptrPage.setDefaultNavigationTimeout(
+    this.#pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }

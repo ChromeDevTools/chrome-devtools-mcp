@@ -20,7 +20,7 @@ const HEAP_SNAPSHOT_FILTERS: readonly [string, ...string[]] = [
   'attributedToSpecificNativeContext',
 ];
 
-export const takeHeapSnapshot = definePageTool({
+export const takeHeapSnapshot = definePageTool(() => ({
   name: 'take_heapsnapshot',
   description: `Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
   annotations: {
@@ -49,9 +49,9 @@ export const takeHeapSnapshot = definePageTool({
 
     response.appendResponseLine(`Heap snapshot saved to ${snapshotPath}`);
   },
-});
+}));
 
-export const getHeapSnapshotSummary = defineTool({
+export const getHeapSnapshotSummary = defineTool(() => ({
   name: 'get_heapsnapshot_summary',
   description:
     'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary.',
@@ -87,9 +87,9 @@ export const getHeapSnapshotSummary = defineTool({
       retainedByContextSummary,
     );
   },
-});
+}));
 
-export const getHeapSnapshotDetails = defineTool({
+export const getHeapSnapshotDetails = defineTool(() => ({
   name: 'get_heapsnapshot_details',
   description:
     'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates.',
@@ -135,9 +135,9 @@ export const getHeapSnapshotDetails = defineTool({
       pageSize: request.params.pageSize,
     });
   },
-});
+}));
 
-export const getHeapSnapshotClassNodes = defineTool({
+export const getHeapSnapshotClassNodes = defineTool(() => ({
   name: 'get_heapsnapshot_class_nodes',
   description:
     'Loads a memory heapsnapshot and returns instances of a specific class with their IDs.',
@@ -179,9 +179,9 @@ export const getHeapSnapshotClassNodes = defineTool({
       pageSize: request.params.pageSize,
     });
   },
-});
+}));
 
-export const getHeapSnapshotRetainers = defineTool({
+export const getHeapSnapshotRetainers = defineTool(() => ({
   name: 'get_heapsnapshot_retainers',
   description:
     'Loads a memory heapsnapshot and returns retainers for a specific node ID.',
@@ -211,9 +211,9 @@ export const getHeapSnapshotRetainers = defineTool({
       pageSize: request.params.pageSize,
     });
   },
-});
+}));
 
-export const closeHeapSnapshot = defineTool({
+export const closeHeapSnapshot = defineTool(() => ({
   name: 'close_heapsnapshot',
   description:
     'Closes a previously loaded memory heapsnapshot, freeing its memory.',
@@ -242,9 +242,9 @@ export const closeHeapSnapshot = defineTool({
       `Closed heap snapshot: ${request.params.filePath}`,
     );
   },
-});
+}));
 
-export const getHeapSnapshotRetainingPaths = defineTool({
+export const getHeapSnapshotRetainingPaths = defineTool(() => ({
   name: 'get_heapsnapshot_retaining_paths',
   description:
     'Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected.',
@@ -284,9 +284,9 @@ export const getHeapSnapshotRetainingPaths = defineTool({
 
     response.setHeapSnapshotRetainingPaths(retainingPaths);
   },
-});
+}));
 
-export const getHeapSnapshotEdges = defineTool({
+export const getHeapSnapshotEdges = defineTool(() => ({
   name: 'get_heapsnapshot_edges',
   description:
     'Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID.',
@@ -333,9 +333,9 @@ export const getHeapSnapshotEdges = defineTool({
       pageSize: request.params.pageSize,
     });
   },
-});
+}));
 
-export const getHeapSnapshotDominators = defineTool({
+export const getHeapSnapshotDominators = defineTool(() => ({
   name: 'get_heapsnapshot_dominators',
   description:
     'Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive.',
@@ -362,9 +362,9 @@ export const getHeapSnapshotDominators = defineTool({
 
     response.setHeapSnapshotDominators(dominators);
   },
-});
+}));
 
-export const compareHeapSnapshots = defineTool({
+export const compareHeapSnapshots = defineTool(() => ({
   name: 'compare_heapsnapshots',
   description:
     'Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff.',
@@ -408,9 +408,9 @@ export const compareHeapSnapshots = defineTool({
       response.setHeapSnapshotClassDiffs(diff);
     }
   },
-});
+}));
 
-export const getHeapSnapshotDuplicateStrings = defineTool({
+export const getHeapSnapshotDuplicateStrings = defineTool(() => ({
   name: 'get_heapsnapshot_duplicate_strings',
   description:
     'Loads a memory heapsnapshot and returns duplicate strings grouped by their value.',
@@ -438,9 +438,9 @@ export const getHeapSnapshotDuplicateStrings = defineTool({
       pageSize: request.params.pageSize,
     });
   },
-});
+}));
 
-export const getHeapSnapshotObjectDetails = defineTool({
+export const getHeapSnapshotObjectDetails = defineTool(() => ({
   name: 'get_heapsnapshot_object_details',
   description:
     'Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness.',
@@ -465,9 +465,9 @@ export const getHeapSnapshotObjectDetails = defineTool({
 
     response.setHeapSnapshotObjectDetails(objectInfo);
   },
-});
+}));
 
-export const queryHeapSnapshotObjects = defineTool({
+export const queryHeapSnapshotObjects = defineTool(() => ({
   name: 'query_heapsnapshot_objects',
   description:
     'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy).',
@@ -532,4 +532,56 @@ export const queryHeapSnapshotObjects = defineTool({
       pageSize: request.params.pageSize,
     });
   },
-});
+}));
+
+export const analyzeHeapSnapshotContexts = defineTool(() => ({
+  name: 'analyze_heapsnapshot_contexts',
+  description:
+    'Loads a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes.',
+  annotations: {
+    category: ToolCategory.MEMORY,
+    readOnlyHint: true,
+    conditions: ['memoryDebugging'],
+  },
+  blockedByDialog: false,
+  verifyFilesSchema: {
+    filePath: true,
+  },
+  schema: {
+    filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
+    retainedSize: byteSizeRangeSchema(
+      'Inclusive range for the dead-field score of a context (e.g. "10KB", "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
+    ).optional(),
+    scopeInfoNodeId: zod
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.',
+      ),
+    pageIdx: zod
+      .number()
+      .int()
+      .nonnegative()
+      .optional()
+      .describe('The zero-based page index. Defaults to 0.'),
+    pageSize: zod
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('The number of contexts to return per page. Defaults to 20.'),
+  },
+  handler: async (request, response, context) => {
+    const analysis = await context.analyzeHeapSnapshotContexts(
+      request.params.filePath,
+    );
+
+    response.setHeapSnapshotContextAnalysis(analysis, {
+      retainedSize: request.params.retainedSize,
+      scopeInfoNodeId: request.params.scopeInfoNodeId,
+      pageIdx: request.params.pageIdx,
+      pageSize: request.params.pageSize,
+    });
+  },
+}));

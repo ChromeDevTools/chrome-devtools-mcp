@@ -7,8 +7,21 @@
 import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './config/mcp-options.js';
+import {
+  CommentFormatter,
+  type StructuredCommentThread,
+} from './formatters/CommentFormatter.js';
 import {ConsoleFormatter} from './formatters/ConsoleFormatter.js';
 import {
+  type CascadeRule,
+  CssFormatter,
+  type CssFormatterOptions,
+  resolveContainerQueries,
+} from './formatters/CssFormatter.js';
+import {
+  collectRankedContexts,
+  type ContextAnalysisReport,
+  type ContextFilterOptions,
   HeapSnapshotFormatter,
   isEdgeLike,
   isNodeLike,
@@ -30,7 +43,6 @@ import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
-  Page,
   ResourceType,
   TextContent,
   Extension,
@@ -42,6 +54,7 @@ import type {
   DevToolsData,
   ImageContentData,
   LighthouseData,
+  MatchedStyles,
   Response,
   SnapshotParams,
 } from './tools/ToolDefinition.js';
@@ -51,7 +64,7 @@ import {
   getInsightOutput,
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
-import type {PaginationOptions} from './types.js';
+import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
@@ -66,6 +79,9 @@ interface TraceInsightData {
   insightSetId: string;
   insightName: InsightName;
 }
+
+interface ContextAnalysisOptions
+  extends PaginationOptions, ContextFilterOptions {}
 
 export class McpResponse implements Response {
   #includePages = false;
@@ -98,6 +114,8 @@ export class McpResponse implements Response {
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
     objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
+    contextAnalysis?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult;
+    contextAnalysisOptions?: ContextAnalysisOptions;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -114,6 +132,10 @@ export class McpResponse implements Response {
     includeStackTraces?: boolean;
     serviceWorkerId?: string;
   };
+  #cssStylesData?: {
+    matchedStyles: MatchedStyles;
+    options: CssFormatterOptions & PaginationOptions;
+  };
   #listExtensions?: boolean;
   #listThirdPartyDeveloperTools?: boolean;
   #listWebMcpTools?: boolean;
@@ -125,6 +147,7 @@ export class McpResponse implements Response {
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
+  #devToolsComments?: CD4ACommentThread[];
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -243,6 +266,16 @@ export class McpResponse implements Response {
     };
   }
 
+  setIncludeCssStyles(
+    matchedStyles: MatchedStyles,
+    options: CssFormatterOptions & PaginationOptions,
+  ): void {
+    this.#cssStylesData = {
+      matchedStyles,
+      options,
+    };
+  }
+
   setError(error: Error): void {
     this.#error = error;
   }
@@ -325,6 +358,14 @@ export class McpResponse implements Response {
 
   attachWaitForResult(result: WaitForEventsResult): void {
     this.#attachedWaitForResult = result;
+  }
+
+  setDevToolsComments(threads: CD4ACommentThread[]): void {
+    this.#devToolsComments = threads;
+  }
+
+  get devToolsComments(): readonly CD4ACommentThread[] | undefined {
+    return this.#devToolsComments;
   }
 
   setHeapSnapshotAggregates(
@@ -424,6 +465,18 @@ export class McpResponse implements Response {
       ...this.#heapSnapshotOptions,
       include: true,
       objectInfo,
+    };
+  }
+
+  setHeapSnapshotContextAnalysis(
+    contextAnalysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
+    options?: ContextAnalysisOptions,
+  ) {
+    this.#heapSnapshotOptions = {
+      ...this.#heapSnapshotOptions,
+      include: true,
+      contextAnalysis,
+      contextAnalysisOptions: options,
     };
   }
 
@@ -668,6 +721,22 @@ export class McpResponse implements Response {
     );
   }
 
+  async #handleComments(): Promise<CommentFormatter | undefined> {
+    const comments = this.#devToolsComments;
+    if (!comments) {
+      return undefined;
+    }
+    const page = this.#page;
+    return await CommentFormatter.from(comments, {
+      resolveBackendNodeId: page
+        ? (id: number) => page.resolveBackendNodeId(id)
+        : undefined,
+      resolveCdpRequestId: page
+        ? (id: string) => page.resolveCdpRequestId(id)
+        : undefined,
+    });
+  }
+
   async handle(
     context: McpContext,
     dataFormat: DataFormat = 'default',
@@ -683,6 +752,7 @@ export class McpResponse implements Response {
       webmcpTools,
       consoleMessages,
       networkRequests,
+      comments,
     ] = await Promise.all([
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
@@ -691,6 +761,7 @@ export class McpResponse implements Response {
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
+      this.#handleComments(),
     ]);
 
     if (this.#includeExtensionServiceWorkers) {
@@ -716,6 +787,7 @@ export class McpResponse implements Response {
         lighthouseResult: this.#attachedLighthouseResult,
         thirdPartyDeveloperTools,
         webmcpTools,
+        comments,
         errorMessage: this.#error?.message,
       },
       dataFormat,
@@ -746,6 +818,7 @@ export class McpResponse implements Response {
       lighthouseResult?: LighthouseData;
       thirdPartyDeveloperTools?: ToolGroups;
       webmcpTools?: WebMCPTool[];
+      comments?: CommentFormatter;
       errorMessage?: string;
     },
     dataFormat: DataFormat = 'default',
@@ -803,8 +876,11 @@ export class McpResponse implements Response {
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
       heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
+      heapSnapshotContextAnalysis?: ContextAnalysisReport;
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
+      comments?: StructuredCommentThread[];
+      matchedStyles?: object;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -840,7 +916,7 @@ export class McpResponse implements Response {
     if (this.#reconnectNotice) {
       structuredContent.reconnected = true;
       response.push(
-        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages().name} to see open pages.`,
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#args).name} to see open pages.`,
       );
     }
     if (this.#textResponseLines.length) {
@@ -907,7 +983,7 @@ export class McpResponse implements Response {
           : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog.name} to handle it before continuing.`);
+Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       structuredContent.dialog = {
         type: dialog.type(),
         message: dialog.message(),
@@ -923,7 +999,7 @@ Call ${handleDialog.name} to handle it before continuing.`);
           acc: {regularPages: McpPage[]; extensionPages: McpPage[]},
           mcpPage: McpPage,
         ) => {
-          if (mcpPage.pptrPage.url().startsWith('chrome-extension://')) {
+          if (mcpPage.url().startsWith('chrome-extension://')) {
             acc.extensionPages.push(mcpPage);
           } else {
             acc.regularPages.push(mcpPage);
@@ -953,10 +1029,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await fetchPageTitle(mcpPage.pptrPage);
+          const title = await mcpPage.getTitle();
           const pageLabel = title
-            ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
-            : mcpPage.pptrPage.url();
+            ? `${truncateTitle(title)} (${mcpPage.url()})`
+            : mcpPage.url();
           parts.push(
             `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
           );
@@ -975,10 +1051,10 @@ Call ${handleDialog.name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await fetchPageTitle(mcpPage.pptrPage);
+            const title = await mcpPage.getTitle();
             const pageLabel = title
-              ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
-              : mcpPage.pptrPage.url();
+              ? `${truncateTitle(title)} (${mcpPage.url()})`
+              : mcpPage.url();
             response.push(
               `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
             );
@@ -1260,6 +1336,33 @@ Call ${handleDialog.name} to handle it before continuing.`);
         );
         structuredContent.heapSnapshotObjectDetails = objectInfo;
       }
+      const contextAnalysis = this.#heapSnapshotOptions.contextAnalysis;
+      if (contextAnalysis) {
+        const contextAnalysisOptions =
+          this.#heapSnapshotOptions.contextAnalysisOptions;
+        const rankedContexts = collectRankedContexts(contextAnalysis, {
+          retainedSize: contextAnalysisOptions?.retainedSize,
+          scopeInfoNodeId: contextAnalysisOptions?.scopeInfoNodeId,
+        });
+        const paginationData = this.#dataWithPagination(rankedContexts, {
+          pageIdx: contextAnalysisOptions?.pageIdx ?? 0,
+          pageSize: contextAnalysisOptions?.pageSize,
+        });
+        const report: ContextAnalysisReport = {
+          contexts: paginationData.items,
+          scriptsWithoutScopes: contextAnalysis.scriptsWithoutScopes,
+        };
+
+        response.push('### Context Analysis');
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+        response.push(
+          compactEncode
+            ? compactEncode(report)
+            : HeapSnapshotFormatter.formatContextAnalysis(report),
+        );
+        structuredContent.heapSnapshotContextAnalysis = report;
+      }
     }
 
     if (data.detailedNetworkRequest) {
@@ -1392,6 +1495,64 @@ Call ${handleDialog.name} to handle it before continuing.`);
       }
     }
 
+    if (data.comments) {
+      const commentsJson = data.comments.toJSON();
+      structuredContent.comments = commentsJson;
+      response.push(
+        compactEncode ? compactEncode(commentsJson) : data.comments.toString(),
+      );
+    }
+
+    if (this.#cssStylesData) {
+      const resolveUid = (backendNodeId: number) =>
+        this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
+
+      const containerDetails = await resolveContainerQueries(
+        this.#cssStylesData.matchedStyles,
+        resolveUid,
+      );
+
+      const options = {
+        ...this.#cssStylesData.options,
+        resolveUid,
+        containerDetails,
+      };
+
+      const allRules = CssFormatter.collectRules(
+        this.#cssStylesData.matchedStyles,
+        options,
+      );
+
+      let rules: readonly CascadeRule[] = allRules;
+
+      const hasPagination =
+        this.#cssStylesData.options.pageSize !== undefined ||
+        this.#cssStylesData.options.pageIdx !== undefined;
+
+      if (hasPagination) {
+        const paginationData = this.#dataWithPagination(
+          allRules,
+          this.#cssStylesData.options,
+        );
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
+        rules = paginationData.items;
+      }
+
+      const formatter = new CssFormatter(
+        this.#cssStylesData.matchedStyles,
+        options,
+        rules,
+      );
+
+      structuredContent.matchedStyles = formatter.toJSON();
+      if (compactEncode) {
+        response.push(compactEncode(structuredContent.matchedStyles));
+      } else {
+        response.push(formatter.toString());
+      }
+    }
+
     if (data.errorMessage) {
       response.push(`Error: ${data.errorMessage}`);
       structuredContent.errorMessage = data.errorMessage;
@@ -1422,8 +1583,9 @@ Call ${handleDialog.name} to handle it before continuing.`);
     }
 
     const {startIndex, endIndex, currentPage, totalPages} = paginationResult;
+    const displayStartIndex = data.length === 0 ? 0 : startIndex + 1;
     response.push(
-      `Showing ${startIndex + 1}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
+      `Showing ${displayStartIndex}-${endIndex} of ${data.length} (Page ${currentPage + 1} of ${totalPages}).`,
     );
     if (pagination) {
       if (paginationResult.hasNextPage) {
@@ -1460,13 +1622,6 @@ function truncateTitle(title: string, maxLength = 50): string {
   return title.slice(0, maxLength - 3) + '...';
 }
 
-async function fetchPageTitle(page: Page): Promise<string> {
-  return Promise.race([
-    page.title().catch(() => ''),
-    new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
-  ]);
-}
-
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
@@ -1482,7 +1637,7 @@ function createStructuredPage(
     isolatedContext?: string;
   } = {
     id: mcpPage.id,
-    url: mcpPage.pptrPage.url(),
+    url: mcpPage.url(),
     title,
     selected: context.isPageSelected(mcpPage),
   };

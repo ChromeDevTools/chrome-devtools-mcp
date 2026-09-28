@@ -21,7 +21,6 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
-import {pageIdSchema} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -72,30 +71,13 @@ function isPageScopedTool(
   return 'pageScoped' in tool && tool.pageScoped === true;
 }
 
-function formatArgumentNames(names: string[]): string {
-  return names.map(name => `"${name}"`).join(', ');
-}
-
-function buildUnknownArgumentsMessage(
-  toolName: string,
-  unknownArgumentNames: string[],
-  expectedArgumentNames: string[],
-): string {
-  const unknownLabel =
-    unknownArgumentNames.length === 1 ? 'argument' : 'arguments';
-  const expectedArguments = expectedArgumentNames.length
-    ? `Expected arguments: ${formatArgumentNames(expectedArgumentNames)}.`
-    : 'This tool does not accept any arguments.';
-  const correction =
-    unknownArgumentNames.length === 1 ? 'Remove it' : 'Remove them';
-
-  return `Unknown ${unknownLabel} for tool "${toolName}": ${formatArgumentNames(unknownArgumentNames)}. ${expectedArguments} ${correction} and retry.`;
-}
-
 async function validateAndResolvePathOrUrl(
   filePathOrUrl: string,
   context: McpContext,
-): Promise<string> {
+): Promise<string | undefined> {
+  if (filePathOrUrl.trim().length === 0) {
+    return undefined;
+  }
   try {
     const url = new URL(filePathOrUrl);
     if (url.protocol === 'file:') {
@@ -151,7 +133,10 @@ async function validateToolFiles(
         const updated: unknown[] = [];
         for (const item of val) {
           if (typeof item === 'string') {
-            updated.push(await validateAndResolvePathOrUrl(item, context));
+            const resolved = await validateAndResolvePathOrUrl(item, context);
+            if (resolved !== undefined) {
+              updated.push(resolved);
+            }
           } else {
             throw new Error(
               'Unexpected non-string value as a file path or URL',
@@ -166,8 +151,11 @@ async function validateToolFiles(
 
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
-  readonly registeredInputSchema: zod.ZodTypeAny;
-  readonly shouldRegister: boolean;
+  readonly registeredInputSchema: zod.ZodObject<
+    zod.ZodRawShape,
+    zod.core.$strict
+  >;
+  readonly disabled: boolean;
   private readonly disabledReason?: string;
 
   constructor(
@@ -178,25 +166,15 @@ export class ToolHandler {
   ) {
     const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
     this.disabledReason = reason;
-    this.shouldRegister = !(disabled && !serverArgs.viaCli);
+    this.disabled = disabled && !serverArgs.viaCli;
 
-    this.inputSchema =
-      'pageScoped' in tool &&
-      tool.pageScoped &&
-      serverArgs.pageIdRouting &&
-      !serverArgs.slim
-        ? {...pageIdSchema, ...tool.schema}
-        : tool.schema;
-    this.registeredInputSchema = zod.object(this.inputSchema).passthrough();
+    this.inputSchema = tool.schema;
+    this.registeredInputSchema = zod.object(this.inputSchema).strict();
   }
 
-  unknownArgumentNames(params: Record<string, unknown>): string[] {
-    return Object.keys(params).filter(
-      key => !Object.hasOwn(this.inputSchema, key),
-    );
-  }
+  handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
+    using _guard = await this.toolMutex.acquire();
 
-  async handle(params: Record<string, unknown>): Promise<CallToolResult> {
     if (this.disabledReason) {
       return {
         content: [
@@ -209,24 +187,6 @@ export class ToolHandler {
       };
     }
 
-    const unknownArgumentNames = this.unknownArgumentNames(params);
-    if (unknownArgumentNames.length) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: buildUnknownArgumentsMessage(
-              this.tool.name,
-              unknownArgumentNames,
-              Object.keys(this.inputSchema),
-            ),
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    const guard = await this.toolMutex.acquire();
     const startTime = Date.now();
     let success = false;
     let devToolsData: DevToolsData | undefined;
@@ -257,6 +217,7 @@ export class ToolHandler {
             !this.serverArgs.slim
               ? context.getPageById(pageId)
               : context.getSelectedMcpPage();
+          await page?.init();
           response.setPage(page);
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();
@@ -333,7 +294,6 @@ export class ToolHandler {
         devToolsData,
         pageUrl,
       });
-      guard[Symbol.dispose]();
     }
-  }
+  };
 }

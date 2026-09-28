@@ -113,6 +113,33 @@ export function isAllowedUrl(
 const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
 
 /**
+ * Finds the first pattern that uses a URLPattern regexp group (for example
+ * `(127\.\d+\.\d+\.\d+)`) in any component -- protocol, username, password,
+ * hostname, port, pathname, search, or hash. Chromium's
+ * `SimpleUrlPatternMatcher::Component::Create` rejects any component whose
+ * `HasRegexGroups()` is true and silently drops the rule, so
+ * `Network.emulateNetworkConditionsByRule` does not enforce these patterns
+ * on redirects or subresources, unlike the initial navigation check. A plain
+ * wildcard (`*`) or named group (`:name`) has no regexp group and is
+ * unaffected.
+ *
+ * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
+ * @returns The first unenforceable pattern, or undefined if all are safe.
+ * @throws Error if a pattern's syntax is invalid (via `new URLPattern`).
+ */
+export function findUnenforceablePattern(
+  patterns: string[],
+): string | undefined {
+  for (const raw of patterns) {
+    const parsed = new URLPattern(raw);
+    if (parsed.hasRegExpGroups) {
+      return raw;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
  *
  * @param url The URL string to validate.

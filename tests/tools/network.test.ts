@@ -4,187 +4,227 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import assert from 'node:assert';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
+
+import sinon from 'sinon';
 
 import {
   getNetworkRequest,
   listNetworkRequests,
 } from '../../src/tools/network.js';
-import {serverHooks} from '../server.js';
-import {
-  getTextContent,
-  html,
-  stabilizeResponseOutput,
-  withMcpContext,
-} from '../utils.js';
+import {createHandlerMocks} from '../mocks.js';
 
 describe('network', () => {
-  const server = serverHooks();
-  describe('network_list_requests', () => {
-    it('list requests', async () => {
-      await withMcpContext(async (response, context) => {
-        await listNetworkRequests.handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.ok(response.includeNetworkRequests);
-        assert.strictEqual(response.networkRequestsPageIdx, undefined);
-      });
-    });
+  afterEach(() => {
+    sinon.restore();
+  });
 
-    it('list requests form current navigations only', async t => {
-      server.addHtmlRoute('/one', html`<main>First</main>`);
-      server.addHtmlRoute('/two', html`<main>Second</main>`);
-      server.addHtmlRoute('/three', html`<main>Third</main>`);
+  describe('list_network_requests', () => {
+    it('handles default parameters', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.getDevToolsData.resolves({});
 
-      await withMcpContext(async (response, context) => {
-        await context.getSelectedMcpPage().setUpNetworkCollectorForTesting();
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/one'));
-        await page.goto(server.getRoute('/two'));
-        await page.goto(server.getRoute('/three'));
-        await listNetworkRequests.handler(
-          {
-            params: {},
-
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const responseData = await response.handle(context);
-        t.assert.snapshot(
-          stabilizeResponseOutput(getTextContent(responseData.content[0])),
-        );
-      });
-    });
-
-    it('list requests from previous navigations', async t => {
-      server.addHtmlRoute('/one', html`<main>First</main>`);
-      server.addHtmlRoute('/two', html`<main>Second</main>`);
-      server.addHtmlRoute('/three', html`<main>Third</main>`);
-
-      await withMcpContext(async (response, context) => {
-        await context.getSelectedMcpPage().setUpNetworkCollectorForTesting();
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/one'));
-        await page.goto(server.getRoute('/two'));
-        await page.goto(server.getRoute('/three'));
-        await listNetworkRequests.handler(
-          {
-            params: {
-              includePreservedRequests: true,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const responseData = await response.handle(context);
-        t.assert.snapshot(
-          stabilizeResponseOutput(getTextContent(responseData.content[0])),
-        );
-      });
-    });
-
-    it('list requests from previous navigations from redirects', async t => {
-      server.addRoute('/redirect', async (_req, res) => {
-        res.writeHead(302, {
-          Location: server.getRoute('/redirected'),
-        });
-        res.end();
-      });
-
-      server.addHtmlRoute(
-        '/redirected',
-        html`<script>
-          document.location.href = '/redirected-page';
-        </script>`,
+      await listNetworkRequests(args).handler(
+        {params: {}, page},
+        response,
+        context,
       );
 
-      server.addHtmlRoute(
-        '/redirected-page',
-        html`<main>I was redirected 2 times</main>`,
+      sinon.assert.calledOnce(page.getDevToolsData);
+      sinon.assert.calledOnceWithExactly(response.attachDevToolsData, {});
+      sinon.assert.calledOnceWithExactly(
+        response.setIncludeNetworkRequests,
+        true,
+        {
+          pageSize: undefined,
+          pageIdx: undefined,
+          resourceTypes: undefined,
+          includePreservedRequests: undefined,
+          networkRequestIdInDevToolsUI: undefined,
+        },
+      );
+    });
+
+    it('passes custom filters and pagination options', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.getDevToolsData.resolves({});
+
+      await listNetworkRequests(args).handler(
+        {
+          params: {
+            pageSize: 25,
+            pageIdx: 1,
+            resourceTypes: ['xhr', 'fetch'],
+            includePreservedRequests: true,
+          },
+          page,
+        },
+        response,
+        context,
       );
 
-      await withMcpContext(async (response, context) => {
-        await context.getSelectedMcpPage().setUpNetworkCollectorForTesting();
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/redirect'), {
-          waitUntil: 'networkidle0',
-        });
-        await listNetworkRequests.handler(
-          {
-            params: {
-              includePreservedRequests: true,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        const responseData = await response.handle(context);
-        t.assert.snapshot(
-          stabilizeResponseOutput(getTextContent(responseData.content[0])),
-        );
-      });
+      sinon.assert.calledOnceWithExactly(
+        response.setIncludeNetworkRequests,
+        true,
+        {
+          pageSize: 25,
+          pageIdx: 1,
+          resourceTypes: ['xhr', 'fetch'],
+          includePreservedRequests: true,
+          networkRequestIdInDevToolsUI: undefined,
+        },
+      );
+    });
+
+    it('resolves cdpRequestId from DevTools data when present', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const devToolsData = {
+        cdpRequestId: 'req-cdp-123',
+      };
+      page.getDevToolsData.resolves(devToolsData);
+      page.resolveCdpRequestId.withArgs('req-cdp-123').returns(42);
+
+      await listNetworkRequests(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.attachDevToolsData,
+        devToolsData,
+      );
+      sinon.assert.calledOnceWithExactly(
+        page.resolveCdpRequestId,
+        'req-cdp-123',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.setIncludeNetworkRequests,
+        true,
+        {
+          pageSize: undefined,
+          pageIdx: undefined,
+          resourceTypes: undefined,
+          includePreservedRequests: undefined,
+          networkRequestIdInDevToolsUI: 42,
+        },
+      );
     });
   });
-  describe('network_get_request', () => {
-    it('attaches request', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto('data:text/html,<div>Hello MCP</div>');
-        await getNetworkRequest.handler(
-          {params: {reqid: 1}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
 
-        assert.equal(response.attachedNetworkRequestId, 1);
-      });
-    });
-    it('should not add the request list', async () => {
-      await withMcpContext(async (response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto('data:text/html,<div>Hello MCP</div>');
-        await getNetworkRequest.handler(
-          {params: {reqid: 1}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert(!response.includeNetworkRequests);
-      });
-    });
-    it('should get request from previous navigations', async t => {
-      server.addHtmlRoute('/one', html`<main>First</main>`);
-      server.addHtmlRoute('/two', html`<main>Second</main>`);
-      server.addHtmlRoute('/three', html`<main>Third</main>`);
+  describe('get_network_request', () => {
+    it('attaches request with explicit reqid', async () => {
+      const {page, context, response, args} = createHandlerMocks();
 
-      await withMcpContext(async (response, context) => {
-        await context.getSelectedMcpPage().setUpNetworkCollectorForTesting();
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/one'));
-        await page.goto(server.getRoute('/two'));
-        await page.goto(server.getRoute('/three'));
-        await getNetworkRequest.handler(
-          {
-            params: {
-              reqid: 1,
-            },
-            page: context.getSelectedMcpPage(),
+      await getNetworkRequest(args).handler(
+        {params: {reqid: 10}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 10, {
+        requestFilePath: undefined,
+        responseFilePath: undefined,
+      });
+      sinon.assert.notCalled(page.getDevToolsData);
+    });
+
+    it('forwards requestFilePath and responseFilePath when reqid is provided', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+
+      await getNetworkRequest(args).handler(
+        {
+          params: {
+            reqid: 10,
+            requestFilePath: '/path/req.txt',
+            responseFilePath: '/path/res.txt',
           },
-          response,
-          context,
-        );
-        const responseData = await response.handle(context);
+          page,
+        },
+        response,
+        context,
+      );
 
-        t.assert.snapshot(
-          stabilizeResponseOutput(getTextContent(responseData.content[0])),
-        );
+      sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 10, {
+        requestFilePath: '/path/req.txt',
+        responseFilePath: '/path/res.txt',
       });
+    });
+
+    it('falls back to DevTools selected request when reqid is omitted', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const devToolsData = {
+        cdpRequestId: 'req-cdp-selected',
+      };
+      page.getDevToolsData.resolves(devToolsData);
+      page.resolveCdpRequestId.withArgs('req-cdp-selected').returns(99);
+
+      await getNetworkRequest(args).handler(
+        {
+          params: {
+            requestFilePath: '/path/req.txt',
+            responseFilePath: '/path/res.txt',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(page.getDevToolsData);
+      sinon.assert.calledOnceWithExactly(
+        response.attachDevToolsData,
+        devToolsData,
+      );
+      sinon.assert.calledOnceWithExactly(
+        page.resolveCdpRequestId,
+        'req-cdp-selected',
+      );
+      sinon.assert.calledOnceWithExactly(response.attachNetworkRequest, 99, {
+        requestFilePath: '/path/req.txt',
+        responseFilePath: '/path/res.txt',
+      });
+    });
+
+    it('appends message when reqid is omitted and nothing is selected in DevTools', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.getDevToolsData.resolves({});
+
+      await getNetworkRequest(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(page.getDevToolsData);
+      sinon.assert.calledOnceWithExactly(response.attachDevToolsData, {});
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Nothing is currently selected in the DevTools Network panel.',
+      );
+      sinon.assert.notCalled(response.attachNetworkRequest);
+    });
+
+    it('appends message when DevTools data exists but cdpRequestId cannot be resolved', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.getDevToolsData.resolves({cdpRequestId: 'unknown-cdp-id'});
+      page.resolveCdpRequestId.withArgs('unknown-cdp-id').returns(undefined);
+
+      await getNetworkRequest(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        page.resolveCdpRequestId,
+        'unknown-cdp-id',
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Nothing is currently selected in the DevTools Network panel.',
+      );
+      sinon.assert.notCalled(response.attachNetworkRequest);
     });
   });
 });

@@ -76,6 +76,8 @@ export function applyToExisting<
     const toAdd = {...entry};
     if (!updatedNames.has(entry.name)) {
       toAdd.isDeprecated = true;
+    } else {
+      delete toAdd.isDeprecated;
     }
     result.push(toAdd);
   }

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {McpContext} from '../McpContext.js';
-import {zod} from '../third_party/index.js';
+import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {parseKey} from '../utils/keyboard.js';
@@ -33,17 +32,37 @@ const submitKeySchema = zod
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
   );
 
-function handleActionError(error: unknown, uid: string) {
+/**
+ * Locator actions abort or time out while the page is blocked by a JavaScript
+ * dialog, even though the action itself was dispatched and opened that dialog.
+ * The open dialog is already reported in the response, so treat this as an
+ * interruption instead of a failure.
+ */
+function handleActionError(error: unknown, uid: string, page: ContextPage) {
+  if (page.getDialog()) {
+    logger?.('action interrupted by a dialog', error);
+    return;
+  }
+
   logger?.('failed to act using a locator', error);
+  const reason =
+    error instanceof TimeoutError
+      ? 'The element did not become interactive within the configured timeout.'
+      : error instanceof Error
+        ? error.message
+        : String(error);
   throw new Error(
-    `Failed to interact with the element with uid ${uid}. The element did not become interactive within the configured timeout.`,
+    `Failed to interact with the element with uid ${uid}. ${reason}`,
     {
       cause: error,
     },
   );
 }
 
-async function selectNativeSelectOption(handle: ElementHandle<Element>) {
+async function selectNativeSelectOption(
+  handle: ElementHandle<Element>,
+  signal: AbortSignal,
+) {
   using selectHandle = await handle.evaluateHandle(node => {
     if (!(node instanceof HTMLOptionElement)) {
       return null;
@@ -76,12 +95,12 @@ async function selectNativeSelectOption(handle: ElementHandle<Element>) {
   if (typeof value !== 'string') {
     return false;
   }
-  await select.asLocator().fill(value);
+  await select.asLocator().fill(value, {signal});
 
   return true;
 }
 
-export const click = definePageTool({
+export const click = definePageTool(() => ({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -106,18 +125,21 @@ export const click = definePageTool({
     const shouldSelectNativeOption =
       !request.params.dblClick && aXNode?.role === 'option';
     try {
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        if (
-          shouldSelectNativeOption &&
-          (await selectNativeSelectOption(handle))
-        ) {
-          return;
-        }
+      const result = await request.page.waitForEventsAfterAction(
+        async signal => {
+          if (
+            shouldSelectNativeOption &&
+            (await selectNativeSelectOption(handle, signal))
+          ) {
+            return;
+          }
 
-        await handle.asLocator().click({
-          count: request.params.dblClick ? 2 : 1,
-        });
-      });
+          await handle.asLocator().click({
+            count: request.params.dblClick ? 2 : 1,
+            signal,
+          });
+        },
+      );
       response.appendResponseLine(
         request.params.dblClick
           ? `Successfully double clicked on the element`
@@ -128,12 +150,17 @@ export const click = definePageTool({
         response.includeSnapshot();
       }
     } catch (error) {
-      handleActionError(error, uid);
+      handleActionError(error, uid, request.page);
+      response.appendResponseLine(
+        request.params.dblClick
+          ? `The element was double clicked and it opened a dialog.`
+          : `The element was clicked and it opened a dialog.`,
+      );
     }
   },
-});
+}));
 
-export const clickAt = definePageTool({
+export const clickAt = definePageTool(() => ({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
   annotations: {
@@ -166,9 +193,9 @@ export const clickAt = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const hover = definePageTool({
+export const hover = definePageTool(() => ({
   name: 'hover',
   description: `Hover over the provided element`,
   annotations: {
@@ -189,19 +216,49 @@ export const hover = definePageTool({
     const uid = request.params.uid;
     using handle = await request.page.getElementByUid(uid);
     try {
-      const result = await request.page.waitForEventsAfterAction(async () => {
-        await handle.asLocator().hover();
-      });
+      const result = await request.page.waitForEventsAfterAction(
+        async signal => {
+          await handle.asLocator().hover({signal});
+        },
+      );
       response.appendResponseLine(`Successfully hovered over the element`);
       response.attachWaitForResult(result);
       if (request.params.includeSnapshot) {
         response.includeSnapshot();
       }
     } catch (error) {
-      handleActionError(error, uid);
+      handleActionError(error, uid, request.page);
+      response.appendResponseLine(
+        `The element was hovered and it opened a dialog.`,
+      );
     }
   },
-});
+}));
+
+function raceWithSignal<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason);
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, {once: true});
+    Promise.resolve(promise).then(
+      value => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
 
 // The AXNode for an option doesn't contain its `value`. We set text content of the option as value.
 // If the form is a combobox, we need to find the correct option by its text value.
@@ -211,18 +268,25 @@ async function selectOption(
   handle: ElementHandle,
   aXNode: TextSnapshotNode,
   value: string,
+  signal: AbortSignal,
 ) {
   let optionFound = false;
   for (const child of aXNode.children) {
     if (child.role === 'option' && child.name === value && child.value) {
       optionFound = true;
-      using childHandle = await child.elementHandle();
+      using childHandle = await raceWithSignal(child.elementHandle(), signal);
       if (childHandle) {
-        using childValueHandle = await childHandle.getProperty('value');
+        using childValueHandle = await raceWithSignal(
+          childHandle.getProperty('value'),
+          signal,
+        );
 
-        const childValue = await childValueHandle.jsonValue();
+        const childValue = await raceWithSignal(
+          childValueHandle.jsonValue(),
+          signal,
+        );
         if (typeof childValue === 'string') {
-          await handle.asLocator().fill(childValue);
+          await handle.asLocator().fill(childValue, {signal});
         }
 
         break;
@@ -238,50 +302,87 @@ function hasOptionChildren(aXNode: TextSnapshotNode) {
   return aXNode.children.some(child => child.role === 'option');
 }
 
-async function fillFormElement(
-  uid: string,
-  value: string,
-  context: McpContext,
+/**
+ * Fills one or more form elements and waits for resulting page events in a
+ * single `waitForEventsAfterAction` call.
+ * If an element opens a JavaScript dialog, returns the `interruptedUid` of that
+ * element so the caller can report it without filling remaining elements.
+ */
+async function fillFormElements(
+  elements: Array<{uid: string; value: string}>,
   page: ContextPage,
-) {
-  using handle = await page.getElementByUid(uid);
+): Promise<{result?: WaitForEventsResult; interruptedUid?: string}> {
+  let currentUid: string | undefined;
   try {
-    const aXNode = page.getAXNodeByUid(uid);
-    // We assume that combobox needs to be handled as select if it has
-    // role='combobox' and option children.
-    if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
-      await selectOption(handle, aXNode, value);
-    } else {
-      const isToggle = await handle.evaluate(el => {
-        if (el instanceof HTMLInputElement) {
-          return el.type === 'checkbox' || el.type === 'radio';
-        }
-        const role = el.getAttribute('role');
-        return role === 'checkbox' || role === 'radio' || role === 'switch';
-      });
-
-      if (isToggle) {
-        if (['true', 'false'].includes(value)) {
-          await handle.asLocator().fill(value === 'true');
-        } else {
-          throw new Error(
-            `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+    const result = await page.waitForEventsAfterAction(async signal => {
+      for (const {uid, value} of elements) {
+        const previousUid = currentUid;
+        currentUid = undefined;
+        using handle = await raceWithSignal(
+          page.getElementByUid(uid),
+          signal,
+        ).catch(error => {
+          if (signal.aborted && previousUid) {
+            currentUid = previousUid;
+          }
+          throw error;
+        });
+        currentUid = uid;
+        const aXNode = page.getAXNodeByUid(uid);
+        // We assume that combobox needs to be handled as select if it has
+        // role='combobox' and option children.
+        if (aXNode && aXNode.role === 'combobox' && hasOptionChildren(aXNode)) {
+          await raceWithSignal(
+            selectOption(handle, aXNode, value, signal),
+            signal,
           );
+        } else {
+          const isToggle = await raceWithSignal(
+            handle.evaluate(el => {
+              if (el instanceof HTMLInputElement) {
+                return el.type === 'checkbox' || el.type === 'radio';
+              }
+              const role = el.getAttribute('role');
+              return (
+                role === 'checkbox' || role === 'radio' || role === 'switch'
+              );
+            }),
+            signal,
+          );
+
+          if (isToggle) {
+            if (['true', 'false'].includes(value)) {
+              await handle.asLocator().fill(value === 'true', {signal});
+            } else {
+              throw new Error(
+                `Checkboxes, radio boxes and toggles require "true" or "false" value, but ${value} was used`,
+              );
+            }
+          } else {
+            // Increase timeout for longer input values.
+            const timeoutPerChar = 10; // ms
+            const fillTimeout =
+              page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
+            await handle
+              .asLocator()
+              .setTimeout(fillTimeout)
+              .fill(value, {signal});
+          }
         }
-      } else {
-        // Increase timeout for longer input values.
-        const timeoutPerChar = 10; // ms
-        const fillTimeout =
-          page.pptrPage.getDefaultTimeout() + value.length * timeoutPerChar;
-        await handle.asLocator().setTimeout(fillTimeout).fill(value);
+        signal.throwIfAborted();
       }
-    }
+    });
+    return {result};
   } catch (error) {
-    handleActionError(error, uid);
+    if (!currentUid) {
+      throw error;
+    }
+    handleActionError(error, currentUid, page);
+    return {interruptedUid: currentUid};
   }
 }
 
-export const fill = definePageTool({
+export const fill = definePageTool(() => ({
   name: 'fill',
   description: `Type text into an input, text area or select an option from a <select> element.`,
   annotations: {
@@ -303,25 +404,26 @@ export const fill = definePageTool({
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
-  handler: async (request, response, context) => {
-    const page = request.page;
-    const result = await page.waitForEventsAfterAction(async () => {
-      await fillFormElement(
-        request.params.uid,
-        request.params.value,
-        context as McpContext,
-        page,
+  handler: async (request, response) => {
+    const {result} = await fillFormElements(
+      [{uid: request.params.uid, value: request.params.value}],
+      request.page,
+    );
+    if (!result) {
+      response.appendResponseLine(
+        `The element was filled out and it opened a dialog.`,
       );
-    });
+      return;
+    }
     response.appendResponseLine(`Successfully filled out the element`);
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const typeText = definePageTool({
+export const typeText = definePageTool(() => ({
   name: 'type_text',
   description: `Type text using keyboard into a previously focused input`,
   annotations: {
@@ -349,9 +451,9 @@ export const typeText = definePageTool({
     );
     response.attachWaitForResult(result);
   },
-});
+}));
 
-export const drag = definePageTool({
+export const drag = definePageTool(() => ({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
@@ -382,9 +484,9 @@ export const drag = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const fillForm = definePageTool({
+export const fillForm = definePageTool(() => ({
   name: 'fill_form',
   description: `Fill out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple individual 'fill' or 'click' calls when interacting with forms. It is significantly faster, more reliable, and reduces turn count. Example: Fill username, password, and check "Remember Me" in one call.`,
   annotations: {
@@ -394,43 +496,52 @@ export const fillForm = definePageTool({
   schema: {
     elements: zod
       .array(
-        // eslint-disable-next-line @local/enforce-zod-schema
-        zod.object({
-          uid: zod.string().describe('The uid of the element to fill out'),
-          value: zod
-            .string()
-            .describe(
-              'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
-            ),
-        }),
+        /* eslint-disable @local/enforce-zod-schema */
+        zod
+          .object({
+            uid: zod.string().describe('The uid of the element to fill out'),
+            value: zod
+              .string()
+              .describe(
+                'Value for the element. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
+              ),
+          })
+          .describe('An element to fill out'),
+        /* eslint-enable @local/enforce-zod-schema */
       )
       .describe('Elements from snapshot to fill out.'),
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
   verifyFilesSchema: {},
-  handler: async (request, response, context) => {
-    const page = request.page;
-    let lastResult: WaitForEventsResult = {};
-    for (const element of request.params.elements) {
-      lastResult = await page.waitForEventsAfterAction(async () => {
-        await fillFormElement(
-          element.uid,
-          element.value,
-          context as McpContext,
-          page,
-        );
-      });
+  handler: async (request, response) => {
+    const {result, interruptedUid} = await fillFormElements(
+      request.params.elements,
+      request.page,
+    );
+    if (!result) {
+      // The page is blocked by a dialog, so the remaining elements cannot be
+      // filled out until it is handled.
+      const hasRemainingElements =
+        interruptedUid !== request.params.elements.at(-1)?.uid;
+      response.appendResponseLine(
+        `Filling out the element with uid ${interruptedUid} opened a dialog.${
+          hasRemainingElements
+            ? ' The remaining elements were not filled out.'
+            : ''
+        }`,
+      );
+      return;
     }
     response.appendResponseLine(`Successfully filled out the form`);
-    response.attachWaitForResult(lastResult);
+    response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
       response.includeSnapshot();
     }
   },
-});
+}));
 
-export const uploadFile = definePageTool({
+export const uploadFile = definePageTool(() => ({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
   annotations: {
@@ -489,9 +600,9 @@ export const uploadFile = definePageTool({
     }
     response.appendResponseLine(`File uploaded from ${filePaths.join(', ')}.`);
   },
-});
+}));
 
-export const pressKey = definePageTool({
+export const pressKey = definePageTool(() => ({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   annotations: {
@@ -539,4 +650,4 @@ export const pressKey = definePageTool({
       response.includeSnapshot();
     }
   },
-});
+}));

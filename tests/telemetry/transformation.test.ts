@@ -8,9 +8,12 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
+  bucketizeDaysSince,
   bucketizeLatency,
   buildContext,
   getEnumValues,
+  MAX_ACTIVE_DAYS,
+  sanitizeClientName,
   sanitizeParams,
   stripUnderscoreBeforeNumber,
   transformArgName,
@@ -78,6 +81,28 @@ describe('bucketizeLatency', () => {
 
     assert.strictEqual(bucketizeLatency(10001), 10000);
     assert.strictEqual(bucketizeLatency(99999), 10000);
+  });
+});
+
+describe('bucketizeDaysSince', () => {
+  it('should bucketize days correctly', () => {
+    const testCases = [
+      {input: -1, expected: -1},
+      {input: 0, expected: 0},
+      {input: 1, expected: 1},
+      {input: 7, expected: 7},
+      {input: 14, expected: 14},
+      {input: 30, expected: 30},
+      {input: 31, expected: 31},
+      {input: MAX_ACTIVE_DAYS, expected: 31},
+      {input: 32, expected: 31},
+      {input: 45, expected: 31},
+      {input: 100, expected: 31},
+    ];
+
+    for (const {input, expected} of testCases) {
+      assert.strictEqual(bucketizeDaysSince(input), expected);
+    }
   });
 });
 
@@ -251,5 +276,34 @@ describe('buildContext', () => {
         },
       },
     );
+  });
+});
+
+describe('sanitizeClientName', () => {
+  it('returns valid alphanumeric client names with hyphens and underscores as is', () => {
+    const validNames = [
+      'a',
+      'my-custom_client123',
+      'Client_Name-1',
+      'a'.repeat(31),
+    ];
+    for (const name of validNames) {
+      assert.strictEqual(sanitizeClientName(name), name);
+    }
+  });
+
+  it('redacts invalid or overly long client names', () => {
+    const invalidNames = [
+      '',
+      'a'.repeat(32),
+      'a'.repeat(100),
+      'client with spaces',
+      'client/1.0',
+      'client.name',
+      'client@home',
+    ];
+    for (const name of invalidNames) {
+      assert.strictEqual(sanitizeClientName(name), '<redacted>');
+    }
   });
 });

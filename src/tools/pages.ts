@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
@@ -17,7 +18,7 @@ import {
   timeoutSchema,
 } from './ToolDefinition.js';
 
-export const listPages = defineTool(args => {
+export const listPages = defineTool((args: ParsedArguments) => {
   return {
     name: 'list_pages',
     description: `Get a list of pages${args?.categoryExtensions ? ' including extension service workers' : ''} open in the browser.`,
@@ -36,7 +37,7 @@ export const listPages = defineTool(args => {
   };
 });
 
-export const selectPage = defineTool({
+export const selectPage = defineTool((args: ParsedArguments) => ({
   name: 'select_page',
   description: `Select a page as a context for future tool calls.`,
   annotations: {
@@ -47,7 +48,7 @@ export const selectPage = defineTool({
     pageId: zod
       .number()
       .describe(
-        `The ID of the page to select. Call ${listPages().name} to get available pages.`,
+        `The ID of the page to select. Call ${listPages(args).name} to get available pages.`,
       ),
     bringToFront: zod
       .boolean()
@@ -58,6 +59,7 @@ export const selectPage = defineTool({
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
+    await page.init();
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
@@ -66,9 +68,9 @@ export const selectPage = defineTool({
       await page.pptrPage.bringToFront();
     }
   },
-});
+}));
 
-export const closePage = defineTool({
+export const closePage = defineTool(() => ({
   name: 'close_page',
   description: `Closes the page by its index. The last open page cannot be closed.`,
   annotations: {
@@ -95,9 +97,9 @@ export const closePage = defineTool({
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
   },
-});
+}));
 
-export const newPage = defineTool(args => {
+export const newPage = defineTool((args: ParsedArguments) => {
   return {
     name: 'new_page',
     description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
@@ -151,7 +153,7 @@ export const newPage = defineTool(args => {
   };
 });
 
-export const navigatePage = definePageTool(args => {
+export const navigatePage = definePageTool((args: ParsedArguments) => {
   return {
     name: 'navigate_page',
     description: `Go to a URL, or back, forward, or reload. Use project URL if not specified otherwise.`,
@@ -311,7 +313,7 @@ export const navigatePage = definePageTool(args => {
   };
 });
 
-export const resizePage = definePageTool({
+export const resizePage = definePageTool(() => ({
   name: 'resize_page',
   description: `Resizes the page's window so that the page has specified dimension`,
   annotations: {
@@ -350,9 +352,9 @@ export const resizePage = definePageTool({
 
     response.setIncludePages(true);
   },
-});
+}));
 
-export const handleDialog = definePageTool({
+export const handleDialog = definePageTool(() => ({
   name: 'handle_dialog',
   description: `If a browser dialog was opened, use this command to handle it`,
   annotations: {
@@ -403,9 +405,9 @@ export const handleDialog = definePageTool({
     page.clearDialog();
     response.setIncludePages(true);
   },
-});
+}));
 
-export const getTabId = definePageTool({
+export const getTabId = definePageTool(() => ({
   name: 'get_tab_id',
   description: `Get the tab ID of the page`,
   annotations: {
@@ -422,4 +424,4 @@ export const getTabId = definePageTool({
     response.setTabId(tabId);
     response.appendResponseLine(`Tab ID: ${tabId}`);
   },
-});
+}));

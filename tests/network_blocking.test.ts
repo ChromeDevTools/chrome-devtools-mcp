@@ -24,9 +24,9 @@ describe('Network Blocking Integration', () => {
 
     const blockedUrlPattern = [server.getRoute('/blocked.html')];
     await withMcpContext(
-      async (response, context) => {
+      async (response, context, args) => {
         const allowedUrl = server.getRoute('/allowed.html');
-        await navigatePage().handler(
+        await navigatePage(args).handler(
           {
             params: {url: allowedUrl},
             page: context.getSelectedMcpPage(),
@@ -40,7 +40,7 @@ describe('Network Blocking Integration', () => {
         );
 
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {function: String(() => document.body.textContent)},
           },
@@ -54,7 +54,7 @@ describe('Network Blocking Integration', () => {
 
         const blockedUrl = server.getRoute('/blocked.html');
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: `async () => {
@@ -89,9 +89,9 @@ describe('Network Blocking Integration', () => {
     const allowedUrlPattern = [server.getRoute('/allowed.html')];
 
     await withMcpContext(
-      async (response, context) => {
+      async (response, context, args) => {
         const allowedUrl = server.getRoute('/allowed.html');
-        await navigatePage().handler(
+        await navigatePage(args).handler(
           {
             params: {url: allowedUrl},
             page: context.getSelectedMcpPage(),
@@ -105,7 +105,7 @@ describe('Network Blocking Integration', () => {
         );
 
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {function: String(() => document.body.textContent)},
           },
@@ -119,7 +119,7 @@ describe('Network Blocking Integration', () => {
 
         const blockedUrl = server.getRoute('/blocked.html');
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: `async () => {
@@ -153,9 +153,9 @@ describe('Network Blocking Integration', () => {
 
     const blockedUrlPattern = [server.getRoute('/blocked.html')];
     await withMcpContext(
-      async (response, context) => {
+      async (response, context, args) => {
         const allowedUrl = server.getRoute('/allowed.html');
-        await navigatePage().handler(
+        await navigatePage(args).handler(
           {
             params: {url: allowedUrl},
             page: context.getSelectedMcpPage(),
@@ -172,7 +172,7 @@ describe('Network Blocking Integration', () => {
 
         // Verifies fetch is blocked before Lighthouse audit
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: `async () => {
@@ -194,7 +194,7 @@ describe('Network Blocking Integration', () => {
           'Fetch should be blocked before audit',
         );
 
-        await lighthouseAudit.handler(
+        await lighthouseAudit(args).handler(
           {
             params: {
               mode: 'navigation',
@@ -213,7 +213,7 @@ describe('Network Blocking Integration', () => {
 
         // 2. Verify fetch remains blocked AFTER Lighthouse audit
         response.resetResponseLineForTesting();
-        await evaluateScript().handler(
+        await evaluateScript(args).handler(
           {
             params: {
               function: `async () => {
@@ -244,10 +244,10 @@ describe('Network Blocking Integration', () => {
   it('throws error when trying to emulate network conditions while blocklist is configured', async () => {
     const blockedUrlPattern = ['*://*/*'];
     await withMcpContext(
-      async (response, context) => {
+      async (response, context, args) => {
         // Attempting to emulate network conditions should throw an error.
         await assert.rejects(async () => {
-          await emulate.handler(
+          await emulate(args).handler(
             {
               params: {
                 networkConditions: 'Offline',
@@ -260,7 +260,7 @@ describe('Network Blocking Integration', () => {
         }, /Network throttling is not supported when network blocking \(allowlist\/blocklist\) is configured\./);
 
         // Attempting to emulate CPU rate or other things should succeed without errors.
-        await emulate.handler(
+        await emulate(args).handler(
           {
             params: {
               cpuThrottlingRate: 2,

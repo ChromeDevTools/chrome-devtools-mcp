@@ -11,6 +11,7 @@ import type {
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
+import type {ByteSizeRange} from '../utils/bytes.js';
 import {stableIdSymbol} from '../utils/id.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -21,6 +22,57 @@ export interface FormattedSnapshotEntry {
   count: number;
   selfSize: string;
   retainedSize: string;
+}
+
+export interface ContextAnalysisReport {
+  contexts: readonly ScopedContext[];
+  scriptsWithoutScopes: readonly DevTools.HeapSnapshotModel.HeapSnapshotModel.ScriptWithoutScopes[];
+}
+
+/** A context paired with the scope that declares it. */
+export interface ScopedContext {
+  scope: DevTools.HeapSnapshotModel.HeapSnapshotModel.ScopeAnalysis;
+  context: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysis;
+}
+
+export interface ContextFilterOptions {
+  /** Inclusive dead-field retained-size score range a context must fall into. */
+  retainedSize?: ByteSizeRange;
+  /** Restricts the result to contexts declared by this scope. */
+  scopeInfoNodeId?: number;
+}
+
+/**
+ * Flattens the analysis into the contexts matching `options`, ranked descending
+ * by their dead-field retained-size score across all scopes.
+ */
+export function collectRankedContexts(
+  analysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
+  options: ContextFilterOptions = {},
+): ScopedContext[] {
+  const {min = 0, max} = options.retainedSize ?? {};
+  const contexts: ScopedContext[] = [];
+  for (const scope of analysis.scopes) {
+    if (
+      options.scopeInfoNodeId !== undefined &&
+      scope.scopeInfoNodeId !== options.scopeInfoNodeId
+    ) {
+      continue;
+    }
+    for (const context of scope.contexts) {
+      const score = context.deadFieldsRetainedSizeSum;
+      if (score < min || (max !== undefined && score > max)) {
+        continue;
+      }
+      contexts.push({scope, context});
+    }
+  }
+  contexts.sort(
+    (left, right) =>
+      right.context.deadFieldsRetainedSizeSum -
+      left.context.deadFieldsRetainedSizeSum,
+  );
+  return contexts;
 }
 
 export function isNodeLike(
@@ -275,6 +327,51 @@ export class HeapSnapshotFormatter {
     ];
     return lines.join('\n');
   }
+
+  static formatContextAnalysis(report: ContextAnalysisReport): string {
+    const lines: string[] = [];
+
+    if (report.contexts.length === 0) {
+      lines.push('No live contexts with dead fields were found.');
+    }
+
+    for (const {scope, context} of report.contexts) {
+      if (lines.length > 0) {
+        lines.push('');
+      }
+      lines.push(
+        `#### Context @${context.contextNodeId} in \`${formatScopeName(scope)}\` — ${formatBytesToKb(context.deadFieldsRetainedSizeSum)}`,
+        `Script @${scope.scriptNodeId}, ScopeInfo @${scope.scopeInfoNodeId}, offsets ${scope.scopeStart}-${scope.scopeEnd}, ${formatCount(scope.contextFieldCount, 'context field')}`,
+      );
+      for (const field of context.deadFields) {
+        lines.push(
+          `- \`${field.name}\` (${field.valueName} @${field.valueNodeId}) — ${formatBytesToKb(field.retainedSize)}`,
+        );
+      }
+    }
+
+    if (report.scriptsWithoutScopes.length > 0) {
+      lines.push('', 'Scripts without scope metadata could not be analyzed:');
+      for (const script of report.scriptsWithoutScopes) {
+        lines.push(
+          `- \`${script.scriptName || `script @${script.scriptNodeId}`}\` (@${script.scriptNodeId}) — ${formatCount(script.contextCount, 'context')}`,
+        );
+      }
+    }
+
+    return lines.join('\n');
+  }
+}
+
+function formatCount(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+}
+
+function formatScopeName(
+  scope: DevTools.HeapSnapshotModel.HeapSnapshotModel.ScopeAnalysis,
+): string {
+  const scriptName = scope.scriptName || `script @${scope.scriptNodeId}`;
+  return scope.scopeName ? `${scope.scopeName} (${scriptName})` : scriptName;
 }
 
 function formatDOMLinkState(

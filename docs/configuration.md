@@ -4,6 +4,16 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 <!-- BEGIN AUTO GENERATED OPTIONS -->
 
+- **`--categoryInput`/ `--category-input`**
+  Set to false to exclude tools related to input.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryNavigation`/ `--category-navigation`**
+  Set to false to exclude tools related to navigation.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--categoryEmulation`/ `--category-emulation`**
   Set to false to exclude tools related to emulation.
   - **Type:** boolean
@@ -19,6 +29,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--categoryDebugging`/ `--category-debugging`**
+  Set to false to exclude tools related to debugging.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--categoryExtensions`/ `--category-extensions`**
   Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
   - **Type:** boolean
@@ -26,6 +41,16 @@ The Chrome DevTools MCP server supports the following configuration option:
 
 - **`--categoryExperimentalThirdParty`/ `--category-experimental-third-party`**
   Set to true to enable third-party developer tools exposed by the inspected page itself
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--categoryMemory`/ `--category-memory`**
+  Set to false to exclude tools related to memory.
+  - **Type:** boolean
+  - **Default:** `true`
+
+- **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
+  Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
   - **Type:** boolean
   - **Default:** `false`
 
@@ -42,17 +67,14 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--browserUrl`/ `--browser-url`, `-u`**
   Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.
   - **Type:** string
-  - **Default:** `false`
 
 - **`--wsEndpoint`/ `--ws-endpoint`, `-w`**
   WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.
   - **Type:** string
-  - **Default:** `false`
 
 - **`--wsHeaders`/ `--ws-headers`**
   Custom headers for WebSocket connection in JSON format (e.g., '{"Authorization":"Bearer token"}'). Only works with --wsEndpoint.
   - **Type:** string
-  - **Default:** `false`
 
 - **`--headless`**
   Whether to run in headless (no UI) mode.
@@ -62,7 +84,6 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--executablePath`/ `--executable-path`, `-e`**
   Path to custom Chrome executable.
   - **Type:** string
-  - **Default:** `false`
 
 - **`--isolated`**
   If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.
@@ -72,28 +93,31 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--userDataDir`/ `--user-data-dir`**
   Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE
   - **Type:** string
-  - **Default:** `false`
 
 - **`--channel`**
   Specify a different Chrome channel that should be used. The default is the stable channel version.
   - **Type:** string
   - **Choices:** `canary`, `dev`, `beta`, `stable`
-  - **Default:** `false`
-
-- **`--logFile`/ `--log-file`**
-  Path to a file to write debug logs to. Set the env variable `DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
-  - **Type:** string
-  - **Default:** `false`
-
-- **`--viewport`**
-  Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
-  - **Type:** string
-  - **Default:** `false`
 
 - **`--proxyServer`/ `--proxy-server`**
   Proxy server configuration for Chrome passed as --proxy-server when launching the browser. See https://www.chromium.org/developers/design-documents/network-settings/ for details.
   - **Type:** string
-  - **Default:** `false`
+
+- **`--chromeArg`/ `--chrome-arg`**
+  Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+
+- **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
+  Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
+  - **Type:** array
+
+- **`--logFile`/ `--log-file`**
+  Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
+  - **Type:** string
+
+- **`--viewport`**
+  Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
+  - **Type:** string
 
 - **`--acceptInsecureCerts`/ `--accept-insecure-certs`**
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
@@ -138,32 +162,18 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--experimentalFfmpegPath`/ `--experimental-ffmpeg-path`**
   Path to ffmpeg executable for screencast recording.
   - **Type:** string
-  - **Default:** `false`
 
 - **`--experimentalScreencastFps`/ `--experimental-screencast-fps`**
   Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.
   - **Type:** number
-  - **Default:** `false`
-
-- **`--chromeArg`/ `--chrome-arg`**
-  Additional arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
-  - **Type:** array
-  - **Default:** `false`
 
 - **`--blockedUrlPattern`/ `--blocked-url-pattern`**
-  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
+  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.
   - **Type:** array
-  - **Default:** `false`
 
 - **`--allowedUrlPattern`/ `--allowed-url-pattern`**
-  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns.
+  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.
   - **Type:** array
-  - **Default:** `false`
-
-- **`--ignoreDefaultChromeArg`/ `--ignore-default-chrome-arg`**
-  Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
-  - **Type:** array
-  - **Default:** `false`
 
 - **`--performanceCrux`/ `--performance-crux`**
   Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.
@@ -189,22 +199,18 @@ The Chrome DevTools MCP server supports the following configuration option:
   Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").
   - **Type:** string
   - **Choices:** `jpeg`, `png`, `webp`
-  - **Default:** `false`
 
 - **`--screenshotQuality`/ `--screenshot-quality`**
   Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.
   - **Type:** number
-  - **Default:** `false`
 
 - **`--screenshotMaxWidth`/ `--screenshot-max-width`**
   Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.
   - **Type:** number
-  - **Default:** `false`
 
 - **`--screenshotMaxHeight`/ `--screenshot-max-height`**
   Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.
   - **Type:** number
-  - **Default:** `false`
 
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
@@ -225,6 +231,10 @@ The Chrome DevTools MCP server supports the following configuration option:
   A directory that filesystem tools are allowed to access. May be specified more than once.
   - **Type:** array
   - **Default:** `OS temp directory`
+
+- **`--config`**
+  Path to JSON configuration file.
+  - **Type:** string
 
 <!-- END AUTO GENERATED OPTIONS -->
 

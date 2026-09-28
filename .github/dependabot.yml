@@ -61,5 +61,5 @@ updates:
     ignore:
       # Ignore tagged releases to fall back to branch commits.
       # Untagged commits get versions like `0.0.0-0.<index>`.
-      - dependency-name: 'devtools-frontend'
+      - dependency-name: 'third_party/devtools-frontend'
         versions: ['> 0.0.0']

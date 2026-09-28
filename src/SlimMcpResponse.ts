@@ -4,13 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  TextContent,
-  ImageContent,
-} from '@modelcontextprotocol/sdk/types.js';
-
 import type {McpContext} from './McpContext.js';
 import {McpResponse} from './McpResponse.js';
+import type {TextContent, ImageContent} from './third_party/index.js';
 
 export class SlimMcpResponse extends McpResponse {
   override async handle(_context: McpContext): Promise<{

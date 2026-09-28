@@ -8,27 +8,39 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {createTempDir} from '../utils.js';
+
+async function createSymlinkOrSkip(
+  t: it.TestContext,
+  target: string,
+  symlinkPath: string,
+  type?: 'dir' | 'file' | 'junction',
+): Promise<boolean> {
+  try {
+    await fs.symlink(target, symlinkPath, type);
+    return true;
+  } catch (error) {
+    if (
+      os.platform() === 'win32' &&
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'EPERM' || error.code === 'EACCES')
+    ) {
+      t.skip('creating symlinks requires additional privileges on Windows');
+      return false;
+    }
+    throw error;
+  }
+}
 
 describe('resolveCanonicalPath', () => {
-  let tmpDir: string;
-  let canonicalTmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'resolve-canonical-test-'),
-    );
-    canonicalTmpDir = await fs.realpath(tmpDir);
-  });
-
-  afterEach(async () => {
-    await fs.rm(tmpDir, {recursive: true, force: true});
-  });
-
   it('should resolve an existing standard file path', async () => {
-    const filePath = path.join(tmpDir, 'test.txt');
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const canonicalTmpDir = await fs.realpath(tmpDir.path);
+    const filePath = path.join(tmpDir.path, 'test.txt');
     await fs.writeFile(filePath, 'hello');
 
     const resolved = await resolveCanonicalPath(filePath);
@@ -36,7 +48,9 @@ describe('resolveCanonicalPath', () => {
   });
 
   it('should resolve a non-existent file whose parent directory exists', async () => {
-    const filePath = path.join(tmpDir, 'non-existent.txt');
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const canonicalTmpDir = await fs.realpath(tmpDir.path);
+    const filePath = path.join(tmpDir.path, 'non-existent.txt');
 
     const resolved = await resolveCanonicalPath(filePath);
     assert.strictEqual(
@@ -46,8 +60,10 @@ describe('resolveCanonicalPath', () => {
   });
 
   it('should resolve a non-existent deeply nested file whose parent directories do not exist', async () => {
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const canonicalTmpDir = await fs.realpath(tmpDir.path);
     const filePath = path.join(
-      tmpDir,
+      tmpDir.path,
       'nested1',
       'nested2',
       'non-existent.txt',
@@ -60,14 +76,18 @@ describe('resolveCanonicalPath', () => {
     );
   });
 
-  it('should resolve existing files with symlinks in path', async () => {
-    const targetDir = path.join(tmpDir, 'target');
+  it('should resolve existing files with symlinks in path', async t => {
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const targetDir = path.join(tmpDir.path, 'target');
     await fs.mkdir(targetDir);
     const targetFile = path.join(targetDir, 'file.txt');
     await fs.writeFile(targetFile, 'hello');
 
-    const symlinkDir = path.join(tmpDir, 'symlink_dir');
-    await fs.symlink(targetDir, symlinkDir, 'dir');
+    const symlinkDir = path.join(tmpDir.path, 'symlink_dir');
+    const created = await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir');
+    if (!created) {
+      return;
+    }
 
     const filePathWithSymlink = path.join(symlinkDir, 'file.txt');
 
@@ -76,12 +96,16 @@ describe('resolveCanonicalPath', () => {
     assert.strictEqual(resolved, path.join(canonicalTargetDir, 'file.txt'));
   });
 
-  it('should resolve non-existent files with symlinks in path', async () => {
-    const targetDir = path.join(tmpDir, 'target');
+  it('should resolve non-existent files with symlinks in path', async t => {
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const targetDir = path.join(tmpDir.path, 'target');
     await fs.mkdir(targetDir);
 
-    const symlinkDir = path.join(tmpDir, 'symlink_dir');
-    await fs.symlink(targetDir, symlinkDir, 'dir');
+    const symlinkDir = path.join(tmpDir.path, 'symlink_dir');
+    const created = await createSymlinkOrSkip(t, targetDir, symlinkDir, 'dir');
+    if (!created) {
+      return;
+    }
 
     const filePathWithSymlink = path.join(symlinkDir, 'non-existent.txt');
 
@@ -93,10 +117,19 @@ describe('resolveCanonicalPath', () => {
     );
   });
 
-  it('should resolve dangling symlink at the end of path', async () => {
-    const nonExistentTarget = path.join(tmpDir, 'non-existent-target.txt');
-    const danglingSymlink = path.join(tmpDir, 'dangling-symlink.txt');
-    await fs.symlink(nonExistentTarget, danglingSymlink);
+  it('should resolve dangling symlink at the end of path', async t => {
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const canonicalTmpDir = await fs.realpath(tmpDir.path);
+    const nonExistentTarget = path.join(tmpDir.path, 'non-existent-target.txt');
+    const danglingSymlink = path.join(tmpDir.path, 'dangling-symlink.txt');
+    const created = await createSymlinkOrSkip(
+      t,
+      nonExistentTarget,
+      danglingSymlink,
+    );
+    if (!created) {
+      return;
+    }
 
     const resolved = await resolveCanonicalPath(danglingSymlink);
     assert.strictEqual(
@@ -105,10 +138,20 @@ describe('resolveCanonicalPath', () => {
     );
   });
 
-  it('should resolve path with a dangling symlink directory in the middle', async () => {
-    const nonExistentTargetDir = path.join(tmpDir, 'non-existent-dir');
-    const danglingSymlinkDir = path.join(tmpDir, 'dangling-dir');
-    await fs.symlink(nonExistentTargetDir, danglingSymlinkDir, 'dir');
+  it('should resolve path with a dangling symlink directory in the middle', async t => {
+    using tmpDir = createTempDir('resolve-canonical-test-');
+    const canonicalTmpDir = await fs.realpath(tmpDir.path);
+    const nonExistentTargetDir = path.join(tmpDir.path, 'non-existent-dir');
+    const danglingSymlinkDir = path.join(tmpDir.path, 'dangling-dir');
+    const created = await createSymlinkOrSkip(
+      t,
+      nonExistentTargetDir,
+      danglingSymlinkDir,
+      'dir',
+    );
+    if (!created) {
+      return;
+    }
 
     const filePath = path.join(danglingSymlinkDir, 'file.txt');
     const resolved = await resolveCanonicalPath(filePath);
