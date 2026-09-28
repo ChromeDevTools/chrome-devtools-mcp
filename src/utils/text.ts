@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 const VALID_PLACEHOLDER_MATCH_PATTERN =
   /\{(PLACEHOLDER_[a-zA-Z][a-zA-Z0-9_]*)\}/g;
 
