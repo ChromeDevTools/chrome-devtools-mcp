@@ -258,6 +258,40 @@ Pass them via the `args` property in the JSON configuration. For example:
 }
 ```
 
+## Configuration file
+
+Instead of passing flags, you can put the options in a JSON file. Keys use the
+camelCase option names:
+
+```json
+{
+  "headless": true,
+  "channel": "canary",
+  "memoryDebugging": true,
+  "blockedUrlPattern": ["*://*.example.com/*"]
+}
+```
+
+The server uses the first config file it finds in the following locations,
+from highest to lowest priority. Config files are not merged.
+
+1. The path passed via `--config`.
+2. `cd4a.config.json` in the current working directory.
+3. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
+   [agent plugin](https://agent-plugins.org/specification).
+4. The global config file:
+   - macOS and Linux: `$XDG_CONFIG_HOME/cd4a/config.json`, falling back to
+     `~/.config/cd4a/config.json`.
+   - Windows: `%LOCALAPPDATA%/Google/cd4a/config.json`, falling back to
+     `~/.config/cd4a/config.json`.
+
+Flags passed on the command line take precedence over the values in the config
+file.
+
+Set the `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable to turn off the
+search for config files, for example in tests. A config file passed via
+`--config` is still used.
+
 ## Connecting via WebSocket with custom headers
 
 You can connect directly to a Chrome WebSocket endpoint and include custom headers (e.g., for authentication):
