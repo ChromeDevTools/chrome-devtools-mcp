@@ -10,6 +10,8 @@ import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
+import {ConfigWatcher} from './config/ConfigWatcher.js';
+import {getRestartRequiredChanges} from './config/reload.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {type LiveMcpContextOptions, McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
@@ -72,6 +74,7 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
+  #configWatcher?: ConfigWatcher;
   #tools = new Map<string, ToolEntry>();
 
   private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
@@ -209,9 +212,59 @@ export class McpServer {
   }
 
   /**
+   * Watches the config file and applies its changes to the running server.
+   *
+   * @param reload Re-reads the config file and returns the new arguments.
+   */
+  watchConfig(
+    configPath: string | undefined,
+    reload: () => ParsedArguments,
+  ): void {
+    if (!configPath) {
+      console.error(
+        '--watchConfig has no effect because no config file was found.',
+      );
+      return;
+    }
+    this.#configWatcher?.dispose();
+    this.#configWatcher = new ConfigWatcher(configPath, () =>
+      this.#reloadConfig(configPath, reload),
+    );
+    this.#configWatcher.start();
+  }
+
+  async #reloadConfig(
+    configPath: string,
+    reload: () => ParsedArguments,
+  ): Promise<void> {
+    let serverArgs: ParsedArguments;
+    try {
+      serverArgs = reload();
+    } catch (err) {
+      console.error(
+        `Keeping the previous configuration, failed to reload ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return;
+    }
+    const restartRequired = getRestartRequiredChanges(
+      this.#serverArgs,
+      serverArgs,
+    );
+    await this.applyConfig(serverArgs);
+    logger?.(`Applied config changes from ${configPath}`);
+    if (restartRequired.length > 0) {
+      console.error(
+        `Restart chrome-devtools-mcp to fully apply changes to ${restartRequired.map(name => `--${name}`).join(', ')} from ${configPath}.`,
+      );
+    }
+  }
+
+  /**
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
+    this.#configWatcher?.dispose();
+    this.#configWatcher = undefined;
     try {
       this.#context?.dispose();
     } catch (err) {

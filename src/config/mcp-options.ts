@@ -201,6 +201,12 @@ export const mcpOptions = {
       return path.resolve(configPath);
     },
   },
+  watchConfig: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Watch the config file for changes and apply them without restarting. Tools are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.',
+  },
 } satisfies Record<string, YargsOptions>;
 
 export function getMcpOptionsForViaCli(): Record<
