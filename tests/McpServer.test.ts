@@ -10,7 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
-import {parseArguments} from '../src/config/ConfigParser.js';
+import {ConfigParser} from '../src/config/ConfigParser.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
@@ -33,9 +33,9 @@ describe('McpServer', () => {
     context.getPages.returns([]);
     sinon.stub(McpContext, 'from').resolves(context);
 
-    const serverArgs = parseArguments('1.0.0', ['node', 'script.js'], {
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    });
+    }).parse();
     const server = await McpServer.from(serverArgs, {browserManager});
     return {server, browserManager, context};
   }

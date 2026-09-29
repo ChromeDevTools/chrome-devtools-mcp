@@ -228,12 +228,3 @@ export class ConfigParser {
     }
   }
 }
-
-export function parseArguments(
-  version: string,
-  argv = process.argv,
-  env = process.env,
-  exitProcess = true,
-): ParsedArguments {
-  return new ConfigParser(version, argv, env, exitProcess).parse();
-}

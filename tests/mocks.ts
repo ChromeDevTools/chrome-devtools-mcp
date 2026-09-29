@@ -1,7 +1,4 @@
-import {
-  type ParsedArguments,
-  parseArguments,
-} from '../src/config/ConfigParser.js';
+import {type ParsedArguments, ConfigParser} from '../src/config/ConfigParser.js';
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -1068,12 +1065,12 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = parseArguments(
+  const defaultArgs = new ConfigParser(
     '0.0.0',
     ['node', 'main.js'],
     process.env,
     false,
-  );
+  ).parse();
   return {...defaultArgs, ...options};
 }
 

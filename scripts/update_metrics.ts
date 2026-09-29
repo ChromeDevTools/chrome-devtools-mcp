@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import {mcpOptions} from '../build/src/config/mcp-options.js';
-import {parseArguments} from '../build/src/config/ConfigParser.js';
+import {ConfigParser} from '../build/src/config/ConfigParser.js';
 import {ErrorCode} from '../build/src/telemetry/errors.js';
 import {
   getPossibleFlagMetrics,
@@ -37,8 +37,10 @@ function writeToolCallMetricsConfig() {
   }
 
   // Avoid 'as ParsedArguments' by using parseArguments
-  const fullTools = createTools(parseArguments('0.0.0', ['', '']));
-  const slimTools = createTools(parseArguments('0.0.0', ['', '', '--slim']));
+  const fullTools = createTools(new ConfigParser('0.0.0', ['', '']).parse());
+  const slimTools = createTools(
+    new ConfigParser('0.0.0', ['', '', '--slim']).parse(),
+  );
 
   const allTools = [...fullTools, ...slimTools];
 
