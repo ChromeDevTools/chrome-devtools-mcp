@@ -113,18 +113,20 @@ export function isAllowedUrl(
 const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
 
 /**
- * Finds the first pattern that uses a URLPattern regexp group (for example
- * `(127\.\d+\.\d+\.\d+)`) in any component -- protocol, username, password,
- * hostname, port, pathname, search, or hash. Chromium's
- * `SimpleUrlPatternMatcher::Component::Create` rejects any component whose
- * `HasRegexGroups()` is true and silently drops the rule, so
- * `Network.emulateNetworkConditionsByRule` does not enforce these patterns
- * on redirects or subresources, unlike the initial navigation check. A plain
- * wildcard (`*`) or named group (`:name`) has no regexp group and is
- * unaffected.
+ * Checks whether a compiled URLPattern component contains an unescaped `:`
+ * (which always represents a `:name` group in URLPattern syntax).
+ */
+function hasNamedGroup(component: string): boolean {
+  return component.replaceAll('\\\\', '').replaceAll('\\:', '').includes(':');
+}
+
+/**
+ * Finds the first pattern that Chrome can't enforce on redirects or subresources:
+ * - Any pattern containing a regexp group (for example `(foo|bar)`).
+ * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/*`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
- * @returns The first unenforceable pattern, or undefined if all are safe.
+ * @returns The first unenforceable pattern, or undefined if all are valid.
  * @throws Error if a pattern's syntax is invalid (via `new URLPattern`).
  */
 export function findUnenforceablePattern(
@@ -133,6 +135,19 @@ export function findUnenforceablePattern(
   for (const raw of patterns) {
     const parsed = new URLPattern(raw);
     if (parsed.hasRegExpGroups) {
+      return raw;
+    }
+    const components = [
+      parsed.protocol,
+      parsed.username,
+      parsed.password,
+      parsed.hostname,
+      parsed.port,
+      parsed.pathname,
+      parsed.search,
+      parsed.hash,
+    ];
+    if (components.some(hasNamedGroup)) {
       return raw;
     }
   }
