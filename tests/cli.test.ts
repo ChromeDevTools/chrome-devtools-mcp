@@ -180,6 +180,83 @@ describe('cli args parsing', () => {
       assert.strictEqual(args.allowUnrestrictedPaths, true);
     });
 
+    it('accepts an explicit unrestricted flag in CLI mode', async () => {
+      const args = parseArguments(['--viaCli', '--allow-unrestricted-paths']);
+      assert.strictEqual(args.allowUnrestrictedPaths, true);
+      assert.strictEqual(args.filesystemRoot, undefined);
+    });
+
+    it('rejects unrestricted paths with a CLI workspace', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--viaCli',
+            '--allow-unrestricted-paths',
+            '--workspace=/tmp/one',
+          ]),
+        /Arguments allowUnrestrictedPaths and filesystemRoot are mutually exclusive/,
+      );
+    });
+
+    it('rejects unrestricted paths with a direct filesystem root', async () => {
+      assert.throws(
+        () =>
+          parseArguments([
+            '--allow-unrestricted-paths',
+            '--filesystem-root=/tmp/one',
+          ]),
+        /Arguments allowUnrestrictedPaths and filesystemRoot are mutually exclusive/,
+      );
+    });
+
+    it('rejects a config unrestricted flag with a CLI workspace', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({allowUnrestrictedPaths: true}),
+        'cd4a.test.config.unrestricted-workspace.json',
+      );
+      assert.throws(
+        () =>
+          parseArguments([
+            '--viaCli',
+            '--config',
+            testConfig.path,
+            '--workspace=/tmp/one',
+          ]),
+        /Arguments allowUnrestrictedPaths and filesystemRoot are mutually exclusive/,
+      );
+    });
+
+    it('rejects a config filesystem root with a CLI unrestricted flag', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({filesystemRoot: ['/tmp/one']}),
+        'cd4a.test.config.root-unrestricted.json',
+      );
+      assert.throws(
+        () =>
+          parseArguments([
+            '--config',
+            testConfig.path,
+            '--allow-unrestricted-paths',
+          ]),
+        /Arguments allowUnrestrictedPaths and filesystemRoot are mutually exclusive/,
+      );
+    });
+
+    it('lets an explicit false override config unrestricted with a workspace', async () => {
+      using testConfig = createTempFile(
+        JSON.stringify({allowUnrestrictedPaths: true}),
+        'cd4a.test.config.unrestricted-false.json',
+      );
+      const args = parseArguments([
+        '--config',
+        testConfig.path,
+        '--no-allow-unrestricted-paths',
+        '--workspace=/tmp/one',
+      ]);
+      assert.strictEqual(args.allowUnrestrictedPaths, false);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
+    });
+
     it('lets an explicit workspace override the CLI unrestricted default', async () => {
       const args = parseArguments(['--viaCli', '--workspace=/tmp/one']);
       assert.strictEqual(args.allowUnrestrictedPaths, false);

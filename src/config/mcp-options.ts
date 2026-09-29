@@ -459,6 +459,7 @@ const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
   ['autoConnect', 'isolated'],
   ['autoConnect', 'executablePath'],
   ['blockedUrlPattern', 'allowedUrlPattern'],
+  ['allowUnrestrictedPaths', 'filesystemRoot'],
   ['categoryPwa', 'autoConnect'],
   ['categoryPwa', 'browserUrl', 'wsEndpoint'],
   ['categoryExtensions', 'autoConnect'],
