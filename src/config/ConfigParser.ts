@@ -20,8 +20,6 @@ import {
   withoutDefaults,
 } from './mcp-options.js';
 
-export type ParsedArgumentsBase = Record<string, unknown>;
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
