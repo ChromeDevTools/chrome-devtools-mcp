@@ -121,9 +121,20 @@ function hasNamedGroup(component: string): boolean {
 }
 
 /**
+ * Checks whether a URLPattern string has a partial IPv4 wildcard in the
+ * hostname (for example `127.0.0.*` or `*.0.0.1`), which Chrome cannot
+ * enforce on redirects or subresources.
+ */
+function hasPartialIpv4Hostname(pattern: string): boolean {
+  const hostname = /:\/\/([^/:?#]+)/.exec(pattern)?.[1] ?? '';
+  return hostname.includes('*') && /^\d|\d$/.test(hostname);
+}
+
+/**
  * Finds the first pattern that Chrome can't enforce on redirects or subresources:
  * - Any pattern containing a regexp group (for example `(foo|bar)`).
- * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/*`).
+ * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/path`).
+ * - Any pattern with a partial IPv4 wildcard in the hostname (for example `127.0.0.*`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
  * @returns The first unenforceable pattern, or undefined if all are valid.
@@ -147,7 +158,7 @@ export function findUnenforceablePattern(
       parsed.search,
       parsed.hash,
     ];
-    if (components.some(hasNamedGroup)) {
+    if (components.some(hasNamedGroup) || hasPartialIpv4Hostname(raw)) {
       return raw;
     }
   }

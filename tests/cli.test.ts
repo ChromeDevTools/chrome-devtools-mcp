@@ -426,7 +426,7 @@ describe('cli args parsing', () => {
     ]);
   });
 
-  it('rejects url-pattern with a regexp group or named group', async () => {
+  it('rejects url-pattern with a regexp group, named group, or partial IPv4 wildcard', async () => {
     assert.throws(
       () =>
         parseArguments([
@@ -450,6 +450,16 @@ describe('cli args parsing', () => {
 
     assert.throws(
       () => parseArguments(['--allowedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseArguments(['--blockedUrlPattern=*://127.0.0.*/*']),
+      /Invalid --blockedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseArguments(['--allowedUrlPattern=*://127.0.0.*/*']),
       /Invalid --allowedUrlPattern .*is not enforced/,
     );
   });
