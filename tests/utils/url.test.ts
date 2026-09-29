@@ -468,24 +468,18 @@ describe('findUnenforceablePattern', () => {
     );
   });
 
-  it('allows named groups in hostname and pathname', () => {
-    assert.strictEqual(
-      findUnenforceablePattern([
-        '*://:sub.example.com/*',
-        '*://example.com/:path',
-        '*://{:sub}.example.com/{:path}',
-      ]),
-      undefined,
-    );
-  });
-
-  it('flags a named group in port, protocol, username, password, search, or hash', () => {
+  it('flags a named group in any component', () => {
     for (const pattern of [
       '*://127.0.0.1::port/secret',
       '*://127.0.0.1:{:port}/secret',
       ':proto://example.com/*',
       '*://:user@example.com/*',
       '*://user::pass@example.com/*',
+      '*://:sub.example.com/*',
+      '*://{:sub}.example.com/*',
+      '*://127.0.0.:oct:*/blocked/:page',
+      '*://example.com/:path',
+      '*://example.com/{:path}',
       '*://example.com/path?:query',
       '*://example.com/path?token=:secret',
       '*://example.com/*#:hash',

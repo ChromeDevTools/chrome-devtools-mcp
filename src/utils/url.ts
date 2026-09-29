@@ -123,8 +123,7 @@ function hasNamedGroup(component: string): boolean {
 /**
  * Finds the first pattern that Chrome can't enforce on redirects or subresources:
  * - Any pattern containing a regexp group (for example `(foo|bar)`).
- * - Any pattern containing a named group (`:name`) outside `hostname` or
- *   `pathname` (for example `*://127.0.0.1::port/*`).
+ * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/*`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
  * @returns The first unenforceable pattern, or undefined if all are valid.
@@ -138,15 +137,17 @@ export function findUnenforceablePattern(
     if (parsed.hasRegExpGroups) {
       return raw;
     }
-    const nonSegmentedComponents = [
+    const components = [
       parsed.protocol,
       parsed.username,
       parsed.password,
+      parsed.hostname,
       parsed.port,
+      parsed.pathname,
       parsed.search,
       parsed.hash,
     ];
-    if (nonSegmentedComponents.some(hasNamedGroup)) {
+    if (components.some(hasNamedGroup)) {
       return raw;
     }
   }
