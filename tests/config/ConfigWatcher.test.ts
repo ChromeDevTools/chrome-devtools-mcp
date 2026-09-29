@@ -97,6 +97,18 @@ describe('ConfigWatcher', () => {
     sinon.assert.calledOnceWithExactly(onChange);
   });
 
+  it('does not call onChange if the content did not change', async () => {
+    using dir = createTempDir('cd4a-watcher-');
+    const configPath = writeConfig(dir.path);
+    const onChange = sinon.stub().resolves();
+    using _watcher = startWatcher(configPath, onChange);
+
+    fs.writeFileSync(configPath, '{}');
+    await wait(SETTLE_MS);
+
+    sinon.assert.notCalled(onChange);
+  });
+
   it('stops calling onChange after dispose', async () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);

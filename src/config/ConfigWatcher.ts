@@ -17,6 +17,18 @@ function getErrorMessage(err: unknown): string {
 }
 
 /**
+ * Returns undefined if the file cannot be read, for example while it is being
+ * replaced.
+ */
+function readContent(filePath: string): string | undefined {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Watches a config file and calls `onChange` after it was modified.
  *
  * - Symlinks are resolved once on start, and the directory of the real file is
@@ -25,6 +37,8 @@ function getErrorMessage(err: unknown): string {
  * - Events are debounced because some platforms emit several events for a
  *   single change.
  * - Some platforms do not report the file name, such events are not filtered.
+ * - `onChange` is only called if the content changed. For example, macOS can
+ *   report events that happened shortly before the watcher was started.
  */
 export class ConfigWatcher implements Disposable {
   readonly #configPath: string;
@@ -32,6 +46,7 @@ export class ConfigWatcher implements Disposable {
   readonly #debounceMs: number;
   #watcher?: fs.FSWatcher;
   #debounced?: ReturnType<typeof DevTools.Common.Debouncer.debounce>;
+  #content?: string;
 
   constructor(
     configPath: string,
@@ -49,7 +64,13 @@ export class ConfigWatcher implements Disposable {
     }
     const realPath = fs.realpathSync(this.#configPath);
     const fileName = path.basename(realPath);
+    this.#content = readContent(realPath);
     this.#debounced = DevTools.Common.Debouncer.debounce(() => {
+      const content = readContent(realPath);
+      if (content === this.#content) {
+        return;
+      }
+      this.#content = content;
       this.#onChange().catch(err => {
         console.error(`Failed to apply ${this.#configPath}:`, err);
       });
