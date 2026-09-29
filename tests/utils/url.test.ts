@@ -462,6 +462,7 @@ describe('findUnenforceablePattern', () => {
       findUnenforceablePattern([
         '*://127.0.0.1:*/*',
         '*://*.example.com/*',
+        '*://*.123.example.com/*',
         'https://127.0.0.1:8080/secret',
       ]),
       undefined,
@@ -483,6 +484,20 @@ describe('findUnenforceablePattern', () => {
       '*://example.com/path?:query',
       '*://example.com/path?token=:secret',
       '*://example.com/*#:hash',
+    ]) {
+      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+    }
+  });
+
+  it('flags a partial IPv4 wildcard in the hostname', () => {
+    for (const pattern of [
+      '*://127.0.0.*/*',
+      '*://127.*:*/*',
+      '*://*.0.0.1/*',
+      '*://127.*.0.1/*',
+      '*://127.0.0*/*',
+      '*://127.0.0.{*}/*',
+      '*://0x7f.0.0.*/*',
     ]) {
       assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
     }

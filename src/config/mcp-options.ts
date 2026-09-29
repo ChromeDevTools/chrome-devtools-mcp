@@ -142,7 +142,7 @@ export const mcpOptions = {
     type: 'array',
     string: true,
     describe:
-      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group or a named group (`:name`) in any component (for example `(127\\.\\d+\\.\\d+\\.\\d+)` in the hostname or `*://127.0.0.1::port/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.",
+      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\\.\\d+\\.\\d+\\.\\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.",
     conflicts: ['allowedUrlPattern'],
     coerce: (arg: string[] | undefined) => {
       if (arg === undefined) {
@@ -151,7 +151,7 @@ export const mcpOptions = {
       const pattern = findUnenforceablePattern(arg);
       if (pattern) {
         throw new Error(
-          `Invalid --blockedUrlPattern "${pattern}": a regexp group or a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+          `Invalid --blockedUrlPattern "${pattern}": a regexp group, a ":name" named group, or a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
         );
       }
       return arg;
@@ -161,7 +161,7 @@ export const mcpOptions = {
     type: 'array',
     string: true,
     describe:
-      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group or a named group (`:name`) in any component (for example `(127\\.\\d+\\.\\d+\\.\\d+)` in the hostname or `*://127.0.0.1::port/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.",
+      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\\.\\d+\\.\\d+\\.\\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.",
     conflicts: ['blockedUrlPattern'],
     coerce: (arg: string[] | undefined) => {
       if (arg === undefined) {
@@ -170,7 +170,7 @@ export const mcpOptions = {
       const pattern = findUnenforceablePattern(arg);
       if (pattern) {
         throw new Error(
-          `Invalid --allowedUrlPattern "${pattern}": a regexp group or a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+          `Invalid --allowedUrlPattern "${pattern}": a regexp group, a ":name" named group, or a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
         );
       }
       return arg;
