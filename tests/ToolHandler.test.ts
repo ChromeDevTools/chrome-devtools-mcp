@@ -544,6 +544,64 @@ describe('ToolHandler', () => {
     assert.strictEqual(disabledHandler.disabled, true);
   });
 
+  describe('slim mode', () => {
+    function createHandler(toolName: string, argv: string[]) {
+      const serverArgs = new ConfigParser(
+        '1.0.0',
+        ['node', 'script.js', ...argv],
+        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+      ).parse();
+      const tool = createTools(serverArgs).find(t => t.name === toolName);
+      if (!tool) {
+        assert.fail(`${toolName} not found`);
+      }
+      return new ToolHandler(
+        tool,
+        serverArgs,
+        async () => sinon.createStubInstance(McpContext),
+        new Mutex(),
+        sinon.spy(),
+        sinon.spy(),
+      );
+    }
+
+    it('disables slim tools without --slim', async () => {
+      const handler = createHandler('navigate', []);
+
+      assert.strictEqual(handler.disabled, true);
+      const result = await handler.handle({url: 'https://example.com'});
+      assert.strictEqual(result.isError, true);
+      assert.deepStrictEqual(result.content, [
+        {type: 'text', text: 'Tool navigate is only available with --slim.'},
+      ]);
+    });
+
+    it('disables non-slim tools with --slim', async () => {
+      const handler = createHandler('navigate_page', ['--slim']);
+
+      assert.strictEqual(handler.disabled, true);
+      const result = await handler.handle({url: 'https://example.com'});
+      assert.strictEqual(result.isError, true);
+      assert.deepStrictEqual(result.content, [
+        {
+          type: 'text',
+          text: 'Tool navigate_page is not available with --slim.',
+        },
+      ]);
+    });
+
+    it('enables slim tools with --slim', () => {
+      assert.strictEqual(createHandler('navigate', ['--slim']).disabled, false);
+    });
+
+    it('disables tools from the other mode even via CLI', () => {
+      assert.strictEqual(
+        createHandler('navigate', ['--viaCli']).disabled,
+        true,
+      );
+    });
+  });
+
   it('validates files specified in verifyFilesSchema and rewrites input with validated paths/URLs', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;

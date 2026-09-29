@@ -20,6 +20,7 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
+import {isAvailableInMode, isSlimTool} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -55,7 +56,17 @@ function buildDisabledMessage(
 function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ParsedArguments,
-): {disabled: boolean; reason?: string} {
+): {disabled: boolean; reason?: string; unavailableInMode?: boolean} {
+  if (!isAvailableInMode(tool, serverArgs)) {
+    return {
+      disabled: true,
+      unavailableInMode: true,
+      reason: isSlimTool(tool)
+        ? `Tool ${tool.name} is only available with --slim.`
+        : `Tool ${tool.name} is not available with --slim.`,
+    };
+  }
+
   const category = tool.annotations.category;
   if (category) {
     const flag = categoryToFlagName(category);
@@ -180,9 +191,13 @@ export class ToolHandler {
     private readonly forgetBrowserOnTimeout: (browser: Browser) => void,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
   ) {
-    const {disabled, reason} = getToolStatusInfo(tool, serverArgs);
+    const {disabled, reason, unavailableInMode} = getToolStatusInfo(
+      tool,
+      serverArgs,
+    );
     this.disabledReason = reason;
-    this.disabled = disabled && !serverArgs.viaCli;
+    this.disabled =
+      disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
 
     this.inputSchema = tool.schema;
     this.registeredInputSchema = zod.object(this.inputSchema).strict();
@@ -276,7 +291,7 @@ export class ToolHandler {
               page =
                 this.serverArgs.pageIdRouting &&
                 pageId !== undefined &&
-                !this.serverArgs.slim
+                !isSlimTool(this.tool)
                   ? context.getPageById(pageId)
                   : context.getSelectedMcpPage();
               await page?.init();

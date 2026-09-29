@@ -23,7 +23,7 @@ describe('McpServer', () => {
     ClearcutLogger.resetForTesting();
   });
 
-  async function createTestServer() {
+  async function createTestServer(extraArgs: string[] = []) {
     const browserManager = sinon.createStubInstance(BrowserManager);
     const browser = createMockPuppeteerBrowser();
     browserManager.ensureBrowser.resolves(browser);
@@ -33,9 +33,13 @@ describe('McpServer', () => {
     context.getPages.returns([]);
     sinon.stub(McpContext, 'from').resolves(context);
 
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const serverArgs = new ConfigParser(
+      '1.0.0',
+      ['node', 'script.js', ...extraArgs],
+      {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      },
+    ).parse();
     const server = await McpServer.from(serverArgs, {browserManager});
     return {server, browserManager, context};
   }
@@ -80,6 +84,28 @@ describe('McpServer', () => {
       assert.strictEqual(result.isError, undefined);
       sinon.assert.calledOnce(browserManager.ensureBrowser);
       sinon.assert.calledOnce(context.createPagesSnapshot);
+    });
+  });
+
+  describe('slim mode', () => {
+    it('does not register slim tools without --slim', async () => {
+      const {server} = await createTestServer();
+
+      const result = await server.callTool('navigate', {url: 'about:blank'});
+
+      assert.deepStrictEqual(result.content, [
+        {type: 'text', text: 'Tool navigate not found'},
+      ]);
+    });
+
+    it('registers only slim tools with --slim', async () => {
+      const {server} = await createTestServer(['--slim']);
+
+      const result = await server.callTool('list_pages');
+
+      assert.deepStrictEqual(result.content, [
+        {type: 'text', text: 'Tool list_pages not found'},
+      ]);
     });
   });
 });
