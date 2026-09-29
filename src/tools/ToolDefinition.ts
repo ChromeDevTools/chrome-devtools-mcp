@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -72,7 +72,9 @@ export type MergeSchema<Schema extends zod.ZodRawShape> = {
     : zod.ZodOptional<ExtractSchemaField<Schema, K>>;
 };
 
-export interface BaseToolDefinition<Schema extends zod.ZodRawShape = zod.ZodRawShape> {
+export interface BaseToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> {
   name: string;
   description: string;
   annotations: {

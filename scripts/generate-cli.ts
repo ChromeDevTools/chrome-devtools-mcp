@@ -11,7 +11,8 @@ import {
   isCategoryOffByDefault,
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
-import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
+import {mcpOptions} from '../build/src/config/mcp-options.js';
+import {parseArguments} from '../build/src/config/ConfigParser.js';
 import {zod} from '../build/src/third_party/index.js';
 import {labels, ToolCategory} from '../build/src/tools/categories.js';
 import {createTools} from '../build/src/tools/tools.js';

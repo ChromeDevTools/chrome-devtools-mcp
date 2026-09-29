@@ -10,7 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
-import {parseArguments} from '../src/config/mcp-options.js';
+import {parseArguments} from '../src/config/ConfigParser.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';

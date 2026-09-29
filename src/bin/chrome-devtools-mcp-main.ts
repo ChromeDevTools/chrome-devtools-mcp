@@ -18,7 +18,8 @@ import {logger, saveLogsToFile} from '../utils/logger.js';
 import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {VERSION} from '../version.js';
 
-import {mcpOptions, parseArguments} from '../config/mcp-options.js';
+import {mcpOptions} from '../config/mcp-options.js';
+import {parseArguments} from '../config/ConfigParser.js';
 
 await checkForUpdates(
   'Run `npm install chrome-devtools-mcp@latest` to update.',

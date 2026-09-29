@@ -1,3 +1,5 @@
+import {mcpOptions} from '../src/config/mcp-options.js';
+import {parseArguments as parseArgumentsImpl} from '../src/config/ConfigParser.js';
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -10,11 +12,7 @@ import {describe, it} from 'node:test';
 
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
-import {
-  getCliOptions,
-  mcpOptions,
-  parseArguments as parseArgumentsImpl,
-} from '../src/config/mcp-options.js';
+import {getCliOptions} from '../src/config/mcp-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';

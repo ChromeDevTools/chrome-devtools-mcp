@@ -12,7 +12,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {parseArguments} from '../../src/config/mcp-options.js';
+import {parseArguments} from '../../src/config/ConfigParser.js';
 import {ScreenRecorder} from '../../src/third_party/index.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {createHandlerMocks} from '../mocks.js';

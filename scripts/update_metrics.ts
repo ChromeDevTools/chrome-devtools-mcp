@@ -7,7 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import {mcpOptions, parseArguments} from '../build/src/config/mcp-options.js';
+import {mcpOptions} from '../build/src/config/mcp-options.js';
+import {parseArguments} from '../build/src/config/ConfigParser.js';
 import {ErrorCode} from '../build/src/telemetry/errors.js';
 import {
   getPossibleFlagMetrics,

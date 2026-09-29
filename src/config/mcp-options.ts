@@ -1,5 +1,3 @@
-// eslint-disable-next-line import/no-cycle
-import {withoutDefaults} from './ConfigParser.js';
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -463,4 +461,17 @@ export const IMPLICATIONS: Array<
   ['experimentalScreencastFps', 'experimentalScreencast'],
 ];
 
-export {parseArguments, type ParsedArguments} from './ConfigParser.js';
+export function withoutDefaults(
+  options: Record<string, YargsOptions>,
+): Record<string, YargsOptions> {
+  const result: Record<string, YargsOptions> = {};
+  for (const [key, option] of Object.entries(options)) {
+    const copy: YargsOptions = {...option};
+    if (copy.default !== undefined) {
+      copy.defaultDescription ??= JSON.stringify(copy.default);
+      delete copy.default;
+    }
+    result[key] = copy;
+  }
+  return result;
+}

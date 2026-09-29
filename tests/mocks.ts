@@ -1,3 +1,7 @@
+import {
+  type ParsedArguments,
+  parseArguments,
+} from '../src/config/ConfigParser.js';
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -25,10 +29,7 @@
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {
-  type ParsedArguments,
-  parseArguments,
-} from '../src/config/mcp-options.js';
+import {} from '../src/config/mcp-options.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';

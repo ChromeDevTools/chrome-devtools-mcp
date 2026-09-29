@@ -32,11 +32,8 @@ import {VERSION} from '../version.js';
 
 import {buildCommand} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
-import {
-  mcpOptions,
-  parseArguments,
-  getCliOptions,
-} from '../config/mcp-options.js';
+import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
+import {parseArguments} from '../config/ConfigParser.js';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',

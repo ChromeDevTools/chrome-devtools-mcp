@@ -11,7 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {parseArguments} from '../../../src/config/mcp-options.js';
+import {parseArguments} from '../../../src/config/ConfigParser.js';
 import {evaluate, navigate, screenshot} from '../../../src/tools/slim/tools.js';
 import {createHandlerMocks} from '../../mocks.js';
 import {screenshots} from '../../snapshot.js';
