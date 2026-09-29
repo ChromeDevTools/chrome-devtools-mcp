@@ -490,6 +490,54 @@ describe('browser', () => {
         sinon.assert.notCalled(freshBrowser.close);
         sinon.assert.calledTwice(launchStub);
       });
+
+      it('discards a queued attempt whose own timeout fires while still waiting for the mutex', async () => {
+        const firstBrowser = createMockPuppeteerBrowser();
+        const launchStarted = Promise.withResolvers<void>();
+        const launchDeferred = Promise.withResolvers<Browser>();
+        const launchStub = sinon.stub(puppeteer, 'launch').callsFake(() => {
+          launchStarted.resolve();
+          return launchDeferred.promise;
+        });
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const ensurePromise1 = manager.ensureBrowser();
+        await launchStarted.promise;
+
+        // Abandon call 1's own caller while its launch() is still pending
+        // and still holding #mutex.
+        manager.abandonPendingAttempt();
+
+        // #initPromise was just cleared, so this starts a genuinely new
+        // #ensureBrowserLocked() call that queues on #mutex (call 1 hasn't
+        // released it yet) instead of sharing call 1's promise.
+        const ensurePromise2 = manager.ensureBrowser();
+        // Abandon call 2's own caller too, while call 2 is still queued
+        // waiting for #mutex — the exact race being guarded against: call 2
+        // must not silently adopt this rotation as its own baseline once it
+        // gets the lock.
+        manager.abandonPendingAttempt();
+
+        launchDeferred.resolve(firstBrowser);
+
+        await assert.rejects(
+          ensurePromise1,
+          /Connection attempt was abandoned before it completed/,
+        );
+        await assert.rejects(
+          ensurePromise2,
+          /Connection attempt was abandoned before it completed/,
+        );
+
+        // Call 2 was already abandoned before it ever reached the front of
+        // #mutex, so it must bail immediately instead of starting (and then
+        // silently keeping) a second, unwanted browser.
+        sinon.assert.calledOnce(launchStub);
+        sinon.assert.calledOnceWithExactly(firstBrowser.close);
+      });
     });
   });
 

@@ -135,11 +135,22 @@ export class BrowserManager {
     if (this.#closingCount > 0) {
       throw new Error('Browser was closed while initializing.');
     }
+    // Captured before acquiring #mutex, not after: a caller queued here can
+    // have its own timeout fire (abandonPendingAttempt()) while it's still
+    // waiting for the lock. Capturing only after acquiring it would let such
+    // a call silently adopt the freshly-rotated token as its own baseline
+    // once the lock frees up, defeating the abandonment check entirely.
+    const attempt = this.#browserAttempt;
     using _guard = await this.#mutex.acquire();
     if (this.#closingCount > 0) {
       throw new Error('Browser was closed while initializing.');
     }
-    const attempt = this.#browserAttempt;
+    if (this.#browserAttempt !== attempt) {
+      // Abandoned while queued for the lock — #browser was never touched by
+      // this call, so bail immediately without #closeBrowser(), which could
+      // otherwise tear down a different, still-current attempt's browser.
+      throw new Error('Connection attempt was abandoned before it completed.');
+    }
     if (!this.#browser?.connected) {
       await this.#initBrowser();
     }
