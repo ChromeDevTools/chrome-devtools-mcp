@@ -841,12 +841,18 @@ export class McpPage implements ContextPage {
   async resolveBackendNodeId(
     backendNodeId: number,
   ): Promise<string | undefined> {
-    if (!this.textSnapshot) {
-      this.textSnapshot = await TextSnapshot.create(this);
+    let id = this.textSnapshot?.resolveCdpElementId(backendNodeId);
+    if (id) {
+      return id;
     }
-    let id = this.textSnapshot.resolveCdpElementId(backendNodeId);
-    if (!id) {
-      this.textSnapshot = await TextSnapshot.create(this);
+    this.textSnapshot = await TextSnapshot.create(this, {
+      verbose: this.textSnapshot?.verbose ?? false,
+    });
+    id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    if (!id && !this.textSnapshot.verbose) {
+      this.textSnapshot = await TextSnapshot.create(this, {
+        verbose: true,
+      });
       id = this.textSnapshot.resolveCdpElementId(backendNodeId);
     }
     return id;

@@ -92,7 +92,7 @@ export class DevToolsCommentBridge {
       try {
         const result = page.evaluate(() => {
           if (window.__onDevToolsCommentListener) {
-            window.universe?.cd4aBridge?.removeEventListener?.(
+            window.universe?.cd4aBridge?.removeEventListener(
               'CommentThreadsChanged',
               window.__onDevToolsCommentListener,
             );
