@@ -112,10 +112,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.
   - **Type:** array
 
-- **`--logFile`/ `--log-file`**
-  Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
-  - **Type:** string
-
 - **`--viewport`**
   Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.
   - **Type:** string
@@ -124,6 +120,36 @@ The Chrome DevTools MCP server supports the following configuration option:
   If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.
   - **Type:** boolean
   - **Default:** `false`
+
+- **`--blockedUrlPattern`/ `--blocked-url-pattern`**
+  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.
+  - **Type:** array
+
+- **`--allowedUrlPattern`/ `--allowed-url-pattern`**
+  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.
+  - **Type:** array
+
+- **`--screenshotFormat`/ `--screenshot-format`**
+  Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").
+  - **Type:** string
+  - **Choices:** `jpeg`, `png`, `webp`
+  - **Default:** `png`
+
+- **`--screenshotQuality`/ `--screenshot-quality`**
+  Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.
+  - **Type:** number
+
+- **`--screenshotMaxWidth`/ `--screenshot-max-width`**
+  Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.
+  - **Type:** number
+
+- **`--screenshotMaxHeight`/ `--screenshot-max-height`**
+  Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.
+  - **Type:** number
+
+- **`--logFile`/ `--log-file`**
+  Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.
+  - **Type:** string
 
 - **`--pageIdRouting`/ `--page-id-routing`**
   Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.
@@ -168,14 +194,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.
   - **Type:** number
 
-- **`--blockedUrlPattern`/ `--blocked-url-pattern`**
-  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.
-  - **Type:** array
-
-- **`--allowedUrlPattern`/ `--allowed-url-pattern`**
-  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.
-  - **Type:** array
-
 - **`--performanceCrux`/ `--performance-crux`**
   Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.
   - **Type:** boolean
@@ -195,24 +213,6 @@ The Chrome DevTools MCP server supports the following configuration option:
   Whether to enable source maps in DevTools. Use --no-source-maps to disable.
   - **Type:** boolean
   - **Default:** `true`
-
-- **`--screenshotFormat`/ `--screenshot-format`**
-  Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").
-  - **Type:** string
-  - **Choices:** `jpeg`, `png`, `webp`
-  - **Default:** `png`
-
-- **`--screenshotQuality`/ `--screenshot-quality`**
-  Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.
-  - **Type:** number
-
-- **`--screenshotMaxWidth`/ `--screenshot-max-width`**
-  Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.
-  - **Type:** number
-
-- **`--screenshotMaxHeight`/ `--screenshot-max-height`**
-  Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.
-  - **Type:** number
 
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
