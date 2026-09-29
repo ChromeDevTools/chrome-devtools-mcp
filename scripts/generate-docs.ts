@@ -20,7 +20,7 @@ import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
-import {createTools} from '../build/src/tools/tools.js';
+import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
@@ -338,6 +338,11 @@ function getToolsAndCategories(
         return false;
       }
 
+      // Skipping tools behind internal flags.
+      if (requiresHiddenFlag(tool)) {
+        return false;
+      }
+
       // Skipping internal interop tools not meant for public documentation
       const skipTools = ['get_tab_id'];
       if (skipTools.includes(tool.name)) {
@@ -399,12 +404,12 @@ function getToolsAndCategories(
 async function generateToolDocumentation(): Promise<void> {
   try {
     console.log('Generating tool documentation from definitions...');
+    // Returns both the regular and the slim tools.
+    const tools = createTools({pageIdRouting: true} as ParsedArguments);
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(
-          createTools({slim: false, pageIdRouting: true} as ParsedArguments),
-        );
+        getToolsAndCategories(tools.filter(tool => !tool.slim));
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,
@@ -416,7 +421,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(createTools({slim: true}));
+        getToolsAndCategories(tools.filter(tool => tool.slim));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,

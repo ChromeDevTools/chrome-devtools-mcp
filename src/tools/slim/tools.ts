@@ -13,6 +13,7 @@ import {validateUrl} from '../../utils/url.js';
 
 export const screenshot = definePageTool(() => ({
   name: 'screenshot',
+  slim: true,
   description: `Takes a screenshot`,
   annotations: {
     category: ToolCategory.DEBUGGING,
@@ -39,6 +40,7 @@ export const screenshot = definePageTool(() => ({
 export const navigate = definePageTool((args: ParsedArguments) => {
   return {
     name: 'navigate',
+    slim: true,
     description: `Loads a URL`,
     annotations: {
       category: ToolCategory.NAVIGATION,
@@ -84,6 +86,7 @@ export const navigate = definePageTool((args: ParsedArguments) => {
 
 export const evaluate = definePageTool(() => ({
   name: 'evaluate',
+  slim: true,
   description: `Evaluates a JavaScript script`,
   annotations: {
     category: ToolCategory.DEBUGGING,
