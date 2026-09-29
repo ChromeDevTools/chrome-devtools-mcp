@@ -15,6 +15,7 @@ import {
   parseCliArgs,
   parseConfigFile,
   validateConflicts,
+  validateImplications,
 } from '../../src/config/mcp-options.js';
 import {createTempFile} from '../utils.js';
 
@@ -91,6 +92,37 @@ describe('mcp-options steps', () => {
           }),
         /Arguments channel and browserUrl are mutually exclusive/,
       );
+    });
+
+    describe('validateImplications', () => {
+      it('accepts when implying key is not set', () => {
+        validateImplications({wsEndpoint: 'ws://localhost:9222'});
+      });
+
+      it('accepts when both implying and implied keys are set', () => {
+        validateImplications({
+          wsHeaders: {Auth: 'token'},
+          wsEndpoint: 'ws://localhost:9222',
+        });
+      });
+
+      it('rejects when implying key is set but implied key is missing', () => {
+        assert.throws(
+          () => validateImplications({wsHeaders: {Auth: 'token'}}),
+          /Implications failed:\n {2}wsHeaders -> wsEndpoint/,
+        );
+      });
+
+      it('rejects when implying key is set but implied key is negated', () => {
+        assert.throws(
+          () =>
+            validateImplications({
+              experimentalFfmpegPath: '/bin/ffmpeg',
+              experimentalScreencast: false,
+            }),
+          /Implications failed:\n {2}experimentalFfmpegPath -> experimentalScreencast/,
+        );
+      });
     });
   });
   describe('applyDefaults', () => {

@@ -327,9 +327,9 @@ type RawParsedArguments = ReturnType<
 >;
 
 export type ParsedArguments = {
-  [K in keyof RawParsedArguments as K extends '_' | '$0'
-    ? never
-    : K]: RawParsedArguments[K];
+  [
+    K in keyof RawParsedArguments as K extends '_' | '$0' ? never : K
+  ]: RawParsedArguments[K];
 };
 
 export function getMcpOptionsForViaCli(): Record<
