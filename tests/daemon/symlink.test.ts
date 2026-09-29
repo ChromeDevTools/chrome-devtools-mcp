@@ -154,7 +154,6 @@ describe('daemon security checks', () => {
       const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH], {
         env: {
           ...process.env,
-          XDG_RUNTIME_DIR: undefined,
           CHROME_DEVTOOLS_MCP_SESSION_ID: sessionId,
         },
       });
