@@ -480,47 +480,59 @@ describe('cli args parsing', () => {
     ]);
   });
 
-  it('rejects a blocked-url-pattern with a regexp group', async () => {
+  it('rejects url-pattern with a regexp group or named group', async () => {
     assert.throws(
       () =>
         parseConfig([
-          String.raw`--blocked-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
+          String.raw`--blockedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --blockedUrlPattern .*is not enforced/,
     );
 
+    assert.throws(
+      () =>
+        parseConfig([
+          String.raw`--allowedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
+        ]),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseConfig(['--blockedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --blockedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseConfig(['--allowedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+  });
+
+  it('rejects when any pattern in multiple url patterns is unenforceable', async () => {
     assert.throws(
       () =>
         parseConfig([
           '--blocked-url-pattern=https://a.com/*',
           String.raw`--blocked-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --blockedUrlPattern .*is not enforced/,
     );
-  });
-
-  it('rejects an allowed-url-pattern with a regexp group', async () => {
-    assert.throws(
-      () =>
-        parseConfig([
-          String.raw`--allowed-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
-        ]),
-      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
-    );
-
     assert.throws(
       () =>
         parseConfig([
           '--allowed-url-pattern=https://a.com/*',
-          String.raw`--allowed-url-pattern=(http|https)://example.com/*`,
+          String.raw`--allowed-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --allowedUrlPattern .*is not enforced/,
     );
   });
 
-  it('rejects a blocked-url-pattern with invalid syntax', async () => {
+  it('rejects url-pattern with invalid syntax', async () => {
     assert.throws(() =>
       parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
+    );
+    assert.throws(() =>
+      parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']),
     );
   });
 
@@ -559,6 +571,9 @@ describe('cli args parsing', () => {
     assert.throws(
       () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file: Invalid --allowedUrlPattern: at least one pattern is required/,
+    );
+    assert.throws(() =>
+      parseArguments(['--allowed-url-pattern=*://example.com/(unterminated']),
     );
   });
 

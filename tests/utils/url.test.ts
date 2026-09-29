@@ -436,11 +436,14 @@ describe('isAllowedUrl', () => {
 });
 
 describe('findUnenforceablePattern', () => {
-  it('flags a hostname regexp group', () => {
-    assert.strictEqual(
-      findUnenforceablePattern([String.raw`*://(127\.\d+\.\d+\.\d+):*/*`]),
+  it('flags a regexp group', () => {
+    for (const pattern of [
       String.raw`*://(127\.\d+\.\d+\.\d+):*/*`,
-    );
+      '*://example.com/(foo|bar)',
+      '(http|https)://example.com/*',
+    ]) {
+      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+    }
   });
 
   it('returns the first offending pattern among several', () => {
@@ -454,56 +457,60 @@ describe('findUnenforceablePattern', () => {
     );
   });
 
-  it('allows an exact hostname', () => {
+  it('allows plain wildcard patterns', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://127.0.0.1:*/*']),
+      findUnenforceablePattern([
+        '*://127.0.0.1:*/*',
+        '*://*.example.com/*',
+        'https://127.0.0.1:8080/secret',
+      ]),
       undefined,
     );
   });
 
-  it('allows a wildcard hostname', () => {
+  it('allows named groups in hostname and pathname', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://*.example.com/*']),
+      findUnenforceablePattern([
+        '*://:sub.example.com/*',
+        '*://example.com/:path',
+        '*://{:sub}.example.com/{:path}',
+      ]),
       undefined,
     );
   });
 
-  it('allows a named group hostname', () => {
+  it('flags a named group in port, protocol, username, password, search, or hash', () => {
+    for (const pattern of [
+      '*://127.0.0.1::port/secret',
+      '*://127.0.0.1:{:port}/secret',
+      ':proto://example.com/*',
+      '*://:user@example.com/*',
+      '*://user::pass@example.com/*',
+      '*://example.com/path?:query',
+      '*://example.com/path?token=:secret',
+      '*://example.com/*#:hash',
+    ]) {
+      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+    }
+  });
+
+  it('allows escaped colons unless an unescaped named group is also present', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://:sub.example.com/*']),
+      findUnenforceablePattern([
+        String.raw`*://example.com/path?foo=a\:b#bar\:c`,
+        String.raw`*://example.com/path?foo=a\\\:b#bar\\\:c`,
+      ]),
       undefined,
     );
-  });
-
-  it('flags a regexp group in the pathname', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://example.com/(foo|bar)']),
-      '*://example.com/(foo|bar)',
-    );
-  });
-
-  it('flags a regexp group in the protocol', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['(http|https)://example.com/*']),
-      '(http|https)://example.com/*',
-    );
-  });
-
-  it('flags a regexp group in the port', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['*://example.com:(80|443)/*']),
-      '*://example.com:(80|443)/*',
-    );
-  });
-
-  it('flags a regexp group in the search or hash', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['*://example.com/*?(foo|bar)']),
-      '*://example.com/*?(foo|bar)',
+      findUnenforceablePattern([
+        String.raw`*://example.com/path?foo=a\:b&bar=:baz`,
+      ]),
+      String.raw`*://example.com/path?foo=a\:b&bar=:baz`,
     );
     assert.strictEqual(
-      findUnenforceablePattern(['*://example.com/*#(foo|bar)']),
-      '*://example.com/*#(foo|bar)',
+      findUnenforceablePattern([String.raw`*://example.com/path?foo\\:bar`]),
+      String.raw`*://example.com/path?foo\\:bar`,
     );
   });
 
@@ -511,6 +518,7 @@ describe('findUnenforceablePattern', () => {
     assert.throws(() =>
       findUnenforceablePattern(['*://example.com/(unterminated']),
     );
+    assert.throws(() => findUnenforceablePattern(['http://[::1]:8080/*']));
   });
 
   it('returns undefined for an empty list', () => {
