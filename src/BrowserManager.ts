@@ -171,20 +171,26 @@ export class BrowserManager {
 
   /**
    * Signals that whoever was waiting on the in-flight ensureBrowser() call
-   * has given up (e.g. a tool-call timeout). Puppeteer gives no way to cancel
-   * a pending connect()/launch(), so the attempt keeps running in the
-   * background under #mutex; this doesn't stop it, it only replaces the
-   * shared token with a fresh, distinct one and clears #initPromise so the
-   * next ensureBrowser() call gets its own tracked promise instead of
-   * awaiting the doomed one. If the abandoned attempt later resolves anyway,
-   * #ensureBrowserLocked() will see its captured token no longer matches and
-   * discard the result instead of returning it to a caller who isn't
-   * waiting anymore — otherwise a stale, no-longer-wanted connection could
-   * silently be handed to a future, unrelated call.
+   * has given up (e.g. a tool-call timeout). There's no way to cancel a
+   * pending connect()/launch(), so this doesn't stop it — it rotates the
+   * token to a fresh value and clears #initPromise, so a late-resolving
+   * attempt gets discarded by #ensureBrowserLocked() instead of silently
+   * installed for a caller who already walked away.
+   *
+   * Also forgets the cached #browser, if any. This only ever fires from a
+   * getContext()-level timeout, which covers both ensureBrowser() and the
+   * McpContext initialization built on it — if ensureBrowser() already
+   * resolved and it's that later step hanging (e.g. a dead CDP transport),
+   * the token rotation alone does nothing, since #browser is already
+   * cached. Safe to forget unconditionally here: the tool mutex serializes
+   * every call, so there's no concurrent caller to disrupt.
    */
   abandonPendingAttempt(): void {
     this.#browserAttempt = new BrowserAttempt();
     this.#initPromise = undefined;
+    if (this.#browser) {
+      this.forget(this.#browser);
+    }
   }
 
   async #initBrowser(): Promise<Browser> {

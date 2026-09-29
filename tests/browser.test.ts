@@ -538,6 +538,37 @@ describe('browser', () => {
         sinon.assert.calledOnce(launchStub);
         sinon.assert.calledOnceWithExactly(firstBrowser.close);
       });
+
+      it('forgets the already-cached browser when abandoned after ensureBrowser() already resolved', async () => {
+        const firstBrowser = createMockPuppeteerBrowser();
+        const secondBrowser = createMockPuppeteerBrowser();
+        const launchStub = sinon
+          .stub(puppeteer, 'launch')
+          .onFirstCall()
+          .resolves(firstBrowser)
+          .onSecondCall()
+          .resolves(secondBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const first = await manager.ensureBrowser();
+        assert.strictEqual(first, firstBrowser);
+
+        // Simulates a getContext()-level timeout firing after ensureBrowser()
+        // had already resolved — e.g. McpContext.from()'s own CDP
+        // initialization hanging on a transport that died silently. Token
+        // rotation alone wouldn't help here: there's no in-flight
+        // connect()/launch() left to discard, #browser is already cached.
+        manager.abandonPendingAttempt();
+
+        sinon.assert.calledOnceWithExactly(firstBrowser.close);
+
+        const second = await manager.ensureBrowser();
+        assert.strictEqual(second, secondBrowser);
+        sinon.assert.calledTwice(launchStub);
+      });
     });
   });
 
