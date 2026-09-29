@@ -11,7 +11,12 @@ import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {getRestartRequiredChanges} from '../../src/config/reload.js';
 
 function parseArgs(argv: string[] = []) {
-  return new ConfigParser('0.0.0', ['node', 'main.js', ...argv], {}).parse();
+  return new ConfigParser(
+    '0.0.0',
+    undefined,
+    ['node', 'main.js', ...argv],
+    {},
+  ).parse();
 }
 
 describe('getRestartRequiredChanges', () => {

@@ -22,7 +22,7 @@ describe('mcp-options steps', () => {
 
   describe('parseCliArgs', () => {
     it('returns only explicitly passed flags', () => {
-      const args = new ConfigParser('0.0.0', [
+      const args = new ConfigParser('0.0.0', undefined, [
         'node',
         'main.js',
         '--headless',
@@ -129,7 +129,7 @@ describe('mcp-options steps', () => {
   });
   describe('applyDefaults', () => {
     it('keeps explicit values and fills in defaults', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
+      const args = new ConfigParser('0.0.0', undefined, [], {}).applyDefaults({
         headless: true,
       });
       assert.strictEqual(args.headless, true);
@@ -145,14 +145,16 @@ describe('mcp-options steps', () => {
     ]) {
       it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
         assert.strictEqual(
-          new ConfigParser('0.0.0', [], {}).applyDefaults(explicitArgs).channel,
+          new ConfigParser('0.0.0', undefined, [], {}).applyDefaults(
+            explicitArgs,
+          ).channel,
           undefined,
         );
       });
     }
 
     it('applies viaCli defaults when launching a browser', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
+      const args = new ConfigParser('0.0.0', undefined, [], {}).applyDefaults({
         viaCli: true,
         filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
       });
@@ -164,7 +166,7 @@ describe('mcp-options steps', () => {
     });
 
     it('does not enable isolated or extensions for viaCli with browserUrl', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
+      const args = new ConfigParser('0.0.0', undefined, [], {}).applyDefaults({
         viaCli: true,
         browserUrl: 'http://localhost:9222',
       });
@@ -174,7 +176,9 @@ describe('mcp-options steps', () => {
 
     it('turns off usage statistics in CI', () => {
       sinon.stub(console, 'error');
-      const args = new ConfigParser('0.0.0', [], {CI: 'true'}).applyDefaults({
+      const args = new ConfigParser('0.0.0', undefined, [], {
+        CI: 'true',
+      }).applyDefaults({
         usageStatistics: true,
       });
       assert.strictEqual(args.usageStatistics, false);
@@ -183,7 +187,13 @@ describe('mcp-options steps', () => {
 
   describe('config discovery', () => {
     it('does not discover a config file without a locator', () => {
-      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
+      const parser = new ConfigParser(
+        '0.0.0',
+        undefined,
+        ['node', 'main.js'],
+        {},
+        false,
+      );
       assert.strictEqual(parser.parse().config, undefined);
       assert.strictEqual(parser.configPath, undefined);
     });
@@ -197,10 +207,10 @@ describe('mcp-options steps', () => {
       locator.locate.returns(configFile.path);
       const parser = new ConfigParser(
         '0.0.0',
+        locator,
         ['node', 'main.js'],
         {},
         false,
-        locator,
       );
 
       const args = parser.parse();
@@ -218,10 +228,10 @@ describe('mcp-options steps', () => {
       const locator = sinon.createStubInstance(ConfigLocator);
       const parser = new ConfigParser(
         '0.0.0',
+        locator,
         ['node', 'main.js', '--config', configFile.path],
         {},
         false,
-        locator,
       );
 
       assert.strictEqual(parser.parse().headless, true);
@@ -235,10 +245,10 @@ describe('mcp-options steps', () => {
       locator.locate.returns(configPath);
       const parser = new ConfigParser(
         '0.0.0',
+        locator,
         ['node', 'main.js', ...argv],
         {},
         false,
-        locator,
       );
       return {parser, locator};
     }

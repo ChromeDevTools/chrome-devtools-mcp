@@ -51,12 +51,16 @@ export class ConfigParser {
    * @param configLocator Used to discover a config file when `--config` is not
    * provided. Discovery is disabled if omitted.
    */
+  /**
+   * @param configLocator Finds the config file when `--config` is not passed.
+   * Config file discovery is off without it, for example in tests.
+   */
   constructor(
     private version: string,
+    private configLocator?: ConfigLocator,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
-    private configLocator?: ConfigLocator,
   ) {}
 
   /**

@@ -132,13 +132,7 @@ let server: Server | null = null;
 
 async function setupMCPServer() {
   logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-  const configParser = new ConfigParser(
-    VERSION,
-    process.argv,
-    process.env,
-    true,
-    new ConfigLocator(),
-  );
+  const configParser = new ConfigParser(VERSION, new ConfigLocator());
   const args = configParser.parse();
   const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
   const browserManager = new BrowserManager(args, {

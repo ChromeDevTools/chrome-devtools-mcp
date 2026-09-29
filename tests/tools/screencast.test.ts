@@ -234,7 +234,7 @@ describe('screencast', () => {
       context.ensureExtension.resolves(filePath);
 
       const experimentalFfmpegPath = '/custom/path/to/ffmpeg';
-      const args = new ConfigParser('test', [
+      const args = new ConfigParser('test', undefined, [
         'node',
         'test',
         '--experimental-screencast',
@@ -268,7 +268,7 @@ describe('screencast', () => {
       const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
       context.ensureExtension.resolves(filePath);
 
-      const args = new ConfigParser('test', [
+      const args = new ConfigParser('test', undefined, [
         'node',
         'test',
         '--experimental-screencast',

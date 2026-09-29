@@ -67,7 +67,7 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 
 async function generateCli() {
   const tools = createTools(
-    new ConfigParser('0.0.0', ['', '', '--viaCli']).parse(),
+    new ConfigParser('0.0.0', undefined, ['', '', '--viaCli']).parse(),
   );
 
   // Sort tools by name
