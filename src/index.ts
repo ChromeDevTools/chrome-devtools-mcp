@@ -11,7 +11,7 @@ import {pathToFileURL} from 'node:url';
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
-import {McpContext} from './McpContext.js';
+import {type LiveMcpContextOptions, McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -44,6 +44,10 @@ puppeteer.setFollowSymlinks(false);
  * slow client sends late still land.
  */
 const ROOTS_REQUEST_TIMEOUT = 5_000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 export interface McpServerOptions {
   browserManager: BrowserManager;
@@ -172,6 +176,39 @@ export class McpServer {
   }
 
   /**
+   * Applies new arguments to the running server. All tools are updated in
+   * place, which results in a single `tools/list_changed` notification. Options
+   * listed in RESTART_REQUIRED_OPTIONS are not applied to the running browser.
+   */
+  async applyConfig(serverArgs: ParsedArguments): Promise<void> {
+    using _guard = await this.#toolMutex.acquire();
+    // Slim mode selects which tools are registered, so it requires a restart.
+    this.#serverArgs = {...serverArgs, slim: this.#serverArgs.slim};
+    for (const tool of createTools(this.#serverArgs)) {
+      if (!isAvailableInMode(tool, this.#serverArgs)) {
+        continue;
+      }
+      const entry = this.#tools.get(tool.name);
+      if (!entry) {
+        this.#registerTool(tool);
+        continue;
+      }
+      const handler = this.#createToolHandler(tool);
+      entry.registeredTool.update({
+        description: tool.description,
+        paramsSchema: handler.registeredInputSchema,
+        annotations: tool.annotations,
+        // The SDK validates the arguments against paramsSchema, a zod object.
+        callback: args => handler.handle(isRecord(args) ? args : {}),
+        enabled: !handler.disabled,
+      });
+      entry.handler = handler;
+    }
+    this.#context?.updateOptions(this.#liveContextOptions());
+    this.#context?.setRoots(this.#combinedRoots());
+  }
+
+  /**
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
@@ -262,15 +299,9 @@ export class McpServer {
     if (this.#context?.browser !== browser) {
       this.#context?.dispose();
       this.#context = await McpContext.from(browser, logger, {
+        ...this.#liveContextOptions(),
         experimentalDevToolsDebugging:
           this.#serverArgs.experimentalDevtools ?? false,
-        experimentalIncludeAllPages:
-          this.#serverArgs.experimentalIncludeAllPages,
-        performanceCrux: this.#serverArgs.performanceCrux,
-        sourceMaps: this.#serverArgs.sourceMaps,
-        allowlist: this.#serverArgs.allowedUrlPattern,
-        blocklist: this.#serverArgs.blockedUrlPattern,
-        allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
@@ -297,6 +328,17 @@ export class McpServer {
       }
     }
     return this.#context;
+  }
+
+  #liveContextOptions(): LiveMcpContextOptions {
+    return {
+      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
+      performanceCrux: this.#serverArgs.performanceCrux,
+      sourceMaps: this.#serverArgs.sourceMaps,
+      allowlist: this.#serverArgs.allowedUrlPattern,
+      blocklist: this.#serverArgs.blockedUrlPattern,
+      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+    };
   }
 
   #createToolHandler(tool: ToolDefinition | DefinedPageTool): ToolHandler {

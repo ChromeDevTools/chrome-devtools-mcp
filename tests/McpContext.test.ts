@@ -824,6 +824,30 @@ describe('McpContext', () => {
       });
     });
 
+    describe('updateOptions', () => {
+      it('applies a new blocklist to a running context', async () => {
+        await withMcpContext(async (_response, context) => {
+          context.updateOptions({
+            performanceCrux: true,
+            blocklist: ['https://example.com/blocked*'],
+          });
+
+          await assert.rejects(
+            () => context.loadResource('https://example.com/blocked'),
+            /Blocked by blocklist/,
+          );
+        });
+      });
+
+      it('updates the CrUX setting', async () => {
+        await withMcpContext(async (_response, context) => {
+          context.updateOptions({performanceCrux: false});
+
+          assert.strictEqual(context.isCruxEnabled(), false);
+        });
+      });
+    });
+
     describe('getDevToolsData', () => {
       it('returns devtools data from passed page', async () => {
         await withMcpContext(async (_response, context) => {
