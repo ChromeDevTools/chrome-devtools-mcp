@@ -371,12 +371,7 @@ describe('browser', () => {
         const first = await manager.ensureBrowser();
         assert.strictEqual(first, firstBrowser);
 
-        const disconnectedCall = firstBrowser.once
-          .getCalls()
-          .find(call => call.args[0] === 'disconnected');
-        assert.ok(disconnectedCall);
-        const disconnectedHandler = disconnectedCall.args[1] as () => void;
-        disconnectedHandler();
+        firstBrowser.emit('disconnected', undefined);
 
         // The mock's `connected` getter still reports true — proves the next
         // ensureBrowser() reconnected because of the push-based eviction,
@@ -411,12 +406,7 @@ describe('browser', () => {
         const second = await manager.ensureBrowser();
         assert.strictEqual(second, newBrowser);
 
-        const disconnectedCall = oldBrowser.once
-          .getCalls()
-          .find(call => call.args[0] === 'disconnected');
-        assert.ok(disconnectedCall);
-        const disconnectedHandler = disconnectedCall.args[1] as () => void;
-        disconnectedHandler();
+        oldBrowser.emit('disconnected', undefined);
 
         const third = await manager.ensureBrowser();
         assert.strictEqual(third, newBrowser);
