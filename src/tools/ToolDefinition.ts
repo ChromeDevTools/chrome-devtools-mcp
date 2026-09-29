@@ -72,9 +72,7 @@ export type MergeSchema<Schema extends zod.ZodRawShape> = {
     : zod.ZodOptional<ExtractSchemaField<Schema, K>>;
 };
 
-export interface BaseToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
-> {
+export interface BaseToolDefinition<Schema extends zod.ZodRawShape = zod.ZodRawShape> {
   name: string;
   description: string;
   annotations: {
@@ -84,7 +82,7 @@ export interface BaseToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
-    conditions?: string[];
+    conditions?: Array<keyof ParsedArguments>;
   };
   schema: Schema;
   blockedByDialog: boolean;

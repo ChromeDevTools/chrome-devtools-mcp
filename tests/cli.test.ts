@@ -11,13 +11,13 @@ import {describe, it} from 'node:test';
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {
-  buildCliParser,
-  DEFAULT_FILESYSTEM_ROOT,
   getCliOptions,
   mcpOptions,
   parseArguments as parseArgumentsImpl,
 } from '../src/config/mcp-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
+import {ConfigParser} from '../src/config/ConfigParser.js';
+import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
 
 import {createTempFile} from './utils.js';
 
@@ -748,11 +748,10 @@ describe('cli args parsing', () => {
   });
 
   it('includes usage examples in help output', async () => {
-    const help = await buildCliParser(
-      '0.0.0',
-      ['node', 'main.js'],
-      mcpOptions,
-    ).getHelp();
+    const parser = new ConfigParser('0.0.0', ['node', 'main.js']);
+    const help = await parser
+      .buildCliParser(mcpOptions as unknown as typeof mcpOptions)
+      .getHelp();
     assert.match(help, /Examples:/);
     assert.match(help, /--browserUrl http:\/\/127\.0\.0\.1:9222/);
   });
