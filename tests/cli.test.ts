@@ -426,27 +426,7 @@ describe('cli args parsing', () => {
     ]);
   });
 
-  it('allows named groups in hostname and pathname for url patterns', async () => {
-    const blockedArgs = parseArguments([
-      '--blocked-url-pattern=*://:sub.example.com/:path',
-      '--blocked-url-pattern=*://{:sub}.example.com/{:path}',
-    ]);
-    assert.deepStrictEqual(blockedArgs.blockedUrlPattern, [
-      '*://:sub.example.com/:path',
-      '*://{:sub}.example.com/{:path}',
-    ]);
-
-    const allowedArgs = parseArguments([
-      '--allowed-url-pattern=*://:sub.example.com/:path',
-      '--allowed-url-pattern=*://{:sub}.example.com/{:path}',
-    ]);
-    assert.deepStrictEqual(allowedArgs.allowedUrlPattern, [
-      '*://:sub.example.com/:path',
-      '*://{:sub}.example.com/{:path}',
-    ]);
-  });
-
-  it('rejects url-pattern with a regexp group or unsupported named group', async () => {
+  it('rejects url-pattern with a regexp group or named group', async () => {
     assert.throws(
       () =>
         parseArguments([
