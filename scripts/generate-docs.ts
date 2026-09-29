@@ -8,10 +8,8 @@ import fs from 'node:fs';
 
 import type {Options as YargsOptions} from 'yargs';
 
-import {
-  mcpOptions,
-  type ParsedArguments,
-} from '../build/src/config/mcp-options.js';
+import type {ParsedArguments} from '../build/src/config/ConfigParser.js';
+import {mcpOptions} from '../build/src/config/mcp-options.js';
 import {
   isCategoryOffByDefault,
   categoryToFlagName,
@@ -22,7 +20,7 @@ import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
-import {createTools} from '../build/src/tools/tools.js';
+import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
@@ -340,6 +338,11 @@ function getToolsAndCategories(
         return false;
       }
 
+      // Skipping tools behind internal flags.
+      if (requiresHiddenFlag(tool)) {
+        return false;
+      }
+
       // Skipping internal interop tools not meant for public documentation
       const skipTools = ['get_tab_id'];
       if (skipTools.includes(tool.name)) {
@@ -405,7 +408,10 @@ async function generateToolDocumentation(): Promise<void> {
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
         getToolsAndCategories(
-          createTools({slim: false, pageIdRouting: true} as ParsedArguments),
+          createTools({
+            slim: false,
+            pageIdRouting: true,
+          } as ParsedArguments).filter(tool => !tool.slim),
         );
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
@@ -418,7 +424,11 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(createTools({slim: true} as ParsedArguments));
+        getToolsAndCategories(
+          createTools({slim: true} as ParsedArguments).filter(
+            tool => tool.slim,
+          ),
+        );
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,

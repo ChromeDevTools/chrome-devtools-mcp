@@ -86,6 +86,11 @@ export interface BaseToolDefinition<
     readOnlyHint: boolean;
     conditions?: Array<keyof ParsedArguments>;
   };
+  /**
+   * If true, the tool is only enabled with `--slim`. Tools without this flag
+   * are only enabled without `--slim`.
+   */
+  slim?: boolean;
   schema: Schema;
   blockedByDialog: boolean;
   verifyFilesSchema: Partial<
@@ -456,7 +461,7 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
     return {
       ...tool,
       schema: {
-        ...(args.pageIdRouting && !args.slim ? pageIdSchema : {}),
+        ...(args.pageIdRouting && !tool.slim ? pageIdSchema : {}),
         ...tool.schema,
       },
       pageScoped: true,

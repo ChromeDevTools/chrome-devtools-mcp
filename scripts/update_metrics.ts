@@ -37,12 +37,10 @@ function writeToolCallMetricsConfig() {
   }
 
   // Avoid 'as ParsedArguments' by using parseArguments
-  const fullTools = createTools(new ConfigParser('0.0.0', ['', '']).parse());
-  const slimTools = createTools(
-    new ConfigParser('0.0.0', ['', '', '--slim']).parse(),
-  );
-
-  const allTools = [...fullTools, ...slimTools];
+  // DevTools comments tools are an internal WIP feature and not tracked.
+  const allTools = createTools(
+    new ConfigParser('0.0.0', ['', '']).parse(),
+  ).filter(tool => !tool.annotations.conditions?.includes('devtoolsComments'));
 
   if (!HaveUniqueNames(allTools)) {
     throw new Error('Error: Duplicate tool names found.');
