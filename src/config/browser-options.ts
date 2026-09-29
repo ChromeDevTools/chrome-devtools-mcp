@@ -59,7 +59,6 @@ export const browserOptions = {
     type: 'string',
     description:
       'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    implies: 'wsEndpoint',
     coerce: (val: string | undefined) => {
       if (!val) {
         return;

@@ -119,13 +119,11 @@ export const mcpOptions = {
   experimentalFfmpegPath: {
     type: 'string',
     describe: 'Path to ffmpeg executable for screencast recording.',
-    implies: 'experimentalScreencast',
   },
   experimentalScreencastFps: {
     type: 'number',
     describe:
       'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
-    implies: 'experimentalScreencast',
     coerce: (value: number | undefined) => {
       if (value === undefined) {
         return;
@@ -324,9 +322,15 @@ export const mcpOptions = {
   },
 } satisfies Record<string, YargsOptions>;
 
-export type ParsedArguments = ReturnType<
+type RawParsedArguments = ReturnType<
   ReturnType<typeof buildCliParser<typeof mcpOptions>>['parseSync']
 >;
+
+export type ParsedArguments = {
+  [K in keyof RawParsedArguments as K extends '_' | '$0'
+    ? never
+    : K]: RawParsedArguments[K];
+};
 
 export function getMcpOptionsForViaCli(): Record<
   keyof typeof mcpOptions,
@@ -373,9 +377,8 @@ export function getMcpOptionsForViaCli(): Record<
 export function getCliOptions(): Partial<
   Record<keyof typeof mcpOptions, YargsOptions>
 > {
-  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> = {
-    ...getMcpOptionsForViaCli(),
-  };
+  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> =
+    withoutDefaults(getMcpOptionsForViaCli());
 
   // Missing CLI serialization.
   delete options.viewport;
@@ -383,19 +386,6 @@ export function getCliOptions(): Partial<
   // Change the defaults for the CLI.
   delete options.experimentalStructuredContent;
   delete options.experimentalInteropTools;
-
-  const recordOptions: Record<string, YargsOptions | undefined> = options;
-  for (const [key, option] of Object.entries(recordOptions)) {
-    if (option?.default !== undefined) {
-      const copy: YargsOptions = {
-        ...option,
-        defaultDescription:
-          option.defaultDescription ?? JSON.stringify(option.default),
-      };
-      delete copy.default;
-      recordOptions[key] = copy;
-    }
-  }
 
   return options;
 }
@@ -475,6 +465,13 @@ const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
   ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
 ];
 
+const IMPLICATIONS: Array<[keyof typeof mcpOptions, keyof typeof mcpOptions]> =
+  [
+    ['wsHeaders', 'wsEndpoint'],
+    ['experimentalFfmpegPath', 'experimentalScreencast'],
+    ['experimentalScreencastFps', 'experimentalScreencast'],
+  ];
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -518,12 +515,11 @@ function withoutDefaults(
   return result;
 }
 
-function stripYargsPositionalArgs(
-  parsed: Partial<ParsedArguments>,
-): Partial<ParsedArguments> {
-  delete (parsed as {_?: unknown})._;
-  delete (parsed as {$0?: unknown}).$0;
-  return parsed;
+function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
+  parsed: T,
+): Omit<T, '_' | '$0'> {
+  const {_: _positionals, $0: _scriptName, ...rest} = parsed;
+  return rest;
 }
 
 /**
@@ -594,6 +590,20 @@ export function validateConflicts(
     if (activeInGroup.length > 1) {
       const [arg1, arg2] = activeInGroup;
       throw new Error(`Arguments ${arg1} and ${arg2} are mutually exclusive`);
+    }
+  }
+}
+
+export function validateImplications(
+  explicitArgs: Partial<ParsedArguments>,
+): void {
+  for (const [key, implied] of IMPLICATIONS) {
+    const isKeySet =
+      explicitArgs[key] !== undefined && explicitArgs[key] !== false;
+    const isImpliedSet =
+      explicitArgs[implied] !== undefined && explicitArgs[implied] !== false;
+    if (isKeySet && !isImpliedSet) {
+      throw new Error(`Implications failed:\n  ${key} -> ${implied}`);
     }
   }
 }
@@ -674,6 +684,7 @@ export function parseArguments(
     const explicitArgs = {...configFileArgs, ...cliArgs};
     warnUnknownArgs(cliArgs);
     validateConflicts(explicitArgs);
+    validateImplications(explicitArgs);
     const resolvedArgs = applyDefaults(explicitArgs, env);
 
     // The merge and the default loop lose the static type that yargs infers from
