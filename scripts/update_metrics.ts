@@ -37,10 +37,7 @@ function writeToolCallMetricsConfig() {
   }
 
   // Avoid 'as ParsedArguments' by using parseArguments
-  // DevTools comments tools are an internal WIP feature and not tracked.
-  const allTools = createTools(
-    new ConfigParser('0.0.0', ['', '']).parse(),
-  ).filter(tool => !tool.annotations.conditions?.includes('devtoolsComments'));
+  const allTools = createTools(new ConfigParser('0.0.0', ['', '']).parse());
 
   if (!HaveUniqueNames(allTools)) {
     throw new Error('Error: Duplicate tool names found.');
