@@ -457,5 +457,13 @@
   {
     "name": "devtools_comments",
     "flagType": "boolean"
+  },
+  {
+    "name": "watch_config_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "watch_config",
+    "flagType": "boolean"
   }
 ]

@@ -39,6 +39,7 @@ export const RESTART_REQUIRED_OPTIONS: ReadonlyArray<keyof ParsedArguments> = [
   'clearcutIncludePidHeader',
   'viaCli',
   'config',
+  'watchConfig',
 ];
 
 export function getRestartRequiredChanges(

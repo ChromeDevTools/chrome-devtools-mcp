@@ -238,6 +238,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   Path to JSON configuration file.
   - **Type:** string
 
+- **`--watchConfig`/ `--watch-config`**
+  Watch the config file for changes and apply them without restarting. Tools are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.
+  - **Type:** boolean
+  - **Default:** `false`
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:
@@ -291,6 +296,19 @@ file.
 Set the `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable to turn off the
 search for config files, for example in tests. A config file passed via
 `--config` is still used.
+
+### Applying changes without a restart
+
+Pass `--watchConfig` to reload the config file whenever it changes. Watching is
+off by default. On a change, the server re-reads the file, updates the list of
+available tools, and notifies the MCP client with `notifications/tools/list_changed`.
+If the new file is invalid, the server logs the error to stderr and keeps the
+previous configuration.
+
+Tool categories and tool-specific options apply immediately. Options that
+configure the browser, such as `headless`, `channel`, `viewport`, or
+`blockedUrlPattern`, only apply after restarting chrome-devtools-mcp. The server
+logs a message to stderr when a change requires a restart.
 
 ## Connecting via WebSocket with custom headers
 
