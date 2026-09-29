@@ -404,15 +404,12 @@ function getToolsAndCategories(
 async function generateToolDocumentation(): Promise<void> {
   try {
     console.log('Generating tool documentation from definitions...');
+    // Returns both the regular and the slim tools.
+    const tools = createTools({pageIdRouting: true} as ParsedArguments);
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(
-          createTools({
-            slim: false,
-            pageIdRouting: true,
-          } as ParsedArguments).filter(tool => !tool.slim),
-        );
+        getToolsAndCategories(tools.filter(tool => !tool.slim));
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,
@@ -424,11 +421,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(
-          createTools({slim: true} as ParsedArguments).filter(
-            tool => tool.slim,
-          ),
-        );
+        getToolsAndCategories(tools.filter(tool => tool.slim));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,
