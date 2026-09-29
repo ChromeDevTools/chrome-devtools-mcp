@@ -426,47 +426,79 @@ describe('cli args parsing', () => {
     ]);
   });
 
-  it('rejects a blocked-url-pattern with a regexp group', async () => {
+  it('allows named groups in hostname and pathname for url patterns', async () => {
+    const blockedArgs = parseArguments([
+      '--blocked-url-pattern=*://:sub.example.com/:path',
+      '--blocked-url-pattern=*://{:sub}.example.com/{:path}',
+    ]);
+    assert.deepStrictEqual(blockedArgs.blockedUrlPattern, [
+      '*://:sub.example.com/:path',
+      '*://{:sub}.example.com/{:path}',
+    ]);
+
+    const allowedArgs = parseArguments([
+      '--allowed-url-pattern=*://:sub.example.com/:path',
+      '--allowed-url-pattern=*://{:sub}.example.com/{:path}',
+    ]);
+    assert.deepStrictEqual(allowedArgs.allowedUrlPattern, [
+      '*://:sub.example.com/:path',
+      '*://{:sub}.example.com/{:path}',
+    ]);
+  });
+
+  it('rejects url-pattern with a regexp group or unsupported named group', async () => {
     assert.throws(
       () =>
         parseArguments([
-          String.raw`--blocked-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
+          String.raw`--blockedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --blockedUrlPattern .*is not enforced/,
     );
 
+    assert.throws(
+      () =>
+        parseArguments([
+          String.raw`--allowedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
+        ]),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseArguments(['--blockedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --blockedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseArguments(['--allowedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+  });
+
+  it('rejects when any pattern in multiple url patterns is unenforceable', async () => {
     assert.throws(
       () =>
         parseArguments([
           '--blocked-url-pattern=https://a.com/*',
           String.raw`--blocked-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --blockedUrlPattern .*is not enforced/,
     );
-  });
-
-  it('rejects an allowed-url-pattern with a regexp group', async () => {
-    assert.throws(
-      () =>
-        parseArguments([
-          String.raw`--allowed-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
-        ]),
-      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
-    );
-
     assert.throws(
       () =>
         parseArguments([
           '--allowed-url-pattern=https://a.com/*',
-          String.raw`--allowed-url-pattern=(http|https)://example.com/*`,
+          String.raw`--allowed-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --allowedUrlPattern .*is not enforced/,
     );
   });
 
-  it('rejects a blocked-url-pattern with invalid syntax', async () => {
+  it('rejects url-pattern with invalid syntax', async () => {
     assert.throws(() =>
       parseArguments(['--blocked-url-pattern=*://example.com/(unterminated']),
+    );
+    assert.throws(() =>
+      parseArguments(['--allowed-url-pattern=*://example.com/(unterminated']),
     );
   });
 
