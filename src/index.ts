@@ -24,7 +24,11 @@ import {
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
-import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
+import {
+  type DefinedPageTool,
+  isAvailableInMode,
+  type ToolDefinition,
+} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
@@ -204,9 +208,11 @@ export class McpServer {
   }
 
   async #init(): Promise<void> {
-    const tools = createTools(this.#serverArgs);
-    for (const tool of tools) {
-      this.#registerTool(tool);
+    for (const tool of createTools(this.#serverArgs)) {
+      // Slim and regular tools may share names, only register the current mode.
+      if (isAvailableInMode(tool, this.#serverArgs)) {
+        this.#registerTool(tool);
+      }
     }
     await loadIssueDescriptions();
   }

@@ -20,6 +20,7 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
+import {isAvailableInMode} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -56,7 +57,7 @@ function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ParsedArguments,
 ): {disabled: boolean; reason?: string; unavailableInMode?: boolean} {
-  if (Boolean(tool.slim) !== Boolean(serverArgs.slim)) {
+  if (!isAvailableInMode(tool, serverArgs)) {
     return {
       disabled: true,
       unavailableInMode: true,

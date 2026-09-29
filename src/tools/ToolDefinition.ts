@@ -87,8 +87,9 @@ export interface BaseToolDefinition<
     conditions?: Array<keyof ParsedArguments>;
   };
   /**
-   * If true, the tool is only enabled with `--slim`. Tools without this flag
-   * are only enabled without `--slim`.
+   * If true, the tool is only available with `--slim`. Tools without this flag
+   * are only available without `--slim`. Slim tools may reuse the names of
+   * other tools, see {@link isAvailableInMode}.
    */
   slim?: boolean;
   schema: Schema;
@@ -555,4 +556,17 @@ export function geolocationTransform(arg: string | undefined) {
     latitude,
     longitude,
   };
+}
+
+/**
+ * Slim mode replaces the regular tools with the slim tools. Only the tools of
+ * the current mode are registered, so a slim tool may share its name with a
+ * regular tool. `--slim` requires a restart, so the mode never changes while
+ * the server is running.
+ */
+export function isAvailableInMode(
+  tool: {slim?: boolean},
+  serverArgs: Pick<ParsedArguments, 'slim'>,
+): boolean {
+  return Boolean(tool.slim) === Boolean(serverArgs.slim);
 }
