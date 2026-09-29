@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type {ParsedArguments} from './config/mcp-options.js';
+import type {ParsedArguments} from './config/ConfigParser.js';
 import type {
   Browser,
   ChromeReleaseChannel,

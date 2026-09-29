@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 import type {ExtensionServiceWorker} from '../types.js';

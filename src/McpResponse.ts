@@ -6,7 +6,7 @@
 
 import type {WebMCPTool} from 'puppeteer-core';
 
-import type {ParsedArguments} from './config/mcp-options.js';
+import type {ParsedArguments} from './config/ConfigParser.js';
 import {
   CommentFormatter,
   type StructuredCommentThread,

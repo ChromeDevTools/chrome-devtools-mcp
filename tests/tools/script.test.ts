@@ -11,7 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {zod} from '../../src/third_party/index.js';
 import {installExtension} from '../../src/tools/extensions.js';

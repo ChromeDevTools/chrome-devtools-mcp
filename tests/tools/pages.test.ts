@@ -11,7 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {parseArguments} from '../../src/config/mcp-options.js';
+import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {
   listPages,
   newPage,
@@ -246,11 +246,11 @@ describe('pages', () => {
     });
     it('throws when navigating to a javascript URL and javascriptEvaluation is false', async () => {
       await withMcpContext(async (response, context) => {
-        const disabledArgs = parseArguments(
+        const disabledArgs = new ConfigParser(
           '1.0.0',
           ['node', 'script.js', '--no-javascript-evaluation'],
           {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
+        ).parse();
         const tool = newPage(disabledArgs);
         await assert.rejects(
           async () => {
@@ -1102,22 +1102,22 @@ describe('pages', () => {
       const defaultTool = navigatePage(createMockParsedArguments());
       assert.strictEqual('initScript' in defaultTool.schema, true);
 
-      const disabledArgs = parseArguments(
+      const disabledArgs = new ConfigParser(
         '1.0.0',
         ['node', 'script.js', '--no-javascript-evaluation'],
         {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-      );
+      ).parse();
       const disabledTool = navigatePage(disabledArgs);
       assert.strictEqual('initScript' in disabledTool.schema, false);
     });
 
     it('throws when navigating to a javascript, data, or vbscript URL and javascriptEvaluation is false', async () => {
       await withMcpContext(async (response, context) => {
-        const disabledArgs = parseArguments(
+        const disabledArgs = new ConfigParser(
           '1.0.0',
           ['node', 'script.js', '--no-javascript-evaluation'],
           {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
+        ).parse();
         const tool = navigatePage(disabledArgs);
         await assert.rejects(
           async () => {

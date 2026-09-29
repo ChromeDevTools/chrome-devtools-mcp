@@ -27,8 +27,8 @@ import sinon from 'sinon';
 
 import {
   type ParsedArguments,
-  parseArguments,
-} from '../src/config/mcp-options.js';
+  ConfigParser,
+} from '../src/config/ConfigParser.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -1067,12 +1067,12 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = parseArguments(
+  const defaultArgs = new ConfigParser(
     '0.0.0',
     ['node', 'main.js'],
     process.env,
     false,
-  );
+  ).parse();
   return {...defaultArgs, ...options};
 }
 

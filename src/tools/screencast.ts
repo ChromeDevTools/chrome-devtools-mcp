@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
 

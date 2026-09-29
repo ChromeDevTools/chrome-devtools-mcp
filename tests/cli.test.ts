@@ -8,21 +8,22 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import {ConfigParser} from '../src/config/ConfigParser.js';
+import {getCliOptions, mcpOptions} from '../src/config/mcp-options.js';
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
-import {
-  buildCliParser,
-  DEFAULT_FILESYSTEM_ROOT,
-  getCliOptions,
-  mcpOptions,
-  parseArguments as parseArgumentsImpl,
-} from '../src/config/mcp-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
+import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
 
 import {createTempFile} from './utils.js';
 
-function parseArguments(argv: string[], env: NodeJS.ProcessEnv = {}) {
-  return parseArgumentsImpl('0.0.0', ['node', 'main.js', ...argv], env, false);
+function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
+  return new ConfigParser(
+    '0.0.0',
+    ['node', 'main.js', ...argv],
+    env,
+    false,
+  ).parse();
 }
 
 describe('cli args parsing', () => {
@@ -62,7 +63,7 @@ describe('cli args parsing', () => {
   };
 
   it('parses with default args', async () => {
-    const args = parseArguments([]);
+    const args = parseConfig([]);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       channel: 'stable',
@@ -70,7 +71,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses with viaCli args', async () => {
-    const args = parseArguments(['--viaCli']);
+    const args = parseConfig(['--viaCli']);
     assert.strictEqual(args.allowUnrestrictedPaths, true);
     assert.strictEqual(args.headless, true);
     assert.strictEqual(args.isolated, true);
@@ -81,7 +82,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses with browser url', async () => {
-    const args = parseArguments(['--browserUrl', 'http://localhost:3000']);
+    const args = parseConfig(['--browserUrl', 'http://localhost:3000']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       browserUrl: 'http://localhost:3000',
@@ -95,7 +96,7 @@ describe('cli args parsing', () => {
       output += msg;
     };
     try {
-      parseArguments(['--browserURL', 'http://localhost:3000']);
+      parseConfig(['--browserURL', 'http://localhost:3000']);
       assert.match(output, /Unknown arguments: --browserURL/);
     } finally {
       console.error = originalError;
@@ -103,13 +104,13 @@ describe('cli args parsing', () => {
   });
 
   it('parses mixed-form option names', async () => {
-    const args = parseArguments(['--category-experimentalWebmcp']);
+    const args = parseConfig(['--category-experimentalWebmcp']);
 
     assert.strictEqual(args.categoryExperimentalWebmcp, true);
   });
 
   it('parses with user data dir', async () => {
-    const args = parseArguments(['--user-data-dir', '/tmp/chrome-profile']);
+    const args = parseConfig(['--user-data-dir', '/tmp/chrome-profile']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       channel: 'stable',
@@ -118,7 +119,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses an empty browser url', async () => {
-    const args = parseArguments(['--browserUrl', ''], {});
+    const args = parseConfig(['--browserUrl', ''], {});
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       channel: 'stable',
@@ -127,7 +128,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses with executable path', async () => {
-    const args = parseArguments(['--executablePath', '/tmp/test 123/chrome']);
+    const args = parseConfig(['--executablePath', '/tmp/test 123/chrome']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       executablePath: '/tmp/test 123/chrome',
@@ -135,7 +136,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses viewport', async () => {
-    const args = parseArguments(['--viewport', '888x777']);
+    const args = parseConfig(['--viewport', '888x777']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       channel: 'stable',
@@ -147,7 +148,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses chrome args', async () => {
-    const args = parseArguments([
+    const args = parseConfig([
       `--chrome-arg='--no-sandbox'`,
       `--chrome-arg='--disable-setuid-sandbox'`,
     ]);
@@ -160,7 +161,7 @@ describe('cli args parsing', () => {
 
   describe('filesystem roots', () => {
     it('parses filesystem roots', async () => {
-      const args = parseArguments([
+      const args = parseConfig([
         '--filesystem-root=/tmp/one',
         '--filesystem-root=/tmp/two',
       ]);
@@ -168,7 +169,7 @@ describe('cli args parsing', () => {
     });
 
     it('parses workspace as an alias for filesystem roots', async () => {
-      const args = parseArguments([
+      const args = parseConfig([
         '--workspace=/tmp/one',
         '--workspace=/tmp/two',
       ]);
@@ -176,12 +177,12 @@ describe('cli args parsing', () => {
     });
 
     it('still accepts unrestricted paths without an explicit root', async () => {
-      const args = parseArguments(['--allow-unrestricted-paths']);
+      const args = parseConfig(['--allow-unrestricted-paths']);
       assert.strictEqual(args.allowUnrestrictedPaths, true);
     });
 
     it('accepts an explicit unrestricted flag in CLI mode', async () => {
-      const args = parseArguments(['--viaCli', '--allow-unrestricted-paths']);
+      const args = parseConfig(['--viaCli', '--allow-unrestricted-paths']);
       assert.strictEqual(args.allowUnrestrictedPaths, true);
       assert.strictEqual(args.filesystemRoot, undefined);
     });
@@ -189,7 +190,7 @@ describe('cli args parsing', () => {
     it('rejects unrestricted paths with a CLI workspace', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--viaCli',
             '--allow-unrestricted-paths',
             '--workspace=/tmp/one',
@@ -201,7 +202,7 @@ describe('cli args parsing', () => {
     it('rejects unrestricted paths with a direct filesystem root', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--allow-unrestricted-paths',
             '--filesystem-root=/tmp/one',
           ]),
@@ -216,7 +217,7 @@ describe('cli args parsing', () => {
       );
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--viaCli',
             '--config',
             testConfig.path,
@@ -233,7 +234,7 @@ describe('cli args parsing', () => {
       );
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--config',
             testConfig.path,
             '--allow-unrestricted-paths',
@@ -247,7 +248,7 @@ describe('cli args parsing', () => {
         JSON.stringify({allowUnrestrictedPaths: true}),
         'cd4a.test.config.unrestricted-false.json',
       );
-      const args = parseArguments([
+      const args = parseConfig([
         '--config',
         testConfig.path,
         '--no-allow-unrestricted-paths',
@@ -258,25 +259,25 @@ describe('cli args parsing', () => {
     });
 
     it('lets an explicit workspace override the CLI unrestricted default', async () => {
-      const args = parseArguments(['--viaCli', '--workspace=/tmp/one']);
+      const args = parseConfig(['--viaCli', '--workspace=/tmp/one']);
       assert.strictEqual(args.allowUnrestrictedPaths, false);
       assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
     });
 
     it('keeps the CLI unrestricted default when no workspace is set', async () => {
-      const args = parseArguments(['--viaCli']);
+      const args = parseConfig(['--viaCli']);
       assert.strictEqual(args.allowUnrestrictedPaths, true);
       assert.strictEqual(args.filesystemRoot, undefined);
     });
 
     it('uses yargs default identity to detect an unset CLI workspace', async () => {
-      const args = parseArguments([]);
+      const args = parseConfig([]);
       assert.strictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
   });
 
   it('parses ignore chrome args', async () => {
-    const args = parseArguments([
+    const args = parseConfig([
       `--ignore-default-chrome-arg='--disable-extensions'`,
       `--ignore-default-chrome-arg='--disable-cancel-all-touches'`,
     ]);
@@ -291,7 +292,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses wsEndpoint with ws:// protocol', async () => {
-    const args = parseArguments([
+    const args = parseConfig([
       '--wsEndpoint',
       'ws://127.0.0.1:9222/devtools/browser/abc123',
     ]);
@@ -302,7 +303,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses wsEndpoint with wss:// protocol', async () => {
-    const args = parseArguments([
+    const args = parseConfig([
       '--wsEndpoint',
       'wss://example.com:9222/devtools/browser/abc123',
     ]);
@@ -313,7 +314,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses wsHeaders with valid JSON', async () => {
-    const args = parseArguments([
+    const args = parseConfig([
       '--wsEndpoint',
       'ws://127.0.0.1:9222/devtools/browser/abc123',
       '--wsHeaders',
@@ -326,7 +327,7 @@ describe('cli args parsing', () => {
   });
 
   it('parses disabled category', async () => {
-    const args = parseArguments(['--no-category-emulation']);
+    const args = parseConfig(['--no-category-emulation']);
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       channel: 'stable',
@@ -334,7 +335,7 @@ describe('cli args parsing', () => {
     });
   });
   it('parses auto-connect', async () => {
-    const args = parseArguments(['--auto-connect'], {});
+    const args = parseConfig(['--auto-connect'], {});
     assert.deepStrictEqual(args, {
       ...defaultArgs,
       channel: 'stable',
@@ -359,76 +360,76 @@ describe('cli args parsing', () => {
 
   it('parses usage statistics flag', async () => {
     // Test default (should be true).
-    const defaultArgs = parseArguments(['main.js'], {});
+    const defaultArgs = parseConfig(['main.js'], {});
     assert.strictEqual(defaultArgs.usageStatistics, true);
 
     // Test enabling it
-    const enabledArgs = parseArguments(['--usage-statistics']);
+    const enabledArgs = parseConfig(['--usage-statistics']);
     assert.strictEqual(enabledArgs.usageStatistics, true);
 
     // Test disabling it
-    const disabledArgs = parseArguments(['--no-usage-statistics']);
+    const disabledArgs = parseConfig(['--no-usage-statistics']);
     assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 
   it('parses javascript evaluation flag', async () => {
     // Test default (should be true).
-    const defaultArgs = parseArguments(['main.js'], {});
+    const defaultArgs = parseConfig(['main.js'], {});
     assert.strictEqual(defaultArgs.javascriptEvaluation, true);
 
     // Test enabling it
-    const enabledArgs = parseArguments(['--javascript-evaluation']);
+    const enabledArgs = parseConfig(['--javascript-evaluation']);
     assert.strictEqual(enabledArgs.javascriptEvaluation, true);
 
     // Test disabling it
-    const disabledArgs = parseArguments(['--no-javascript-evaluation']);
+    const disabledArgs = parseConfig(['--no-javascript-evaluation']);
     assert.strictEqual(disabledArgs.javascriptEvaluation, false);
   });
 
   it('respects env variable', async () => {
     // Test default (should be true).
-    const defaultArgs = parseArguments(['main.js'], {
+    const defaultArgs = parseConfig(['main.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
     assert.strictEqual(defaultArgs.usageStatistics, false);
 
     // Test enabling it
-    const enabledArgs = parseArguments(['--usage-statistics'], {
+    const enabledArgs = parseConfig(['--usage-statistics'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
     assert.strictEqual(enabledArgs.usageStatistics, false);
 
     // Test disabling it
-    const disabledArgs = parseArguments(['--no-usage-statistics'], {
+    const disabledArgs = parseConfig(['--no-usage-statistics'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
     assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 
   it('parses performance crux flag', async () => {
-    const defaultArgs = parseArguments(['main.js']);
+    const defaultArgs = parseConfig(['main.js']);
     assert.strictEqual(defaultArgs.performanceCrux, true);
 
     // force enable
-    const enabledArgs = parseArguments(['--performance-crux']);
+    const enabledArgs = parseConfig(['--performance-crux']);
     assert.strictEqual(enabledArgs.performanceCrux, true);
 
-    const disabledArgs = parseArguments(['--no-performance-crux']);
+    const disabledArgs = parseConfig(['--no-performance-crux']);
     assert.strictEqual(disabledArgs.performanceCrux, false);
   });
 
   it('parses blocked-url-pattern flags as array', async () => {
-    const defaultArgs = parseArguments(['main.js']);
+    const defaultArgs = parseConfig(['main.js']);
     assert.strictEqual(defaultArgs.blockedUrlPattern, undefined);
 
-    const singleArgs = parseArguments([
+    const singleArgs = parseConfig([
       '--blocked-url-pattern=https://example.com/*',
     ]);
     assert.deepStrictEqual(singleArgs.blockedUrlPattern, [
       'https://example.com/*',
     ]);
 
-    const repeatedArgs = parseArguments([
+    const repeatedArgs = parseConfig([
       '--blocked-url-pattern=https://a.com/*',
       '--blocked-url-pattern=https://b.com/*',
     ]);
@@ -437,7 +438,7 @@ describe('cli args parsing', () => {
       'https://b.com/*',
     ]);
 
-    const spaceSeparatedArgs = parseArguments([
+    const spaceSeparatedArgs = parseConfig([
       '--blocked-url-pattern',
       'https://a.com/*',
       'https://b.com/*',
@@ -449,17 +450,17 @@ describe('cli args parsing', () => {
   });
 
   it('parses allowed-url-pattern flags as array', async () => {
-    const defaultArgs = parseArguments(['main.js']);
+    const defaultArgs = parseConfig(['main.js']);
     assert.strictEqual(defaultArgs.allowedUrlPattern, undefined);
 
-    const singleArgs = parseArguments([
+    const singleArgs = parseConfig([
       '--allowed-url-pattern=https://example.com/*',
     ]);
     assert.deepStrictEqual(singleArgs.allowedUrlPattern, [
       'https://example.com/*',
     ]);
 
-    const repeatedArgs = parseArguments([
+    const repeatedArgs = parseConfig([
       '--allowed-url-pattern=https://a.com/*',
       '--allowed-url-pattern=https://b.com/*',
     ]);
@@ -468,7 +469,7 @@ describe('cli args parsing', () => {
       'https://b.com/*',
     ]);
 
-    const spaceSeparatedArgs = parseArguments([
+    const spaceSeparatedArgs = parseConfig([
       '--allowed-url-pattern',
       'https://a.com/*',
       'https://b.com/*',
@@ -482,7 +483,7 @@ describe('cli args parsing', () => {
   it('rejects a blocked-url-pattern with a regexp group', async () => {
     assert.throws(
       () =>
-        parseArguments([
+        parseConfig([
           String.raw`--blocked-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
       /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
@@ -490,7 +491,7 @@ describe('cli args parsing', () => {
 
     assert.throws(
       () =>
-        parseArguments([
+        parseConfig([
           '--blocked-url-pattern=https://a.com/*',
           String.raw`--blocked-url-pattern=*://example.com/(foo|bar)`,
         ]),
@@ -501,7 +502,7 @@ describe('cli args parsing', () => {
   it('rejects an allowed-url-pattern with a regexp group', async () => {
     assert.throws(
       () =>
-        parseArguments([
+        parseConfig([
           String.raw`--allowed-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
       /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
@@ -509,7 +510,7 @@ describe('cli args parsing', () => {
 
     assert.throws(
       () =>
-        parseArguments([
+        parseConfig([
           '--allowed-url-pattern=https://a.com/*',
           String.raw`--allowed-url-pattern=(http|https)://example.com/*`,
         ]),
@@ -519,12 +520,12 @@ describe('cli args parsing', () => {
 
   it('rejects a blocked-url-pattern with invalid syntax', async () => {
     assert.throws(() =>
-      parseArguments(['--blocked-url-pattern=*://example.com/(unterminated']),
+      parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
     );
   });
 
   it('strips an empty blocked-url-pattern', async () => {
-    const args = parseArguments(['--blocked-url-pattern']);
+    const args = parseConfig(['--blocked-url-pattern']);
     assert.strictEqual(args.blockedUrlPattern, undefined);
   });
 
@@ -533,7 +534,7 @@ describe('cli args parsing', () => {
       JSON.stringify({blockedUrlPattern: []}),
       'cd4a.test.config.empty-blocked.json',
     );
-    const args = parseArguments([
+    const args = parseConfig([
       '--config',
       testConfig.path,
       '--allowed-url-pattern',
@@ -545,7 +546,7 @@ describe('cli args parsing', () => {
 
   it('rejects an empty allowed-url-pattern', async () => {
     assert.throws(
-      () => parseArguments(['--allowed-url-pattern']),
+      () => parseConfig(['--allowed-url-pattern']),
       /Invalid --allowedUrlPattern: at least one pattern is required/,
     );
   });
@@ -556,22 +557,22 @@ describe('cli args parsing', () => {
       'cd4a.test.config.empty-allowed.json',
     );
     assert.throws(
-      () => parseArguments(['--config', testConfig.path]),
+      () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file: Invalid --allowedUrlPattern: at least one pattern is required/,
     );
   });
 
   it('parses source-maps flag', async () => {
-    const defaultParsed = parseArguments(['main.js']);
+    const defaultParsed = parseConfig(['main.js']);
     assert.strictEqual(defaultParsed.sourceMaps, true);
 
-    const disabledArgs = parseArguments(['--no-source-maps']);
+    const disabledArgs = parseConfig(['--no-source-maps']);
     assert.strictEqual(disabledArgs.sourceMaps, false);
 
-    const explicitFalseArgs = parseArguments(['--source-maps=false']);
+    const explicitFalseArgs = parseConfig(['--source-maps=false']);
     assert.strictEqual(explicitFalseArgs.sourceMaps, false);
 
-    const explicitTrueArgs = parseArguments(['--source-maps=true']);
+    const explicitTrueArgs = parseConfig(['--source-maps=true']);
     assert.strictEqual(explicitTrueArgs.sourceMaps, true);
   });
 
@@ -584,7 +585,7 @@ describe('cli args parsing', () => {
       }),
       'cd4a.test.config.json',
     );
-    const args = parseArguments(['--config', testConfig.path]);
+    const args = parseConfig(['--config', testConfig.path]);
     assert.strictEqual(args.config, testConfig.path);
     assert.strictEqual(args.headless, true);
     assert.strictEqual(args.categoryInput, false);
@@ -599,7 +600,7 @@ describe('cli args parsing', () => {
       }),
       'cd4a.test.config.mixed.json',
     );
-    const args = parseArguments([
+    const args = parseConfig([
       '--config',
       testConfig.path,
       '--headless=false',
@@ -621,7 +622,7 @@ describe('cli args parsing', () => {
       }),
       'cd4a.test.config.coercion.json',
     );
-    const args = parseArguments(['--config', testConfig.path]);
+    const args = parseConfig(['--config', testConfig.path]);
     assert.deepStrictEqual(args.viewport, {width: 1280, height: 720});
     assert.deepStrictEqual(args.wsHeaders, {Authorization: 'Bearer token'});
   });
@@ -631,7 +632,7 @@ describe('cli args parsing', () => {
       JSON.stringify({viewport: '1280x720'}),
       'cd4a.test.config.coercion-override.json',
     );
-    const args = parseArguments([
+    const args = parseConfig([
       '--config',
       testConfig.path,
       '--viewport',
@@ -649,7 +650,7 @@ describe('cli args parsing', () => {
       'cd4a.test.config.viacli.json',
     );
     const relativePath = path.relative(process.cwd(), testConfig.path);
-    const args = parseArguments(['--viaCli', '--config', relativePath]);
+    const args = parseConfig(['--viaCli', '--config', relativePath]);
     assert.strictEqual(args.config, testConfig.path);
     assert.strictEqual(args.userDataDir, '/tmp/custom-profile');
     assert.strictEqual(args.isolated, false);
@@ -663,7 +664,7 @@ describe('cli args parsing', () => {
       }),
       'cd4a.test.config.viacli-isolated.json',
     );
-    const args = parseArguments(['--viaCli', '--config', testConfig.path]);
+    const args = parseConfig(['--viaCli', '--config', testConfig.path]);
     assert.strictEqual(args.isolated, false);
   });
 
@@ -676,7 +677,7 @@ describe('cli args parsing', () => {
       'cd4a.test.config.mixed.json',
     );
     assert.throws(
-      () => parseArguments(['--config', testConfig.path]),
+      () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file: Unknown argument: no-category-memory/,
     );
   });
@@ -690,7 +691,7 @@ describe('cli args parsing', () => {
       'cd4a.test.config.mixed.json',
     );
     assert.throws(
-      () => parseArguments(['--config', testConfig.path]),
+      () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file: Unknown argument: category-memory/,
     );
   });
@@ -701,7 +702,7 @@ describe('cli args parsing', () => {
       'cd4a.test.config.malformed.json',
     );
     assert.throws(
-      () => parseArguments(['--config', testConfig.path]),
+      () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file:/,
     );
   });
@@ -712,14 +713,14 @@ describe('cli args parsing', () => {
       'cd4a.test.config.array.json',
     );
     assert.throws(
-      () => parseArguments(['--config', testConfig.path]),
+      () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file: Config must be a JSON object/,
     );
   });
 
   it('rejects a missing config file', async () => {
     assert.throws(
-      () => parseArguments(['--config', 'cd4a.test.config.missing.json']),
+      () => parseConfig(['--config', 'cd4a.test.config.missing.json']),
       /Invalid JSON config file: ENOENT/,
     );
   });
@@ -729,11 +730,7 @@ describe('cli args parsing', () => {
       JSON.stringify({chromeArg: ['--a']}),
       'cd4a.test.config.array-replace.json',
     );
-    const args = parseArguments([
-      '--config',
-      testConfig.path,
-      '--chrome-arg=--b',
-    ]);
+    const args = parseConfig(['--config', testConfig.path, '--chrome-arg=--b']);
     assert.deepStrictEqual(args.chromeArg, ['--b']);
   });
 
@@ -742,19 +739,19 @@ describe('cli args parsing', () => {
       JSON.stringify({usageStatistics: true}),
       'cd4a.test.config.usage-statistics.json',
     );
-    const args = parseArguments(['--config', testConfig.path], {CI: 'true'});
+    const args = parseConfig(['--config', testConfig.path], {CI: 'true'});
     assert.strictEqual(args.usageStatistics, false);
   });
 
   it('lets explicit cli flags override viaCli dynamic defaults', async () => {
-    const args = parseArguments(['--viaCli', '--no-headless']);
+    const args = parseConfig(['--viaCli', '--no-headless']);
     assert.strictEqual(args.headless, false);
   });
 
   describe('viaCli defaults', () => {
     for (const flag of ['--viaCli=true', '--via-cli=true']) {
       it(`applies viaCli defaults for ${flag}`, async () => {
-        const args = parseArguments([flag]);
+        const args = parseConfig([flag]);
         assert.strictEqual(args.viaCli, true);
         assert.strictEqual(args.headless, true);
         assert.strictEqual(args.isolated, true);
@@ -763,7 +760,7 @@ describe('cli args parsing', () => {
     }
 
     it('does not apply viaCli defaults for --viaCli false', async () => {
-      const args = parseArguments(['--viaCli', 'false']);
+      const args = parseConfig(['--viaCli', 'false']);
       assert.strictEqual(args.viaCli, false);
       assert.strictEqual(args.headless, false);
       assert.strictEqual(args.isolated, false);
@@ -775,7 +772,7 @@ describe('cli args parsing', () => {
         JSON.stringify({viaCli: true}),
         'cd4a.test.config.via-cli.json',
       );
-      const args = parseArguments(['--config', testConfig.path]);
+      const args = parseConfig(['--config', testConfig.path]);
       assert.strictEqual(args.viaCli, true);
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.isolated, true);
@@ -786,11 +783,7 @@ describe('cli args parsing', () => {
         JSON.stringify({viaCli: true}),
         'cd4a.test.config.via-cli-override.json',
       );
-      const args = parseArguments([
-        '--config',
-        testConfig.path,
-        '--viaCli=false',
-      ]);
+      const args = parseConfig(['--config', testConfig.path, '--viaCli=false']);
       assert.strictEqual(args.viaCli, false);
       assert.strictEqual(args.headless, false);
       assert.strictEqual(args.isolated, false);
@@ -803,7 +796,7 @@ describe('cli args parsing', () => {
       ['--user-data-dir', '/tmp/chrome-profile'],
     ]) {
       it(`does not default to isolated with ${connectArgs[0]}`, async () => {
-        const args = parseArguments(['--viaCli', ...connectArgs]);
+        const args = parseConfig(['--viaCli', ...connectArgs]);
         assert.strictEqual(args.isolated, false);
       });
     }
@@ -813,23 +806,20 @@ describe('cli args parsing', () => {
         JSON.stringify({autoConnect: true}),
         'cd4a.test.config.via-cli-auto-connect.json',
       );
-      const args = parseArguments(['--viaCli', '--config', testConfig.path]);
+      const args = parseConfig(['--viaCli', '--config', testConfig.path]);
       assert.strictEqual(args.autoConnect, true);
       assert.strictEqual(args.isolated, false);
     });
   });
 
   it('parses with devtoolsComments enabled', async () => {
-    const args = parseArguments(['--devtoolsComments']);
+    const args = parseConfig(['--devtoolsComments']);
     assert.strictEqual(args.devtoolsComments, true);
   });
 
   it('includes usage examples in help output', async () => {
-    const help = await buildCliParser(
-      '0.0.0',
-      ['node', 'main.js'],
-      mcpOptions,
-    ).getHelp();
+    const parser = new ConfigParser('0.0.0', ['node', 'main.js']);
+    const help = await parser.buildCliParser(mcpOptions).getHelp();
     assert.match(help, /Examples:/);
     assert.match(help, /--browserUrl http:\/\/127\.0\.0\.1:9222/);
   });
@@ -869,18 +859,14 @@ describe('cli args parsing', () => {
     it('rejects isolated with userDataDir', async () => {
       assert.throws(
         () =>
-          parseArguments([
-            '--isolated',
-            '--user-data-dir',
-            '/tmp/chrome-profile',
-          ]),
+          parseConfig(['--isolated', '--user-data-dir', '/tmp/chrome-profile']),
         /Arguments userDataDir and isolated are mutually exclusive/,
       );
     });
 
     it('rejects isolated with autoConnect', async () => {
       assert.throws(
-        () => parseArguments(['--isolated', '--auto-connect']),
+        () => parseConfig(['--isolated', '--auto-connect']),
         /Arguments autoConnect and isolated are mutually exclusive/,
       );
     });
@@ -888,14 +874,14 @@ describe('cli args parsing', () => {
     it('rejects autoConnect with executablePath', async () => {
       assert.throws(
         () =>
-          parseArguments(['--auto-connect', '--executablePath', '/bin/chrome']),
+          parseConfig(['--auto-connect', '--executablePath', '/bin/chrome']),
         /Arguments autoConnect and executablePath are mutually exclusive/,
       );
     });
 
     it('rejects categoryPwa with autoConnect', async () => {
       assert.throws(
-        () => parseArguments(['--category-pwa', '--auto-connect']),
+        () => parseConfig(['--category-pwa', '--auto-connect']),
         /Arguments categoryPwa and autoConnect are mutually exclusive/,
       );
     });
@@ -903,7 +889,7 @@ describe('cli args parsing', () => {
     it('rejects categoryPwa with browserUrl', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--category-pwa',
             '--browserUrl',
             'http://localhost:9222',
@@ -915,7 +901,7 @@ describe('cli args parsing', () => {
     it('rejects categoryPwa with wsEndpoint', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--category-pwa',
             '--wsEndpoint',
             'ws://localhost:9222',
@@ -927,7 +913,7 @@ describe('cli args parsing', () => {
     it('rejects explicit channel with browserUrl', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--channel=canary',
             '--browserUrl',
             'http://localhost:9222',
@@ -939,7 +925,7 @@ describe('cli args parsing', () => {
     it('rejects explicit channel with wsEndpoint', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--channel',
             'canary',
             '--wsEndpoint',
@@ -952,7 +938,7 @@ describe('cli args parsing', () => {
     it('rejects explicit channel with executablePath', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--channel',
             'canary',
             '--executablePath',
@@ -965,7 +951,7 @@ describe('cli args parsing', () => {
     it('rejects browserUrl with wsEndpoint', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--browserUrl',
             'http://localhost:9222',
             '--wsEndpoint',
@@ -978,7 +964,7 @@ describe('cli args parsing', () => {
     it('rejects executablePath with browserUrl', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--executablePath',
             '/bin/chrome',
             '--browserUrl',
@@ -991,7 +977,7 @@ describe('cli args parsing', () => {
     it('rejects executablePath with wsEndpoint', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--executablePath',
             '/bin/chrome',
             '--wsEndpoint',
@@ -1004,7 +990,7 @@ describe('cli args parsing', () => {
     it('rejects userDataDir with browserUrl', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--user-data-dir',
             '/tmp/dir',
             '--browserUrl',
@@ -1017,7 +1003,7 @@ describe('cli args parsing', () => {
     it('rejects userDataDir with wsEndpoint', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--user-data-dir',
             '/tmp/dir',
             '--wsEndpoint',
@@ -1030,7 +1016,7 @@ describe('cli args parsing', () => {
     it('rejects blockedUrlPattern with allowedUrlPattern', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--blocked-url-pattern',
             'https://a.com/*',
             '--allowed-url-pattern',
@@ -1047,7 +1033,7 @@ describe('cli args parsing', () => {
       );
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--config',
             testConfig.path,
             '--browserUrl',
@@ -1063,8 +1049,7 @@ describe('cli args parsing', () => {
         'cd4a.test.config.browser-url.json',
       );
       assert.throws(
-        () =>
-          parseArguments(['--config', testConfig.path, '--channel', 'canary']),
+        () => parseConfig(['--config', testConfig.path, '--channel', 'canary']),
         /Arguments channel and browserUrl are mutually exclusive/,
       );
     });
@@ -1078,13 +1063,13 @@ describe('cli args parsing', () => {
         'cd4a.test.config.conflict.json',
       );
       assert.throws(
-        () => parseArguments(['--config', testConfig.path]),
+        () => parseConfig(['--config', testConfig.path]),
         /Arguments browserUrl and wsEndpoint are mutually exclusive/,
       );
     });
 
     it('allows explicitly disabled isolated with userDataDir', async () => {
-      const args = parseArguments([
+      const args = parseConfig([
         '--isolated=false',
         '--user-data-dir',
         '/tmp/chrome-profile',
@@ -1098,7 +1083,7 @@ describe('cli args parsing', () => {
         JSON.stringify({autoConnect: false}),
         'cd4a.test.config.false-no-conflict.json',
       );
-      const args = parseArguments([
+      const args = parseConfig([
         '--config',
         testConfig.path,
         '--executablePath',
@@ -1113,7 +1098,7 @@ describe('cli args parsing', () => {
         JSON.stringify({autoConnect: true}),
         'cd4a.test.config.false-override.json',
       );
-      const args = parseArguments([
+      const args = parseConfig([
         '--config',
         testConfig.path,
         '--autoConnect=false',
@@ -1126,7 +1111,7 @@ describe('cli args parsing', () => {
 
     it('rejects categoryExtensions with autoConnect', async () => {
       assert.throws(
-        () => parseArguments(['--category-extensions', '--auto-connect']),
+        () => parseConfig(['--category-extensions', '--auto-connect']),
         /Arguments categoryExtensions and autoConnect are mutually exclusive/,
       );
     });
@@ -1134,7 +1119,7 @@ describe('cli args parsing', () => {
     it('rejects categoryExtensions with browserUrl', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--category-extensions',
             '--browserUrl',
             'http://localhost:9222',
@@ -1146,7 +1131,7 @@ describe('cli args parsing', () => {
     it('rejects categoryExtensions with wsEndpoint', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--category-extensions',
             '--wsEndpoint',
             'ws://localhost:9222',
@@ -1161,7 +1146,7 @@ describe('cli args parsing', () => {
       ['--executablePath', '/tmp/chrome'],
     ]) {
       it(`does not default channel with ${connectArgs[0]}`, async () => {
-        const args = parseArguments(connectArgs);
+        const args = parseConfig(connectArgs);
         assert.strictEqual(args.channel, undefined);
       });
     }
@@ -1172,7 +1157,7 @@ describe('cli args parsing', () => {
       ['--auto-connect'],
     ]) {
       it(`allows viaCli with ${connectArgs[0]} without enabling extensions`, async () => {
-        const args = parseArguments(['--viaCli', ...connectArgs]);
+        const args = parseConfig(['--viaCli', ...connectArgs]);
         assert.strictEqual(args.categoryExtensions, undefined);
         assert.strictEqual(args.isolated, false);
       });
@@ -1181,7 +1166,7 @@ describe('cli args parsing', () => {
     it('rejects explicit categoryExtensions with browserUrl in viaCli', async () => {
       assert.throws(
         () =>
-          parseArguments([
+          parseConfig([
             '--viaCli',
             '--category-extensions',
             '--browserUrl',
@@ -1194,7 +1179,7 @@ describe('cli args parsing', () => {
 
   describe('dataFormat', () => {
     it('keeps experimentalToonFormat and experimentalDataFormat separate', () => {
-      const args = parseArguments(['--experimentalToonFormat']);
+      const args = parseConfig(['--experimentalToonFormat']);
       assert.strictEqual(args.experimentalToonFormat, true);
       assert.strictEqual(args.experimentalDataFormat, undefined);
     });
@@ -1266,7 +1251,7 @@ describe('cli command strings', () => {
 
 describe('flag usage telemetry', () => {
   it('reports the stable channel for a default launch', async () => {
-    const usage = computeFlagUsage(parseArguments([]), mcpOptions);
+    const usage = computeFlagUsage(parseConfig([]), mcpOptions);
     assert.strictEqual(usage.isolated_present, undefined);
     assert.strictEqual(usage.channel_present, undefined);
     assert.strictEqual(usage.channel, 'CHANNEL_STABLE');
@@ -1278,7 +1263,7 @@ describe('flag usage telemetry', () => {
     ['--executablePath', '/tmp/chrome'],
   ]) {
     it(`does not report channel with ${connectArgs[0]}`, async () => {
-      const usage = computeFlagUsage(parseArguments(connectArgs), mcpOptions);
+      const usage = computeFlagUsage(parseConfig(connectArgs), mcpOptions);
       assert.strictEqual(usage.isolated_present, undefined);
       assert.strictEqual(usage.channel_present, false);
       assert.strictEqual(usage.channel, undefined);
@@ -1287,7 +1272,7 @@ describe('flag usage telemetry', () => {
 
   it('does not report experimentalDataFormat for legacy experimentalToonFormat', async () => {
     const usage = computeFlagUsage(
-      parseArguments(['--experimentalToonFormat']),
+      parseConfig(['--experimentalToonFormat']),
       mcpOptions,
     );
     assert.strictEqual(usage.experimental_toon_format, true);

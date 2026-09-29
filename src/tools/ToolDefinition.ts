@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -84,7 +84,7 @@ export interface BaseToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
-    conditions?: string[];
+    conditions?: Array<keyof ParsedArguments>;
   };
   schema: Schema;
   blockedByDialog: boolean;

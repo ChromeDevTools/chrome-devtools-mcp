@@ -12,7 +12,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {parseArguments} from '../../src/config/mcp-options.js';
+import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {ScreenRecorder} from '../../src/third_party/index.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {createHandlerMocks} from '../mocks.js';
@@ -234,12 +234,12 @@ describe('screencast', () => {
       context.ensureExtension.resolves(filePath);
 
       const experimentalFfmpegPath = '/custom/path/to/ffmpeg';
-      const args = parseArguments('test', [
+      const args = new ConfigParser('test', [
         'node',
         'test',
         '--experimental-screencast',
         `--experimental-ffmpeg-path=${experimentalFfmpegPath}`,
-      ]);
+      ]).parse();
       await startScreencast(args).handler(
         {params: {filePath}, page},
         response,
@@ -268,12 +268,12 @@ describe('screencast', () => {
       const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
       context.ensureExtension.resolves(filePath);
 
-      const args = parseArguments('test', [
+      const args = new ConfigParser('test', [
         'node',
         'test',
         '--experimental-screencast',
         '--experimental-screencast-fps=10',
-      ]);
+      ]).parse();
       await startScreencast(args).handler(
         {params: {filePath}, page},
         response,
