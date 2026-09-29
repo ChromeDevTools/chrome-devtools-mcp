@@ -85,6 +85,16 @@ describe('ConfigLocator', () => {
       assert.strictEqual(createLocator([], {PLUGIN_DATA}).locate(), undefined);
     });
 
+    it('returns undefined when discovery is turned off', () => {
+      assert.strictEqual(
+        createLocator([CWD_CONFIG, PLUGIN_CONFIG, HOME_CONFIG], {
+          PLUGIN_DATA,
+          CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY: 'true',
+        }).locate(),
+        undefined,
+      );
+    });
+
     it('prefers the config file in the current working directory', () => {
       assert.strictEqual(
         createLocator([CWD_CONFIG, PLUGIN_CONFIG, HOME_CONFIG], {

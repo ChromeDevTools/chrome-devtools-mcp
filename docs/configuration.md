@@ -293,6 +293,10 @@ from highest to lowest priority. Config files are not merged.
 Flags passed on the command line take precedence over the values in the config
 file.
 
+Set the `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable to turn off the
+search for config files, for example in tests. A config file passed via
+`--config` is still used.
+
 ### Applying changes without a restart
 
 Pass `--watchConfig` to reload the config file whenever it changes. Watching is

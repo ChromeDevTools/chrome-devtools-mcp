@@ -10,6 +10,13 @@ import path from 'node:path';
 
 export const CONFIG_FILE_NAME = 'cd4a.config.json';
 
+/**
+ * Turns off config file discovery, for example in tests. A config file passed
+ * via `--config` is still used.
+ */
+export const NO_CONFIG_DISCOVERY_ENV =
+  'CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY';
+
 export interface ConfigLocatorOptions {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -38,7 +45,8 @@ function isFile(filePath: string): boolean {
  *    fallback to `~/.config/cd4a/config.json`.
  *
  * An explicit `--config` takes precedence over all of them and is handled by
- * the ConfigParser.
+ * the ConfigParser. Discovery is turned off if the
+ * `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable is set.
  */
 export class ConfigLocator {
   readonly #options: ConfigLocatorOptions;
@@ -83,6 +91,9 @@ export class ConfigLocator {
   }
 
   locate(): string | undefined {
+    if (this.#options.env[NO_CONFIG_DISCOVERY_ENV]) {
+      return undefined;
+    }
     return this.getSearchPaths().find(filePath =>
       this.#options.isFile(filePath),
     );
