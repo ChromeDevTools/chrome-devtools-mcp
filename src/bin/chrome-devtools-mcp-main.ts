@@ -19,13 +19,21 @@ import {setupUnhandledRejectionHandler} from '../utils/errorHandling.js';
 import {VERSION} from '../version.js';
 
 import {mcpOptions} from '../config/mcp-options.js';
+import {ConfigLocator} from '../config/ConfigLocator.js';
 import {ConfigParser} from '../config/ConfigParser.js';
 
 await checkForUpdates(
   'Run `npm install chrome-devtools-mcp@latest` to update.',
 );
 
-export const args = new ConfigParser(VERSION).parse();
+const configParser = new ConfigParser(
+  VERSION,
+  process.argv,
+  process.env,
+  true,
+  new ConfigLocator(),
+);
+export const args = configParser.parse();
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 

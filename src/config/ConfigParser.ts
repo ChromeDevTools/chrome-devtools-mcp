@@ -19,6 +19,7 @@ import {
   DEFAULT_FILESYSTEM_ROOT,
   withoutDefaults,
 } from './mcp-options.js';
+import type {ConfigLocator} from './ConfigLocator.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -44,12 +45,26 @@ export type ParsedArguments = {
 };
 
 export class ConfigParser {
+  #configPath?: string;
+
+  /**
+   * @param configLocator Used to discover a config file when `--config` is not
+   * provided. Discovery is disabled if omitted.
+   */
   constructor(
     private version: string,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
+    private configLocator?: ConfigLocator,
   ) {}
+
+  /**
+   * The config file resolved by the last `parse()` call, if any.
+   */
+  get configPath(): string | undefined {
+    return this.#configPath;
+  }
 
   buildCliParser<O extends Record<string, YargsOptions> = typeof mcpOptions>(
     options: O = mcpOptions as unknown as O,
@@ -204,19 +219,9 @@ export class ConfigParser {
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
-      const configFileArgs =
-        typeof (cliArgs as Record<string, unknown>).config === 'string'
-          ? this.parseConfigFile(
-              (cliArgs as Record<string, unknown>).config as string,
-            )
-          : {};
-      const explicitArgs = {...configFileArgs, ...cliArgs};
+      this.#configPath = cliArgs.config ?? this.configLocator?.locate();
       this.warnUnknownArgs(cliArgs);
-      this.validateConflicts(explicitArgs);
-      this.validateImplications(explicitArgs);
-      const resolvedArgs = this.applyDefaults(explicitArgs);
-
-      return resolvedArgs;
+      return this.#resolve(cliArgs);
     } catch (error) {
       if (this.exitProcess) {
         console.error(getErrorMessage(error));
@@ -224,5 +229,27 @@ export class ConfigParser {
       }
       throw error;
     }
+  }
+
+  /**
+   * Re-reads the config file resolved by `parse()` and merges it with the CLI
+   * arguments again. Unlike `parse()`, it does not discover a new config file
+   * and throws on invalid configuration instead of exiting the process.
+   */
+  reload(): ParsedArguments {
+    return this.#resolve(this.parseCliArgs());
+  }
+
+  #resolve(cliArgs: ParsedArguments): ParsedArguments {
+    const configPath = this.#configPath;
+    const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
+    const explicitArgs = {
+      ...configFileArgs,
+      ...cliArgs,
+      ...(configPath ? {config: configPath} : {}),
+    };
+    this.validateConflicts(explicitArgs);
+    this.validateImplications(explicitArgs);
+    return this.applyDefaults(explicitArgs);
   }
 }

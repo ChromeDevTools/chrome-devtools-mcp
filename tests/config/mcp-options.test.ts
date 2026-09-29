@@ -5,10 +5,12 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {DEFAULT_FILESYSTEM_ROOT} from '../../src/config/mcp-options.js';
 import {createTempFile} from '../utils.js';
@@ -176,6 +178,114 @@ describe('mcp-options steps', () => {
         usageStatistics: true,
       });
       assert.strictEqual(args.usageStatistics, false);
+    });
+  });
+
+  describe('config discovery', () => {
+    it('does not discover a config file without a locator', () => {
+      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
+      assert.strictEqual(parser.parse().config, undefined);
+      assert.strictEqual(parser.configPath, undefined);
+    });
+
+    it('uses the config file found by the locator', () => {
+      using configFile = createTempFile(
+        JSON.stringify({headless: true}),
+        'cd4a.config.json',
+      );
+      const locator = sinon.createStubInstance(ConfigLocator);
+      locator.locate.returns(configFile.path);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js'],
+        {},
+        false,
+        locator,
+      );
+
+      const args = parser.parse();
+
+      assert.strictEqual(args.headless, true);
+      assert.strictEqual(args.config, configFile.path);
+      assert.strictEqual(parser.configPath, configFile.path);
+    });
+
+    it('prefers --config over a discovered config file', () => {
+      using configFile = createTempFile(
+        JSON.stringify({headless: true}),
+        'cd4a.explicit.config.json',
+      );
+      const locator = sinon.createStubInstance(ConfigLocator);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js', '--config', configFile.path],
+        {},
+        false,
+        locator,
+      );
+
+      assert.strictEqual(parser.parse().headless, true);
+      sinon.assert.notCalled(locator.locate);
+    });
+  });
+
+  describe('reload', () => {
+    function createParser(configPath: string, argv: string[] = []) {
+      const locator = sinon.createStubInstance(ConfigLocator);
+      locator.locate.returns(configPath);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js', ...argv],
+        {},
+        false,
+        locator,
+      );
+      return {parser, locator};
+    }
+
+    it('re-reads the config file without discovering it again', () => {
+      using configFile = createTempFile(
+        JSON.stringify({memoryDebugging: false}),
+        'cd4a.config.json',
+      );
+      const {parser, locator} = createParser(configFile.path);
+      assert.strictEqual(parser.parse().memoryDebugging, false);
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({memoryDebugging: true}),
+      );
+
+      assert.strictEqual(parser.reload().memoryDebugging, true);
+      sinon.assert.calledOnce(locator.locate);
+    });
+
+    it('keeps CLI arguments over the config file', () => {
+      using configFile = createTempFile(
+        JSON.stringify({headless: false}),
+        'cd4a.config.json',
+      );
+      const {parser} = createParser(configFile.path, ['--headless']);
+      parser.parse();
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({headless: false, memoryDebugging: true}),
+      );
+      const args = parser.reload();
+
+      assert.strictEqual(args.headless, true);
+      assert.strictEqual(args.memoryDebugging, true);
+    });
+
+    it('throws on an invalid config file', () => {
+      using configFile = createTempFile('{}', 'cd4a.config.json');
+      const {parser} = createParser(configFile.path);
+      parser.parse();
+
+      fs.writeFileSync(configFile.path, '{');
+
+      assert.throws(() => parser.reload(), /Invalid JSON config file/);
     });
   });
 });

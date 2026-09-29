@@ -33,6 +33,7 @@ import {VERSION} from '../version.js';
 import {buildCommand} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
+import {ConfigLocator} from '../config/ConfigLocator.js';
 import {ConfigParser} from '../config/ConfigParser.js';
 
 await checkForUpdates(
@@ -43,11 +44,14 @@ const DEFAULT_CLI_ARGS = ['--viaCli'];
 
 async function start(args: string[], sessionId: string, stopExisting = false) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
-  const parsedArgs = new ConfigParser(VERSION, [
-    process.execPath,
-    process.argv[1],
-    ...combinedArgs,
-  ]).parse();
+  // Validates the arguments and the config file before starting the daemon.
+  const parsedArgs = new ConfigParser(
+    VERSION,
+    [process.execPath, process.argv[1], ...combinedArgs],
+    process.env,
+    true,
+    new ConfigLocator(),
+  ).parse();
   if (stopExisting && isDaemonRunning(sessionId)) {
     await stopDaemon(sessionId);
   }
