@@ -19,7 +19,12 @@ import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
 import {createTempFile} from './utils.js';
 
 function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
-  return new ConfigParser('0.0.0', ['node', 'main.js', ...argv], env, false).parse();
+  return new ConfigParser(
+    '0.0.0',
+    ['node', 'main.js', ...argv],
+    env,
+    false,
+  ).parse();
 }
 
 describe('cli args parsing', () => {
