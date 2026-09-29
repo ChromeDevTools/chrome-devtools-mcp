@@ -13,13 +13,13 @@ export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
 import {puppeteerOptions} from './puppeteer-options.js';
-import {screenshotOptions} from './screenshot-options.js';
+import {toolOptions} from './tool-options.js';
 
 export const mcpOptions = {
   ...getCategoryOptions(),
   ...getBrowserOptions(),
   ...puppeteerOptions,
-  ...screenshotOptions,
+  ...toolOptions,
   logFile: {
     type: 'string',
     describe:

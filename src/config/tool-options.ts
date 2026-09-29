@@ -7,9 +7,9 @@
 import type {YargsOptions} from '../third_party/index.js';
 
 /**
- * Options that change the defaults of the screenshot tools.
+ * Options that change the default behavior of tools.
  */
-export const screenshotOptions = {
+export const toolOptions = {
   screenshotFormat: {
     type: 'string',
     default: 'png' as const,
