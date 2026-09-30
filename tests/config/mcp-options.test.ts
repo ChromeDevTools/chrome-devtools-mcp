@@ -152,9 +152,7 @@ describe('mcp-options steps', () => {
     ]) {
       it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
         assert.strictEqual(
-          new ConfigParser('0.0.0', [], {}).applyDefaults(
-            explicitArgs,
-          ).channel,
+          new ConfigParser('0.0.0', [], {}).applyDefaults(explicitArgs).channel,
           undefined,
         );
       });
@@ -194,12 +192,7 @@ describe('mcp-options steps', () => {
 
   describe('config discovery', () => {
     it('does not discover a config file without a locator', () => {
-      const parser = new ConfigParser(
-        '0.0.0',
-        ['node', 'main.js'],
-        {},
-        false,
-      );
+      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
       sinon.stub(parser.configLocator, 'locate').returns(undefined);
       assert.strictEqual(parser.parse().config, undefined);
     });
@@ -209,13 +202,10 @@ describe('mcp-options steps', () => {
         JSON.stringify({headless: true}),
         'cd4a.config.json',
       );
-      const parser = new ConfigParser(
-        '0.0.0',
-        ['node', 'main.js'],
-        {},
-        false,
-      );
-      const locateStub = sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
+      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
+      const locateStub = sinon
+        .stub(parser.configLocator, 'locate')
+        .returns(configFile.path);
 
       const args = parser.parse();
 
@@ -250,7 +240,9 @@ describe('mcp-options steps', () => {
         {},
         false,
       );
-      const locateStub = sinon.stub(parser.configLocator, 'locate').returns(configPath);
+      const locateStub = sinon
+        .stub(parser.configLocator, 'locate')
+        .returns(configPath);
       return {parser, locateStub};
     }
 

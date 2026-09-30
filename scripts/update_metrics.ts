@@ -37,9 +37,7 @@ function writeToolCallMetricsConfig() {
   }
 
   // Avoid 'as ParsedArguments' by using parseArguments
-  const allTools = createTools(
-    new ConfigParser('0.0.0', ['', '']).parse(),
-  );
+  const allTools = createTools(new ConfigParser('0.0.0', ['', '']).parse());
 
   if (!HaveUniqueNames(allTools)) {
     throw new Error('Error: Duplicate tool names found.');
