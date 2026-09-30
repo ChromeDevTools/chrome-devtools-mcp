@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {WebMCPTool} from 'puppeteer-core';
+import type {Page, WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './config/ConfigParser.js';
 import {
@@ -939,9 +939,14 @@ export class McpResponse implements Response {
       }
       if (this.#attachedWaitForResult.openedPages) {
         const openedPages = this.#attachedWaitForResult.openedPages;
-        const openedMcpPages = context
-          .getPages()
-          .filter(mcpPage => openedPages.has(mcpPage.pptrPage));
+        const openedMcpPages = [];
+        for (const mcpPage of context.getPages()) {
+          const page = await mcpPage.target.page();
+          if (page && openedPages.has(page)) {
+            await mcpPage.init();
+            openedMcpPages.push(mcpPage);
+          }
+        }
 
         if (openedMcpPages.length) {
           response.push('## Opened pages');
