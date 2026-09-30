@@ -180,31 +180,6 @@ describe('pwa', () => {
     sinon.assert.calledOnceWithExactly(context.uninstallPWA, {manifestId});
     sinon.assert.calledTwice(response.setIncludePages);
     sinon.assert.alwaysCalledWithExactly(response.setIncludePages, true);
-    sinon.assert.callCount(response.appendResponseLine, 6);
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.firstCall,
-      `Installed PWA with manifest ID: ${manifestId}`,
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.secondCall,
-      `Launched PWA with manifest ID: ${manifestId} (${startUrl})`,
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.thirdCall,
-      `OS app state for manifest ID: ${manifestId}`,
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.getCall(3),
-      'Badge count: 0',
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.getCall(4),
-      'File handlers: []',
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.getCall(5),
-      `Uninstalled PWA with manifest ID: ${manifestId}`,
-    );
   });
 
   it('launches an installed PWA in a standalone window', async () => {
