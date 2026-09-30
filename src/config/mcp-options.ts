@@ -131,6 +131,12 @@ export const mcpOptions = {
     describe:
       'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
   },
+  fileNavigations: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page and the slim navigate tool reject file: URLs outright. Use this when tool calls may come from an untrusted source and the browser should not be able to open local files.',
+  },
   sourceMaps: {
     type: 'boolean',
     default: true,

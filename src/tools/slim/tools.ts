@@ -55,6 +55,7 @@ export const navigate = definePageTool((args: ParsedArguments) => {
       validateUrl(request.params.url, {
         javascriptEvaluation: args?.javascriptEvaluation,
         categoryExtensions: args?.categoryExtensions,
+        fileNavigations: args?.fileNavigations,
       });
 
       const page = request.page;

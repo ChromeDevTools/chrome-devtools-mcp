@@ -131,6 +131,7 @@ export const newPage = defineTool((args: ParsedArguments) => {
       validateUrl(request.params.url, {
         javascriptEvaluation: args?.javascriptEvaluation,
         categoryExtensions: args?.categoryExtensions,
+        fileNavigations: args?.fileNavigations,
       });
 
       const page = await context.newPage(
@@ -211,6 +212,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
         validateUrl(request.params.url, {
           javascriptEvaluation: args?.javascriptEvaluation,
           categoryExtensions: args?.categoryExtensions,
+          fileNavigations: args?.fileNavigations,
         });
       }
 

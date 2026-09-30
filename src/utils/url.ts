@@ -52,6 +52,7 @@ export function isLocalhost(url?: string): boolean {
 export interface ValidateUrlOptions {
   javascriptEvaluation: boolean | undefined;
   categoryExtensions: boolean | undefined;
+  fileNavigations: boolean | undefined;
 }
 
 export interface IsAllowedUrlOptions {
@@ -143,13 +144,13 @@ export function findUnenforceablePattern(
  * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
  *
  * @param url The URL string to validate.
- * @param options Options object containing javascriptEvaluation and categoryExtensions.
+ * @param options Options object containing javascriptEvaluation, categoryExtensions and fileNavigations.
  * @returns The parsed URL.
  * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed,
- * or if navigating to a restricted scheme.
+ * or if file navigations are disabled and a `file:` URL is passed, or if navigating to a restricted scheme.
  */
 export function validateUrl(url: string, options: ValidateUrlOptions): URL {
-  const {javascriptEvaluation, categoryExtensions} = options;
+  const {javascriptEvaluation, categoryExtensions, fileNavigations} = options;
 
   let parsed: URL;
   try {
@@ -166,6 +167,12 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
   ) {
     throw new Error(
       `Navigating to ${parsed.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
+    );
+  }
+
+  if (fileNavigations === false && parsed.protocol === 'file:') {
+    throw new Error(
+      `Navigating to file: URLs is not allowed when --file-navigations is disabled.`,
     );
   }
 

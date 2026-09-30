@@ -42,6 +42,7 @@ describe('cli args parsing', () => {
     performanceCrux: true,
     usageStatistics: true,
     javascriptEvaluation: true,
+    fileNavigations: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
     filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
@@ -384,6 +385,24 @@ describe('cli args parsing', () => {
     // Test disabling it
     const disabledArgs = parseConfig(['--no-javascript-evaluation']);
     assert.strictEqual(disabledArgs.javascriptEvaluation, false);
+  });
+
+  it('parses file navigations flag', async () => {
+    // Test default (should be true).
+    const defaultArgs = parseConfig(['main.js'], {});
+    assert.strictEqual(defaultArgs.fileNavigations, true);
+
+    // Test enabling it
+    const enabledArgs = parseConfig(['--file-navigations']);
+    assert.strictEqual(enabledArgs.fileNavigations, true);
+
+    // Test disabling it
+    const disabledArgs = parseConfig(['--no-file-navigations']);
+    assert.strictEqual(disabledArgs.fileNavigations, false);
+
+    // The camelCase form is equivalent.
+    const camelCaseArgs = parseConfig(['--fileNavigations=false']);
+    assert.strictEqual(camelCaseArgs.fileNavigations, false);
   });
 
   it('respects env variable', async () => {

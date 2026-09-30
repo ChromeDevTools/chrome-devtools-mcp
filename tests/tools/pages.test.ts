@@ -293,6 +293,29 @@ describe('pages', () => {
         );
       });
     });
+    it('throws when navigating to a file URL and fileNavigations is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const disabledArgs = new ConfigParser(
+          '1.0.0',
+          ['node', 'script.js', '--no-file-navigations'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        ).parse();
+        const tool = newPage(disabledArgs);
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'file:///etc/passwd'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
+          },
+        );
+      });
+    });
     it('throws when URL does not parse with new URL', async () => {
       await withMcpContext(async (response, context, args) => {
         const tool = newPage(args);
@@ -856,6 +879,37 @@ describe('pages', () => {
           'Hello MCP',
         );
         assert.ok(response.includePages);
+      });
+    });
+
+    it('throws when navigating to a file URL and fileNavigations is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const disabledArgs = new ConfigParser(
+          '1.0.0',
+          ['node', 'script.js', '--no-file-navigations'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        ).parse();
+        await assert.rejects(
+          async () => {
+            await navigatePage(disabledArgs).handler(
+              {
+                params: {url: 'file:///etc/passwd'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
+          },
+        );
+        // The page must not have left about:blank.
+        assert.strictEqual(
+          context.getSelectedMcpPage().pptrPage.url(),
+          'about:blank',
+        );
       });
     });
 

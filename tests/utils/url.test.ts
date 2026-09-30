@@ -96,6 +96,7 @@ describe('isLocalhost', () => {
 const defaultOptions = {
   javascriptEvaluation: undefined,
   categoryExtensions: undefined,
+  fileNavigations: undefined,
 };
 
 describe('validateUrl', () => {
@@ -143,6 +144,7 @@ describe('validateUrl', () => {
       validateUrl('javascript:alert(1)', {
         javascriptEvaluation: true,
         categoryExtensions: undefined,
+        fileNavigations: undefined,
       }).protocol,
       'javascript:',
     );
@@ -154,6 +156,7 @@ describe('validateUrl', () => {
       validateUrl('data:text/html,<div>test</div>', {
         javascriptEvaluation: true,
         categoryExtensions: undefined,
+        fileNavigations: undefined,
       }).protocol,
       'data:',
     );
@@ -165,6 +168,7 @@ describe('validateUrl', () => {
       validateUrl('vbscript:msgbox(1)', {
         javascriptEvaluation: true,
         categoryExtensions: undefined,
+        fileNavigations: undefined,
       }).protocol,
       'vbscript:',
     );
@@ -176,6 +180,7 @@ describe('validateUrl', () => {
         validateUrl('javascript:alert(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -184,6 +189,7 @@ describe('validateUrl', () => {
         validateUrl('JAVASCRIPT:alert(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -192,6 +198,7 @@ describe('validateUrl', () => {
         validateUrl('javascript:void(0)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -200,6 +207,7 @@ describe('validateUrl', () => {
         validateUrl('data:text/html,<div>test</div>', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -208,6 +216,7 @@ describe('validateUrl', () => {
         validateUrl('DATA:text/html,<div>test</div>', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -216,6 +225,7 @@ describe('validateUrl', () => {
         validateUrl('vbscript:msgbox(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -224,6 +234,7 @@ describe('validateUrl', () => {
         validateUrl('VBSCRIPT:msgbox(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -285,6 +296,7 @@ describe('validateUrl', () => {
         validateUrl('chrome-extension://abcdef/popup.html', {
           javascriptEvaluation: undefined,
           categoryExtensions: false,
+          fileNavigations: undefined,
         }),
       /Navigating to chrome-extension: URLs is not allowed without --categoryExtensions\./,
     );
@@ -292,8 +304,65 @@ describe('validateUrl', () => {
       validateUrl('chrome-extension://abcdef/popup.html', {
         javascriptEvaluation: undefined,
         categoryExtensions: true,
+        fileNavigations: undefined,
       }).href,
       'chrome-extension://abcdef/popup.html',
+    );
+  });
+
+  it('should allow file URLs when fileNavigations is true or omitted', () => {
+    assert.strictEqual(
+      validateUrl('file:///tmp/example.txt', defaultOptions).protocol,
+      'file:',
+    );
+    assert.strictEqual(
+      validateUrl('file:///tmp/example.txt', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: undefined,
+        fileNavigations: true,
+      }).href,
+      'file:///tmp/example.txt',
+    );
+  });
+
+  it('should reject file URLs when fileNavigations is false', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    assert.throws(
+      () => validateUrl('file:///tmp/example.txt', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('file:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // The host form resolves to the same scheme and is rejected too.
+    assert.throws(
+      () => validateUrl('file://localhost/tmp/example.txt', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should only reject file URLs when fileNavigations is false', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    assert.strictEqual(
+      validateUrl('https://example.com', noFileNavigations).href,
+      'https://example.com/',
+    );
+    assert.strictEqual(
+      validateUrl('about:blank', noFileNavigations).href,
+      'about:blank',
+    );
+    assert.strictEqual(
+      validateUrl('data:text/html,<div>test</div>', noFileNavigations).protocol,
+      'data:',
     );
   });
 });

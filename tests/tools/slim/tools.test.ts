@@ -138,6 +138,31 @@ describe('slim', () => {
     sinon.assert.notCalled(page.pptrPage.goto);
   });
 
+  it('disallows file URLs when fileNavigations is false', async () => {
+    const {page, context, response} = createHandlerMocks();
+    const disabledArgs = new ConfigParser(
+      '1.0.0',
+      ['node', 'script.js', '--slim', '--no-file-navigations'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    ).parse();
+    const tool = navigate(disabledArgs);
+    await assert.rejects(
+      async () => {
+        await tool.handler(
+          {params: {url: 'file:///etc/passwd'}, page},
+          response,
+          context,
+        );
+      },
+      {
+        message:
+          'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
+      },
+    );
+
+    sinon.assert.notCalled(page.pptrPage.goto);
+  });
+
   it('rejects chrome: and chrome-untrusted: URLs', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const tool = navigate(args);

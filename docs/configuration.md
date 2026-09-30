@@ -209,6 +209,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--fileNavigations`/ `--file-navigations`**
+  Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page and the slim navigate tool reject file: URLs outright. Use this when tool calls may come from an untrusted source and the browser should not be able to open local files.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--sourceMaps`/ `--source-maps`**
   Whether to enable source maps in DevTools. Use --no-source-maps to disable.
   - **Type:** boolean
