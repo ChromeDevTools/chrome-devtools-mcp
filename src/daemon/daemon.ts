@@ -142,6 +142,9 @@ async function setupMCPServer() {
     browserManager,
     logFile,
   });
+  if (args.watchConfig) {
+    mcpServer.watchConfig(configParser.configPath, () => configParser.reload());
+  }
   ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
   void ClearcutLogger.get()?.logDailyActiveIfNeeded();
   void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));

@@ -21,7 +21,7 @@ import type {TextContent} from '../src/third_party/index.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
-import {createTempDir} from './utils.js';
+import {createTempDir, createTempFile, waitExecutionFor} from './utils.js';
 
 describe('e2e', () => {
   async function withClient(
@@ -219,6 +219,29 @@ describe('e2e', () => {
         assert.ok(getHeapSnapshotSummary);
       },
       ['--memoryDebugging'],
+    );
+  });
+
+  it('applies config file changes with --watchConfig', async () => {
+    using configFile = createTempFile('{}', 'cd4a.config.json');
+    await withClient(
+      async client => {
+        const hasHeapSnapshotSummary = async () => {
+          const {tools} = await client.listTools();
+          return tools.some(t => t.name === 'get_heapsnapshot_summary');
+        };
+        assert.strictEqual(await hasHeapSnapshotSummary(), false);
+
+        fs.writeFileSync(
+          configFile.path,
+          JSON.stringify({memoryDebugging: true}),
+        );
+
+        await waitExecutionFor(async () => {
+          assert.ok(await hasHeapSnapshotSummary());
+        }, 10000);
+      },
+      ['--config', configFile.path, '--watchConfig'],
     );
   });
 
