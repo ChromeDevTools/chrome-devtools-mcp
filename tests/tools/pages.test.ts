@@ -248,6 +248,7 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         const disabledArgs = new ConfigParser(
           '1.0.0',
+
           ['node', 'script.js', '--no-javascript-evaluation'],
           {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
         ).parse();
@@ -1104,6 +1105,7 @@ describe('pages', () => {
 
       const disabledArgs = new ConfigParser(
         '1.0.0',
+
         ['node', 'script.js', '--no-javascript-evaluation'],
         {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
       ).parse();
@@ -1115,6 +1117,7 @@ describe('pages', () => {
       await withMcpContext(async (response, context) => {
         const disabledArgs = new ConfigParser(
           '1.0.0',
+
           ['node', 'script.js', '--no-javascript-evaluation'],
           {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
         ).parse();

@@ -79,6 +79,19 @@ interface McpContextOptions {
   onNotification?: (message: string) => void;
 }
 
+/**
+ * Options that can be changed on a running context.
+ */
+export type LiveMcpContextOptions = Pick<
+  McpContextOptions,
+  | 'experimentalIncludeAllPages'
+  | 'performanceCrux'
+  | 'sourceMaps'
+  | 'allowlist'
+  | 'blocklist'
+  | 'allowUnrestrictedPaths'
+>;
+
 // Page ids are handed out from a process-wide counter so they stay unique
 // across all contexts, in particular across browser reconnects. An id issued
 // before a reconnect then fails to resolve instead of hitting an unrelated
@@ -150,6 +163,16 @@ export class McpContext implements Context {
     await this.#serviceWorkerConsoleCollector.init(workers);
     this.browser.on('targetcreated', this.#onTargetCreated);
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
+  }
+
+  /**
+   * Updates options after a config reload. `sourceMaps` only applies to pages
+   * opened afterwards.
+   */
+  updateOptions(options: LiveMcpContextOptions): void {
+    this.#options = {...this.#options, ...options};
+    this.#allowUnrestrictedPaths =
+      this.#options.allowUnrestrictedPaths ?? false;
   }
 
   dispose() {

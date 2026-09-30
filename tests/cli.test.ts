@@ -20,6 +20,7 @@ import {createTempFile} from './utils.js';
 function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return new ConfigParser(
     '0.0.0',
+
     ['node', 'main.js', ...argv],
     env,
     false,

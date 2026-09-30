@@ -16,6 +16,7 @@ describe('createTools', () => {
     it(`has unique tool names with [${extraArgs.join(' ')}]`, () => {
       const serverArgs = new ConfigParser(
         '0.0.0',
+
         ['node', 'script.js', ...extraArgs],
         {},
       ).parse();
