@@ -91,7 +91,6 @@ describe('slim', () => {
     const {page, context, response} = createHandlerMocks();
     const disabledArgs = new ConfigParser(
       '1.0.0',
-
       ['node', 'script.js', '--slim', '--no-javascript-evaluation'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();

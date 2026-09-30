@@ -26,14 +26,9 @@ describe('McpServer', () => {
   });
 
   function parseArgs(argv: string[] = []) {
-    return new ConfigParser(
-      '1.0.0',
-
-      ['node', 'script.js', ...argv],
-      {
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-      },
-    ).parse();
+    return new ConfigParser('1.0.0', ['node', 'script.js', ...argv], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parse();
   }
 
   async function createTestServer(extraArgs: string[] = []) {
