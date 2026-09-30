@@ -1667,7 +1667,7 @@ describe('ToolHandler', () => {
       sinon.assert.notCalled(handler);
     });
 
-    it('re-validates the params of waiting calls against the new schema', async () => {
+    it('rejects waiting calls when the schema changes', async () => {
       const serverArgs = parseArgs();
       const handler = sinon.stub().resolves();
       const toolMutex = new Mutex();
@@ -1683,7 +1683,10 @@ describe('ToolHandler', () => {
       await toolMutex.acquire();
       const call = toolHandler.handle({a: 'value'});
       toolHandler.update(
-        createGlobalTool({b: zod.string()}, handler),
+        createGlobalTool(
+          {a: zod.string().optional(), b: zod.string()},
+          handler,
+        ),
         serverArgs,
       );
       toolMutex.release();
@@ -1692,9 +1695,36 @@ describe('ToolHandler', () => {
       assert.strictEqual(result.isError, true);
       assert.match(
         result.content[0]?.type === 'text' ? result.content[0].text : '',
-        /^Input validation error: Invalid arguments for tool global_tool:/,
+        /^The input schema of tool global_tool changed/,
       );
       sinon.assert.notCalled(handler);
+    });
+
+    it('runs waiting calls when the schema is unchanged', async () => {
+      const serverArgs = parseArgs();
+      const handler = sinon.stub().resolves();
+      const toolMutex = new Mutex();
+      const mockContext = createMockMcpContext();
+      mockContext.browser = getMockBrowser();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({a: 'value'});
+      toolHandler.update(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        parseArgs(['--redact-network-headers']),
+      );
+      toolMutex.release();
+      await call;
+
+      sinon.assert.calledOnce(handler);
     });
 
     it('updates the disabled state', () => {

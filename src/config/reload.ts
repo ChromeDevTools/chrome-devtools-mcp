@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {isDeepStrictEqual} from 'node:util';
-
 import {ToolCategory} from '../tools/categories.js';
 
 import {categoryToFlagName} from './category-options.js';
@@ -60,35 +58,6 @@ export const RELOADABLE_OPTIONS: ReadonlyArray<keyof ParsedArguments> = [
   'allowUnrestrictedPaths',
   'filesystemRoot',
 ];
-
-const reloadableOptions = new Set<string>(RELOADABLE_OPTIONS);
-
-function isReloadable(name: string): boolean {
-  return reloadableOptions.has(name);
-}
-
-/**
- * Returns the options that changed between `previous` and `next` but are only
- * applied after a restart.
- */
-export function getRestartRequiredChanges(
-  previous: ParsedArguments,
-  next: ParsedArguments,
-): string[] {
-  const names = new Set([...Object.keys(previous), ...Object.keys(next)]);
-  const changes: string[] = [];
-  for (const name of names) {
-    if (isReloadable(name)) {
-      continue;
-    }
-    if (
-      !isDeepStrictEqual(Reflect.get(previous, name), Reflect.get(next, name))
-    ) {
-      changes.push(name);
-    }
-  }
-  return changes;
-}
 
 /**
  * Returns the arguments a running server continues with: `next` for

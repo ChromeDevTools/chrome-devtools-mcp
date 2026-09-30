@@ -26,7 +26,7 @@ import {
   puppeteer,
   zod,
 } from './third_party/index.js';
-import {formatInputValidationError, ToolHandler} from './ToolHandler.js';
+import {ToolHandler} from './ToolHandler.js';
 import {
   type DefinedPageTool,
   isAvailableInMode,
@@ -172,7 +172,20 @@ export class McpServer {
     const parseResult =
       await toolHandler.registeredInputSchema.safeParseAsync(args);
     if (!parseResult.success) {
-      return formatInputValidationError(name, parseResult.error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Input validation error: Invalid arguments for tool ${name}: ${parseResult.error.issues
+              .map(
+                issue =>
+                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
+              )
+              .join(', ')}`,
+          },
+        ],
+        isError: true,
+      };
     }
     return await toolHandler.handle(parseResult.data);
   }

@@ -24,6 +24,7 @@ import {isAvailableInMode, isSlimTool} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 import {isLocalhost} from './utils/url.js';
 
 /**
@@ -174,24 +175,8 @@ async function validateToolFiles(
   }
 }
 
-export function formatInputValidationError(
-  toolName: string,
-  error: zod.ZodError,
-): CallToolResult {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Input validation error: Invalid arguments for tool ${toolName}: ${error.issues
-          .map(
-            issue =>
-              `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
-          )
-          .join(', ')}`,
-      },
-    ],
-    isError: true,
-  };
+function toInputJsonSchema(schema: zod.ZodType) {
+  return zod.toJSONSchema(schema, {io: 'input', unrepresentable: 'any'});
 }
 
 export class ToolHandler {
@@ -201,6 +186,10 @@ export class ToolHandler {
   #registeredInputSchema: zod.ZodObject<zod.ZodRawShape, zod.core.$strict> = zod
     .object({})
     .strict();
+  /**
+   * Incremented whenever an update changes the input schema the client sees.
+   */
+  #schemaVersion = 0;
   #disabled = false;
   #disabledReason?: string;
 
@@ -260,8 +249,17 @@ export class ToolHandler {
     this.#disabledReason = reason;
     this.#disabled =
       disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
+    const registeredInputSchema = zod.object(tool.schema).strict();
+    if (
+      !isDeepStrictEqual(
+        toInputJsonSchema(this.#registeredInputSchema),
+        toInputJsonSchema(registeredInputSchema),
+      )
+    ) {
+      this.#schemaVersion++;
+    }
     this.#inputSchema = tool.schema;
-    this.#registeredInputSchema = zod.object(this.#inputSchema).strict();
+    this.#registeredInputSchema = registeredInputSchema;
   }
 
   /**
@@ -297,7 +295,7 @@ export class ToolHandler {
   handle = async (
     validatedParams: Record<string, unknown>,
   ): Promise<CallToolResult> => {
-    const schemaAtCall = this.#registeredInputSchema;
+    const schemaVersionAtCall = this.#schemaVersion;
     using _guard = await this.toolMutex.acquire();
 
     if (this.#disabledReason) {
@@ -314,17 +312,20 @@ export class ToolHandler {
 
     const tool = this.#tool;
     const serverArgs = this.#serverArgs;
-    let params = validatedParams;
-    if (schemaAtCall !== this.#registeredInputSchema) {
+    if (schemaVersionAtCall !== this.#schemaVersion) {
       // The tool was updated while this call waited for the mutex, so the
       // params were validated against the previous schema.
-      const parseResult =
-        await this.#registeredInputSchema.safeParseAsync(validatedParams);
-      if (!parseResult.success) {
-        return formatInputValidationError(tool.name, parseResult.error);
-      }
-      params = parseResult.data;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `The input schema of tool ${tool.name} changed because the server configuration was reloaded. List the tools again and retry the call with the new parameters.`,
+          },
+        ],
+        isError: true,
+      };
     }
+    const params = validatedParams;
 
     const startTime = Date.now();
     let success = false;
@@ -342,7 +343,7 @@ export class ToolHandler {
         this.abandonPendingBrowserAttemptOnTimeout(),
       );
       logger?.(`${tool.name} context: resolved`);
-      const response = serverArgs.slim
+      const response = isSlimTool(tool)
         ? new SlimMcpResponse(serverArgs)
         : new McpResponse(serverArgs);
 
