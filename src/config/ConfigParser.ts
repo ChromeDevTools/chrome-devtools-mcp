@@ -40,6 +40,7 @@ export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
+  #usageStatisticsNoticeShown = false;
 
   constructor(
     private version: string,
@@ -212,9 +213,12 @@ export class ConfigParser {
     }
 
     if (this.env['CI'] || this.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-      console.error(
-        "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-      );
+      if (!this.#usageStatisticsNoticeShown) {
+        this.#usageStatisticsNoticeShown = true;
+        console.error(
+          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+        );
+      }
       resolvedArgs.usageStatistics = false;
     }
 

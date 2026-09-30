@@ -181,6 +181,17 @@ describe('mcp-options steps', () => {
       });
       assert.strictEqual(args.usageStatistics, false);
     });
+
+    it('prints the usage statistics notice once', () => {
+      const consoleError = sinon.stub(console, 'error');
+      const parser = new ConfigParser('0.0.0', [], {CI: 'true'});
+
+      parser.applyDefaults({});
+      const args = parser.applyDefaults({});
+
+      assert.strictEqual(args.usageStatistics, false);
+      sinon.assert.calledOnce(consoleError);
+    });
   });
 
   describe('config discovery', () => {

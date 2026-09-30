@@ -181,21 +181,84 @@ describe('McpServer', () => {
     });
 
     it('updates the options of an existing context', async () => {
-      const {server, context} = await createTestServer();
+      const {server, context} = await createTestServer([
+        '--blockedUrlPattern',
+        'https://example.com/*',
+      ]);
       await server.callTool('list_pages', {});
 
-      await server.applyConfig(
-        parseArgs(['--blockedUrlPattern', 'https://example.com/*']),
-      );
+      await server.applyConfig(parseArgs(['--no-performance-crux']));
 
       sinon.assert.calledOnceWithExactly(context.updateOptions, {
         experimentalIncludeAllPages: false,
-        performanceCrux: true,
+        performanceCrux: false,
         sourceMaps: true,
-        allowlist: undefined,
-        blocklist: ['https://example.com/*'],
         allowUnrestrictedPaths: false,
       });
+    });
+
+    it('keeps restart-required options the server was started with', async () => {
+      const {server} = await createTestServer();
+
+      await server.applyConfig(parseArgs(['--categoryExtensions']));
+
+      assert.ok(!(await listToolNames(server)).includes('install_extension'));
+    });
+
+    it('does not notify the client when no tool changed', async () => {
+      const {server} = await createTestServer();
+      const sendToolListChanged = sinon.spy(
+        server.server,
+        'sendToolListChanged',
+      );
+
+      await server.applyConfig(parseArgs());
+
+      sinon.assert.notCalled(sendToolListChanged);
+    });
+
+    it('releases state owned by tools that were disabled', async () => {
+      const {server, context} = await createTestServer([
+        '--experimentalScreencast',
+        '--memoryDebugging',
+      ]);
+      await server.callTool('list_pages', {});
+
+      await server.applyConfig(parseArgs(['--no-category-performance']));
+
+      sinon.assert.calledOnceWithExactly(context.releaseState, {
+        screencast: true,
+        heapSnapshots: true,
+        performanceTrace: true,
+      });
+    });
+
+    it('does not release state of tools that stay enabled', async () => {
+      const {server, context} = await createTestServer([
+        '--experimentalScreencast',
+        '--memoryDebugging',
+      ]);
+      await server.callTool('list_pages', {});
+
+      await server.applyConfig(
+        parseArgs(['--experimentalScreencast', '--memoryDebugging']),
+      );
+
+      sinon.assert.calledOnceWithExactly(context.releaseState, {
+        screencast: false,
+        heapSnapshots: false,
+        performanceTrace: false,
+      });
+    });
+
+    it('refreshes the pages when experimentalIncludeAllPages changes', async () => {
+      const {server, context} = await createTestServer();
+      await server.callTool('list_pages', {});
+      context.createPagesSnapshot.resetHistory();
+
+      await server.applyConfig(parseArgs(['--experimentalIncludeAllPages']));
+
+      sinon.assert.calledOnceWithExactly(context.createPagesSnapshot);
     });
   });
 });
