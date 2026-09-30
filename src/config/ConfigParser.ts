@@ -224,7 +224,7 @@ export class ConfigParser {
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
-      this.#configPath = cliArgs.config ?? this.configLocator?.locate();
+      this.#configPath = cliArgs.config ?? this.configLocator?.locate(this.env);
       this.warnUnknownArgs(cliArgs);
       return this.#resolve(cliArgs);
     } catch (error) {
