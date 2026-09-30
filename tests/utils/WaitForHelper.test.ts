@@ -7,14 +7,10 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
-<<<<<<< HEAD
 import sinon from 'sinon';
 
 import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
 import {createMockDialog, createMockPuppeteerPage} from '../mocks.js';
-import type {Page} from '../../src/third_party/index.js';
-=======
->>>>>>> 2647b63 (Address review feedback for opened pages)
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 

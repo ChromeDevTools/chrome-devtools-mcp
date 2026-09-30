@@ -1051,14 +1051,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-<<<<<<< HEAD
-          const title = await mcpPage.getTitle();
-          const pageLabel = title
-            ? `${truncateTitle(title)} (${mcpPage.url()})`
-            : mcpPage.url();
-=======
           const page = await formatPage(mcpPage, context);
->>>>>>> 2647b63 (Address review feedback for opened pages)
           parts.push(
             `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
           );
@@ -1077,14 +1070,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-<<<<<<< HEAD
-            const title = await mcpPage.getTitle();
-            const pageLabel = title
-              ? `${truncateTitle(title)} (${mcpPage.url()})`
-              : mcpPage.url();
-=======
             const page = await formatPage(mcpPage, context);
->>>>>>> 2647b63 (Address review feedback for opened pages)
             response.push(
               `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
             );
@@ -1650,8 +1636,6 @@ function truncateTitle(title: string, maxLength = 50): string {
   return title.slice(0, maxLength - 3) + '...';
 }
 
-<<<<<<< HEAD
-=======
 async function fetchPageTitle(page: Page): Promise<string> {
   return Promise.race([
     page.title().catch(() => ''),
@@ -1668,8 +1652,6 @@ async function formatPage(mcpPage: McpPage, context: McpContext) {
     structured: createStructuredPage(mcpPage, context, title),
   };
 }
-
->>>>>>> 2647b63 (Address review feedback for opened pages)
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
