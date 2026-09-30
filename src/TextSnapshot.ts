@@ -155,14 +155,15 @@ export class TextSnapshot {
     }
     // TODO: index by backendNodeId instead.
     const queue = [this.root];
-    while (queue.length) {
-      const current = queue.pop()!;
+    let current = queue.pop();
+    while (current) {
       if (current.backendNodeId === cdpBackendNodeId) {
         return current.id;
       }
       for (const child of current.children) {
         queue.push(child);
       }
+      current = queue.pop();
     }
     return;
   }

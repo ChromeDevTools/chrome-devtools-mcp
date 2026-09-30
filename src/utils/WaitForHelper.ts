@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page, Protocol, CdpPage, Dialog} from '../third_party/index.js';
-import type {PredefinedNetworkConditions} from '../third_party/index.js';
+import type {
+  Page,
+  Protocol,
+  CdpPage,
+  Dialog,
+  PredefinedNetworkConditions,
+} from '../third_party/index.js';
 import {logger} from './logger.js';
 
 export type DialogAction = 'accept' | 'dismiss' | string;
@@ -89,7 +94,7 @@ export class WaitForHelper {
       }
     });
 
-    return Promise.race([
+    return await Promise.race([
       stableDomObserver.evaluate(async observer => {
         return await observer.resolver.promise;
       }),

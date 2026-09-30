@@ -217,7 +217,7 @@ export class ClearcutLogger {
     this.#watchdog.send({
       type: WatchdogMessageType.LOG_EVENT,
       payload: this.#addMcpClient({
-        tool_invocation: tool_invocation,
+        tool_invocation,
       }),
     });
   }

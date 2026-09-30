@@ -46,7 +46,9 @@ Now use the press_key tool to type "a" on Page 1 without selecting it first. You
           pressKeys.length >= 2,
           'Should retry press_key after error recovery',
         );
-        const lastPressKeyIndex = result.calls.lastIndexOf(pressKeys.at(-1)!);
+        const lastPressKey = pressKeys.at(-1);
+        assert.ok(lastPressKey);
+        const lastPressKeyIndex = result.calls.lastIndexOf(lastPressKey);
         assert.ok(
           firstSelectPageIndex < lastPressKeyIndex,
           'select_page should precede the successful press_key',

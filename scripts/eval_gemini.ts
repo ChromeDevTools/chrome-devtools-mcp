@@ -15,12 +15,12 @@ import {Client} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {TestServer} from '../build/tests/server.js';
 
+import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
+import {Result} from './eval_result.js';
+
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
 const SKILL_PATH = path.join(ROOT_DIR, 'skills', 'chrome-devtools', 'SKILL.md');
-
-import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
-import {Result} from './eval_result.js';
 export type {CapturedFunctionCall, TestScenario};
 export {Result};
 

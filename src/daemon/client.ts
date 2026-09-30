@@ -170,7 +170,7 @@ export async function sendCommand(
     path: socketPath,
   });
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.destroy();
       reject(new Error('Timeout waiting for daemon response'));
@@ -207,7 +207,7 @@ export async function stopDaemon(sessionId: string) {
 
   await sendCommand({method: 'stop'}, sessionId);
 
-  await waitForFile(pidFilePath, /*removed=*/ true);
+  await waitForFile(pidFilePath, /* removed=*/ true);
 }
 
 export async function verifyDaemonVersion(

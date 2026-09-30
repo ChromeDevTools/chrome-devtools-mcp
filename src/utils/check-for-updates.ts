@@ -19,7 +19,7 @@ import {VERSION} from '../version.js';
  */
 let isChecking = false;
 
-/** @internal Reset flag for tests only. */
+/** @internal */
 export function resetUpdateCheckFlagForTesting() {
   isChecking = false;
 }

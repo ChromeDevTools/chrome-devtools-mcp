@@ -46,8 +46,7 @@ import type {
   SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
-import type {Logger} from './types.js';
-import type {ExtensionServiceWorker} from './types.js';
+import type {Logger, ExtensionServiceWorker} from './types.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
@@ -427,7 +426,7 @@ export class McpContext implements Context {
     if (!targetPage) {
       return undefined;
     }
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<undefined>(resolve => {
       timeoutId = setTimeout(() => resolve(undefined), 500);
     });
@@ -437,7 +436,7 @@ export class McpContext implements Context {
     } catch {
       return undefined;
     } finally {
-      clearTimeout(timeoutId!);
+      clearTimeout(timeoutId);
     }
   }
 
@@ -501,19 +500,15 @@ export class McpContext implements Context {
       );
     });
 
-    for (const serviceWorker of serviceWorkers) {
-      if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
-        this.#extensionServiceWorkerMap.set(
-          serviceWorker,
-          'sw-' + this.#nextExtensionServiceWorkerId++,
-        );
-      }
-    }
-
     this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
+      let id = this.#extensionServiceWorkerMap.get(serviceWorker);
+      if (!id) {
+        id = 'sw-' + this.#nextExtensionServiceWorkerId++;
+        this.#extensionServiceWorkerMap.set(serviceWorker, id);
+      }
       return {
         target: serviceWorker,
-        id: this.#extensionServiceWorkerMap.get(serviceWorker)!,
+        id,
         url: serviceWorker.url(),
       };
     });
@@ -916,7 +911,7 @@ export class McpContext implements Context {
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${url}`);
         }
-        return response.text();
+        return await response.text();
       }
 
       case 'file:': {

@@ -13,7 +13,7 @@ const mcpDebugNamespace = 'mcp:log';
 
 let logFileStream: fs.WriteStream | undefined;
 
-const _debugLog = util.debuglog(mcpDebugNamespace);
+const debugLog = util.debuglog(mcpDebugNamespace);
 
 export function saveLogsToFile(fileName: string): fs.WriteStream {
   const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
@@ -57,8 +57,8 @@ export const logger: Logger = (...args: unknown[]) => {
     logFileStream.write(
       `${new Date().toISOString()} ${mcpDebugNamespace} ${util.format(...args)}\n`,
     );
-  } else if (_debugLog.enabled) {
-    _debugLog('%s %s', new Date().toISOString(), util.format(...args));
+  } else if (debugLog.enabled) {
+    debugLog('%s %s', new Date().toISOString(), util.format(...args));
   }
 };
 
@@ -69,9 +69,10 @@ export const puppeteerLogger = (prefix: string) => {
     return;
   }
 
-  if (logFileStream) {
+  const stream = logFileStream;
+  if (stream) {
     return (...args: unknown[]) => {
-      logFileStream!.write(
+      stream.write(
         `${new Date().toISOString()} ${prefix} ${util.format(...args)}\n`,
       );
     };

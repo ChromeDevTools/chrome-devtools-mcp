@@ -320,7 +320,7 @@ export class SymbolizedError {
       opts.targetId,
     );
     if (details) {
-      return SymbolizedError.fromDetails({
+      return await SymbolizedError.fromDetails({
         details,
         devTools: opts.devTools,
         targetId: opts.targetId,
@@ -415,7 +415,7 @@ export async function createStackTraceForConsoleMessage(
   };
   const rawStackTrace = message._rawStackTrace();
   if (rawStackTrace) {
-    return createStackTrace(devTools, rawStackTrace, message._targetId());
+    return await createStackTrace(devTools, rawStackTrace, message._targetId());
   }
   return undefined;
 }
@@ -465,7 +465,7 @@ export async function createStackTrace(
     DevTools.DebuggerWorkspaceBinding,
   );
   // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
-  return binding.createStackTraceFromProtocolRuntime(
+  return await binding.createStackTraceFromProtocolRuntime(
     rawStackTrace as Parameters<
       DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
     >[0],

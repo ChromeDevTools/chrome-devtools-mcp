@@ -101,15 +101,10 @@ export class NetworkFormatter {
         } else {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
+      } else if (data) {
+        this.#requestBody = getSizeLimitedString(data, BODY_CONTEXT_SIZE_LIMIT);
       } else {
-        if (data) {
-          this.#requestBody = getSizeLimitedString(
-            data,
-            BODY_CONTEXT_SIZE_LIMIT,
-          );
-        } else {
-          this.#requestBody = requestBodyNotAvailableMessage;
-        }
+        this.#requestBody = requestBodyNotAvailableMessage;
       }
     }
 
