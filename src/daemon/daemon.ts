@@ -16,7 +16,7 @@ import process from 'node:process';
 
 import {BrowserManager} from '../BrowserManager.js';
 import {mcpOptions} from '../config/mcp-options.js';
-import {ConfigLocator} from '../config/ConfigLocator.js';
+
 import {ConfigParser} from '../config/ConfigParser.js';
 import {McpServer} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
@@ -140,7 +140,7 @@ let server: Server | null = null;
 
 async function setupMCPServer() {
   logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-  const configParser = new ConfigParser(VERSION, new ConfigLocator());
+  const configParser = new ConfigParser(VERSION);
   const args = configParser.parse();
   const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
   const browserManager = new BrowserManager(args, {

@@ -38,7 +38,7 @@ function writeToolCallMetricsConfig() {
 
   // Avoid 'as ParsedArguments' by using parseArguments
   const allTools = createTools(
-    new ConfigParser('0.0.0', undefined, ['', '']).parse(),
+    new ConfigParser('0.0.0', ['', '']).parse(),
   );
 
   if (!HaveUniqueNames(allTools)) {

@@ -20,9 +20,16 @@ describe('mcp-options steps', () => {
 
   const parser = new ConfigParser('0.0.0');
 
+  describe('constructor', () => {
+    it('initializes configLocator', () => {
+      const testParser = new ConfigParser('0.0.0');
+      assert.ok(testParser.configLocator instanceof ConfigLocator);
+    });
+  });
+
   describe('parseCliArgs', () => {
     it('returns only explicitly passed flags', () => {
-      const args = new ConfigParser('0.0.0', undefined, [
+      const args = new ConfigParser('0.0.0', [
         'node',
         'main.js',
         '--headless',
@@ -129,7 +136,7 @@ describe('mcp-options steps', () => {
   });
   describe('applyDefaults', () => {
     it('keeps explicit values and fills in defaults', () => {
-      const args = new ConfigParser('0.0.0', undefined, [], {}).applyDefaults({
+      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
         headless: true,
       });
       assert.strictEqual(args.headless, true);
@@ -145,7 +152,7 @@ describe('mcp-options steps', () => {
     ]) {
       it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
         assert.strictEqual(
-          new ConfigParser('0.0.0', undefined, [], {}).applyDefaults(
+          new ConfigParser('0.0.0', [], {}).applyDefaults(
             explicitArgs,
           ).channel,
           undefined,
@@ -154,7 +161,7 @@ describe('mcp-options steps', () => {
     }
 
     it('applies viaCli defaults when launching a browser', () => {
-      const args = new ConfigParser('0.0.0', undefined, [], {}).applyDefaults({
+      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
         viaCli: true,
         filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
       });
@@ -166,7 +173,7 @@ describe('mcp-options steps', () => {
     });
 
     it('does not enable isolated or extensions for viaCli with browserUrl', () => {
-      const args = new ConfigParser('0.0.0', undefined, [], {}).applyDefaults({
+      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
         viaCli: true,
         browserUrl: 'http://localhost:9222',
       });
@@ -176,7 +183,7 @@ describe('mcp-options steps', () => {
 
     it('turns off usage statistics in CI', () => {
       sinon.stub(console, 'error');
-      const args = new ConfigParser('0.0.0', undefined, [], {
+      const args = new ConfigParser('0.0.0', [], {
         CI: 'true',
       }).applyDefaults({
         usageStatistics: true,
@@ -189,11 +196,11 @@ describe('mcp-options steps', () => {
     it('does not discover a config file without a locator', () => {
       const parser = new ConfigParser(
         '0.0.0',
-        undefined,
         ['node', 'main.js'],
         {},
         false,
       );
+      sinon.stub(parser.configLocator, 'locate').returns(undefined);
       assert.strictEqual(parser.parse().config, undefined);
     });
 
@@ -202,20 +209,19 @@ describe('mcp-options steps', () => {
         JSON.stringify({headless: true}),
         'cd4a.config.json',
       );
-      const locator = sinon.createStubInstance(ConfigLocator);
-      locator.locate.returns(configFile.path);
       const parser = new ConfigParser(
         '0.0.0',
-        locator,
         ['node', 'main.js'],
         {},
         false,
       );
+      const locateStub = sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
 
       const args = parser.parse();
 
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.config, configFile.path);
+      sinon.assert.calledOnce(locateStub);
     });
 
     it('prefers --config over a discovered config file', () => {
@@ -223,32 +229,29 @@ describe('mcp-options steps', () => {
         JSON.stringify({headless: true}),
         'cd4a.explicit.config.json',
       );
-      const locator = sinon.createStubInstance(ConfigLocator);
       const parser = new ConfigParser(
         '0.0.0',
-        locator,
         ['node', 'main.js', '--config', configFile.path],
         {},
         false,
       );
+      const locateStub = sinon.stub(parser.configLocator, 'locate');
 
       assert.strictEqual(parser.parse().headless, true);
-      sinon.assert.notCalled(locator.locate);
+      sinon.assert.notCalled(locateStub);
     });
   });
 
   describe('reload', () => {
     function createParser(configPath: string, argv: string[] = []) {
-      const locator = sinon.createStubInstance(ConfigLocator);
-      locator.locate.returns(configPath);
       const parser = new ConfigParser(
         '0.0.0',
-        locator,
         ['node', 'main.js', ...argv],
         {},
         false,
       );
-      return {parser, locator};
+      const locateStub = sinon.stub(parser.configLocator, 'locate').returns(configPath);
+      return {parser, locateStub};
     }
 
     it('re-reads the config file without discovering it again', () => {
@@ -256,7 +259,7 @@ describe('mcp-options steps', () => {
         JSON.stringify({memoryDebugging: false}),
         'cd4a.config.json',
       );
-      const {parser, locator} = createParser(configFile.path);
+      const {parser, locateStub} = createParser(configFile.path);
       assert.strictEqual(parser.parse().memoryDebugging, false);
 
       fs.writeFileSync(
@@ -265,7 +268,7 @@ describe('mcp-options steps', () => {
       );
 
       assert.strictEqual(parser.reload().memoryDebugging, true);
-      sinon.assert.calledOnce(locator.locate);
+      sinon.assert.calledOnce(locateStub);
     });
 
     it('keeps CLI arguments over the config file', () => {

@@ -41,7 +41,6 @@ describe('ToolHandler', () => {
     let handlerCalled = false;
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -91,7 +90,6 @@ describe('ToolHandler', () => {
     let handlerCalled = false;
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js', '--no-page-id-routing'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();
@@ -159,7 +157,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -221,7 +218,6 @@ describe('ToolHandler', () => {
         .resolves({content: [], structuredContent: {}});
       const serverArgs = new ConfigParser(
         '1.0.0',
-        undefined,
         ['node', 'script.js', ...argv],
         {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
       ).parse();
@@ -257,7 +253,6 @@ describe('ToolHandler', () => {
 
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -355,7 +350,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -414,7 +408,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js', '--categoryEmulation=false'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();
@@ -445,7 +438,6 @@ describe('ToolHandler', () => {
 
     const defaultServerArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -469,7 +461,6 @@ describe('ToolHandler', () => {
 
     const disabledServerArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js', '--no-javascript-evaluation'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();
@@ -500,7 +491,6 @@ describe('ToolHandler', () => {
 
     const cliServerArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js', '--no-javascript-evaluation', '--viaCli'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();
@@ -533,7 +523,6 @@ describe('ToolHandler', () => {
 
     const defaultServerArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js', '--slim'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();
@@ -555,7 +544,6 @@ describe('ToolHandler', () => {
 
     const disabledServerArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js', '--slim', '--javascriptEvaluation=false'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
     ).parse();
@@ -580,7 +568,6 @@ describe('ToolHandler', () => {
     function createHandler(toolName: string, argv: string[]) {
       const serverArgs = new ConfigParser(
         '1.0.0',
-        undefined,
         ['node', 'script.js', ...argv],
         {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
       ).parse();
@@ -676,7 +663,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -759,7 +745,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -822,7 +807,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -886,7 +870,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -953,7 +936,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1010,7 +992,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1065,7 +1046,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1128,7 +1108,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1196,7 +1175,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1250,7 +1228,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1302,7 +1279,6 @@ describe('ToolHandler', () => {
     let receivedParams: Record<string, unknown> | undefined;
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1396,7 +1372,6 @@ describe('ToolHandler', () => {
     mockContext.browser = getMockBrowser();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1452,7 +1427,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1517,7 +1491,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -1573,7 +1546,6 @@ describe('ToolHandler', () => {
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser(
       '1.0.0',
-      undefined,
       ['node', 'script.js'],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',

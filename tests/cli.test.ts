@@ -20,7 +20,6 @@ import {createTempFile} from './utils.js';
 function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
   return new ConfigParser(
     '0.0.0',
-    undefined,
     ['node', 'main.js', ...argv],
     env,
     false,
@@ -819,7 +818,7 @@ describe('cli args parsing', () => {
   });
 
   it('includes usage examples in help output', async () => {
-    const parser = new ConfigParser('0.0.0', undefined, ['node', 'main.js']);
+    const parser = new ConfigParser('0.0.0', ['node', 'main.js']);
     const help = await parser.buildCliParser(mcpOptions).getHelp();
     assert.match(help, /Examples:/);
     assert.match(help, /--browserUrl http:\/\/127\.0\.0\.1:9222/);

@@ -19,7 +19,7 @@ import {
   DEFAULT_FILESYSTEM_ROOT,
   withoutDefaults,
 } from './mcp-options.js';
-import type {ConfigLocator} from './ConfigLocator.js';
+import {ConfigLocator} from './ConfigLocator.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -40,6 +40,7 @@ export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
+  public readonly configLocator: ConfigLocator;
 
   /**
    * @param configLocator Finds the config file when `--config` is not passed.
@@ -47,11 +48,12 @@ export class ConfigParser {
    */
   constructor(
     private version: string,
-    private configLocator?: ConfigLocator,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
-  ) {}
+  ) {
+    this.configLocator = new ConfigLocator();
+  }
 
   buildCliParser(options: Record<string, YargsOptions> = mcpOptions) {
     const yargsInstance = yargs(hideBin(this.argv));
