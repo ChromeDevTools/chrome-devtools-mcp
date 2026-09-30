@@ -141,6 +141,30 @@ export function findUnenforceablePattern(
 }
 
 /**
+ * Reports whether a URL ultimately targets the `file:` scheme.
+ *
+ * `view-source:` wraps another URL and Chrome resolves the inner target, so
+ * `view-source:file:///etc/passwd` reads the file just as `file:///etc/passwd`
+ * does. The inner URL is re-parsed rather than string-matched so that an
+ * uppercase inner scheme (`view-source:FILE:///etc/passwd`) is normalised.
+ *
+ * @param url The already-parsed URL to inspect.
+ * @returns true if the URL, after unwrapping any `view-source:` prefixes, uses `file:`.
+ */
+function targetsFileScheme(url: URL): boolean {
+  let current = url;
+  // Bounded in case of a pathologically nested `view-source:` chain.
+  for (let i = 0; i < 5 && current.protocol === 'view-source:'; i++) {
+    try {
+      current = new URL(current.pathname);
+    } catch {
+      return false;
+    }
+  }
+  return current.protocol === 'file:';
+}
+
+/**
  * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
  *
  * @param url The URL string to validate.
@@ -170,7 +194,7 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
     );
   }
 
-  if (fileNavigations === false && parsed.protocol === 'file:') {
+  if (fileNavigations === false && targetsFileScheme(parsed)) {
     throw new Error(
       `Navigating to file: URLs is not allowed when --file-navigations is disabled.`,
     );

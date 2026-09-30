@@ -346,6 +346,67 @@ describe('validateUrl', () => {
     );
   });
 
+  it('should reject view-source URLs that target a file URL when fileNavigations is false', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    // `view-source:` wraps the inner URL and Chrome resolves it, so this reads
+    // the file just as a bare `file:` URL would.
+    assert.throws(
+      () => validateUrl('view-source:file:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // An uppercase inner scheme normalises to `file:` when re-parsed.
+    assert.throws(
+      () => validateUrl('view-source:FILE:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // An uppercase outer scheme normalises too.
+    assert.throws(
+      () => validateUrl('VIEW-SOURCE:file:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // Nested wrapping unwraps to the same target.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:view-source:file:///etc/passwd',
+          noFileNavigations,
+        ),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should not reject view-source URLs that target other schemes', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    assert.strictEqual(
+      validateUrl('view-source:http://example.com', noFileNavigations).protocol,
+      'view-source:',
+    );
+    assert.strictEqual(
+      validateUrl('view-source:https://example.com', noFileNavigations)
+        .protocol,
+      'view-source:',
+    );
+  });
+
+  it('should allow view-source of a file URL when fileNavigations is true', () => {
+    assert.strictEqual(
+      validateUrl('view-source:file:///etc/passwd', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: undefined,
+        fileNavigations: true,
+      }).protocol,
+      'view-source:',
+    );
+  });
+
   it('should only reject file URLs when fileNavigations is false', () => {
     const noFileNavigations = {
       javascriptEvaluation: undefined,

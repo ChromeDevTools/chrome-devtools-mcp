@@ -314,6 +314,19 @@ describe('pages', () => {
               'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
           },
         );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'view-source:file:///etc/passwd'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
+          },
+        );
       });
     });
     it('throws when URL does not parse with new URL', async () => {
