@@ -19,6 +19,7 @@ import {
   DEFAULT_FILESYSTEM_ROOT,
   withoutDefaults,
 } from './mcp-options.js';
+import type {ConfigLocator} from './ConfigLocator.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -38,8 +39,15 @@ function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
 export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
+  #configPath?: string;
+
+  /**
+   * @param configLocator Finds the config file when `--config` is not passed.
+   * Config file discovery is off without it, for example in tests.
+   */
   constructor(
     private version: string,
+    private configLocator?: ConfigLocator,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
@@ -216,15 +224,9 @@ export class ConfigParser {
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
-      const configPath = cliArgs.config;
-      const configFileArgs =
-        typeof configPath === 'string' ? this.parseConfigFile(configPath) : {};
-      // Step 3: merges the explicit inputs. The CLI wins over the config file.
-      const explicitArgs = {...configFileArgs, ...cliArgs};
+      this.#configPath = cliArgs.config ?? this.configLocator?.locate();
       this.warnUnknownArgs(cliArgs);
-      this.validateConflicts(explicitArgs);
-      this.validateImplications(explicitArgs);
-      return this.applyDefaults(explicitArgs);
+      return this.#resolve(cliArgs);
     } catch (error) {
       if (this.exitProcess) {
         console.error(getErrorMessage(error));
@@ -232,5 +234,28 @@ export class ConfigParser {
       }
       throw error;
     }
+  }
+
+  /**
+   * Re-reads the config file resolved by `parse()` and merges it with the CLI
+   * arguments again. Unlike `parse()`, it does not discover a new config file
+   * and throws on invalid configuration instead of exiting the process.
+   */
+  reload(): ParsedArguments {
+    return this.#resolve(this.parseCliArgs());
+  }
+
+  #resolve(cliArgs: Partial<ParsedArguments>): ParsedArguments {
+    const configPath = this.#configPath;
+    const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
+    // Step 3: merges the explicit inputs. The CLI wins over the config file.
+    const explicitArgs = {
+      ...configFileArgs,
+      ...cliArgs,
+      ...(configPath ? {config: configPath} : {}),
+    };
+    this.validateConflicts(explicitArgs);
+    this.validateImplications(explicitArgs);
+    return this.applyDefaults(explicitArgs);
   }
 }

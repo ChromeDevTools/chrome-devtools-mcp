@@ -35,6 +35,7 @@ describe('McpServer', () => {
 
     const serverArgs = new ConfigParser(
       '1.0.0',
+      undefined,
       ['node', 'script.js', ...extraArgs],
       {
         CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
