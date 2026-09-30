@@ -14,6 +14,8 @@ import {pathToFileURL} from 'node:url';
 import {Locator} from 'puppeteer';
 import sinon from 'sinon';
 
+import {UncaughtError} from '../src/collectors/PageCollector.js';
+import {ServiceWorkerConsoleCollector} from '../src/collectors/ServiceWorkerCollector.js';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
@@ -21,8 +23,10 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
+import {stableIdSymbol} from '../src/utils/id.js';
 
 import {serverHooks} from './server.js';
+import {createMockMcpWorker, createMockPuppeteerBrowser} from './mocks.js';
 import {
   assertNoServiceWorkerReported,
   createTempDir,
@@ -46,6 +50,79 @@ const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
 describe('McpContext', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('getServiceWorkerConsoleData', () => {
+    it('resolves the service worker ID to the collector extension ID', async () => {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      const context = await McpContext.from(browser, sinon.stub(), {
+        experimentalDevToolsDebugging: false,
+        performanceCrux: false,
+      });
+      const worker = createMockMcpWorker({
+        id: 'sw-3',
+        url: 'chrome-extension://extension-id/background.js',
+      });
+      const getWorkerById = sinon
+        .stub(context, 'getWorkerById')
+        .returns(worker);
+      const messages = [
+        Object.assign(
+          new UncaughtError(
+            {
+              exceptionId: 1,
+              text: 'Service worker error',
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+            'extension-id',
+          ),
+          {[stableIdSymbol]: 1},
+        ),
+      ];
+      const getData = sinon
+        .stub(ServiceWorkerConsoleCollector.prototype, 'getData')
+        .returns(messages);
+
+      const result = context.getServiceWorkerConsoleData('sw-3');
+
+      sinon.assert.calledOnceWithExactly(getWorkerById, 'sw-3');
+      sinon.assert.calledOnceWithExactly(getData, 'extension-id');
+      assert.strictEqual(result, messages);
+      context.dispose();
+    });
+
+    for (const serviceWorkerId of ['sw-404', 'extension-id', 'dw-1', 'shw-2']) {
+      it(`rejects ${serviceWorkerId} without reading console data`, async () => {
+        const browser = createMockPuppeteerBrowser();
+        browser.targets.returns([]);
+        const context = await McpContext.from(browser, sinon.stub(), {
+          experimentalDevToolsDebugging: false,
+          performanceCrux: false,
+        });
+        const getWorkerById = sinon.stub(context, 'getWorkerById');
+        getWorkerById
+          .withArgs('dw-1')
+          .returns(createMockMcpWorker({id: 'dw-1', type: 'dedicated_worker'}));
+        getWorkerById
+          .withArgs('shw-2')
+          .returns(createMockMcpWorker({id: 'shw-2', type: 'shared_worker'}));
+        const getData = sinon.stub(
+          ServiceWorkerConsoleCollector.prototype,
+          'getData',
+        );
+
+        assert.throws(
+          () => context.getServiceWorkerConsoleData(serviceWorkerId),
+          /Service worker not found\./,
+        );
+
+        sinon.assert.calledOnceWithExactly(getWorkerById, serviceWorkerId);
+        sinon.assert.notCalled(getData);
+        context.dispose();
+      });
+    }
   });
 
   it('list pages', async () => {
