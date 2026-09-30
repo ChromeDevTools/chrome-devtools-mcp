@@ -107,10 +107,7 @@ describe('daemon security checks', () => {
       fs.writeFileSync(targetPidFile, 'original content', 'utf-8');
       fs.symlinkSync(targetDir, pidDir);
 
-      await assert.rejects(
-        startDaemon([], sessionId),
-        /symbolic link/,
-      );
+      await assert.rejects(startDaemon([], sessionId), /symbolic link/);
       assert.strictEqual(
         fs.readFileSync(targetPidFile, 'utf-8'),
         'original content',
