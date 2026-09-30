@@ -42,6 +42,7 @@ import {
   createMockClassDiffs,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
+  createMockExtension,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
   createMockHeapSnapshotStats,
@@ -543,6 +544,40 @@ describe('McpResponse', () => {
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
+  });
+
+  it('rejects an unknown service worker or extension ID', async () => {
+    const context = createMockMcpContext();
+    context.createExtensionServiceWorkersSnapshot.resolves([]);
+    context.listExtensions.resolves(new Map());
+
+    for (const serviceWorkerId of ['sw-404', 'unknown-extension']) {
+      const response = new McpResponse(createMockParsedArguments());
+      response.setIncludeConsoleData(true, {serviceWorkerId});
+      await assert.rejects(
+        response.handle(context),
+        /Service worker or extension .* not found/,
+      );
+    }
+    sinon.assert.notCalled(context.getServiceWorkerConsoleData);
+  });
+
+  it('accepts an extension ID for service worker console messages', async () => {
+    const context = createMockMcpContext();
+    context.createExtensionServiceWorkersSnapshot.resolves([]);
+    context.listExtensions.resolves(
+      new Map([['extension-id', createMockExtension({id: 'extension-id'})]]),
+    );
+    context.getServiceWorkerConsoleData.returns([]);
+    const response = new McpResponse(createMockParsedArguments());
+    response.setIncludeConsoleData(true, {serviceWorkerId: 'extension-id'});
+
+    await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(
+      context.getServiceWorkerConsoleData,
+      'extension-id',
+    );
   });
 
   it("doesn't list the issue message if mapping returns null", async t => {

@@ -90,7 +90,7 @@ export const listConsoleMessages = definePageTool(
           .string()
           .optional()
           .describe(
-            'Filter messages to only return messages of the specified service worker.',
+            'Filter messages by the service worker ID shown by list_pages (sw-N). An extension ID is also accepted.',
           ),
       },
       blockedByDialog: false,
