@@ -1029,7 +1029,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await mcpPage.getTitle();
+          const title = mcpPage.getTitle();
           const pageLabel = title
             ? `${truncateTitle(title)} (${mcpPage.url()})`
             : mcpPage.url();
@@ -1051,7 +1051,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await mcpPage.getTitle();
+            const title = mcpPage.getTitle();
             const pageLabel = title
               ? `${truncateTitle(title)} (${mcpPage.url()})`
               : mcpPage.url();

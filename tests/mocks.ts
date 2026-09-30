@@ -280,7 +280,7 @@ export function createMockMcpPage(
     await pptrPage.close({runBeforeUnload: false});
   });
   page.url.callsFake(() => pptrPage.url());
-  page.getTitle.callsFake(async () => (await pptrPage.title()) ?? '');
+  page.getTitle.returns('');
   page.isClosed.callsFake(() => Boolean(pptrPage.isClosed()));
   page.waitForEventsAfterAction.callsFake(async action => {
     await action(new AbortController().signal);

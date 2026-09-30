@@ -324,12 +324,14 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.asPage);
       assert.throws(() => mcpPage.pptrPage, /not initialized/);
       assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
-      assert.strictEqual(await mcpPage.getTitle(), 'Target Title');
+      assert.strictEqual(mcpPage.getTitle(), 'Target Title');
 
       await mcpPage.init();
 
       sinon.assert.calledOnce(target.page);
       assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      assert.strictEqual(mcpPage.getTitle(), 'Target Title');
+      sinon.assert.notCalled(pptrPage.title);
     });
 
     it('falls back to target.asPage() when target.page() returns null', async () => {

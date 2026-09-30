@@ -215,29 +215,10 @@ export class McpPage implements ContextPage {
     return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
   }
 
-  async getTitle(): Promise<string> {
-    if (this.#pptrPage) {
-      return Promise.race([
-        this.#pptrPage.title().catch(() => ''),
-        new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
-      ]);
-    }
-    if (
-      '_getTargetInfo' in this.target &&
-      typeof this.target._getTargetInfo === 'function'
-    ) {
-      const info = this.target._getTargetInfo();
-      if (
-        info &&
-        typeof info === 'object' &&
-        'title' in info &&
-        typeof info.title === 'string' &&
-        info.title !== this.target.url()
-      ) {
-        return info.title;
-      }
-    }
-    return '';
+  getTitle(): string {
+    // @ts-expect-error internal types
+    const info = this.target._getTargetInfo();
+    return info.title !== this.target.url() ? info.title : '';
   }
 
   isClosed(): boolean {
