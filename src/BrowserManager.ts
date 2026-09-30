@@ -211,6 +211,7 @@ export class BrowserManager {
       headless,
       isolated = false,
       categoryExtensions: enableExtensions,
+      categoryExperimentalThirdParty,
       viaCli,
       viewport,
       acceptInsecureCerts,
@@ -244,6 +245,9 @@ export class BrowserManager {
       args.push(`--proxy-server=${proxyServer}`);
     }
     args.push('--hide-crash-restore-bubble');
+    if (categoryExperimentalThirdParty) {
+      args.push('--enable-features=WebMCP,DevToolsWebMCPSupport');
+    }
 
     const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =
       ignoreDefaultChromeArg ?? false;

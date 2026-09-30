@@ -55,6 +55,14 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
+function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
+  return Boolean(
+    tool.annotations &&
+    'debugging' in tool.annotations &&
+    tool.annotations.debugging === true,
+  );
+}
+
 import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
@@ -341,19 +349,36 @@ export class McpPage implements ContextPage {
   }
 
   async getToolGroups(): Promise<ToolGroups> {
+    const toolGroups: ToolGroups = [];
+    const webmcpTools = this.pptrPage.webmcp
+      .tools()
+      .filter(isDebuggingWebMcpTool);
+    if (webmcpTools.length > 0) {
+      toolGroups.push({
+        name: 'WebMCP Tools',
+        description: 'Tools exposed via WebMCP',
+        tools: webmcpTools.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: structuredClone(tool.inputSchema ?? {}),
+        })),
+      });
+    }
+
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
     const client = this.pptrPage._client();
-    const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
+    const {listeners = []}: {listeners?: Protocol.DOMDebugger.EventListener[]} =
       await client.send('DOMDebugger.getEventListeners', {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      return [];
+      this.thirdPartyDeveloperTools = toolGroups;
+      return toolGroups;
     }
 
-    const toolGroups = await this.pptrPage.evaluate(() => {
+    const eventToolGroups = await this.pptrPage.evaluate(() => {
       if (window.__dtmcp) {
         window.__dtmcp.toolGroups = [];
       }
@@ -430,11 +455,12 @@ export class McpPage implements ContextPage {
       });
     });
 
-    for (const group of toolGroups) {
+    for (const group of eventToolGroups) {
       for (const tool of group.tools ?? []) {
         replaceHtmlElementsWithUids(tool.inputSchema);
       }
     }
+    toolGroups.push(...eventToolGroups);
 
     this.thirdPartyDeveloperTools = toolGroups;
 
@@ -442,7 +468,9 @@ export class McpPage implements ContextPage {
   }
 
   getWebMcpTools(): WebMCPTool[] {
-    return this.pptrPage.webmcp.tools();
+    return this.pptrPage.webmcp
+      .tools()
+      .filter(tool => !isDebuggingWebMcpTool(tool));
   }
 
   resolveCdpRequestId(cdpRequestId: string): number | undefined {
@@ -595,6 +623,18 @@ export class McpPage implements ContextPage {
     params: Record<string, unknown>,
     response: Response,
   ): Promise<void> {
+    const webmcpTool = this.pptrPage.webmcp
+      .tools()
+      .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
+    if (webmcpTool) {
+      const {status, output, errorText} = await webmcpTool.execute(params);
+      if (status !== 'Completed') {
+        throw new Error(errorText ?? `Tool execution failed: ${status}`);
+      }
+      response.appendResponseLine(JSON.stringify(output, null, 2));
+      return;
+    }
+
     // Creates array of ElementHandles from the UIDs in the params.
     // We do not replace the uids with the ElementsHandles yet, because
     // the `evaluate` function only turns them into DOM elements if they

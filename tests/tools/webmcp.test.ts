@@ -12,7 +12,7 @@ import sinon from 'sinon';
 import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
-import {createHandlerMocks} from '../mocks.js';
+import {createHandlerMocks, createMockWebMCPTool} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
@@ -111,6 +111,34 @@ describe('webmcp', () => {
             },
             {message: /Tool missing-tool not found/},
           );
+        },
+        {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
+        {categoryExperimentalWebmcp: true},
+      );
+    });
+
+    it('does not execute debugging WebMCP tools', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const page = context.getSelectedMcpPage();
+          const debuggingTool = createMockWebMCPTool({
+            name: 'debug_tool',
+            annotations: {debugging: true},
+          });
+          sinon.stub(page.pptrPage.webmcp, 'tools').returns([debuggingTool]);
+
+          await assert.rejects(
+            executeWebMcpTool(args).handler(
+              {
+                params: {toolName: 'debug_tool', input: '{}'},
+                page,
+              },
+              response,
+              context,
+            ),
+            {message: /Tool debug_tool not found/},
+          );
+          sinon.assert.notCalled(debuggingTool.execute);
         },
         {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
         {categoryExperimentalWebmcp: true},

@@ -44,7 +44,7 @@ declare global {
 
 export const listThirdPartyDeveloperTools = definePageTool(() => ({
   name: 'list_3p_developer_tools',
-  description: `Lists all third-party developer tools the page exposes for providing runtime information.
+  description: `Lists all third-party developer tools the page exposes for providing runtime information (including debugging WebMCP tools and tools exposed via the 'devtoolstooldiscovery' event).
 Third-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.
 Alternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the
 following command to the script:
@@ -65,7 +65,7 @@ third-party developer tools with additional functionality.`,
 
 export const executeThirdPartyDeveloperTool = definePageTool(() => ({
   name: 'execute_3p_developer_tool',
-  description: `Executes a tool exposed by the page.`,
+  description: `Executes a third-party developer tool exposed by the page.`,
   annotations: {
     category: ToolCategory.THIRD_PARTY,
     readOnlyHint: false,

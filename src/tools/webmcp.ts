@@ -62,7 +62,7 @@ export const executeWebMcpTool = definePageTool(() => ({
       }
     }
 
-    const tools = request.page.pptrPage.webmcp.tools();
+    const tools = request.page.getWebMcpTools();
     const tool = tools.find(t => t.name === toolName);
     if (!tool) {
       throw new Error(`Tool ${toolName} not found`);
