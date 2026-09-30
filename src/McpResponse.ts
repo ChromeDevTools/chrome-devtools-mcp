@@ -725,13 +725,20 @@ export class McpResponse implements Response {
     );
   }
 
-  async #handleComments(): Promise<CommentFormatter | undefined> {
+  async #handleComments(): Promise<
+    | {
+        formatter: CommentFormatter;
+        commentsSnapshotRegenerated?: 'standard' | 'verbose';
+      }
+    | undefined
+  > {
     const comments = this.#devToolsComments;
     if (!comments) {
       return undefined;
     }
     const page = this.#page;
-    return await CommentFormatter.from(comments, {
+    const initialSnapshot = page?.textSnapshot;
+    const formatter = await CommentFormatter.from(comments, {
       resolveBackendNodeId: page
         ? (id: number) => page.resolveBackendNodeId(id)
         : undefined,
@@ -739,6 +746,13 @@ export class McpResponse implements Response {
         ? (id: string) => page.resolveCdpRequestId(id)
         : undefined,
     });
+    let commentsSnapshotRegenerated: 'standard' | 'verbose' | undefined;
+    if (page?.textSnapshot && page.textSnapshot !== initialSnapshot) {
+      commentsSnapshotRegenerated = page.textSnapshot.verbose
+        ? 'verbose'
+        : 'standard';
+    }
+    return {formatter, commentsSnapshotRegenerated};
   }
 
   async handle(
@@ -756,7 +770,7 @@ export class McpResponse implements Response {
       webmcpTools,
       consoleMessages,
       networkRequests,
-      comments,
+      commentsResult,
     ] = await Promise.all([
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
@@ -791,7 +805,9 @@ export class McpResponse implements Response {
         lighthouseResult: this.#attachedLighthouseResult,
         thirdPartyDeveloperTools,
         webmcpTools,
-        comments,
+        comments: commentsResult?.formatter,
+        commentsSnapshotRegenerated:
+          commentsResult?.commentsSnapshotRegenerated,
         errorMessage: this.#error?.message,
       },
       dataFormat,
@@ -823,6 +839,7 @@ export class McpResponse implements Response {
       thirdPartyDeveloperTools?: ToolGroups;
       webmcpTools?: WebMCPTool[];
       comments?: CommentFormatter;
+      commentsSnapshotRegenerated?: 'standard' | 'verbose';
       errorMessage?: string;
     },
     dataFormat: DataFormat = 'default',
@@ -884,6 +901,7 @@ export class McpResponse implements Response {
       extensionServiceWorkers?: object[];
       extensionPages?: object[];
       comments?: StructuredCommentThread[];
+      commentsSnapshotRegenerated?: 'standard' | 'verbose';
       matchedStyles?: object;
       errorMessage?: string;
       navigatedToUrl?: string;
@@ -1509,6 +1527,13 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       response.push(
         compactEncode ? compactEncode(commentsJson) : data.comments.toString(),
       );
+      if (data.commentsSnapshotRegenerated) {
+        response.push(
+          `Note: DevTools comments regenerated the ${data.commentsSnapshotRegenerated} text snapshot.`,
+        );
+        structuredContent.commentsSnapshotRegenerated =
+          data.commentsSnapshotRegenerated;
+      }
     }
 
     if (this.#cssStylesData) {

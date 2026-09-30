@@ -284,6 +284,7 @@ export function createMockMcpPage(
   } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
+  page.emulationSettings = {};
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
