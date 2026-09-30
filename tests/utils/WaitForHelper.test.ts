@@ -10,7 +10,11 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
-import {createMockDialog, createMockPuppeteerPage} from '../mocks.js';
+import {
+  createMockDialog,
+  createMockPuppeteerPage,
+  createMockPuppeteerTarget,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -201,5 +205,23 @@ describe('WaitForHelper', () => {
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
     });
+  });
+
+  it('captures popup targets opened by the action', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.url.returns('https://example.com');
+    pptrPage.waitForNavigation.returns(Promise.withResolvers<null>().promise);
+    const popupPage = createMockPuppeteerPage();
+    const popupTarget = createMockPuppeteerTarget({page: popupPage});
+    const helper = new WaitForHelper(pptrPage, 1, 1);
+
+    const result = await helper.waitForEventsAfterAction(
+      async () => {
+        pptrPage.emit('popup', popupPage);
+      },
+      {waitForStableDom: false, expectNavigationIn: 0},
+    );
+
+    assert.strictEqual(result.openedPages?.has(popupTarget), true);
   });
 });
