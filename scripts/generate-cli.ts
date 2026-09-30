@@ -15,6 +15,7 @@ import {mcpOptions} from '../build/src/config/mcp-options.js';
 import {ConfigParser} from '../build/src/config/ConfigParser.js';
 import {zod} from '../build/src/third_party/index.js';
 import {labels, ToolCategory} from '../build/src/tools/categories.js';
+import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
 import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = path.join(
@@ -75,7 +76,7 @@ async function generateCli() {
     .sort((a, b) => a.name.localeCompare(b.name))
     .filter(tool => {
       // Skipping slim tools and tools behind internal flags.
-      if (tool.slim || requiresHiddenFlag(tool)) {
+      if (isSlimTool(tool) || requiresHiddenFlag(tool)) {
         return false;
       }
       // Skipping fill_form because it is not relevant in shell scripts

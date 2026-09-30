@@ -16,6 +16,7 @@ import {
 import type {ParsedArguments} from '../build/src/config/ConfigParser.js';
 import {zod} from '../build/src/third_party/index.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
 import type {
   DefinedPageTool,
   ToolDefinition,
@@ -84,6 +85,9 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
 
 function hasOffByDefaultConditions(tool: ToolWithAnnotations): boolean {
   for (const condition of tool.annotations?.conditions || []) {
+    if (condition === 'slim') {
+      continue;
+    }
     const option = mcpOptions[condition];
     if (!option || !('default' in option) || option.default !== true) {
       return true;
@@ -247,6 +251,9 @@ async function generateReference(
 
         const conditions = tool.annotations?.conditions || [];
         for (const condition of conditions) {
+          if (condition === 'slim') {
+            continue;
+          }
           const option = mcpOptions[condition];
           if (!option || !('default' in option) || option.default !== true) {
             requiredFlags.push(`--${condition}=true`);
@@ -409,7 +416,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(tools.filter(tool => !tool.slim));
+        getToolsAndCategories(tools.filter(tool => !isSlimTool(tool)));
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,
@@ -421,7 +428,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(tools.filter(tool => tool.slim));
+        getToolsAndCategories(tools.filter(tool => isSlimTool(tool)));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,

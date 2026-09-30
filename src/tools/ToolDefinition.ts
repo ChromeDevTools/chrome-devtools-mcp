@@ -84,14 +84,13 @@ export interface BaseToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    /**
+     * If `'slim'` is included, the tool is only available with `--slim`. Tools
+     * without `'slim'` are only available without `--slim`. Slim tools may
+     * reuse the names of other tools, see {@link isAvailableInMode}.
+     */
     conditions?: Array<keyof ParsedArguments>;
   };
-  /**
-   * If true, the tool is only available with `--slim`. Tools without this flag
-   * are only available without `--slim`. Slim tools may reuse the names of
-   * other tools, see {@link isAvailableInMode}.
-   */
-  slim?: boolean;
   schema: Schema;
   blockedByDialog: boolean;
   verifyFilesSchema: Partial<
@@ -462,7 +461,7 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
     return {
       ...tool,
       schema: {
-        ...(args.pageIdRouting && !tool.slim ? pageIdSchema : {}),
+        ...(args.pageIdRouting && !isSlimTool(tool) ? pageIdSchema : {}),
         ...tool.schema,
       },
       pageScoped: true,
@@ -558,6 +557,12 @@ export function geolocationTransform(arg: string | undefined) {
   };
 }
 
+export function isSlimTool(
+  tool: Pick<BaseToolDefinition, 'annotations'>,
+): boolean {
+  return Boolean(tool.annotations.conditions?.includes('slim'));
+}
+
 /**
  * Slim mode replaces the regular tools with the slim tools. Only the tools of
  * the current mode are registered, so a slim tool may share its name with a
@@ -565,8 +570,8 @@ export function geolocationTransform(arg: string | undefined) {
  * the server is running.
  */
 export function isAvailableInMode(
-  tool: {slim?: boolean},
+  tool: Pick<BaseToolDefinition, 'annotations'>,
   serverArgs: Pick<ParsedArguments, 'slim'>,
 ): boolean {
-  return Boolean(tool.slim) === Boolean(serverArgs.slim);
+  return isSlimTool(tool) === Boolean(serverArgs.slim);
 }

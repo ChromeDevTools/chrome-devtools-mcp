@@ -20,7 +20,7 @@ import type {
   FileVerificationOption,
   ToolDefinition,
 } from './tools/ToolDefinition.js';
-import {isAvailableInMode} from './tools/ToolDefinition.js';
+import {isAvailableInMode, isSlimTool} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -61,7 +61,7 @@ function getToolStatusInfo(
     return {
       disabled: true,
       unavailableInMode: true,
-      reason: tool.slim
+      reason: isSlimTool(tool)
         ? `Tool ${tool.name} is only available with --slim.`
         : `Tool ${tool.name} is not available with --slim.`,
     };
@@ -291,7 +291,7 @@ export class ToolHandler {
               page =
                 this.serverArgs.pageIdRouting &&
                 pageId !== undefined &&
-                !this.tool.slim
+                !isSlimTool(this.tool)
                   ? context.getPageById(pageId)
                   : context.getSelectedMcpPage();
               await page?.init();
