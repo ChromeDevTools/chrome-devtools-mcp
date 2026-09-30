@@ -135,7 +135,7 @@ export const mcpOptions = {
     type: 'boolean',
     default: true,
     describe:
-      'Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page and the slim navigate tool reject file: URLs outright. Use this when tool calls may come from an untrusted source and the browser should not be able to open local files.',
+      'Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page and the slim navigate tool reject file: URLs, including view-source: URLs that target them. This restricts navigations the server performs. It is not a filesystem sandbox: it does not affect pages the browser already had open when the server connected, and the browser can reach the filesystem by other means. Use OS sandboxing for full filesystem confinement.',
   },
   sourceMaps: {
     type: 'boolean',
