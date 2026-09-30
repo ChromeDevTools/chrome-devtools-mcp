@@ -10,7 +10,11 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
-import {createMockDialog, createMockPuppeteerPage} from '../mocks.js';
+import {
+  createMockDialog,
+  createMockPuppeteerPage,
+  createMockPuppeteerTarget,
+} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
@@ -203,29 +207,21 @@ describe('WaitForHelper', () => {
     });
   });
 
-  it('captures pages opened by the action', async () => {
-    await withMcpContext(async (response, context) => {
-      const mcpPage = context.getSelectedMcpPage();
-      const listenerCountBefore = mcpPage.pptrPage.listenerCount('popup');
-      const popup = Promise.withResolvers<object | null>();
-      mcpPage.pptrPage.once('popup', page => popup.resolve(page));
+  it('captures popup targets opened by the action', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.url.returns('https://example.com');
+    pptrPage.waitForNavigation.returns(Promise.withResolvers<null>().promise);
+    const popupPage = createMockPuppeteerPage();
+    const popupTarget = createMockPuppeteerTarget({page: popupPage});
+    const helper = new WaitForHelper(pptrPage, 1, 1);
 
-      const result = await mcpPage.waitForEventsAfterAction(
-        async () => {
-          await mcpPage.pptrPage.evaluate(() => {
-            window.open('about:blank');
-          });
-        },
-        {waitForStableDom: false},
-      );
+    const result = await helper.waitForEventsAfterAction(
+      async () => {
+        pptrPage.emit('popup', popupPage);
+      },
+      {waitForStableDom: false, expectNavigationIn: 0},
+    );
 
-      const openedPage = await popup.promise;
-      assert.ok(openedPage);
-      assert.strictEqual(result.openedPages?.has(openedPage), true);
-      assert.strictEqual(
-        mcpPage.pptrPage.listenerCount('popup'),
-        listenerCountBefore,
-      );
-    });
+    assert.strictEqual(result.openedPages?.has(popupTarget), true);
   });
 });

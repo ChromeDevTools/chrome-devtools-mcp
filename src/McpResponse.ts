@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page, WebMCPTool} from 'puppeteer-core';
+import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ParsedArguments} from './config/ConfigParser.js';
 import {
@@ -939,14 +939,9 @@ export class McpResponse implements Response {
       }
       if (this.#attachedWaitForResult.openedPages) {
         const openedPages = this.#attachedWaitForResult.openedPages;
-        const openedMcpPages = [];
-        for (const mcpPage of context.getPages()) {
-          const page = await mcpPage.target.page();
-          if (page && openedPages.has(page)) {
-            await mcpPage.init();
-            openedMcpPages.push(mcpPage);
-          }
-        }
+        const openedMcpPages = context
+          .getPages()
+          .filter(mcpPage => openedPages.has(mcpPage.target));
 
         if (openedMcpPages.length) {
           response.push('## Opened pages');
@@ -1641,16 +1636,9 @@ function truncateTitle(title: string, maxLength = 50): string {
   return title.slice(0, maxLength - 3) + '...';
 }
 
-async function fetchPageTitle(page: Page): Promise<string> {
-  return Promise.race([
-    page.title().catch(() => ''),
-    new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
-  ]);
-}
-
 async function formatPage(mcpPage: McpPage, context: McpContext) {
-  const title = await fetchPageTitle(mcpPage.pptrPage);
-  const url = mcpPage.pptrPage.url();
+  const title = await mcpPage.getTitle();
+  const url = mcpPage.url();
   const pageLabel = title ? `${truncateTitle(title)} (${url})` : url;
   return {
     text: `${mcpPage.id}: ${pageLabel}`,

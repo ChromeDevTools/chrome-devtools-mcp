@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page, Protocol, CdpPage, Dialog} from '../third_party/index.js';
+import {
+  Target,
+  type Page,
+  type Protocol,
+  type CdpPage,
+  type Dialog,
+} from '../third_party/index.js';
 import type {PredefinedNetworkConditions} from '../third_party/index.js';
 import {logger} from './logger.js';
 
@@ -22,8 +28,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
-  #openedPages = new WeakSet<object>();
-  #hasOpenedPages = false;
+  #openedPages = new Set<Target>();
 
   constructor(
     page: Page,
@@ -160,10 +165,15 @@ export class WaitForHelper {
       this.#page.off('dialog', dialogHandler);
     });
 
-    const popupHandler = (page: object | null) => {
-      if (page) {
-        this.#openedPages.add(page);
-        this.#hasOpenedPages = true;
+    const popupHandler = (page: unknown) => {
+      if (page && typeof page === 'object' && 'target' in page) {
+        const target = page.target;
+        if (typeof target === 'function') {
+          const popupTarget = target.call(page);
+          if (popupTarget instanceof Target) {
+            this.#openedPages.add(popupTarget);
+          }
+        }
       }
     };
     this.#page.on('popup', popupHandler);
@@ -300,7 +310,7 @@ export class WaitForHelper {
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
-      ...(this.#hasOpenedPages ? {openedPages: this.#openedPages} : {}),
+      ...(this.#openedPages.size ? {openedPages: this.#openedPages} : {}),
     };
   }
 }
@@ -315,7 +325,7 @@ export interface WaitForEventsResult {
    * Whether a dialog was automatically handled during the action.
    */
   dialogHandled?: boolean;
-  openedPages?: WeakSet<object>;
+  openedPages?: Set<Target>;
 }
 
 export function getNetworkMultiplierFromString(
