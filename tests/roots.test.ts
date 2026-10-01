@@ -5,13 +5,19 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
-import {resolveCanonicalPath} from '../src/utils/files.js';
+import sinon from 'sinon';
 
+import {McpContext} from '../src/McpContext.js';
+import {resolveCanonicalPath} from '../src/utils/files.js';
+import {escapeForLog} from '../src/utils/logger.js';
+
+import {createMockPuppeteerBrowser} from './mocks.js';
 import {createTempDir, withMcpContext} from './utils.js';
 
 describe('McpContext Roots', () => {
@@ -137,5 +143,109 @@ describe('McpContext Roots', () => {
         /Access denied/,
       );
     });
+  });
+});
+
+const UNESCAPED_LINE_BREAK = /[\n\r\u2028\u2029]/;
+const INJECTED = 'x\n\u2028[MCP Context] injected line';
+
+function enoent(filePath: string): Error {
+  return Object.assign(new Error(`ENOENT: ${filePath}`), {code: 'ENOENT'});
+}
+
+// Payload paths hold characters some file systems reject; report them missing
+// so every OS takes the same branch.
+function stubMissingPaths(...missingPaths: string[]) {
+  const realpath = sinon.stub(fs, 'realpath').callThrough();
+  for (const missingPath of missingPaths) {
+    realpath.withArgs(missingPath).rejects(enoent(missingPath));
+  }
+  return realpath;
+}
+
+describe('McpContext path validation escaping', () => {
+  afterEach(() => sinon.restore());
+
+  async function createContext(): Promise<McpContext> {
+    const browser = createMockPuppeteerBrowser();
+    browser.targets.returns([]);
+    return await McpContext.from(browser, undefined, {
+      experimentalDevToolsDebugging: false,
+      performanceCrux: false,
+    });
+  }
+
+  it('escapes the file path when it cannot be resolved', async () => {
+    const context = await createContext();
+    const filePath = path.join(os.tmpdir(), 'file.txt', INJECTED);
+    const errMsg = `ENOTDIR: not a directory, realpath '${filePath}'`;
+    sinon
+      .stub(fs, 'realpath')
+      .rejects(Object.assign(new Error(errMsg), {code: 'ENOTDIR'}));
+    const errorStub = sinon.stub(console, 'error');
+
+    await assert.rejects(context.validatePath(filePath), {
+      message: `Access denied: Cannot resolve base path for ${escapeForLog(filePath)}.`,
+    });
+
+    sinon.assert.calledWithMatch(
+      errorStub,
+      sinon.match((message: string) => !UNESCAPED_LINE_BREAK.test(message)),
+    );
+    sinon.assert.calledOnceWithExactly(
+      errorStub,
+      `[MCP Context] Error resolving real path for ${escapeForLog(filePath)}: ${escapeForLog(errMsg)}`,
+    );
+  });
+
+  it('escapes the path when it is outside the configured roots', async () => {
+    const context = await createContext();
+    const unlikelyDir = 'a_very_unlikely_path_name_12345';
+    const filePath = path.resolve(
+      path.parse(os.tmpdir()).root,
+      unlikelyDir,
+      INJECTED,
+    );
+    stubMissingPaths(filePath, path.dirname(filePath));
+    const canonicalPath = await resolveCanonicalPath(filePath);
+
+    await assert.rejects(context.validatePath(filePath), {
+      message: `Access denied: path ${escapeForLog(filePath)} (canonical: ${escapeForLog(canonicalPath)}) is not within any of the configured workspace roots.`,
+    });
+  });
+
+  it('escapes the path when the file cannot be written', async () => {
+    const context = await createContext();
+    const clientPath = path.join(os.tmpdir(), `${INJECTED}.png`);
+    const realpath = stubMissingPaths(clientPath);
+    const filePath = await context.ensureExtension(clientPath, '.png');
+    realpath.withArgs(filePath).rejects(enoent(filePath));
+    sinon
+      .stub(fs, 'mkdir')
+      .rejects(Object.assign(new Error('EACCES'), {code: 'EACCES'}));
+
+    await assert.rejects(
+      context.saveFile(new Uint8Array([0]), clientPath, '.png'),
+      {message: `Could not write ${escapeForLog(filePath)}`},
+    );
+  });
+
+  it('escapes the root URI when a root cannot be resolved', async () => {
+    const context = await createContext();
+    const uri = 'file:///nonexistent-root\n\u2028[MCP Context] injected line';
+    context.setRoots([{uri, name: 'unresolvable'}]);
+    const warnStub = sinon.stub(console, 'warn');
+
+    await context.validatePath(path.join(os.tmpdir(), 'test-file.txt'));
+
+    sinon.assert.calledOnceWithMatch(
+      warnStub,
+      sinon.match(
+        (message: string) =>
+          message.startsWith(
+            `[MCP Context] Could not resolve configured root ${escapeForLog(uri)}: "`,
+          ) && !UNESCAPED_LINE_BREAK.test(message),
+      ),
+    );
   });
 });

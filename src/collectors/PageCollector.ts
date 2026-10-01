@@ -42,7 +42,15 @@ interface PageEvents extends PuppeteerPageEvents {
 }
 
 export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
-  [K in keyof EventMap]?: (event: EventMap[K]) => void;
+  [
+    K in keyof EventMap as string extends K
+      ? never
+      : number extends K
+        ? never
+        : symbol extends K
+          ? never
+          : K
+  ]?: (event: EventMap[K]) => void;
 };
 
 export class PageCollector<T> {

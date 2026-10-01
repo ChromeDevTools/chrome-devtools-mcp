@@ -60,8 +60,8 @@ export class CommentFormatter {
     for (const thread of threads) {
       let elementUid: string | undefined;
       const resolveBackendNodeId = options?.resolveBackendNodeId;
-      if (thread.backendNodeId !== undefined && resolveBackendNodeId) {
-        elementUid = await resolveBackendNodeId(thread.backendNodeId);
+      if (thread.node?.backendNodeId !== undefined && resolveBackendNodeId) {
+        elementUid = await resolveBackendNodeId(thread.node.backendNodeId);
       }
 
       let reqid: number | undefined;

@@ -6,7 +6,7 @@
 
 import type {WebMCPTool} from 'puppeteer-core';
 
-import type {ParsedArguments} from './config/mcp-options.js';
+import type {ParsedArguments} from './config/ConfigParser.js';
 import {
   CommentFormatter,
   type StructuredCommentThread,
@@ -43,7 +43,6 @@ import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
 import type {
   ConsoleMessage,
   ImageContent,
-  Page,
   ResourceType,
   TextContent,
   Extension,
@@ -189,6 +188,10 @@ export class McpResponse implements Response {
       this.#includeExtensionServiceWorkers = value;
       this.#includeExtensionPages = value;
     }
+  }
+
+  setIncludeExtensionServiceWorkers(value: boolean): void {
+    this.#includeExtensionServiceWorkers = value;
   }
 
   includeSnapshot(params?: SnapshotParams): void {
@@ -766,7 +769,7 @@ export class McpResponse implements Response {
     ]);
 
     if (this.#includeExtensionServiceWorkers) {
-      await context.createExtensionServiceWorkersSnapshot();
+      context.createWorkersSnapshot();
     }
 
     let extensions: Map<string, Extension> | undefined;
@@ -1000,7 +1003,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           acc: {regularPages: McpPage[]; extensionPages: McpPage[]},
           mcpPage: McpPage,
         ) => {
-          if (mcpPage.pptrPage.url().startsWith('chrome-extension://')) {
+          if (mcpPage.url().startsWith('chrome-extension://')) {
             acc.extensionPages.push(mcpPage);
           } else {
             acc.regularPages.push(mcpPage);
@@ -1030,10 +1033,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = await fetchPageTitle(mcpPage.pptrPage);
+          const title = mcpPage.getTitle();
           const pageLabel = title
-            ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
-            : mcpPage.pptrPage.url();
+            ? `${truncateTitle(title)} (${mcpPage.url()})`
+            : mcpPage.url();
           parts.push(
             `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
           );
@@ -1052,10 +1055,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = await fetchPageTitle(mcpPage.pptrPage);
+            const title = mcpPage.getTitle();
             const pageLabel = title
-              ? `${truncateTitle(title)} (${mcpPage.pptrPage.url()})`
-              : mcpPage.pptrPage.url();
+              ? `${truncateTitle(title)} (${mcpPage.url()})`
+              : mcpPage.url();
             response.push(
               `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
             );
@@ -1069,23 +1072,27 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     if (this.#includeExtensionServiceWorkers) {
-      if (context.getExtensionServiceWorkers().length) {
+      const extensionServiceWorkers = context
+        .getWorkers()
+        .filter(worker => worker.type === 'service_worker');
+
+      if (extensionServiceWorkers.length) {
         response.push(`## Extension Service Workers`);
       }
 
-      for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
+      for (const extensionServiceWorker of extensionServiceWorkers) {
         response.push(
           `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
         );
       }
-      structuredContent.extensionServiceWorkers = context
-        .getExtensionServiceWorkers()
-        .map(extensionServiceWorker => {
+      structuredContent.extensionServiceWorkers = extensionServiceWorkers.map(
+        extensionServiceWorker => {
           return {
             id: extensionServiceWorker.id,
             url: extensionServiceWorker.url,
           };
-        });
+        },
+      );
     }
 
     if (this.#tabId) {
@@ -1623,13 +1630,6 @@ function truncateTitle(title: string, maxLength = 50): string {
   return title.slice(0, maxLength - 3) + '...';
 }
 
-async function fetchPageTitle(page: Page): Promise<string> {
-  return Promise.race([
-    page.title().catch(() => ''),
-    new Promise<string>(resolve => setTimeout(() => resolve(''), 1000)),
-  ]);
-}
-
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
@@ -1645,7 +1645,7 @@ function createStructuredPage(
     isolatedContext?: string;
   } = {
     id: mcpPage.id,
-    url: mcpPage.pptrPage.url(),
+    url: mcpPage.url(),
     title,
     selected: context.isPageSelected(mcpPage),
   };

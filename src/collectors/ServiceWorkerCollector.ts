@@ -13,7 +13,7 @@ import type {
   Protocol,
   Browser,
 } from '../third_party/index.js';
-import type {ExtensionServiceWorker} from '../types.js';
+import type {McpWorker} from '../McpWorker.js';
 import type {WithSymbolId} from '../utils/id.js';
 import {createIdGenerator, stableIdSymbol} from '../utils/id.js';
 
@@ -81,7 +81,7 @@ export class ServiceWorkerConsoleCollector {
     this.#maxLogs = maxLogs;
   }
 
-  async init(workers: ExtensionServiceWorker[]) {
+  async init(workers: McpWorker[]) {
     if (!this.#browser) {
       return;
     }

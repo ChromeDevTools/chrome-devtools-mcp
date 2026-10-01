@@ -9,20 +9,26 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
-import {type ParsedArguments} from './config/mcp-options.js';
+import {type ParsedArguments} from './config/ConfigParser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
+  type CallToolResult,
   McpServer as SdkMcpServer,
+  type RegisteredTool,
   type Root,
   type Transport,
   Mutex,
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
-import type {DefinedPageTool, ToolDefinition} from './tools/ToolDefinition.js';
+import {
+  type DefinedPageTool,
+  isAvailableInMode,
+  type ToolDefinition,
+} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
@@ -44,6 +50,11 @@ export interface McpServerOptions {
   logFile?: fs.WriteStream;
 }
 
+interface ToolEntry {
+  handler: ToolHandler;
+  registeredTool: RegisteredTool;
+}
+
 export class McpServer {
   readonly server: SdkMcpServer;
   #serverArgs: ParsedArguments;
@@ -57,6 +68,7 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   #toolMutex = new Mutex();
+  #tools = new Map<string, ToolEntry>();
 
   private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
     this.#serverArgs = serverArgs;
@@ -80,7 +92,11 @@ export class McpServer {
         title: 'Chrome DevTools MCP server',
         version: VERSION,
       },
-      {capabilities: {logging: {}}},
+      {
+        capabilities: {logging: {}, tools: {listChanged: true}},
+        // Enabling or updating many tools at once sends a single notification.
+        debouncedNotificationMethods: ['notifications/tools/list_changed'],
+      },
     );
 
     this.server.server.setRequestHandler('logging/setLevel', () => {
@@ -116,6 +132,43 @@ export class McpServer {
 
   async connect(transport: Transport): Promise<void> {
     return await this.server.connect(transport);
+  }
+
+  async callTool(
+    name: string,
+    args: Record<string, unknown> = {},
+  ): Promise<CallToolResult> {
+    const toolHandler = this.#tools.get(name)?.handler;
+    if (!toolHandler) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Tool ${name} not found`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    const parseResult =
+      await toolHandler.registeredInputSchema.safeParseAsync(args);
+    if (!parseResult.success) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Input validation error: Invalid arguments for tool ${name}: ${parseResult.error.issues
+              .map(
+                issue =>
+                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
+              )
+              .join(', ')}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    return await toolHandler.handle(parseResult.data);
   }
 
   /**
@@ -155,9 +208,11 @@ export class McpServer {
   }
 
   async #init(): Promise<void> {
-    const tools = createTools(this.#serverArgs);
-    for (const tool of tools) {
-      this.#registerTool(tool);
+    for (const tool of createTools(this.#serverArgs)) {
+      // Slim and regular tools may share names, only register the current mode.
+      if (isAvailableInMode(tool, this.#serverArgs)) {
+        this.#registerTool(tool);
+      }
     }
     await loadIssueDescriptions();
   }
@@ -244,27 +299,35 @@ export class McpServer {
     return this.#context;
   }
 
-  #registerTool(tool: ToolDefinition | DefinedPageTool): void {
-    const toolHandler = new ToolHandler(
+  #createToolHandler(tool: ToolDefinition | DefinedPageTool): ToolHandler {
+    return new ToolHandler(
       tool,
       this.#serverArgs,
       () => this.#getContext(),
       this.#toolMutex,
+      browser => this.#browserManager.forget(browser),
+      () => this.#browserManager.abandonPendingAttempt(),
     );
+  }
+
+  #registerTool(tool: ToolDefinition | DefinedPageTool): void {
+    const handler = this.#createToolHandler(tool);
 
     const registeredTool = this.server.registerTool(
       tool.name,
       {
         description: tool.description,
-        inputSchema: toolHandler.registeredInputSchema,
+        inputSchema: handler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      toolHandler.handle,
+      handler.handle,
     );
 
-    if (toolHandler.disabled) {
+    if (handler.disabled) {
       registeredTool.disable();
     }
+
+    this.#tools.set(tool.name, {handler, registeredTool});
   }
 }
 

@@ -25,10 +25,14 @@
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
+import {
+  type ParsedArguments,
+  ConfigParser,
+} from '../src/config/ConfigParser.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {McpWorker, type WorkerType} from '../src/McpWorker.js';
 import type {
   AggregatedInfoWithId,
   DuplicateStringGroup,
@@ -46,18 +50,25 @@ import {
   Dialog,
   ElementHandle,
   Locator,
+  Target,
+  TargetType,
+  WebWorker,
 } from '../src/third_party/index.js';
 import type {
   Browser,
+  BrowserContext,
+  CDPSession,
   Extension,
   Page,
   Protocol,
+  Realm,
   Result,
   RunnerResult,
 } from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
   pptrPage: sinon.SinonStubbedInstance<Page>;
+  target: sinon.SinonStubbedInstance<MockTarget>;
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
@@ -131,6 +142,21 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   browser.disconnect.resolves();
   browser.pages.resolves([]);
   browser.process.returns(null);
+
+  const browserListener = mockListener();
+  browser.once.callsFake((eventName, handler) => {
+    const onceHandler = (data: unknown) => {
+      browserListener.off(eventName, onceHandler);
+      handler(data);
+    };
+    browserListener.on(eventName, onceHandler);
+    return browser;
+  });
+  browser.emit.callsFake((eventName, data) => {
+    browserListener.emit(eventName, data);
+    return true;
+  });
+
   return browser;
 }
 
@@ -192,16 +218,88 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   return page;
 }
 
+export class MockTarget extends Target {
+  override asPage(): Promise<Page> {
+    throw new Error('Not implemented');
+  }
+  override url(): string {
+    return '';
+  }
+  override createCDPSession(): Promise<CDPSession> {
+    throw new Error('Not implemented');
+  }
+  override type(): TargetType {
+    return TargetType.PAGE;
+  }
+  override browser(): Browser {
+    throw new Error('Not implemented');
+  }
+  override browserContext(): BrowserContext {
+    throw new Error('Not implemented');
+  }
+  override opener(): Target | undefined {
+    return undefined;
+  }
+  _getTargetInfo(): Protocol.Target.TargetInfo {
+    throw new Error('Not implemented');
+  }
+}
+
+export function createMockPuppeteerTarget(
+  options: {
+    page?: sinon.SinonStubbedInstance<Page>;
+    url?: string;
+    title?: string;
+  } = {},
+): sinon.SinonStubbedInstance<MockTarget> {
+  const target = sinon.createStubInstance(MockTarget);
+  const page = options.page ?? createMockPuppeteerPage();
+  page.target.returns(target);
+  target.page.resolves(page);
+  target.asPage.resolves(page);
+  target.url.returns(options.url ?? 'https://example.com');
+  target._getTargetInfo.returns({
+    targetId: '<mock-target-id>',
+    type: 'page',
+    title: options.title ?? '',
+    url: options.url ?? 'https://example.com',
+    attached: true,
+    canAccessOpener: false,
+  });
+  return target;
+}
+
 export function createMockMcpPage(
-  options: {pptrPage?: sinon.SinonStubbedInstance<Page>} = {},
+  options: {
+    pptrPage?: sinon.SinonStubbedInstance<Page>;
+    target?: sinon.SinonStubbedInstance<MockTarget>;
+  } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
+  const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
+  page.init.resolves();
+  page.close.callsFake(async () => {
+    await pptrPage.close({runBeforeUnload: false});
+  });
+  page.url.callsFake(() => pptrPage.url());
+  page.getTitle.returns('');
+  page.isClosed.callsFake(() => Boolean(pptrPage.isClosed()));
   page.waitForEventsAfterAction.callsFake(async action => {
     await action(new AbortController().signal);
     return {};
   });
-  return Object.assign(page, {pptrPage});
+  Object.defineProperty(page, 'pptrPage', {
+    value: pptrPage,
+    writable: true,
+    configurable: true,
+  });
+  Object.defineProperty(page, 'target', {
+    value: target,
+    writable: true,
+    configurable: true,
+  });
+  return Object.assign(page, {pptrPage, target});
 }
 
 export function createMockDialog(
@@ -224,6 +322,47 @@ export function createMockElementHandle(): {
   locator.setTimeout.returns(locator);
   handle.asLocator.returns(locator);
   return {handle, locator};
+}
+
+export function createMockTarget(): sinon.SinonStubbedInstance<MockTarget> {
+  return createMockPuppeteerTarget();
+}
+
+// Concrete subclass of Puppeteer's abstract WebWorker so sinon.createStubInstance
+// can stub it without an `as unknown as` cast, mirroring MockTarget above.
+class MockWebWorker extends WebWorker {
+  mainRealm(): Realm {
+    throw new Error('Not implemented');
+  }
+  get client(): CDPSession {
+    throw new Error('Not implemented');
+  }
+}
+
+export function createMockWebWorker(): sinon.SinonStubbedInstance<MockWebWorker> {
+  return sinon.createStubInstance(MockWebWorker);
+}
+
+export function createMockMcpWorker(
+  options: {
+    id?: string;
+    type?: WorkerType;
+    url?: string;
+    worker?: WebWorker;
+  } = {},
+): McpWorker {
+  // A real McpWorker over a stubbed Target, so `url`/`worker()` resolve through
+  // the same code paths as in production rather than through stubbed getters.
+  const target = createMockTarget();
+  target.url.returns(
+    options.url ?? 'chrome-extension://mock-extension-id/sw.js',
+  );
+  target.worker.resolves(options.worker ?? null);
+  return new McpWorker(
+    options.id ?? 'sw-1',
+    options.type ?? 'service_worker',
+    target,
+  );
 }
 
 export function createMockMcpContext(
@@ -972,7 +1111,12 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = parser('0.0.0', ['node', 'main.js']).parseSync();
+  const defaultArgs = new ConfigParser(
+    '0.0.0',
+    ['node', 'main.js'],
+    process.env,
+    false,
+  ).parse();
   return {...defaultArgs, ...options};
 }
 

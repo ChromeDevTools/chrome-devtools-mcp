@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 
 import {
   lighthouseRunner,

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
@@ -59,6 +59,7 @@ export const selectPage = defineTool((args: ParsedArguments) => ({
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
+    await page.init();
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
@@ -130,6 +131,7 @@ export const newPage = defineTool((args: ParsedArguments) => {
       validateUrl(request.params.url, {
         javascriptEvaluation: args?.javascriptEvaluation,
         categoryExtensions: args?.categoryExtensions,
+        fileNavigations: args?.fileNavigations,
       });
 
       const page = await context.newPage(
@@ -210,6 +212,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
         validateUrl(request.params.url, {
           javascriptEvaluation: args?.javascriptEvaluation,
           categoryExtensions: args?.categoryExtensions,
+          fileNavigations: args?.fileNavigations,
         });
       }
 

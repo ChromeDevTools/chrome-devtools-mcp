@@ -10,7 +10,7 @@ import {before, describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
 
-import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
@@ -58,7 +58,7 @@ describe('console', () => {
           t => t.type() === 'service_worker' && t.url().includes(extensionId),
         );
 
-        const swList = await context.createExtensionServiceWorkersSnapshot();
+        const swList = context.createWorkersSnapshot();
         const sw = swList.find(s => s.target === swTarget);
         assert(sw, 'Service worker not found in context list');
 

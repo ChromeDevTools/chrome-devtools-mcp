@@ -11,21 +11,13 @@ export const browserOptions = {
     type: 'boolean',
     description:
       'If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.',
-    conflicts: ['isolated', 'executablePath'],
     default: false,
-    coerce: (value: boolean | undefined) => {
-      if (!value) {
-        return;
-      }
-      return value;
-    },
   },
   browserUrl: {
     type: 'string',
     description:
       'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.',
     alias: 'u',
-    conflicts: ['wsEndpoint'],
     coerce: (url: string | undefined) => {
       if (!url) {
         return;
@@ -43,7 +35,6 @@ export const browserOptions = {
     description:
       'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
     alias: 'w',
-    conflicts: ['browserUrl'],
     coerce: (url: string | undefined) => {
       if (!url) {
         return;
@@ -68,7 +59,6 @@ export const browserOptions = {
     type: 'string',
     description:
       'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    implies: 'wsEndpoint',
     coerce: (val: string | undefined) => {
       if (!val) {
         return;
@@ -94,26 +84,25 @@ export const browserOptions = {
   executablePath: {
     type: 'string',
     description: 'Path to custom Chrome executable.',
-    conflicts: ['browserUrl', 'wsEndpoint'],
     alias: 'e',
   },
   isolated: {
     type: 'boolean',
     description:
       'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to false.',
+    default: false,
   },
   userDataDir: {
     type: 'string',
     description:
       'Path to the user data directory for Chrome. Default is $HOME/.cache/chrome-devtools-mcp/chrome-profile$CHANNEL_SUFFIX_IF_NON_STABLE',
-    conflicts: ['browserUrl', 'wsEndpoint', 'isolated'],
   },
   channel: {
     type: 'string',
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
     choices: ['canary', 'dev', 'beta', 'stable'] as const,
-    conflicts: ['browserUrl', 'wsEndpoint', 'executablePath'],
+    default: 'stable' as const,
   },
   proxyServer: {
     type: 'string',

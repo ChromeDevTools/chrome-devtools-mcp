@@ -47,8 +47,9 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
-import type {ExtensionServiceWorker} from './types.js';
+import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
 interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
@@ -93,9 +94,11 @@ export class McpContext implements Context {
   // Auto-generated name counter for when no name is provided.
   #nextIsolatedContextId = 1;
 
-  #extensionServiceWorkers: ExtensionServiceWorker[] = [];
+  // Cached McpWorker per target, reused across snapshots (mirrors #mcpPages) so
+  // referential identity holds and workers can carry per-worker state later.
+  #workers = new Map<Target, McpWorker>();
 
-  #mcpPages = new Map<Page, McpPage>();
+  #mcpPages = new Map<Target, McpPage>();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
 
@@ -106,10 +109,6 @@ export class McpContext implements Context {
     null;
 
   #reconnectNotice = false;
-  #extensionPages = new WeakMap<Target, Page>();
-
-  #extensionServiceWorkerMap = new WeakMap<Target, string>();
-  #nextExtensionServiceWorkerId = 1;
 
   #traceResults: TraceResult[] = [];
 
@@ -145,7 +144,7 @@ export class McpContext implements Context {
 
   async #init() {
     await this.createPagesSnapshot();
-    const workers = await this.createExtensionServiceWorkersSnapshot();
+    const workers = this.createWorkersSnapshot();
 
     await this.#serviceWorkerConsoleCollector.init(workers);
     this.browser.on('targetcreated', this.#onTargetCreated);
@@ -161,28 +160,21 @@ export class McpContext implements Context {
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
+    this.#selectedPage?.dispose();
     this.#mcpPages.clear();
+    this.#workers.clear();
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
     this.#isolatedContexts.clear();
   }
 
-  #onTargetCreated = async (target: Target) => {
+  #onTargetCreated = (target: Target) => {
     try {
-      const url = target.url();
-      if (
-        !isAllowedUrl(url, {
-          categoryExtensions: this.#options.categoryExtensions,
-        })
-      ) {
+      if (!this.#isPageTarget(target)) {
         return;
       }
-      const page = await target.page();
-      if (!page) {
-        return;
-      }
-      void this.#createMcpPage(page);
+      this.#createMcpPage(target);
     } catch (err) {
       this.logger?.('Error handling targetcreated', err);
     }
@@ -190,21 +182,12 @@ export class McpContext implements Context {
 
   #onTargetDestroyed = (target: Target) => {
     try {
-      let foundPage: Page | undefined;
-      for (const page of this.#mcpPages.keys()) {
-        if (page.target() === target) {
-          foundPage = page;
-          break;
-        }
-      }
-      if (!foundPage) {
-        return;
-      }
-      const mcpPage = this.#mcpPages.get(foundPage);
+      const mcpPage = this.#mcpPages.get(target);
       if (mcpPage) {
         mcpPage.dispose();
-        this.#mcpPages.delete(foundPage);
+        this.#mcpPages.delete(target);
       }
+      this.#workers.delete(target);
     } catch (err) {
       this.logger?.('Error handling targetdestroyed', err);
     }
@@ -224,6 +207,10 @@ export class McpContext implements Context {
 
   static resetPageIdsForTesting(): void {
     nextPageId = 1;
+  }
+
+  static resetWorkerIdsForTesting(): void {
+    McpWorker.resetIdsForTesting();
   }
 
   roots(): Root[] {
@@ -260,10 +247,10 @@ export class McpContext implements Context {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(
-        `[MCP Context] Error resolving real path for ${filePath}: ${errMsg}`,
+        `[MCP Context] Error resolving real path for ${escapeForLog(filePath)}: ${escapeForLog(errMsg)}`,
       );
       throw new Error(
-        `Access denied: Cannot resolve base path for ${filePath}.`,
+        `Access denied: Cannot resolve base path for ${escapeForLog(filePath)}.`,
       );
     }
 
@@ -308,7 +295,7 @@ export class McpContext implements Context {
         const errMsg =
           rootErr instanceof Error ? rootErr.message : String(rootErr);
         console.warn(
-          `[MCP Context] Could not resolve configured root ${root.uri}: ${errMsg}`,
+          `[MCP Context] Could not resolve configured root ${escapeForLog(root.uri)}: ${escapeForLog(errMsg)}`,
         );
         // Skip this root if it cannot be resolved.
       }
@@ -316,7 +303,7 @@ export class McpContext implements Context {
 
     if (!allowed) {
       throw new Error(
-        `Access denied: path ${filePath} (canonical: ${canonicalPath}) is not within any of the configured workspace roots.`,
+        `Access denied: path ${escapeForLog(filePath)} (canonical: ${escapeForLog(canonicalPath)}) is not within any of the configured workspace roots.`,
       );
     }
 
@@ -351,9 +338,10 @@ export class McpContext implements Context {
     } else {
       page = await this.browser.newPage({background});
     }
-    const mcpPage = await this.#createMcpPage(page);
-    await this.createPagesSnapshot();
+    const mcpPage = this.#createMcpPage(page.target());
+    await mcpPage.init();
     this.selectPage(mcpPage);
+    await this.createPagesSnapshot();
     return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
@@ -361,11 +349,8 @@ export class McpContext implements Context {
       throw new Error(CLOSE_PAGE_ERROR);
     }
     const page = this.getPageById(pageId);
-    if (page) {
-      page.dispose();
-      this.#mcpPages.delete(page.pptrPage);
-    }
-    await page.pptrPage.close({runBeforeUnload: false});
+    this.#mcpPages.delete(page.target);
+    await page.close();
   }
 
   get #hasNetworkBlockOrAllowlist(): boolean {
@@ -419,7 +404,7 @@ export class McpContext implements Context {
     if (!page) {
       throw new Error('No page selected');
     }
-    if (page.pptrPage.isClosed()) {
+    if (page.isClosed()) {
       throw new Error(
         'The selected page has been closed. Call list_pages to see open pages.',
       );
@@ -436,8 +421,8 @@ export class McpContext implements Context {
         return undefined;
       }
     }
-    if (targetPage?.pptrPage?.isClosed() === false) {
-      return targetPage.pptrPage.url();
+    if (targetPage && !targetPage.isClosed()) {
+      return targetPage.url();
     }
     return undefined;
   }
@@ -485,6 +470,13 @@ export class McpContext implements Context {
   }
 
   selectPage(newPage: McpPage): void {
+    if (
+      this.#selectedPage &&
+      this.#selectedPage !== newPage &&
+      !this.#mcpPages.has(this.#selectedPage.target)
+    ) {
+      this.#selectedPage.dispose();
+    }
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -500,38 +492,35 @@ export class McpContext implements Context {
   }
 
   /**
-   * Creates a snapshot of the extension service workers.
+   * Creates a snapshot of the tracked workers. Today this is limited to
+   * extension service workers; the McpWorker abstraction lets dedicated and
+   * shared workers join the same snapshot later without changing consumers.
    */
-  async createExtensionServiceWorkersSnapshot(): Promise<
-    ExtensionServiceWorker[]
-  > {
-    const allTargets = this.browser.targets();
-
-    const serviceWorkers = allTargets.filter(target => {
+  createWorkersSnapshot(): McpWorker[] {
+    const serviceWorkers = this.browser.targets().filter(target => {
       return (
         target.type() === 'service_worker' &&
         target.url().includes('chrome-extension://')
       );
     });
 
-    for (const serviceWorker of serviceWorkers) {
-      if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
-        this.#extensionServiceWorkerMap.set(
-          serviceWorker,
-          'sw-' + this.#nextExtensionServiceWorkerId++,
-        );
+    // Reuse the existing McpWorker for a target; only mint one (and an id) for
+    // targets seen for the first time.
+    for (const target of serviceWorkers) {
+      if (!this.#workers.has(target)) {
+        this.#workers.set(target, McpWorker.create('service_worker', target));
       }
     }
 
-    this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
-      return {
-        target: serviceWorker,
-        id: this.#extensionServiceWorkerMap.get(serviceWorker)!,
-        url: serviceWorker.url(),
-      };
-    });
+    // Prune workers whose target is gone (mirrors #mcpPages pruning).
+    const currentTargets = new Set(serviceWorkers);
+    for (const target of this.#workers.keys()) {
+      if (!currentTargets.has(target)) {
+        this.#workers.delete(target);
+      }
+    }
 
-    return this.#extensionServiceWorkers;
+    return Array.from(this.#workers.values());
   }
 
   getServiceWorkerConsoleData(
@@ -560,36 +549,41 @@ export class McpContext implements Context {
     return contextToName;
   }
 
-  async #createMcpPage(page: Page): Promise<McpPage> {
-    let mcpPage = this.#mcpPages.get(page);
+  #createMcpPage(target: Target): McpPage {
+    let mcpPage =
+      this.#mcpPages.get(target) ??
+      (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     if (!mcpPage) {
-      mcpPage = new McpPage(page, nextPageId++, {
+      mcpPage = new McpPage(target, nextPageId++, {
         locatorClass: this.#locatorClass,
         hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
         isolatedContextName: this.#getBrowserContextToNameMap().get(
-          page.browserContext(),
+          target.browserContext(),
         ),
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
         onNotification: this.#options.onNotification,
       });
-      this.#mcpPages.set(page, mcpPage);
-      await mcpPage.init();
     }
+    this.#mcpPages.set(target, mcpPage);
     return mcpPage;
   }
 
-  async createPagesSnapshot(): Promise<Page[]> {
-    const allPages = await this.#fetchBrowserPages();
+  async createPagesSnapshot(): Promise<McpPage[]> {
+    const allTargets = this.#fetchPageTargets();
 
-    await Promise.allSettled(allPages.map(page => this.#createMcpPage(page)));
+    for (const target of allTargets) {
+      this.#createMcpPage(target);
+    }
 
-    // Prune orphaned #mcpPages entries (pages that no longer exist).
-    const currentPages = new Set(allPages);
-    for (const [page, mcpPage] of this.#mcpPages) {
-      if (!currentPages.has(page)) {
-        mcpPage.dispose();
-        this.#mcpPages.delete(page);
+    // Prune orphaned #mcpPages entries (targets that no longer exist).
+    const currentTargets = new Set(allTargets);
+    for (const [target, mcpPage] of this.#mcpPages) {
+      if (!currentTargets.has(target)) {
+        if (mcpPage !== this.#selectedPage || mcpPage.isClosed()) {
+          mcpPage.dispose();
+        }
+        this.#mcpPages.delete(target);
       }
     }
 
@@ -599,80 +593,70 @@ export class McpContext implements Context {
     // `isClosed()` instead of `pages` membership avoids silently swapping a
     // live page that is momentarily missing from the snapshot.
     this.#selectedPageFallback = undefined;
-    if (
-      (!this.#selectedPage || this.#selectedPage.pptrPage.isClosed()) &&
-      pages[0]
-    ) {
+    if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
       if (this.#selectedPage) {
         this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.pptrPage.isClosed(),
+          wasClosed: this.#selectedPage.isClosed(),
         };
       }
       this.selectPage(pages[0]);
     }
 
-    return pages.map(p => p.pptrPage);
-  }
-
-  async #fetchBrowserPages(): Promise<Page[]> {
-    const allPages = (
-      await this.browser.pages(this.#options.experimentalIncludeAllPages)
-    ).filter(page => {
-      if (
-        !this.#options.experimentalDevToolsDebugging &&
-        page.url().startsWith('devtools://')
-      ) {
-        return false;
-      }
-      return isAllowedUrl(page.url(), {
-        categoryExtensions: this.#options.categoryExtensions,
-      });
-    });
-
-    if (this.#options.categoryExtensions) {
-      const allTargets = this.browser.targets();
-      const extensionTargets = allTargets.filter(target => {
-        return (
-          target.url().startsWith('chrome-extension://') &&
-          target.type() === 'page'
-        );
-      });
-
-      await Promise.allSettled(
-        extensionTargets.map(async target => {
-          try {
-            let page = await target.page();
-            if (!page) {
-              page = await target.asPage();
-            }
-            this.#extensionPages.set(target, page);
-            if (
-              page &&
-              isAllowedUrl(page.url(), {categoryExtensions: true}) &&
-              !allPages.includes(page)
-            ) {
-              allPages.push(page);
-            }
-          } catch (e) {
-            this.logger?.('Failed to get page for extension target', e);
-          }
-        }),
-      );
+    if (this.#selectedPage && !this.#selectedPage.isClosed()) {
+      await this.#selectedPage.init();
     }
 
-    return allPages;
+    return pages;
   }
 
-  getExtensionServiceWorkers(): ExtensionServiceWorker[] {
-    return this.#extensionServiceWorkers;
+  #isPageTarget(target: Target): boolean {
+    const existingMcpPage = this.#mcpPages.get(target);
+    const url = existingMcpPage ? existingMcpPage.url() : target.url();
+    if (
+      !this.#options.experimentalDevToolsDebugging &&
+      url.startsWith('devtools://')
+    ) {
+      return false;
+    }
+    if (
+      !isAllowedUrl(url, {
+        categoryExtensions: this.#options.categoryExtensions,
+      })
+    ) {
+      return false;
+    }
+    const type = target.type();
+    if (type === 'page') {
+      return true;
+    }
+    if (
+      this.#options.experimentalIncludeAllPages &&
+      (type === 'background_page' || type === 'webview')
+    ) {
+      return true;
+    }
+    if (
+      this.#options.experimentalDevToolsDebugging &&
+      type === 'other' &&
+      url.startsWith('devtools://')
+    ) {
+      return true;
+    }
+    return false;
   }
 
-  getExtensionServiceWorkerId(
-    extensionServiceWorker: ExtensionServiceWorker,
-  ): string | undefined {
-    return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
+  #fetchPageTargets(): Target[] {
+    return this.browser.targets().filter(target => this.#isPageTarget(target));
+  }
+
+  getWorkers(): McpWorker[] {
+    return Array.from(this.#workers.values());
+  }
+
+  getWorkerById(id: string): McpWorker | undefined {
+    return this.#workers.values().find(worker => worker.id === id);
   }
 
   async #writeFile(
@@ -698,7 +682,9 @@ export class McpContext implements Context {
         mode: 0o600,
       });
     } catch (err) {
-      throw new Error(`Could not write ${filepath}`, {cause: err});
+      throw new Error(`Could not write ${escapeForLog(filepath)}`, {
+        cause: err,
+      });
     }
   }
 
