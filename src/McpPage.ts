@@ -4,6 +4,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
+import {
+  createTargetUniverse,
+  type TargetUniverse,
+} from './devtools/DevtoolsUtils.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './collectors/PageCollector.js';
+import {TextSnapshot} from './TextSnapshot.js';
+import type {Locator} from './third_party/index.js';
+import {
+  PredefinedNetworkConditions,
+  type Dialog,
+  type ElementHandle,
+  type Viewport,
+  type WebMCPTool,
+  type Protocol,
+  type Page,
+  type Target,
+  type ConsoleMessage,
+  type HTTPRequest,
+  DevTools,
+  type JSONSchema7Definition,
+} from './third_party/index.js';
+import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
+import type {
+  ContextPage,
+  DevToolsData,
+  MatchedStyles,
+  Response,
+} from './tools/ToolDefinition.js';
+import type {
+  EmulationSettings,
+  GeolocationOptions,
+  TextSnapshotNode,
+} from './types.js';
+import {logger} from './utils/logger.js';
+import {
+  getNetworkMultiplierFromString,
+  WaitForHelper,
+  type WaitForEventsResult,
+  type DialogAction,
+} from './utils/WaitForHelper.js';
+
+const DEFAULT_TIMEOUT = 5_000;
+const NAVIGATION_TIMEOUT = 10_000;
+
 export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   if (typeof schema === 'boolean') {
     return;
@@ -62,55 +112,6 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
     tool.annotations.debugging === true,
   );
 }
-
-import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
-import {
-  createTargetUniverse,
-  type TargetUniverse,
-} from './devtools/DevtoolsUtils.js';
-import {
-  ConsoleCollector,
-  NetworkCollector,
-  type ListenerMap,
-  type UncaughtError,
-} from './collectors/PageCollector.js';
-import {TextSnapshot} from './TextSnapshot.js';
-import type {Locator} from './third_party/index.js';
-import {
-  PredefinedNetworkConditions,
-  type Dialog,
-  type ElementHandle,
-  type Viewport,
-  type WebMCPTool,
-  type Protocol,
-  type Page,
-  type Target,
-  type ConsoleMessage,
-  type HTTPRequest,
-  DevTools,
-  type JSONSchema7Definition,
-} from './third_party/index.js';
-import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
-const DEFAULT_TIMEOUT = 5_000;
-const NAVIGATION_TIMEOUT = 10_000;
-import type {
-  ContextPage,
-  DevToolsData,
-  MatchedStyles,
-  Response,
-} from './tools/ToolDefinition.js';
-import type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshotNode,
-} from './types.js';
-import {logger} from './utils/logger.js';
-import {
-  getNetworkMultiplierFromString,
-  WaitForHelper,
-  type WaitForEventsResult,
-  type DialogAction,
-} from './utils/WaitForHelper.js';
 
 function isBackendNodeId(
   id: unknown,
@@ -344,17 +345,18 @@ export class McpPage implements ContextPage {
     }
   }
 
-  getThirdPartyDeveloperTools(): ToolGroups {
-    return this.thirdPartyDeveloperTools;
-  }
-
-  async getToolGroups(): Promise<ToolGroups> {
-    const toolGroups: ToolGroups = [];
-    const webmcpTools = this.pptrPage.webmcp
+  #getWebMcpToolGroups(): ToolGroups {
+    if (!this.#pptrPage) {
+      return [];
+    }
+    const webmcpTools = this.#pptrPage.webmcp
       .tools()
       .filter(isDebuggingWebMcpTool);
-    if (webmcpTools.length > 0) {
-      toolGroups.push({
+    if (webmcpTools.length === 0) {
+      return [];
+    }
+    return [
+      {
         name: 'WebMCP Tools',
         description: 'Tools exposed via WebMCP',
         tools: webmcpTools.map(tool => ({
@@ -362,9 +364,15 @@ export class McpPage implements ContextPage {
           description: tool.description,
           inputSchema: structuredClone(tool.inputSchema ?? {}),
         })),
-      });
-    }
+      },
+    ];
+  }
 
+  getThirdPartyDeveloperTools(): ToolGroups {
+    return [...this.#getWebMcpToolGroups(), ...this.thirdPartyDeveloperTools];
+  }
+
+  async getToolGroups(): Promise<ToolGroups> {
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
@@ -374,8 +382,8 @@ export class McpPage implements ContextPage {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      this.thirdPartyDeveloperTools = toolGroups;
-      return toolGroups;
+      this.thirdPartyDeveloperTools = [];
+      return this.getThirdPartyDeveloperTools();
     }
 
     const eventToolGroups = await this.pptrPage.evaluate(() => {
@@ -460,11 +468,10 @@ export class McpPage implements ContextPage {
         replaceHtmlElementsWithUids(tool.inputSchema);
       }
     }
-    toolGroups.push(...eventToolGroups);
 
-    this.thirdPartyDeveloperTools = toolGroups;
+    this.thirdPartyDeveloperTools = eventToolGroups;
 
-    return toolGroups;
+    return this.getThirdPartyDeveloperTools();
   }
 
   getWebMcpTools(): WebMCPTool[] {
@@ -629,9 +636,9 @@ export class McpPage implements ContextPage {
     if (webmcpTool) {
       const {status, output, errorText} = await webmcpTool.execute(params);
       if (status !== 'Completed') {
-        throw new Error(errorText ?? `Tool execution failed: ${status}`);
+        throw new Error(errorText || `Tool execution failed: ${status}`);
       }
-      response.appendResponseLine(JSON.stringify(output, null, 2));
+      response.appendResponseLine(JSON.stringify(output ?? null, null, 2));
       return;
     }
 

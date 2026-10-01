@@ -117,31 +117,55 @@ describe('webmcp', () => {
       );
     });
 
-    it('does not execute debugging WebMCP tools', async () => {
-      await withMcpContext(
-        async (response, context, args) => {
-          const page = context.getSelectedMcpPage();
-          const debuggingTool = createMockWebMCPTool({
-            name: 'debug_tool',
-            annotations: {debugging: true},
-          });
-          sinon.stub(page.pptrPage.webmcp, 'tools').returns([debuggingTool]);
+    it('looks up tools via page.getWebMcpTools and throws if not returned', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.getWebMcpTools.returns([]);
 
-          await assert.rejects(
-            executeWebMcpTool(args).handler(
-              {
-                params: {toolName: 'debug_tool', input: '{}'},
-                page,
-              },
-              response,
-              context,
-            ),
-            {message: /Tool debug_tool not found/},
-          );
-          sinon.assert.notCalled(debuggingTool.execute);
+      await assert.rejects(
+        executeWebMcpTool(args).handler(
+          {
+            params: {toolName: 'debug_tool', input: '{}'},
+            page,
+          },
+          response,
+          context,
+        ),
+        {message: /Tool debug_tool not found/},
+      );
+      sinon.assert.calledOnceWithExactly(page.getWebMcpTools);
+    });
+
+    it('executes a matching tool returned by page.getWebMcpTools', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const tool = createMockWebMCPTool({
+        name: 'my_tool',
+      });
+      tool.execute.resolves({
+        id: 'call-1',
+        status: 'Completed',
+        output: {ok: true},
+        errorText: undefined,
+      });
+      page.getWebMcpTools.returns([tool]);
+
+      await executeWebMcpTool(args).handler(
+        {
+          params: {toolName: 'my_tool', input: '{"key":"val"}'},
+          page,
         },
-        {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
-        {categoryExperimentalWebmcp: true},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getWebMcpTools);
+      sinon.assert.calledOnceWithExactly(tool.execute, {key: 'val'});
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        JSON.stringify(
+          {status: 'Completed', output: {ok: true}, errorText: undefined},
+          null,
+          2,
+        ),
       );
     });
 

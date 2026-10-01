@@ -246,7 +246,25 @@ export class BrowserManager {
     }
     args.push('--hide-crash-restore-bubble');
     if (categoryExperimentalThirdParty) {
-      args.push('--enable-features=WebMCP,DevToolsWebMCPSupport');
+      const enableFeaturesPrefix = '--enable-features=';
+      const enableFeaturesIndex = args.findIndex(arg =>
+        arg.startsWith(enableFeaturesPrefix),
+      );
+      if (enableFeaturesIndex !== -1) {
+        const existingFeatures = args[enableFeaturesIndex]
+          .slice(enableFeaturesPrefix.length)
+          .split(',')
+          .filter(Boolean);
+        const mergedFeatures = new Set([
+          ...existingFeatures,
+          'WebMCP',
+          'DevToolsWebMCPSupport',
+        ]);
+        args[enableFeaturesIndex] =
+          `${enableFeaturesPrefix}${[...mergedFeatures].join(',')}`;
+      } else {
+        args.push(`${enableFeaturesPrefix}WebMCP,DevToolsWebMCPSupport`);
+      }
     }
 
     const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =

@@ -755,7 +755,7 @@ in the DevTools Elements panel (if any).
 
 **Description:** Lists all third-party developer tools the page exposes for providing runtime information (including debugging WebMCP tools and tools exposed via the 'devtoolstooldiscovery' event).
 Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
-Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
+Alternatively, third-party developer tools exposed via the 'devtoolstooldiscovery' event can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
 following command to the script:
 `window.__dtmcp.executeTool(toolName, params)`
 This might be helpful when the third-party developer tools return non-serializable values or when composing
