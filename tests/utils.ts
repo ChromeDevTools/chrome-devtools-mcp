@@ -210,7 +210,12 @@ export async function withMcpContext(
 
     response.setPage(context.getSelectedMcpPage());
 
-    await cb(response, context, parsedArgs);
+    try {
+      await cb(response, context, parsedArgs);
+    } finally {
+      context.dispose();
+      context = undefined;
+    }
   }, options);
 }
 

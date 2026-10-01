@@ -144,6 +144,14 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   browser.process.returns(null);
 
   const browserListener = mockListener();
+  browser.on.callsFake((eventName, handler) => {
+    browserListener.on(eventName, handler);
+    return browser;
+  });
+  browser.off.callsFake((eventName, handler) => {
+    browserListener.off(eventName, handler);
+    return browser;
+  });
   browser.once.callsFake((eventName, handler) => {
     const onceHandler = (data: unknown) => {
       browserListener.off(eventName, onceHandler);
