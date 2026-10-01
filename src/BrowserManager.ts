@@ -23,6 +23,25 @@ export interface BrowserManagerOptions {
   logFile?: fs.WriteStream;
 }
 
+async function connectWithRetry(
+  options: Parameters<typeof puppeteer.connect>[0],
+  retries = 3,
+  delayMs = 500,
+): Promise<Browser> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await puppeteer.connect(options);
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export class BrowserManager {
   #browser?: Browser;
   #browserMode?: 'launched' | 'connected';
@@ -351,7 +370,7 @@ export class BrowserManager {
 
     logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
     try {
-      const connected = await puppeteer.connect(connectOptions);
+      const connected = await connectWithRetry(connectOptions);
       logger?.('Connected Puppeteer');
       this.#browserMode = 'connected';
       this.#browser = connected;
