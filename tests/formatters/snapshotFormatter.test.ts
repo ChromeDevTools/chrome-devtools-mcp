@@ -80,7 +80,7 @@ describe('snapshotFormatter', () => {
     );
   });
 
-  it('keeps the duplicate StaticText child if it has siblings', () => {
+  it('keeps the duplicate StaticText child if it has non-text siblings', () => {
     const node = createNode('1_1', 'link', 'Privacy Policy', [
       createNode('1_2', 'StaticText', 'Privacy Policy'),
       createNode('1_3', 'image', 'icon'),
@@ -95,6 +95,62 @@ describe('snapshotFormatter', () => {
       `uid=1_1 link "Privacy Policy"
   uid=1_2 "Privacy Policy"
   uid=1_3 image "icon"
+`,
+    );
+  });
+
+  it('skips StaticText children whose combined text equals the parent name', () => {
+    const node = createNode('1_1', 'link', 'English 7,245,000+ articles', [
+      createNode('1_2', 'StaticText', 'English'),
+      createNode('1_3', 'StaticText', '7,245,000+ '),
+      createNode('1_4', 'StaticText', 'articles'),
+    ]);
+
+    const formatter = new SnapshotFormatter({
+      root: node,
+      verbose: false,
+    } as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 link "English 7,245,000+ articles"\n`,
+    );
+  });
+
+  it('keeps StaticText children whose combined text differs from the parent name', () => {
+    const node = createNode('1_1', 'link', 'English', [
+      createNode('1_2', 'StaticText', 'English'),
+      createNode('1_3', 'StaticText', 'articles'),
+    ]);
+
+    const formatter = new SnapshotFormatter({
+      root: node,
+      verbose: false,
+    } as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 link "English"
+  uid=1_2 "English"
+  uid=1_3 "articles"
+`,
+    );
+  });
+
+  it('omits redundant option attributes in text output', () => {
+    const node = createNode('1_1', 'combobox', 'Language', [
+      {...createNode('1_2', 'option', 'English'), value: 'English'},
+      {
+        ...createNode('1_3', 'option', 'Deutsch'),
+        value: 'de',
+        selected: true,
+      },
+    ]);
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 combobox "Language"
+  uid=1_2 option "English"
+  uid=1_3 option "Deutsch" selected value="de"
 `,
     );
   });
