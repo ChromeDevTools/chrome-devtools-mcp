@@ -445,9 +445,7 @@ export class BrowserManager {
     this.#browser = undefined;
     this.#browserMode = undefined;
     if (mode === 'launched') {
-      void candidate.close().catch(err => {
-        logger?.('Failed to close forgotten browser', err);
-      });
+      void this.#closeLaunchedBrowser(candidate);
     } else {
       void candidate.disconnect().catch(err => {
         logger?.('Failed to disconnect forgotten browser', err);
@@ -473,6 +471,27 @@ export class BrowserManager {
     this.#browserMode = undefined;
   }
 
+  async #closeLaunchedBrowser(browser: Browser): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        browser.close(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('Timed out closing browser')),
+            5_000,
+          );
+          timer.unref?.();
+        }),
+      ]);
+    } catch (err) {
+      logger?.('Failed to close browser', err);
+      browser.process()?.kill('SIGKILL');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async #closeBrowser(): Promise<void> {
     const browser = this.#browser;
     const mode = this.#browserMode;
@@ -482,9 +501,7 @@ export class BrowserManager {
       return;
     }
     if (mode === 'launched') {
-      await browser.close().catch(err => {
-        logger?.('Failed to close browser', err);
-      });
+      await this.#closeLaunchedBrowser(browser);
       return;
     }
     await browser.disconnect().catch(err => {

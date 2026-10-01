@@ -259,7 +259,13 @@ async function startSocketServer() {
   });
 }
 
+let isCleaningUp = false;
+
 async function cleanup(exitCode = 0) {
+  if (isCleaningUp) {
+    return;
+  }
+  isCleaningUp = true;
   console.log('Cleaning up daemon...');
 
   try {
@@ -268,8 +274,9 @@ async function cleanup(exitCode = 0) {
     logger?.('Error closing MCP server:', error);
   }
   if (server) {
+    const activeServer = server;
     await new Promise<void>(resolve => {
-      server!.close(() => resolve());
+      activeServer.close(() => resolve());
     });
   }
   if (!IS_WINDOWS) {
@@ -280,8 +287,10 @@ async function cleanup(exitCode = 0) {
     }
   }
   logger?.(`unlinking ${pidFilePath}`);
-  if (fs.existsSync(pidFilePath)) {
+  try {
     fs.unlinkSync(pidFilePath);
+  } catch {
+    // ignore errors
   }
   process.exit(exitCode);
 }
