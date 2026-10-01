@@ -130,6 +130,26 @@ describe('browser', () => {
       sinon.assert.notCalled(pptrBrowser.close);
     });
 
+    it('retries connecting to browser when puppeteer.connect fails transiently', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const connectStub = sinon
+        .stub(puppeteer, 'connect')
+        .onFirstCall()
+        .rejects(new Error('WebSocket connection failed'))
+        .onSecondCall()
+        .resolves(pptrBrowser);
+
+      const args = createMockParsedArguments({
+        browserUrl: 'http://127.0.0.1:9222',
+      });
+      const manager = new BrowserManager(args);
+
+      const browser = await manager.ensureBrowser();
+
+      assert.strictEqual(browser, pptrBrowser);
+      sinon.assert.calledTwice(connectStub);
+    });
+
     it('deduplicates concurrent ensureBrowser() calls while launch is in-flight', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const {promise, resolve} = Promise.withResolvers<Browser>();
