@@ -47,7 +47,7 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
-import type {ExtensionServiceWorker} from './types.js';
+import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
@@ -94,7 +94,9 @@ export class McpContext implements Context {
   // Auto-generated name counter for when no name is provided.
   #nextIsolatedContextId = 1;
 
-  #extensionServiceWorkers: ExtensionServiceWorker[] = [];
+  // Cached McpWorker per target, reused across snapshots (mirrors #mcpPages) so
+  // referential identity holds and workers can carry per-worker state later.
+  #workers = new Map<Target, McpWorker>();
 
   #mcpPages = new Map<Target, McpPage>();
   #selectedPage?: McpPage;
@@ -107,9 +109,6 @@ export class McpContext implements Context {
     null;
 
   #reconnectNotice = false;
-
-  #extensionServiceWorkerMap = new WeakMap<Target, string>();
-  #nextExtensionServiceWorkerId = 1;
 
   #traceResults: TraceResult[] = [];
 
@@ -145,7 +144,7 @@ export class McpContext implements Context {
 
   async #init() {
     await this.createPagesSnapshot();
-    const workers = await this.createExtensionServiceWorkersSnapshot();
+    const workers = this.createWorkersSnapshot();
 
     await this.#serviceWorkerConsoleCollector.init(workers);
     this.browser.on('targetcreated', this.#onTargetCreated);
@@ -163,6 +162,7 @@ export class McpContext implements Context {
     }
     this.#selectedPage?.dispose();
     this.#mcpPages.clear();
+    this.#workers.clear();
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
@@ -187,6 +187,7 @@ export class McpContext implements Context {
         mcpPage.dispose();
         this.#mcpPages.delete(target);
       }
+      this.#workers.delete(target);
     } catch (err) {
       this.logger?.('Error handling targetdestroyed', err);
     }
@@ -206,6 +207,10 @@ export class McpContext implements Context {
 
   static resetPageIdsForTesting(): void {
     nextPageId = 1;
+  }
+
+  static resetWorkerIdsForTesting(): void {
+    McpWorker.resetIdsForTesting();
   }
 
   roots(): Root[] {
@@ -487,38 +492,35 @@ export class McpContext implements Context {
   }
 
   /**
-   * Creates a snapshot of the extension service workers.
+   * Creates a snapshot of the tracked workers. Today this is limited to
+   * extension service workers; the McpWorker abstraction lets dedicated and
+   * shared workers join the same snapshot later without changing consumers.
    */
-  async createExtensionServiceWorkersSnapshot(): Promise<
-    ExtensionServiceWorker[]
-  > {
-    const allTargets = this.browser.targets();
-
-    const serviceWorkers = allTargets.filter(target => {
+  createWorkersSnapshot(): McpWorker[] {
+    const serviceWorkers = this.browser.targets().filter(target => {
       return (
         target.type() === 'service_worker' &&
         target.url().includes('chrome-extension://')
       );
     });
 
-    for (const serviceWorker of serviceWorkers) {
-      if (!this.#extensionServiceWorkerMap.has(serviceWorker)) {
-        this.#extensionServiceWorkerMap.set(
-          serviceWorker,
-          'sw-' + this.#nextExtensionServiceWorkerId++,
-        );
+    // Reuse the existing McpWorker for a target; only mint one (and an id) for
+    // targets seen for the first time.
+    for (const target of serviceWorkers) {
+      if (!this.#workers.has(target)) {
+        this.#workers.set(target, McpWorker.create('service_worker', target));
       }
     }
 
-    this.#extensionServiceWorkers = serviceWorkers.map(serviceWorker => {
-      return {
-        target: serviceWorker,
-        id: this.#extensionServiceWorkerMap.get(serviceWorker)!,
-        url: serviceWorker.url(),
-      };
-    });
+    // Prune workers whose target is gone (mirrors #mcpPages pruning).
+    const currentTargets = new Set(serviceWorkers);
+    for (const target of this.#workers.keys()) {
+      if (!currentTargets.has(target)) {
+        this.#workers.delete(target);
+      }
+    }
 
-    return this.#extensionServiceWorkers;
+    return Array.from(this.#workers.values());
   }
 
   getServiceWorkerConsoleData(
@@ -649,14 +651,12 @@ export class McpContext implements Context {
     return this.browser.targets().filter(target => this.#isPageTarget(target));
   }
 
-  getExtensionServiceWorkers(): ExtensionServiceWorker[] {
-    return this.#extensionServiceWorkers;
+  getWorkers(): McpWorker[] {
+    return Array.from(this.#workers.values());
   }
 
-  getExtensionServiceWorkerId(
-    extensionServiceWorker: ExtensionServiceWorker,
-  ): string | undefined {
-    return this.#extensionServiceWorkerMap.get(extensionServiceWorker.target);
+  getWorkerById(id: string): McpWorker | undefined {
+    return this.#workers.values().find(worker => worker.id === id);
   }
 
   async #writeFile(

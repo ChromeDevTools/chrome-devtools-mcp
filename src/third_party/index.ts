@@ -14,7 +14,7 @@ import {z as zod} from 'zod';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
-export type {Options as YargsOptions} from 'yargs';
+export type {Options as YargsOptions, InferredOptionTypes} from 'yargs';
 export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
@@ -54,6 +54,7 @@ export {
   Target,
   TargetType,
   TimeoutError,
+  WebWorker,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';

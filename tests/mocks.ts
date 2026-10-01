@@ -25,10 +25,14 @@
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {type ParsedArguments, parser} from '../src/config/mcp-options.js';
+import {
+  type ParsedArguments,
+  ConfigParser,
+} from '../src/config/ConfigParser.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {McpWorker, type WorkerType} from '../src/McpWorker.js';
 import type {
   AggregatedInfoWithId,
   DuplicateStringGroup,
@@ -48,6 +52,7 @@ import {
   Locator,
   Target,
   TargetType,
+  WebWorker,
 } from '../src/third_party/index.js';
 import type {
   Browser,
@@ -56,6 +61,7 @@ import type {
   Extension,
   Page,
   Protocol,
+  Realm,
   Result,
   RunnerResult,
 } from '../src/third_party/index.js';
@@ -277,7 +283,7 @@ export function createMockMcpPage(
     await pptrPage.close({runBeforeUnload: false});
   });
   page.url.callsFake(() => pptrPage.url());
-  page.getTitle.callsFake(async () => (await pptrPage.title()) ?? '');
+  page.getTitle.returns('');
   page.isClosed.callsFake(() => Boolean(pptrPage.isClosed()));
   page.waitForEventsAfterAction.callsFake(async action => {
     await action(new AbortController().signal);
@@ -316,6 +322,47 @@ export function createMockElementHandle(): {
   locator.setTimeout.returns(locator);
   handle.asLocator.returns(locator);
   return {handle, locator};
+}
+
+export function createMockTarget(): sinon.SinonStubbedInstance<MockTarget> {
+  return createMockPuppeteerTarget();
+}
+
+// Concrete subclass of Puppeteer's abstract WebWorker so sinon.createStubInstance
+// can stub it without an `as unknown as` cast, mirroring MockTarget above.
+class MockWebWorker extends WebWorker {
+  mainRealm(): Realm {
+    throw new Error('Not implemented');
+  }
+  get client(): CDPSession {
+    throw new Error('Not implemented');
+  }
+}
+
+export function createMockWebWorker(): sinon.SinonStubbedInstance<MockWebWorker> {
+  return sinon.createStubInstance(MockWebWorker);
+}
+
+export function createMockMcpWorker(
+  options: {
+    id?: string;
+    type?: WorkerType;
+    url?: string;
+    worker?: WebWorker;
+  } = {},
+): McpWorker {
+  // A real McpWorker over a stubbed Target, so `url`/`worker()` resolve through
+  // the same code paths as in production rather than through stubbed getters.
+  const target = createMockTarget();
+  target.url.returns(
+    options.url ?? 'chrome-extension://mock-extension-id/sw.js',
+  );
+  target.worker.resolves(options.worker ?? null);
+  return new McpWorker(
+    options.id ?? 'sw-1',
+    options.type ?? 'service_worker',
+    target,
+  );
 }
 
 export function createMockMcpContext(
@@ -1064,7 +1111,12 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = parser('0.0.0', ['node', 'main.js']).parseSync();
+  const defaultArgs = new ConfigParser(
+    '0.0.0',
+    ['node', 'main.js'],
+    process.env,
+    false,
+  ).parse();
   return {...defaultArgs, ...options};
 }
 

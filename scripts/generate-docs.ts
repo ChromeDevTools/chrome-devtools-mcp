@@ -8,21 +8,20 @@ import fs from 'node:fs';
 
 import type {Options as YargsOptions} from 'yargs';
 
-import {
-  mcpOptions,
-  type ParsedArguments,
-} from '../build/src/config/mcp-options.js';
+import {mcpOptions} from '../build/src/config/mcp-options.js';
 import {
   isCategoryOffByDefault,
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
+import type {ParsedArguments} from '../build/src/config/ConfigParser.js';
 import {zod} from '../build/src/third_party/index.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
+import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
 import type {
   DefinedPageTool,
   ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
-import {createTools} from '../build/src/tools/tools.js';
+import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
 const SLIM_OUTPUT_PATH = './docs/slim-tool-reference.md';
@@ -46,7 +45,7 @@ interface ToolWithAnnotations {
   annotations?: {
     title?: string;
     category?: ToolCategory;
-    conditions?: string[];
+    conditions?: Array<keyof ParsedArguments>;
   };
 }
 
@@ -86,7 +85,10 @@ function addCrossLinks(text: string, tools: ToolWithAnnotations[]): string {
 
 function hasOffByDefaultConditions(tool: ToolWithAnnotations): boolean {
   for (const condition of tool.annotations?.conditions || []) {
-    const option = mcpOptions[condition as keyof typeof mcpOptions];
+    if (condition === 'slim') {
+      continue;
+    }
+    const option = mcpOptions[condition];
     if (!option || !('default' in option) || option.default !== true) {
       return true;
     }
@@ -249,7 +251,10 @@ async function generateReference(
 
         const conditions = tool.annotations?.conditions || [];
         for (const condition of conditions) {
-          const option = mcpOptions[condition as keyof typeof mcpOptions];
+          if (condition === 'slim') {
+            continue;
+          }
+          const option = mcpOptions[condition];
           if (!option || !('default' in option) || option.default !== true) {
             requiredFlags.push(`--${condition}=true`);
           }
@@ -340,6 +345,11 @@ function getToolsAndCategories(
         return false;
       }
 
+      // Skipping tools behind internal flags.
+      if (requiresHiddenFlag(tool)) {
+        return false;
+      }
+
       // Skipping internal interop tools not meant for public documentation
       const skipTools = ['get_tab_id'];
       if (skipTools.includes(tool.name)) {
@@ -401,12 +411,12 @@ function getToolsAndCategories(
 async function generateToolDocumentation(): Promise<void> {
   try {
     console.log('Generating tool documentation from definitions...');
+    // Returns both the regular and the slim tools.
+    const tools = createTools({pageIdRouting: true} as ParsedArguments);
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(
-          createTools({slim: false, pageIdRouting: true} as ParsedArguments),
-        );
+        getToolsAndCategories(tools.filter(tool => !isSlimTool(tool)));
       await generateReference(
         'Chrome DevTools MCP Tool Reference',
         OUTPUT_PATH,
@@ -418,7 +428,7 @@ async function generateToolDocumentation(): Promise<void> {
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
-        getToolsAndCategories(createTools({slim: true} as ParsedArguments));
+        getToolsAndCategories(tools.filter(tool => isSlimTool(tool)));
       await generateReference(
         'Chrome DevTools MCP Slim Tool Reference',
         SLIM_OUTPUT_PATH,

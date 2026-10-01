@@ -328,12 +328,14 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.asPage);
       assert.throws(() => mcpPage.pptrPage, /not initialized/);
       assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
-      assert.strictEqual(await mcpPage.getTitle(), 'Target Title');
+      assert.strictEqual(mcpPage.getTitle(), 'Target Title');
 
       await mcpPage.init();
 
       sinon.assert.calledOnce(target.page);
       assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      assert.strictEqual(mcpPage.getTitle(), 'Target Title');
+      sinon.assert.notCalled(pptrPage.title);
     });
 
     it('falls back to target.asPage() when target.page() returns null', async () => {
@@ -899,6 +901,117 @@ describe('McpPage', () => {
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
       sinon.assert.calledTwice(devtoolsPage.evaluate);
+    });
+  });
+
+  describe('resolveBackendNodeId()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    function createSnapshotWithNodes(
+      nodes: Array<{id: string; backendNodeId?: number}>,
+      verbose = false,
+    ): TextSnapshot {
+      const idToNode = new Map<string, TextSnapshotNode>();
+      const children: TextSnapshotNode[] = [];
+      for (const n of nodes) {
+        const node: TextSnapshotNode = {
+          id: n.id,
+          role: 'generic',
+          backendNodeId: n.backendNodeId,
+          children: [],
+          elementHandle: async () => null,
+        };
+        idToNode.set(n.id, node);
+        children.push(node);
+      }
+      const rootNode: TextSnapshotNode = {
+        id: '1_0',
+        role: 'root',
+        children,
+        elementHandle: async () => null,
+      };
+      return new TextSnapshot({
+        root: rootNode,
+        idToNode,
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose,
+      });
+    }
+
+    it('returns uid from existing textSnapshot without regenerating', async () => {
+      const {mcpPage} = await createMcpPage();
+      mcpPage.textSnapshot = createSnapshotWithNodes([
+        {id: '1_1', backendNodeId: 42},
+      ]);
+      const createStub = sinon.stub(TextSnapshot, 'create');
+
+      const uid = await mcpPage.resolveBackendNodeId(42);
+
+      assert.strictEqual(uid, '1_1');
+      sinon.assert.notCalled(createStub);
+    });
+
+    it('creates textSnapshot when textSnapshot is null', async () => {
+      const {mcpPage} = await createMcpPage();
+      const snapshot = createSnapshotWithNodes([
+        {id: '1_1', backendNodeId: 42},
+      ]);
+      const createStub = sinon.stub(TextSnapshot, 'create').resolves(snapshot);
+
+      const uid = await mcpPage.resolveBackendNodeId(42);
+
+      assert.strictEqual(uid, '1_1');
+      sinon.assert.calledOnceWithExactly(createStub, mcpPage, {verbose: false});
+      assert.strictEqual(mcpPage.textSnapshot, snapshot);
+    });
+
+    it('regenerates textSnapshot when backendNodeId is not in existing snapshot', async () => {
+      const {mcpPage} = await createMcpPage();
+      mcpPage.textSnapshot = createSnapshotWithNodes([
+        {id: '1_1', backendNodeId: 10},
+      ]);
+      const updatedSnapshot = createSnapshotWithNodes([
+        {id: '2_1', backendNodeId: 42},
+      ]);
+      const createStub = sinon
+        .stub(TextSnapshot, 'create')
+        .resolves(updatedSnapshot);
+
+      const uid = await mcpPage.resolveBackendNodeId(42);
+
+      assert.strictEqual(uid, '2_1');
+      sinon.assert.calledOnceWithExactly(createStub, mcpPage, {verbose: false});
+      assert.strictEqual(mcpPage.textSnapshot, updatedSnapshot);
+    });
+
+    it('falls back to verbose textSnapshot when backendNodeId is not in non-verbose snapshot', async () => {
+      const {mcpPage} = await createMcpPage();
+      const nonVerboseSnapshot = createSnapshotWithNodes(
+        [{id: '1_1', backendNodeId: 10}],
+        false,
+      );
+      const verboseSnapshot = createSnapshotWithNodes(
+        [{id: '2_5', backendNodeId: 30}],
+        true,
+      );
+      const createStub = sinon.stub(TextSnapshot, 'create');
+      createStub.onFirstCall().resolves(nonVerboseSnapshot);
+      createStub.onSecondCall().resolves(verboseSnapshot);
+
+      const uid = await mcpPage.resolveBackendNodeId(30);
+
+      assert.strictEqual(uid, '2_5');
+      sinon.assert.calledTwice(createStub);
+      sinon.assert.calledWithExactly(createStub.firstCall, mcpPage, {
+        verbose: false,
+      });
+      sinon.assert.calledWithExactly(createStub.secondCall, mcpPage, {
+        verbose: true,
+      });
+      assert.strictEqual(mcpPage.textSnapshot, verboseSnapshot);
     });
   });
 

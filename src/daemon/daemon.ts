@@ -15,7 +15,9 @@ import path from 'node:path';
 import process from 'node:process';
 
 import {BrowserManager} from '../BrowserManager.js';
-import {mcpOptions, parseArguments} from '../config/mcp-options.js';
+import {mcpOptions} from '../config/mcp-options.js';
+
+import {ConfigParser} from '../config/ConfigParser.js';
 import {McpServer} from '../index.js';
 import {ClearcutLogger} from '../telemetry/ClearcutLogger.js';
 import {computeFlagUsage} from '../telemetry/flagUtils.js';
@@ -50,9 +52,17 @@ try {
   if (os.platform() !== 'win32') {
     // POSIX specific checks
     try {
-      const stats = fs.statSync(pidDir);
+      const stats = fs.lstatSync(pidDir);
 
-      // 1. Check Ownership: Ensure the directory is owned by the current user.
+      // 1. Reject symlinked runtime directories before checking ownership.
+      if (stats.isSymbolicLink()) {
+        console.error(
+          `[MCP Daemon] Critical error: PID directory ${pidDir} must not be a symbolic link. Possible tampering.`,
+        );
+        process.exit(1);
+      }
+
+      // 2. Check Ownership: Ensure the directory is owned by the current user.
       if (stats.uid !== currentUserUid) {
         console.error(
           `[MCP Daemon] Critical error: PID directory ${pidDir} is not owned by the current user (Expected: ${currentUserUid}, Found: ${stats.uid}). Possible tampering.`,
@@ -60,7 +70,7 @@ try {
         process.exit(1);
       }
 
-      // 2. Check Permissions: Ensure the directory is not group or world-writable.
+      // 3. Check Permissions: Ensure the directory is not group or world-writable.
       // Mode is a number, e.g., 0o700. We check if bits for group/world write are set.
       const mode = stats.mode;
       if (mode & constants.S_IWGRP || mode & constants.S_IWOTH) {
@@ -130,7 +140,8 @@ let server: Server | null = null;
 
 async function setupMCPServer() {
   logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-  const args = parseArguments(VERSION);
+  const configParser = new ConfigParser(VERSION);
+  const args = configParser.parse();
   const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
   const browserManager = new BrowserManager(args, {
     logFile,
@@ -248,7 +259,13 @@ async function startSocketServer() {
   });
 }
 
+let isCleaningUp = false;
+
 async function cleanup(exitCode = 0) {
+  if (isCleaningUp) {
+    return;
+  }
+  isCleaningUp = true;
   console.log('Cleaning up daemon...');
 
   try {
@@ -257,8 +274,9 @@ async function cleanup(exitCode = 0) {
     logger?.('Error closing MCP server:', error);
   }
   if (server) {
+    const activeServer = server;
     await new Promise<void>(resolve => {
-      server!.close(() => resolve());
+      activeServer.close(() => resolve());
     });
   }
   if (!IS_WINDOWS) {
@@ -269,8 +287,10 @@ async function cleanup(exitCode = 0) {
     }
   }
   logger?.(`unlinking ${pidFilePath}`);
-  if (fs.existsSync(pidFilePath)) {
+  try {
     fs.unlinkSync(pidFilePath);
+  } catch {
+    // ignore errors
   }
   process.exit(exitCode);
 }

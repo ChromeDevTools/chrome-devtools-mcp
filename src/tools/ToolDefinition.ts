@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -37,9 +37,9 @@ import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
-  ExtensionServiceWorker,
   CD4ACommentThread,
 } from '../types.js';
+import type {McpWorker} from '../McpWorker.js';
 import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
@@ -84,7 +84,12 @@ export interface BaseToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
-    conditions?: string[];
+    /**
+     * If `'slim'` is included, the tool is only available with `--slim`. Tools
+     * without `'slim'` are only available without `--slim`. Slim tools may
+     * reuse the names of other tools, see {@link isAvailableInMode}.
+     */
+    conditions?: Array<keyof ParsedArguments>;
   };
   schema: Schema;
   blockedByDialog: boolean;
@@ -276,6 +281,7 @@ export type Context = Readonly<{
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}>;
+  loadResource(path: string): Promise<string>;
 
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
@@ -287,10 +293,8 @@ export type Context = Readonly<{
   listExtensions(): Promise<Map<string, Extension>>;
   getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
-  getExtensionServiceWorkers(): ExtensionServiceWorker[];
-  getExtensionServiceWorkerId(
-    extensionServiceWorker: ExtensionServiceWorker,
-  ): string | undefined;
+  getWorkers(): McpWorker[];
+  getWorkerById(id: string): McpWorker | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
@@ -456,7 +460,7 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
     return {
       ...tool,
       schema: {
-        ...(args.pageIdRouting && !args.slim ? pageIdSchema : {}),
+        ...(args.pageIdRouting && !isSlimTool(tool) ? pageIdSchema : {}),
         ...tool.schema,
       },
       pageScoped: true,
@@ -550,4 +554,23 @@ export function geolocationTransform(arg: string | undefined) {
     latitude,
     longitude,
   };
+}
+
+export function isSlimTool(
+  tool: Pick<BaseToolDefinition, 'annotations'>,
+): boolean {
+  return Boolean(tool.annotations.conditions?.includes('slim'));
+}
+
+/**
+ * Slim mode replaces the regular tools with the slim tools. Only the tools of
+ * the current mode are registered, so a slim tool may share its name with a
+ * regular tool. `--slim` requires a restart, so the mode never changes while
+ * the server is running.
+ */
+export function isAvailableInMode(
+  tool: Pick<BaseToolDefinition, 'annotations'>,
+  serverArgs: Pick<ParsedArguments, 'slim'>,
+): boolean {
+  return isSlimTool(tool) === Boolean(serverArgs.slim);
 }
