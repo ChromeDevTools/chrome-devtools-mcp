@@ -31,6 +31,7 @@ import {VERSION} from '../version.js';
 
 import {
   buildCommand,
+  expandShorthandArgs,
   getCommandArgSpec,
   shieldLiteralArgs,
 } from '../config/cli-commands.js';
@@ -67,7 +68,7 @@ async function start(
 }
 
 const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
-  hideBin(process.argv),
+  expandShorthandArgs(hideBin(process.argv), commands),
   commandName => {
     const commandDef = commands[commandName];
     return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
@@ -123,6 +124,9 @@ const y = yargs(cliArgs)
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
+        );
+        console.error(
+          '4. Element uids can be passed as @<uid> and URLs without --url, e.g. chrome-devtools take_screenshot 1 @1_5 or chrome-devtools navigate_page 1 https://example.com',
         );
         console.error(
           'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',
