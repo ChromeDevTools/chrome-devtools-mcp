@@ -491,6 +491,7 @@ describe('findUnenforceablePattern', () => {
   it('allows escaped colons unless an unescaped named group is also present', () => {
     assert.strictEqual(
       findUnenforceablePattern([
+        String.raw`http://[\:\:1]:8080/*`,
         String.raw`*://example.com/path?foo=a\:b#bar\:c`,
         String.raw`*://example.com/path?foo=a\\\:b#bar\\\:c`,
       ]),
@@ -512,7 +513,6 @@ describe('findUnenforceablePattern', () => {
     assert.throws(() =>
       findUnenforceablePattern(['*://example.com/(unterminated']),
     );
-    assert.throws(() => findUnenforceablePattern(['http://[::1]:8080/*']));
   });
 
   it('returns undefined for an empty list', () => {

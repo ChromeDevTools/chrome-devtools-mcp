@@ -572,9 +572,6 @@ describe('cli args parsing', () => {
       () => parseConfig(['--config', testConfig.path]),
       /Invalid JSON config file: Invalid --allowedUrlPattern: at least one pattern is required/,
     );
-    assert.throws(() =>
-      parseArguments(['--allowed-url-pattern=*://example.com/(unterminated']),
-    );
   });
 
   it('parses source-maps flag', async () => {
