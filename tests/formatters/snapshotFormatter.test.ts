@@ -14,40 +14,89 @@ import type {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../../src/types.js';
 
 describe('snapshotFormatter', () => {
-  it('omits the StaticText role in text output', () => {
-    const node: TextSnapshotNode = {
-      id: '1_1',
-      role: 'link',
-      name: 'Privacy Policy',
-      children: [
-        {
-          id: '1_2',
-          role: 'StaticText',
-          name: 'Privacy Policy',
-          children: [],
-          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
-            return null;
-          },
-        },
-      ],
+  function createNode(
+    id: string,
+    role: string,
+    name: string,
+    children: TextSnapshotNode[] = [],
+  ): TextSnapshotNode {
+    return {
+      id,
+      role,
+      name,
+      children,
       elementHandle: async (): Promise<ElementHandle<Element> | null> => {
         return null;
       },
     };
+  }
+
+  it('omits the StaticText role in text output', () => {
+    const node = createNode('1_1', 'link', 'Privacy', [
+      createNode('1_2', 'StaticText', 'Privacy Policy'),
+    ]);
 
     const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
     assert.strictEqual(
       formatter.toString(),
-      `uid=1_1 link "Privacy Policy"
+      `uid=1_1 link "Privacy"
   uid=1_2 "Privacy Policy"
 `,
     );
     assert.deepStrictEqual(formatter.toJSON(), {
       id: '1_1',
       role: 'link',
-      name: 'Privacy Policy',
+      name: 'Privacy',
       children: [{id: '1_2', role: 'StaticText', name: 'Privacy Policy'}],
     });
+  });
+
+  it('skips the only StaticText child duplicating the parent name', () => {
+    const node = createNode('1_1', 'link', 'Privacy Policy', [
+      createNode('1_2', 'StaticText', 'Privacy Policy'),
+    ]);
+
+    const formatter = new SnapshotFormatter({
+      root: node,
+      verbose: false,
+    } as TextSnapshot);
+    assert.strictEqual(formatter.toString(), `uid=1_1 link "Privacy Policy"\n`);
+  });
+
+  it('keeps the duplicate StaticText child in verbose mode', () => {
+    const node = createNode('1_1', 'link', 'Privacy Policy', [
+      createNode('1_2', 'StaticText', 'Privacy Policy'),
+    ]);
+
+    const formatter = new SnapshotFormatter({
+      root: node,
+      verbose: true,
+    } as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 link "Privacy Policy"
+  uid=1_2 "Privacy Policy"
+`,
+    );
+  });
+
+  it('keeps the duplicate StaticText child if it has siblings', () => {
+    const node = createNode('1_1', 'link', 'Privacy Policy', [
+      createNode('1_2', 'StaticText', 'Privacy Policy'),
+      createNode('1_3', 'image', 'icon'),
+    ]);
+
+    const formatter = new SnapshotFormatter({
+      root: node,
+      verbose: false,
+    } as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 link "Privacy Policy"
+  uid=1_2 "Privacy Policy"
+  uid=1_3 image "icon"
+`,
+    );
   });
 
   it('formats a snapshot with value properties', () => {

@@ -49,9 +49,27 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     chunks.push(line);
 
     for (const child of node.children) {
+      if (this.#isRedundantStaticText(node, child)) {
+        continue;
+      }
       chunks.push(this.#formatNode(child, depth + 1));
     }
     return chunks.join('');
+  }
+
+  #isRedundantStaticText(
+    parent: TextSnapshotNode,
+    child: TextSnapshotNode,
+  ): boolean {
+    return (
+      !this.#snapshot.verbose &&
+      parent.children.length === 1 &&
+      child.role === 'StaticText' &&
+      child.children.length === 0 &&
+      Boolean(parent.name) &&
+      child.name === parent.name &&
+      child.id !== this.#snapshot.selectedElementUid
+    );
   }
 
   #nodeToJSON(node: TextSnapshotNode): object {
