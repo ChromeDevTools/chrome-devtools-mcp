@@ -746,6 +746,82 @@ describe('thirdPartyDeveloperTools', () => {
       );
     });
 
+    it('processToolResult handles symbols, bigints, circular arrays, shared references, and null-prototype objects', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const page = await context.newPage();
+          response.setPage(page);
+
+          page.thirdPartyDeveloperTools = [
+            {
+              name: 'test-group',
+              description: 'test description',
+              tools: [
+                {
+                  name: 'test-tool',
+                  description: 'test tool description',
+                  inputSchema: {},
+                },
+              ],
+            },
+          ];
+
+          await page.pptrPage.evaluate(() => {
+            window.__dtmcp = {
+              executeTool: async () => {
+                const circularArr: unknown[] = ['item'];
+                circularArr.push(circularArr);
+                const sharedObj = {sharedKey: 'sharedVal'};
+                const nullProtoObj: Record<string, unknown> =
+                  Object.create(null);
+                nullProtoObj.key = 'val';
+                const AnonymousClass = (() => class {})();
+                return {
+                  sym: Symbol('test-sym'),
+                  big: BigInt(42),
+                  circularArr,
+                  shared1: sharedObj,
+                  shared2: sharedObj,
+                  nullProtoObj,
+                  anonInstance: new AnonymousClass(),
+                };
+              },
+            };
+          });
+
+          await executeThirdPartyDeveloperTool(args).handler(
+            {
+              params: {
+                toolName: 'test-tool',
+                params: JSON.stringify({}),
+              },
+              page,
+            },
+            response,
+            context,
+          );
+          assert.strictEqual(
+            response.responseLines[0],
+            JSON.stringify(
+              {
+                sym: 'Symbol(test-sym)',
+                big: '42n',
+                circularArr: ['item', '<Circular reference>'],
+                shared1: {sharedKey: 'sharedVal'},
+                shared2: {sharedKey: 'sharedVal'},
+                nullProtoObj: {key: 'val'},
+                anonInstance: '<Object instance>',
+              },
+              null,
+              2,
+            ),
+          );
+        },
+        undefined,
+        {categoryExperimentalThirdParty: true},
+      );
+    });
+
     it('stashDOMElement stashes elements and returns UID', async () => {
       await withMcpContext(
         async (response, context, args) => {

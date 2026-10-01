@@ -16,7 +16,11 @@ import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
-import {createMockPuppeteerPage, createMockPuppeteerTarget} from './mocks.js';
+import {
+  createMockMcpResponse,
+  createMockPuppeteerPage,
+  createMockPuppeteerTarget,
+} from './mocks.js';
 import {serverHooks} from './server.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
@@ -1096,6 +1100,39 @@ describe('McpPage', () => {
           assert.ok(selectors.includes('.frame-btn'));
         }
       });
+    });
+  });
+
+  describe('executeThirdPartyDeveloperTool()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('throws a descriptive error and cleans up stashedElements when evaluate resolves to undefined', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const response = createMockMcpResponse();
+      pptrPage.evaluate.onFirstCall().resolves(undefined);
+      pptrPage.evaluate.onSecondCall().resolves();
+
+      await assert.rejects(
+        () => mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response),
+        /Failed to serialize result of tool my-tool: object reference chain is too long or could not be returned by value/,
+      );
+
+      sinon.assert.calledTwice(pptrPage.evaluate);
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
+
+    it('does not call appendResponseLine when the tool returns undefined', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const response = createMockMcpResponse();
+      pptrPage.evaluate.onFirstCall().resolves({result: undefined, stashed: 0});
+      pptrPage.evaluate.onSecondCall().resolves();
+
+      await mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response);
+
+      sinon.assert.calledTwice(pptrPage.evaluate);
+      sinon.assert.notCalled(response.appendResponseLine);
     });
   });
 });

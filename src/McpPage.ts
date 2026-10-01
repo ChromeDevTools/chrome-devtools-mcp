@@ -631,7 +631,11 @@ export class McpPage implements ContextPage {
     }
 
     const result = await this.pptrPage.evaluate(
-      async (name, args, ...elements) => {
+      async (
+        name,
+        args,
+        ...elements
+      ): Promise<{result?: string; stashed: number} | undefined> => {
         // Replace the UIDs with DOM elements.
         for (const [key, value] of Object.entries(args)) {
           if (
@@ -650,29 +654,23 @@ export class McpPage implements ContextPage {
 
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
+        const stashedElements: Element[] = [];
+
         const stashDOMElement = (el: Element) => {
-          if (!window.__dtmcp) {
-            window.__dtmcp = {};
-          }
-          if (window.__dtmcp.stashedElements === undefined) {
-            window.__dtmcp.stashedElements = [];
-          }
-          window.__dtmcp.stashedElements.push(el);
+          stashedElements.push(el);
           return {
-            stashedId: `stashed-${window.__dtmcp.stashedElements.length - 1}`,
+            stashedId: `stashed-${stashedElements.length - 1}`,
           };
         };
 
-        const ancestors: unknown[] = [];
+        const ancestors = new Set<unknown>();
         // Recursively walks the tool result:
         // - Replaces DOM elements with an ID and stashes the DOM element on the window object
         // - Replaces non-plain objects with a string representation of the object
         // - Replaces circular references with the string '<Circular reference>'
         // - Replaces functions with the string '<Function object>'
-        const processToolResult = (
-          data: unknown,
-          parentEl?: unknown,
-        ): unknown => {
+        // - Replaces symbols and bigints with their string representation
+        const processToolResult = (data: unknown): unknown => {
           // 1. Handle DOM Elements
           if (data instanceof Element) {
             return stashDOMElement(data);
@@ -680,31 +678,38 @@ export class McpPage implements ContextPage {
 
           // 2. Handle Arrays
           if (Array.isArray(data)) {
-            return data.map((item: unknown) =>
-              processToolResult(item, parentEl),
-            );
+            if (ancestors.has(data)) {
+              return '<Circular reference>';
+            }
+            ancestors.add(data);
+            try {
+              return data.map((item: unknown) => processToolResult(item));
+            } finally {
+              ancestors.delete(data);
+            }
           }
 
           // 3. Handle Objects
           if (data !== null && typeof data === 'object') {
-            while (ancestors.length > 0 && ancestors.at(-1) !== parentEl) {
-              ancestors.pop();
+            const proto = Object.getPrototypeOf(data);
+            // If not a plain object, return a string representation of the object
+            if (proto !== null && proto !== Object.prototype) {
+              return `<${data.constructor?.name || 'Object'} instance>`;
             }
-            if (ancestors.includes(data)) {
+
+            if (ancestors.has(data)) {
               return '<Circular reference>';
             }
-            ancestors.push(data);
-
-            // If not a plain object, return a string representation of the object
-            if (Object.getPrototypeOf(data) !== Object.prototype) {
-              return `<${data.constructor.name} instance>`;
+            ancestors.add(data);
+            try {
+              const processedObj: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(data)) {
+                processedObj[key] = processToolResult(value);
+              }
+              return processedObj;
+            } finally {
+              ancestors.delete(data);
             }
-
-            const processedObj: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(data)) {
-              processedObj[key] = processToolResult(value, data);
-            }
-            return processedObj;
           }
 
           // 4. Handle Functions
@@ -712,13 +717,27 @@ export class McpPage implements ContextPage {
             return '<Function object>';
           }
 
-          // 5. Return primitives (strings, numbers, booleans) as-is
+          // 5. Handle Symbols and BigInts (not JSON/CDP-by-value serializable)
+          if (typeof data === 'symbol') {
+            return data.toString();
+          }
+          if (typeof data === 'bigint') {
+            return `${data.toString()}n`;
+          }
+
+          // 6. Return primitives (strings, numbers, booleans, undefined, null) as-is
           return data;
         };
 
+        const processed = processToolResult(toolResult);
+        const serialized =
+          processed !== undefined ? JSON.stringify(processed) : undefined;
+        if (stashedElements.length > 0) {
+          window.__dtmcp.stashedElements = stashedElements;
+        }
         return {
-          result: processToolResult(toolResult),
-          stashed: window.__dtmcp?.stashedElements?.length ?? 0,
+          result: serialized,
+          stashed: stashedElements.length,
         };
       },
       toolName,
@@ -727,22 +746,30 @@ export class McpPage implements ContextPage {
     );
 
     const elementHandles: ElementHandle[] = [];
-    for (let i = 0; i < (result.stashed ?? 0); i++) {
-      const elementHandle = await this.pptrPage.evaluateHandle(index => {
-        const el = window.__dtmcp?.stashedElements?.[index];
-        if (!el) {
-          throw new Error(`Stashed element at index ${index} not found`);
-        }
-        return el;
-      }, i);
-      elementHandles.push(elementHandle);
-    }
-
-    await this.pptrPage.evaluate(() => {
-      if (window.__dtmcp) {
-        window.__dtmcp.stashedElements = undefined;
+    try {
+      if (!result) {
+        throw new Error(
+          `Failed to serialize result of tool ${toolName}: object reference chain is too long or could not be returned by value.`,
+        );
       }
-    });
+
+      for (let i = 0; i < result.stashed; i++) {
+        const elementHandle = await this.pptrPage.evaluateHandle(index => {
+          const el = window.__dtmcp?.stashedElements?.[index];
+          if (!el) {
+            throw new Error(`Stashed element at index ${index} not found`);
+          }
+          return el;
+        }, i);
+        elementHandles.push(elementHandle);
+      }
+    } finally {
+      await this.pptrPage.evaluate(() => {
+        if (window.__dtmcp) {
+          window.__dtmcp.stashedElements = undefined;
+        }
+      });
+    }
 
     if (elementHandles.length) {
       using stack = new DisposableStack();
@@ -799,8 +826,11 @@ export class McpPage implements ContextPage {
       return node;
     };
 
-    const resultWithUids = recursivelyReplaceStashedElements(result.result);
-    response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
+    if (result.result !== undefined) {
+      const parsedResult: unknown = JSON.parse(result.result);
+      const resultWithUids = recursivelyReplaceStashedElements(parsedResult);
+      response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
+    }
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
