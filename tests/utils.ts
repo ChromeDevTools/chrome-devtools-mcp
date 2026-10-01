@@ -148,6 +148,8 @@ export async function withBrowser(
       const isRetryable =
         error instanceof Error &&
         (error.message === 'withBrowser timeout exceeded' ||
+          error.message.includes('Navigation timeout') ||
+          error.message.includes("Couldn't fetch install info") ||
           error.message.includes('closed') ||
           error.message.includes('crash') ||
           error.message.includes('hang'));
