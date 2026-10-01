@@ -30,7 +30,11 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
+import {
+  buildCommand,
+  expandShorthandArgs,
+  isOptionalPositionalArg,
+} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
 
@@ -57,7 +61,7 @@ async function start(args: string[], sessionId: string, stopExisting = false) {
   logDisclaimers(parsedArgs);
 }
 
-const y = yargs(hideBin(process.argv))
+const y = yargs(expandShorthandArgs(hideBin(process.argv), commands))
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
@@ -106,6 +110,9 @@ const y = yargs(hideBin(process.argv))
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
+        );
+        console.error(
+          '4. Element uids can be passed as @<uid> and URLs without --url, e.g. chrome-devtools take_screenshot 1 @1_5 or chrome-devtools navigate_page 1 https://example.com',
         );
         console.error(
           'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',

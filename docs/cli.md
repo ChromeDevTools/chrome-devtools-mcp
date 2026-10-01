@@ -55,6 +55,18 @@ chrome-devtools <tool> [arguments] [flags]
 - **Required Arguments**: Passed as positional arguments. Page-scoped tools require `<pageId>` as their first positional argument.
 - **Optional Arguments**: Passed as flags (e.g., `--filePath`, `--fullPage`).
 
+### Shorthands
+
+- **Element uids** can be prefixed with `@`. This works for required uid arguments, and an extra `@<uid>` argument fills an optional uid parameter (e.g. `--uid`, or the element `--args` of `evaluate_script`).
+- **URLs** can be passed without `--url` for commands with an optional `url` parameter. Only absolute URLs (`http`, `https`, `file`, `chrome`, `chrome-extension`, `about`, `data`) are recognized.
+
+```sh
+chrome-devtools click 1 @1_5                  # same as: click 1 1_5
+chrome-devtools take_screenshot 1 @1_5        # same as: take_screenshot 1 --uid 1_5
+chrome-devtools evaluate_script "(el) => el.innerText" --pageId 1 @1_5
+chrome-devtools navigate_page 1 https://web.dev
+```
+
 ### Examples
 
 **New Page and Navigation:**
