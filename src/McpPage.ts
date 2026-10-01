@@ -612,11 +612,7 @@ export class McpPage implements ContextPage {
     }
 
     const result = await this.pptrPage.evaluate(
-      async (
-        name,
-        args,
-        ...elements
-      ): Promise<{result?: string; stashed: number} | undefined> => {
+      async (name, args, ...elements) => {
         // Replace the UIDs with DOM elements.
         for (const [key, value] of Object.entries(args)) {
           if (
@@ -727,29 +723,29 @@ export class McpPage implements ContextPage {
     );
 
     const elementHandles: ElementHandle[] = [];
-    try {
-      if (!result) {
-        throw new Error(
-          `Failed to serialize result of tool ${toolName}: object reference chain is too long or could not be returned by value.`,
-        );
-      }
-
-      for (let i = 0; i < result.stashed; i++) {
-        const elementHandle = await this.pptrPage.evaluateHandle(index => {
-          const el = window.__dtmcp?.stashedElements?.[index];
-          if (!el) {
-            throw new Error(`Stashed element at index ${index} not found`);
-          }
-          return el;
-        }, i);
-        elementHandles.push(elementHandle);
-      }
-    } finally {
-      await this.pptrPage.evaluate(() => {
-        if (window.__dtmcp) {
-          window.__dtmcp.stashedElements = undefined;
+    if (result.stashed > 0) {
+      try {
+        for (let i = 0; i < result.stashed; i++) {
+          const elementHandle = await this.pptrPage.evaluateHandle(index => {
+            const el = window.__dtmcp?.stashedElements?.[index];
+            if (!el) {
+              throw new Error(`Stashed element at index ${index} not found`);
+            }
+            return el;
+          }, i);
+          elementHandles.push(elementHandle);
         }
-      });
+      } finally {
+        try {
+          await this.pptrPage.evaluate(() => {
+            if (window.__dtmcp) {
+              window.__dtmcp.stashedElements = undefined;
+            }
+          });
+        } catch (error) {
+          logger?.('Failed to clean up stashed elements', error);
+        }
+      }
     }
 
     if (elementHandles.length) {
@@ -811,6 +807,8 @@ export class McpPage implements ContextPage {
       const parsedResult: unknown = JSON.parse(result.result);
       const resultWithUids = recursivelyReplaceStashedElements(parsedResult);
       response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
+    } else {
+      response.appendResponseLine('Tool returned no result.');
     }
   }
 

@@ -1221,28 +1221,35 @@ describe('McpPage', () => {
       sinon.restore();
     });
 
-    it('throws a descriptive error and cleans up stashedElements when evaluate resolves to undefined', async () => {
+    it('appends "Tool returned no result." and skips cleanup evaluate when the tool returns undefined and stashed is 0', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const response = createMockMcpResponse();
-      pptrPage.evaluate.onFirstCall().resolves(undefined);
-      pptrPage.evaluate.onSecondCall().resolves();
+      pptrPage.evaluate.resolves({result: undefined, stashed: 0});
+
+      await mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response);
+
+      sinon.assert.calledOnce(pptrPage.evaluate);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Tool returned no result.',
+      );
+    });
+
+    it('preserves the original evaluateHandle error when stashedElements cleanup fails', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const response = createMockMcpResponse();
+      pptrPage.evaluate
+        .onFirstCall()
+        .resolves({result: '{"stashedId":"stashed-0"}', stashed: 1});
+      pptrPage.evaluateHandle.rejects(
+        new Error('Execution context was destroyed'),
+      );
+      pptrPage.evaluate.onSecondCall().rejects(new Error('Target closed'));
 
       await assert.rejects(
         () => mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response),
-        /Failed to serialize result of tool my-tool: object reference chain is too long or could not be returned by value/,
+        /Execution context was destroyed/,
       );
-
-      sinon.assert.calledTwice(pptrPage.evaluate);
-      sinon.assert.notCalled(response.appendResponseLine);
-    });
-
-    it('does not call appendResponseLine when the tool returns undefined', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      const response = createMockMcpResponse();
-      pptrPage.evaluate.onFirstCall().resolves({result: undefined, stashed: 0});
-      pptrPage.evaluate.onSecondCall().resolves();
-
-      await mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response);
 
       sinon.assert.calledTwice(pptrPage.evaluate);
       sinon.assert.notCalled(response.appendResponseLine);
