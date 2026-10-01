@@ -14,6 +14,42 @@ import type {TextSnapshot} from '../../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../../src/types.js';
 
 describe('snapshotFormatter', () => {
+  it('omits the StaticText role in text output', () => {
+    const node: TextSnapshotNode = {
+      id: '1_1',
+      role: 'link',
+      name: 'Privacy Policy',
+      children: [
+        {
+          id: '1_2',
+          role: 'StaticText',
+          name: 'Privacy Policy',
+          children: [],
+          elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+            return null;
+          },
+        },
+      ],
+      elementHandle: async (): Promise<ElementHandle<Element> | null> => {
+        return null;
+      },
+    };
+
+    const formatter = new SnapshotFormatter({root: node} as TextSnapshot);
+    assert.strictEqual(
+      formatter.toString(),
+      `uid=1_1 link "Privacy Policy"
+  uid=1_2 "Privacy Policy"
+`,
+    );
+    assert.deepStrictEqual(formatter.toJSON(), {
+      id: '1_1',
+      role: 'link',
+      name: 'Privacy Policy',
+      children: [{id: '1_2', role: 'StaticText', name: 'Privacy Policy'}],
+    });
+  });
+
   it('formats a snapshot with value properties', () => {
     const node: TextSnapshotNode = {
       id: '1_1',

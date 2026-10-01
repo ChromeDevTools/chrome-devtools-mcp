@@ -67,7 +67,10 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   #getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
     const attributes = [`uid=${serializedAXNodeRoot.id}`];
 
-    if (serializedAXNodeRoot.role) {
+    if (
+      serializedAXNodeRoot.role &&
+      serializedAXNodeRoot.role !== 'StaticText'
+    ) {
       attributes.push(
         serializedAXNodeRoot.role === 'none'
           ? 'ignored'
