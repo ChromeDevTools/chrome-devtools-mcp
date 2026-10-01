@@ -21,6 +21,7 @@ import type {
 } from './types.js';
 import {
   DAEMON_SCRIPT_PATH,
+  getDaemonPid,
   getSocketPath,
   getPidFilePath,
   isDaemonRunning,
@@ -30,54 +31,49 @@ const FILE_TIMEOUT = 10_000;
 const READY_CHECK_INTERVAL = 100;
 const READY_CHECK_COMMAND_TIMEOUT = 1_000;
 
-/**
- * Waits for a file to be created and populated (removed = false) or removed (removed = true).
- */
-function waitForFile(filePath: string, removed = false) {
-  return new Promise<void>((resolve, reject) => {
-    const check = () => {
-      const exists = fs.existsSync(filePath);
-      if (removed) {
-        return !exists;
-      }
-      if (!exists) {
-        return false;
-      }
-      try {
-        return fs.statSync(filePath).size > 0;
-      } catch {
-        return false;
-      }
-    };
-
-    if (check()) {
-      resolve();
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      fs.unwatchFile(filePath);
-      reject(
-        new Error(
-          `Timeout: file ${filePath} ${removed ? 'not removed' : 'not found'} within ${FILE_TIMEOUT}ms`,
-        ),
-      );
-    }, FILE_TIMEOUT);
-
-    fs.watchFile(filePath, {interval: 500}, () => {
-      if (check()) {
-        clearTimeout(timer);
-        fs.unwatchFile(filePath);
-        resolve();
-      }
-    });
-  });
-}
-
 function delay(ms: number) {
   return new Promise<void>(resolve => {
     setTimeout(resolve, ms);
   });
+}
+
+/**
+ * Waits for a file to be created and populated (removed = false) or removed (removed = true).
+ */
+async function waitForFile(filePath: string, removed = false) {
+  const check = () => {
+    const exists = fs.existsSync(filePath);
+    if (removed) {
+      return !exists;
+    }
+    if (!exists) {
+      return false;
+    }
+    try {
+      return fs.statSync(filePath).size > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const deadline = Date.now() + FILE_TIMEOUT;
+  while (Date.now() < deadline) {
+    if (check()) {
+      return;
+    }
+    const timeLeft = deadline - Date.now();
+    if (timeLeft > 0) {
+      await delay(Math.min(READY_CHECK_INTERVAL, timeLeft));
+    }
+  }
+
+  if (check()) {
+    return;
+  }
+
+  throw new Error(
+    `Timeout: file ${filePath} ${removed ? 'not removed' : 'not found'} within ${FILE_TIMEOUT}ms`,
+  );
 }
 
 async function waitForDaemonReady(sessionId: string) {
@@ -180,6 +176,7 @@ export async function sendCommand(
     transport.onmessage = async (message: string) => {
       clearTimeout(timer);
       logger?.('onmessage', message);
+      socket.end();
       resolve(JSON.parse(message));
     };
     socket.on('error', error => {
@@ -203,11 +200,30 @@ export async function stopDaemon(sessionId: string) {
     return;
   }
 
+  const pid = getDaemonPid(sessionId);
   const pidFilePath = getPidFilePath(sessionId);
 
   await sendCommand({method: 'stop'}, sessionId);
 
-  await waitForFile(pidFilePath, /*removed=*/ true);
+  try {
+    await waitForFile(pidFilePath, /*removed=*/ true);
+  } catch (error) {
+    if (pid) {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // Ignore if process already exited.
+      }
+    }
+    try {
+      fs.unlinkSync(pidFilePath);
+    } catch {
+      // Ignore if file already removed.
+    }
+    if (isDaemonRunning(sessionId)) {
+      throw error;
+    }
+  }
 }
 
 export async function verifyDaemonVersion(

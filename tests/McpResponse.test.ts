@@ -47,6 +47,7 @@ import {
   createMockHeapSnapshotStats,
   createMockHeapSnapshotStaticData,
   createMockMcpContext,
+  createMockMcpWorker,
   createMockObjectInfo,
   createMockParsedArguments,
 } from './mocks.js';
@@ -1593,5 +1594,39 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(text.includes('Context @111'));
     assert.ok(!text.includes('Context @102'));
     assert.ok('heapSnapshotContextAnalysis' in structuredContent);
+  });
+
+  describe('extension service workers', () => {
+    it('lists only service workers, excluding dedicated and shared workers', async () => {
+      const response = new McpResponse(createMockParsedArguments());
+      response.setIncludeExtensionServiceWorkers(true);
+
+      const context = createMockMcpContext();
+      context.getWorkers.returns([
+        createMockMcpWorker({
+          id: 'sw-1',
+          type: 'service_worker',
+          url: 'chrome-extension://abc/sw.js',
+        }),
+        createMockMcpWorker({id: 'dw-2', type: 'dedicated_worker'}),
+        createMockMcpWorker({id: 'shw-3', type: 'shared_worker'}),
+      ]);
+
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+
+      assert.ok(text.includes('## Extension Service Workers'));
+      assert.ok(text.includes('sw-1: chrome-extension://abc/sw.js'));
+      assert.ok(!text.includes('dw-2'));
+      assert.ok(!text.includes('shw-3'));
+      assert.deepEqual(
+        (
+          structuredContent as {
+            extensionServiceWorkers?: Array<{id: string}>;
+          }
+        ).extensionServiceWorkers,
+        [{id: 'sw-1', url: 'chrome-extension://abc/sw.js'}],
+      );
+    });
   });
 });

@@ -42,6 +42,7 @@ describe('cli args parsing', () => {
     performanceCrux: true,
     usageStatistics: true,
     javascriptEvaluation: true,
+    fileNavigations: true,
     redactNetworkHeaders: false,
     allowUnrestrictedPaths: false,
     filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
@@ -386,6 +387,24 @@ describe('cli args parsing', () => {
     assert.strictEqual(disabledArgs.javascriptEvaluation, false);
   });
 
+  it('parses file navigations flag', async () => {
+    // Test default (should be true).
+    const defaultArgs = parseConfig(['main.js'], {});
+    assert.strictEqual(defaultArgs.fileNavigations, true);
+
+    // Test enabling it
+    const enabledArgs = parseConfig(['--file-navigations']);
+    assert.strictEqual(enabledArgs.fileNavigations, true);
+
+    // Test disabling it
+    const disabledArgs = parseConfig(['--no-file-navigations']);
+    assert.strictEqual(disabledArgs.fileNavigations, false);
+
+    // The camelCase form is equivalent.
+    const camelCaseArgs = parseConfig(['--fileNavigations=false']);
+    assert.strictEqual(camelCaseArgs.fileNavigations, false);
+  });
+
   it('respects env variable', async () => {
     // Test default (should be true).
     const defaultArgs = parseConfig(['main.js'], {
@@ -480,47 +499,59 @@ describe('cli args parsing', () => {
     ]);
   });
 
-  it('rejects a blocked-url-pattern with a regexp group', async () => {
+  it('rejects url-pattern with a regexp group or named group', async () => {
     assert.throws(
       () =>
         parseConfig([
-          String.raw`--blocked-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
+          String.raw`--blockedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --blockedUrlPattern .*is not enforced/,
     );
 
+    assert.throws(
+      () =>
+        parseConfig([
+          String.raw`--allowedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
+        ]),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseConfig(['--blockedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --blockedUrlPattern .*is not enforced/,
+    );
+
+    assert.throws(
+      () => parseConfig(['--allowedUrlPattern=*://127.0.0.1::port/secret']),
+      /Invalid --allowedUrlPattern .*is not enforced/,
+    );
+  });
+
+  it('rejects when any pattern in multiple url patterns is unenforceable', async () => {
     assert.throws(
       () =>
         parseConfig([
           '--blocked-url-pattern=https://a.com/*',
           String.raw`--blocked-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --blockedUrlPattern .*is not enforced/,
     );
-  });
-
-  it('rejects an allowed-url-pattern with a regexp group', async () => {
-    assert.throws(
-      () =>
-        parseConfig([
-          String.raw`--allowed-url-pattern=*://(127\.\d+\.\d+\.\d+):*/*`,
-        ]),
-      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
-    );
-
     assert.throws(
       () =>
         parseConfig([
           '--allowed-url-pattern=https://a.com/*',
-          String.raw`--allowed-url-pattern=(http|https)://example.com/*`,
+          String.raw`--allowed-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
+      /Invalid --allowedUrlPattern .*is not enforced/,
     );
   });
 
-  it('rejects a blocked-url-pattern with invalid syntax', async () => {
+  it('rejects url-pattern with invalid syntax', async () => {
     assert.throws(() =>
       parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
+    );
+    assert.throws(() =>
+      parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']),
     );
   });
 

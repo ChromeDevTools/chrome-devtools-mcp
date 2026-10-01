@@ -190,6 +190,10 @@ export class McpResponse implements Response {
     }
   }
 
+  setIncludeExtensionServiceWorkers(value: boolean): void {
+    this.#includeExtensionServiceWorkers = value;
+  }
+
   includeSnapshot(params?: SnapshotParams): void {
     this.#snapshotParams = params ?? {
       verbose: false,
@@ -765,7 +769,7 @@ export class McpResponse implements Response {
     ]);
 
     if (this.#includeExtensionServiceWorkers) {
-      await context.createExtensionServiceWorkersSnapshot();
+      context.createWorkersSnapshot();
     }
 
     let extensions: Map<string, Extension> | undefined;
@@ -1068,23 +1072,27 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     if (this.#includeExtensionServiceWorkers) {
-      if (context.getExtensionServiceWorkers().length) {
+      const extensionServiceWorkers = context
+        .getWorkers()
+        .filter(worker => worker.type === 'service_worker');
+
+      if (extensionServiceWorkers.length) {
         response.push(`## Extension Service Workers`);
       }
 
-      for (const extensionServiceWorker of context.getExtensionServiceWorkers()) {
+      for (const extensionServiceWorker of extensionServiceWorkers) {
         response.push(
           `${extensionServiceWorker.id}: ${extensionServiceWorker.url}`,
         );
       }
-      structuredContent.extensionServiceWorkers = context
-        .getExtensionServiceWorkers()
-        .map(extensionServiceWorker => {
+      structuredContent.extensionServiceWorkers = extensionServiceWorkers.map(
+        extensionServiceWorker => {
           return {
             id: extensionServiceWorker.id,
             url: extensionServiceWorker.url,
           };
-        });
+        },
+      );
     }
 
     if (this.#tabId) {
