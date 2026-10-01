@@ -524,9 +524,8 @@ export class McpResponse implements Response {
         '.txt',
       );
       return result.filename;
-    } else {
-      return formatter;
     }
+    return formatter;
   }
 
   async #handleAttachedNetworkRequest(
@@ -573,7 +572,8 @@ export class McpResponse implements Response {
         fetchDetailedData: true,
         devTools: this.#page.devtoolsUniverse,
       });
-    } else if (message instanceof DevTools.AggregatedIssue) {
+    }
+    if (message instanceof DevTools.AggregatedIssue) {
       const formatter = new IssueFormatter(message, {
         id: consoleMessageStableId,
         requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
@@ -587,9 +587,8 @@ export class McpResponse implements Response {
         );
       }
       return formatter;
-    } else {
-      return undefined;
     }
+    return undefined;
   }
 
   async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
@@ -773,7 +772,7 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    return this.format(
+    return await this.format(
       context,
       {
         detailedConsoleMessage,
@@ -934,9 +933,10 @@ export class McpResponse implements Response {
       }
     }
 
-    const networkConditions = this.#page?.networkConditions;
-    if (networkConditions) {
-      const timeout = this.#page!.pptrPage.getDefaultNavigationTimeout();
+    const page = this.#page;
+    const networkConditions = page?.networkConditions;
+    if (page && networkConditions) {
+      const timeout = page.pptrPage.getDefaultNavigationTimeout();
       response.push(`Emulating network conditions: ${networkConditions}`);
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;

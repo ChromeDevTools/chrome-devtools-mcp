@@ -525,6 +525,7 @@ describe('McpResponse', () => {
         });
       });
       page.evaluate(() => {
+        // eslint-disable-next-line no-console
         console.log('Hello from the test');
       });
       await consoleMessagePromise;
@@ -855,7 +856,7 @@ describe('extensions', () => {
       response.resetResponseLineForTesting();
       // Testing with extensions
       context.listExtensions = async () =>
-        Promise.resolve(
+        await Promise.resolve(
           new Map<string, Extension>([
             [
               'id1',

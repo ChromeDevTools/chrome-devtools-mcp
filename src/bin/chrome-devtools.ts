@@ -6,8 +6,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-process.title = 'chrome-devtools';
-
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -35,6 +33,8 @@ import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
 
 import {ConfigParser} from '../config/ConfigParser.js';
+
+process.title = 'chrome-devtools';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',

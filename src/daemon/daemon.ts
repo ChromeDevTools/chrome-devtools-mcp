@@ -170,7 +170,8 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         result: JSON.stringify(result),
       };
-    } else if (msg.method === 'stop') {
+    }
+    if (msg.method === 'stop') {
       // Ensure we are not interrupting in-progress starting.
       await started;
       // Trigger cleanup asynchronously.
@@ -181,7 +182,8 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         message: 'stopping',
       };
-    } else if (msg.method === 'status') {
+    }
+    if (msg.method === 'status') {
       await started;
       const statusResult: DaemonStatusResult = {
         pid: process.pid,
@@ -267,9 +269,10 @@ async function cleanup(exitCode = 0) {
   } catch (error) {
     logger?.('Error closing MCP server:', error);
   }
-  if (server) {
+  const activeServer = server;
+  if (activeServer) {
     await new Promise<void>(resolve => {
-      server!.close(() => resolve());
+      activeServer.close(() => resolve());
     });
   }
   if (!IS_WINDOWS) {

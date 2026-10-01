@@ -39,8 +39,8 @@ import type {
   GeolocationOptions,
   ExtensionServiceWorker,
   CD4ACommentThread,
+  PaginationOptions,
 } from '../types.js';
-import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
   DialogAction,
@@ -531,9 +531,9 @@ export function viewportTransform(arg: string | undefined):
     width,
     height,
     deviceScaleFactor: dpr,
-    isMobile: isMobile,
-    isLandscape: isLandscape,
-    hasTouch: hasTouch,
+    isMobile,
+    isLandscape,
+    hasTouch,
   };
 }
 

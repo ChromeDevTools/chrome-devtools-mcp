@@ -116,7 +116,7 @@ function main() {
 
   const sender = new ClearcutSender({
     appVersion,
-    osType: osType,
+    osType,
     clearcutEndpoint,
     forceFlushIntervalMs: clearcutForceFlushIntervalMs,
     includePidHeader: clearcutIncludePidHeader,

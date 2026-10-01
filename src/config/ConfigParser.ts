@@ -40,7 +40,7 @@ export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
-  public readonly configLocator: ConfigLocator;
+  readonly configLocator: ConfigLocator;
 
   /**
    * @param configLocator Finds the config file when `--config` is not passed.

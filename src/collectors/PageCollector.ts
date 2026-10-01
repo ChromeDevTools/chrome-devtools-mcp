@@ -10,15 +10,13 @@ import type {
   ConsoleMessage,
   Protocol,
   Issue,
+  Frame,
+  Handler,
+  HTTPRequest,
+  Page,
+  PageEvents as PuppeteerPageEvents,
 } from '../third_party/index.js';
 import {DevTools, FrameEvent} from '../third_party/index.js';
-import {
-  type Frame,
-  type Handler,
-  type HTTPRequest,
-  type Page,
-  type PageEvents as PuppeteerPageEvents,
-} from '../third_party/index.js';
 import {
   createIdGenerator,
   stableIdSymbol,

@@ -10,8 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
-import {McpPage} from '../src/McpPage.js';
-import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';

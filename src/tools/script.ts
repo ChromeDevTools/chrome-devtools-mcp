@@ -300,7 +300,6 @@ const getWebWorker = async (
     }
 
     return worker;
-  } else {
-    throw new Error('Service worker not found.');
   }
+  throw new Error('Service worker not found.');
 };

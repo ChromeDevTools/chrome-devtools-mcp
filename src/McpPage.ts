@@ -4,6 +4,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
+import {
+  createTargetUniverse,
+  type TargetUniverse,
+} from './devtools/DevtoolsUtils.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './collectors/PageCollector.js';
+import {TextSnapshot} from './TextSnapshot.js';
+import {
+  type Locator,
+  PredefinedNetworkConditions,
+  type Dialog,
+  type ElementHandle,
+  type Viewport,
+  type WebMCPTool,
+  type Protocol,
+  type Page,
+  type Target,
+  type ConsoleMessage,
+  type HTTPRequest,
+  DevTools,
+  type JSONSchema7Definition,
+} from './third_party/index.js';
+import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
+import type {
+  ContextPage,
+  DevToolsData,
+  MatchedStyles,
+  Response,
+} from './tools/ToolDefinition.js';
+import type {
+  EmulationSettings,
+  GeolocationOptions,
+  TextSnapshotNode,
+} from './types.js';
+import {logger} from './utils/logger.js';
+import {
+  getNetworkMultiplierFromString,
+  WaitForHelper,
+  type WaitForEventsResult,
+  type DialogAction,
+} from './utils/WaitForHelper.js';
+
 export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   if (typeof schema === 'boolean') {
     return;
@@ -54,55 +101,8 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
     }
   }
 }
-
-import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
-import {
-  createTargetUniverse,
-  type TargetUniverse,
-} from './devtools/DevtoolsUtils.js';
-import {
-  ConsoleCollector,
-  NetworkCollector,
-  type ListenerMap,
-  type UncaughtError,
-} from './collectors/PageCollector.js';
-import {TextSnapshot} from './TextSnapshot.js';
-import type {Locator} from './third_party/index.js';
-import {
-  PredefinedNetworkConditions,
-  type Dialog,
-  type ElementHandle,
-  type Viewport,
-  type WebMCPTool,
-  type Protocol,
-  type Page,
-  type Target,
-  type ConsoleMessage,
-  type HTTPRequest,
-  DevTools,
-  type JSONSchema7Definition,
-} from './third_party/index.js';
-import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
-import type {
-  ContextPage,
-  DevToolsData,
-  MatchedStyles,
-  Response,
-} from './tools/ToolDefinition.js';
-import type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshotNode,
-} from './types.js';
-import {logger} from './utils/logger.js';
-import {
-  getNetworkMultiplierFromString,
-  WaitForHelper,
-  type WaitForEventsResult,
-  type DialogAction,
-} from './utils/WaitForHelper.js';
 
 function isBackendNodeId(
   id: unknown,
@@ -246,7 +246,7 @@ export class McpPage implements ContextPage {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
     if (this.#initPromise) {
-      return this.#initPromise;
+      return await this.#initPromise;
     }
     this.#initPromise = this.#doInit();
     try {
@@ -768,7 +768,7 @@ export class McpPage implements ContextPage {
           node.stashedId.startsWith('stashed-') &&
           Object.keys(node).length === 1
         ) {
-          const index = parseInt(node.stashedId.split('-')[1]);
+          const index = parseInt(node.stashedId.split('-')[1], 10);
           return {uid: cdpElementIds[index]};
         }
         const resultObj: Record<string, unknown> = {};
@@ -794,7 +794,7 @@ export class McpPage implements ContextPage {
     if (!node) {
       throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
     }
-    return this.#resolveElementHandle(node, uid);
+    return await this.#resolveElementHandle(node, uid);
   }
 
   async #resolveElementHandle(
