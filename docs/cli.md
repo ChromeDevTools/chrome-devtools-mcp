@@ -48,8 +48,8 @@ chrome-devtools stop
 The CLI only supports tools available in the MCP server without additional arguments (see [Tool reference](./tool-reference.md)).
 Extension tools (`list_extensions`, `install_extension`, `reload_extension`, `trigger_extension_action`,
 `uninstall_extension`) _are_ available in the CLI: the CLI daemon enables `categoryExtensions` by default.
-They do require a pipe connection, so `--autoConnect`, `--browserUrl` and `--wsEndpoint` are not supported
-with them.
+`--autoConnect`, `--browserUrl` and `--wsEndpoint` are still rejected alongside them, so these tools run
+against the browser the CLI daemon launches itself.
 
 ```sh
 chrome-devtools <tool> [arguments] [flags]
