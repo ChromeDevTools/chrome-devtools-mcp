@@ -73,6 +73,36 @@ describe('McpContext Roots', () => {
     });
   });
 
+  // loadResource decodes a client-supplied file: URI through the same helper as
+  // the advertised roots, so it has to read the file the plain path names and
+  // still refuse a URI that resolves outside every root.
+  it('should read a file: resource and still refuse one outside the roots', async () => {
+    using workspace = createTempDir('workspace-resource-');
+    using outside = createTempDir(
+      'outside-resource-',
+      path.resolve(os.homedir()),
+    );
+    const inRoot = path.join(workspace.path, 'script.js');
+    const outsideRoot = path.join(outside.path, 'script.js');
+    await fs.writeFile(inRoot, 'inside', 'utf-8');
+    await fs.writeFile(outsideRoot, 'outside', 'utf-8');
+
+    await withMcpContext(async (_response, context) => {
+      context.setRoots([
+        {uri: pathToFileURL(workspace.path).href, name: 'workspace'},
+      ]);
+
+      assert.strictEqual(
+        await context.loadResource(pathToFileURL(inRoot).href),
+        'inside',
+      );
+      await assert.rejects(
+        context.loadResource(pathToFileURL(outsideRoot).href),
+        /Access denied/,
+      );
+    });
+  });
+
   it('should enforce extensions and validate the output path', async () => {
     using workspace = createTempDir('workspace-root-');
     await withMcpContext(async (_response, context) => {
