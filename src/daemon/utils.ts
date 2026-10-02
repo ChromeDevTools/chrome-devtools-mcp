@@ -136,7 +136,9 @@ export function serializeArgs(
         args.push(`--${kebabKey}=${String(item)}`);
       }
     } else {
-      args.push(`--${kebabKey}=${String(value)}`);
+      const serializedValue =
+        typeof value === 'object' ? JSON.stringify(value) : String(value);
+      args.push(`--${kebabKey}=${serializedValue}`);
     }
   }
   return args;
