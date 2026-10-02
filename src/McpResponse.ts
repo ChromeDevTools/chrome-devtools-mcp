@@ -629,9 +629,23 @@ export class McpResponse implements Response {
     let page: McpPage | undefined;
 
     if (this.#consoleDataOptions.serviceWorkerId) {
-      messages = context.getServiceWorkerConsoleData(
-        this.#consoleDataOptions.serviceWorkerId,
-      );
+      const serviceWorkerId = this.#consoleDataOptions.serviceWorkerId;
+      const workers = await context.createExtensionServiceWorkersSnapshot();
+      const worker = workers.find(worker => worker.id === serviceWorkerId);
+      let extensionId: string;
+      if (worker) {
+        extensionId = new URL(worker.url).hostname;
+      } else if (
+        !serviceWorkerId.startsWith('sw-') &&
+        (await context.listExtensions()).has(serviceWorkerId)
+      ) {
+        extensionId = serviceWorkerId;
+      } else {
+        throw new Error(
+          `Service worker or extension ${serviceWorkerId} not found.`,
+        );
+      }
+      messages = context.getServiceWorkerConsoleData(extensionId);
     } else {
       page = this.#page;
       if (!page) {

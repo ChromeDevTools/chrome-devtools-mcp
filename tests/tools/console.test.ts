@@ -110,6 +110,14 @@ describe('console', () => {
         const formattedResponse = await response2.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
 
+        const workerResponse = new McpResponse(args);
+        workerResponse.setIncludeConsoleData(true, {serviceWorkerId: sw.id});
+        const workerResult = await workerResponse.handle(context);
+        assert.deepStrictEqual(
+          workerResult.structuredContent,
+          formattedResponse.structuredContent,
+        );
+
         const sanitizedText = textContent.replaceAll(
           new RegExp(extensionId, 'g'),
           '<extension-id>',

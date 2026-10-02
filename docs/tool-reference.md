@@ -444,7 +444,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 - **includeStackTraces** (boolean) _(optional)_: Set to true to include the stack trace for each message when available. Increases the response size.
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
-- **serviceWorkerId** (string) _(optional)_: Filter messages to only return messages of the specified service worker.
+- **serviceWorkerId** (string) _(optional)_: Filter messages by the service worker ID shown by list_pages (sw-N). An extension ID is also accepted.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
 
 ---
