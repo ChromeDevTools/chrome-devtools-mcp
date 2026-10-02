@@ -59,6 +59,20 @@ export class BrowserManager {
     };
   }
 
+  static redactConnectOptionsForLogging(
+    options: Parameters<typeof puppeteer.connect>[0],
+  ): Parameters<typeof puppeteer.connect>[0] {
+    if (!options.headers) {
+      return {...options};
+    }
+    return {
+      ...options,
+      headers: Object.fromEntries(
+        Object.keys(options.headers).map(name => [name, '[REDACTED]']),
+      ),
+    };
+  }
+
   static detectDisplay(): void {
     // Only detect display on Linux/UNIX.
     if (os.platform() === 'win32' || os.platform() === 'darwin') {
@@ -404,7 +418,10 @@ export class BrowserManager {
       );
     }
 
-    logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+    logger?.(
+      'Connecting Puppeteer to ',
+      JSON.stringify(BrowserManager.redactConnectOptionsForLogging(connectOptions)),
+    );
     try {
       const connected = await puppeteer.connect(connectOptions);
       logger?.('Connected Puppeteer');
