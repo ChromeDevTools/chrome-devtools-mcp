@@ -40,19 +40,21 @@ export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
-  public readonly configLocator: ConfigLocator;
+  #usageStatisticsNoticeShown = false;
 
-  /**
-   * @param configLocator Finds the config file when `--config` is not passed.
-   * Config file discovery is off without it, for example in tests.
-   */
   constructor(
     private version: string,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
-  ) {
-    this.configLocator = new ConfigLocator();
+    public readonly configLocator = new ConfigLocator(),
+  ) {}
+
+  /**
+   * The config file resolved by the last `parse()` call, if any.
+   */
+  get configPath(): string | undefined {
+    return this.#configPath;
   }
 
   buildCliParser(options: Record<string, YargsOptions> = mcpOptions) {
@@ -211,9 +213,12 @@ export class ConfigParser {
     }
 
     if (this.env['CI'] || this.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-      console.error(
-        "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-      );
+      if (!this.#usageStatisticsNoticeShown) {
+        this.#usageStatisticsNoticeShown = true;
+        console.error(
+          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+        );
+      }
       resolvedArgs.usageStatistics = false;
     }
 
@@ -226,7 +231,7 @@ export class ConfigParser {
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
-      this.#configPath = cliArgs.config ?? this.configLocator?.locate(this.env);
+      this.#configPath = cliArgs.config ?? this.configLocator.locate(this.env);
       this.warnUnknownArgs(cliArgs);
       return this.#resolve(cliArgs);
     } catch (error) {

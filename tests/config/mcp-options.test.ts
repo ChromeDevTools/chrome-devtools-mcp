@@ -20,13 +20,6 @@ describe('mcp-options steps', () => {
 
   const parser = new ConfigParser('0.0.0');
 
-  describe('constructor', () => {
-    it('initializes configLocator', () => {
-      const testParser = new ConfigParser('0.0.0');
-      assert.ok(testParser.configLocator instanceof ConfigLocator);
-    });
-  });
-
   describe('parseCliArgs', () => {
     it('returns only explicitly passed flags', () => {
       const args = new ConfigParser('0.0.0', [
@@ -188,13 +181,32 @@ describe('mcp-options steps', () => {
       });
       assert.strictEqual(args.usageStatistics, false);
     });
+
+    it('prints the usage statistics notice once', () => {
+      const consoleError = sinon.stub(console, 'error');
+      const parser = new ConfigParser('0.0.0', [], {CI: 'true'});
+
+      parser.applyDefaults({});
+      const args = parser.applyDefaults({});
+
+      assert.strictEqual(args.usageStatistics, false);
+      sinon.assert.calledOnce(consoleError);
+    });
   });
 
   describe('config discovery', () => {
-    it('does not discover a config file without a locator', () => {
-      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      sinon.stub(parser.configLocator, 'locate').returns(undefined);
+    it('does not discover a config file when locator returns undefined', () => {
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js'],
+        {},
+        false,
+        locator,
+      );
       assert.strictEqual(parser.parse().config, undefined);
+      assert.strictEqual(parser.configPath, undefined);
     });
 
     it('uses the config file found by the locator', () => {
@@ -203,15 +215,13 @@ describe('mcp-options steps', () => {
         'cd4a.config.json',
       );
       const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      const locateStub = sinon
-        .stub(parser.configLocator, 'locate')
-        .returns(configFile.path);
+      sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
 
       const args = parser.parse();
 
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.config, configFile.path);
-      sinon.assert.calledOnce(locateStub);
+      assert.strictEqual(parser.configPath, configFile.path);
     });
 
     it('prefers --config over a discovered config file', () => {
@@ -240,10 +250,9 @@ describe('mcp-options steps', () => {
         {},
         false,
       );
-      const locateStub = sinon
-        .stub(parser.configLocator, 'locate')
-        .returns(configPath);
-      return {parser, locateStub};
+      const locator = parser.configLocator;
+      sinon.stub(locator, 'locate').returns(configPath);
+      return {parser, locator};
     }
 
     it('re-reads the config file without discovering it again', () => {
@@ -251,7 +260,7 @@ describe('mcp-options steps', () => {
         JSON.stringify({memoryDebugging: false}),
         'cd4a.config.json',
       );
-      const {parser, locateStub} = createParser(configFile.path);
+      const {parser, locator} = createParser(configFile.path);
       assert.strictEqual(parser.parse().memoryDebugging, false);
 
       fs.writeFileSync(
@@ -260,7 +269,7 @@ describe('mcp-options steps', () => {
       );
 
       assert.strictEqual(parser.reload().memoryDebugging, true);
-      sinon.assert.calledOnce(locateStub);
+      sinon.assert.calledOnce(locator.locate as sinon.SinonStub);
     });
 
     it('keeps CLI arguments over the config file', () => {

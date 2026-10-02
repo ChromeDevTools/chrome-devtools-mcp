@@ -7,11 +7,13 @@
 import type fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
+import {mergeReloadableOptions} from './config/reload.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
-import {McpContext} from './McpContext.js';
+import {type LiveMcpContextOptions, McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -22,6 +24,7 @@ import {
   type Transport,
   Mutex,
   puppeteer,
+  zod,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import {
@@ -51,8 +54,24 @@ export interface McpServerOptions {
 }
 
 interface ToolEntry {
+  tool: ToolDefinition | DefinedPageTool;
   handler: ToolHandler;
   registeredTool: RegisteredTool;
+}
+
+/**
+ * What the client sees in `tools/list` for a tool.
+ */
+function listingOf(entry: ToolEntry) {
+  return {
+    description: entry.tool.description,
+    inputSchema: zod.toJSONSchema(entry.handler.registeredInputSchema, {
+      io: 'input',
+      unrepresentable: 'any',
+    }),
+    annotations: entry.tool.annotations,
+    enabled: !entry.handler.disabled,
+  };
 }
 
 export class McpServer {
@@ -172,6 +191,75 @@ export class McpServer {
   }
 
   /**
+   * Applies new arguments to the running server. Only RELOADABLE_OPTIONS are
+   * applied, all other options keep the value the server was started with.
+   * Tools are updated in place and only tools whose listing changed notify
+   * the client, which results in at most one `tools/list_changed`
+   * notification.
+   */
+  async applyConfig(serverArgs: ParsedArguments): Promise<void> {
+    using _guard = await this.#toolMutex.acquire();
+    const previousArgs = this.#serverArgs;
+    const nextArgs = mergeReloadableOptions(previousArgs, serverArgs);
+    // Build everything before committing so that a throwing tool factory
+    // leaves the server untouched.
+    const updates: Array<{
+      entry: ToolEntry;
+      tool: ToolDefinition | DefinedPageTool;
+    }> = [];
+    for (const tool of createTools(nextArgs)) {
+      const entry = this.#tools.get(tool.name);
+      // Slim mode is restart-required, so the set of registered tools is
+      // stable.
+      if (entry) {
+        updates.push({entry, tool});
+      }
+    }
+
+    this.#serverArgs = nextArgs;
+    for (const {entry, tool} of updates) {
+      const previousListing = listingOf(entry);
+      entry.handler.update(tool, nextArgs);
+      entry.tool = tool;
+      const nextListing = listingOf(entry);
+      if (!isDeepStrictEqual(previousListing, nextListing)) {
+        entry.registeredTool.update({
+          description: tool.description,
+          paramsSchema: entry.handler.registeredInputSchema,
+          annotations: tool.annotations,
+          enabled: nextListing.enabled,
+        });
+      }
+    }
+
+    if (!previousArgs.performanceCrux && nextArgs.performanceCrux) {
+      logCruxDisclaimer(nextArgs);
+    }
+
+    const context = this.#context;
+    if (!context) {
+      return;
+    }
+    context.updateOptions(this.#liveContextOptions());
+    context.setRoots(this.#combinedRoots());
+    if (
+      previousArgs.experimentalIncludeAllPages !==
+      nextArgs.experimentalIncludeAllPages
+    ) {
+      await context.createPagesSnapshot();
+    }
+    await context.releaseState({
+      screencast: !this.#isCallable('screencast_stop'),
+      heapSnapshots: !this.#isCallable('close_heapsnapshot'),
+      performanceTrace: !this.#isCallable('performance_stop_trace'),
+    });
+  }
+
+  #isCallable(toolName: string): boolean {
+    return this.#tools.get(toolName)?.handler.callable ?? false;
+  }
+
+  /**
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
@@ -262,15 +350,13 @@ export class McpServer {
     if (this.#context?.browser !== browser) {
       this.#context?.dispose();
       this.#context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging:
-          this.#serverArgs.experimentalDevtools ?? false,
-        experimentalIncludeAllPages:
-          this.#serverArgs.experimentalIncludeAllPages,
-        performanceCrux: this.#serverArgs.performanceCrux,
-        sourceMaps: this.#serverArgs.sourceMaps,
+        ...this.#liveContextOptions(),
+        // Enforced by Puppeteer for the lifetime of the browser, so they are
+        // not part of the live options.
         allowlist: this.#serverArgs.allowedUrlPattern,
         blocklist: this.#serverArgs.blockedUrlPattern,
-        allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+        experimentalDevToolsDebugging:
+          this.#serverArgs.experimentalDevtools ?? false,
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
@@ -297,6 +383,15 @@ export class McpServer {
       }
     }
     return this.#context;
+  }
+
+  #liveContextOptions(): LiveMcpContextOptions {
+    return {
+      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
+      performanceCrux: this.#serverArgs.performanceCrux,
+      sourceMaps: this.#serverArgs.sourceMaps,
+      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+    };
   }
 
   #createToolHandler(tool: ToolDefinition | DefinedPageTool): ToolHandler {
@@ -327,7 +422,7 @@ export class McpServer {
       registeredTool.disable();
     }
 
-    this.#tools.set(tool.name, {handler, registeredTool});
+    this.#tools.set(tool.name, {tool, handler, registeredTool});
   }
 }
 
@@ -354,6 +449,14 @@ export async function createMcpServer(
   return {server: server.server};
 }
 
+function logCruxDisclaimer(args: ParsedArguments): void {
+  if (!args.slim && args.performanceCrux) {
+    console.error(
+      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
+    );
+  }
+}
+
 export const logDisclaimers = (args: ParsedArguments) => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
@@ -361,11 +464,7 @@ debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
 
-  if (!args.slim && args.performanceCrux) {
-    console.error(
-      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
-    );
-  }
+  logCruxDisclaimer(args);
 
   if (!args.slim && args.usageStatistics) {
     console.error(
