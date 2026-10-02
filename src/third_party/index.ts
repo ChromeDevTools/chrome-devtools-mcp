@@ -55,6 +55,8 @@ export {
   TargetType,
   TimeoutError,
   WebWorker,
+  WebMCP,
+  WebMCPTool,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';

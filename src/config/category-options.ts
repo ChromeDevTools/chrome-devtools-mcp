@@ -48,7 +48,7 @@ const categoryOverrides: Record<
   },
   [ToolCategory.THIRD_PARTY]: {
     describe:
-      'Set to true to enable third-party developer tools exposed by the inspected page itself',
+      'Set to true to enable third-party developer tools exposed by the inspected page itself (via WebMCP or devtoolstooldiscovery)',
     offByDefault: true,
   },
   [ToolCategory.PWA]: {

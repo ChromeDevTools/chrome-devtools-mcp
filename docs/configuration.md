@@ -40,7 +40,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--categoryExperimentalThirdParty`/ `--category-experimental-third-party`**
-  Set to true to enable third-party developer tools exposed by the inspected page itself
+  Set to true to enable third-party developer tools exposed by the inspected page itself (via WebMCP or devtoolstooldiscovery)
   - **Type:** boolean
   - **Default:** `false`
 
