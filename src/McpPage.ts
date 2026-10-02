@@ -152,7 +152,7 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  thirdPartyDeveloperTools: ToolGroups = [];
+  eventBasedThirdPartyTools: ToolGroups = [];
 
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
@@ -369,7 +369,7 @@ export class McpPage implements ContextPage {
   }
 
   getThirdPartyDeveloperTools(): ToolGroups {
-    return [...this.#getWebMcpToolGroups(), ...this.thirdPartyDeveloperTools];
+    return [...this.#getWebMcpToolGroups(), ...this.eventBasedThirdPartyTools];
   }
 
   async getToolGroups(): Promise<ToolGroups> {
@@ -382,7 +382,7 @@ export class McpPage implements ContextPage {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      this.thirdPartyDeveloperTools = [];
+      this.eventBasedThirdPartyTools = [];
       return this.getThirdPartyDeveloperTools();
     }
 
@@ -469,7 +469,7 @@ export class McpPage implements ContextPage {
       }
     }
 
-    this.thirdPartyDeveloperTools = eventToolGroups;
+    this.eventBasedThirdPartyTools = eventToolGroups;
 
     return this.getThirdPartyDeveloperTools();
   }
@@ -638,7 +638,11 @@ export class McpPage implements ContextPage {
       if (status !== 'Completed') {
         throw new Error(errorText || `Tool execution failed: ${status}`);
       }
-      response.appendResponseLine(JSON.stringify(output ?? null, null, 2));
+      if (output !== undefined) {
+        response.appendResponseLine(JSON.stringify(output, null, 2));
+      } else {
+        response.appendResponseLine('Tool returned no result.');
+      }
       return;
     }
 

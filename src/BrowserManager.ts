@@ -211,7 +211,6 @@ export class BrowserManager {
       headless,
       isolated = false,
       categoryExtensions: enableExtensions,
-      categoryExperimentalThirdParty,
       viaCli,
       viewport,
       acceptInsecureCerts,
@@ -245,27 +244,6 @@ export class BrowserManager {
       args.push(`--proxy-server=${proxyServer}`);
     }
     args.push('--hide-crash-restore-bubble');
-    if (categoryExperimentalThirdParty) {
-      const enableFeaturesPrefix = '--enable-features=';
-      const enableFeaturesIndex = args.findIndex(arg =>
-        arg.startsWith(enableFeaturesPrefix),
-      );
-      if (enableFeaturesIndex !== -1) {
-        const existingFeatures = args[enableFeaturesIndex]
-          .slice(enableFeaturesPrefix.length)
-          .split(',')
-          .filter(Boolean);
-        const mergedFeatures = new Set([
-          ...existingFeatures,
-          'WebMCP',
-          'DevToolsWebMCPSupport',
-        ]);
-        args[enableFeaturesIndex] =
-          `${enableFeaturesPrefix}${[...mergedFeatures].join(',')}`;
-      } else {
-        args.push(`${enableFeaturesPrefix}WebMCP,DevToolsWebMCPSupport`);
-      }
-    }
 
     const ignoreDefaultArgs: LaunchOptions['ignoreDefaultArgs'] =
       ignoreDefaultChromeArg ?? false;

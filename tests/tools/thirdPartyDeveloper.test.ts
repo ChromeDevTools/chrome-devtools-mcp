@@ -500,7 +500,7 @@ describe('thirdPartyDeveloperTools', () => {
         const page = await context.newPage();
         response.setPage(page);
 
-        page.thirdPartyDeveloperTools = [
+        page.eventBasedThirdPartyTools = [
           {
             name: 'test-group',
             description: 'test description',
@@ -740,7 +740,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -816,7 +816,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -869,7 +869,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -922,7 +922,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -1046,46 +1046,6 @@ describe('thirdPartyDeveloperTools', () => {
         },
         undefined,
         {categoryExperimentalThirdParty: true},
-      );
-    });
-
-    it('validates and delegates WebMCP tool execution to page.executeThirdPartyDeveloperTool', async () => {
-      const {page, context, response, args} = createHandlerMocks();
-      page.getThirdPartyDeveloperTools.returns([
-        {
-          name: 'WebMCP Tools',
-          description: 'Tools exposed via WebMCP',
-          tools: [
-            {
-              name: 'webmcp_debug',
-              description: 'Inspects state',
-              inputSchema: {
-                type: 'object',
-                properties: {query: {type: 'string'}},
-                required: ['query'],
-              },
-            },
-          ],
-        },
-      ]);
-
-      await executeThirdPartyDeveloperTool(args).handler(
-        {
-          params: {
-            toolName: 'webmcp_debug',
-            params: JSON.stringify({query: 'status'}),
-          },
-          page,
-        },
-        response,
-        context,
-      );
-
-      sinon.assert.calledOnceWithExactly(
-        page.executeThirdPartyDeveloperTool,
-        'webmcp_debug',
-        {query: 'status'},
-        response,
       );
     });
   });

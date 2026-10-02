@@ -1347,7 +1347,7 @@ describe('McpPage', () => {
         annotations: {debugging: true},
       });
       pptrPage.webmcp.tools.returns([debuggingTool]);
-      mcpPage.thirdPartyDeveloperTools = [
+      mcpPage.eventBasedThirdPartyTools = [
         {
           name: 'Custom Tools',
           description: 'Tools exposed via event',
@@ -1464,7 +1464,7 @@ describe('McpPage', () => {
       sinon.assert.notCalled(pptrPage.evaluate);
     });
 
-    it('serializes undefined WebMCP tool output as null in executeThirdPartyDeveloperTool()', async () => {
+    it('appends "Tool returned no result." when WebMCP tool output is undefined in executeThirdPartyDeveloperTool()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const mockTool = createMockWebMCPTool({
         name: 'webmcp_void_tool',
@@ -1485,7 +1485,10 @@ describe('McpPage', () => {
       );
 
       sinon.assert.calledOnceWithExactly(mockTool.execute, {});
-      sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'null');
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Tool returned no result.',
+      );
     });
 
     it('does not execute non-debugging WebMCP tools in executeThirdPartyDeveloperTool()', async () => {

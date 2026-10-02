@@ -122,47 +122,6 @@ describe('browser', () => {
       });
     });
 
-    it('enables WebMCP features when categoryExperimentalThirdParty is true', async () => {
-      const pptrBrowser = createMockPuppeteerBrowser();
-      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
-
-      const args = createMockParsedArguments({
-        isolated: true,
-        categoryExperimentalThirdParty: true,
-      });
-      const manager = new BrowserManager(args);
-
-      await manager.ensureBrowser();
-
-      sinon.assert.calledOnceWithMatch(launchStub, {
-        args: [
-          '--hide-crash-restore-bubble',
-          '--enable-features=WebMCP,DevToolsWebMCPSupport',
-        ],
-      });
-    });
-
-    it('merges WebMCP features into an existing --enable-features flag when categoryExperimentalThirdParty is true', async () => {
-      const pptrBrowser = createMockPuppeteerBrowser();
-      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
-
-      const args = createMockParsedArguments({
-        isolated: true,
-        categoryExperimentalThirdParty: true,
-        chromeArg: ['--enable-features=CustomFeature,WebMCP'],
-      });
-      const manager = new BrowserManager(args);
-
-      await manager.ensureBrowser();
-
-      sinon.assert.calledOnceWithMatch(launchStub, {
-        args: [
-          '--enable-features=CustomFeature,WebMCP,DevToolsWebMCPSupport',
-          '--hide-crash-restore-bubble',
-        ],
-      });
-    });
-
     it('connects to a browser when browserUrl is set and disconnects on close()', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch');
