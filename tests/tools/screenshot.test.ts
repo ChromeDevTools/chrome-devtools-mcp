@@ -15,6 +15,7 @@ import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {createHandlerMocks, createMockElementHandle} from '../mocks.js';
 import {screenshots} from '../snapshot.js';
 import {createTempDir, html, withMcpContext} from '../utils.js';
 
@@ -37,6 +38,133 @@ function pngHeight(data: Buffer): number {
 describe('screenshot', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('downscale clip', () => {
+    for (const viewport of [{width: 800, height: 600}, null]) {
+      const mode = viewport ? 'emulated viewport' : 'native viewport';
+
+      it(`passes the scrolled ${mode} clip to page.screenshot`, async () => {
+        const {page, context, response, args} = createHandlerMocks({
+          screenshotMaxWidth: 100,
+        });
+        const pptrPage = page.pptrPage;
+        pptrPage.viewport.returns(viewport);
+        pptrPage.evaluate.resolves({
+          x: 800,
+          y: 1000,
+          width: 1000,
+          height: 700,
+          devicePixelRatio: 2,
+        });
+        pptrPage.screenshot.resolves(new Uint8Array());
+
+        await screenshot(args).handler(
+          {params: {format: 'png'}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(pptrPage.screenshot, {
+          type: 'png',
+          quality: undefined,
+          optimizeForSpeed: true,
+          clip: {
+            x: 800,
+            y: 1000,
+            width: viewport ? 800 : 1000,
+            height: viewport ? 600 : 700,
+            scale: viewport ? 0.125 : 0.05,
+          },
+        });
+      });
+
+      it(`adds the scroll offset to the element clip with ${mode}`, async () => {
+        const {page, context, response, args} = createHandlerMocks({
+          screenshotMaxWidth: 100,
+        });
+        const pptrPage = page.pptrPage;
+        const {handle} = createMockElementHandle();
+        page.getElementByUid.resolves(handle);
+        handle.boundingBox.resolves({x: 120, y: 80, width: 400, height: 300});
+        pptrPage.viewport.returns(viewport);
+        pptrPage.evaluate.resolves({x: 800, y: 1000, devicePixelRatio: 2});
+        pptrPage.screenshot.resolves(new Uint8Array());
+
+        await screenshot(args).handler(
+          {params: {format: 'png', uid: '1_1'}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+        sinon.assert.calledOnceWithExactly(pptrPage.screenshot, {
+          type: 'png',
+          quality: undefined,
+          optimizeForSpeed: true,
+          clip: {
+            x: 920,
+            y: 1080,
+            width: 400,
+            height: 300,
+            scale: viewport ? 0.25 : 0.125,
+          },
+        });
+        sinon.assert.notCalled(handle.screenshot);
+      });
+    }
+
+    it('keeps the full-page clip at the document origin', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        screenshotMaxWidth: 100,
+      });
+      const pptrPage = page.pptrPage;
+      pptrPage.evaluate.resolves({
+        width: 1600,
+        height: 2000,
+        devicePixelRatio: 1,
+      });
+      pptrPage.screenshot.resolves(new Uint8Array());
+
+      await screenshot(args).handler(
+        {params: {format: 'png', fullPage: true}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(pptrPage.screenshot, {
+        type: 'png',
+        quality: undefined,
+        optimizeForSpeed: true,
+        clip: {x: 0, y: 0, width: 1600, height: 2000, scale: 0.0625},
+      });
+    });
+
+    it('uses element.screenshot when the element needs no downscaling', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        screenshotMaxWidth: 400,
+      });
+      const pptrPage = page.pptrPage;
+      const {handle} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      handle.boundingBox.resolves({x: 120, y: 80, width: 400, height: 300});
+      handle.screenshot.resolves(new Uint8Array());
+      pptrPage.viewport.returns(null);
+      pptrPage.evaluate.resolves({x: 800, y: 1000, devicePixelRatio: 1});
+
+      await screenshot(args).handler(
+        {params: {format: 'png', uid: '1_1'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(handle.screenshot, {
+        type: 'png',
+        quality: undefined,
+        optimizeForSpeed: true,
+      });
+      sinon.assert.notCalled(pptrPage.screenshot);
+    });
   });
 
   describe('browser_take_screenshot', () => {
