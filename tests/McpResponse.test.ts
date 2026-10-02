@@ -1579,6 +1579,23 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(objectText.includes('### Object Details'));
     assert.ok(objectText.includes('id: @1'));
     assert.ok(objectText.includes('name: Object'));
+
+    const toonResponse = new McpResponse({
+      ...createMockParsedArguments(),
+      experimentalDataFormat: 'toon',
+    });
+    const longNameObjectInfo = {
+      ...createMockObjectInfo(),
+      name: 'Object_' + 'x'.repeat(150),
+    };
+    toonResponse.setHeapSnapshotObjectDetails(longNameObjectInfo, {
+      maxNameLength: 10,
+    });
+
+    const toonResult = await toonResponse.handle(context);
+    const toonText = getTextContent(toonResult.content[0]);
+    assert.ok(toonText.includes('### Object Details'));
+    assert.ok(toonText.includes('Object_xxx...'));
   });
 
   it('renders the context field usage section for the filtered contexts', async () => {
