@@ -10,7 +10,7 @@ import {describe, it} from 'node:test';
 
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {getCliOptions, mcpOptions} from '../src/config/mcp-options.js';
-import {buildCommand} from '../src/config/cli-commands.js';
+import {buildCommand, expandShorthandArgs} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
@@ -1286,6 +1286,155 @@ describe('cli command strings', () => {
           );
         }
       }
+    }
+  });
+
+  it('renders shorthand hints for optional uid and url args', () => {
+    const screenshot = buildCommand(
+      'take_screenshot',
+      commands['take_screenshot'].args,
+    );
+    assert.ok(screenshot.usage.includes('[@uid]'));
+    assert.ok(!screenshot.usage.includes('[--uid]'));
+
+    const navigate = buildCommand(
+      'navigate_page',
+      commands['navigate_page'].args,
+    );
+    assert.ok(navigate.usage.includes('[url]'));
+
+    const evaluate = buildCommand(
+      'evaluate_script',
+      commands['evaluate_script'].args,
+    );
+    assert.ok(evaluate.usage.includes('[@args..]'));
+  });
+});
+
+describe('cli shorthand args', () => {
+  const expand = (argv: string[]) => expandShorthandArgs(argv, commands);
+
+  it('strips @ from required uid positionals', () => {
+    assert.deepStrictEqual(expand(['click', '1', '@1_5']), [
+      'click',
+      '1',
+      '1_5',
+    ]);
+    assert.deepStrictEqual(expand(['drag', '1', '@1_2', '@1_3']), [
+      'drag',
+      '1',
+      '1_2',
+      '1_3',
+    ]);
+  });
+
+  it('keeps plain uids unchanged', () => {
+    assert.deepStrictEqual(expand(['click', '1', '1_5']), [
+      'click',
+      '1',
+      '1_5',
+    ]);
+  });
+
+  it('does not strip @ from non-uid positionals', () => {
+    assert.deepStrictEqual(expand(['fill', '1', '@1_5', '@handle']), [
+      'fill',
+      '1',
+      '1_5',
+      '@handle',
+    ]);
+  });
+
+  it('maps an extra @uid to an optional uid flag', () => {
+    assert.deepStrictEqual(
+      expand(['take_screenshot', '1', '@1_5', '--fullPage']),
+      ['take_screenshot', '1', '--fullPage', '--uid', '1_5'],
+    );
+  });
+
+  it('strips @ from uid flag values', () => {
+    assert.deepStrictEqual(expand(['take_screenshot', '1', '--uid', '@1_5']), [
+      'take_screenshot',
+      '1',
+      '--uid',
+      '1_5',
+    ]);
+  });
+
+  it('does not override an explicit uid flag', () => {
+    assert.deepStrictEqual(
+      expand(['take_screenshot', '1', '--uid', '1_4', '@1_5']),
+      ['take_screenshot', '1', '--uid', '1_4', '@1_5'],
+    );
+  });
+
+  it('appends extra @uids to evaluate_script args', () => {
+    assert.deepStrictEqual(
+      expand([
+        'evaluate_script',
+        '(a, b) => 1',
+        '--pageId',
+        '1',
+        '@1_2',
+        '@1_3',
+      ]),
+      [
+        'evaluate_script',
+        '(a, b) => 1',
+        '--pageId',
+        '1',
+        '--args',
+        '1_2',
+        '--args',
+        '1_3',
+      ],
+    );
+  });
+
+  it('maps an extra URL to an optional url flag', () => {
+    assert.deepStrictEqual(
+      expand(['navigate_page', '1', 'https://example.com']),
+      ['navigate_page', '1', '--url', 'https://example.com'],
+    );
+  });
+
+  it('does not treat non-URLs as urls', () => {
+    for (const token of ['example.com', 'foo:bar', 'Control+A']) {
+      assert.deepStrictEqual(expand(['navigate_page', '1', token]), [
+        'navigate_page',
+        '1',
+        token,
+      ]);
+    }
+  });
+
+  it('does not rewrite flag values', () => {
+    assert.deepStrictEqual(
+      expand(['take_screenshot', '1', '--filePath', '@out.png']),
+      ['take_screenshot', '1', '--filePath', '@out.png'],
+    );
+    assert.deepStrictEqual(expand(['navigate_page', '1', '--type', 'reload']), [
+      'navigate_page',
+      '1',
+      '--type',
+      'reload',
+    ]);
+  });
+
+  it('does not consume a positional after a boolean flag', () => {
+    assert.deepStrictEqual(
+      expand(['take_screenshot', '1', '--fullPage', '@1_5']),
+      ['take_screenshot', '1', '--fullPage', '--uid', '1_5'],
+    );
+  });
+
+  it('keeps non-tool commands unchanged', () => {
+    for (const argv of [
+      ['start', '--headless'],
+      ['status'],
+      ['stop', '@1_5'],
+    ]) {
+      assert.deepStrictEqual(expand(argv), argv);
     }
   });
 });
