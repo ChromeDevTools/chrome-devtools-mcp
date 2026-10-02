@@ -66,6 +66,28 @@ describe('browser', () => {
   });
 
   describe('BrowserManager', () => {
+    it('redacts WebSocket header values for logging without mutating connection options', () => {
+      const options = {
+        browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser/test',
+        headers: {
+          Authorization: 'Bearer LOG_CANARY_31337',
+          'X-Test': 'visible',
+        },
+      };
+
+      const redacted = BrowserManager.redactConnectOptionsForLogging(options);
+
+      assert.deepStrictEqual(redacted.headers, {
+        Authorization: '[REDACTED]',
+        'X-Test': '[REDACTED]',
+      });
+      assert.ok(!JSON.stringify(redacted).includes('LOG_CANARY_31337'));
+      assert.deepStrictEqual(options.headers, {
+        Authorization: 'Bearer LOG_CANARY_31337',
+        'X-Test': 'visible',
+      });
+    });
+
     it('launches a browser when no connect options are set and closes it on close()', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
