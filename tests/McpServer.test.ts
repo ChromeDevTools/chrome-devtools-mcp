@@ -76,6 +76,44 @@ describe('McpServer', () => {
       sinon.assert.notCalled(browserManager.ensureBrowser);
     });
 
+    it('returns an input error for invalid emulate geolocation', async () => {
+      const {server, browserManager} = await createTestServer();
+
+      const result = await server.callTool('emulate', {geolocation: '0x0'});
+
+      assert.strictEqual(result.isError, true);
+      const firstBlock = result.content[0];
+      assert.strictEqual(firstBlock.type, 'text');
+      assert.match(firstBlock.text, /Invalid longitude/);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+    });
+
+    it('returns an input error for invalid emulate viewport', async () => {
+      const {server, browserManager} = await createTestServer();
+
+      const result = await server.callTool('emulate', {viewport: '0x0'});
+
+      assert.strictEqual(result.isError, true);
+      const firstBlock = result.content[0];
+      assert.strictEqual(firstBlock.type, 'text');
+      assert.match(firstBlock.text, /Invalid viewport width/);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+    });
+
+    it('returns an input error for invalid emulate HTTP headers', async () => {
+      const {server, browserManager} = await createTestServer();
+
+      const result = await server.callTool('emulate', {
+        extraHttpHeaders: 'notjson',
+      });
+
+      assert.strictEqual(result.isError, true);
+      const firstBlock = result.content[0];
+      assert.strictEqual(firstBlock.type, 'text');
+      assert.match(firstBlock.text, /Invalid JSON for headers/);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+    });
+
     it('executes the tool handler when arguments are valid', async () => {
       const {server, browserManager, context} = await createTestServer();
 
