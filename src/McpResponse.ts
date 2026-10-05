@@ -1160,9 +1160,11 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       response.push(`URL: ${summary.url}`);
       response.push('### Category Scores');
       for (const score of summary.scores) {
-        response.push(
-          `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
-        );
+        // Lighthouse uses a null score for categories that could not be
+        // scored and renders scores as Math.round(score * 100).
+        const formattedScore =
+          score.score === null ? 'n/a' : Math.round(score.score * 100);
+        response.push(`- ${score.title}: ${formattedScore} (${score.id})`);
       }
       response.push('### Audit Summary');
       response.push(`Passed: ${summary.audits.passed}`);

@@ -930,6 +930,54 @@ describe('lighthouse', () => {
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
+
+  it('rounds category scores and shows unscored categories as n/a', async t => {
+    await withMcpContext(async (response, context) => {
+      const lighthouseResult = {
+        summary: {
+          mode: 'navigation',
+          device: 'desktop',
+          url: 'https://example.com',
+          scores: [
+            {
+              id: 'accessibility',
+              title: 'Accessibility',
+              score: 0.57,
+            },
+            {
+              id: 'seo',
+              title: 'SEO',
+              score: 0,
+            },
+            {
+              id: 'agentic-browsing',
+              title: 'Agentic Browsing',
+              score: null,
+            },
+          ],
+          audits: {
+            failed: 1,
+            passed: 10,
+          },
+          timing: {
+            total: 1000,
+          },
+        },
+        reports: ['/tmp/report.json', '/tmp/report.html'],
+      };
+
+      response.attachLighthouseResult(lighthouseResult);
+      const {content, structuredContent} = await response.handle(context);
+
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('- Accessibility: 57 (accessibility)'));
+      assert.ok(text.includes('- SEO: 0 (seo)'));
+      assert.ok(text.includes('- Agentic Browsing: n/a (agentic-browsing)'));
+
+      t.assert.snapshot(text);
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    });
+  });
 });
 
 describe('third-party developer tools', () => {
