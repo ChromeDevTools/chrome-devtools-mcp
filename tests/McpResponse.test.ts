@@ -916,6 +916,39 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [
+          {
+            id: 'color-contrast',
+            title:
+              'Background and foreground colors do not have a sufficient contrast ratio.',
+            description: 'Low-contrast text is difficult to read.',
+            score: 0,
+            categories: ['accessibility'],
+            nodes: [
+              {
+                selector: 'body > p',
+                snippet: '<p class="faint">',
+                nodeLabel: 'Hello',
+                explanation:
+                  'Fix any of the following:\n  Element has insufficient color contrast',
+              },
+              {
+                selector: 'a[title="Say \\"hi\\""]',
+                snippet: '<a title="Say &quot;hi&quot;">',
+                nodeLabel: 'Say "hi"\nnow',
+              },
+            ],
+            totalNodes: 12,
+          },
+          {
+            id: 'document-title',
+            title: 'Document does not have a `<title>` element',
+            score: 0,
+            categories: ['accessibility', 'seo'],
+            nodes: [],
+            totalNodes: 0,
+          },
+        ],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 
@@ -923,6 +956,7 @@ describe('lighthouse', () => {
       const {content, structuredContent} = await response.handle(context);
 
       const text = getTextContent(content[0]);
+      assert.ok(text.includes('### Failed audits'));
       assert.ok(text.includes('### Reports'));
       assert.ok(text.includes('- /tmp/report.json'));
       assert.ok(text.includes('- /tmp/report.html'));
@@ -964,6 +998,7 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 

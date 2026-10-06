@@ -422,7 +422,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ### `lighthouse_audit`
 
-**Description:** Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run [`performance_start_trace`](#performance_start_trace)
+**Description:** Get Lighthouse scores, failing audits, and the DOM nodes they flag for accessibility, SEO, best practices, and agentic browsing. Full reports are saved to disk. This excludes performance. For performance audits, run [`performance_start_trace`](#performance_start_trace)
 
 **Parameters:**
 
