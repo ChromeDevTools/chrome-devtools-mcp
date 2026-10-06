@@ -9,6 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {zod} from '../../src/third_party/index.js';
 import {emulate} from '../../src/tools/emulation.js';
 import {
   geolocationTransform,
@@ -555,6 +556,50 @@ describe('emulation', () => {
       sinon.assert.calledOnceWithExactly(page.emulate, {
         colorScheme: 'auto',
       });
+    });
+  });
+
+  describe('media features', () => {
+    it('emulates forced-colors, prefers-contrast and prefers-reduced-motion', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await emulate(args).handler(
+        {
+          params: {
+            forcedColors: 'active',
+            prefersContrast: 'more',
+            prefersReducedMotion: 'reduce',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        forcedColors: 'active',
+        prefersContrast: 'more',
+        prefersReducedMotion: 'reduce',
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Emulation configured successfully',
+      );
+    });
+
+    it('rejects unsupported values', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      assert.strictEqual(
+        schema.safeParse({forcedColors: 'inactive'}).success,
+        false,
+      );
+      assert.strictEqual(
+        schema.safeParse({prefersContrast: 'high'}).success,
+        false,
+      );
+      assert.strictEqual(
+        schema.safeParse({prefersReducedMotion: 'yes'}).success,
+        false,
+      );
     });
   });
 });

@@ -93,7 +93,10 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
+  ForcedColors,
   GeolocationOptions,
+  PrefersContrast,
+  PrefersReducedMotion,
   TextSnapshotNode,
 } from './types.js';
 import {logger} from './utils/logger.js';
@@ -550,6 +553,18 @@ export class McpPage implements ContextPage {
     return this.emulationSettings.colorScheme ?? null;
   }
 
+  get forcedColors(): ForcedColors | null {
+    return this.emulationSettings.forcedColors ?? null;
+  }
+
+  get prefersContrast(): PrefersContrast | null {
+    return this.emulationSettings.prefersContrast ?? null;
+  }
+
+  get prefersReducedMotion(): PrefersReducedMotion | null {
+    return this.emulationSettings.prefersReducedMotion ?? null;
+  }
+
   // Public for testability: tests spy on this method to verify throttle multipliers.
   createWaitForHelper(
     cpuMultiplier: number,
@@ -995,12 +1010,30 @@ export class McpPage implements ContextPage {
     await this.emulate(currentSetting);
   }
 
+  async #emulateMediaFeatures(settings: EmulationSettings): Promise<void> {
+    // `page.emulateMediaFeatures` replaces all previously emulated media
+    // features, so every supported feature is sent on each call. An empty
+    // value disables the override for that feature.
+    await this.pptrPage.emulateMediaFeatures([
+      {name: 'prefers-color-scheme', value: settings.colorScheme ?? ''},
+      {name: 'forced-colors', value: settings.forcedColors ?? ''},
+      {name: 'prefers-contrast', value: settings.prefersContrast ?? ''},
+      {
+        name: 'prefers-reduced-motion',
+        value: settings.prefersReducedMotion ?? '',
+      },
+    ]);
+  }
+
   async emulate(options: {
     networkConditions?: string;
     cpuThrottlingRate?: number;
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
     extraHttpHeaders?: Record<string, string> | undefined;
   }): Promise<void> {
@@ -1070,16 +1103,33 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.colorScheme || options.colorScheme === 'auto') {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: ''},
-      ]);
       delete newSettings.colorScheme;
     } else {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: options.colorScheme},
-      ]);
       newSettings.colorScheme = options.colorScheme;
     }
+
+    if (!options.forcedColors || options.forcedColors === 'auto') {
+      delete newSettings.forcedColors;
+    } else {
+      newSettings.forcedColors = options.forcedColors;
+    }
+
+    if (!options.prefersContrast || options.prefersContrast === 'auto') {
+      delete newSettings.prefersContrast;
+    } else {
+      newSettings.prefersContrast = options.prefersContrast;
+    }
+
+    if (
+      !options.prefersReducedMotion ||
+      options.prefersReducedMotion === 'auto'
+    ) {
+      delete newSettings.prefersReducedMotion;
+    } else {
+      newSettings.prefersReducedMotion = options.prefersReducedMotion;
+    }
+
+    await this.#emulateMediaFeatures(newSettings);
 
     if (!options.viewport) {
       delete newSettings.viewport;

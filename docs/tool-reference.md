@@ -285,8 +285,11 @@
 - **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Set to "auto" to reset to the default.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling
 - **extraHttpHeaders** (string) _(optional)_: Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.
+- **forcedColors** (enum: "active", "none", "auto") _(optional)_: [`Emulate`](#emulate) the `forced-colors` CSS media feature. Set to "auto" to reset to the default.
 - **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;,&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.
 - **networkConditions** (enum: "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Omit to disable throttling.
+- **prefersContrast** (enum: "more", "less", "custom", "no-preference", "auto") _(optional)_: [`Emulate`](#emulate) the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.
+- **prefersReducedMotion** (enum: "reduce", "no-preference", "auto") _(optional)_: [`Emulate`](#emulate) the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.
 - **userAgent** (string) _(optional)_: User agent to [`emulate`](#emulate). Set to empty string to clear the user agent override.
 - **viewport** (string) _(optional)_: [`Emulate`](#emulate) device viewports '&lt;width&gt;x&lt;height&gt;x&lt;devicePixelRatio&gt;[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to [`emulate`](#emulate) mobile devices. 'landscape' to [`emulate`](#emulate) landscape mode.
 
