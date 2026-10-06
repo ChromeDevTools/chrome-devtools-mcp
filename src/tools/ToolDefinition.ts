@@ -130,6 +130,34 @@ export interface SnapshotParams {
   filePath?: string;
 }
 
+export interface LighthouseAuditNode {
+  selector?: string;
+  snippet?: string;
+  nodeLabel?: string;
+  explanation?: string;
+}
+
+export interface LighthouseFailedAudit {
+  id: string;
+  title: string;
+  description?: string;
+  score: number;
+  displayValue?: string;
+  /**
+   * IDs of the categories that reference this audit.
+   */
+  categories: string[];
+  /**
+   * DOM nodes flagged by the audit, capped to a small number.
+   */
+  nodes: LighthouseAuditNode[];
+  /**
+   * Total number of distinct DOM nodes flagged by the audit, which may exceed
+   * the number of entries in `nodes`.
+   */
+  totalNodes: number;
+}
+
 export interface LighthouseData {
   summary: {
     mode: string;
@@ -148,6 +176,7 @@ export interface LighthouseData {
       total: number;
     };
   };
+  failedAudits: LighthouseFailedAudit[];
   reports: string[];
 }
 

@@ -915,6 +915,39 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [
+          {
+            id: 'color-contrast',
+            title:
+              'Background and foreground colors do not have a sufficient contrast ratio.',
+            description: 'Low-contrast text is difficult to read.',
+            score: 0,
+            categories: ['accessibility'],
+            nodes: [
+              {
+                selector: 'body > p',
+                snippet: '<p class="faint">',
+                nodeLabel: 'Hello',
+                explanation:
+                  'Fix any of the following:\n  Element has insufficient color contrast',
+              },
+              {
+                selector: 'a[title="Say \\"hi\\""]',
+                snippet: '<a title="Say &quot;hi&quot;">',
+                nodeLabel: 'Say "hi"\nnow',
+              },
+            ],
+            totalNodes: 12,
+          },
+          {
+            id: 'document-title',
+            title: 'Document does not have a `<title>` element',
+            score: 0,
+            categories: ['accessibility', 'seo'],
+            nodes: [],
+            totalNodes: 0,
+          },
+        ],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 
@@ -922,6 +955,7 @@ describe('lighthouse', () => {
       const {content, structuredContent} = await response.handle(context);
 
       const text = getTextContent(content[0]);
+      assert.ok(text.includes('### Failed audits'));
       assert.ok(text.includes('### Reports'));
       assert.ok(text.includes('- /tmp/report.json'));
       assert.ok(text.includes('- /tmp/report.html'));
@@ -1294,12 +1328,12 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content, structuredContent} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('## Heap Snapshot Data'));
+    assert.ok(text.includes('## Heap snapshot data'));
     assert.ok(text.includes('Statistics: '));
-    assert.ok(text.includes('Static Data: '));
-    assert.ok(text.includes('### Native Contexts'));
+    assert.ok(text.includes('Static data: '));
+    assert.ok(text.includes('### Native contexts'));
     assert.ok(text.includes('system / NativeContext'));
-    assert.ok(text.includes('### Retained by Context Summary'));
+    assert.ok(text.includes('### Retained by context summary'));
     assert.ok(text.includes('Context count: 2'));
     assert.ok(text.includes('Total size: '));
 
@@ -1352,7 +1386,7 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content, structuredContent} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('## Heap Snapshot Data'));
+    assert.ok(text.includes('## Heap snapshot data'));
     assert.ok(text.includes('Objects: 15'));
     assert.ok(text.includes('Total shallow size: '));
     assert.ok(text.includes('Showing 1-1 of 2 (Page 1 of 2).'));
@@ -1468,7 +1502,7 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('### Retaining Paths'));
+    assert.ok(text.includes('### Retaining paths'));
     assert.ok(
       text.includes('<- @10 ParentClass via property ref (distance: 1)'),
     );
@@ -1489,7 +1523,7 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('### Retaining Paths'));
+    assert.ok(text.includes('### Retaining paths'));
     assert.ok(text.includes('No retaining paths found.'));
   });
 
@@ -1510,14 +1544,14 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('### Dominator Chain'));
+    assert.ok(text.includes('### Dominator chain'));
     assert.ok(text.includes('10,DomClass'));
 
     const emptyResponse = new McpResponse(createMockParsedArguments());
     emptyResponse.setHeapSnapshotDominators([]);
     const emptyResult = await emptyResponse.handle(context);
     const emptyText = getTextContent(emptyResult.content[0]);
-    assert.ok(emptyText.includes('### Dominator Chain'));
+    assert.ok(emptyText.includes('### Dominator chain'));
     assert.ok(emptyText.includes('No dominators found.'));
   });
 
@@ -1530,7 +1564,7 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('### Heap Snapshot Diff'));
+    assert.ok(text.includes('### Heap snapshot diff'));
     assert.ok(text.includes('TestClass'));
 
     const detailedResponse = new McpResponse(createMockParsedArguments());
@@ -1539,7 +1573,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
     const detailedResult = await detailedResponse.handle(context);
     const detailedText = getTextContent(detailedResult.content[0]);
-    assert.ok(detailedText.includes('### Heap Snapshot Detailed Diff'));
+    assert.ok(detailedText.includes('### Heap snapshot detailed diff'));
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
   });
 
@@ -1566,7 +1600,7 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('### Duplicate Strings'));
+    assert.ok(text.includes('### Duplicate strings'));
     assert.ok(text.includes('duplicated-string-value'));
     assert.ok(text.includes('Showing 1-1 of 1 (Page 1 of 1).'));
 
@@ -1576,7 +1610,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
     const objectResult = await objectInfoResponse.handle(context);
     const objectText = getTextContent(objectResult.content[0]);
-    assert.ok(objectText.includes('### Object Details'));
+    assert.ok(objectText.includes('### Object details'));
     assert.ok(objectText.includes('id: @1'));
     assert.ok(objectText.includes('name: Object'));
   });
@@ -1594,7 +1628,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
     const toonResult = await toonResponse.handle(context, 'toon');
     const toonText = getTextContent(toonResult.content[0]);
-    assert.ok(toonText.includes('### Object Details'));
+    assert.ok(toonText.includes('### Object details'));
     assert.ok(toonText.includes('Object_xxx...'));
   });
 
@@ -1608,7 +1642,7 @@ describe('McpResponse heap snapshot formatting', () => {
     const {content, structuredContent} = await response.handle(context);
     const text = getTextContent(content[0]);
 
-    assert.ok(text.includes('### Context Analysis'));
+    assert.ok(text.includes('### Context analysis'));
     assert.ok(text.includes('Showing 1-2 of 2 (Page 1 of 1).'));
     assert.ok(text.includes('Context @101'));
     assert.ok(text.includes('Context @111'));

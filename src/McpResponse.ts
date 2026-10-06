@@ -1167,21 +1167,67 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
 
     if (data.lighthouseResult) {
       structuredContent.lighthouseResult = data.lighthouseResult;
-      const {summary, reports} = data.lighthouseResult;
-      response.push('## Lighthouse Audit Results');
+      const {summary, failedAudits, reports} = data.lighthouseResult;
+      response.push('## Lighthouse audit results');
       response.push(`Mode: ${summary.mode}`);
       response.push(`Device: ${summary.device}`);
       response.push(`URL: ${summary.url}`);
-      response.push('### Category Scores');
+      response.push('### Category scores');
       for (const score of summary.scores) {
         response.push(
           `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
         );
       }
-      response.push('### Audit Summary');
+      response.push('### Audit summary');
       response.push(`Passed: ${summary.audits.passed}`);
       response.push(`Failed: ${summary.audits.failed}`);
-      response.push(`Total Timing: ${summary.timing.total}ms`);
+      response.push(`Total timing: ${summary.timing.total}ms`);
+      if (failedAudits.length) {
+        response.push('### Failed audits');
+        for (const audit of failedAudits) {
+          const categories = audit.categories.length
+            ? ` [${audit.categories.join(', ')}]`
+            : '';
+          const displayValue = audit.displayValue
+            ? ` (${audit.displayValue})`
+            : '';
+          response.push(
+            `- ${audit.id}${categories}: ${audit.title}${displayValue} (score: ${audit.score})`,
+          );
+          if (audit.description) {
+            response.push(`  ${collapseWhitespace(audit.description)}`);
+          }
+          if (audit.totalNodes) {
+            const shown =
+              audit.totalNodes > audit.nodes.length
+                ? `, showing ${audit.nodes.length}`
+                : '';
+            response.push(`  Nodes (${audit.totalNodes}${shown}):`);
+          }
+          for (const node of audit.nodes) {
+            // Values are JSON-encoded so that quotes or spaces within them
+            // cannot be confused with the `key=value` delimiters.
+            const parts: string[] = [];
+            if (node.selector) {
+              parts.push(`selector=${JSON.stringify(node.selector)}`);
+            }
+            if (node.nodeLabel) {
+              parts.push(
+                `label=${JSON.stringify(collapseWhitespace(node.nodeLabel))}`,
+              );
+            }
+            if (node.snippet) {
+              parts.push(
+                `snippet=${JSON.stringify(collapseWhitespace(node.snippet))}`,
+              );
+            }
+            response.push(`  - ${parts.join(' ')}`);
+            if (node.explanation) {
+              response.push(`    ${collapseWhitespace(node.explanation)}`);
+            }
+          }
+        }
+      }
       response.push('### Reports');
       for (const report of reports) {
         response.push(`- ${report}`);
@@ -1204,7 +1250,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     if (this.#heapSnapshotOptions?.include) {
-      response.push('## Heap Snapshot Data');
+      response.push('## Heap snapshot data');
       const formatOptions = this.#heapSnapshotOptions.formatOptions ?? {};
       const stats = this.#heapSnapshotOptions.stats;
       const staticData = this.#heapSnapshotOptions.staticData;
@@ -1214,13 +1260,13 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         structuredContent.heapSnapshot.stats = stats;
       }
       if (staticData) {
-        response.push(`Static Data: ${JSON.stringify(staticData, null, 2)}`);
+        response.push(`Static data: ${JSON.stringify(staticData, null, 2)}`);
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.staticData = staticData;
       }
       const nativeContextSizes = this.#heapSnapshotOptions.nativeContextSizes;
       if (nativeContextSizes) {
-        response.push('### Native Contexts');
+        response.push('### Native contexts');
         response.push(
           HeapSnapshotFormatter.formatNativeContextSizes(
             nativeContextSizes,
@@ -1233,7 +1279,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       const retainedByContextSummary =
         this.#heapSnapshotOptions.retainedByContextSummary;
       if (retainedByContextSummary) {
-        response.push('### Retained by Context Summary');
+        response.push('### Retained by context summary');
         response.push(
           HeapSnapshotFormatter.formatRetainedByContextSummary(
             retainedByContextSummary,
@@ -1309,7 +1355,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const retainingPaths = this.#heapSnapshotOptions.retainingPaths;
       if (retainingPaths) {
-        response.push('### Retaining Paths');
+        response.push('### Retaining paths');
         const {paths, limitsReached} = retainingPaths;
         if (paths.length === 0) {
           response.push('No retaining paths found.');
@@ -1331,7 +1377,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const dominators = this.#heapSnapshotOptions.dominators;
       if (dominators) {
-        response.push('### Dominator Chain');
+        response.push('### Dominator chain');
         if (dominators.length === 0) {
           response.push('No dominators found.');
         } else {
@@ -1343,7 +1389,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const classDiffs = this.#heapSnapshotOptions.classDiffs;
       if (classDiffs) {
-        response.push('### Heap Snapshot Diff');
+        response.push('### Heap snapshot diff');
         response.push(
           compactEncode
             ? compactEncode(classDiffs)
@@ -1353,7 +1399,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const detailedClassDiff = this.#heapSnapshotOptions.detailedClassDiff;
       if (detailedClassDiff) {
-        response.push('### Heap Snapshot Detailed Diff');
+        response.push('### Heap snapshot detailed diff');
         response.push(
           compactEncode
             ? compactEncode(detailedClassDiff)
@@ -1363,7 +1409,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const duplicateStrings = this.#heapSnapshotOptions.duplicateStrings;
       if (duplicateStrings) {
-        response.push('### Duplicate Strings');
+        response.push('### Duplicate strings');
         const paginationData = this.#dataWithPagination(
           duplicateStrings,
           this.#heapSnapshotOptions.pagination,
@@ -1382,7 +1428,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const objectInfo = this.#heapSnapshotOptions.objectInfo;
       if (objectInfo) {
-        response.push('### Object Details');
+        response.push('### Object details');
         if (compactEncode) {
           response.push(
             compactEncode({
@@ -1414,7 +1460,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           scriptsWithoutScopes: contextAnalysis.scriptsWithoutScopes,
         };
 
-        response.push('### Context Analysis');
+        response.push('### Context analysis');
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
         response.push(
@@ -1692,6 +1738,10 @@ function truncateTitle(title: string, maxLength = 50): string {
   }
   return title.slice(0, maxLength - 3) + '...';
 }
+
+const collapseWhitespace = (value: string): string => {
+  return value.replace(/\s+/g, ' ').trim();
+};
 
 function createStructuredPage(
   mcpPage: McpPage,

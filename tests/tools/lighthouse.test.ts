@@ -50,6 +50,7 @@ describe('lighthouse', () => {
         assert.equal(data.summary.mode, 'navigation');
         assert.equal(data.summary.device, 'desktop');
         assert.ok(data.reports.length === 2); // json, html
+        assert.equal(data.failedAudits.length, data.summary.audits.failed);
 
         // Verify files exist
         for (const reportPath of data.reports) {
@@ -256,6 +257,152 @@ describe('lighthouse', () => {
       assert.equal(summary.mode, 'snapshot');
       assert.equal(summary.device, 'mobile');
       assert.deepEqual(reports, [`${reportPath}.json`, `${reportPath}.html`]);
+    });
+
+    it('returns failing audits with their DOM nodes inline', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.saveTemporaryFile.resolves({filepath: 'report.json'});
+      const node = (
+        id: number,
+      ): {
+        type: 'node';
+        lhId: string;
+        selector: string;
+        snippet: string;
+        nodeLabel: string;
+      } => ({
+        type: 'node',
+        lhId: `node-${id}`,
+        selector: `div.item-${id}`,
+        snippet: `<div class="item-${id}">`,
+        nodeLabel: `Item ${id}`,
+      });
+      sinon.stub(lighthouseRunner, 'snapshot').resolves(
+        createMockRunnerResult({
+          categories: {
+            accessibility: {
+              id: 'accessibility',
+              title: 'Accessibility',
+              score: 0.5,
+              auditRefs: [
+                {id: 'color-contrast', weight: 7},
+                {id: 'document-title', weight: 7},
+                {id: 'html-has-lang', weight: 7},
+              ],
+            },
+            seo: {
+              id: 'seo',
+              title: 'SEO',
+              score: 0.5,
+              auditRefs: [{id: 'document-title', weight: 1}],
+            },
+          },
+          audits: {
+            'color-contrast': {
+              id: 'color-contrast',
+              title: 'Insufficient contrast',
+              description: 'Low-contrast text is difficult to read.',
+              score: 0,
+              scoreDisplayMode: 'binary',
+              details: {
+                type: 'table',
+                headings: [],
+                items: [
+                  {
+                    node: {
+                      ...node(1),
+                      explanation: 'Fix any of the following: contrast',
+                    },
+                    subItems: {
+                      type: 'subitems',
+                      items: [{relatedNode: node(2)}],
+                    },
+                  },
+                  // Duplicate node, which must only be reported once.
+                  {node: node(1)},
+                  ...Array.from({length: 12}, (_, i) => ({node: node(i + 3)})),
+                ],
+                debugData: {type: 'debugdata', node: node(99)},
+              },
+            },
+            'document-title': {
+              id: 'document-title',
+              title: 'Missing title',
+              description: 'Titles matter.',
+              score: 0,
+              scoreDisplayMode: 'binary',
+              displayValue: '1 issue',
+              details: {
+                type: 'list',
+                items: [
+                  {type: 'table', headings: [], items: [{node: node(50)}]},
+                ],
+              },
+            },
+            'html-has-lang': {
+              id: 'html-has-lang',
+              title: 'Has lang',
+              description: '',
+              score: 1,
+              scoreDisplayMode: 'binary',
+            },
+            'manual-audit': {
+              id: 'manual-audit',
+              title: 'Manual',
+              description: '',
+              score: null,
+              scoreDisplayMode: 'manual',
+            },
+          },
+        }),
+      );
+
+      await lighthouseAudit(args).handler(
+        {params: {mode: 'snapshot', device: 'desktop'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(response.attachLighthouseResult);
+      const {summary, failedAudits} =
+        response.attachLighthouseResult.firstCall.args[0];
+      assert.deepEqual(summary.audits, {failed: 2, passed: 1});
+      assert.equal(failedAudits.length, 2);
+
+      const [contrast, title] = failedAudits;
+      assert.equal(contrast.id, 'color-contrast');
+      assert.deepEqual(contrast.categories, ['accessibility']);
+      assert.equal(
+        contrast.description,
+        'Low-contrast text is difficult to read.',
+      );
+      assert.equal(contrast.totalNodes, 14);
+      assert.equal(contrast.nodes.length, 10);
+      assert.deepEqual(contrast.nodes[0], {
+        selector: 'div.item-1',
+        snippet: '<div class="item-1">',
+        nodeLabel: 'Item 1',
+        explanation: 'Fix any of the following: contrast',
+      });
+      assert.equal(contrast.nodes[1].selector, 'div.item-2');
+      assert.ok(!contrast.nodes.some(n => n.selector === 'div.item-99'));
+
+      assert.deepEqual(title, {
+        id: 'document-title',
+        title: 'Missing title',
+        description: 'Titles matter.',
+        score: 0,
+        displayValue: '1 issue',
+        categories: ['accessibility', 'seo'],
+        nodes: [
+          {
+            selector: 'div.item-50',
+            snippet: '<div class="item-50">',
+            nodeLabel: 'Item 50',
+          },
+        ],
+        totalNodes: 1,
+      });
     });
   });
 });
