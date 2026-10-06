@@ -276,6 +276,30 @@ export const commands: Commands = {
         required: false,
         enum: ['dark', 'light', 'auto'],
       },
+      forcedColors: {
+        name: 'forcedColors',
+        type: 'string',
+        description:
+          'Emulate the `forced-colors` CSS media feature. Set to "auto" to reset to the default.',
+        required: false,
+        enum: ['active', 'none', 'auto'],
+      },
+      prefersContrast: {
+        name: 'prefersContrast',
+        type: 'string',
+        description:
+          'Emulate the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.',
+        required: false,
+        enum: ['more', 'less', 'custom', 'no-preference', 'auto'],
+      },
+      prefersReducedMotion: {
+        name: 'prefersReducedMotion',
+        type: 'string',
+        description:
+          'Emulate the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.',
+        required: false,
+        enum: ['reduce', 'no-preference', 'auto'],
+      },
       viewport: {
         name: 'viewport',
         type: 'string',

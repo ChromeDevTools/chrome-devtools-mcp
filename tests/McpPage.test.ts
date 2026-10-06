@@ -20,6 +20,7 @@ import {
   createMockMcpResponse,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
+  getMockCdpClient,
 } from './mocks.js';
 import {serverHooks} from './server.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
@@ -539,24 +540,94 @@ describe('McpPage', () => {
       });
     });
 
-    it('calls emulateMediaFeatures with dark color scheme', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      await mcpPage.emulate({colorScheme: 'dark'});
-      assert.strictEqual(mcpPage.colorScheme, 'dark');
-      sinon.assert.calledOnceWithExactly(pptrPage.emulateMediaFeatures, [
-        {name: 'prefers-color-scheme', value: 'dark'},
-      ]);
-    });
+    describe('media features', () => {
+      const createMcpPageWithMediaStub = async () => {
+        const {mcpPage, pptrPage} = await createMcpPage();
+        const setEmulatedMedia = getMockCdpClient(pptrPage).send.withArgs(
+          'Emulation.setEmulatedMedia',
+        );
+        return {mcpPage, setEmulatedMedia};
+      };
 
-    it('calls emulateMediaFeatures with empty string to reset color scheme', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      await mcpPage.emulate({colorScheme: 'dark'});
-      await mcpPage.emulate({colorScheme: 'auto'});
-      assert.strictEqual(mcpPage.colorScheme, null);
-      sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
-      sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
-        {name: 'prefers-color-scheme', value: ''},
-      ]);
+      it('emulates all media features in a single call', async () => {
+        const {mcpPage, setEmulatedMedia} = await createMcpPageWithMediaStub();
+        await mcpPage.emulate({
+          colorScheme: 'dark',
+          forcedColors: 'active',
+          prefersContrast: 'more',
+          prefersReducedMotion: 'reduce',
+        });
+        assert.strictEqual(mcpPage.colorScheme, 'dark');
+        assert.strictEqual(mcpPage.forcedColors, 'active');
+        assert.strictEqual(mcpPage.prefersContrast, 'more');
+        assert.strictEqual(mcpPage.prefersReducedMotion, 'reduce');
+        sinon.assert.calledOnceWithExactly(
+          setEmulatedMedia,
+          'Emulation.setEmulatedMedia',
+          {
+            features: [
+              {name: 'prefers-color-scheme', value: 'dark'},
+              {name: 'forced-colors', value: 'active'},
+              {name: 'prefers-contrast', value: 'more'},
+              {name: 'prefers-reduced-motion', value: 'reduce'},
+            ],
+          },
+        );
+      });
+
+      it('resets media features set to auto', async () => {
+        const {mcpPage, setEmulatedMedia} = await createMcpPageWithMediaStub();
+        await mcpPage.emulate({
+          colorScheme: 'dark',
+          forcedColors: 'active',
+          prefersContrast: 'more',
+          prefersReducedMotion: 'reduce',
+        });
+        await mcpPage.emulate({
+          colorScheme: 'auto',
+          forcedColors: 'auto',
+          prefersContrast: 'auto',
+          prefersReducedMotion: 'auto',
+        });
+        assert.strictEqual(mcpPage.colorScheme, null);
+        assert.strictEqual(mcpPage.forcedColors, null);
+        assert.strictEqual(mcpPage.prefersContrast, null);
+        assert.strictEqual(mcpPage.prefersReducedMotion, null);
+        sinon.assert.calledTwice(setEmulatedMedia);
+        sinon.assert.calledWithExactly(
+          setEmulatedMedia.secondCall,
+          'Emulation.setEmulatedMedia',
+          {
+            features: [
+              {name: 'prefers-color-scheme', value: ''},
+              {name: 'forced-colors', value: ''},
+              {name: 'prefers-contrast', value: ''},
+              {name: 'prefers-reduced-motion', value: ''},
+            ],
+          },
+        );
+      });
+
+      it('resets omitted media features', async () => {
+        const {mcpPage, setEmulatedMedia} = await createMcpPageWithMediaStub();
+        await mcpPage.emulate({forcedColors: 'active'});
+        await mcpPage.emulate({prefersContrast: 'less'});
+        assert.strictEqual(mcpPage.forcedColors, null);
+        assert.strictEqual(mcpPage.prefersContrast, 'less');
+        sinon.assert.calledTwice(setEmulatedMedia);
+        sinon.assert.calledWithExactly(
+          setEmulatedMedia.secondCall,
+          'Emulation.setEmulatedMedia',
+          {
+            features: [
+              {name: 'prefers-color-scheme', value: ''},
+              {name: 'forced-colors', value: ''},
+              {name: 'prefers-contrast', value: 'less'},
+              {name: 'prefers-reduced-motion', value: ''},
+            ],
+          },
+        );
+      });
     });
 
     it('calls setViewport with the given dimensions merged with defaults', async () => {

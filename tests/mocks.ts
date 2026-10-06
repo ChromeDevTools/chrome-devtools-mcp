@@ -212,19 +212,40 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   // in the McpPage constructor. Not on the CdpPage prototype, so added
   // explicitly. It needs real on/off/emit behavior so tests can trigger CDP
   // events directly via cdpSession.emit(...).
+  const cdpSession = createMockCdpClient();
+  // @ts-expect-error internal API
+  page._client = sinon.stub().returns(cdpSession);
+  mockCdpClients.set(page, cdpSession);
+
+  return page;
+}
+
+const createMockCdpClient = () => {
   const cdpListener = mockListener();
-  const cdpSession = {
+  return {
     on: sinon.stub().callsFake(cdpListener.on),
     off: sinon.stub().callsFake(cdpListener.off),
     send: sinon.stub().resolves({}),
     target: sinon.stub().returns({_targetId: '<mock>'}),
     emit: cdpListener.emit,
   };
-  // @ts-expect-error internal API
-  page._client = sinon.stub().returns(cdpSession);
+};
 
-  return page;
-}
+type MockCdpClient = ReturnType<typeof createMockCdpClient>;
+
+const mockCdpClients = new WeakMap<Page, MockCdpClient>();
+
+/**
+ * Returns the mocked CDP session that `_client()` returns for a page created
+ * by `createMockPuppeteerPage()`.
+ */
+export const getMockCdpClient = (page: Page): MockCdpClient => {
+  const client = mockCdpClients.get(page);
+  if (!client) {
+    throw new Error('Page was not created by createMockPuppeteerPage()');
+  }
+  return client;
+};
 
 export class MockTarget extends Target {
   override asPage(): Promise<Page> {

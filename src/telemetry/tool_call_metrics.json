@@ -105,6 +105,18 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "forced_colors",
+        "argType": "string"
+      },
+      {
+        "name": "prefers_contrast",
+        "argType": "string"
+      },
+      {
+        "name": "prefers_reduced_motion",
+        "argType": "string"
       }
     ]
   },
