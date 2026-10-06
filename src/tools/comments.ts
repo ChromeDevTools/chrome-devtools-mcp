@@ -15,7 +15,7 @@ export type CommentThreadPayload = CD4ACommentThread;
 export type RevealTargetPayload = CD4ARevealTarget;
 
 const DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE =
-  'DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet, or the feature is disabled. Update Chrome or continue without DevTools comments.';
+  'DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet. Update Chrome or continue without DevTools comments.';
 
 export const openDevtools = definePageTool(() => ({
   name: 'open_devtools',
