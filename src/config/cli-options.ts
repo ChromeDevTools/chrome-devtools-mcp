@@ -1334,6 +1334,13 @@ export const commands: Commands = {
         required: false,
         default: true,
       },
+      ignoreCache: {
+        name: 'ignoreCache',
+        type: 'boolean',
+        description:
+          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
+        required: false,
+      },
       filePath: {
         name: 'filePath',
         type: 'string',

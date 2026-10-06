@@ -60,6 +60,7 @@ export {
   Target,
   TargetType,
   TimeoutError,
+  Tracing,
   WebWorker,
   WebMCP,
   WebMCPTool,
