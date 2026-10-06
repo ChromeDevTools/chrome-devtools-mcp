@@ -16,6 +16,7 @@ import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 
 import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
+import {createTempFile} from './utils.js';
 
 describe('McpServer', () => {
   afterEach(() => {
@@ -106,6 +107,78 @@ describe('McpServer', () => {
       assert.deepStrictEqual(result.content, [
         {type: 'text', text: 'Tool list_pages not found'},
       ]);
+    });
+  });
+
+  describe('oninitialized', () => {
+    const tempDirectoryWarning =
+      '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
+      'capability. File-writing tools will be restricted to the OS temp directory. ' +
+      'To restore the previous unrestricted behavior, start the server with ' +
+      '--allow-unrestricted-paths.';
+
+    async function warnOnInitialized(
+      extraArgs: string[] = [],
+      clientHasRoots = false,
+    ) {
+      const {server} = await createTestServer(extraArgs);
+      const protocol = server.server.server;
+      sinon
+        .stub(protocol, 'getClientCapabilities')
+        .returns(clientHasRoots ? {roots: {}} : {});
+      sinon.stub(protocol, 'getClientVersion').returns(undefined);
+      if (clientHasRoots) {
+        sinon.stub(protocol, 'request').resolves({roots: []});
+      }
+      const warnStub = sinon.stub(console, 'warn');
+      const oninitialized = protocol.oninitialized;
+      assert.ok(oninitialized);
+      oninitialized();
+      await Promise.resolve();
+      return warnStub;
+    }
+
+    it('warns when default flags meet a client without roots', async () => {
+      const warnStub = await warnOnInitialized();
+
+      sinon.assert.calledOnceWithExactly(warnStub, tempDirectoryWarning);
+    });
+
+    it('warns when filesystem roots are explicitly empty', async () => {
+      using configFile = createTempFile(
+        JSON.stringify({filesystemRoot: []}),
+        'cd4a.test.config.empty-filesystem-root.json',
+      );
+
+      const warnStub = await warnOnInitialized(['--config', configFile.path]);
+
+      sinon.assert.calledOnceWithExactly(warnStub, tempDirectoryWarning);
+    });
+
+    it('does not warn for an explicit workspace', async () => {
+      const warnStub = await warnOnInitialized([
+        '--workspace=/tmp/explicit-workspace',
+      ]);
+
+      sinon.assert.notCalled(warnStub);
+    });
+
+    it('does not warn when unrestricted paths are allowed', async () => {
+      const warnStub = await warnOnInitialized(['--allow-unrestricted-paths']);
+
+      sinon.assert.notCalled(warnStub);
+    });
+
+    it('does not warn when started via the CLI', async () => {
+      const warnStub = await warnOnInitialized(['--viaCli']);
+
+      sinon.assert.notCalled(warnStub);
+    });
+
+    it('does not warn when the client negotiates roots', async () => {
+      const warnStub = await warnOnInitialized([], true);
+
+      sinon.assert.notCalled(warnStub);
     });
   });
 });
