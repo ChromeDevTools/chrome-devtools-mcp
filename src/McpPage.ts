@@ -478,16 +478,20 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  /**
+   * Returns the comment bridge attached to the DevTools page, or undefined if
+   * the DevTools page does not support DevTools comments.
+   */
   async ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge> {
+  ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
       this.#commentBridge = new DevToolsCommentBridge({
         onNotification: this.#onNotification,
       });
     }
-    await this.#commentBridge.attach(devtoolsPage);
-    return this.#commentBridge;
+    const attached = await this.#commentBridge.attach(devtoolsPage);
+    return attached ? this.#commentBridge : undefined;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {

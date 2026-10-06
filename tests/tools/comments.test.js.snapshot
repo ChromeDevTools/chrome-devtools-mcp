@@ -2,12 +2,20 @@ exports[`comments tools > get_devtools_comments > reports error when DevTools wi
 DevTools window is not open for this page. Call open_devtools first to open DevTools.
 `;
 
+exports[`comments tools > get_devtools_comments > reports when DevTools comments are unavailable 1`] = `
+DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet, or the feature is disabled. Update Chrome or continue without DevTools comments.
+`;
+
 exports[`comments tools > resolve_devtools_comment > reports error when DevTools window is not open 1`] = `
 DevTools window is not open for this page. Call open_devtools first to open DevTools.
 `;
 
 exports[`comments tools > resolve_devtools_comment > reports error when thread is not found 1`] = `
 Failed to resolve comment thread "comment-nonexistent". Thread not found.
+`;
+
+exports[`comments tools > resolve_devtools_comment > reports when DevTools comments are unavailable 1`] = `
+DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet, or the feature is disabled. Update Chrome or continue without DevTools comments.
 `;
 
 exports[`comments tools > resolve_devtools_comment > resolves comment thread and appends reply text 1`] = `
@@ -17,6 +25,10 @@ Agent reply added: "Updated background color in index.css"
 
 exports[`comments tools > reveal_in_devtools > reports error when DevTools window is not open 1`] = `
 DevTools window is not open for this page. Call open_devtools first to open DevTools.
+`;
+
+exports[`comments tools > reveal_in_devtools > reports when DevTools comments are unavailable 1`] = `
+DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet, or the feature is disabled. Update Chrome or continue without DevTools comments.
 `;
 
 exports[`comments tools > reveal_in_devtools > reveals element by snapshot uid 1`] = `

@@ -431,7 +431,7 @@ export type ContextPage = Readonly<{
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge>;
+  ): Promise<DevToolsCommentBridge | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

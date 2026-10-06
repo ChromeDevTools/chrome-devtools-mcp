@@ -34,9 +34,41 @@ export class DevToolsCommentBridge {
     return this.#attachedPages.has(devtoolsPage);
   }
 
-  async attach(devtoolsPage: Page): Promise<void> {
+  /**
+   * Attaches to the DevTools page if it exposes the CD4A bridge.
+   *
+   * Returns false if the bridge does not exist, e.g., because the connected
+   * Chrome version does not support DevTools comments or the feature is
+   * disabled. Negative results are not cached so that a DevTools window that
+   * has not finished loading yet is checked again on the next call.
+   */
+  async attach(devtoolsPage: Page): Promise<boolean> {
     if (this.#attachedPages.has(devtoolsPage)) {
-      return;
+      return true;
+    }
+
+    let hasBridge = false;
+    try {
+      hasBridge = await devtoolsPage.evaluate(() => {
+        const cd4aBridge = window.universe?.cd4aBridge;
+        if (!cd4aBridge) {
+          return false;
+        }
+        window.__onDevToolsCommentListener = () => {
+          window.__onDevToolsCommentEvent?.();
+        };
+        cd4aBridge.addEventListener(
+          'CommentThreadsChanged',
+          window.__onDevToolsCommentListener,
+        );
+        cd4aBridge.setAgentAttached(true);
+        return true;
+      });
+    } catch (e) {
+      logger?.('DevToolsCommentBridge: evaluate failed', e);
+    }
+    if (!hasBridge) {
+      return false;
     }
     this.#attachedPages.add(devtoolsPage);
 
@@ -50,21 +82,7 @@ export class DevToolsCommentBridge {
         e,
       );
     }
-
-    try {
-      await devtoolsPage.evaluate(() => {
-        window.__onDevToolsCommentListener = () => {
-          window.__onDevToolsCommentEvent?.();
-        };
-        window.universe?.cd4aBridge?.addEventListener(
-          'CommentThreadsChanged',
-          window.__onDevToolsCommentListener,
-        );
-        window.universe?.cd4aBridge?.setAgentAttached(true);
-      });
-    } catch (e) {
-      logger?.('DevToolsCommentBridge: evaluate failed', e);
-    }
+    return true;
   }
 
   async getComments(devtoolsPage: Page): Promise<CD4ACommentThread[]> {

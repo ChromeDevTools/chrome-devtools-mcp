@@ -853,6 +853,7 @@ describe('McpPage', () => {
     it('creates and attaches commentBridge when openDevTools is called', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
       assert.strictEqual(mcpPage.commentBridge, undefined);
@@ -861,6 +862,28 @@ describe('McpPage', () => {
       assert.strictEqual(result, devtoolsPage);
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    });
+
+    it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
+      const {mcpPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.notStrictEqual(bridge, undefined);
+      assert.strictEqual(bridge, mcpPage.commentBridge);
+    });
+
+    it('returns undefined when the DevTools page has no CD4A bridge', async () => {
+      const {mcpPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(false);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.strictEqual(bridge, undefined);
+      sinon.assert.notCalled(devtoolsPage.exposeFunction);
     });
 
     it('disposes commentBridge on mcpPage.dispose()', async () => {

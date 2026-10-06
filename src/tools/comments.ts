@@ -14,6 +14,9 @@ import {definePageTool} from './ToolDefinition.js';
 export type CommentThreadPayload = CD4ACommentThread;
 export type RevealTargetPayload = CD4ARevealTarget;
 
+const DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE =
+  'DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet, or the feature is disabled. Update Chrome or continue without DevTools comments.';
+
 export const openDevtools = definePageTool(() => ({
   name: 'open_devtools',
   description: 'Open a DevTools window for the selected page.',
@@ -60,6 +63,10 @@ export const getDevtoolsComments = definePageTool(() => ({
     }
 
     const bridge = await page.ensureDevToolsCommentBridge(devtoolsPage);
+    if (!bridge) {
+      response.appendResponseLine(DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE);
+      return;
+    }
     const threads = await bridge.getComments(devtoolsPage);
 
     response.setDevToolsComments(threads);
@@ -97,6 +104,11 @@ export const resolveDevtoolsComment = definePageTool(() => ({
       response.appendResponseLine(
         'DevTools window is not open for this page. Call open_devtools first to open DevTools.',
       );
+      return;
+    }
+
+    if (!(await page.ensureDevToolsCommentBridge(devtoolsPage))) {
+      response.appendResponseLine(DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE);
       return;
     }
 
@@ -162,6 +174,11 @@ export const revealInDevtools = definePageTool(() => ({
       response.appendResponseLine(
         'DevTools window is not open for this page. Call open_devtools first to open DevTools.',
       );
+      return;
+    }
+
+    if (!(await page.ensureDevToolsCommentBridge(devtoolsPage))) {
+      response.appendResponseLine(DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE);
       return;
     }
 
