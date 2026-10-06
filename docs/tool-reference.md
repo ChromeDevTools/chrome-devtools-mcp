@@ -327,6 +327,7 @@
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **autoStop** (boolean) _(optional)_: Determines if the trace recording should be automatically stopped.
 - **filePath** (string) _(optional)_: The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).
+- **ignoreCache** (boolean) _(optional)_: Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.
 - **reload** (boolean) _(optional)_: Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the [`navigate_page`](#navigate_page) tool BEFORE starting the trace if reload or autoStop is set to true.
 
 ---

@@ -466,6 +466,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "ignore_cache",
+        "argType": "boolean"
       }
     ]
   },

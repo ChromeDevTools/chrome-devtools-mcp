@@ -49,7 +49,9 @@ describe('performance', () => {
       await withMcpContext(async (response, context, args) => {
         context.setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
-        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://trace.example/');
         sinon.stub(selectedPage, 'goto').resolves(null);
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace(args).handler(
@@ -82,7 +84,9 @@ describe('performance', () => {
     it('can navigate to about:blank and record a page reload', async () => {
       await withMcpContext(async (response, context, args) => {
         const selectedPage = context.getSelectedMcpPage().pptrPage;
-        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://trace.example/');
         const gotoStub = sinon.stub(selectedPage, 'goto');
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         await startTrace(args).handler(
@@ -97,7 +101,7 @@ describe('performance', () => {
         sinon.assert.calledWithExactly(gotoStub, 'about:blank', {
           waitUntil: 'load',
         });
-        sinon.assert.calledWithExactly(gotoStub, 'https://www.test.com', {
+        sinon.assert.calledWithExactly(gotoStub, 'https://trace.example/', {
           waitUntil: ['load'],
         });
         assert.ok(context.isRunningPerformanceTrace());
@@ -109,12 +113,72 @@ describe('performance', () => {
       });
     });
 
+    it('disables the cache during the reload when ignoreCache is set', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const selectedPage = context.getSelectedMcpPage().pptrPage;
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://cold-load.example/');
+        const gotoStub = sinon.stub(selectedPage, 'goto').resolves(null);
+        const setCacheEnabledStub = sinon.stub(selectedPage, 'setCacheEnabled');
+        sinon.stub(selectedPage.tracing, 'start');
+        await startTrace(args).handler(
+          {
+            params: {reload: true, autoStop: false, ignoreCache: true},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        sinon.assert.calledTwice(setCacheEnabledStub);
+        sinon.assert.calledWithExactly(setCacheEnabledStub.firstCall, false);
+        sinon.assert.calledWithExactly(setCacheEnabledStub.secondCall, true);
+        sinon.assert.calledWithExactly(
+          gotoStub.secondCall,
+          'https://cold-load.example/',
+          {waitUntil: ['load']},
+        );
+        assert.ok(
+          setCacheEnabledStub.firstCall.calledAfter(gotoStub.firstCall) &&
+            setCacheEnabledStub.firstCall.calledBefore(gotoStub.secondCall),
+          'Cache is disabled right before the traced navigation',
+        );
+        assert.ok(
+          setCacheEnabledStub.secondCall.calledAfter(gotoStub.secondCall),
+          'Cache is re-enabled after the traced navigation',
+        );
+      });
+    });
+
+    it('does not touch the cache when ignoreCache is not set', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const selectedPage = context.getSelectedMcpPage().pptrPage;
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://cold-load.example/');
+        sinon.stub(selectedPage, 'goto').resolves(null);
+        const setCacheEnabledStub = sinon.stub(selectedPage, 'setCacheEnabled');
+        sinon.stub(selectedPage.tracing, 'start');
+        await startTrace(args).handler(
+          {
+            params: {reload: true, autoStop: false},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        sinon.assert.notCalled(setCacheEnabledStub);
+      });
+    });
+
     it('can autostop and store a recording', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
 
       await withMcpContext(async (response, context, args) => {
         const selectedPage = context.getSelectedMcpPage().pptrPage;
-        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://trace.example/');
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         const startTracingStub = sinon.stub(selectedPage.tracing, 'start');
         const stopTracingStub = sinon
@@ -178,7 +242,9 @@ describe('performance', () => {
     it('resets the running flag if a setup step throws', async () => {
       await withMcpContext(async (response, context, args) => {
         const selectedPage = context.getSelectedMcpPage().pptrPage;
-        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://trace.example/');
         const gotoStub = sinon
           .stub(selectedPage, 'goto')
           .rejects(new Error('Navigation failed'));
@@ -225,7 +291,9 @@ describe('performance', () => {
       await withMcpContext(async (response, context, args) => {
         const filePath = 'test-trace.json.gz';
         const selectedPage = context.getSelectedMcpPage().pptrPage;
-        sinon.stub(selectedPage, 'url').callsFake(() => 'https://www.test.com');
+        sinon
+          .stub(selectedPage, 'url')
+          .callsFake(() => 'https://trace.example/');
         sinon.stub(selectedPage, 'goto').callsFake(() => Promise.resolve(null));
         sinon.stub(selectedPage.tracing, 'start');
         sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
