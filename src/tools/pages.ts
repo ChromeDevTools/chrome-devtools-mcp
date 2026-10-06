@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {McpPage} from '../McpPage.js';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
@@ -134,19 +135,46 @@ export const newPage = defineTool((args: ParsedArguments) => {
         fileNavigations: args?.fileNavigations,
       });
 
+      let previousPage: McpPage | undefined;
+      try {
+        previousPage = context.getSelectedMcpPage();
+      } catch {
+        previousPage = undefined;
+      }
+
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
       );
 
-      await page.waitForEventsAfterAction(
-        async () => {
-          await page.pptrPage.goto(request.params.url, {
-            timeout: request.params.timeout,
-          });
-        },
-        {timeout: request.params.timeout},
-      );
+      try {
+        await page.waitForEventsAfterAction(
+          async () => {
+            await page.pptrPage.goto(request.params.url, {
+              timeout: request.params.timeout,
+            });
+          },
+          {timeout: request.params.timeout},
+        );
+      } catch (error) {
+        // The tab is created and selected before navigation starts, so a
+        // failed navigation leaves a stray tab behind as the selected page.
+        // Restore the state from before this call: re-select the previously
+        // selected page and close the failed tab, then surface the original
+        // navigation error.
+        try {
+          const failedPage = context.getSelectedMcpPage();
+          if (failedPage === page) {
+            if (previousPage && !previousPage.isClosed()) {
+              context.selectPage(previousPage);
+            }
+            await context.closePage(failedPage.id);
+          }
+        } catch {
+          // Best-effort cleanup: always surface the original error below.
+        }
+        throw error;
+      }
 
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();

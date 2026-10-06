@@ -438,6 +438,27 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
+    it('closes the failed tab and restores the previous selection when navigation fails', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const originalPage = context.getSelectedMcpPage();
+
+          await assert.rejects(async () => {
+            await newPage(args).handler(
+              {params: {url: 'http://127.0.0.1:1/blocked'}},
+              response,
+              context,
+            );
+          }, /blocked by blocklist/);
+
+          // The tab opened by the failed new_page is closed again and the
+          // previously selected page is selected once more.
+          assert.strictEqual(context.getPages().length, 1);
+          assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+        },
+        {blockedUrlPattern: ['http://127.0.0.1:1/blocked']},
+      );
+    });
   });
   describe('new_page with isolatedContext', () => {
     it('creates a page in an isolated context', async () => {
