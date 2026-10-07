@@ -217,6 +217,13 @@ export class ConfigParser {
       resolvedArgs.usageStatistics = false;
     }
 
+    if (
+      resolvedArgs.categoryExperimentalThirdParty === undefined &&
+      this.env['CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY']
+    ) {
+      resolvedArgs.categoryExperimentalThirdParty = true;
+    }
+
     // The merge and the default loop lose the static type that yargs infers from
     // `mcpOptions`. Every value was produced by the same option definitions (CLI
     // parser, strict config-file parser, option defaults), so the shape matches.
