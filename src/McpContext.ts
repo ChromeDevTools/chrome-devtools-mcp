@@ -10,8 +10,8 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
-import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import type {
+  HeapSnapshotManager,
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
@@ -77,6 +77,8 @@ interface McpContextOptions {
   categoryExtensions?: boolean;
   // Callback when a notification should be emitted to MCP client.
   onNotification?: (message: string) => void;
+  // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
+  heapSnapshotManager: HeapSnapshotManager;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -114,7 +116,7 @@ export class McpContext implements Context {
 
   #locatorClass: typeof Locator;
   #options: McpContextOptions;
-  #heapSnapshotManager = new HeapSnapshotManager();
+  #heapSnapshotManager: HeapSnapshotManager;
   #roots: Root[] | undefined = undefined;
   #allowUnrestrictedPaths: boolean;
 
@@ -134,6 +136,7 @@ export class McpContext implements Context {
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
+    this.#heapSnapshotManager = options.heapSnapshotManager;
     this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
     this.#reconnectNotice = options.reconnected ?? false;
 
@@ -156,7 +159,6 @@ export class McpContext implements Context {
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
     this.#serviceWorkerConsoleCollector.dispose();
-    this.#heapSnapshotManager.dispose();
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
@@ -868,10 +870,6 @@ export class McpContext implements Context {
 
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
     return this.#heapSnapshotManager.disposeSnapshot(filePath);
-  }
-
-  hasHeapSnapshots(): boolean {
-    return this.#heapSnapshotManager.hasSnapshots();
   }
 
   async getHeapSnapshotRetainingPaths(

@@ -12,6 +12,7 @@ import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
+import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -60,6 +61,7 @@ export class McpServer {
   #serverArgs: ParsedArguments;
   #browserManager: BrowserManager;
   #context?: McpContext;
+  #heapSnapshotManager = new HeapSnapshotManager();
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
@@ -182,6 +184,7 @@ export class McpServer {
     } finally {
       this.#context = undefined;
     }
+    this.#heapSnapshotManager.dispose();
     await Promise.allSettled([
       this.#browserManager.close(),
       this.server.close(),
@@ -274,6 +277,7 @@ export class McpServer {
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
+        heapSnapshotManager: this.#heapSnapshotManager,
         onNotification: (message: string) => {
           void this.server
             .sendLoggingMessage({
