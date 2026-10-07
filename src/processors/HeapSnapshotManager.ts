@@ -66,6 +66,10 @@ export class HeapSnapshotManager {
       classKeyToId: Map<string, number>;
     }
   >();
+  #loadingSnapshots = new Map<
+    string,
+    Promise<DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy>
+  >();
 
   async getSnapshot(
     filePath: string,
@@ -81,25 +85,38 @@ export class HeapSnapshotManager {
       return cached.snapshot;
     }
 
-    const uid = this.#snapshotIdGenerator();
-    const {snapshot, worker} = await this.#loadSnapshot(absolutePath, uid);
-    this.#snapshots.set(absolutePath, {
-      snapshot,
-      worker,
-      idToClassKey: [''],
-      classKeyToId: new Map<string, number>(),
-    });
-    // Assign ids to all aggregates of this snapshot. This ensures ids are available
-    // even without calling getAggregates() and deterministic (do not depend on
-    // the filter used on the getAggregates() call).
-    const aggregates = await snapshot.aggregatesWithFilter(
-      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter(),
-    );
-    for (const key of Object.keys(aggregates)) {
-      this.getOrCreateIdForClassKey(filePath, key);
+    const inFlight = this.#loadingSnapshots.get(absolutePath);
+    if (inFlight) {
+      return await inFlight;
     }
 
-    return snapshot;
+    const uid = this.#snapshotIdGenerator();
+    const loadPromise = (async () => {
+      try {
+        const {snapshot, worker} = await this.#loadSnapshot(absolutePath, uid);
+        // Assign ids to all aggregates of this snapshot. This ensures ids are available
+        // even without calling getAggregates() and deterministic (do not depend on
+        // the filter used on the getAggregates() call).
+        const aggregates = await snapshot.aggregatesWithFilter(
+          new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter(),
+        );
+        this.#snapshots.set(absolutePath, {
+          snapshot,
+          worker,
+          idToClassKey: [''],
+          classKeyToId: new Map<string, number>(),
+        });
+        for (const key of Object.keys(aggregates)) {
+          this.getOrCreateIdForClassKey(filePath, key);
+        }
+        return snapshot;
+      } finally {
+        this.#loadingSnapshots.delete(absolutePath);
+      }
+    })();
+
+    this.#loadingSnapshots.set(absolutePath, loadPromise);
+    return await loadPromise;
   }
 
   async #applyNodeFilter(
@@ -350,8 +367,10 @@ export class HeapSnapshotManager {
     baseFilePath: string,
     currentFilePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff[]> {
-    const baseSnapshot = await this.getSnapshot(baseFilePath);
-    const currentSnapshot = await this.getSnapshot(currentFilePath);
+    const [baseSnapshot, currentSnapshot] = await Promise.all([
+      this.getSnapshot(baseFilePath),
+      this.getSnapshot(currentFilePath),
+    ]);
 
     const interfaceDefinitions = await currentSnapshot.interfaceDefinitions();
     const aggregatesForDiff =
