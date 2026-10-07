@@ -337,6 +337,25 @@ describe('NetworkCollector', () => {
     assert.equal(collector.getData(true).length, 3);
   });
 
+  it('respects a custom maxNavigationSaved', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const collector = new NetworkCollector(page, undefined, undefined, 5);
+
+    for (let i = 0; i < 7; i++) {
+      const req = getMockRequest({
+        url: `http://example.com/nav${i}`,
+        navigationRequest: true,
+        frame: mainFrame,
+      });
+      page.emit('request', req);
+      page.emit('framenavigated', mainFrame);
+    }
+
+    assert.equal(collector.getData(true).length, 5);
+  });
+
   it('bounds retained navigation buckets with redirects and subframes', async () => {
     class TestNetworkCollector extends NetworkCollector {
       get navigationSizes(): number[] {

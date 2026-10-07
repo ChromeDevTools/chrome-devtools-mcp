@@ -465,5 +465,9 @@
   {
     "name": "file_navigations",
     "flagType": "boolean"
+  },
+  {
+    "name": "max_navigation_saved_present",
+    "flagType": "boolean"
   }
 ]

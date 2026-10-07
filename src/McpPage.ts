@@ -152,6 +152,7 @@ export class McpPage implements ContextPage {
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
   #sourceMaps: boolean;
+  #maxNavigationSaved?: number;
   #commentBridge?: DevToolsCommentBridge;
   #onNotification?: (message: string) => void;
 
@@ -164,6 +165,7 @@ export class McpPage implements ContextPage {
       isolatedContextName?: string;
       navigationTimeout?: number;
       sourceMaps?: boolean;
+      maxNavigationSaved?: number;
       onNotification?: (message: string) => void;
     },
   ) {
@@ -171,6 +173,7 @@ export class McpPage implements ContextPage {
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
+    this.#maxNavigationSaved = options.maxNavigationSaved;
     this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
@@ -270,20 +273,30 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(page);
-      this.#consoleCollector = new ConsoleCollector(page, collect => {
-        return {
-          console: event => {
-            collect(event);
-          },
-          uncaughtError: event => {
-            collect(event);
-          },
-          devtoolsAggregatedIssue: event => {
-            collect(event);
-          },
-        };
-      });
+      this.#networkCollector = new NetworkCollector(
+        page,
+        undefined,
+        undefined,
+        this.#maxNavigationSaved,
+      );
+      this.#consoleCollector = new ConsoleCollector(
+        page,
+        collect => {
+          return {
+            console: event => {
+              collect(event);
+            },
+            uncaughtError: event => {
+              collect(event);
+            },
+            devtoolsAggregatedIssue: event => {
+              collect(event);
+            },
+          };
+        },
+        undefined,
+        this.#maxNavigationSaved,
+      );
     }
     this.updateTimeouts();
     await Promise.allSettled([
@@ -1166,6 +1179,7 @@ export class McpPage implements ContextPage {
           },
         } as ListenerMap;
       },
+      this.#maxNavigationSaved,
     );
   }
 }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -12,7 +13,7 @@ import {
   getNetworkRequest,
   listNetworkRequests,
 } from '../../src/tools/network.js';
-import {createHandlerMocks} from '../mocks.js';
+import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 
 describe('network', () => {
   afterEach(() => {
@@ -20,6 +21,16 @@ describe('network', () => {
   });
 
   describe('list_network_requests', () => {
+    it('describes preserved requests using maxNavigationSaved', () => {
+      const tool = listNetworkRequests(
+        createMockParsedArguments({maxNavigationSaved: 5}),
+      );
+      assert.strictEqual(
+        tool.schema.includePreservedRequests.description,
+        'Set to true to return the preserved requests over the last 5 navigations.',
+      );
+    });
+
     it('handles default parameters', async () => {
       const {page, context, response, args} = createHandlerMocks();
       page.getDevToolsData.resolves({});

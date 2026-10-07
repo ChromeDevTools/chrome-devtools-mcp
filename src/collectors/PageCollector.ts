@@ -58,7 +58,8 @@ export class PageCollector<T> {
   #listeners?: ListenerMap<PageEvents>;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
-  protected maxNavigationSaved = 3;
+  static readonly MAX_NAVIGATION_SAVED = 3;
+  protected readonly maxNavigationSaved: number;
 
   /**
    * This maps a Page to a list of navigations with a sub-list
@@ -71,8 +72,10 @@ export class PageCollector<T> {
     page: Page,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
     maxResourcesPerNavigation?: number,
+    maxNavigationSaved = PageCollector.MAX_NAVIGATION_SAVED,
   ) {
     this.pptrPage = page;
+    this.maxNavigationSaved = maxNavigationSaved;
     this.#attachFrameNavigatedWithinDocumentListener();
 
     const idGenerator = createIdGenerator();
@@ -216,8 +219,9 @@ export class ConsoleCollector extends PageCollector<
       ) => void,
     ) => ListenerMap<PageEvents>,
     maxMessagesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
+    maxNavigationSaved?: number,
   ) {
-    super(page, listeners, maxMessagesPerNavigation);
+    super(page, listeners, maxMessagesPerNavigation, maxNavigationSaved);
     this.#subscriber = new PageEventSubscriber(this.pptrPage);
     this.#subscriber.subscribe();
   }
@@ -398,8 +402,9 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
         },
       } as ListenerMap;
     },
+    maxNavigationSaved?: number,
   ) {
-    super(page, listeners, maxRequestsPerNavigation);
+    super(page, listeners, maxRequestsPerNavigation, maxNavigationSaved);
   }
   override splitAfterNavigation() {
     const requests = this.storage[0];
