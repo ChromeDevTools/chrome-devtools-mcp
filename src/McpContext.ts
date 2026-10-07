@@ -867,7 +867,7 @@ export class McpContext implements Context {
   }
 
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
-    return this.#heapSnapshotManager.disposeSnapshot(filePath);
+    return await this.#heapSnapshotManager.disposeSnapshot(filePath);
   }
 
   hasHeapSnapshots(): boolean {

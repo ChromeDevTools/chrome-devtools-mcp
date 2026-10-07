@@ -184,8 +184,8 @@ describe('HeapSnapshotManager', () => {
       assert.ok(staticData.nodeCount > 0);
 
       assert.strictEqual(manager.hasSnapshots(), true);
-      assert.strictEqual(manager.disposeSnapshot(filePath), true);
-      assert.strictEqual(manager.disposeSnapshot(filePath), false);
+      assert.strictEqual(await manager.disposeSnapshot(filePath), true);
+      assert.strictEqual(await manager.disposeSnapshot(filePath), false);
       assert.strictEqual(manager.hasSnapshots(), false);
     } finally {
       manager.dispose();
