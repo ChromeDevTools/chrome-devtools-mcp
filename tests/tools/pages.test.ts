@@ -73,7 +73,7 @@ describe('pages', () => {
 
           await context.triggerExtensionAction(extensionId);
 
-          const _popupTarget = await context.browser.waitForTarget(
+          await context.browser.waitForTarget(
             t => t.type() === 'page' && t.url().includes('chrome-extension://'),
           );
 

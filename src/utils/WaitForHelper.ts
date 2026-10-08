@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page, Protocol, CdpPage, Dialog} from '../third_party/index.js';
-import type {PredefinedNetworkConditions} from '../third_party/index.js';
+import type {
+  Page,
+  Protocol,
+  CdpPage,
+  Dialog,
+  PredefinedNetworkConditions,
+} from '../third_party/index.js';
 import {logger} from './logger.js';
 
 export type DialogAction = 'accept' | 'dismiss' | string;
@@ -48,7 +53,7 @@ export class WaitForHelper {
     using stableDomObserver = await Promise.race([
       this.#page.evaluateHandle(timeout => {
         let timeoutId: ReturnType<typeof setTimeout>;
-        function callback() {
+        function callback(): void {
           clearTimeout(timeoutId);
           timeoutId = setTimeout(() => {
             domObserver.resolver.resolve();
@@ -89,7 +94,7 @@ export class WaitForHelper {
       }
     });
 
-    return Promise.race([
+    return await Promise.race([
       stableDomObserver.evaluate(async observer => {
         return await observer.resolver.promise;
       }),
@@ -127,7 +132,7 @@ export class WaitForHelper {
     }
     const dialogHandler = (
       dialog: Pick<Dialog, 'accept' | 'dismiss' | 'type'>,
-    ) => {
+    ): void => {
       this.#dialogDetected = true;
 
       let actionToTake: DialogAction | undefined;
@@ -167,7 +172,7 @@ export class WaitForHelper {
 
     const navigationListener = (
       event: Protocol.Page.FrameStartedNavigatingEvent,
-    ) => {
+    ): void => {
       if (event.frameId !== this.#page.mainFrame()._id) {
         return;
       }
@@ -182,7 +187,7 @@ export class WaitForHelper {
     };
     const requestedNavigationListener = (
       event: Protocol.Page.FrameRequestedNavigationEvent,
-    ) => {
+    ): void => {
       if (event.frameId === this.#page.mainFrame()._id) {
         navigationStartedResolvers.resolve(true);
       }

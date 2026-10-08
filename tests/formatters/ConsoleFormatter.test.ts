@@ -9,8 +9,11 @@ import {describe, it} from 'node:test';
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
-import type {ConsoleMessage, Protocol} from '../../src/third_party/index.js';
-import type {DevTools} from '../../src/third_party/index.js';
+import type {
+  ConsoleMessage,
+  Protocol,
+  DevTools,
+} from '../../src/third_party/index.js';
 
 interface MockConsoleMessage {
   type: () => string;

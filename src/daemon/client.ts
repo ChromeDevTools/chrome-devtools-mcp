@@ -31,7 +31,7 @@ const FILE_TIMEOUT = 10_000;
 const READY_CHECK_INTERVAL = 100;
 const READY_CHECK_COMMAND_TIMEOUT = 1_000;
 
-function delay(ms: number) {
+function delay(ms: number): Promise<void> {
   return new Promise<void>(resolve => {
     setTimeout(resolve, ms);
   });
@@ -40,8 +40,8 @@ function delay(ms: number) {
 /**
  * Waits for a file to be created and populated (removed = false) or removed (removed = true).
  */
-async function waitForFile(filePath: string, removed = false) {
-  const check = () => {
+async function waitForFile(filePath: string, removed = false): Promise<void> {
+  const check = (): boolean => {
     const exists = fs.existsSync(filePath);
     if (removed) {
       return !exists;
@@ -76,7 +76,7 @@ async function waitForFile(filePath: string, removed = false) {
   );
 }
 
-async function waitForDaemonReady(sessionId: string) {
+async function waitForDaemonReady(sessionId: string): Promise<void> {
   const deadline = Date.now() + FILE_TIMEOUT;
   let lastError: unknown;
 
@@ -107,7 +107,10 @@ async function waitForDaemonReady(sessionId: string) {
   );
 }
 
-export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
+export async function startDaemon(
+  mcpArgs: string[] = [],
+  sessionId: string,
+): Promise<void> {
   if (isDaemonRunning(sessionId)) {
     logger?.('Daemon is already running');
     await waitForDaemonReady(sessionId);
@@ -166,7 +169,7 @@ export async function sendCommand(
     path: socketPath,
   });
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.destroy();
       reject(new Error('Timeout waiting for daemon response'));
@@ -194,7 +197,7 @@ export async function sendCommand(
   });
 }
 
-export async function stopDaemon(sessionId: string) {
+export async function stopDaemon(sessionId: string): Promise<void> {
   if (!isDaemonRunning(sessionId)) {
     logger?.('Daemon is not running');
     return;
@@ -206,7 +209,7 @@ export async function stopDaemon(sessionId: string) {
   await sendCommand({method: 'stop'}, sessionId);
 
   try {
-    await waitForFile(pidFilePath, /*removed=*/ true);
+    await waitForFile(pidFilePath, /* removed=*/ true);
   } catch (error) {
     if (pid) {
       try {

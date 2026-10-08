@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-export async function getTempFilePath(filename: string) {
+export async function getTempFilePath(filename: string): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
 
   const filepath = path.join(dir, filename);

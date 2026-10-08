@@ -64,7 +64,7 @@ export const navigate = definePageTool((args: ParsedArguments) => {
         timeout: 30_000,
       };
 
-      const dialogHandler = (dialog: Dialog) => {
+      const dialogHandler = (dialog: Dialog): void => {
         if (dialog.type() === 'beforeunload') {
           response.appendResponseLine(`Accepted a beforeunload dialog.`);
           void dialog.accept();

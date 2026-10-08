@@ -115,7 +115,9 @@ export function parseByteSizeRange(value: string): ByteSizeRange {
   return {min, max};
 }
 
-export function byteSizeRangeSchema(description: string) {
+export function byteSizeRangeSchema(
+  description: string,
+): zod.ZodType<ByteSizeRange> {
   return zod
     .string()
     .transform((value, context) => {
