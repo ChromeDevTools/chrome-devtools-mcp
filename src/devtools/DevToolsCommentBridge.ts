@@ -39,20 +39,55 @@ export class DevToolsCommentBridge {
    *
    * Returns false if the bridge does not exist, e.g., because the connected
    * Chrome version does not support DevTools comments or the feature is
-   * disabled. Negative results are not cached so that a DevTools window that
-   * has not finished loading yet is checked again on the next call.
+   * disabled, or if the comment event binding could not be installed.
+   * Negative results are not cached so that a DevTools window that has not
+   * finished loading yet is checked again on the next call.
    */
   async attach(devtoolsPage: Page): Promise<boolean> {
     if (this.#attachedPages.has(devtoolsPage)) {
       return true;
     }
 
-    let hasBridge = false;
     try {
-      hasBridge = await devtoolsPage.evaluate(() => {
+      const hasBridge = await devtoolsPage.evaluate(() => {
+        return Boolean(window.universe?.cd4aBridge);
+      });
+      if (!hasBridge) {
+        return false;
+      }
+    } catch (e) {
+      logger?.('DevToolsCommentBridge: evaluate failed', e);
+      return false;
+    }
+
+    try {
+      await devtoolsPage.exposeFunction('__onDevToolsCommentEvent', () => {
+        this.#handleCommentEvent();
+      });
+    } catch (e) {
+      // The binding may already exist, e.g., exposed by a previous bridge.
+      // Whether it is usable is checked in the page below.
+      logger?.(
+        'DevToolsCommentBridge: exposeFunction already bound or failed',
+        e,
+      );
+    }
+
+    let attached = false;
+    try {
+      attached = await devtoolsPage.evaluate(() => {
         const cd4aBridge = window.universe?.cd4aBridge;
-        if (!cd4aBridge) {
+        if (
+          !cd4aBridge ||
+          typeof window.__onDevToolsCommentEvent !== 'function'
+        ) {
           return false;
+        }
+        if (window.__onDevToolsCommentListener) {
+          cd4aBridge.removeEventListener(
+            'CommentThreadsChanged',
+            window.__onDevToolsCommentListener,
+          );
         }
         window.__onDevToolsCommentListener = () => {
           window.__onDevToolsCommentEvent?.();
@@ -67,21 +102,10 @@ export class DevToolsCommentBridge {
     } catch (e) {
       logger?.('DevToolsCommentBridge: evaluate failed', e);
     }
-    if (!hasBridge) {
+    if (!attached) {
       return false;
     }
     this.#attachedPages.add(devtoolsPage);
-
-    try {
-      await devtoolsPage.exposeFunction('__onDevToolsCommentEvent', () => {
-        this.#handleCommentEvent();
-      });
-    } catch (e) {
-      logger?.(
-        'DevToolsCommentBridge: exposeFunction already bound or failed',
-        e,
-      );
-    }
     return true;
   }
 

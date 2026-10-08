@@ -3,7 +3,7 @@ DevTools window is not open for this page. Call open_devtools first to open DevT
 `;
 
 exports[`comments tools > get_devtools_comments > reports when DevTools comments are unavailable 1`] = `
-DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet. Update Chrome or continue without DevTools comments.
+DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.
 `;
 
 exports[`comments tools > resolve_devtools_comment > reports error when DevTools window is not open 1`] = `
@@ -15,7 +15,7 @@ Failed to resolve comment thread "comment-nonexistent". Thread not found.
 `;
 
 exports[`comments tools > resolve_devtools_comment > reports when DevTools comments are unavailable 1`] = `
-DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet. Update Chrome or continue without DevTools comments.
+DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.
 `;
 
 exports[`comments tools > resolve_devtools_comment > resolves comment thread and appends reply text 1`] = `
@@ -28,7 +28,7 @@ DevTools window is not open for this page. Call open_devtools first to open DevT
 `;
 
 exports[`comments tools > reveal_in_devtools > reports when DevTools comments are unavailable 1`] = `
-DevTools comments are not available in this DevTools window. The connected Chrome may not support them yet. Update Chrome or continue without DevTools comments.
+DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.
 `;
 
 exports[`comments tools > reveal_in_devtools > reveals element by snapshot uid 1`] = `

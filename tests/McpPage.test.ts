@@ -908,7 +908,8 @@ describe('McpPage', () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
       const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves({
+      devtoolsPage.evaluate.resolves(true);
+      devtoolsPage.evaluate.onThirdCall().resolves({
         cdpRequestId: 'req-1',
         cdpBackendNodeId: 10,
       });
@@ -923,7 +924,7 @@ describe('McpPage', () => {
       });
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-      sinon.assert.calledTwice(devtoolsPage.evaluate);
+      sinon.assert.calledThrice(devtoolsPage.evaluate);
     });
   });
 
