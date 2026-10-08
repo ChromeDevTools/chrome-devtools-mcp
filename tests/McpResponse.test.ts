@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -53,6 +53,7 @@ import {
   createMockMcpWorker,
   createMockObjectInfo,
   createMockParsedArguments,
+  createMockPuppeteerTarget,
 } from './mocks.js';
 import {
   createTempDir,
@@ -68,6 +69,58 @@ import {
 } from './utils.js';
 
 describe('McpResponse', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('reports only pages opened by the attached action', async () => {
+    const openedTarget = createMockPuppeteerTarget({
+      url: 'https://example.com/opened',
+      title: 'Opened page',
+    });
+    const openedPage = createMockMcpPage({target: openedTarget});
+    const unrelatedPage = createMockMcpPage();
+    Object.defineProperty(openedPage, 'id', {value: 2});
+    openedPage.url.returns('https://example.com/opened');
+    openedPage.getTitle.returns('Opened page');
+    Object.defineProperty(unrelatedPage, 'id', {value: 3});
+    unrelatedPage.url.returns('https://example.com/unrelated');
+    unrelatedPage.getTitle.returns('Unrelated page');
+
+    const context = createMockMcpContext();
+    const targetInfo = openedTarget._getTargetInfo();
+    context.getTargetInfos.resolves(
+      new Map([[targetInfo.targetId, targetInfo]]),
+    );
+    context.getPages.returns([openedPage, unrelatedPage]);
+    context.isPageSelected.returns(false);
+    const response = new McpResponse(createMockParsedArguments());
+    response.attachWaitForResult({
+      openedPages: new Set([openedPage.target]),
+    });
+
+    const result = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(context.createPagesSnapshot);
+    sinon.assert.calledOnceWithExactly(context.getTargetInfos);
+    sinon.assert.calledOnceWithExactly(openedPage.getTitle, targetInfo);
+    assert.match(
+      getTextContent(result.content[0]),
+      /## Opened pages\n2: Opened page \(https:\/\/example\.com\/opened\)/,
+    );
+    assert.ok(!getTextContent(result.content[0]).includes('Unrelated page'));
+    assert.deepStrictEqual(result.structuredContent, {
+      openedPages: [
+        {
+          id: 2,
+          url: 'https://example.com/opened',
+          title: 'Opened page',
+          selected: false,
+        },
+      ],
+    });
+  });
+
   it('list pages', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);
