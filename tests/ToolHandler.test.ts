@@ -1284,6 +1284,9 @@ describe('ToolHandler', () => {
     sinon.stub(mockPage, 'viewport').get(() => undefined);
     sinon.stub(mockPage, 'userAgent').get(() => undefined);
     sinon.stub(mockPage, 'colorScheme').get(() => undefined);
+    sinon.stub(mockPage, 'forcedColors').get(() => undefined);
+    sinon.stub(mockPage, 'prefersContrast').get(() => undefined);
+    sinon.stub(mockPage, 'prefersReducedMotion').get(() => undefined);
     sinon.stub(mockPage, 'cpuThrottlingRate').get(() => 1);
     mockContext.getSelectedMcpPage.returns(mockPage);
     const canonicalFilePath = path.resolve('/canonical/output.png');

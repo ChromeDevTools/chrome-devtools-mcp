@@ -6,6 +6,11 @@
  */
 
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
+import {
+  FORCED_COLORS_VALUES,
+  PREFERS_CONTRAST_VALUES,
+  PREFERS_REDUCED_MOTION_VALUES,
+} from '../types.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -83,6 +88,24 @@ export const emulate = definePageTool(() => ({
       .optional()
       .describe(
         'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+      ),
+    forcedColors: zod
+      .enum([...FORCED_COLORS_VALUES, 'auto'])
+      .optional()
+      .describe(
+        'Emulate the `forced-colors` CSS media feature. Set to "auto" to reset to the default.',
+      ),
+    prefersContrast: zod
+      .enum([...PREFERS_CONTRAST_VALUES, 'auto'])
+      .optional()
+      .describe(
+        'Emulate the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.',
+      ),
+    prefersReducedMotion: zod
+      .enum([...PREFERS_REDUCED_MOTION_VALUES, 'auto'])
+      .optional()
+      .describe(
+        'Emulate the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.',
       ),
     viewport: zod
       .string()

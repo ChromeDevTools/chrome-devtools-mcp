@@ -886,6 +886,9 @@ export class McpResponse implements Response {
       userAgent?: string;
       cpuThrottlingRate?: number;
       colorScheme?: string;
+      forcedColors?: string;
+      prefersContrast?: string;
+      prefersReducedMotion?: string;
       dialog?: {
         type: string;
         message: string;
@@ -1009,6 +1012,26 @@ export class McpResponse implements Response {
     if (colorScheme) {
       response.push(`Emulating color scheme: ${colorScheme}`);
       structuredContent.colorScheme = colorScheme;
+    }
+
+    const forcedColors = this.#page?.forcedColors;
+    if (forcedColors) {
+      response.push(`Emulating forced-colors: ${forcedColors}`);
+      structuredContent.forcedColors = forcedColors;
+    }
+
+    const prefersContrast = this.#page?.prefersContrast;
+    if (prefersContrast) {
+      response.push(`Emulating prefers-contrast: ${prefersContrast}`);
+      structuredContent.prefersContrast = prefersContrast;
+    }
+
+    const prefersReducedMotion = this.#page?.prefersReducedMotion;
+    if (prefersReducedMotion) {
+      response.push(
+        `Emulating prefers-reduced-motion: ${prefersReducedMotion}`,
+      );
+      structuredContent.prefersReducedMotion = prefersReducedMotion;
     }
 
     const dialog = this.#page?.getDialog();
