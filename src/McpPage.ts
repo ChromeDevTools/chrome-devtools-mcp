@@ -345,7 +345,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  #getWebMcpToolGroups(): ToolGroups {
+  #getDebuggingWebMcpToolGroups(): ToolGroups {
     if (!this.#pptrPage) {
       return [];
     }
@@ -369,7 +369,10 @@ export class McpPage implements ContextPage {
   }
 
   getThirdPartyDeveloperTools(): ToolGroups {
-    return [...this.#getWebMcpToolGroups(), ...this.eventBasedThirdPartyTools];
+    return [
+      ...this.#getDebuggingWebMcpToolGroups(),
+      ...this.eventBasedThirdPartyTools,
+    ];
   }
 
   async getToolGroups(): Promise<ToolGroups> {

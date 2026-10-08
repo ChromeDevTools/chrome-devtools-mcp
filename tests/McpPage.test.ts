@@ -1262,40 +1262,6 @@ describe('McpPage', () => {
       sinon.restore();
     });
 
-    it('includes WebMCP tools in getToolGroups()', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-
-      const mockTool = createMockWebMCPTool({
-        name: 'webmcp_tool',
-        description: 'A WebMCP tool',
-        inputSchema: {
-          type: 'object',
-          properties: {foo: {type: 'string'}},
-        },
-        annotations: {debugging: true},
-      });
-      pptrPage.webmcp.tools.returns([mockTool]);
-
-      const groups = await mcpPage.getToolGroups();
-      assert.deepStrictEqual(groups, [
-        {
-          name: 'WebMCP Tools',
-          description: 'Tools exposed via WebMCP',
-          tools: [
-            {
-              name: 'webmcp_tool',
-              description: 'A WebMCP tool',
-              inputSchema: {
-                type: 'object',
-                properties: {foo: {type: 'string'}},
-              },
-            },
-          ],
-        },
-      ]);
-      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), groups);
-    });
-
     it('filters WebMCP tools by annotations.debugging in getToolGroups()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 
@@ -1336,6 +1302,7 @@ describe('McpPage', () => {
           ],
         },
       ]);
+      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), groups);
     });
 
     it('combines WebMCP debugging tools and devtoolstooldiscovery tools in getThirdPartyDeveloperTools()', async () => {

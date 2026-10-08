@@ -773,7 +773,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `execute_webmcp_tool`
 
-**Description:** Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)
+**Description:** Executes a WebMCP tool exposed by the page (for debugging tools, use '[`execute_3p_developer_tool`](#execute_3p_developer_tool)'). (requires flag: --categoryExperimentalWebmcp=true)
 
 **Parameters:**
 
@@ -785,7 +785,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `list_webmcp_tools`
 
-**Description:** Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)
+**Description:** Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via '[`list_3p_developer_tools`](#list_3p_developer_tools)'). (requires flag: --categoryExperimentalWebmcp=true)
 
 **Parameters:**
 

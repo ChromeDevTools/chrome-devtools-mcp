@@ -50,7 +50,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
-  Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
+  Set to true to enable WebMCP tools (excluding debugging tools, which are exposed under the third-party developer tools category). Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
   - **Type:** boolean
   - **Default:** `false`
 
