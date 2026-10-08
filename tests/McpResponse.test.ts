@@ -68,6 +68,47 @@ import {
 } from './utils.js';
 
 describe('McpResponse', () => {
+  it('reports only pages opened by the attached action', async () => {
+    const openedPage = createMockMcpPage();
+    const unrelatedPage = createMockMcpPage();
+    Object.defineProperty(openedPage, 'id', {value: 2});
+    openedPage.url.returns('https://example.com/opened');
+    openedPage.getTitle.returns('Opened page');
+    Object.defineProperty(unrelatedPage, 'id', {value: 3});
+    unrelatedPage.url.returns('https://example.com/unrelated');
+    unrelatedPage.getTitle.returns('Unrelated page');
+
+    const context = createMockMcpContext();
+    context.getPages.returns([openedPage, unrelatedPage]);
+    context.isPageSelected.returns(false);
+    const response = new McpResponse(createMockParsedArguments());
+    response.attachWaitForResult({
+      openedPages: new Set([openedPage.target]),
+    });
+
+    const result = await response.format(context, {
+      detailedConsoleMessage: undefined,
+      consoleMessages: undefined,
+      snapshot: undefined,
+    });
+
+    assert.match(
+      getTextContent(result.content[0]),
+      /## Opened pages\n2: Opened page \(https:\/\/example\.com\/opened\)/,
+    );
+    assert.ok(!getTextContent(result.content[0]).includes('Unrelated page'));
+    assert.deepStrictEqual(result.structuredContent, {
+      openedPages: [
+        {
+          id: 2,
+          url: 'https://example.com/opened',
+          title: 'Opened page',
+          selected: false,
+        },
+      ],
+    });
+  });
+
   it('list pages', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);

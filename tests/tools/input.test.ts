@@ -100,6 +100,7 @@ describe('input', () => {
         assert.ok(await page.$('text/dblclicked'));
       });
     });
+
     it('waits for navigation', async () => {
       const resolveNavigation = Promise.withResolvers<void>();
       server.addHtmlRoute(
