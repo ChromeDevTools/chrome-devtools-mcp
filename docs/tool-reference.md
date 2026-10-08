@@ -380,7 +380,7 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **args** (array) _(optional)_: An optional list of element uids from the latest page snapshot ([`take_snapshot`](#take_snapshot)). Each uid is passed to the function as the matching element, not as a string. To pass other values, write them into the function source.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
 - **format** (enum: "function", "script") _(optional)_: How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.
