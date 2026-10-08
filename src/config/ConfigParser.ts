@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {Argv} from 'yargs';
 import type {YargsOptions, InferredOptionTypes} from '../third_party/index.js';
 
 import {yargs, hideBin} from '../third_party/index.js';
@@ -32,15 +33,17 @@ function getErrorMessage(err: unknown): string {
 function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
   parsed: T,
 ): Omit<T, '_' | '$0'> {
-  const {_: _positionals, $0: _scriptName, ...rest} = parsed;
-  return rest;
+  const copy = {...parsed};
+  delete copy._;
+  delete copy.$0;
+  return copy;
 }
 
 export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
-  public readonly configLocator: ConfigLocator;
+  readonly configLocator: ConfigLocator;
 
   /**
    * @param configLocator Finds the config file when `--config` is not passed.
@@ -55,7 +58,9 @@ export class ConfigParser {
     this.configLocator = new ConfigLocator();
   }
 
-  buildCliParser(options: Record<string, YargsOptions> = mcpOptions) {
+  buildCliParser(
+    options: Record<string, YargsOptions> = mcpOptions,
+  ): Argv<InferredOptionTypes<Record<string, YargsOptions>>> {
     const yargsInstance = yargs(hideBin(this.argv));
     return yargsInstance
       .scriptName('npx chrome-devtools-mcp@latest')

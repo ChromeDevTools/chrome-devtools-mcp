@@ -13,7 +13,7 @@ const mcpDebugNamespace = 'mcp:log';
 
 let logFileStream: fs.WriteStream | undefined;
 
-const _debugLog = util.debuglog(mcpDebugNamespace);
+const debugLog = util.debuglog(mcpDebugNamespace);
 
 export function saveLogsToFile(fileName: string): fs.WriteStream {
   const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
@@ -57,27 +57,28 @@ export const logger: Logger = (...args: unknown[]) => {
     logFileStream.write(
       `${new Date().toISOString()} ${mcpDebugNamespace} ${util.format(...args)}\n`,
     );
-  } else if (_debugLog.enabled) {
-    _debugLog('%s %s', new Date().toISOString(), util.format(...args));
+  } else if (debugLog.enabled) {
+    debugLog('%s %s', new Date().toISOString(), util.format(...args));
   }
 };
 
-export const puppeteerLogger = (prefix: string) => {
+export const puppeteerLogger = (prefix: string): Logger | undefined => {
   const dbg = util.debuglog(prefix);
 
   if (!dbg.enabled) {
     return;
   }
 
-  if (logFileStream) {
-    return (...args: unknown[]) => {
-      logFileStream!.write(
+  const stream = logFileStream;
+  if (stream) {
+    return (...args: unknown[]): void => {
+      stream.write(
         `${new Date().toISOString()} ${prefix} ${util.format(...args)}\n`,
       );
     };
   }
 
-  return (...args: unknown[]) => {
+  return (...args: unknown[]): void => {
     dbg('%s %s', new Date().toISOString(), util.format(...args));
   };
 };

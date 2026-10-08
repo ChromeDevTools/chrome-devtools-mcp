@@ -25,6 +25,7 @@ export type ToolGroups = Array<ToolGroup<ToolDefinition>>;
 
 declare global {
   interface Window {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     __dtmcp?: {
       toolGroups?: Array<
         ToolGroup<

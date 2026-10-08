@@ -323,7 +323,9 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
   }
 }
 
-function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
+function convertConsoleMessageConciseToString(
+  msg: ConsoleMessageConcise,
+): string {
   const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
   const messageLine = `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
   if (!msg.stackTrace) {
@@ -338,7 +340,7 @@ function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
 
 function convertConsoleMessageConciseDetailedToString(
   msg: ConsoleMessageDetailed,
-) {
+): string {
   const result = [
     `ID: ${msg.id}`,
     `Message: ${msg.type}> ${msg.text}`,
@@ -364,7 +366,7 @@ function formatArgs(msg: ConsoleMessageDetailed): string {
   return result.join('\n');
 }
 
-function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}) {
+function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}): string {
   if (arg instanceof SymbolizedError) {
     return [
       arg.message,

@@ -22,7 +22,7 @@ import {
 } from '../build/src/telemetry/metricsRegistry.js';
 import {createTools} from '../build/src/tools/tools.js';
 
-export function HaveUniqueNames(tools: Array<{name: string}>): boolean {
+export function haveUniqueNames(tools: Array<{name: string}>): boolean {
   const toolNames = tools.map(tool => tool.name);
   const toolNamesSet = new Set(toolNames);
   return toolNamesSet.size === toolNames.length;
@@ -39,7 +39,7 @@ function writeToolCallMetricsConfig() {
   // Avoid 'as ParsedArguments' by using parseArguments
   const allTools = createTools(new ConfigParser('0.0.0', ['', '']).parse());
 
-  if (!HaveUniqueNames(allTools)) {
+  if (!haveUniqueNames(allTools)) {
     throw new Error('Error: Duplicate tool names found.');
   }
 

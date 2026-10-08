@@ -354,8 +354,9 @@ function createContainerQueryAncestor(
 }
 
 /**
- * Collects enclosing ancestor rules (@media, @container, @supports, @layer,
- * @scope, @starting-style, @navigation, and CSS nesting) for a style rule.
+ * Collects enclosing ancestor rules (`@media`, `@container`, `@supports`,
+ * `@layer`, `@scope`, `@starting-style`, `@navigation`, and CSS nesting) for a
+ * style rule.
  */
 function collectAncestorRules(
   rule: DevTools.CSSRule.CSSStyleRule,

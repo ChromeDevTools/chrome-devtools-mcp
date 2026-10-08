@@ -181,7 +181,7 @@ export class HeapSnapshotFormatter {
     function formatEdge(
       edge: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge,
       depth: number,
-    ) {
+    ): void {
       const indent = '  '.repeat(depth);
       lines.push(
         `${indent}<- @${edge.nodeId} ${formatName(edge.nodeName, options)} via ${edge.edgeType} ${formatName(edge.edgeName, options)} (distance: ${edge.distance})`,
