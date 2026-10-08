@@ -438,7 +438,8 @@ function formatAsyncFragment(
 
   const separatorLineLength = 40;
   const prefix = `--- ${fragment.description || 'async'} `;
-  const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
+  const separator =
+    prefix + '-'.repeat(Math.max(0, separatorLineLength - prefix.length));
   return [separator, ...formattedFrames];
 }
 
