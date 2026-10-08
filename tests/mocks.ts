@@ -1122,6 +1122,7 @@ export function createMockParsedArguments(
 ): ParsedArguments {
   const defaultArgs = new ConfigParser(
     '0.0.0',
+
     ['node', 'main.js'],
     process.env,
     false,

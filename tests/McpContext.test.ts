@@ -18,7 +18,7 @@ import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {type HTTPResponse} from '../src/third_party/index.js';
+import {type HTTPResponse, ScreenRecorder} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
@@ -821,6 +821,85 @@ describe('McpContext', () => {
             allowedUrlPattern: ['https://example.com/allowed*'],
           },
         );
+      });
+    });
+
+    describe('updateOptions', () => {
+      it('updates the CrUX setting', async () => {
+        await withMcpContext(async (_response, context) => {
+          context.updateOptions({performanceCrux: false});
+
+          assert.strictEqual(context.isCruxEnabled(), false);
+        });
+      });
+    });
+
+    describe('releaseState', () => {
+      it('stops and clears the screencast recording', async () => {
+        await withMcpContext(async (_response, context) => {
+          const recorder = sinon.createStubInstance(ScreenRecorder);
+          recorder.stop.resolves();
+          context.setScreenRecorder({recorder, filePath: '/tmp/video.mp4'});
+
+          await context.releaseState({
+            screencast: true,
+            heapSnapshots: false,
+            performanceTrace: false,
+          });
+
+          sinon.assert.calledOnceWithExactly(recorder.stop);
+          assert.strictEqual(context.getScreenRecorder(), null);
+        });
+      });
+
+      it('keeps the screencast recording when not released', async () => {
+        await withMcpContext(async (_response, context) => {
+          const recorder = sinon.createStubInstance(ScreenRecorder);
+          const data = {recorder, filePath: '/tmp/video.mp4'};
+          context.setScreenRecorder(data);
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: true,
+            performanceTrace: true,
+          });
+
+          sinon.assert.notCalled(recorder.stop);
+          assert.strictEqual(context.getScreenRecorder(), data);
+        });
+      });
+
+      it('disposes loaded heap snapshots', async () => {
+        await withMcpContext(async (_response, context) => {
+          await context.getHeapSnapshotStats(
+            path.join(process.cwd(), 'tests/fixtures/example.heapsnapshot'),
+          );
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: true,
+            performanceTrace: false,
+          });
+
+          assert.strictEqual(context.hasHeapSnapshots(), false);
+        });
+      });
+
+      it('stops the running performance trace on the traced page', async () => {
+        await withMcpContext(async (_response, context) => {
+          const pptrPage = context.getSelectedMcpPage().pptrPage;
+          const stop = sinon.stub(pptrPage.tracing, 'stop').resolves();
+          context.setIsRunningPerformanceTrace(true, pptrPage);
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: false,
+            performanceTrace: true,
+          });
+
+          sinon.assert.calledOnceWithExactly(stop);
+          assert.strictEqual(context.isRunningPerformanceTrace(), false);
+        });
       });
     });
 
