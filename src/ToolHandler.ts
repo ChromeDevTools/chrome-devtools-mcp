@@ -235,7 +235,6 @@ export class ToolHandler {
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
     using guard = await this.toolMutex.acquire();
-    void guard;
 
     if (this.disabledReason) {
       return {

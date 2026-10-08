@@ -142,7 +142,6 @@ export class BrowserManager {
     // once the lock frees up, defeating the abandonment check entirely.
     const attempt = this.#browserAttempt;
     using guard = await this.#mutex.acquire();
-    void guard;
     if (this.#closingCount > 0) {
       throw new Error('Browser was closed while initializing.');
     }
@@ -520,7 +519,6 @@ export class BrowserManager {
     this.#initPromise = undefined;
     this.#closingCount++;
     using guard = await this.#mutex.acquire();
-    void guard;
     try {
       await this.#closeBrowser();
     } finally {
