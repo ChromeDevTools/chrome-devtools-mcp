@@ -331,6 +331,7 @@ export default defineConfig([
         'error',
         {
           argsIgnorePattern: '^_',
+          ignoreUsingDeclarations: true,
         },
       ],
 
