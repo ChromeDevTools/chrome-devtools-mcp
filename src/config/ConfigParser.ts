@@ -20,6 +20,7 @@ import {
   withoutDefaults,
 } from './mcp-options.js';
 import {ConfigLocator} from './ConfigLocator.js';
+import {mergeExplicitReloadableArgs} from './reload.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -40,19 +41,23 @@ export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
-  public readonly configLocator: ConfigLocator;
+  #startupCliArgs?: Partial<ParsedArguments>;
+  #startupExplicitArgs?: Partial<ParsedArguments>;
+  #usageStatisticsNoticeShown = false;
 
-  /**
-   * @param configLocator Finds the config file when `--config` is not passed.
-   * Config file discovery is off without it, for example in tests.
-   */
   constructor(
     private version: string,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
-  ) {
-    this.configLocator = new ConfigLocator();
+    public readonly configLocator = new ConfigLocator(),
+  ) {}
+
+  /**
+   * The config file resolved by the last `parse()` call, if any.
+   */
+  get configPath(): string | undefined {
+    return this.#configPath;
   }
 
   buildCliParser(options: Record<string, YargsOptions> = mcpOptions) {
@@ -214,9 +219,12 @@ export class ConfigParser {
     }
 
     if (this.env['CI'] || this.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-      console.error(
-        "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-      );
+      if (!this.#usageStatisticsNoticeShown) {
+        this.#usageStatisticsNoticeShown = true;
+        console.error(
+          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+        );
+      }
       resolvedArgs.usageStatistics = false;
     }
 
@@ -236,9 +244,21 @@ export class ConfigParser {
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
-      this.#configPath = cliArgs.config ?? this.configLocator?.locate(this.env);
+      this.#startupCliArgs = cliArgs;
+      this.#configPath = cliArgs.config ?? this.configLocator.locate(this.env);
       this.warnUnknownArgs(cliArgs);
-      return this.#resolve(cliArgs);
+      const configPath = this.#configPath;
+      const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
+      // Step 3: merges the explicit inputs. The CLI wins over the config file.
+      const explicitArgs: Partial<ParsedArguments> = {
+        ...configFileArgs,
+        ...cliArgs,
+        ...(configPath ? {config: configPath} : {}),
+      };
+      this.validateConflicts(explicitArgs);
+      this.validateImplications(explicitArgs);
+      this.#startupExplicitArgs = explicitArgs;
+      return this.applyDefaults(explicitArgs);
     } catch (error) {
       if (this.exitProcess) {
         console.error(getErrorMessage(error));
@@ -254,20 +274,21 @@ export class ConfigParser {
    * and throws on invalid configuration instead of exiting the process.
    */
   reload(): ParsedArguments {
-    return this.#resolve(this.parseCliArgs());
-  }
-
-  #resolve(cliArgs: Partial<ParsedArguments>): ParsedArguments {
+    const cliArgs = this.#startupCliArgs ?? this.parseCliArgs();
     const configPath = this.#configPath;
     const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
-    // Step 3: merges the explicit inputs. The CLI wins over the config file.
-    const explicitArgs = {
+    this.validateConflicts(configFileArgs);
+    this.validateImplications(configFileArgs);
+    const explicitArgs: Partial<ParsedArguments> = {
       ...configFileArgs,
       ...cliArgs,
       ...(configPath ? {config: configPath} : {}),
     };
-    this.validateConflicts(explicitArgs);
-    this.validateImplications(explicitArgs);
-    return this.applyDefaults(explicitArgs);
+    const effectiveExplicitArgs = this.#startupExplicitArgs
+      ? mergeExplicitReloadableArgs(this.#startupExplicitArgs, explicitArgs)
+      : explicitArgs;
+    this.validateConflicts(effectiveExplicitArgs);
+    this.validateImplications(effectiveExplicitArgs);
+    return this.applyDefaults(effectiveExplicitArgs);
   }
 }

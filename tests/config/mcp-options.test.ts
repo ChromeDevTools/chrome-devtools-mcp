@@ -20,13 +20,6 @@ describe('mcp-options steps', () => {
 
   const parser = new ConfigParser('0.0.0');
 
-  describe('constructor', () => {
-    it('initializes configLocator', () => {
-      const testParser = new ConfigParser('0.0.0');
-      assert.ok(testParser.configLocator instanceof ConfigLocator);
-    });
-  });
-
   describe('parseCliArgs', () => {
     it('returns only explicitly passed flags', () => {
       const args = new ConfigParser('0.0.0', [
@@ -197,13 +190,32 @@ describe('mcp-options steps', () => {
       });
       assert.strictEqual(args.usageStatistics, false);
     });
+
+    it('prints the usage statistics notice once', () => {
+      const consoleError = sinon.stub(console, 'error');
+      const parser = new ConfigParser('0.0.0', [], {CI: 'true'});
+
+      parser.applyDefaults({});
+      const args = parser.applyDefaults({});
+
+      assert.strictEqual(args.usageStatistics, false);
+      sinon.assert.calledOnce(consoleError);
+    });
   });
 
   describe('config discovery', () => {
-    it('does not discover a config file without a locator', () => {
-      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      sinon.stub(parser.configLocator, 'locate').returns(undefined);
+    it('does not discover a config file when locator returns undefined', () => {
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js'],
+        {},
+        false,
+        locator,
+      );
       assert.strictEqual(parser.parse().config, undefined);
+      assert.strictEqual(parser.configPath, undefined);
     });
 
     it('uses the config file found by the locator', () => {
@@ -212,15 +224,13 @@ describe('mcp-options steps', () => {
         'cd4a.config.json',
       );
       const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      const locateStub = sinon
-        .stub(parser.configLocator, 'locate')
-        .returns(configFile.path);
+      sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
 
       const args = parser.parse();
 
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.config, configFile.path);
-      sinon.assert.calledOnce(locateStub);
+      assert.strictEqual(parser.configPath, configFile.path);
     });
 
     it('prefers --config over a discovered config file', () => {
@@ -255,12 +265,13 @@ describe('mcp-options steps', () => {
       return {parser, locateStub};
     }
 
-    it('re-reads the config file without discovering it again', () => {
+    it('re-reads the config file without discovering it again or re-parsing CLI args', () => {
       using configFile = createTempFile(
         JSON.stringify({memoryDebugging: false}),
         'cd4a.config.json',
       );
       const {parser, locateStub} = createParser(configFile.path);
+      const parseCliArgsSpy = sinon.spy(parser, 'parseCliArgs');
       assert.strictEqual(parser.parse().memoryDebugging, false);
 
       fs.writeFileSync(
@@ -270,6 +281,7 @@ describe('mcp-options steps', () => {
 
       assert.strictEqual(parser.reload().memoryDebugging, true);
       sinon.assert.calledOnce(locateStub);
+      sinon.assert.calledOnce(parseCliArgsSpy);
     });
 
     it('keeps CLI arguments over the config file', () => {
@@ -298,6 +310,59 @@ describe('mcp-options steps', () => {
       fs.writeFileSync(configFile.path, '{');
 
       assert.throws(() => parser.reload(), /Invalid JSON config file/);
+    });
+
+    it('rejects reloadable options that conflict with startup config-file options', () => {
+      using configFile = createTempFile(
+        JSON.stringify({browserUrl: 'http://127.0.0.1:9222'}),
+        'cd4a.config.json',
+      );
+      const {parser} = createParser(configFile.path);
+      parser.parse();
+
+      fs.writeFileSync(configFile.path, JSON.stringify({categoryPwa: true}));
+
+      assert.throws(
+        () => parser.reload(),
+        /Arguments categoryPwa and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('allows staging a restart-required option in the config file that conflicts with a startup CLI option', () => {
+      using configFile = createTempFile('{}', 'cd4a.config.json');
+      const {parser} = createParser(configFile.path, ['--channel=canary']);
+      parser.parse();
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({
+          browserUrl: 'http://127.0.0.1:9222',
+          memoryDebugging: true,
+        }),
+      );
+
+      const reloaded = parser.reload();
+      assert.strictEqual(reloaded.memoryDebugging, true);
+    });
+
+    it('preserves startup viaCli defaults across reloads even if config file sets viaCli to false', () => {
+      using configFile = createTempFile(
+        JSON.stringify({viaCli: true}),
+        'cd4a.config.json',
+      );
+      const {parser} = createParser(configFile.path);
+      assert.strictEqual(parser.parse().memoryDebugging, true);
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({viaCli: false, performanceCrux: false}),
+      );
+
+      const reloaded = parser.reload();
+      assert.strictEqual(reloaded.viaCli, true);
+      assert.strictEqual(reloaded.memoryDebugging, true);
+      assert.strictEqual(reloaded.allowUnrestrictedPaths, true);
+      assert.strictEqual(reloaded.performanceCrux, false);
     });
   });
 });
