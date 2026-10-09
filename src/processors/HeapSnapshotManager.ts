@@ -436,6 +436,24 @@ export class HeapSnapshotManager {
     filePath: string,
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    for (const [parameter, pattern] of Object.entries({
+      className: options.className,
+      propertyName: options.propertyName,
+    })) {
+      if (pattern === undefined) {
+        continue;
+      }
+      try {
+        new RegExp(pattern, 'i');
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          throw new Error(
+            `Invalid ${parameter} regular expression: ${error.message}. Escape special characters to match them literally.`,
+          );
+        }
+        throw error;
+      }
+    }
     const snapshot = await this.getSnapshot(filePath);
     const provider = snapshot.queryObjects(options);
     return await provider.serializeItemsRange(0, Infinity);
