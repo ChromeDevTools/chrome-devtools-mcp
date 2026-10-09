@@ -412,7 +412,10 @@ async function generateToolDocumentation(): Promise<void> {
   try {
     console.log('Generating tool documentation from definitions...');
     // Returns both the regular and the slim tools.
-    const tools = createTools({pageIdRouting: true} as ParsedArguments);
+    const tools = createTools({
+      categoryExtensions: true,
+      pageIdRouting: true,
+    } as ParsedArguments);
 
     {
       const {toolsWithAnnotations, categories, sortedCategories} =
