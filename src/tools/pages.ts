@@ -103,7 +103,7 @@ export const closePage = defineTool(() => ({
 export const newPage = defineTool((args: ParsedArguments) => {
   return {
     name: 'new_page',
-    description: `Open a new tab and load a URL. Use project URL if not specified otherwise.`,
+    description: `Open a new tab and load a URL. Use project URL if not specified otherwise. If the URL fails to load, the tab is closed and the previously selected page stays selected, and the navigation error names the tab instead if it could not be closed.`,
     annotations: {
       category: ToolCategory.NAVIGATION,
       readOnlyHint: false,

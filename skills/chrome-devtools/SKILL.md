@@ -11,7 +11,7 @@ Addional tooling can be enabled by providing the following flags:
 - For extension tooling, use the `--categoryExtensions` flag.
 - For memory tooling, use the `--memoryDebugging` flag.
 
-**Page targeting**: Page-scoped tools require a `pageId` parameter to target a specific page. Use `list_pages` to see available pages and their IDs (e.g. `pageId: 1`), or use the ID returned when creating a page with `new_page`.
+**Page targeting**: Page-scoped tools require a `pageId` parameter to target a specific page. Use `list_pages` to see available pages and their IDs (e.g. `pageId: 1`), or use the ID returned when creating a page with `new_page`. A `new_page` whose URL fails to load closes the tab it opened and leaves the previously selected page selected, so there is no new page to target after that error.
 Note: For `evaluate_script`, `pageId` is required when targeting pages. However, when `--categoryExtensions` is enabled, `pageId` is optional so you can pass `serviceWorkerId` instead to evaluate inside an extension background service worker.
 **Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.
 

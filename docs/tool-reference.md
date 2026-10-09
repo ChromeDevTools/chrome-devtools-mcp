@@ -239,7 +239,7 @@
 
 ### `new_page`
 
-**Description:** Open a new tab and load a URL. Use project URL if not specified otherwise.
+**Description:** Open a new tab and load a URL. Use project URL if not specified otherwise. If the URL fails to load, the tab is closed and the previously selected page stays selected, and the navigation error names the tab instead if it could not be closed.
 
 **Parameters:**
 
