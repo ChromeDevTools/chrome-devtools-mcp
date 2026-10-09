@@ -30,7 +30,11 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
+import {
+  buildCommand,
+  expandShorthandArgs,
+  isOptionalPositionalArg,
+} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
 
@@ -57,7 +61,7 @@ async function start(args: string[], sessionId: string, stopExisting = false) {
   logDisclaimers(parsedArgs);
 }
 
-const y = yargs(hideBin(process.argv))
+const y = yargs(expandShorthandArgs(hideBin(process.argv), commands))
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
@@ -92,20 +96,32 @@ const y = yargs(hideBin(process.argv))
         console.error('💡 TIP FOR AI AGENT / DEVELOPER:');
         console.error('In the `chrome-devtools` CLI:');
         console.error(
-          '1. Required parameters MUST be passed as positional arguments (without flags).',
+          '1. Use exact command names from `chrome-devtools --help` (e.g. navigate_page, take_screenshot).',
+        );
+        console.error(
+          '2. Required parameters MUST be passed as positional arguments (without flags).',
         );
         console.error(
           '   - INCORRECT: chrome-devtools click --pageId 1 --uid "1_2"',
         );
-        console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
+        console.error('   - CORRECT:   chrome-devtools click 1 @1_2');
         console.error(
           '   - CORRECT:   chrome-devtools evaluate_script "() => document.title" --pageId 1',
         );
         console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except optional positional parameters shown in command help.',
+          '3. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except:',
         );
         console.error(
-          '3. Make sure to escape quotes properly for your shell environment.',
+          '   - optional element uids as @<uid>: chrome-devtools take_screenshot 1 @1_5',
+        );
+        console.error(
+          '   - optional URLs without --url: chrome-devtools navigate_page 1 https://example.com',
+        );
+        console.error(
+          '   - optional positional parameters shown in command help.',
+        );
+        console.error(
+          '4. Make sure to escape quotes properly for your shell environment.',
         );
         console.error(
           'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',
