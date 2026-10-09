@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {PageCollector} from '../collectors/PageCollector.js';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
@@ -77,7 +78,7 @@ export const listConsoleMessages = definePageTool(
           .default(false)
           .optional()
           .describe(
-            'Set to true to return the preserved messages over the last 3 navigations.',
+            `Set to true to return the preserved messages over the last ${cliArgs?.maxNavigationSaved ?? PageCollector.MAX_NAVIGATION_SAVED} navigations.`,
           ),
         includeStackTraces: zod
           .boolean()

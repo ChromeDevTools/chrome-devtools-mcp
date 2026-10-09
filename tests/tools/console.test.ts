@@ -21,6 +21,7 @@ import {
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {installExtension} from '../../src/tools/extensions.js';
+import {createMockParsedArguments} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
   getTextContent,
@@ -142,6 +143,16 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    it('describes preserved messages using maxNavigationSaved', () => {
+      const tool = listConsoleMessages(
+        createMockParsedArguments({maxNavigationSaved: 5}),
+      );
+      assert.strictEqual(
+        tool.schema.includePreservedMessages.description,
+        'Set to true to return the preserved messages over the last 5 navigations.',
+      );
+    });
+
     it('list messages', async () => {
       await withMcpContext(async (response, context, args) => {
         await listConsoleMessages(args).handler(
