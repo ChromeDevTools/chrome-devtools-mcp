@@ -5,6 +5,8 @@
  */
 
 import assert from 'node:assert';
+import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
@@ -22,6 +24,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
+import {evaluateScript} from '../../src/tools/script.js';
 import {createMockParsedArguments} from '../mocks.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
@@ -438,25 +441,305 @@ describe('pages', () => {
         assert.ok(response.includePages);
       });
     });
-    it('closes the failed tab and restores the previous selection when navigation fails', async () => {
+    // A loopback port with no listener: the connection is refused, so a
+    // navigation to it fails without reaching the network.
+    async function unusedPort(): Promise<number> {
+      const server = net.createServer();
+      await new Promise<void>(resolve =>
+        server.listen(0, '127.0.0.1', resolve),
+      );
+      const port = (server.address() as net.AddressInfo).port;
+      await new Promise<void>(resolve => server.close(() => resolve()));
+      return port;
+    }
+
+    // A server that accepts the connection and never answers, so the only
+    // end a navigation to it can reach is its own timeout.
+    async function neverRespondingServer(): Promise<{
+      port: number;
+      close: () => Promise<void>;
+    }> {
+      const server = http.createServer(() => {
+        // Never respond.
+      });
+      await new Promise<void>(resolve =>
+        server.listen(0, '127.0.0.1', resolve),
+      );
+      const port = (server.address() as net.AddressInfo).port;
+      return {
+        port,
+        close: () =>
+          new Promise<void>(resolve => {
+            server.closeAllConnections();
+            server.close(() => resolve());
+          }),
+      };
+    }
+
+    it('closes the tab when the navigation is blocked', async () => {
       await withMcpContext(
         async (response, context, args) => {
           const originalPage = context.getSelectedMcpPage();
 
-          await assert.rejects(async () => {
-            await newPage(args).handler(
-              {params: {url: 'http://127.0.0.1:1/blocked'}},
+          await assert.rejects(
+            newPage(args).handler(
+              {params: {url: 'http://127.0.0.1/blocked'}},
               response,
               context,
-            );
-          }, /blocked by blocklist/);
+            ),
+            /blocked by blocklist\/allowlist rules/,
+          );
 
-          // The tab opened by the failed new_page is closed again and the
-          // previously selected page is selected once more.
+          // The tab this call opened is closed again and the page that was
+          // selected before it is selected once more.
           assert.strictEqual(context.getPages().length, 1);
           assert.strictEqual(context.getSelectedMcpPage(), originalPage);
         },
-        {blockedUrlPattern: ['http://127.0.0.1:1/blocked']},
+        {blockedUrlPattern: ['http://127.0.0.1/blocked']},
+      );
+    });
+
+    it('closes the tab when the URL is not in the allowed list', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const originalPage = context.getSelectedMcpPage();
+
+          await assert.rejects(
+            newPage(args).handler(
+              {params: {url: 'http://127.0.0.1/not-allowed'}},
+              response,
+              context,
+            ),
+            /blocked by blocklist\/allowlist rules/,
+          );
+
+          assert.strictEqual(context.getPages().length, 1);
+          assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+        },
+        {allowedUrlPattern: ['http://127.0.0.1/allowed']},
+      );
+    });
+
+    it('closes the tab when the connection is refused', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const originalPage = context.getSelectedMcpPage();
+        const port = await unusedPort();
+
+        await assert.rejects(
+          newPage(args).handler(
+            {params: {url: `http://127.0.0.1:${port}/`}},
+            response,
+            context,
+          ),
+          /net::ERR_CONNECTION_REFUSED/,
+        );
+
+        assert.strictEqual(context.getPages().length, 1);
+        assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+      });
+    });
+
+    it('closes the tab when the navigation times out', async () => {
+      const stalled = await neverRespondingServer();
+      try {
+        await withMcpContext(async (response, context, args) => {
+          const originalPage = context.getSelectedMcpPage();
+
+          await assert.rejects(
+            newPage(args).handler(
+              {
+                params: {
+                  url: `http://127.0.0.1:${stalled.port}/`,
+                  timeout: 1000,
+                },
+              },
+              response,
+              context,
+            ),
+            /Navigation timeout of 1000 ms exceeded/,
+          );
+
+          assert.strictEqual(context.getPages().length, 1);
+          assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+        });
+      } finally {
+        await stalled.close();
+      }
+    });
+
+    it('closes the tab when it was opened in the background', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const originalPage = context.getSelectedMcpPage();
+
+          await assert.rejects(
+            newPage(args).handler(
+              {params: {url: 'http://127.0.0.1/blocked', background: true}},
+              response,
+              context,
+            ),
+            /blocked by blocklist\/allowlist rules/,
+          );
+
+          // `background` keeps the tab from being brought to the front; the
+          // selection still moves to it, so a failure still has to undo it.
+          assert.strictEqual(context.getPages().length, 1);
+          assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+        },
+        {blockedUrlPattern: ['http://127.0.0.1/blocked']},
+      );
+    });
+
+    it('closes the tab when a dialog blocks the load', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const originalPage = context.getSelectedMcpPage();
+
+        // The dialog pauses the renderer, so the load ends in a timeout and
+        // the tab stays behind with the dialog on it unless it is closed.
+        await assert.rejects(
+          newPage(args).handler(
+            {
+              params: {
+                url: 'data:text/html,<script>alert("blocked")</script>',
+                timeout: 1000,
+              },
+            },
+            response,
+            context,
+          ),
+          /Navigation timeout of 1000 ms exceeded/,
+        );
+
+        assert.strictEqual(context.getPages().length, 1);
+        assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+      });
+    });
+
+    it('keeps another page and its dialog when the load fails', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const withDialog = context.getPageById(1);
+          await withDialog.pptrPage.goto(
+            'data:text/html,<script>setTimeout(() => alert("keep me"), 0)</script>',
+          );
+          for (let i = 0; i < 100 && !withDialog.getDialog(); i++) {
+            await new Promise(resolve => setTimeout(resolve, 20));
+          }
+          assert.ok(
+            withDialog.getDialog(),
+            'the first page should hold a dialog',
+          );
+
+          await assert.rejects(
+            newPage(args).handler(
+              {params: {url: 'http://127.0.0.1/blocked'}},
+              response,
+              context,
+            ),
+            /blocked by blocklist\/allowlist rules/,
+          );
+
+          // Only the tab this call opened is closed: the page that was
+          // selected before it keeps its dialog and stays selected.
+          assert.strictEqual(context.getPages().length, 1);
+          assert.strictEqual(context.getSelectedMcpPage(), withDialog);
+          assert.strictEqual(withDialog.getDialog()?.message(), 'keep me');
+        },
+        {blockedUrlPattern: ['http://127.0.0.1/blocked']},
+      );
+    });
+
+    it('reports a tab it could not close and keeps the navigation error', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const originalPage = context.getSelectedMcpPage();
+          sinon.stub(context, 'closePage').rejects(new Error('close failed'));
+
+          await assert.rejects(
+            newPage(args).handler(
+              {params: {url: 'http://127.0.0.1/blocked'}},
+              response,
+              context,
+            ),
+            // The navigation error is what the caller is told about, cleanup
+            // failure included.
+            /blocked by blocklist\/allowlist rules/,
+          );
+          sinon.restore();
+
+          // The tab is still open, and the response says so — with the page it
+          // is — rather than leaving it unreported, while the selection that
+          // was restored is the one marked [selected].
+          assert.strictEqual(context.getPages().length, 2);
+          assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+          const {content} = await response.handle(context);
+          const text = content
+            .map(part => ('text' in part ? part.text : ''))
+            .join('\n');
+          assert.match(text, /still open as page 2/);
+          assert.match(text, /Page 1 is selected again/);
+          assert.match(text, /^1: .*\[selected\]$/m);
+        },
+        {blockedUrlPattern: ['http://127.0.0.1/blocked']},
+      );
+    });
+
+    it('leaves the pages and the selection alone when the URL is rejected before a tab exists', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const originalPage = context.getSelectedMcpPage();
+        const before = context.getPages().map(page => page.id);
+
+        await assert.rejects(
+          newPage(args).handler(
+            {params: {url: 'chrome://settings'}},
+            response,
+            context,
+          ),
+          /Navigating to chrome: URLs is not allowed./,
+        );
+
+        // No tab was created, so nothing is closed and nothing is re-selected.
+        assert.deepStrictEqual(
+          context.getPages().map(page => page.id),
+          before,
+        );
+        assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+      });
+    });
+
+    it('leaves page-scoped calls on the page selected before a failed new_page', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const originalPage = context.getSelectedMcpPage();
+          await originalPage.pptrPage.goto(
+            'data:text/html,<title>the original page</title>',
+          );
+
+          await assert.rejects(
+            newPage(args).handler(
+              {params: {url: 'http://127.0.0.1/blocked'}},
+              response,
+              context,
+            ),
+            /blocked by blocklist\/allowlist rules/,
+          );
+
+          // With pageId routing off, a page-scoped call without a pageId
+          // follows the selection, which the failed call must have put back.
+          await evaluateScript(args).handler(
+            {params: {function: '() => document.title'}},
+            response,
+            context,
+          );
+          assert.ok(
+            response.responseLines.some(line =>
+              line.includes('the original page'),
+            ),
+            response.responseLines.join('\n'),
+          );
+        },
+        {blockedUrlPattern: ['http://127.0.0.1/blocked']},
+        {pageIdRouting: false},
       );
     });
   });
