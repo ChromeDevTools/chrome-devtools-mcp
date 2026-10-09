@@ -18,11 +18,16 @@ import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {type HTTPResponse} from '../src/third_party/index.js';
-import type {TraceResult} from '../src/processors/PerformanceTrace.js';
+import {type HTTPResponse, ScreenRecorder} from '../src/third_party/index.js';
+import {
+  parseRawTraceBuffer,
+  type TraceResult,
+  traceResultIsSuccess,
+} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
 import {serverHooks} from './server.js';
+import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   assertNoServiceWorkerReported,
   createTempDir,
@@ -290,6 +295,25 @@ describe('McpContext', () => {
 
       // A later snapshot keeps a valid selection (e.g. the one taken before the
       // next response, or after an explicit select), so the note is not repeated.
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('preserves an unread fallback across snapshots until read', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      await page.pptrPage.close();
+      // First snapshot (e.g. from applyConfig) detects the fallback.
+      await context.createPagesSnapshot();
+      // Second snapshot (e.g. from McpResponse.#handleSnapshot) runs before the
+      // fallback has been read by the response formatter.
+      await context.createPagesSnapshot();
+
+      assert.deepStrictEqual(context.getSelectedPageFallback(), {
+        wasClosed: true,
+      });
+
       await context.createPagesSnapshot();
       assert.strictEqual(context.getSelectedPageFallback(), undefined);
     });
@@ -821,6 +845,127 @@ describe('McpContext', () => {
             allowedUrlPattern: ['https://example.com/allowed*'],
           },
         );
+      });
+    });
+
+    describe('updateOptions', () => {
+      it('updates the CrUX setting', async () => {
+        await withMcpContext(async (_response, context) => {
+          context.updateOptions({performanceCrux: false});
+
+          assert.strictEqual(context.isCruxEnabled(), false);
+        });
+      });
+
+      it('updates sourceMaps on existing pages only when changed', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          const setSourceMapsSpy = sinon.spy(mcpPage, 'setSourceMaps');
+
+          context.updateOptions({performanceCrux: true, sourceMaps: true});
+          sinon.assert.notCalled(setSourceMapsSpy);
+
+          context.updateOptions({performanceCrux: true, sourceMaps: false});
+          sinon.assert.calledOnceWithExactly(setSourceMapsSpy, false);
+
+          setSourceMapsSpy.resetHistory();
+          context.updateOptions({performanceCrux: false, sourceMaps: false});
+          sinon.assert.notCalled(setSourceMapsSpy);
+        });
+      });
+    });
+
+    describe('releaseState', () => {
+      it('stops and clears the screencast recording', async () => {
+        await withMcpContext(async (_response, context) => {
+          const recorder = sinon.createStubInstance(ScreenRecorder);
+          recorder.stop.resolves();
+          context.setScreenRecorder({recorder, filePath: '/tmp/video.mp4'});
+
+          await context.releaseState({
+            screencast: true,
+            heapSnapshots: false,
+            performanceTrace: false,
+          });
+
+          sinon.assert.calledOnceWithExactly(recorder.stop);
+          assert.strictEqual(context.getScreenRecorder(), null);
+        });
+      });
+
+      it('keeps the screencast recording when not released', async () => {
+        await withMcpContext(async (_response, context) => {
+          const recorder = sinon.createStubInstance(ScreenRecorder);
+          const data = {recorder, filePath: '/tmp/video.mp4'};
+          context.setScreenRecorder(data);
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: true,
+            performanceTrace: true,
+          });
+
+          sinon.assert.notCalled(recorder.stop);
+          assert.strictEqual(context.getScreenRecorder(), data);
+        });
+      });
+
+      it('disposes loaded heap snapshots', async () => {
+        await withMcpContext(async (_response, context) => {
+          await context.getHeapSnapshotStats(
+            path.join(process.cwd(), 'tests/fixtures/example.heapsnapshot'),
+          );
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: true,
+            performanceTrace: false,
+          });
+
+          assert.strictEqual(context.hasHeapSnapshots(), false);
+        });
+      });
+
+      it('stops the running performance trace and clears recorded traces', async () => {
+        await withMcpContext(async (_response, context) => {
+          const pptrPage = context.getSelectedMcpPage().pptrPage;
+          const stop = sinon.stub(pptrPage.tracing, 'stop').resolves();
+          context.setIsRunningPerformanceTrace(true, pptrPage);
+          const traceResult = await parseRawTraceBuffer(
+            loadTraceAsBuffer('basic-trace.json.gz'),
+          );
+          assert.ok(traceResultIsSuccess(traceResult));
+          context.storeTraceRecording(traceResult);
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: false,
+            performanceTrace: true,
+          });
+
+          sinon.assert.calledOnceWithExactly(stop);
+          assert.strictEqual(context.isRunningPerformanceTrace(), false);
+          assert.deepStrictEqual(context.recordedTraces(), []);
+        });
+      });
+
+      it('disposes comment bridges once per page when devtoolsComments is released', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          const disposeCommentBridgeSpy = sinon.spy(
+            mcpPage,
+            'disposeCommentBridge',
+          );
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: false,
+            performanceTrace: false,
+            devtoolsComments: true,
+          });
+
+          sinon.assert.calledOnceWithExactly(disposeCommentBridgeSpy);
+        });
       });
     });
 

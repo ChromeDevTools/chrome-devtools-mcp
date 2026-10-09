@@ -79,6 +79,30 @@ interface McpContextOptions {
   onNotification?: (message: string) => void;
 }
 
+/**
+ * Options that can be changed on a running context. The allowlist and
+ * blocklist are enforced by Puppeteer for the lifetime of the browser and are
+ * therefore fixed.
+ */
+export type LiveMcpContextOptions = Pick<
+  McpContextOptions,
+  | 'experimentalIncludeAllPages'
+  | 'performanceCrux'
+  | 'sourceMaps'
+  | 'allowUnrestrictedPaths'
+>;
+
+/**
+ * State owned by tools that should be released because the tools that manage
+ * it are no longer available.
+ */
+export interface ReleasableState {
+  screencast: boolean;
+  heapSnapshots: boolean;
+  performanceTrace: boolean;
+  devtoolsComments?: boolean;
+}
+
 // Page ids are handed out from a process-wide counter so they stay unique
 // across all contexts, in particular across browser reconnects. An id issued
 // before a reconnect then fails to resolve instead of hitting an unrelated
@@ -101,10 +125,12 @@ export class McpContext implements Context {
   #mcpPages = new Map<Target, McpPage>();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
+  #selectedPageFallbackRead = false;
 
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
+  #tracingPage?: Page;
   #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
     null;
 
@@ -151,16 +177,92 @@ export class McpContext implements Context {
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
   }
 
+  #allMcpPages(): Set<McpPage> {
+    const pages = new Set(this.#mcpPages.values());
+    if (this.#selectedPage) {
+      pages.add(this.#selectedPage);
+    }
+    return pages;
+  }
+
+  /**
+   * Updates options after a config reload.
+   */
+  updateOptions(options: LiveMcpContextOptions): void {
+    const previousSourceMaps = this.#options.sourceMaps;
+    this.#options = {...this.#options, ...options};
+    this.#allowUnrestrictedPaths =
+      this.#options.allowUnrestrictedPaths ?? false;
+    if (
+      options.sourceMaps !== undefined &&
+      options.sourceMaps !== previousSourceMaps
+    ) {
+      for (const mcpPage of this.#allMcpPages()) {
+        mcpPage.setSourceMaps(options.sourceMaps);
+      }
+    }
+  }
+
+  /**
+   * Stops recordings and frees resources that can no longer be managed
+   * because the corresponding tools were disabled by a config reload. A
+   * screencast is stopped and saved, a running trace is discarded.
+   */
+  async releaseState(state: ReleasableState): Promise<void> {
+    if (state.screencast && this.#screenRecorderData) {
+      const {recorder, filePath} = this.#screenRecorderData;
+      this.#screenRecorderData = null;
+      try {
+        await recorder.stop();
+        this.#notify(
+          `The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`,
+        );
+      } catch (err) {
+        this.logger?.('Failed to stop the screencast recording', err);
+      }
+    }
+    if (state.heapSnapshots && this.#heapSnapshotManager.hasSnapshots()) {
+      this.#heapSnapshotManager.dispose();
+      this.#notify(
+        'Loaded heap snapshots were closed because memory tools were disabled.',
+      );
+    }
+    if (state.performanceTrace) {
+      this.#traceResults = [];
+      if (this.#isRunningTrace) {
+        const page = this.#tracingPage;
+        this.setIsRunningPerformanceTrace(false);
+        try {
+          await page?.tracing.stop();
+        } catch (err) {
+          this.logger?.('Failed to stop the performance trace', err);
+        }
+        this.#notify(
+          'The running performance trace was discarded because performance tools were disabled.',
+        );
+      }
+    }
+    if (state.devtoolsComments) {
+      for (const mcpPage of this.#allMcpPages()) {
+        mcpPage.disposeCommentBridge();
+      }
+    }
+  }
+
+  #notify(message: string): void {
+    this.logger?.(message);
+    this.#options.onNotification?.(message);
+  }
+
   dispose() {
     this.browser.off('targetcreated', this.#onTargetCreated);
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
     this.#serviceWorkerConsoleCollector.dispose();
     this.#heapSnapshotManager.dispose();
-    for (const mcpPage of this.#mcpPages.values()) {
+    for (const mcpPage of this.#allMcpPages()) {
       mcpPage.dispose();
     }
-    this.#selectedPage?.dispose();
     this.#mcpPages.clear();
     this.#workers.clear();
     // Isolated contexts are intentionally not closed here.
@@ -393,8 +495,13 @@ export class McpContext implements Context {
     return this.browser.getPWAState(options);
   }
 
-  setIsRunningPerformanceTrace(x: boolean): void {
+  /**
+   * @param page The page that is being traced, so the trace can be stopped if
+   * performance tools are disabled while it is running.
+   */
+  setIsRunningPerformanceTrace(x: boolean, page?: Page): void {
     this.#isRunningTrace = x;
+    this.#tracingPage = x ? page : undefined;
   }
 
   isRunningPerformanceTrace(): boolean {
@@ -497,6 +604,8 @@ export class McpContext implements Context {
     ) {
       this.#selectedPage.dispose();
     }
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -504,10 +613,12 @@ export class McpContext implements Context {
   /**
    * Returns details about the last page snapshot automatically replacing the
    * selection because the selected page disappeared from the page list, or
-   * `undefined` if the snapshot left the selection intact. Recomputed on every
-   * createPagesSnapshot() call.
+   * `undefined` if the snapshot left the selection intact. Cleared on the next
+   * createPagesSnapshot() call after it has been read, or when selectPage() is
+   * called explicitly.
    */
   getSelectedPageFallback(): {wasClosed: boolean} | undefined {
+    this.#selectedPageFallbackRead = true;
     return this.#selectedPageFallback;
   }
 
@@ -609,19 +720,31 @@ export class McpContext implements Context {
 
     const pages = Array.from(this.#mcpPages.values());
 
-    // Only fall back when the selected page is actually gone. Gating on
-    // `isClosed()` instead of `pages` membership avoids silently swapping a
-    // live page that is momentarily missing from the snapshot.
-    this.#selectedPageFallback = undefined;
-    if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
+    // Only fall back when the selected page is actually gone or no longer
+    // counts as a page, e.g. a background page after
+    // experimentalIncludeAllPages was turned off. Gating on `isClosed()`
+    // instead of `pages` membership avoids silently swapping a live page that
+    // is momentarily missing from the snapshot.
+    if (this.#selectedPageFallbackRead) {
+      this.#selectedPageFallback = undefined;
+      this.#selectedPageFallbackRead = false;
+    }
+    if (
+      (!this.#selectedPage ||
+        this.#selectedPage.isClosed() ||
+        !this.#isPageTarget(this.#selectedPage.target)) &&
+      pages[0]
+    ) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
-      if (this.#selectedPage) {
-        this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.isClosed(),
-        };
-      }
+      const fallback = this.#selectedPage
+        ? {wasClosed: this.#selectedPage.isClosed()}
+        : undefined;
       this.selectPage(pages[0]);
+      if (fallback) {
+        this.#selectedPageFallback = fallback;
+        this.#selectedPageFallbackRead = false;
+      }
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {

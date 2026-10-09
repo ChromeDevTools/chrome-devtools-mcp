@@ -58,9 +58,9 @@ export const startTrace = definePageTool(() => ({
       );
       return;
     }
-    context.setIsRunningPerformanceTrace(true);
-
     const page = request.page;
+    context.setIsRunningPerformanceTrace(true, page.pptrPage);
+
     const pageUrlForTracing = page.pptrPage.url();
 
     try {

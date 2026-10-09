@@ -325,6 +325,18 @@ export class McpPage implements ContextPage {
     }
   }
 
+  setSourceMaps(sourceMaps: boolean): void {
+    this.#sourceMaps = sourceMaps;
+    if (this.#devtoolsUniverse) {
+      this.#devtoolsUniverse.universe.settings
+        .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+        .set(sourceMaps);
+      this.#devtoolsUniverse.universe.settings
+        .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+        .set(sourceMaps);
+    }
+  }
+
   get devtoolsUniverse(): TargetUniverse | undefined {
     return this.#devtoolsUniverse;
   }
@@ -514,6 +526,11 @@ export class McpPage implements ContextPage {
 
   get commentBridge(): DevToolsCommentBridge | undefined {
     return this.#commentBridge;
+  }
+
+  disposeCommentBridge(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
   }
 
   async ensureDevToolsCommentBridge(
