@@ -68,7 +68,9 @@ Example with arguments: \`(el) => el.innerText\`
             ),
         )
         .optional()
-        .describe(`An optional list of arguments to pass to the function.`),
+        .describe(
+          `An optional list of element uids from the latest page snapshot (take_snapshot). Each uid is passed to the function as the matching element, not as a string. To pass other values, write them into the function source.`,
+        ),
       filePath: zod
         .string()
         .optional()

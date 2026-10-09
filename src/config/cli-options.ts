@@ -329,7 +329,8 @@ export const commands: Commands = {
       args: {
         name: 'args',
         type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
+        description:
+          'An optional list of element uids from the latest page snapshot (take_snapshot). Each uid is passed to the function as the matching element, not as a string. To pass other values, write them into the function source.',
         required: false,
       },
       filePath: {
