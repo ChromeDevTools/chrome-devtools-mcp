@@ -9,15 +9,26 @@ You are acting as a troubleshooting wizard to help the user configure and fix th
 
 ### Step 1: Find and Read Configuration
 
-Your first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `gemini-extension.json`, `.claude/settings.json`, `.vscode/launch.json`, or `.gemini/settings.json`.
+Your first action should be to locate and read the MCP configuration file. Distinguish between workspace-level and user/profile-level configurations:
 
-If you find a configuration file, read and interpret it to identify potential issues such as:
+- **Workspace-level configurations**: Search the user's workspace for files such as:
+  - `.mcp.json` (portable workspace MCP configuration used by Claude Code for project-scoped servers, also supported by VS Code and other clients)
+  - `.vscode/mcp.json` (VS Code workspace-level MCP configuration)
+  - `gemini-extension.json` (Gemini extension manifest)
+  - `.gemini/settings.json` (Gemini CLI workspace settings)
+- **User/profile-level configurations**: Configurations stored outside the workspace that are not discoverable by searching the workspace:
+  - `~/.claude.json` (Claude Code local- and user-scoped MCP server definitions)
+  - VS Code user-profile MCP configuration (`mcp.json` in the active user profile, accessible via the **MCP: Open User Configuration** command)
+
+Note that `.vscode/launch.json` configures debug launch targets rather than MCP servers, and `.claude/settings.json` does not contain MCP server definitions.
+
+If you find an accessible configuration file, read and interpret it to identify potential issues such as:
 
 - Incorrect arguments or flags.
 - Missing environment variables.
 - Usage of `--autoConnect` in incompatible environments.
 
-If you cannot find any of these files, only then should you ask the user to provide their configuration file content.
+When an external user/profile configuration cannot be accessed from the workspace, explain this limitation to the user and request only the necessary MCP server configuration details. If no workspace configuration is found, ask the user to provide their configuration file content.
 
 ### Step 2: Triage Common Connection Errors
 
