@@ -252,6 +252,7 @@ export class McpServer {
       screencast: !this.#isCallable('screencast_stop'),
       heapSnapshots: !this.#isCallable('close_heapsnapshot'),
       performanceTrace: !this.#isCallable('performance_stop_trace'),
+      devtoolsComments: !this.#isCallable('list_devtools_comments'),
     });
   }
 

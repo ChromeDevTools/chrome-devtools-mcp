@@ -295,6 +295,11 @@ export class ToolHandler {
   handle = async (
     validatedParams: Record<string, unknown>,
   ): Promise<CallToolResult> => {
+    // TODO: Investigate if we can reliably hit a race where input validation
+    // (MCP SDK's async validateToolInput or McpServer.callTool's safeParseAsync)
+    // starts against the old schema, applyConfig() increments #schemaVersion
+    // while validation awaits, and handle() then captures the already-incremented
+    // #schemaVersion.
     const schemaVersionAtCall = this.#schemaVersion;
     using _guard = await this.toolMutex.acquire();
 

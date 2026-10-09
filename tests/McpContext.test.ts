@@ -19,10 +19,15 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse, ScreenRecorder} from '../src/third_party/index.js';
-import type {TraceResult} from '../src/processors/PerformanceTrace.js';
+import {
+  parseRawTraceBuffer,
+  type TraceResult,
+  traceResultIsSuccess,
+} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
 import {serverHooks} from './server.js';
+import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   assertNoServiceWorkerReported,
   createTempDir,
@@ -290,6 +295,25 @@ describe('McpContext', () => {
 
       // A later snapshot keeps a valid selection (e.g. the one taken before the
       // next response, or after an explicit select), so the note is not repeated.
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedPageFallback(), undefined);
+    });
+  });
+
+  it('preserves an unread fallback across snapshots until read', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = await context.newPage();
+      await page.pptrPage.close();
+      // First snapshot (e.g. from applyConfig) detects the fallback.
+      await context.createPagesSnapshot();
+      // Second snapshot (e.g. from McpResponse.#handleSnapshot) runs before the
+      // fallback has been read by the response formatter.
+      await context.createPagesSnapshot();
+
+      assert.deepStrictEqual(context.getSelectedPageFallback(), {
+        wasClosed: true,
+      });
+
       await context.createPagesSnapshot();
       assert.strictEqual(context.getSelectedPageFallback(), undefined);
     });
@@ -832,6 +856,17 @@ describe('McpContext', () => {
           assert.strictEqual(context.isCruxEnabled(), false);
         });
       });
+
+      it('updates sourceMaps on existing pages', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          const setSourceMapsSpy = sinon.spy(mcpPage, 'setSourceMaps');
+
+          context.updateOptions({performanceCrux: true, sourceMaps: false});
+
+          sinon.assert.calledOnceWithExactly(setSourceMapsSpy, false);
+        });
+      });
     });
 
     describe('releaseState', () => {
@@ -885,11 +920,16 @@ describe('McpContext', () => {
         });
       });
 
-      it('stops the running performance trace on the traced page', async () => {
+      it('stops the running performance trace and clears recorded traces', async () => {
         await withMcpContext(async (_response, context) => {
           const pptrPage = context.getSelectedMcpPage().pptrPage;
           const stop = sinon.stub(pptrPage.tracing, 'stop').resolves();
           context.setIsRunningPerformanceTrace(true, pptrPage);
+          const traceResult = await parseRawTraceBuffer(
+            loadTraceAsBuffer('basic-trace.json.gz'),
+          );
+          assert.ok(traceResultIsSuccess(traceResult));
+          context.storeTraceRecording(traceResult);
 
           await context.releaseState({
             screencast: false,
@@ -899,6 +939,26 @@ describe('McpContext', () => {
 
           sinon.assert.calledOnceWithExactly(stop);
           assert.strictEqual(context.isRunningPerformanceTrace(), false);
+          assert.deepStrictEqual(context.recordedTraces(), []);
+        });
+      });
+
+      it('disposes comment bridges when devtoolsComments is released', async () => {
+        await withMcpContext(async (_response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          const disposeCommentBridgeSpy = sinon.spy(
+            mcpPage,
+            'disposeCommentBridge',
+          );
+
+          await context.releaseState({
+            screencast: false,
+            heapSnapshots: false,
+            performanceTrace: false,
+            devtoolsComments: true,
+          });
+
+          sinon.assert.called(disposeCommentBridgeSpy);
         });
       });
     });

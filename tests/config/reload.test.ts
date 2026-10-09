@@ -8,21 +8,50 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {ConfigParser} from '../../src/config/ConfigParser.js';
-import {mergeReloadableOptions} from '../../src/config/reload.js';
+import {mcpOptions} from '../../src/config/mcp-options.js';
+import {
+  mergeReloadableOptions,
+  RELOADABLE_OPTIONS,
+  RESTART_REQUIRED_OPTIONS,
+} from '../../src/config/reload.js';
 
 function parseArgs(argv: string[] = []) {
   return new ConfigParser('0.0.0', ['node', 'main.js', ...argv], {}).parse();
 }
 
 describe('mergeReloadableOptions', () => {
+  it('partitions all mcpOptions between RELOADABLE_OPTIONS and RESTART_REQUIRED_OPTIONS without overlap', () => {
+    const reloadable = new Set<string>(RELOADABLE_OPTIONS);
+    const restartRequired = new Set<string>(RESTART_REQUIRED_OPTIONS);
+
+    for (const key of reloadable) {
+      assert.strictEqual(
+        restartRequired.has(key),
+        false,
+        `Option ${key} is listed in both RELOADABLE_OPTIONS and RESTART_REQUIRED_OPTIONS`,
+      );
+    }
+
+    const classified = new Set<string>([...reloadable, ...restartRequired]);
+    assert.deepStrictEqual(
+      [...classified].sort(),
+      Object.keys(mcpOptions).sort(),
+    );
+  });
+
   it('applies reloadable options', () => {
     const merged = mergeReloadableOptions(
       parseArgs(),
-      parseArgs(['--memoryDebugging', '--no-category-network']),
+      parseArgs([
+        '--memoryDebugging',
+        '--no-category-network',
+        '--no-file-navigations',
+      ]),
     );
 
     assert.strictEqual(merged.memoryDebugging, true);
     assert.strictEqual(merged.categoryNetwork, false);
+    assert.strictEqual(merged.fileNavigations, false);
   });
 
   it('keeps restart-required options', () => {
@@ -56,5 +85,15 @@ describe('mergeReloadableOptions', () => {
 
     assert.strictEqual(merged.categoryExtensions, true);
     assert.strictEqual(merged.browserUrl, undefined);
+  });
+
+  it('rejects reloadable options that conflict with startup restart-required options', () => {
+    const previous = parseArgs(['--browserUrl=http://127.0.0.1:9222']);
+    const next = parseArgs(['--categoryPwa']);
+
+    assert.throws(
+      () => mergeReloadableOptions(previous, next),
+      /Arguments categoryPwa and browserUrl are mutually exclusive/,
+    );
   });
 });

@@ -299,5 +299,58 @@ describe('mcp-options steps', () => {
 
       assert.throws(() => parser.reload(), /Invalid JSON config file/);
     });
+
+    it('rejects reloadable options that conflict with startup config-file options', () => {
+      using configFile = createTempFile(
+        JSON.stringify({browserUrl: 'http://127.0.0.1:9222'}),
+        'cd4a.config.json',
+      );
+      const {parser} = createParser(configFile.path);
+      parser.parse();
+
+      fs.writeFileSync(configFile.path, JSON.stringify({categoryPwa: true}));
+
+      assert.throws(
+        () => parser.reload(),
+        /Arguments categoryPwa and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('allows staging a restart-required option in the config file that conflicts with a startup CLI option', () => {
+      using configFile = createTempFile('{}', 'cd4a.config.json');
+      const {parser} = createParser(configFile.path, ['--channel=canary']);
+      parser.parse();
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({
+          browserUrl: 'http://127.0.0.1:9222',
+          memoryDebugging: true,
+        }),
+      );
+
+      const reloaded = parser.reload();
+      assert.strictEqual(reloaded.memoryDebugging, true);
+    });
+
+    it('preserves startup viaCli defaults across reloads', () => {
+      using configFile = createTempFile(
+        JSON.stringify({viaCli: true}),
+        'cd4a.config.json',
+      );
+      const {parser} = createParser(configFile.path);
+      assert.strictEqual(parser.parse().memoryDebugging, true);
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({performanceCrux: false}),
+      );
+
+      const reloaded = parser.reload();
+      assert.strictEqual(reloaded.viaCli, true);
+      assert.strictEqual(reloaded.memoryDebugging, true);
+      assert.strictEqual(reloaded.allowUnrestrictedPaths, true);
+      assert.strictEqual(reloaded.performanceCrux, false);
+    });
   });
 });

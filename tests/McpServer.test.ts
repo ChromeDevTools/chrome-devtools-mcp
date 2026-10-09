@@ -216,6 +216,7 @@ describe('McpServer', () => {
       const {server, context} = await createTestServer([
         '--experimentalScreencast',
         '--memoryDebugging',
+        '--devtoolsComments',
       ]);
       await server.callTool('list_pages', {});
 
@@ -225,6 +226,7 @@ describe('McpServer', () => {
         screencast: true,
         heapSnapshots: true,
         performanceTrace: true,
+        devtoolsComments: true,
       });
     });
 
@@ -232,17 +234,23 @@ describe('McpServer', () => {
       const {server, context} = await createTestServer([
         '--experimentalScreencast',
         '--memoryDebugging',
+        '--devtoolsComments',
       ]);
       await server.callTool('list_pages', {});
 
       await server.applyConfig(
-        parseArgs(['--experimentalScreencast', '--memoryDebugging']),
+        parseArgs([
+          '--experimentalScreencast',
+          '--memoryDebugging',
+          '--devtoolsComments',
+        ]),
       );
 
       sinon.assert.calledOnceWithExactly(context.releaseState, {
         screencast: false,
         heapSnapshots: false,
         performanceTrace: false,
+        devtoolsComments: false,
       });
     });
 

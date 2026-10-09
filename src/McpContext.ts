@@ -100,6 +100,7 @@ export interface ReleasableState {
   screencast: boolean;
   heapSnapshots: boolean;
   performanceTrace: boolean;
+  devtoolsComments?: boolean;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -124,6 +125,7 @@ export class McpContext implements Context {
   #mcpPages = new Map<Target, McpPage>();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
+  #selectedPageFallbackRead = false;
 
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
@@ -176,13 +178,23 @@ export class McpContext implements Context {
   }
 
   /**
-   * Updates options after a config reload. `sourceMaps` only applies to pages
-   * opened afterwards.
+   * Updates options after a config reload.
    */
   updateOptions(options: LiveMcpContextOptions): void {
     this.#options = {...this.#options, ...options};
     this.#allowUnrestrictedPaths =
       this.#options.allowUnrestrictedPaths ?? false;
+    if (options.sourceMaps !== undefined) {
+      for (const mcpPage of this.#mcpPages.values()) {
+        mcpPage.setSourceMaps(options.sourceMaps);
+      }
+      if (
+        this.#selectedPage &&
+        !this.#mcpPages.has(this.#selectedPage.target)
+      ) {
+        this.#selectedPage.setSourceMaps(options.sourceMaps);
+      }
+    }
   }
 
   /**
@@ -209,17 +221,26 @@ export class McpContext implements Context {
         'Loaded heap snapshots were closed because memory tools were disabled.',
       );
     }
-    if (state.performanceTrace && this.#isRunningTrace) {
-      const page = this.#tracingPage;
-      this.setIsRunningPerformanceTrace(false);
-      try {
-        await page?.tracing.stop();
-      } catch (err) {
-        this.logger?.('Failed to stop the performance trace', err);
+    if (state.performanceTrace) {
+      this.#traceResults = [];
+      if (this.#isRunningTrace) {
+        const page = this.#tracingPage;
+        this.setIsRunningPerformanceTrace(false);
+        try {
+          await page?.tracing.stop();
+        } catch (err) {
+          this.logger?.('Failed to stop the performance trace', err);
+        }
+        this.#notify(
+          'The running performance trace was discarded because performance tools were disabled.',
+        );
       }
-      this.#notify(
-        'The running performance trace was discarded because performance tools were disabled.',
-      );
+    }
+    if (state.devtoolsComments) {
+      for (const mcpPage of this.#mcpPages.values()) {
+        mcpPage.disposeCommentBridge();
+      }
+      this.#selectedPage?.disposeCommentBridge();
     }
   }
 
@@ -579,6 +600,8 @@ export class McpContext implements Context {
     ) {
       this.#selectedPage.dispose();
     }
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -586,10 +609,12 @@ export class McpContext implements Context {
   /**
    * Returns details about the last page snapshot automatically replacing the
    * selection because the selected page disappeared from the page list, or
-   * `undefined` if the snapshot left the selection intact. Recomputed on every
-   * createPagesSnapshot() call.
+   * `undefined` if the snapshot left the selection intact. Cleared on the next
+   * createPagesSnapshot() call after it has been read, or when selectPage() is
+   * called explicitly.
    */
   getSelectedPageFallback(): {wasClosed: boolean} | undefined {
+    this.#selectedPageFallbackRead = true;
     return this.#selectedPageFallback;
   }
 
@@ -696,7 +721,10 @@ export class McpContext implements Context {
     // experimentalIncludeAllPages was turned off. Gating on `isClosed()`
     // instead of `pages` membership avoids silently swapping a live page that
     // is momentarily missing from the snapshot.
-    this.#selectedPageFallback = undefined;
+    if (this.#selectedPageFallbackRead) {
+      this.#selectedPageFallback = undefined;
+      this.#selectedPageFallbackRead = false;
+    }
     if (
       (!this.#selectedPage ||
         this.#selectedPage.isClosed() ||
@@ -705,12 +733,14 @@ export class McpContext implements Context {
     ) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
-      if (this.#selectedPage) {
-        this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.isClosed(),
-        };
-      }
+      const fallback = this.#selectedPage
+        ? {wasClosed: this.#selectedPage.isClosed()}
+        : undefined;
       this.selectPage(pages[0]);
+      if (fallback) {
+        this.#selectedPageFallback = fallback;
+        this.#selectedPageFallbackRead = false;
+      }
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {

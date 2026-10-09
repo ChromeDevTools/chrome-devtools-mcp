@@ -6,8 +6,14 @@
 
 import {ToolCategory} from '../tools/categories.js';
 
-import {categoryToFlagName} from './category-options.js';
+import {browserOptions} from './browser-options.js';
+import {
+  type CategoryFlagName,
+  categoryToFlagName,
+} from './category-options.js';
 import type {ParsedArguments} from './ConfigParser.js';
+import {CONFLICTING_ARGS} from './mcp-options.js';
+import {puppeteerOptions} from './puppeteer-options.js';
 import {toolOptions} from './tool-options.js';
 
 function optionNames<T extends object>(options: T): Array<keyof T> {
@@ -18,16 +24,30 @@ function optionNames<T extends object>(options: T): Array<keyof T> {
   return names;
 }
 
-function reloadableCategoryFlags(): Array<keyof ParsedArguments> {
-  const flags: Array<keyof ParsedArguments> = [];
+function isReloadableCategoryFlag(
+  flag: CategoryFlagName,
+): flag is Exclude<CategoryFlagName, 'categoryExtensions'> {
+  return flag !== 'categoryExtensions';
+}
+
+function reloadableCategoryFlags(): Array<
+  Exclude<CategoryFlagName, 'categoryExtensions'>
+> {
+  const flags: Array<Exclude<CategoryFlagName, 'categoryExtensions'>> = [];
   for (const category of Object.values(ToolCategory)) {
     // Extensions support is enabled when the browser is launched.
-    if (category === ToolCategory.EXTENSIONS) {
-      continue;
+    const flag = categoryToFlagName(category);
+    if (isReloadableCategoryFlag(flag)) {
+      flags.push(flag);
     }
-    flags.push(categoryToFlagName(category));
   }
   return flags;
+}
+
+function defineOptionList<
+  const T extends ReadonlyArray<keyof ParsedArguments>,
+>(options: T): T {
+  return options;
 }
 
 /**
@@ -36,7 +56,7 @@ function reloadableCategoryFlags(): Array<keyof ParsedArguments> {
  * was started with until it is restarted. New options are therefore
  * restart-required unless they are explicitly added here.
  */
-export const RELOADABLE_OPTIONS: ReadonlyArray<keyof ParsedArguments> = [
+export const RELOADABLE_OPTIONS = defineOptionList([
   ...reloadableCategoryFlags(),
   ...optionNames(toolOptions),
   'pageIdRouting',
@@ -53,11 +73,79 @@ export const RELOADABLE_OPTIONS: ReadonlyArray<keyof ParsedArguments> = [
   'experimentalScreencastFps',
   'performanceCrux',
   'javascriptEvaluation',
+  'fileNavigations',
   'sourceMaps',
   'redactNetworkHeaders',
   'allowUnrestrictedPaths',
   'filesystemRoot',
-];
+]);
+
+/**
+ * Options that are only read on startup. Changing them in a config file
+ * requires restarting the server to take full effect.
+ */
+export const RESTART_REQUIRED_OPTIONS = defineOptionList([
+  // Used to launch or connect to the browser.
+  ...optionNames(browserOptions),
+  // Applied through Puppeteer when launching or connecting to the browser.
+  ...optionNames(puppeteerOptions),
+  'categoryExtensions',
+  'experimentalDevtools',
+  // Process-wide settings.
+  'slim',
+  'logFile',
+  'usageStatistics',
+  'clearcutEndpoint',
+  'clearcutForceFlushIntervalMs',
+  'clearcutIncludePidHeader',
+  'viaCli',
+  'config',
+]);
+
+type ReloadableOption = (typeof RELOADABLE_OPTIONS)[number];
+type RestartRequiredOption = (typeof RESTART_REQUIRED_OPTIONS)[number];
+type UnclassifiedOption = Exclude<
+  keyof ParsedArguments,
+  ReloadableOption | RestartRequiredOption
+>;
+type OverlappingOption = Extract<ReloadableOption, RestartRequiredOption>;
+
+// Compile-time check that every option in ParsedArguments is classified in
+// either RELOADABLE_OPTIONS or RESTART_REQUIRED_OPTIONS without overlap.
+const _exhaustiveOptionClassificationCheck: Record<
+  UnclassifiedOption | OverlappingOption,
+  never
+> = {};
+void _exhaustiveOptionClassificationCheck;
+
+const RELOADABLE_OPTION_SET: ReadonlySet<keyof ParsedArguments> = new Set(
+  RELOADABLE_OPTIONS,
+);
+
+const CROSS_BOUNDARY_CONFLICTING_ARGS = CONFLICTING_ARGS.filter(
+  group =>
+    group.some(arg => RELOADABLE_OPTION_SET.has(arg)) &&
+    group.some(arg => !RELOADABLE_OPTION_SET.has(arg)),
+);
+
+/**
+ * Merges reloadable explicit arguments from `next` onto the startup explicit
+ * arguments from `previous`.
+ */
+export function mergeExplicitReloadableArgs(
+  previous: Partial<ParsedArguments>,
+  next: Partial<ParsedArguments>,
+): Partial<ParsedArguments> {
+  const merged: Partial<ParsedArguments> = {...previous};
+  for (const name of RELOADABLE_OPTIONS) {
+    if (name in next) {
+      Reflect.set(merged, name, next[name]);
+    } else {
+      Reflect.deleteProperty(merged, name);
+    }
+  }
+  return merged;
+}
 
 /**
  * Returns the arguments a running server continues with: `next` for
@@ -70,6 +158,17 @@ export function mergeReloadableOptions(
   const merged = {...previous};
   for (const name of RELOADABLE_OPTIONS) {
     Reflect.set(merged, name, next[name]);
+  }
+  for (const group of CROSS_BOUNDARY_CONFLICTING_ARGS) {
+    const activeInGroup = group.filter(
+      arg => merged[arg] !== undefined && merged[arg] !== false,
+    );
+    if (activeInGroup.length > 1) {
+      const [arg1, arg2] = activeInGroup;
+      throw new Error(
+        `Arguments ${String(arg1)} and ${String(arg2)} are mutually exclusive`,
+      );
+    }
   }
   return merged;
 }
