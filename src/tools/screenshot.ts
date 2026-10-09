@@ -17,6 +17,7 @@ import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
+const MAX_SCREENSHOT_HEIGHT = 16_384;
 
 type SourceBox = BoundingBox & {
   devicePixelRatio: number;
@@ -206,16 +207,33 @@ export const screenshot = definePageTool((args: ParsedArguments) => {
       // The smaller scale factor wins so both bounds are respected while
       // preserving aspect ratio.
       let clip: ScreenshotClip | undefined;
+      let sourceBox: SourceBox | undefined;
       if (
+        fullPage ||
         screenshotMaxWidth !== undefined ||
         screenshotMaxHeight !== undefined
       ) {
-        const box = await getSourceBox(page, element, fullPage);
-        if (box) {
+        sourceBox = await getSourceBox(page, element, fullPage);
+        if (
+          sourceBox &&
+          (screenshotMaxWidth !== undefined ||
+            screenshotMaxHeight !== undefined)
+        ) {
           clip = computeDownscaleClip(
-            box,
+            sourceBox,
             screenshotMaxWidth,
             screenshotMaxHeight,
+          );
+        }
+      }
+
+      if (fullPage && sourceBox) {
+        const outputHeight = Math.ceil(
+          sourceBox.height * sourceBox.devicePixelRatio * (clip?.scale ?? 1),
+        );
+        if (outputHeight > MAX_SCREENSHOT_HEIGHT) {
+          throw new Error(
+            `Full-page screenshot height (${outputHeight}px) exceeds the ${MAX_SCREENSHOT_HEIGHT} pixel screenshot height limit. Set --screenshotMaxHeight to downscale it.`,
           );
         }
       }

@@ -136,21 +136,92 @@ describe('screenshot', () => {
       });
     });
 
+    it('rejects full-page screenshots taller than the capture limit', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setViewport({width: 100, height: 100});
+        await page.setContent(
+          html`<style>
+              body {
+                margin: 0;
+              }
+            </style>
+            <div
+              style="height: 20000px; background: linear-gradient(red, blue)"
+            ></div>`,
+        );
+
+        await assert.rejects(
+          screenshotTool.handler(
+            {
+              params: {format: 'png', fullPage: true},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /exceeds the 16384 pixel screenshot height limit/,
+        );
+      });
+    });
+
+    it('allows tall full-page screenshots when downscaled within the limit', async () => {
+      const tool = screenshot({
+        screenshotMaxHeight: 8000,
+      } as ParsedArguments);
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setViewport({width: 100, height: 100});
+        await page.setContent(
+          html`<style>
+              body {
+                margin: 0;
+              }
+            </style>
+            <div
+              style="height: 20000px; background: linear-gradient(red, blue)"
+            ></div>`,
+        );
+
+        await tool.handler(
+          {
+            params: {format: 'png', fullPage: true},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const screenshot = Buffer.from(response.images[0].data, 'base64');
+        assert.equal(pngHeight(screenshot), 8000);
+      });
+    });
+
     it('with full page resulting in a large screenshot', async () => {
       await withMcpContext(async (response, context) => {
         const page = context.getSelectedMcpPage().pptrPage;
-
         await page.setContent(
-          html`${`<div style="color:blue;">test</div>`.repeat(6500)}
-            <div
-              id="red"
-              style="color:blue;"
-              >test</div
-            > `,
+          html`<canvas
+            width="2500"
+            height="1000"
+          ></canvas>`,
         );
         await page.evaluate(() => {
-          const el = document.querySelector('#red');
-          return el?.scrollIntoViewIfNeeded();
+          const canvas = document.querySelector('canvas');
+          const context = canvas?.getContext('2d');
+          if (!canvas || !context) {
+            throw new Error('Canvas context is unavailable');
+          }
+          const image = context.createImageData(canvas.width, canvas.height);
+          let seed = 1;
+          for (let offset = 0; offset < image.data.length; offset += 4) {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            image.data[offset] = seed >>> 24;
+            image.data[offset + 1] = seed >>> 16;
+            image.data[offset + 2] = seed >>> 8;
+            image.data[offset + 3] = 255;
+          }
+          context.putImageData(image, 0, 0);
         });
 
         await screenshotTool.handler(
