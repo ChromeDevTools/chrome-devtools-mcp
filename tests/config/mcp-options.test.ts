@@ -170,6 +170,15 @@ describe('mcp-options steps', () => {
       assert.strictEqual(args.filesystemRoot, undefined);
     });
 
+    it('keeps the default filesystem root for viaCli with explicit allowUnrestrictedPaths=false', () => {
+      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
+        viaCli: true,
+        allowUnrestrictedPaths: false,
+      });
+      assert.strictEqual(args.allowUnrestrictedPaths, false);
+      assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
+    });
+
     it('does not enable isolated or extensions for viaCli with browserUrl', () => {
       const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
         viaCli: true,
