@@ -1082,7 +1082,7 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'integer',
         description:
-          'Maximum number of messages to return. When omitted, returns all messages.',
+          'Maximum number of messages to return. When omitted, returns all messages unless pageIdx is provided, in which case the page size defaults to 20.',
         required: false,
       },
       pageIdx: {
@@ -1145,7 +1145,7 @@ export const commands: Commands = {
         name: 'pageSize',
         type: 'integer',
         description:
-          'Maximum number of requests to return. When omitted, returns all requests.',
+          'Maximum number of requests to return. When omitted, returns all requests unless pageIdx is provided, in which case the page size defaults to 20.',
         required: false,
       },
       pageIdx: {
