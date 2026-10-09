@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page, Protocol, CdpPage, Dialog} from '../third_party/index.js';
+import {
+  Target,
+  type Page,
+  type Protocol,
+  type CdpPage,
+  type Dialog,
+} from '../third_party/index.js';
+import type {Page as PuppeteerPage} from 'puppeteer-core/internal/api/Page.js';
 import type {PredefinedNetworkConditions} from '../third_party/index.js';
 import {logger} from './logger.js';
 
@@ -22,6 +29,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
+  #openedPages = new Set<Target>();
 
   constructor(
     page: Page,
@@ -158,6 +166,19 @@ export class WaitForHelper {
       this.#page.off('dialog', dialogHandler);
     });
 
+    const popupHandler = (page: PuppeteerPage | null) => {
+      if (page) {
+        const popupTarget = page.target();
+        if (popupTarget instanceof Target) {
+          this.#openedPages.add(popupTarget);
+        }
+      }
+    };
+    this.#page.on('popup', popupHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      this.#page.off('popup', popupHandler);
+    });
+
     // A scoped AbortController used to clean up navigation probe listeners.
     // When aborted (either after navigation detection finishes or if this.#abortController
     // aborts), it removes CDP navigation probe listeners and automatically
@@ -287,6 +308,7 @@ export class WaitForHelper {
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
+      ...(this.#openedPages.size ? {openedPages: this.#openedPages} : {}),
     };
   }
 }
@@ -301,6 +323,7 @@ export interface WaitForEventsResult {
    * Whether a dialog was automatically handled during the action.
    */
   dialogHandled?: boolean;
+  openedPages?: Set<Target>;
 }
 
 export function getNetworkMultiplierFromString(
