@@ -46,7 +46,7 @@ export const listNetworkRequests = definePageTool(() => ({
       .positive()
       .optional()
       .describe(
-        'Maximum number of requests to return. When omitted, returns all requests.',
+        'Maximum number of requests to return. When omitted, returns all requests unless pageIdx is provided, in which case the page size defaults to 20.',
       ),
     pageIdx: zod
       .number()

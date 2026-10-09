@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {listConsoleMessages} from '../../src/tools/console.js';
 import {
   getNetworkRequest,
   listNetworkRequests,
@@ -20,6 +22,19 @@ describe('network', () => {
   });
 
   describe('list_network_requests', () => {
+    it('documents the default page size when pageIdx is provided', () => {
+      const {args} = createHandlerMocks();
+      const networkDescription =
+        listNetworkRequests(args).schema.pageSize.description;
+      const consoleDescription =
+        listConsoleMessages(args).schema.pageSize.description;
+
+      assert.ok(networkDescription?.includes('unless pageIdx is provided'));
+      assert.ok(networkDescription?.includes('defaults to 20'));
+      assert.ok(consoleDescription?.includes('unless pageIdx is provided'));
+      assert.ok(consoleDescription?.includes('defaults to 20'));
+    });
+
     it('handles default parameters', async () => {
       const {page, context, response, args} = createHandlerMocks();
       page.getDevToolsData.resolves({});

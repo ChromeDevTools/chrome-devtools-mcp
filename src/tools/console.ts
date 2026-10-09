@@ -56,7 +56,7 @@ export const listConsoleMessages = definePageTool(
           .positive()
           .optional()
           .describe(
-            'Maximum number of messages to return. When omitted, returns all messages.',
+            'Maximum number of messages to return. When omitted, returns all messages unless pageIdx is provided, in which case the page size defaults to 20.',
           ),
         pageIdx: zod
           .number()
