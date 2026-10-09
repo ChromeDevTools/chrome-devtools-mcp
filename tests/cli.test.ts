@@ -1164,36 +1164,16 @@ describe('cli args parsing', () => {
       assert.strictEqual(args.executablePath, '/bin/chrome');
     });
 
-    it('rejects categoryExtensions with autoConnect', async () => {
-      assert.throws(
-        () => parseConfig(['--category-extensions', '--auto-connect']),
-        /Arguments categoryExtensions and autoConnect are mutually exclusive/,
-      );
-    });
-
-    it('rejects categoryExtensions with browserUrl', async () => {
-      assert.throws(
-        () =>
-          parseConfig([
-            '--category-extensions',
-            '--browserUrl',
-            'http://localhost:9222',
-          ]),
-        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
-      );
-    });
-
-    it('rejects categoryExtensions with wsEndpoint', async () => {
-      assert.throws(
-        () =>
-          parseConfig([
-            '--category-extensions',
-            '--wsEndpoint',
-            'ws://localhost:9222',
-          ]),
-        /Arguments categoryExtensions and wsEndpoint are mutually exclusive/,
-      );
-    });
+    for (const connectArgs of [
+      ['--auto-connect'],
+      ['--browserUrl', 'http://localhost:9222'],
+      ['--wsEndpoint', 'ws://localhost:9222'],
+    ]) {
+      it(`allows categoryExtensions with ${connectArgs[0]}`, async () => {
+        const args = parseConfig(['--category-extensions', ...connectArgs]);
+        assert.strictEqual(args.categoryExtensions, true);
+      });
+    }
 
     for (const connectArgs of [
       ['--browserUrl', 'http://localhost:9222'],
@@ -1218,17 +1198,14 @@ describe('cli args parsing', () => {
       });
     }
 
-    it('rejects explicit categoryExtensions with browserUrl in viaCli', async () => {
-      assert.throws(
-        () =>
-          parseConfig([
-            '--viaCli',
-            '--category-extensions',
-            '--browserUrl',
-            'http://localhost:9222',
-          ]),
-        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
-      );
+    it('allows explicit categoryExtensions with browserUrl in viaCli', async () => {
+      const args = parseConfig([
+        '--viaCli',
+        '--category-extensions',
+        '--browserUrl',
+        'http://localhost:9222',
+      ]);
+      assert.strictEqual(args.categoryExtensions, true);
     });
   });
 

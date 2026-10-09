@@ -43,7 +43,7 @@ const categoryOverrides: Record<
   },
   [ToolCategory.EXTENSIONS]: {
     describe:
-      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
+      'Set to true to include tools related to extensions. With autoConnect, browserUrl or wsEndpoint, this requires Chrome 149 or later.',
     offByDefault: true,
   },
   [ToolCategory.THIRD_PARTY]: {
