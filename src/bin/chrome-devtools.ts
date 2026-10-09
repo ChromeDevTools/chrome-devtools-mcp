@@ -226,7 +226,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
             type: type as Options['type'],
           };
           if (opt.default !== undefined) {
-            options.default = opt.default;
+            options.defaultDescription = JSON.stringify(opt.default);
           }
           if (opt.enum) {
             options.choices = opt.enum as Array<string | number>;
