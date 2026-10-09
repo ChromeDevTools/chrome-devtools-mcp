@@ -1322,16 +1322,24 @@ exports[`extensions > lists extensions 2`] = `
 `;
 
 exports[`lighthouse > includes lighthouse report paths 1`] = `
-## Lighthouse Audit Results
+## Lighthouse audit results
 Mode: navigation
 Device: desktop
 URL: https://example.com
-### Category Scores
+### Category scores
 - Performance: 90 (performance)
-### Audit Summary
+### Audit summary
 Passed: 10
 Failed: 1
-Total Timing: 1000ms
+Total timing: 1000ms
+### Failed audits
+- color-contrast [accessibility]: Background and foreground colors do not have a sufficient contrast ratio. (score: 0)
+  Low-contrast text is difficult to read.
+  Nodes (12, showing 2):
+  - selector="body > p" label="Hello" snippet="<p class=\\"faint\\">"
+    Fix any of the following: Element has insufficient color contrast
+  - selector="a[title=\\"Say \\\\\\"hi\\\\\\"\\"]" label="Say \\"hi\\" now" snippet="<a title=\\"Say &quot;hi&quot;\\">"
+- document-title [accessibility, seo]: Document does not have a \`<title>\` element (score: 0)
 ### Reports
 - /tmp/report.json
 - /tmp/report.html
@@ -1359,6 +1367,42 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
         "total": 1000
       }
     },
+    "failedAudits": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "description": "Low-contrast text is difficult to read.",
+        "score": 0,
+        "categories": [
+          "accessibility"
+        ],
+        "nodes": [
+          {
+            "selector": "body > p",
+            "snippet": "<p class=\\"faint\\">",
+            "nodeLabel": "Hello",
+            "explanation": "Fix any of the following:\\n  Element has insufficient color contrast"
+          },
+          {
+            "selector": "a[title=\\"Say \\\\\\"hi\\\\\\"\\"]",
+            "snippet": "<a title=\\"Say &quot;hi&quot;\\">",
+            "nodeLabel": "Say \\"hi\\"\\nnow"
+          }
+        ],
+        "totalNodes": 12
+      },
+      {
+        "id": "document-title",
+        "title": "Document does not have a \`<title>\` element",
+        "score": 0,
+        "categories": [
+          "accessibility",
+          "seo"
+        ],
+        "nodes": [],
+        "totalNodes": 0
+      }
+    ],
     "reports": [
       "/tmp/report.json",
       "/tmp/report.html"

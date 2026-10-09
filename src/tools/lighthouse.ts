@@ -13,13 +13,18 @@ import {
   generateReport,
   zod,
   type Flags,
+  type Result,
   type RunnerResult,
   type OutputMode,
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {startTrace} from './performance.js';
-import {definePageTool} from './ToolDefinition.js';
+import {
+  definePageTool,
+  type LighthouseAuditNode,
+  type LighthouseFailedAudit,
+} from './ToolDefinition.js';
 
 // Kept in sync with `constants.userAgents` in Lighthouse's
 // core/config/constants.js, which `lighthouse:default` and the `desktop`
@@ -31,9 +36,108 @@ const MOBILE_USER_AGENT =
 const DESKTOP_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
 
+// Caps the number of DOM nodes returned inline per failing audit to keep the
+// response compact. The full list remains available in the saved reports.
+const MAX_NODES_PER_AUDIT = 10;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const getString = (value: unknown): string | undefined => {
+  return typeof value === 'string' ? value : undefined;
+};
+
+const toAuditNode = (value: Record<string, unknown>): LighthouseAuditNode => {
+  const node: LighthouseAuditNode = {};
+  const selector = getString(value.selector);
+  const snippet = getString(value.snippet);
+  const nodeLabel = getString(value.nodeLabel);
+  const explanation = getString(value.explanation);
+  if (selector) {
+    node.selector = selector;
+  }
+  if (snippet) {
+    node.snippet = snippet;
+  }
+  if (nodeLabel) {
+    node.nodeLabel = nodeLabel;
+  }
+  if (explanation) {
+    node.explanation = explanation;
+  }
+  return node;
+};
+
+// Recursively collects node values from audit details. Walking the details
+// generically covers tables, lists of tables, and sub-items alike.
+const collectNodes = (
+  value: unknown,
+  nodes: Map<string, LighthouseAuditNode>,
+): void => {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectNodes(item, nodes);
+    }
+    return;
+  }
+  if (!isRecord(value) || value.type === 'debugdata') {
+    return;
+  }
+  if (value.type === 'node') {
+    const key =
+      getString(value.lhId) ??
+      getString(value.path) ??
+      `${getString(value.selector)}|${getString(value.snippet)}`;
+    if (!nodes.has(key)) {
+      nodes.set(key, toAuditNode(value));
+    }
+    return;
+  }
+  for (const child of Object.values(value)) {
+    collectNodes(child, nodes);
+  }
+};
+
+const getFailedAudits = (lhr: Result): LighthouseFailedAudit[] => {
+  const categoriesByAudit = new Map<string, string[]>();
+  for (const category of Object.values(lhr.categories)) {
+    for (const ref of category.auditRefs) {
+      const categoryIds = categoriesByAudit.get(ref.id) ?? [];
+      categoryIds.push(category.id);
+      categoriesByAudit.set(ref.id, categoryIds);
+    }
+  }
+
+  const failedAudits: LighthouseFailedAudit[] = [];
+  for (const audit of Object.values(lhr.audits)) {
+    if (audit.score === null || audit.score >= 1) {
+      continue;
+    }
+    const nodes = new Map<string, LighthouseAuditNode>();
+    collectNodes(audit.details, nodes);
+    const failedAudit: LighthouseFailedAudit = {
+      id: audit.id,
+      title: audit.title,
+      score: audit.score,
+      categories: categoriesByAudit.get(audit.id) ?? [],
+      nodes: [...nodes.values()].slice(0, MAX_NODES_PER_AUDIT),
+      totalNodes: nodes.size,
+    };
+    if (audit.description) {
+      failedAudit.description = audit.description;
+    }
+    if (audit.displayValue) {
+      failedAudit.displayValue = audit.displayValue;
+    }
+    failedAudits.push(failedAudit);
+  }
+  return failedAudits;
+};
+
 export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
   name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace(args).name}`,
+  description: `Get Lighthouse scores, failing audits, and the DOM nodes they flag for accessibility, SEO, best practices, and agentic browsing. Full reports are saved to disk. This excludes performance. For performance audits, run ${startTrace(args).name}`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
@@ -162,9 +266,7 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
       score: c.score,
     }));
 
-    const failedAudits = Object.values(lhr.audits).filter(
-      a => a.score !== null && a.score < 1,
-    ).length;
+    const failedAudits = getFailedAudits(lhr);
 
     const passedAudits = Object.values(lhr.audits).filter(
       a => a.score === 1,
@@ -179,13 +281,14 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
         url: lhr.finalDisplayedUrl,
         scores: categoryScores,
         audits: {
-          failed: failedAudits,
+          failed: failedAudits.length,
           passed: passedAudits,
         },
         timing: {
           total: lhr.timing.total,
         },
       },
+      failedAudits,
       reports: reportPaths,
     };
 
