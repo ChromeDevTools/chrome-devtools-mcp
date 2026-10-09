@@ -803,5 +803,46 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+
+    formatterTestDetailed(
+      'formats an async fragment with a description longer than the separator line',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'error',
+          text: () => 'TypeError: Cannot read properties of undefined',
+        });
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+                url: 'Component.tsx',
+                name: 'MyVeryLongReactComponentNameThatExceedsFortyCharacters',
+              },
+            ],
+          },
+          asyncFragments: [
+            {
+              description:
+                '<MyVeryLongReactComponentNameThatExceedsFortyCharacters>',
+              frames: [
+                {
+                  line: 5,
+                  column: 2,
+                  url: 'App.tsx',
+                  name: 'App',
+                },
+              ],
+            },
+          ],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+        return await ConsoleFormatter.from(message, {
+          id: 17,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
   });
 });
