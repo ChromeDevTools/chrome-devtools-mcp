@@ -135,11 +135,15 @@ export const newPage = defineTool((args: ParsedArguments) => {
         fileNavigations: args?.fileNavigations,
       });
 
+      // Where the selection was before this call, so a failed navigation can
+      // put it back. Read first: `newPage` moves the selection to the tab it
+      // creates, `background: true` included, because `McpContext.newPage`
+      // selects every page it creates.
       let previousPage: McpPage | undefined;
       try {
         previousPage = context.getSelectedMcpPage();
       } catch {
-        previousPage = undefined;
+        // Nothing was selected, so there is no selection to restore.
       }
 
       const page = await context.newPage(
@@ -157,21 +161,34 @@ export const newPage = defineTool((args: ParsedArguments) => {
           {timeout: request.params.timeout},
         );
       } catch (error) {
-        // The tab is created and selected before navigation starts, so a
-        // failed navigation leaves a stray tab behind as the selected page.
-        // Restore the state from before this call: re-select the previously
-        // selected page and close the failed tab, then surface the original
-        // navigation error.
-        try {
-          const failedPage = context.getSelectedMcpPage();
-          if (failedPage === page) {
-            if (previousPage && !previousPage.isClosed()) {
-              context.selectPage(previousPage);
-            }
-            await context.closePage(failedPage.id);
+        // A failed navigation would otherwise leave the tab this call created
+        // open as the selected page, and the error response lists no pages, so
+        // the caller could not tell that either had happened. Undo both: select
+        // where the selection was, then close the tab THIS call created — by
+        // its own id, never by whatever happens to be selected now.
+        const restorable =
+          previousPage && !previousPage.isClosed() ? previousPage : undefined;
+        if (restorable) {
+          context.selectPage(restorable);
+        }
+        if (!page.isClosed()) {
+          try {
+            await context.closePage(page.id);
+          } catch (cleanupError) {
+            // The navigation error is the caller's; the tab left behind is
+            // ours to report, with the id it has and the selection it left.
+            logger?.(
+              'Failed to close the tab of a failed new_page',
+              cleanupError,
+            );
+            response.setIncludePages(true);
+            response.appendResponseLine(
+              `Note: the tab this call opened is still open as page ${page.id}` +
+                (restorable
+                  ? `. Page ${restorable.id} is selected again.`
+                  : ' and it is the selected page.'),
+            );
           }
-        } catch {
-          // Best-effort cleanup: always surface the original error below.
         }
         throw error;
       }
