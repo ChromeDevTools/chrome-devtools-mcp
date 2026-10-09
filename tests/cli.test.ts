@@ -14,6 +14,7 @@ import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
+import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 
 import {createTempFile} from './utils.js';
 
@@ -146,6 +147,27 @@ describe('cli args parsing', () => {
         height: 777,
       },
     });
+  });
+
+  it('rejects non-positive viewport dimensions', async () => {
+    const coerce = puppeteerOptions.viewport.coerce;
+    assert.ok(coerce);
+
+    assert.strictEqual(coerce(undefined), undefined);
+
+    for (const value of [
+      '800x-1',
+      '-100x800',
+      '800x0',
+      '0x800',
+      'Infinityx600',
+      '800xInfinity',
+    ]) {
+      assert.throws(
+        () => coerce(value),
+        /Invalid viewport\. Expected format is `1280x720` with positive width and height\./,
+      );
+    }
   });
 
   it('parses chrome args', async () => {
