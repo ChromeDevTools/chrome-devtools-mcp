@@ -19,7 +19,9 @@ export const installExtension = defineTool(() => ({
   schema: {
     path: zod
       .string()
-      .describe('Absolute path to the unpacked extension folder.'),
+      .describe(
+        'Absolute path to the unpacked extension folder. The path must be within a configured filesystem root; use --workspace to add a directory.',
+      ),
   },
   blockedByDialog: false,
   verifyFilesSchema: {

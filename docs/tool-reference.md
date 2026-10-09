@@ -703,7 +703,7 @@ in the DevTools Elements panel (if any).
 
 **Parameters:**
 
-- **path** (string) **(required)**: Absolute path to the unpacked extension folder.
+- **path** (string) **(required)**: Absolute path to the unpacked extension folder. The path must be within a configured filesystem root; use --workspace to add a directory.
 
 ---
 
