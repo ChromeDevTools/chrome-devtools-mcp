@@ -5,6 +5,7 @@
  */
 
 import type {ParsedArguments} from '../config/ConfigParser.js';
+import type {McpPage} from '../McpPage.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
@@ -134,19 +135,37 @@ export const newPage = defineTool((args: ParsedArguments) => {
         fileNavigations: args?.fileNavigations,
       });
 
+      let previousPage: McpPage | undefined;
+      try {
+        previousPage = context.getSelectedMcpPage();
+      } catch {
+        // Nothing is selected, so there is no selection to restore on failure.
+      }
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
       );
 
-      await page.waitForEventsAfterAction(
-        async () => {
-          await page.pptrPage.goto(request.params.url, {
-            timeout: request.params.timeout,
-          });
-        },
-        {timeout: request.params.timeout},
-      );
+      try {
+        await page.waitForEventsAfterAction(
+          async () => {
+            await page.pptrPage.goto(request.params.url, {
+              timeout: request.params.timeout,
+            });
+          },
+          {timeout: request.params.timeout},
+        );
+      } catch (error) {
+        // The error response does not list pages, so don't leave behind a tab
+        // the caller never learns about. A dialog-blocked load stays for handle_dialog.
+        if (!page.getDialog()) {
+          await context.closePage(page.id);
+          if (previousPage) {
+            context.selectPage(previousPage);
+          }
+        }
+        throw error;
+      }
 
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();

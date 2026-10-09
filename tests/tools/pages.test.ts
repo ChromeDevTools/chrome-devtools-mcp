@@ -377,6 +377,45 @@ describe('pages', () => {
         assert.strictEqual(context.getPages().length, 1);
       });
     });
+    it('closes the new tab and keeps the selection when navigation fails', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const originalPage = context.getSelectedMcpPage();
+        // Chrome refuses port 1 outright, so the navigation fails offline.
+        await assert.rejects(
+          newPage(args).handler(
+            {params: {url: 'http://127.0.0.1:1/'}},
+            response,
+            context,
+          ),
+          /net::ERR_UNSAFE_PORT/,
+        );
+        assert.strictEqual(context.getPages().length, 1);
+        assert.strictEqual(context.getSelectedMcpPage(), originalPage);
+      });
+    });
+    it('keeps the new tab selected when a dialog blocks its load', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await assert.rejects(
+          newPage(args).handler(
+            {
+              params: {
+                url: 'data:text/html,<script>alert("blocked")</script>',
+                timeout: 1000,
+              },
+            },
+            response,
+            context,
+          ),
+          /Navigation timeout/,
+        );
+        assert.strictEqual(context.getPages().length, 2);
+        assert.strictEqual(
+          context.getSelectedMcpPage().getDialog()?.message(),
+          'blocked',
+        );
+        await context.getSelectedMcpPage().getDialog()?.dismiss();
+      });
+    });
     it('rejects chrome-extension: URLs unless categoryExtensions is enabled', async () => {
       await withMcpContext(async (response, context, args) => {
         const tool = newPage(args);
