@@ -27,6 +27,7 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../src/config/ConfigParser.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
@@ -189,6 +190,7 @@ export async function withMcpContext(
     McpContext.resetWorkerIdsForTesting();
     const parsedArgs = createMockParsedArguments(args);
     const response = new McpResponse(parsedArgs);
+    const heapSnapshotManager = new HeapSnapshotManager();
     if (context) {
       context.dispose();
     }
@@ -206,6 +208,7 @@ export async function withMcpContext(
           options.navigationTimeout ??
           (process.platform === 'win32' ? 20000 : undefined),
         categoryExtensions: parsedArgs.categoryExtensions,
+        heapSnapshotManager,
       },
       Locator,
     );
@@ -216,6 +219,7 @@ export async function withMcpContext(
       await cb(response, context, parsedArgs);
     } finally {
       context.dispose();
+      heapSnapshotManager.dispose();
       context = undefined;
     }
   }, options);
