@@ -10,8 +10,9 @@ import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
+import {mergeReloadableOptions} from './config/reload.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
-import {McpContext} from './McpContext.js';
+import {type LiveMcpContextOptions, McpContext} from './McpContext.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -150,8 +151,7 @@ export class McpServer {
         isError: true,
       };
     }
-    const parseResult =
-      await toolHandler.registeredInputSchema.safeParseAsync(args);
+    const parseResult = toolHandler.registeredInputSchema.safeParse(args);
     if (!parseResult.success) {
       return {
         content: [
@@ -169,6 +169,72 @@ export class McpServer {
       };
     }
     return await toolHandler.handle(parseResult.data);
+  }
+
+  /**
+   * Applies new arguments to the running server. Only RELOADABLE_OPTIONS are
+   * applied, all other options keep the value the server was started with.
+   * Tools are updated in place and only tools whose listing changed notify
+   * the client, which results in at most one `tools/list_changed`
+   * notification.
+   */
+  async applyConfig(serverArgs: ParsedArguments): Promise<void> {
+    using _guard = await this.#toolMutex.acquire();
+    const previousArgs = this.#serverArgs;
+    const nextArgs = mergeReloadableOptions(previousArgs, serverArgs);
+    // Build everything before committing so that a throwing tool factory
+    // leaves the server untouched.
+    const updates: Array<{
+      entry: ToolEntry;
+      tool: ToolDefinition | DefinedPageTool;
+    }> = [];
+    for (const tool of createTools(nextArgs)) {
+      const entry = this.#tools.get(tool.name);
+      // Slim mode is restart-required, so the set of registered tools is
+      // stable.
+      if (entry) {
+        updates.push({entry, tool});
+      }
+    }
+
+    this.#serverArgs = nextArgs;
+    for (const {entry, tool} of updates) {
+      if (entry.handler.update(tool, nextArgs)) {
+        entry.registeredTool.update({
+          description: tool.description,
+          paramsSchema: entry.handler.registeredInputSchema,
+          annotations: tool.annotations,
+          enabled: !entry.handler.disabled,
+        });
+      }
+    }
+
+    if (!previousArgs.performanceCrux && nextArgs.performanceCrux) {
+      logCruxDisclaimer(nextArgs);
+    }
+
+    const context = this.#context;
+    if (!context) {
+      return;
+    }
+    context.updateOptions(this.#liveContextOptions());
+    context.setRoots(this.#combinedRoots());
+    if (
+      previousArgs.experimentalIncludeAllPages !==
+      nextArgs.experimentalIncludeAllPages
+    ) {
+      await context.createPagesSnapshot();
+    }
+    await context.releaseState({
+      screencast: !this.#isCallable('screencast_stop'),
+      heapSnapshots: !this.#isCallable('close_heapsnapshot'),
+      performanceTrace: !this.#isCallable('performance_stop_trace'),
+      devtoolsComments: !this.#isCallable('get_devtools_comments'),
+    });
+  }
+
+  #isCallable(toolName: string): boolean {
+    return this.#tools.get(toolName)?.handler.callable ?? false;
   }
 
   /**
@@ -262,15 +328,13 @@ export class McpServer {
     if (this.#context?.browser !== browser) {
       this.#context?.dispose();
       this.#context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging:
-          this.#serverArgs.experimentalDevtools ?? false,
-        experimentalIncludeAllPages:
-          this.#serverArgs.experimentalIncludeAllPages,
-        performanceCrux: this.#serverArgs.performanceCrux,
-        sourceMaps: this.#serverArgs.sourceMaps,
+        ...this.#liveContextOptions(),
+        // Enforced by Puppeteer for the lifetime of the browser, so they are
+        // not part of the live options.
         allowlist: this.#serverArgs.allowedUrlPattern,
         blocklist: this.#serverArgs.blockedUrlPattern,
-        allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+        experimentalDevToolsDebugging:
+          this.#serverArgs.experimentalDevtools ?? false,
         // Surfaces a one-time note in the next response after a reconnect.
         reconnected: this.#context !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
@@ -297,6 +361,15 @@ export class McpServer {
       }
     }
     return this.#context;
+  }
+
+  #liveContextOptions(): LiveMcpContextOptions {
+    return {
+      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
+      performanceCrux: this.#serverArgs.performanceCrux,
+      sourceMaps: this.#serverArgs.sourceMaps,
+      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+    };
   }
 
   #createToolHandler(tool: ToolDefinition | DefinedPageTool): ToolHandler {
@@ -354,6 +427,14 @@ export async function createMcpServer(
   return {server: server.server};
 }
 
+function logCruxDisclaimer(args: ParsedArguments): void {
+  if (!args.slim && args.performanceCrux) {
+    console.error(
+      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
+    );
+  }
+}
+
 export const logDisclaimers = (args: ParsedArguments) => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
@@ -361,11 +442,7 @@ debug, and modify any data in the browser or DevTools.
 Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
   );
 
-  if (!args.slim && args.performanceCrux) {
-    console.error(
-      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
-    );
-  }
+  logCruxDisclaimer(args);
 
   if (!args.slim && args.usageStatistics) {
     console.error(
