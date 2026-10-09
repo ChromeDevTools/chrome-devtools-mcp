@@ -93,7 +93,7 @@ Example with arguments: \`(el) => el.innerText\`
               .string()
               .optional()
               .describe(
-                `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
+                `The optional service worker id to evaluate the script in. Only available when --categoryExtensions is enabled. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
               ),
           }
         : {}),

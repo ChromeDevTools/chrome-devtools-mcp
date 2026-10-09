@@ -215,7 +215,7 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages open in the browser.
+**Description:** Get a list of pages including extension service workers open in the browser.
 
 **Parameters:** None
 
@@ -375,11 +375,10 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate JavaScript inside the target page. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.
+**Description:** Evaluate JavaScript inside the target page or service worker. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
 
-- **pageId** (number) **(required)**: Targets a specific page by ID.
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
@@ -388,6 +387,8 @@
   Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
   Example with arguments: `(el) => el.innerText`
 
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Required when not evaluating in a service worker.
+- **serviceWorkerId** (string) _(optional)_: The optional service worker id to evaluate the script in. Only available when --categoryExtensions is enabled. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.
 - **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.
 - **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
@@ -435,7 +436,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the target page since the last navigation.
+**Description:** List all console messages for the target page since the last navigation. This includes console messages originating from extensions content scripts.
 
 **Parameters:**
 
