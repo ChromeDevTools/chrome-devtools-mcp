@@ -544,8 +544,13 @@ export class McpContext implements Context {
   }
 
   getServiceWorkerConsoleData(
-    extensionId: string,
+    serviceWorkerId: string,
   ): Array<ConsoleMessage | UncaughtError> {
+    const worker = this.getWorkerById(serviceWorkerId);
+    if (worker?.type !== 'service_worker') {
+      throw new Error('Service worker not found.');
+    }
+    const extensionId = new URL(worker.url).hostname;
     return this.#serviceWorkerConsoleCollector.getData(extensionId);
   }
 

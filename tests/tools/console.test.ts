@@ -100,7 +100,7 @@ describe('console', () => {
 
         await listConsoleMessages(args).handler(
           {
-            params: {serviceWorkerId: extensionId},
+            params: {serviceWorkerId: sw.id},
             page: context.getSelectedMcpPage(),
           },
           response2,
