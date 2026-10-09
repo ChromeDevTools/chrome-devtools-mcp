@@ -1539,4 +1539,177 @@ describe('ToolHandler', () => {
       clock.restore();
     }
   });
+
+  describe('update', () => {
+    function parseArgs(argv: string[] = []) {
+      return new ConfigParser('1.0.0', ['node', 'script.js', ...argv], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      }).parse();
+    }
+
+    function createGlobalTool(
+      schema: zod.ZodRawShape,
+      handler: ToolDefinition['handler'],
+    ): ToolDefinition {
+      return {
+        name: 'global_tool',
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema,
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler,
+      };
+    }
+
+    it('applies to calls that wait for the mutex', async () => {
+      const serverArgs = parseArgs();
+      const handler = sinon.stub().resolves();
+      const tool = createGlobalTool({}, handler);
+      const toolMutex = new Mutex();
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => createMockMcpContext(),
+        toolMutex,
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({});
+      toolHandler.update(tool, parseArgs(['--no-category-navigation']));
+      toolMutex.release();
+      const result = await call;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0]?.type === 'text' ? result.content[0].text : '',
+        /is currently disabled/,
+      );
+      sinon.assert.notCalled(handler);
+    });
+
+    it('rejects waiting calls when the schema changes', async () => {
+      const serverArgs = parseArgs();
+      const handler = sinon.stub().resolves();
+      const toolMutex = new Mutex();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        serverArgs,
+        async () => createMockMcpContext(),
+        toolMutex,
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({a: 'value'});
+      toolHandler.update(
+        createGlobalTool(
+          {a: zod.string().optional(), b: zod.string()},
+          handler,
+        ),
+        serverArgs,
+      );
+      toolMutex.release();
+      const result = await call;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0]?.type === 'text' ? result.content[0].text : '',
+        /^The input schema of tool global_tool changed/,
+      );
+      sinon.assert.notCalled(handler);
+    });
+
+    it('rejects calls whose async validation started before the schema changed', async () => {
+      const serverArgs = parseArgs();
+      const handler = sinon.stub().resolves();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        serverArgs,
+        async () => createMockMcpContext(),
+        new Mutex(),
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      // Start async validation against the v0 schema, then update the schema
+      // before the safeParseAsync promise resolves and calls handle().
+      const parsePromise = toolHandler.registeredInputSchema.safeParseAsync({
+        a: 'value',
+      });
+      toolHandler.update(
+        createGlobalTool(
+          {a: zod.string().optional(), b: zod.string()},
+          handler,
+        ),
+        serverArgs,
+      );
+      const parsed = await parsePromise;
+      assert.ok(parsed.success);
+      const result = await toolHandler.handle(parsed.data);
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0]?.type === 'text' ? result.content[0].text : '',
+        /^The input schema of tool global_tool changed/,
+      );
+      sinon.assert.notCalled(handler);
+    });
+
+    it('runs waiting calls when the schema is unchanged', async () => {
+      const serverArgs = parseArgs();
+      const handler = sinon.stub().resolves();
+      const toolMutex = new Mutex();
+      const mockContext = createMockMcpContext();
+      mockContext.browser = getMockBrowser();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({a: 'value'});
+      const listingChanged = toolHandler.update(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        parseArgs(['--redact-network-headers']),
+      );
+      toolMutex.release();
+      await call;
+
+      assert.strictEqual(listingChanged, false);
+      sinon.assert.calledOnce(handler);
+    });
+
+    it('updates the disabled state and reports listing change', () => {
+      const serverArgs = parseArgs();
+      const tool = createGlobalTool({}, sinon.stub().resolves());
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => createMockMcpContext(),
+        new Mutex(),
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      const listingChanged = toolHandler.update(
+        tool,
+        parseArgs(['--no-category-navigation']),
+      );
+
+      assert.strictEqual(listingChanged, true);
+      assert.strictEqual(toolHandler.disabled, true);
+      assert.strictEqual(toolHandler.callable, false);
+    });
+  });
 });
