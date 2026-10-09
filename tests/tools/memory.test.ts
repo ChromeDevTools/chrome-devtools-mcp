@@ -11,6 +11,7 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
+import {zod} from '../../src/third_party/index.js';
 import {
   takeHeapSnapshot,
   getHeapSnapshotSummary,
@@ -50,6 +51,68 @@ import {createTempDir, withMcpContext} from '../utils.js';
 describe('memory', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  it('validates pagination for all paginated heap snapshot tools', () => {
+    const {args} = createHandlerMocks();
+    const tools = [
+      {
+        tool: getHeapSnapshotDetails(args),
+        params: {filePath: 'test.heapsnapshot'},
+      },
+      {
+        tool: getHeapSnapshotClassNodes(args),
+        params: {filePath: 'test.heapsnapshot', id: 1},
+      },
+      {
+        tool: getHeapSnapshotEdges(args),
+        params: {filePath: 'test.heapsnapshot', nodeId: 1},
+      },
+      {
+        tool: getHeapSnapshotRetainers(args),
+        params: {filePath: 'test.heapsnapshot', nodeId: 1},
+      },
+      {
+        tool: getHeapSnapshotDuplicateStrings(args),
+        params: {filePath: 'test.heapsnapshot'},
+      },
+      {
+        tool: queryHeapSnapshotObjects(args),
+        params: {filePath: 'test.heapsnapshot'},
+      },
+    ];
+
+    for (const {tool, params} of tools) {
+      const schema = zod.object(tool.schema);
+      const validParams = {...params, pageIdx: 0, pageSize: 1};
+
+      assert.equal(schema.safeParse(validParams).success, true, tool.name);
+      assert.equal(
+        schema.safeParse({...validParams, pageIdx: -1}).success,
+        false,
+        `${tool.name} accepts a negative pageIdx`,
+      );
+      assert.equal(
+        schema.safeParse({...validParams, pageIdx: 1.5}).success,
+        false,
+        `${tool.name} accepts a fractional pageIdx`,
+      );
+      assert.equal(
+        schema.safeParse({...validParams, pageSize: 0}).success,
+        false,
+        `${tool.name} accepts a zero pageSize`,
+      );
+      assert.equal(
+        schema.safeParse({...validParams, pageSize: -1}).success,
+        false,
+        `${tool.name} accepts a negative pageSize`,
+      );
+      assert.equal(
+        schema.safeParse({...validParams, pageSize: 1.5}).success,
+        false,
+        `${tool.name} accepts a fractional pageSize`,
+      );
+    }
   });
 
   describe('take_heapsnapshot', () => {
