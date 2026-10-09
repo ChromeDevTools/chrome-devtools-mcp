@@ -57,7 +57,7 @@
     "@blackwell-systems/gcf": "^2.2.2",
     "@eslint/js": "^10.0.1",
     "@google/genai": "^2.0.1",
-    "@modelcontextprotocol/client": "2.1.0",
+    "@modelcontextprotocol/client": "2.2.0",
     "@modelcontextprotocol/core": "2.1.0",
     "@modelcontextprotocol/server": "2.1.0",
     "@rollup/plugin-commonjs": "^29.0.0",
