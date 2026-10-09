@@ -383,6 +383,18 @@ describe('McpContext', () => {
     });
   });
 
+  it('reports an unknown page id before the last-page guard on close', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await assert.rejects(context.closePage(99), /No page found/);
+      await assert.rejects(
+        context.closePage(page.id),
+        /The last open page cannot be closed/,
+      );
+      assert.ok(!page.pptrPage.isClosed());
+    });
+  });
+
   it('reports the reconnect notice once', async () => {
     await withBrowser(async browser => {
       const context = await McpContext.from(

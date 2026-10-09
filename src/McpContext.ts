@@ -345,10 +345,10 @@ export class McpContext implements Context {
     return mcpPage;
   }
   async closePage(pageId: number): Promise<void> {
+    const page = this.getPageById(pageId);
     if (this.#mcpPages.size === 1) {
       throw new Error(CLOSE_PAGE_ERROR);
     }
-    const page = this.getPageById(pageId);
     this.#mcpPages.delete(page.target);
     await page.close();
   }
