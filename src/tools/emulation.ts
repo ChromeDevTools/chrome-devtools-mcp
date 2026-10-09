@@ -14,6 +14,20 @@ import {
   viewportTransform,
 } from './ToolDefinition.js';
 
+function transformInputString<T>(transform: (value: string) => T) {
+  return zod.string().transform((value, context) => {
+    try {
+      return transform(value);
+    } catch (error: unknown) {
+      context.addIssue({
+        code: 'custom',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return zod.NEVER;
+    }
+  });
+}
+
 function headerStringTransform(
   value: string | undefined,
 ): Record<string, string> | undefined {
@@ -65,9 +79,7 @@ export const emulate = definePageTool(() => ({
       .describe(
         'Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling',
       ),
-    geolocation: zod
-      .string()
-      .transform(geolocationTransform)
+    geolocation: transformInputString(geolocationTransform)
       .optional()
       .describe(
         'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
@@ -84,16 +96,12 @@ export const emulate = definePageTool(() => ({
       .describe(
         'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
       ),
-    viewport: zod
-      .string()
-      .transform(viewportTransform)
+    viewport: transformInputString(viewportTransform)
       .optional()
       .describe(
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
       ),
-    extraHttpHeaders: zod
-      .string()
-      .transform(headerStringTransform)
+    extraHttpHeaders: transformInputString(headerStringTransform)
       .optional()
       .describe(
         'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
