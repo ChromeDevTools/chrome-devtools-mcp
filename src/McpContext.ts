@@ -7,7 +7,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {pathToFileURL} from 'node:url';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
@@ -48,7 +48,11 @@ import type {
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
-import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {
+  getTempFilePath,
+  resolveCanonicalPath,
+  resolveFileUriPath,
+} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
 interface McpContextOptions {
@@ -271,9 +275,7 @@ export class McpContext implements Context {
     let allowed = false;
     const resolvedRoots = await Promise.allSettled(
       roots.map(async root => {
-        const rootPathUri = root.uri;
-        const rootPath = path.resolve(fileURLToPath(rootPathUri));
-        return await fs.realpath(rootPath);
+        return await fs.realpath(resolveFileUriPath(root.uri));
       }),
     );
 
@@ -940,7 +942,7 @@ export class McpContext implements Context {
       }
 
       case 'file:': {
-        const resolved = await this.validatePath(fileURLToPath(url));
+        const resolved = await this.validatePath(resolveFileUriPath(url));
         return await fs.readFile(resolved, 'utf-8');
       }
 

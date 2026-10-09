@@ -23,7 +23,8 @@ import type {
 import {isAvailableInMode, isSlimTool} from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import type {Mutex} from './third_party/index.js';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {pathToFileURL} from 'node:url';
+import {resolveFileUriPath} from './utils/files.js';
 import {isLocalhost} from './utils/url.js';
 
 /**
@@ -106,7 +107,8 @@ async function validateAndResolvePathOrUrl(
   try {
     const url = new URL(filePathOrUrl);
     if (url.protocol === 'file:') {
-      return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
+      return pathToFileURL(await context.validatePath(resolveFileUriPath(url)))
+        .href;
     } else if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
       return filePathOrUrl;
     }
