@@ -53,7 +53,7 @@ async function runWithRetry(fn: () => Promise<void>) {
       await new Promise(r => setTimeout(r, 500));
     }
   }
-  throw lastError;
+  throw lastError ?? new Error('Failed without an error');
 }
 
 describe('browser', () => {

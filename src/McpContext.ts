@@ -142,7 +142,7 @@ export class McpContext implements Context {
     );
   }
 
-  async #init() {
+  async #init(): Promise<void> {
     await this.createPagesSnapshot();
     const workers = this.createWorkersSnapshot();
 
@@ -151,7 +151,7 @@ export class McpContext implements Context {
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
   }
 
-  dispose() {
+  dispose(): void {
     this.browser.off('targetcreated', this.#onTargetCreated);
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
@@ -169,7 +169,7 @@ export class McpContext implements Context {
     this.#isolatedContexts.clear();
   }
 
-  #onTargetCreated = (target: Target) => {
+  #onTargetCreated = (target: Target): void => {
     try {
       if (!this.#isPageTarget(target)) {
         return;
@@ -180,7 +180,7 @@ export class McpContext implements Context {
     }
   };
 
-  #onTargetDestroyed = (target: Target) => {
+  #onTargetDestroyed = (target: Target): void => {
     try {
       const mcpPage = this.#mcpPages.get(target);
       if (mcpPage) {
@@ -199,7 +199,7 @@ export class McpContext implements Context {
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
-  ) {
+  ): Promise<McpContext> {
     const context = new McpContext(browser, logger, opts, locatorClass);
     await context.#init();
     return context;
@@ -452,7 +452,7 @@ export class McpContext implements Context {
     if (!targetPage) {
       return undefined;
     }
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<undefined>(resolve => {
       timeoutId = setTimeout(() => resolve(undefined), 500);
     });
@@ -462,7 +462,7 @@ export class McpContext implements Context {
     } catch {
       return undefined;
     } finally {
-      clearTimeout(timeoutId!);
+      clearTimeout(timeoutId);
     }
   }
 
@@ -936,7 +936,7 @@ export class McpContext implements Context {
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${url}`);
         }
-        return response.text();
+        return await response.text();
       }
 
       case 'file:': {

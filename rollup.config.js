@@ -16,7 +16,7 @@
  */
 
 /**
- * @fileoverview taken from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
+ * @file taken from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
  * and modified to specific requirement.
  */
 
@@ -195,7 +195,7 @@ const bundleDependency = (
             const stringifiedDependencies = Array.from(
               seenDependencies.values(),
             ).map(dependency => {
-              let arr = [];
+              const arr = [];
               arr.push(`Name: ${dependency.name ?? 'N/A'}`);
               let url = dependency.homepage ?? dependency.repository;
               if (url !== null && typeof url !== 'string') {

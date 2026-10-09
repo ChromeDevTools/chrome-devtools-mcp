@@ -435,7 +435,7 @@ export async function runCli(
   sessionId?: string,
   options?: {cwd?: string},
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const finalArgs = [...args];
     if (sessionId) {
       finalArgs.push('--sessionId', sessionId);

@@ -29,7 +29,9 @@ import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
 import type {DefinedPageTool, ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
 
-export const createTools = (args: ParsedArguments) => {
+export const createTools = (
+  args: ParsedArguments,
+): Array<ToolDefinition | DefinedPageTool> => {
   const rawTools = [
     ...Object.values(commentsTools),
     ...Object.values(consoleTools),

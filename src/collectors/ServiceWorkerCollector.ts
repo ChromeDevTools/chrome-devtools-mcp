@@ -33,7 +33,7 @@ export class ServiceWorkerSubscriber {
     this.#callback = callback;
   }
 
-  async subscribe() {
+  async subscribe(): Promise<void> {
     this.#session = await this.#target.createCDPSession();
     await this.#session.send('Runtime.enable');
     this.#session.on('Runtime.exceptionThrown', this.#onExceptionThrown);
@@ -44,18 +44,18 @@ export class ServiceWorkerSubscriber {
     }
   }
 
-  async unsubscribe() {
+  async unsubscribe(): Promise<void> {
     if (this.#worker) {
       this.#worker.off('console', this.#onConsole);
     }
     await this.#session?.detach();
   }
 
-  #onConsole = (message: ConsoleMessage) => {
+  #onConsole = (message: ConsoleMessage): void => {
     this.#callback(message);
   };
 
-  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent) => {
+  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
     const url = this.#target.url();
 
     const extensionId = extractExtensionId(url);
@@ -81,7 +81,7 @@ export class ServiceWorkerConsoleCollector {
     this.#maxLogs = maxLogs;
   }
 
-  async init(workers: McpWorker[]) {
+  async init(workers: McpWorker[]): Promise<void> {
     if (!this.#browser) {
       return;
     }
@@ -93,7 +93,7 @@ export class ServiceWorkerConsoleCollector {
     }
   }
 
-  dispose() {
+  dispose(): void {
     if (!this.#browser) {
       return;
     }
@@ -109,7 +109,7 @@ export class ServiceWorkerConsoleCollector {
     this.#serviceWorkerSubscribers.clear();
   }
 
-  #onTargetCreated = async (target: Target) => {
+  #onTargetCreated = async (target: Target): Promise<void> => {
     if (this.#serviceWorkerSubscribers.has(target)) {
       return;
     }
@@ -141,7 +141,7 @@ export class ServiceWorkerConsoleCollector {
     }
   };
 
-  #onTargetDestroyed = async (target: Target) => {
+  #onTargetDestroyed = async (target: Target): Promise<void> => {
     const subscriber = this.#serviceWorkerSubscribers.get(target);
     if (subscriber) {
       this.#serviceWorkerSubscribers.delete(target);
@@ -155,7 +155,7 @@ export class ServiceWorkerConsoleCollector {
     }
   };
 
-  addLog(extensionId: string, log: ConsoleMessage | UncaughtError) {
+  addLog(extensionId: string, log: ConsoleMessage | UncaughtError): void {
     const logs = this.#storage.get(extensionId) ?? [];
     const withId = log as WithSymbolId<ConsoleMessage | UncaughtError>;
     withId[stableIdSymbol] = this.#idGenerator();
@@ -198,7 +198,7 @@ export class ServiceWorkerConsoleCollector {
     return logs.find(filter);
   }
 
-  clearLogs(extensionId: string) {
+  clearLogs(extensionId: string): void {
     this.#storage.delete(extensionId);
   }
 }
@@ -216,7 +216,7 @@ function extractExtensionId(origin: string): string | null {
   return slashIndex === -1 ? pathPart : pathPart.substring(0, slashIndex);
 }
 
-function isExtensionOrigin(origin: string) {
+function isExtensionOrigin(origin: string): boolean {
   return origin.startsWith(CHROME_EXTENSION_PREFIX);
 }
 

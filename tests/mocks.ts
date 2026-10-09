@@ -585,7 +585,7 @@ export function synthesizeRuleTypes(
   ];
   for (const [items, ruleType] of mappings) {
     if (items) {
-      for (const _ of items) {
+      for (let i = 0; i < items.length; i++) {
         ruleTypes.push(ruleType);
       }
     }

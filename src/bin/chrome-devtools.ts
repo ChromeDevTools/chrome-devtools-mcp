@@ -6,8 +6,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-process.title = 'chrome-devtools';
-
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -36,13 +34,19 @@ import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
 
 import {ConfigParser} from '../config/ConfigParser.js';
 
+process.title = 'chrome-devtools';
+
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
 );
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
 
-async function start(args: string[], sessionId: string, stopExisting = false) {
+async function start(
+  args: string[],
+  sessionId: string,
+  stopExisting = false,
+): Promise<void> {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
   // Validates the arguments and the config file before starting the daemon.
   const parsedArgs = new ConfigParser(VERSION, [

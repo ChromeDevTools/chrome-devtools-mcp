@@ -17,7 +17,7 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
-import {zod} from '../src/third_party/index.js';
+import {zod, Mutex} from '../src/third_party/index.js';
 import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import {
@@ -30,7 +30,6 @@ import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
 import {createMockMcpContext} from './mocks.js';
 import {getMockBrowser} from './utils.js';
-import {Mutex} from '../src/third_party/index.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {
@@ -1378,7 +1377,7 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: {},
       handler: async () => {
-        return new Promise<void>(() => {
+        return await new Promise<void>(() => {
           // Simulates a tool call awaiting a CDP response on a transport
           // that died silently: it never resolves or rejects on its own.
         });

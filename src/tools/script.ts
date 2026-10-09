@@ -225,7 +225,7 @@ const performEvaluation = async (
   args: Array<JSHandle<unknown>>,
   response: Response,
   options: {filePath?: string; context: Context},
-) => {
+): Promise<void> => {
   let result: string | undefined;
   if (format === 'function') {
     const functionSource = source.trimEnd().replace(/;$/, '');

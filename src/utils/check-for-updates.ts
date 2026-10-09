@@ -19,12 +19,12 @@ import {VERSION} from '../version.js';
  */
 let isChecking = false;
 
-/** @internal Reset flag for tests only. */
-export function resetUpdateCheckFlagForTesting() {
+/** @internal */
+export function resetUpdateCheckFlagForTesting(): void {
   isChecking = false;
 }
 
-export async function checkForUpdates(message: string) {
+export async function checkForUpdates(message: string): Promise<void> {
   if (isChecking || process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS']) {
     return;
   }

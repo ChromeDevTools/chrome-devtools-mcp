@@ -378,7 +378,7 @@ export class McpResponse implements Response {
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -393,7 +393,7 @@ export class McpResponse implements Response {
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -408,7 +408,7 @@ export class McpResponse implements Response {
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
     options?: PaginationOptions & HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -421,7 +421,7 @@ export class McpResponse implements Response {
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
     options?: PaginationOptions & HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -434,7 +434,7 @@ export class McpResponse implements Response {
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -446,7 +446,7 @@ export class McpResponse implements Response {
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -455,7 +455,7 @@ export class McpResponse implements Response {
     };
   }
 
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]) {
+  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -465,7 +465,7 @@ export class McpResponse implements Response {
 
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -476,7 +476,7 @@ export class McpResponse implements Response {
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -488,7 +488,7 @@ export class McpResponse implements Response {
   setHeapSnapshotContextAnalysis(
     contextAnalysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
     options?: ContextAnalysisOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -542,9 +542,8 @@ export class McpResponse implements Response {
         '.txt',
       );
       return result.filename;
-    } else {
-      return formatter;
     }
+    return formatter;
   }
 
   async #handleAttachedNetworkRequest(
@@ -591,7 +590,8 @@ export class McpResponse implements Response {
         fetchDetailedData: true,
         devTools: this.#page.devtoolsUniverse,
       });
-    } else if (message instanceof DevTools.AggregatedIssue) {
+    }
+    if (message instanceof DevTools.AggregatedIssue) {
       const formatter = new IssueFormatter(message, {
         id: consoleMessageStableId,
         requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
@@ -605,9 +605,8 @@ export class McpResponse implements Response {
         );
       }
       return formatter;
-    } else {
-      return undefined;
     }
+    return undefined;
   }
 
   async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
@@ -805,7 +804,7 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    return this.format(
+    return await this.format(
       context,
       {
         detailedConsoleMessage,
@@ -970,9 +969,10 @@ export class McpResponse implements Response {
       }
     }
 
-    const networkConditions = this.#page?.networkConditions;
-    if (networkConditions) {
-      const timeout = this.#page!.pptrPage.getDefaultNavigationTimeout();
+    const page = this.#page;
+    const networkConditions = page?.networkConditions;
+    if (page && networkConditions) {
+      const timeout = page.pptrPage.getDefaultNavigationTimeout();
       response.push(`Emulating network conditions: ${networkConditions}`);
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
@@ -1575,7 +1575,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     if (this.#cssStylesData) {
-      const resolveUid = (backendNodeId: number) =>
+      const resolveUid = (backendNodeId: number): string | undefined =>
         this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
 
       const containerDetails = await resolveContainerQueries(
@@ -1646,7 +1646,22 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     };
   }
 
-  #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
+  #dataWithPagination<T>(
+    data: T[],
+    pagination?: PaginationOptions,
+  ): {
+    info: string[];
+    items: readonly T[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startIndex: number;
+      endIndex: number;
+      invalidPage: boolean;
+    };
+  } {
     const response = [];
     const paginationResult = paginate<T>(data, pagination);
     if (paginationResult.invalidPage) {
@@ -1682,7 +1697,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     };
   }
 
-  resetResponseLineForTesting() {
+  resetResponseLineForTesting(): void {
     this.#textResponseLines = [];
   }
 }
@@ -1697,7 +1712,13 @@ function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
   rawTitle: string,
-) {
+): {
+  id: number | undefined;
+  url: string;
+  title: string;
+  selected: boolean;
+  isolatedContext?: string;
+} {
   const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
   const entry: {

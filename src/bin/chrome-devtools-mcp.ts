@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-process.title = 'chrome-devtools-mcp';
-
 import {version} from 'node:process';
+
+process.title = 'chrome-devtools-mcp';
 
 const [major, minor] = version.substring(1).split('.').map(Number);
 

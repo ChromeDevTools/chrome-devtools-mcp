@@ -68,7 +68,9 @@ declare global {
     universe?: {
       cd4aBridge?: CD4ABridge | null;
     };
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     __onDevToolsCommentEvent?: () => void;
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     __onDevToolsCommentListener?: () => void;
   }
 }
