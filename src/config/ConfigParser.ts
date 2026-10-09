@@ -41,6 +41,7 @@ export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
+  #startupCliArgs?: Partial<ParsedArguments>;
   #startupExplicitArgs?: Partial<ParsedArguments>;
   #usageStatisticsNoticeShown = false;
 
@@ -240,6 +241,7 @@ export class ConfigParser {
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
+      this.#startupCliArgs = cliArgs;
       this.#configPath = cliArgs.config ?? this.configLocator.locate(this.env);
       this.warnUnknownArgs(cliArgs);
       const configPath = this.#configPath;
@@ -269,7 +271,7 @@ export class ConfigParser {
    * and throws on invalid configuration instead of exiting the process.
    */
   reload(): ParsedArguments {
-    const cliArgs = this.parseCliArgs();
+    const cliArgs = this.#startupCliArgs ?? this.parseCliArgs();
     const configPath = this.#configPath;
     const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
     this.validateConflicts(configFileArgs);
@@ -279,17 +281,11 @@ export class ConfigParser {
       ...cliArgs,
       ...(configPath ? {config: configPath} : {}),
     };
-    if (
-      this.#startupExplicitArgs?.viaCli !== undefined &&
-      explicitArgs.viaCli === undefined
-    ) {
-      explicitArgs.viaCli = this.#startupExplicitArgs.viaCli;
-    }
     const effectiveExplicitArgs = this.#startupExplicitArgs
       ? mergeExplicitReloadableArgs(this.#startupExplicitArgs, explicitArgs)
       : explicitArgs;
     this.validateConflicts(effectiveExplicitArgs);
     this.validateImplications(effectiveExplicitArgs);
-    return this.applyDefaults(explicitArgs);
+    return this.applyDefaults(effectiveExplicitArgs);
   }
 }

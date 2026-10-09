@@ -1626,6 +1626,42 @@ describe('ToolHandler', () => {
       sinon.assert.notCalled(handler);
     });
 
+    it('rejects calls whose async validation started before the schema changed', async () => {
+      const serverArgs = parseArgs();
+      const handler = sinon.stub().resolves();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        serverArgs,
+        async () => createMockMcpContext(),
+        new Mutex(),
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      // Start async validation against the v0 schema, then update the schema
+      // before the safeParseAsync promise resolves and calls handle().
+      const parsePromise = toolHandler.registeredInputSchema.safeParseAsync({
+        a: 'value',
+      });
+      toolHandler.update(
+        createGlobalTool(
+          {a: zod.string().optional(), b: zod.string()},
+          handler,
+        ),
+        serverArgs,
+      );
+      const parsed = await parsePromise;
+      assert.ok(parsed.success);
+      const result = await toolHandler.handle(parsed.data);
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0]?.type === 'text' ? result.content[0].text : '',
+        /^The input schema of tool global_tool changed/,
+      );
+      sinon.assert.notCalled(handler);
+    });
+
     it('runs waiting calls when the schema is unchanged', async () => {
       const serverArgs = parseArgs();
       const handler = sinon.stub().resolves();
@@ -1643,17 +1679,18 @@ describe('ToolHandler', () => {
 
       await toolMutex.acquire();
       const call = toolHandler.handle({a: 'value'});
-      toolHandler.update(
+      const listingChanged = toolHandler.update(
         createGlobalTool({a: zod.string().optional()}, handler),
         parseArgs(['--redact-network-headers']),
       );
       toolMutex.release();
       await call;
 
+      assert.strictEqual(listingChanged, false);
       sinon.assert.calledOnce(handler);
     });
 
-    it('updates the disabled state', () => {
+    it('updates the disabled state and reports listing change', () => {
       const serverArgs = parseArgs();
       const tool = createGlobalTool({}, sinon.stub().resolves());
       const toolHandler = new ToolHandler(
@@ -1665,8 +1702,12 @@ describe('ToolHandler', () => {
         sinon.spy(),
       );
 
-      toolHandler.update(tool, parseArgs(['--no-category-navigation']));
+      const listingChanged = toolHandler.update(
+        tool,
+        parseArgs(['--no-category-navigation']),
+      );
 
+      assert.strictEqual(listingChanged, true);
       assert.strictEqual(toolHandler.disabled, true);
       assert.strictEqual(toolHandler.callable, false);
     });

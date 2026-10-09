@@ -250,17 +250,19 @@ describe('mcp-options steps', () => {
         {},
         false,
       );
-      const locator = parser.configLocator;
-      sinon.stub(locator, 'locate').returns(configPath);
-      return {parser, locator};
+      const locateStub = sinon
+        .stub(parser.configLocator, 'locate')
+        .returns(configPath);
+      return {parser, locateStub};
     }
 
-    it('re-reads the config file without discovering it again', () => {
+    it('re-reads the config file without discovering it again or re-parsing CLI args', () => {
       using configFile = createTempFile(
         JSON.stringify({memoryDebugging: false}),
         'cd4a.config.json',
       );
-      const {parser, locator} = createParser(configFile.path);
+      const {parser, locateStub} = createParser(configFile.path);
+      const parseCliArgsSpy = sinon.spy(parser, 'parseCliArgs');
       assert.strictEqual(parser.parse().memoryDebugging, false);
 
       fs.writeFileSync(
@@ -269,7 +271,8 @@ describe('mcp-options steps', () => {
       );
 
       assert.strictEqual(parser.reload().memoryDebugging, true);
-      sinon.assert.calledOnce(locator.locate as sinon.SinonStub);
+      sinon.assert.calledOnce(locateStub);
+      sinon.assert.calledOnce(parseCliArgsSpy);
     });
 
     it('keeps CLI arguments over the config file', () => {
@@ -333,7 +336,7 @@ describe('mcp-options steps', () => {
       assert.strictEqual(reloaded.memoryDebugging, true);
     });
 
-    it('preserves startup viaCli defaults across reloads', () => {
+    it('preserves startup viaCli defaults across reloads even if config file sets viaCli to false', () => {
       using configFile = createTempFile(
         JSON.stringify({viaCli: true}),
         'cd4a.config.json',
@@ -343,7 +346,7 @@ describe('mcp-options steps', () => {
 
       fs.writeFileSync(
         configFile.path,
-        JSON.stringify({performanceCrux: false}),
+        JSON.stringify({viaCli: false, performanceCrux: false}),
       );
 
       const reloaded = parser.reload();

@@ -186,10 +186,14 @@ export class ToolHandler {
   #registeredInputSchema: zod.ZodObject<zod.ZodRawShape, zod.core.$strict> = zod
     .object({})
     .strict();
+  #inputJsonSchema: ReturnType<typeof toInputJsonSchema> = toInputJsonSchema(
+    this.#registeredInputSchema,
+  );
   /**
    * Incremented whenever an update changes the input schema the client sees.
    */
   #schemaVersion = 0;
+  #validatedParamsVersion = new WeakMap<Record<string, unknown>, number>();
   #disabled = false;
   #disabledReason?: string;
 
@@ -235,11 +239,14 @@ export class ToolHandler {
   /**
    * Replaces the tool definition and arguments. Callers must hold the tool
    * mutex, so calls that are already waiting for it run with the new state.
+   * Returns true if the tool listing visible to the client changed.
    */
   update(
     tool: ToolDefinition | DefinedPageTool,
     serverArgs: ParsedArguments,
-  ): void {
+  ): boolean {
+    const previousTool = this.#tool;
+    const previousDisabled = this.#disabled;
     const {disabled, reason, unavailableInMode} = getToolStatusInfo(
       tool,
       serverArgs,
@@ -249,17 +256,28 @@ export class ToolHandler {
     this.#disabledReason = reason;
     this.#disabled =
       disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
-    const registeredInputSchema = zod.object(tool.schema).strict();
-    if (
-      !isDeepStrictEqual(
-        toInputJsonSchema(this.#registeredInputSchema),
-        toInputJsonSchema(registeredInputSchema),
-      )
-    ) {
+    const nextInputSchema = zod.object(tool.schema).strict();
+    const nextInputJsonSchema = toInputJsonSchema(nextInputSchema);
+    const schemaChanged = !isDeepStrictEqual(
+      this.#inputJsonSchema,
+      nextInputJsonSchema,
+    );
+    if (schemaChanged) {
       this.#schemaVersion++;
     }
+    const schemaVersion = this.#schemaVersion;
+    const registeredInputSchema = nextInputSchema.check(ctx => {
+      this.#validatedParamsVersion.set(ctx.value, schemaVersion);
+    });
+    const listingChanged =
+      schemaChanged ||
+      previousDisabled !== this.#disabled ||
+      previousTool.description !== tool.description ||
+      !isDeepStrictEqual(previousTool.annotations, tool.annotations);
     this.#inputSchema = tool.schema;
     this.#registeredInputSchema = registeredInputSchema;
+    this.#inputJsonSchema = nextInputJsonSchema;
+    return listingChanged;
   }
 
   /**
@@ -295,12 +313,8 @@ export class ToolHandler {
   handle = async (
     validatedParams: Record<string, unknown>,
   ): Promise<CallToolResult> => {
-    // TODO: Investigate if we can reliably hit a race where input validation
-    // (MCP SDK's async validateToolInput or McpServer.callTool's safeParseAsync)
-    // starts against the old schema, applyConfig() increments #schemaVersion
-    // while validation awaits, and handle() then captures the already-incremented
-    // #schemaVersion.
-    const schemaVersionAtCall = this.#schemaVersion;
+    const schemaVersionAtCall =
+      this.#validatedParamsVersion.get(validatedParams) ?? this.#schemaVersion;
     using _guard = await this.toolMutex.acquire();
 
     if (this.#disabledReason) {

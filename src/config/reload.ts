@@ -12,7 +12,7 @@ import {
   categoryToFlagName,
 } from './category-options.js';
 import type {ParsedArguments} from './ConfigParser.js';
-import {CONFLICTING_ARGS} from './mcp-options.js';
+import {CONFLICTING_ARGS, IMPLICATIONS} from './mcp-options.js';
 import {puppeteerOptions} from './puppeteer-options.js';
 import {toolOptions} from './tool-options.js';
 
@@ -128,6 +128,31 @@ const CROSS_BOUNDARY_CONFLICTING_ARGS = CONFLICTING_ARGS.filter(
     group.some(arg => !RELOADABLE_OPTION_SET.has(arg)),
 );
 
+const CROSS_BOUNDARY_IMPLICATIONS = IMPLICATIONS.filter(
+  ([key, implied]) =>
+    RELOADABLE_OPTION_SET.has(key) !== RELOADABLE_OPTION_SET.has(implied),
+);
+
+function copyExplicitOption<K extends keyof ParsedArguments>(
+  target: Partial<ParsedArguments>,
+  source: Partial<ParsedArguments>,
+  key: K,
+): void {
+  if (key in source) {
+    target[key] = source[key];
+  } else {
+    delete target[key];
+  }
+}
+
+function copyOption<K extends keyof ParsedArguments>(
+  target: ParsedArguments,
+  source: ParsedArguments,
+  key: K,
+): void {
+  target[key] = source[key];
+}
+
 /**
  * Merges reloadable explicit arguments from `next` onto the startup explicit
  * arguments from `previous`.
@@ -138,11 +163,7 @@ export function mergeExplicitReloadableArgs(
 ): Partial<ParsedArguments> {
   const merged: Partial<ParsedArguments> = {...previous};
   for (const name of RELOADABLE_OPTIONS) {
-    if (name in next) {
-      Reflect.set(merged, name, next[name]);
-    } else {
-      Reflect.deleteProperty(merged, name);
-    }
+    copyExplicitOption(merged, next, name);
   }
   return merged;
 }
@@ -157,7 +178,7 @@ export function mergeReloadableOptions(
 ): ParsedArguments {
   const merged = {...previous};
   for (const name of RELOADABLE_OPTIONS) {
-    Reflect.set(merged, name, next[name]);
+    copyOption(merged, next, name);
   }
   for (const group of CROSS_BOUNDARY_CONFLICTING_ARGS) {
     const activeInGroup = group.filter(
@@ -167,6 +188,16 @@ export function mergeReloadableOptions(
       const [arg1, arg2] = activeInGroup;
       throw new Error(
         `Arguments ${String(arg1)} and ${String(arg2)} are mutually exclusive`,
+      );
+    }
+  }
+  for (const [key, implied] of CROSS_BOUNDARY_IMPLICATIONS) {
+    const isKeySet = merged[key] !== undefined && merged[key] !== false;
+    const isImpliedSet =
+      merged[implied] !== undefined && merged[implied] !== false;
+    if (isKeySet && !isImpliedSet) {
+      throw new Error(
+        `Implications failed:\n  ${String(key)} -> ${String(implied)}`,
       );
     }
   }

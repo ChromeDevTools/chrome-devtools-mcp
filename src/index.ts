@@ -7,7 +7,6 @@
 import type fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {isDeepStrictEqual} from 'node:util';
 
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
@@ -24,7 +23,6 @@ import {
   type Transport,
   Mutex,
   puppeteer,
-  zod,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import {
@@ -54,24 +52,8 @@ export interface McpServerOptions {
 }
 
 interface ToolEntry {
-  tool: ToolDefinition | DefinedPageTool;
   handler: ToolHandler;
   registeredTool: RegisteredTool;
-}
-
-/**
- * What the client sees in `tools/list` for a tool.
- */
-function listingOf(entry: ToolEntry) {
-  return {
-    description: entry.tool.description,
-    inputSchema: zod.toJSONSchema(entry.handler.registeredInputSchema, {
-      io: 'input',
-      unrepresentable: 'any',
-    }),
-    annotations: entry.tool.annotations,
-    enabled: !entry.handler.disabled,
-  };
 }
 
 export class McpServer {
@@ -169,8 +151,7 @@ export class McpServer {
         isError: true,
       };
     }
-    const parseResult =
-      await toolHandler.registeredInputSchema.safeParseAsync(args);
+    const parseResult = toolHandler.registeredInputSchema.safeParse(args);
     if (!parseResult.success) {
       return {
         content: [
@@ -218,16 +199,12 @@ export class McpServer {
 
     this.#serverArgs = nextArgs;
     for (const {entry, tool} of updates) {
-      const previousListing = listingOf(entry);
-      entry.handler.update(tool, nextArgs);
-      entry.tool = tool;
-      const nextListing = listingOf(entry);
-      if (!isDeepStrictEqual(previousListing, nextListing)) {
+      if (entry.handler.update(tool, nextArgs)) {
         entry.registeredTool.update({
           description: tool.description,
           paramsSchema: entry.handler.registeredInputSchema,
           annotations: tool.annotations,
-          enabled: nextListing.enabled,
+          enabled: !entry.handler.disabled,
         });
       }
     }
@@ -252,7 +229,7 @@ export class McpServer {
       screencast: !this.#isCallable('screencast_stop'),
       heapSnapshots: !this.#isCallable('close_heapsnapshot'),
       performanceTrace: !this.#isCallable('performance_stop_trace'),
-      devtoolsComments: !this.#isCallable('list_devtools_comments'),
+      devtoolsComments: !this.#isCallable('get_devtools_comments'),
     });
   }
 
@@ -423,7 +400,7 @@ export class McpServer {
       registeredTool.disable();
     }
 
-    this.#tools.set(tool.name, {tool, handler, registeredTool});
+    this.#tools.set(tool.name, {handler, registeredTool});
   }
 }
 

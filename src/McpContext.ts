@@ -177,22 +177,28 @@ export class McpContext implements Context {
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
   }
 
+  #allMcpPages(): Set<McpPage> {
+    const pages = new Set(this.#mcpPages.values());
+    if (this.#selectedPage) {
+      pages.add(this.#selectedPage);
+    }
+    return pages;
+  }
+
   /**
    * Updates options after a config reload.
    */
   updateOptions(options: LiveMcpContextOptions): void {
+    const previousSourceMaps = this.#options.sourceMaps;
     this.#options = {...this.#options, ...options};
     this.#allowUnrestrictedPaths =
       this.#options.allowUnrestrictedPaths ?? false;
-    if (options.sourceMaps !== undefined) {
-      for (const mcpPage of this.#mcpPages.values()) {
+    if (
+      options.sourceMaps !== undefined &&
+      options.sourceMaps !== previousSourceMaps
+    ) {
+      for (const mcpPage of this.#allMcpPages()) {
         mcpPage.setSourceMaps(options.sourceMaps);
-      }
-      if (
-        this.#selectedPage &&
-        !this.#mcpPages.has(this.#selectedPage.target)
-      ) {
-        this.#selectedPage.setSourceMaps(options.sourceMaps);
       }
     }
   }
@@ -237,10 +243,9 @@ export class McpContext implements Context {
       }
     }
     if (state.devtoolsComments) {
-      for (const mcpPage of this.#mcpPages.values()) {
+      for (const mcpPage of this.#allMcpPages()) {
         mcpPage.disposeCommentBridge();
       }
-      this.#selectedPage?.disposeCommentBridge();
     }
   }
 
@@ -255,10 +260,9 @@ export class McpContext implements Context {
 
     this.#serviceWorkerConsoleCollector.dispose();
     this.#heapSnapshotManager.dispose();
-    for (const mcpPage of this.#mcpPages.values()) {
+    for (const mcpPage of this.#allMcpPages()) {
       mcpPage.dispose();
     }
-    this.#selectedPage?.dispose();
     this.#mcpPages.clear();
     this.#workers.clear();
     // Isolated contexts are intentionally not closed here.

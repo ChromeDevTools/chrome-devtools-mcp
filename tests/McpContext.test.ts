@@ -857,14 +857,20 @@ describe('McpContext', () => {
         });
       });
 
-      it('updates sourceMaps on existing pages', async () => {
+      it('updates sourceMaps on existing pages only when changed', async () => {
         await withMcpContext(async (_response, context) => {
           const mcpPage = context.getSelectedMcpPage();
           const setSourceMapsSpy = sinon.spy(mcpPage, 'setSourceMaps');
 
-          context.updateOptions({performanceCrux: true, sourceMaps: false});
+          context.updateOptions({performanceCrux: true, sourceMaps: true});
+          sinon.assert.notCalled(setSourceMapsSpy);
 
+          context.updateOptions({performanceCrux: true, sourceMaps: false});
           sinon.assert.calledOnceWithExactly(setSourceMapsSpy, false);
+
+          setSourceMapsSpy.resetHistory();
+          context.updateOptions({performanceCrux: false, sourceMaps: false});
+          sinon.assert.notCalled(setSourceMapsSpy);
         });
       });
     });
@@ -943,7 +949,7 @@ describe('McpContext', () => {
         });
       });
 
-      it('disposes comment bridges when devtoolsComments is released', async () => {
+      it('disposes comment bridges once per page when devtoolsComments is released', async () => {
         await withMcpContext(async (_response, context) => {
           const mcpPage = context.getSelectedMcpPage();
           const disposeCommentBridgeSpy = sinon.spy(
@@ -958,7 +964,7 @@ describe('McpContext', () => {
             devtoolsComments: true,
           });
 
-          sinon.assert.called(disposeCommentBridgeSpy);
+          sinon.assert.calledOnceWithExactly(disposeCommentBridgeSpy);
         });
       });
     });
