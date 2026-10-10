@@ -26,6 +26,7 @@ import {
   newPage,
   selectPage,
 } from '../src/tools/pages.js';
+import {listThirdPartyDeveloperTools} from '../src/tools/thirdPartyDeveloper.js';
 import type {InsightName} from '../src/processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
@@ -995,6 +996,56 @@ describe('third-party developer tools', () => {
       undefined,
       {categoryExperimentalThirdParty: true},
     );
+  });
+
+  it('explains when no third-party developer tools are available', async () => {
+    const args = createMockParsedArguments({
+      categoryExperimentalThirdParty: true,
+    });
+    const response = new McpResponse(args);
+    const context = createMockMcpContext();
+    const page = context.getSelectedMcpPage();
+
+    await listThirdPartyDeveloperTools(args).handler(
+      {params: {}, page},
+      response,
+      context,
+    );
+
+    const {content, structuredContent} = await response.format(context, {
+      detailedConsoleMessage: undefined,
+      snapshot: undefined,
+      consoleMessages: undefined,
+      thirdPartyDeveloperTools: [],
+    });
+
+    assert.equal(
+      getTextContent(content[0]),
+      'No third-party developer tools available.',
+    );
+    assert.deepStrictEqual(structuredContent, {
+      thirdPartyDeveloperTools: [],
+    });
+  });
+
+  it('does not add empty tool output to implicit page listings', async () => {
+    const args = createMockParsedArguments({
+      categoryExperimentalThirdParty: true,
+    });
+    const response = new McpResponse(args);
+    const context = createMockMcpContext();
+
+    response.setListThirdPartyDeveloperTools();
+
+    const {content, structuredContent} = await response.format(context, {
+      detailedConsoleMessage: undefined,
+      snapshot: undefined,
+      consoleMessages: undefined,
+      thirdPartyDeveloperTools: [],
+    });
+
+    assert.equal(getTextContent(content[0]), '');
+    assert.deepStrictEqual(structuredContent, {});
   });
 
   async function testIncludesThirdPartyDeveloperTools(
