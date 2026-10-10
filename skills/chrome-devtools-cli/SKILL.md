@@ -66,7 +66,7 @@ chrome-devtools list_pages # Get a list of pages open in the browser
 chrome-devtools navigate_page 1 --url "https://example.com" # Navigates the currently selected page to a URL
 chrome-devtools navigate_page 1 --type "reload" --ignoreCache true # Reload page ignoring cache
 chrome-devtools navigate_page 1 --url "https://example.com" --timeout 5000 # Navigate with a timeout
-chrome-devtools navigate_page 1 --handleBeforeUnload "accept" # Handle before unload dialog
+chrome-devtools navigate_page 1 --type "reload" --handleBeforeUnload "accept" # Handle a before unload dialog during reload
 chrome-devtools navigate_page 1 --type "back" --initScript "foo()" # Navigate back and run an init script
 chrome-devtools new_page "https://example.com" # Creates a new page
 chrome-devtools new_page "https://example.com" --background true --timeout 5000 # Create new page in background
@@ -88,8 +88,8 @@ chrome-devtools resize_page 1 1920 1080 # Resizes the selected page's window
 ## Performance
 
 ```bash
-chrome-devtools performance_analyze_insight 1 "1" "LCPBreakdown" # Get more details on a specific Performance Insight (pageId, insightSetId, insightName)
-chrome-devtools performance_start_trace 1 --reload true --autoStop false # Starts a performance trace recording (reload, autoStop)
+chrome-devtools performance_start_trace 1 --reload true --autoStop true # Record a trace and print its available insight set IDs
+chrome-devtools performance_analyze_insight 1 "NAVIGATION_0" "LCPBreakdown" # Analyze an insight set ID from the trace output
 chrome-devtools performance_start_trace 1 --reload true --autoStop true --filePath "t.json.gz" # Start trace and save to a file
 chrome-devtools performance_stop_trace 1 # Stops the active performance trace
 chrome-devtools performance_stop_trace 1 --filePath "t.json.gz" # Stop trace and save to a file
@@ -120,12 +120,12 @@ chrome-devtools close_heapsnapshot "./snap.heapsnapshot" # Free memory from load
 ## Network
 
 ```bash
-chrome-devtools get_network_request 1 # Get the currently selected network request for page 1
-chrome-devtools get_network_request 1 --reqid 1 --requestFilePath "req.md" # Get request by id and save to file
-chrome-devtools get_network_request 1 --responseFilePath "res.md" # Save response body to file
+chrome-devtools get_network_request 1 # Get the currently selected request (requires DevTools Network selection; unavailable in headless mode)
+chrome-devtools get_network_request 1 --reqid 7 --requestFilePath "req.network-request" # Replace 7 with a reqid from list_network_requests
+chrome-devtools get_network_request 1 --reqid 7 --responseFilePath "res.network-response" # Replace 7 with a reqid from list_network_requests
 chrome-devtools list_network_requests 1 # List all network requests for page 1
 chrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination
-chrome-devtools list_network_requests 1 --resourceTypes Fetch # Filter requests by resource type
+chrome-devtools list_network_requests 1 --resourceTypes fetch # Filter requests by resource type
 chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
 ```
 
