@@ -500,7 +500,7 @@ describe('thirdPartyDeveloperTools', () => {
         const page = await context.newPage();
         response.setPage(page);
 
-        page.thirdPartyDeveloperTools = [
+        page.eventBasedThirdPartyTools = [
           {
             name: 'test-group',
             description: 'test description',
@@ -740,7 +740,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -816,7 +816,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -869,7 +869,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -922,7 +922,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',

@@ -29,7 +29,7 @@ export type Commands = Record<
 export const commands: Commands = {
   analyze_heapsnapshot_contexts: {
     description:
-      'Loads a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -146,7 +146,7 @@ export const commands: Commands = {
   },
   close_heapsnapshot: {
     description:
-      'Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
+      'Closes a previously loaded and cached memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -173,7 +173,7 @@ export const commands: Commands = {
   },
   compare_heapsnapshots: {
     description:
-      'Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)',
+      'Loads and caches two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       baseFilePath: {
@@ -364,7 +364,7 @@ export const commands: Commands = {
   },
   execute_3p_developer_tool: {
     description:
-      'Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)',
+      'Executes a third-party developer tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)',
     category: 'Third-party',
     args: {
       pageId: {
@@ -389,7 +389,7 @@ export const commands: Commands = {
   },
   execute_webmcp_tool: {
     description:
-      'Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)',
+      "Executes a WebMCP tool exposed by the page (for debugging tools, use 'execute_3p_developer_tool'). (requires flag: --categoryExperimentalWebmcp=true)",
     category: 'WebMCP',
     args: {
       pageId: {
@@ -505,7 +505,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_class_nodes: {
     description:
-      'Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -565,7 +565,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_details: {
     description:
-      'Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -612,7 +612,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_dominators: {
     description:
-      'Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -638,7 +638,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_duplicate_strings: {
     description:
-      'Loads a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -670,7 +670,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_edges: {
     description:
-      'Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -729,7 +729,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_object_details: {
     description:
-      'Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -755,7 +755,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_retainers: {
     description:
-      'Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -793,7 +793,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_retaining_paths: {
     description:
-      'Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -837,7 +837,7 @@ export const commands: Commands = {
   },
   get_heapsnapshot_summary: {
     description:
-      'Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {
@@ -1056,7 +1056,7 @@ export const commands: Commands = {
   },
   list_3p_developer_tools: {
     description:
-      "Lists all third-party developer tools the page exposes for providing runtime information.\nThird-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\nAlternatively, third-party developer tools can be executed by calling 'evaluate_script' and adding the\nfollowing command to the script:\n`window.__dtmcp.executeTool(toolName, params)`\nThis might be helpful when the third-party developer tools return non-serializable values or when composing\nthird-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
+      "Lists all third-party developer tools the page exposes for providing runtime information (including debugging WebMCP tools and tools exposed via the 'devtoolstooldiscovery' event).\nThird-party developer tools can be called via the 'execute_3p_developer_tool()' MCP tool.\nAlternatively, third-party developer tools exposed via the 'devtoolstooldiscovery' event can be executed by calling 'evaluate_script' and adding the\nfollowing command to the script:\n`window.__dtmcp.executeTool(toolName, params)`\nThis might be helpful when the third-party developer tools return non-serializable values or when composing\nthird-party developer tools with additional functionality. (requires flag: --categoryExperimentalThirdParty=true)",
     category: 'Third-party',
     args: {
       pageId: {
@@ -1180,7 +1180,7 @@ export const commands: Commands = {
   },
   list_webmcp_tools: {
     description:
-      'Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)',
+      "Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via 'list_3p_developer_tools'). (requires flag: --categoryExperimentalWebmcp=true)",
     category: 'WebMCP',
     args: {
       pageId: {
@@ -1392,7 +1392,7 @@ export const commands: Commands = {
   },
   query_heapsnapshot_objects: {
     description:
-      'Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
+      'Loads and caches a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)',
     category: 'Memory',
     args: {
       filePath: {

@@ -35,6 +35,7 @@ import type {
   DevTools,
   Protocol,
   Page,
+  WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
@@ -409,6 +410,7 @@ export type ContextPage = Readonly<{
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult>;
+  getWebMcpTools(): WebMCPTool[];
   getThirdPartyDeveloperTools(): ToolGroups;
 
   executeThirdPartyDeveloperTool(
