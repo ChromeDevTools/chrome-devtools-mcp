@@ -141,6 +141,7 @@ export class McpResponse implements Response {
   };
   #listExtensions?: boolean;
   #listThirdPartyDeveloperTools?: boolean;
+  #includeEmptyThirdPartyDeveloperToolsMessage = false;
   #listWebMcpTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
@@ -207,8 +208,9 @@ export class McpResponse implements Response {
     this.#listExtensions = true;
   }
 
-  setListThirdPartyDeveloperTools(): void {
+  setListThirdPartyDeveloperTools(includeEmptyMessage = false): void {
     this.#listThirdPartyDeveloperTools = true;
+    this.#includeEmptyThirdPartyDeveloperToolsMessage = includeEmptyMessage;
   }
 
   setListWebMcpTools(): void {
@@ -1473,6 +1475,12 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           .join('\n');
         response.push(toolDefinitionsMessage);
       }
+    } else if (
+      thirdPartyDeveloperTools &&
+      this.#includeEmptyThirdPartyDeveloperToolsMessage
+    ) {
+      structuredContent.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
+      response.push('No third-party developer tools available.');
     }
 
     if (this.#listWebMcpTools && data.webmcpTools) {

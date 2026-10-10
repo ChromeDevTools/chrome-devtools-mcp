@@ -59,7 +59,7 @@ third-party developer tools with additional functionality.`,
   blockedByDialog: false,
   verifyFilesSchema: {},
   handler: async (_request, response) => {
-    response.setListThirdPartyDeveloperTools();
+    response.setListThirdPartyDeveloperTools(true);
   },
 }));
 

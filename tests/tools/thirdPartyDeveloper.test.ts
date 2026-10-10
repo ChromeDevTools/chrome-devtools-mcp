@@ -114,7 +114,14 @@ describe('thirdPartyDeveloperTools', () => {
                 thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
-            undefined,
+            [],
+          );
+          assert.ok(
+            result.content.some(
+              item =>
+                item.type === 'text' &&
+                item.text === 'No third-party developer tools available.',
+            ),
           );
         },
         undefined,
@@ -147,7 +154,14 @@ describe('thirdPartyDeveloperTools', () => {
                 thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
-            undefined,
+            [],
+          );
+          assert.ok(
+            result.content.some(
+              item =>
+                item.type === 'text' &&
+                item.text === 'No third-party developer tools available.',
+            ),
           );
         },
         undefined,
@@ -174,7 +188,14 @@ describe('thirdPartyDeveloperTools', () => {
                 thirdPartyDeveloperTools?: ToolGroups;
               }
             ).thirdPartyDeveloperTools,
-            undefined,
+            [],
+          );
+          assert.ok(
+            result.content.some(
+              item =>
+                item.type === 'text' &&
+                item.text === 'No third-party developer tools available.',
+            ),
           );
         },
         undefined,

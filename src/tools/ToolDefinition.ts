@@ -240,7 +240,7 @@ export interface Response {
   ): void;
   setListExtensions(): void;
   attachLighthouseResult(result: LighthouseData): void;
-  setListThirdPartyDeveloperTools(): void;
+  setListThirdPartyDeveloperTools(includeEmptyMessage?: boolean): void;
   setListWebMcpTools(): void;
   attachWaitForResult(result: WaitForEventsResult): void;
   setDevToolsComments(threads: CD4ACommentThread[]): void;
