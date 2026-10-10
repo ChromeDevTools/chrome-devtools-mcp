@@ -81,6 +81,20 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
       filePath,
       enforcedExtension,
     );
+    let outputExistedBeforeStart = false;
+    try {
+      await fs.lstat(resolvedPath);
+      outputExistedBeforeStart = true;
+    } catch (err) {
+      if (!(
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        err.code === 'ENOENT'
+      )) {
+        throw err;
+      }
+    }
 
     const page = request.page;
 
@@ -96,14 +110,12 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
       // If we generated a temporary directory for this recording, remove it so
       // a failed start (e.g. ffmpeg missing) does not leak an empty directory.
       if (requestedFilePath === undefined) {
-        try {
-          await fs.rm(path.dirname(resolvedPath), {
-            recursive: true,
-            force: true,
-          });
-        } catch {
-          // no-op
-        }
+        await fs.rm(path.dirname(resolvedPath), {
+          recursive: true,
+          force: true,
+        });
+      } else if (!outputExistedBeforeStart) {
+        await fs.rm(resolvedPath, {force: true});
       }
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('ENOENT') && message.includes('ffmpeg')) {

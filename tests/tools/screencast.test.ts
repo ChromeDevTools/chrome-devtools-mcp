@@ -16,6 +16,7 @@ import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {ScreenRecorder} from '../../src/third_party/index.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {createHandlerMocks} from '../mocks.js';
+import {createTempDir} from '../utils.js';
 
 function createMockScreenRecorder(): sinon.SinonStubbedInstance<ScreenRecorder> {
   return sinon.createStubInstance(ScreenRecorder);
@@ -210,6 +211,54 @@ describe('screencast', () => {
         '.mp4',
       );
       sinon.assert.notCalled(context.setScreenRecorder);
+    });
+
+    it('removes the requested output file if recording fails to start', async () => {
+      const {page, context, response, args} = createScreencastMocks();
+      using dir = createTempDir('screencast-test-');
+      const filePath: `${string}.mp4` = `${dir.path}${path.sep}recording.mp4`;
+      context.ensureExtension.resolves(filePath);
+      page.pptrPage.screencast.callsFake(async options => {
+        assert.ok(options);
+        assert.ok(options.path);
+        await fs.writeFile(options.path, '');
+        throw new Error('spawn ffmpeg ENOENT');
+      });
+
+      await assert.rejects(
+        startScreencast(args).handler(
+          {params: {filePath}, page},
+          response,
+          context,
+        ),
+        /ffmpeg is required for screencast recording/,
+      );
+
+      await assert.rejects(fs.access(filePath));
+      sinon.assert.notCalled(context.setScreenRecorder);
+    });
+
+    it('does not remove a requested output file that already existed', async () => {
+      const {page, context, response, args} = createScreencastMocks();
+      using dir = createTempDir('screencast-test-');
+      const filePath: `${string}.mp4` = `${dir.path}${path.sep}recording.mp4`;
+      await fs.writeFile(filePath, 'existing recording');
+      context.ensureExtension.resolves(filePath);
+      page.pptrPage.screencast.rejects(new Error('spawn ffmpeg ENOENT'));
+
+      await assert.rejects(
+        startScreencast(args).handler(
+          {params: {filePath}, page},
+          response,
+          context,
+        ),
+        /ffmpeg is required for screencast recording/,
+      );
+
+      assert.strictEqual(
+        await fs.readFile(filePath, 'utf8'),
+        'existing recording',
+      );
     });
 
     it('cleans up the generated temp directory if recording fails to start', async () => {
