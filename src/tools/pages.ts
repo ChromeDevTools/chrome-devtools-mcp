@@ -352,6 +352,18 @@ export const resizePage = definePageTool(() => ({
       contentHeight: request.params.height,
     });
 
+    const cdpSession = await page.pptrPage.createCDPSession();
+    try {
+      const {cssLayoutViewport} = await cdpSession.send(
+        'Page.getLayoutMetrics',
+      );
+      response.appendResponseLine(
+        `Current page size: ${cssLayoutViewport.clientWidth} x ${cssLayoutViewport.clientHeight}`,
+      );
+    } finally {
+      await cdpSession.detach();
+    }
+
     response.setIncludePages(true);
   },
 }));
