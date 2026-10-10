@@ -1400,6 +1400,10 @@ describe('pages', () => {
           return [window.innerWidth, window.innerHeight];
         });
         assert.deepStrictEqual(dimensions, [700, 500]);
+        const result = await response.handle(context);
+        const textContent = result.content.find(c => c.type === 'text');
+        assert.ok(textContent);
+        assert.match(textContent.text, /Current page size: 700 x 500/);
       });
     });
 

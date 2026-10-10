@@ -43,7 +43,7 @@ exports[`pages > new_page with isolatedContext > when dialog is open 1`] = `
 `;
 
 exports[`pages > resize > when dialog is open 1`] = `
-{"content":[{"type":"text","text":"# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank [selected]"}],"structuredContent":{"dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"about:blank","title":"","selected":true}]}}
+{"content":[{"type":"text","text":"Current page size: 1600 x 1400\\n# Open dialog\\nalert: test dialog.\\nCall handle_dialog to handle it before continuing.\\n## Pages\\n1: about:blank [selected]"}],"structuredContent":{"message":"Current page size: 1600 x 1400","dialog":{"type":"alert","message":"test dialog","defaultValue":""},"pages":[{"id":1,"url":"about:blank","title":"","selected":true}]}}
 `;
 
 exports[`pages > select_page > when dialog is open 1`] = `
