@@ -140,6 +140,14 @@ export const stopTrace = definePageTool(() => ({
   },
   handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
+      response.appendResponseLine(
+        'Error: no performance trace is running. Use performance_start_trace to start one.',
+      );
+      if (request.params.filePath) {
+        response.appendResponseLine(
+          `No trace file was written to ${request.params.filePath}.`,
+        );
+      }
       return;
     }
     const page = request.page;

@@ -323,7 +323,7 @@ describe('performance', () => {
   });
 
   describe('performance_stop_trace', () => {
-    it('does nothing if the trace is not running and does not error', async () => {
+    it('returns an error message if the trace is not running', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.isRunningPerformanceTrace.returns(false);
 
@@ -331,7 +331,28 @@ describe('performance', () => {
 
       sinon.assert.notCalled(context.setIsRunningPerformanceTrace);
       sinon.assert.notCalled(context.storeTraceRecording);
-      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Error: no performance trace is running. Use performance_start_trace to start one.',
+      );
+    });
+
+    it('says no file was written when a filePath is given without a running trace', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.isRunningPerformanceTrace.returns(false);
+
+      await stopTrace(args).handler(
+        {params: {filePath: '/tmp/none.json'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.notCalled(context.storeTraceRecording);
+      sinon.assert.calledTwice(response.appendResponseLine);
+      sinon.assert.calledWith(
+        response.appendResponseLine.secondCall,
+        'No trace file was written to /tmp/none.json.',
+      );
     });
 
     it('will stop the trace and return trace info when a trace is running', async () => {
