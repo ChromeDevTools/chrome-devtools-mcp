@@ -12,7 +12,11 @@ import sinon from 'sinon';
 import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
-import {createHandlerMocks} from '../mocks.js';
+import {
+  createHandlerMocks,
+  createMockMcpPage,
+  createMockWebMCPTool,
+} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
