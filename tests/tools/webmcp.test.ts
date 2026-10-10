@@ -12,7 +12,11 @@ import sinon from 'sinon';
 import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
-import {createHandlerMocks, createMockWebMCPTool} from '../mocks.js';
+import {
+  createHandlerMocks,
+  createMockMcpPage,
+  createMockWebMCPTool,
+} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
@@ -22,32 +26,38 @@ describe('webmcp', () => {
 
   describe('list_webmcp_tools', () => {
     it('list webmcp tools in navigate_page response', async () => {
-      await withMcpContext(async (response, context, args) => {
-        await navigatePage(args).handler(
-          {
-            params: {url: 'data:text/html,<html></html>'},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        assert.ok(response.listWebMcpTools);
-      });
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.goto.resolves(null);
+
+      await navigatePage(args).handler(
+        {
+          params: {url: 'data:text/html,<html></html>'},
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.called(response.setListWebMcpTools);
     });
 
     it('list webmcp tools in list_pages response', async () => {
-      await withMcpContext(async (response, context, args) => {
-        await listPages(args).handler({params: {}}, response, context);
-        assert.ok(response.listWebMcpTools);
-      });
+      const {context, response, args} = createHandlerMocks();
+
+      await listPages(args).handler({params: {}}, response, context);
+
+      sinon.assert.called(response.setListWebMcpTools);
     });
 
     it('list webmcp tools in select_page response', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const pageId = context.getSelectedMcpPage().id ?? 1;
-        await selectPage(args).handler({params: {pageId}}, response, context);
-        assert.ok(response.listWebMcpTools);
-      });
+      const {context, response, args} = createHandlerMocks();
+      const mockPage = createMockMcpPage();
+      mockPage.init.resolves();
+      context.getPageById.returns(mockPage);
+
+      await selectPage(args).handler({params: {pageId: 1}}, response, context);
+
+      sinon.assert.called(response.setListWebMcpTools);
     });
   });
 
