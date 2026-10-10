@@ -9,7 +9,11 @@ import fs from 'node:fs';
 import {afterEach, describe, it, mock} from 'node:test';
 import util from 'node:util';
 
-import {puppeteerLogger, saveLogsToFile} from '../../src/utils/logger.js';
+import {
+  escapeForLog,
+  puppeteerLogger,
+  saveLogsToFile,
+} from '../../src/utils/logger.js';
 
 describe('puppeteerLogger', () => {
   afterEach(() => {
@@ -64,5 +68,28 @@ describe('puppeteerLogger', () => {
     assert.match(writeArg, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /);
     assert.ok(writeArg.includes('test-prefix'));
     assert.ok(writeArg.includes('hello world\n'));
+  });
+});
+
+describe('escapeForLog', () => {
+  it('returns a JSON string literal', () => {
+    assert.strictEqual(escapeForLog('a"b\\c'), '"a\\"b\\\\c"');
+  });
+
+  it('escapes characters that break a log line or control a terminal', () => {
+    const cases: Array<[string, string]> = [
+      ['\n', '\\n'],
+      ['\r', '\\r'],
+      ['\u001b', '\\u001b'],
+      ['\u007f', '\\u007f'],
+      ['\u0085', '\\u0085'],
+      ['\u009b', '\\u009b'],
+      ['\u2028', '\\u2028'],
+      ['\u2029', '\\u2029'],
+    ];
+    for (const [char, escaped] of cases) {
+      assert.strictEqual(escapeForLog(`a${char}b`), `"a${escaped}b"`);
+      assert.strictEqual(JSON.parse(escapeForLog(`a${char}b`)), `a${char}b`);
+    }
   });
 });

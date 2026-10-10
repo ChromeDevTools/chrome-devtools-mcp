@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {SerializedAXNode, Viewport, Target} from './third_party/index.js';
-
-export interface ExtensionServiceWorker {
-  url: string;
-  target: Target;
-  id: string;
-}
+import type {
+  SerializedAXNode,
+  Viewport,
+  DevTools,
+} from './third_party/index.js';
 
 export interface TextSnapshotNode extends SerializedAXNode {
   id: string;
@@ -41,51 +39,29 @@ export interface PaginationOptions {
   pageIdx?: number;
 }
 
-export interface CD4AEditorAnchorSignature {
-  /** 1-based line number for CodeMirror text editor anchors */
-  lineNumber: number;
-  /** File path associated with the editor */
-  filePath?: string;
-}
-
-export interface CD4ACommentThread {
-  id: string;
-  text: string;
-  networkRequestId?: string;
-  backendNodeId?: number;
-  editor?: CD4AEditorAnchorSignature;
-}
-
-export interface CD4ARevealTarget {
-  networkRequestId?: string;
-  backendNodeId?: number;
-  targetId?: string;
-}
+export type CD4ACommentThread = DevTools.CD4ABridge.CommentThread;
+export type CD4ARevealTarget = DevTools.CD4ABridge.RevealTarget;
 
 export enum CD4ABridgeEvents {
   COMMENT_THREADS_CHANGED = 'CommentThreadsChanged',
 }
 
-export interface CD4ABridge {
-  dispose?(): void;
-  setAgentAttached(value: boolean): void;
-  getCommentThreads(): CD4ACommentThread[];
-  takeComments(): CD4ACommentThread[];
-  resolveCommentThread(threadId: string, replyText?: string): boolean;
-  reveal(panelName?: string, target?: CD4ARevealTarget): Promise<void>;
-  addEventListener(
-    event: CD4ABridgeEvents | 'CommentThreadsChanged' | string,
-    listener: () => void,
-  ): void;
-  removeEventListener?(
-    event: CD4ABridgeEvents | 'CommentThreadsChanged' | string,
-    listener: () => void,
-  ): void;
-}
+/**
+ * Functions evaluated in the DevTools page cannot reference `CD4ABridgeEvents`
+ * at runtime, so they pass the string value instead.
+ */
+export type CD4ABridgeEventName = `${CD4ABridgeEvents}`;
+
+export type CD4ABridge = Omit<
+  DevTools.CD4ABridge.CD4ABridge,
+  'addEventListener' | 'removeEventListener'
+> & {
+  addEventListener(event: CD4ABridgeEventName, listener: () => void): void;
+  removeEventListener(event: CD4ABridgeEventName, listener: () => void): void;
+};
 
 export type CommentThread = CD4ACommentThread;
 export type RevealTarget = CD4ARevealTarget;
-export type EditorAnchorSignature = CD4AEditorAnchorSignature;
 
 declare global {
   interface Window {

@@ -11,10 +11,12 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/config/mcp-options.js';
+import type {ParsedArguments} from '../src/config/ConfigParser.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
+import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
+import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 import {
@@ -47,6 +49,8 @@ import {
   createMockHeapSnapshotStats,
   createMockHeapSnapshotStaticData,
   createMockMcpContext,
+  createMockMcpPage,
+  createMockMcpWorker,
   createMockObjectInfo,
   createMockParsedArguments,
 } from './mocks.js';
@@ -1577,6 +1581,23 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(objectText.includes('name: Object'));
   });
 
+  it('truncates object details name in compact format', async () => {
+    const context = createMockMcpContext();
+    const toonResponse = new McpResponse(createMockParsedArguments());
+    const longNameObjectInfo = {
+      ...createMockObjectInfo(),
+      name: 'Object_' + 'x'.repeat(150),
+    };
+    toonResponse.setHeapSnapshotObjectDetails(longNameObjectInfo, {
+      maxNameLength: 10,
+    });
+
+    const toonResult = await toonResponse.handle(context, 'toon');
+    const toonText = getTextContent(toonResult.content[0]);
+    assert.ok(toonText.includes('### Object Details'));
+    assert.ok(toonText.includes('Object_xxx...'));
+  });
+
   it('renders the context field usage section for the filtered contexts', async () => {
     const response = new McpResponse(createMockParsedArguments());
     response.setHeapSnapshotContextAnalysis(createMockContextAnalysisResult(), {
@@ -1593,5 +1614,197 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(text.includes('Context @111'));
     assert.ok(!text.includes('Context @102'));
     assert.ok('heapSnapshotContextAnalysis' in structuredContent);
+  });
+
+  describe('extension service workers', () => {
+    it('lists only service workers, excluding dedicated and shared workers', async () => {
+      const response = new McpResponse(createMockParsedArguments());
+      response.setIncludeExtensionServiceWorkers(true);
+
+      const context = createMockMcpContext();
+      context.getWorkers.returns([
+        createMockMcpWorker({
+          id: 'sw-1',
+          type: 'service_worker',
+          url: 'chrome-extension://abc/sw.js',
+        }),
+        createMockMcpWorker({id: 'dw-2', type: 'dedicated_worker'}),
+        createMockMcpWorker({id: 'shw-3', type: 'shared_worker'}),
+      ]);
+
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+
+      assert.ok(text.includes('## Extension Service Workers'));
+      assert.ok(text.includes('sw-1: chrome-extension://abc/sw.js'));
+      assert.ok(!text.includes('dw-2'));
+      assert.ok(!text.includes('shw-3'));
+      assert.deepEqual(
+        (
+          structuredContent as {
+            extensionServiceWorkers?: Array<{id: string}>;
+          }
+        ).extensionServiceWorkers,
+        [{id: 'sw-1', url: 'chrome-extension://abc/sw.js'}],
+      );
+    });
+  });
+
+  describe('DevTools comments snapshot regeneration note', () => {
+    function createSnapshotWithNodes(
+      nodes: Array<{id: string; backendNodeId?: number}>,
+      verbose = false,
+    ): TextSnapshot {
+      const idToNode = new Map<string, TextSnapshotNode>();
+      const children: TextSnapshotNode[] = [];
+      for (const n of nodes) {
+        const node: TextSnapshotNode = {
+          id: n.id,
+          role: 'generic',
+          backendNodeId: n.backendNodeId,
+          children: [],
+          elementHandle: async () => null,
+        };
+        idToNode.set(n.id, node);
+        children.push(node);
+      }
+      const rootNode: TextSnapshotNode = {
+        id: '1_0',
+        role: 'root',
+        children,
+        elementHandle: async () => null,
+      };
+      return new TextSnapshot({
+        root: rootNode,
+        idToNode,
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose,
+      });
+    }
+
+    it('includes note when DevTools comments regenerate a standard text snapshot', async () => {
+      const response = new McpResponse(createMockParsedArguments());
+      const page = createMockMcpPage();
+      page.textSnapshot = null;
+      const standardSnapshot = createSnapshotWithNodes(
+        [{id: '1_1', backendNodeId: 42}],
+        false,
+      );
+      page.resolveBackendNodeId.callsFake(async () => {
+        page.textSnapshot = standardSnapshot;
+        return '1_1';
+      });
+      response.setPage(page);
+      response.setDevToolsComments([
+        {
+          id: 'comment-1',
+          text: 'Fix the color contrast here',
+          node: {backendNodeId: 42, targetId: 'target-1'},
+        },
+      ]);
+
+      const context = createMockMcpContext();
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+
+      assert.ok(
+        text.includes(
+          'Note: DevTools comments regenerated the standard text snapshot.',
+        ),
+      );
+      assert.strictEqual(
+        Reflect.get(structuredContent, 'commentsSnapshotRegenerated'),
+        'standard',
+      );
+    });
+
+    it('includes note when DevTools comments regenerate a verbose text snapshot', async () => {
+      const response = new McpResponse(createMockParsedArguments());
+      const page = createMockMcpPage();
+      page.textSnapshot = null;
+      const verboseSnapshot = createSnapshotWithNodes(
+        [{id: '1_1', backendNodeId: 42}],
+        true,
+      );
+      page.resolveBackendNodeId.callsFake(async () => {
+        page.textSnapshot = verboseSnapshot;
+        return '1_1';
+      });
+      response.setPage(page);
+      response.setDevToolsComments([
+        {
+          id: 'comment-1',
+          text: 'Fix the color contrast here',
+          node: {backendNodeId: 42, targetId: 'target-1'},
+        },
+      ]);
+
+      const context = createMockMcpContext();
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+
+      assert.ok(
+        text.includes(
+          'Note: DevTools comments regenerated the verbose text snapshot.',
+        ),
+      );
+      assert.strictEqual(
+        Reflect.get(structuredContent, 'commentsSnapshotRegenerated'),
+        'verbose',
+      );
+    });
+
+    it('does not include note when DevTools comments do not regenerate the snapshot', async () => {
+      const response = new McpResponse(createMockParsedArguments());
+      const page = createMockMcpPage();
+      const existingSnapshot = createSnapshotWithNodes(
+        [{id: '1_1', backendNodeId: 42}],
+        false,
+      );
+      page.textSnapshot = existingSnapshot;
+      page.resolveBackendNodeId.resolves('1_1');
+      response.setPage(page);
+      response.setDevToolsComments([
+        {
+          id: 'comment-1',
+          text: 'Fix the color contrast here',
+          node: {backendNodeId: 42, targetId: 'target-1'},
+        },
+      ]);
+
+      const context = createMockMcpContext();
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+
+      assert.ok(!text.includes('Note: DevTools comments regenerated'));
+      assert.strictEqual(
+        Reflect.get(structuredContent, 'commentsSnapshotRegenerated'),
+        undefined,
+      );
+    });
+
+    it('does not include note when comments have no associated nodes', async () => {
+      const response = new McpResponse(createMockParsedArguments());
+      const page = createMockMcpPage();
+      page.textSnapshot = null;
+      response.setPage(page);
+      response.setDevToolsComments([
+        {
+          id: 'comment-1',
+          text: 'General comment without a node',
+        },
+      ]);
+
+      const context = createMockMcpContext();
+      const {content, structuredContent} = await response.handle(context);
+      const text = getTextContent(content[0]);
+
+      assert.ok(!text.includes('Note: DevTools comments regenerated'));
+      assert.strictEqual(
+        Reflect.get(structuredContent, 'commentsSnapshotRegenerated'),
+        undefined,
+      );
+    });
   });
 });

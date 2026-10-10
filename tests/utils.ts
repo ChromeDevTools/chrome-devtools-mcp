@@ -24,7 +24,7 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/config/mcp-options.js';
+import type {ParsedArguments} from '../src/config/ConfigParser.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -148,6 +148,8 @@ export async function withBrowser(
       const isRetryable =
         error instanceof Error &&
         (error.message === 'withBrowser timeout exceeded' ||
+          error.message.includes('Navigation timeout') ||
+          error.message.includes("Couldn't fetch install info") ||
           error.message.includes('closed') ||
           error.message.includes('crash') ||
           error.message.includes('hang'));
@@ -184,6 +186,7 @@ export async function withMcpContext(
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
     McpContext.resetPageIdsForTesting();
+    McpContext.resetWorkerIdsForTesting();
     const parsedArgs = createMockParsedArguments(args);
     const response = new McpResponse(parsedArgs);
     if (context) {
@@ -209,7 +212,12 @@ export async function withMcpContext(
 
     response.setPage(context.getSelectedMcpPage());
 
-    await cb(response, context, parsedArgs);
+    try {
+      await cb(response, context, parsedArgs);
+    } finally {
+      context.dispose();
+      context = undefined;
+    }
   }, options);
 }
 
@@ -425,6 +433,7 @@ export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
 export async function runCli(
   args: string[],
   sessionId?: string,
+  options?: {cwd?: string},
 ): Promise<{status: number | null; stdout: string; stderr: string}> {
   return new Promise((resolve, reject) => {
     const finalArgs = [...args];
@@ -433,6 +442,7 @@ export async function runCli(
     }
     const child = spawn('node', [CLI_PATH, ...finalArgs], {
       env: process.env,
+      cwd: options?.cwd,
     });
     let stdout = '';
     let stderr = '';

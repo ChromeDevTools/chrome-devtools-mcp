@@ -64,12 +64,11 @@ describe('comments tools', () => {
       const mockThread: CommentThreadPayload = {
         id: 'comment-1',
         text: 'Fix the color contrast here',
-        backendNodeId: 42,
-        networkRequestId: 'req-99',
-        editor: {
-          filePath: 'src/style.css',
-          lineNumber: 10,
+        node: {
+          backendNodeId: 42,
+          targetId: 'target-1',
         },
+        networkRequestId: 'req-99',
       };
 
       bridge.getComments.resolves([mockThread]);

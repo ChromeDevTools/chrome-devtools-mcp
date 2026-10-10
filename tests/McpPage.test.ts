@@ -16,7 +16,12 @@ import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
-import {createMockPuppeteerPage, createMockPuppeteerTarget} from './mocks.js';
+import {
+  createMockMcpResponse,
+  createMockPuppeteerPage,
+  createMockPuppeteerTarget,
+  createMockWebMCPTool,
+} from './mocks.js';
 import {serverHooks} from './server.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
@@ -324,12 +329,14 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.asPage);
       assert.throws(() => mcpPage.pptrPage, /not initialized/);
       assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
-      assert.strictEqual(await mcpPage.getTitle(), 'Target Title');
+      assert.strictEqual(mcpPage.getTitle(), 'Target Title');
 
       await mcpPage.init();
 
       sinon.assert.calledOnce(target.page);
       assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      assert.strictEqual(mcpPage.getTitle(), 'Target Title');
+      sinon.assert.notCalled(pptrPage.title);
     });
 
     it('falls back to target.asPage() when target.page() returns null', async () => {
@@ -898,6 +905,117 @@ describe('McpPage', () => {
     });
   });
 
+  describe('resolveBackendNodeId()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    function createSnapshotWithNodes(
+      nodes: Array<{id: string; backendNodeId?: number}>,
+      verbose = false,
+    ): TextSnapshot {
+      const idToNode = new Map<string, TextSnapshotNode>();
+      const children: TextSnapshotNode[] = [];
+      for (const n of nodes) {
+        const node: TextSnapshotNode = {
+          id: n.id,
+          role: 'generic',
+          backendNodeId: n.backendNodeId,
+          children: [],
+          elementHandle: async () => null,
+        };
+        idToNode.set(n.id, node);
+        children.push(node);
+      }
+      const rootNode: TextSnapshotNode = {
+        id: '1_0',
+        role: 'root',
+        children,
+        elementHandle: async () => null,
+      };
+      return new TextSnapshot({
+        root: rootNode,
+        idToNode,
+        snapshotId: '1',
+        hasSelectedElement: false,
+        verbose,
+      });
+    }
+
+    it('returns uid from existing textSnapshot without regenerating', async () => {
+      const {mcpPage} = await createMcpPage();
+      mcpPage.textSnapshot = createSnapshotWithNodes([
+        {id: '1_1', backendNodeId: 42},
+      ]);
+      const createStub = sinon.stub(TextSnapshot, 'create');
+
+      const uid = await mcpPage.resolveBackendNodeId(42);
+
+      assert.strictEqual(uid, '1_1');
+      sinon.assert.notCalled(createStub);
+    });
+
+    it('creates textSnapshot when textSnapshot is null', async () => {
+      const {mcpPage} = await createMcpPage();
+      const snapshot = createSnapshotWithNodes([
+        {id: '1_1', backendNodeId: 42},
+      ]);
+      const createStub = sinon.stub(TextSnapshot, 'create').resolves(snapshot);
+
+      const uid = await mcpPage.resolveBackendNodeId(42);
+
+      assert.strictEqual(uid, '1_1');
+      sinon.assert.calledOnceWithExactly(createStub, mcpPage, {verbose: false});
+      assert.strictEqual(mcpPage.textSnapshot, snapshot);
+    });
+
+    it('regenerates textSnapshot when backendNodeId is not in existing snapshot', async () => {
+      const {mcpPage} = await createMcpPage();
+      mcpPage.textSnapshot = createSnapshotWithNodes([
+        {id: '1_1', backendNodeId: 10},
+      ]);
+      const updatedSnapshot = createSnapshotWithNodes([
+        {id: '2_1', backendNodeId: 42},
+      ]);
+      const createStub = sinon
+        .stub(TextSnapshot, 'create')
+        .resolves(updatedSnapshot);
+
+      const uid = await mcpPage.resolveBackendNodeId(42);
+
+      assert.strictEqual(uid, '2_1');
+      sinon.assert.calledOnceWithExactly(createStub, mcpPage, {verbose: false});
+      assert.strictEqual(mcpPage.textSnapshot, updatedSnapshot);
+    });
+
+    it('falls back to verbose textSnapshot when backendNodeId is not in non-verbose snapshot', async () => {
+      const {mcpPage} = await createMcpPage();
+      const nonVerboseSnapshot = createSnapshotWithNodes(
+        [{id: '1_1', backendNodeId: 10}],
+        false,
+      );
+      const verboseSnapshot = createSnapshotWithNodes(
+        [{id: '2_5', backendNodeId: 30}],
+        true,
+      );
+      const createStub = sinon.stub(TextSnapshot, 'create');
+      createStub.onFirstCall().resolves(nonVerboseSnapshot);
+      createStub.onSecondCall().resolves(verboseSnapshot);
+
+      const uid = await mcpPage.resolveBackendNodeId(30);
+
+      assert.strictEqual(uid, '2_5');
+      sinon.assert.calledTwice(createStub);
+      sinon.assert.calledWithExactly(createStub.firstCall, mcpPage, {
+        verbose: false,
+      });
+      sinon.assert.calledWithExactly(createStub.secondCall, mcpPage, {
+        verbose: true,
+      });
+      assert.strictEqual(mcpPage.textSnapshot, verboseSnapshot);
+    });
+  });
+
   describe('getMatchedStylesForUid()', () => {
     const server = serverHooks();
 
@@ -1096,6 +1214,315 @@ describe('McpPage', () => {
           assert.ok(selectors.includes('.frame-btn'));
         }
       });
+    });
+  });
+
+  describe('executeThirdPartyDeveloperTool()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('appends "Tool returned no result." and skips cleanup evaluate when the tool returns undefined and stashed is 0', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const response = createMockMcpResponse();
+      pptrPage.evaluate.resolves({result: undefined, stashed: 0});
+
+      await mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response);
+
+      sinon.assert.calledOnce(pptrPage.evaluate);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Tool returned no result.',
+      );
+    });
+
+    it('preserves the original evaluateHandle error when stashedElements cleanup fails', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const response = createMockMcpResponse();
+      pptrPage.evaluate
+        .onFirstCall()
+        .resolves({result: '{"stashedId":"stashed-0"}', stashed: 1});
+      pptrPage.evaluateHandle.rejects(
+        new Error('Execution context was destroyed'),
+      );
+      pptrPage.evaluate.onSecondCall().rejects(new Error('Target closed'));
+
+      await assert.rejects(
+        () => mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response),
+        /Execution context was destroyed/,
+      );
+
+      sinon.assert.calledTwice(pptrPage.evaluate);
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
+  });
+
+  describe('WebMCP third-party developer tools', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('filters WebMCP tools by annotations.debugging in getToolGroups()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      const debuggingTool = createMockWebMCPTool({
+        name: 'debug_tool',
+        description: 'A debugging WebMCP tool',
+        inputSchema: {type: 'object'},
+        annotations: {debugging: true},
+      });
+      const nonDebuggingTool = createMockWebMCPTool({
+        name: 'user_tool',
+        description: 'A non-debugging WebMCP tool',
+        inputSchema: {type: 'object'},
+        annotations: {debugging: false},
+      });
+      const unannotatedTool = createMockWebMCPTool({
+        name: 'legacy_webmcp_tool',
+        description: 'A WebMCP tool without debugging annotation',
+        inputSchema: {type: 'object'},
+      });
+      pptrPage.webmcp.tools.returns([
+        debuggingTool,
+        nonDebuggingTool,
+        unannotatedTool,
+      ]);
+
+      const groups = await mcpPage.getToolGroups();
+      assert.deepStrictEqual(groups, [
+        {
+          name: 'WebMCP Tools',
+          description: 'Tools exposed via WebMCP',
+          tools: [
+            {
+              name: 'debug_tool',
+              description: 'A debugging WebMCP tool',
+              inputSchema: {type: 'object'},
+            },
+          ],
+        },
+      ]);
+      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), groups);
+    });
+
+    it('combines WebMCP debugging tools and devtoolstooldiscovery tools in getThirdPartyDeveloperTools()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      const debuggingTool = createMockWebMCPTool({
+        name: 'debug_tool',
+        description: 'A debugging WebMCP tool',
+        annotations: {debugging: true},
+      });
+      pptrPage.webmcp.tools.returns([debuggingTool]);
+      mcpPage.eventBasedThirdPartyTools = [
+        {
+          name: 'Custom Tools',
+          description: 'Tools exposed via event',
+          tools: [
+            {
+              name: 'custom_tool',
+              description: 'A custom tool',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  el: {
+                    properties: {uid: {type: 'string'}},
+                    required: ['uid'],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ];
+
+      const groups = mcpPage.getThirdPartyDeveloperTools();
+      assert.deepStrictEqual(groups, [
+        {
+          name: 'WebMCP Tools',
+          description: 'Tools exposed via WebMCP',
+          tools: [
+            {
+              name: 'debug_tool',
+              description: 'A debugging WebMCP tool',
+              inputSchema: {},
+            },
+          ],
+        },
+        {
+          name: 'Custom Tools',
+          description: 'Tools exposed via event',
+          tools: [
+            {
+              name: 'custom_tool',
+              description: 'A custom tool',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  el: {
+                    properties: {uid: {type: 'string'}},
+                    required: ['uid'],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('reflects dynamically added and removed WebMCP debugging tools in getThirdPartyDeveloperTools()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), []);
+
+      const debuggingTool = createMockWebMCPTool({
+        name: 'dynamic_debug_tool',
+        description: 'Added dynamically',
+        inputSchema: {type: 'object'},
+        annotations: {debugging: true},
+      });
+      pptrPage.webmcp.tools.returns([debuggingTool]);
+
+      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), [
+        {
+          name: 'WebMCP Tools',
+          description: 'Tools exposed via WebMCP',
+          tools: [
+            {
+              name: 'dynamic_debug_tool',
+              description: 'Added dynamically',
+              inputSchema: {type: 'object'},
+            },
+          ],
+        },
+      ]);
+
+      pptrPage.webmcp.tools.returns([]);
+      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), []);
+    });
+
+    it('executes a WebMCP tool in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_tool',
+        description: 'A WebMCP tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Completed',
+        output: {result: 42},
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+
+      await mcpPage.executeThirdPartyDeveloperTool(
+        'webmcp_tool',
+        {x: 21},
+        response,
+      );
+
+      sinon.assert.calledOnceWithExactly(mockTool.execute, {x: 21});
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        JSON.stringify({result: 42}, null, 2),
+      );
+      sinon.assert.notCalled(pptrPage.evaluate);
+    });
+
+    it('appends "Tool returned no result." when WebMCP tool output is undefined in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_void_tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Completed',
+        output: undefined,
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+
+      await mcpPage.executeThirdPartyDeveloperTool(
+        'webmcp_void_tool',
+        {},
+        response,
+      );
+
+      sinon.assert.calledOnceWithExactly(mockTool.execute, {});
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Tool returned no result.',
+      );
+    });
+
+    it('does not execute non-debugging WebMCP tools in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const nonDebuggingTool = createMockWebMCPTool({
+        name: 'user_tool',
+        annotations: {debugging: false},
+      });
+      pptrPage.webmcp.tools.returns([nonDebuggingTool]);
+      pptrPage.evaluate.rejects(new Error('No tools found on the page'));
+      const response = createMockMcpResponse();
+
+      await assert.rejects(
+        () => mcpPage.executeThirdPartyDeveloperTool('user_tool', {}, response),
+        /No tools found on the page/,
+      );
+      sinon.assert.notCalled(nonDebuggingTool.execute);
+    });
+
+    it('throws when WebMCP tool execution fails in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        errorText: 'Execution failed in page',
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+
+      await assert.rejects(
+        () =>
+          mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response),
+        /Execution failed in page/,
+      );
+    });
+
+    it('excludes debugging WebMCP tools from getWebMcpTools()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+
+      const debuggingTool = createMockWebMCPTool({
+        name: 'debug_tool',
+        description: 'A debugging WebMCP tool',
+        annotations: {debugging: true},
+      });
+      const nonDebuggingTool = createMockWebMCPTool({
+        name: 'user_tool',
+        description: 'A non-debugging WebMCP tool',
+        annotations: {debugging: false},
+      });
+      const unannotatedTool = createMockWebMCPTool({
+        name: 'legacy_webmcp_tool',
+        description: 'A WebMCP tool without debugging annotation',
+      });
+      pptrPage.webmcp.tools.returns([
+        debuggingTool,
+        nonDebuggingTool,
+        unannotatedTool,
+      ]);
+
+      assert.deepStrictEqual(mcpPage.getWebMcpTools(), [
+        nonDebuggingTool,
+        unannotatedTool,
+      ]);
     });
   });
 });

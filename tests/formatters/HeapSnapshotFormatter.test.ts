@@ -11,7 +11,9 @@ import {describe, it, before, after} from 'node:test';
 import {
   collectRankedContexts,
   type ContextAnalysisReport,
+  formatName,
   HeapSnapshotFormatter,
+  MAX_NAME_LENGTH,
 } from '../../src/formatters/HeapSnapshotFormatter.js';
 import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
@@ -54,6 +56,32 @@ describe('HeapSnapshotFormatter', () => {
       [stableIdSymbol]: 2,
     } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
   };
+
+  describe('formatName', () => {
+    it('returns short name unchanged', () => {
+      assert.strictEqual(formatName('shortName', {}), 'shortName');
+    });
+
+    it('truncates name exceeding MAX_NAME_LENGTH', () => {
+      const longName = 'a'.repeat(150);
+      const expected = 'a'.repeat(MAX_NAME_LENGTH) + '...';
+      assert.strictEqual(formatName(longName, {}), expected);
+    });
+
+    it('escapes newlines in name', () => {
+      assert.strictEqual(
+        formatName('first\r\nsecond\nthird\rfourth', {}),
+        'first\\r\\nsecond\\nthird\\rfourth',
+      );
+    });
+
+    it('respects a custom maxNameLength', () => {
+      assert.strictEqual(
+        formatName('abcdefghij', {maxNameLength: 5}),
+        'abcde...',
+      );
+    });
+  });
 
   describe('toString', () => {
     it('formats data as CSV and sorts by retained size', t => {
@@ -129,7 +157,7 @@ describe('HeapSnapshotFormatter', () => {
         },
       ];
 
-      const result = HeapSnapshotFormatter.formatNodes(mockEdges);
+      const result = HeapSnapshotFormatter.formatNodes(mockEdges, {});
       const expected = [
         'name,type,nodeId,nodeName,selfSize,retainedSize',
         'edge1,property,1,NodeA,0.0 kB,0.0 kB',
@@ -254,8 +282,10 @@ describe('HeapSnapshotFormatter', () => {
         },
       ] as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge[];
 
-      const result =
-        HeapSnapshotFormatter.formatRetainingPaths(mockRetainingPaths);
+      const result = HeapSnapshotFormatter.formatRetainingPaths(
+        mockRetainingPaths,
+        {},
+      );
       const expected = [
         '<- @10 ClassA via property foo (distance: 2)',
         '  <- @20 ClassB via element bar (distance: 1)',
@@ -285,7 +315,7 @@ describe('HeapSnapshotFormatter', () => {
           },
         ];
 
-      const result = HeapSnapshotFormatter.formatDominators(mockDominators);
+      const result = HeapSnapshotFormatter.formatDominators(mockDominators, {});
       const expected = [
         'nodeId,nodeName,selfSize,retainedSize',
         `10,ClassA,${formatBytesToKb(100)},${formatBytesToKb(1000)}`,
@@ -298,7 +328,7 @@ describe('HeapSnapshotFormatter', () => {
     it('formats empty dominator chain correctly', () => {
       const mockDominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain =
         [];
-      const result = HeapSnapshotFormatter.formatDominators(mockDominators);
+      const result = HeapSnapshotFormatter.formatDominators(mockDominators, {});
       const expected = 'nodeId,nodeName,selfSize,retainedSize';
       assert.strictEqual(result, expected);
     });
@@ -330,13 +360,72 @@ describe('HeapSnapshotFormatter', () => {
           noAttributionSize: 400,
         };
 
-      const result = HeapSnapshotFormatter.formatNativeContextSizes(mockSizes);
+      const result = HeapSnapshotFormatter.formatNativeContextSizes(
+        mockSizes,
+        {},
+      );
       const expected = [
         'nodeId,nodeName,selfSize,retainedSize,attributedSize',
         `20,system / NativeContext / https://example.com,${formatBytesToKb(200)},${formatBytesToKb(5000)},${formatBytesToKb(2000)}`,
         `10,system / NativeContext,${formatBytesToKb(100)},${formatBytesToKb(1000)},${formatBytesToKb(500)}`,
         `Shared Size: ${formatBytesToKb(300)}`,
         `Unattributed Size: ${formatBytesToKb(400)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+  });
+
+  describe('formatDuplicateStrings', () => {
+    it('truncates long duplicate string values without changing the truncated flag', () => {
+      const longString = 'str_' + 's'.repeat(150);
+      const mockGroups: DevTools.HeapSnapshotModel.HeapSnapshotModel.DuplicateStringGroup[] =
+        [
+          {
+            value: longString,
+            count: 2,
+            totalSelfSize: 200,
+            totalRetainedSize: 200,
+            nodes: [
+              {id: 1, selfSize: 100, retainedSize: 100, distance: 1},
+              {id: 2, selfSize: 100, retainedSize: 100, distance: 1},
+            ],
+          },
+        ];
+
+      const result = HeapSnapshotFormatter.formatDuplicateStrings(
+        mockGroups,
+        {},
+      );
+      const expectedValue = JSON.stringify('str_' + 's'.repeat(96) + '...');
+      const expected = [
+        'value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds',
+        `${expectedValue},2,${formatBytesToKb(200)},${formatBytesToKb(200)},false,@1 @2`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
+    });
+
+    it('reports values truncated by the snapshot itself', () => {
+      const mockGroups: DevTools.HeapSnapshotModel.HeapSnapshotModel.DuplicateStringGroup[] =
+        [
+          {
+            value: 'short string',
+            count: 2,
+            totalSelfSize: 20,
+            totalRetainedSize: 20,
+            truncated: true,
+            nodes: [{id: 1, selfSize: 10, retainedSize: 10, distance: 1}],
+          },
+        ];
+
+      const result = HeapSnapshotFormatter.formatDuplicateStrings(
+        mockGroups,
+        {},
+      );
+      const expected = [
+        'value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds',
+        `"short string",2,${formatBytesToKb(20)},${formatBytesToKb(20)},true,@1`,
       ].join('\n');
 
       assert.strictEqual(result, expected);
@@ -425,7 +514,7 @@ describe('HeapSnapshotFormatter', () => {
       it('formats native context sizes from fixture', async t => {
         const sizes = await manager.getNativeContextSizes(examplePath);
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatNativeContextSizes(sizes),
+          HeapSnapshotFormatter.formatNativeContextSizes(sizes, {}),
         );
       });
     });
@@ -443,7 +532,7 @@ describe('HeapSnapshotFormatter', () => {
       it('formats class nodes with default options', async t => {
         await manager.getAggregates(examplePath);
         const nodes = await manager.getNodesById(examplePath, 19);
-        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items));
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items, {}));
       });
 
       it('formats class nodes with objectsRetainedByContexts filterName', async t => {
@@ -464,21 +553,25 @@ describe('HeapSnapshotFormatter', () => {
           id,
           'objectsRetainedByContexts',
         );
-        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items));
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items, {}));
       });
     });
 
     describe('formatNodes with retainers', () => {
       it('formats retainers for a valid nodeId', async t => {
         const retainers = await manager.getRetainers(examplePath, 25341);
-        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(retainers.items));
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatNodes(retainers.items, {}),
+        );
       });
     });
 
     describe('formatObjectInfo', () => {
       it('formats object details for a valid nodeId', async t => {
         const objectInfo = await manager.getObjectInfo(examplePath, 25341);
-        t.assert.snapshot(HeapSnapshotFormatter.formatObjectInfo(objectInfo));
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatObjectInfo(objectInfo, {}),
+        );
       });
     });
 
@@ -489,7 +582,7 @@ describe('HeapSnapshotFormatter', () => {
           45901,
         );
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatRetainingPaths(retainingPaths.paths),
+          HeapSnapshotFormatter.formatRetainingPaths(retainingPaths.paths, {}),
         );
       });
 
@@ -507,13 +600,13 @@ describe('HeapSnapshotFormatter', () => {
     describe('formatNodes with edges', () => {
       it('formats outgoing edges for a valid nodeId', async t => {
         const edges = await manager.getEdges(examplePath, 25341);
-        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(edges.items));
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(edges.items, {}));
       });
 
       it('formats outgoing edges with pagination', async t => {
         const edges = await manager.getEdges(examplePath, 25341);
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatNodes(edges.items.slice(0, 2)),
+          HeapSnapshotFormatter.formatNodes(edges.items.slice(0, 2), {}),
         );
       });
 
@@ -522,14 +615,16 @@ describe('HeapSnapshotFormatter', () => {
         const edges = await manager.getEdges(examplePath, 25341, {
           minRetainedSize: range?.min,
         });
-        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(edges.items));
+        t.assert.snapshot(HeapSnapshotFormatter.formatNodes(edges.items, {}));
       });
     });
 
     describe('formatDominators', () => {
       it('formats dominator chain for a valid nodeId', async t => {
         const dominators = await manager.getDominatorsOf(examplePath, 25341);
-        t.assert.snapshot(HeapSnapshotFormatter.formatDominators(dominators));
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatDominators(dominators, {}),
+        );
       });
     });
 
@@ -560,7 +655,7 @@ describe('HeapSnapshotFormatter', () => {
       it('formats duplicate strings with default options', async t => {
         const duplicateStrings = await manager.getDuplicateStrings(examplePath);
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatDuplicateStrings(duplicateStrings),
+          HeapSnapshotFormatter.formatDuplicateStrings(duplicateStrings, {}),
         );
       });
     });
@@ -569,7 +664,7 @@ describe('HeapSnapshotFormatter', () => {
       it('formats queried objects with default options', async t => {
         const objects = await manager.queryObjects(examplePath, {});
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10)),
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10), {}),
         );
       });
 
@@ -578,7 +673,7 @@ describe('HeapSnapshotFormatter', () => {
           className: 'Window',
         });
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10)),
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10), {}),
         );
       });
 
@@ -588,7 +683,7 @@ describe('HeapSnapshotFormatter', () => {
           minRetainedSize: range?.min,
         });
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10)),
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 10), {}),
         );
       });
 
@@ -597,7 +692,7 @@ describe('HeapSnapshotFormatter', () => {
           sortBy: 'selfSize',
         });
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 5)),
+          HeapSnapshotFormatter.formatNodes(objects.items.slice(0, 5), {}),
         );
       });
     });
@@ -611,7 +706,9 @@ describe('HeapSnapshotFormatter', () => {
         scriptsWithoutScopes: analysis.scriptsWithoutScopes,
       };
 
-      t.assert.snapshot(HeapSnapshotFormatter.formatContextAnalysis(report));
+      t.assert.snapshot(
+        HeapSnapshotFormatter.formatContextAnalysis(report, {}),
+      );
     });
 
     it('reports when there are no contexts with dead fields', () => {
@@ -620,7 +717,7 @@ describe('HeapSnapshotFormatter', () => {
         scriptsWithoutScopes: [],
       };
 
-      const result = HeapSnapshotFormatter.formatContextAnalysis(report);
+      const result = HeapSnapshotFormatter.formatContextAnalysis(report, {});
 
       assert.strictEqual(
         result,

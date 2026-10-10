@@ -375,18 +375,20 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate a JavaScript function inside the target page. Returns the response as JSON, so returned values have to be JSON-serializable.
+**Description:** Evaluate JavaScript inside the target page. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
-
-- **function** (string) **(required)**: A JavaScript function declaration to be executed by the tool in the target page.
-  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
-  Example with arguments: `(el) => el.innerText`
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **args** (array) _(optional)_: An optional list of arguments to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
+- **format** (enum: "function", "script") _(optional)_: How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.
+- **function** (string) _(optional)_: JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
+  Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
+  Example with arguments: `(el) => el.innerText`
+
+- **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.
 - **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
 ---
@@ -512,11 +514,12 @@ in the DevTools Elements panel (if any).
 
 ### `analyze_heapsnapshot_contexts`
 
-**Description:** Loads a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0.
 - **pageSize** (integer) _(optional)_: The number of contexts to return per page. Defaults to 20.
 - **retainedSize** (string) _(optional)_: Inclusive range for the dead-field score of a context (e.g. "10KB", "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
@@ -526,7 +529,7 @@ in the DevTools Elements panel (if any).
 
 ### `close_heapsnapshot`
 
-**Description:** Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)
+**Description:** Closes a previously loaded and cached memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -536,7 +539,7 @@ in the DevTools Elements panel (if any).
 
 ### `compare_heapsnapshots`
 
-**Description:** Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -548,13 +551,14 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_class_nodes`
 
-**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **id** (number) **(required)**: The ID for the class, obtained from details.
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the nodes.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
@@ -563,7 +567,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_details`
 
-**Description:** Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -577,22 +581,24 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_dominators`
 
-**Description:** Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get the dominator chain for.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 
 ---
 
 ### `get_heapsnapshot_duplicate_strings`
 
-**Description:** Loads a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 
@@ -600,13 +606,14 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_edges`
 
-**Description:** Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
 - **excludePrimitives** (boolean) _(optional)_: Whether to exclude primitive target nodes. Default is true.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.
@@ -616,23 +623,25 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_object_details`
 
-**Description:** Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get object details for.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 
 ---
 
 ### `get_heapsnapshot_retainers`
 
-**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get retainers for.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
 
@@ -640,13 +649,14 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_retaining_paths`
 
-**Description:** Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get retaining paths for.
 - **maxDepth** (number) _(optional)_: The maximum depth to search for retaining paths.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **maxNodes** (number) _(optional)_: The maximum number of nodes to return.
 - **maxSiblings** (number) _(optional)_: The maximum number of siblings to return.
 
@@ -654,23 +664,25 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 
 ---
 
 ### `query_heapsnapshot_objects`
 
-**Description:** Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **className** (string) _(optional)_: Optional regex or text matching object class name.
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).
 - **pageIdx** (number) _(optional)_: The page index for pagination.
 - **pageSize** (number) _(optional)_: The page size for pagination.
@@ -739,7 +751,7 @@ in the DevTools Elements panel (if any).
 
 ### `execute_3p_developer_tool`
 
-**Description:** Executes a tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)
+**Description:** Executes a third-party developer tool exposed by the page. (requires flag: --categoryExperimentalThirdParty=true)
 
 **Parameters:**
 
@@ -751,9 +763,9 @@ in the DevTools Elements panel (if any).
 
 ### `list_3p_developer_tools`
 
-**Description:** Lists all third-party developer tools the page exposes for providing runtime information.
+**Description:** Lists all third-party developer tools the page exposes for providing runtime information (including debugging WebMCP tools and tools exposed via the 'devtoolstooldiscovery' event).
 Third-party developer tools can be called via the '[`execute_3p_developer_tool`](#execute_3p_developer_tool)()' MCP tool.
-Alternatively, third-party developer tools can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
+Alternatively, third-party developer tools exposed via the 'devtoolstooldiscovery' event can be executed by calling '[`evaluate_script`](#evaluate_script)' and adding the
 following command to the script:
 `window.__dtmcp.executeTool(toolName, params)`
 This might be helpful when the third-party developer tools return non-serializable values or when composing
@@ -771,7 +783,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `execute_webmcp_tool`
 
-**Description:** Executes a WebMCP tool exposed by the page. (requires flag: --categoryExperimentalWebmcp=true)
+**Description:** Executes a WebMCP tool exposed by the page (for debugging tools, use '[`execute_3p_developer_tool`](#execute_3p_developer_tool)'). (requires flag: --categoryExperimentalWebmcp=true)
 
 **Parameters:**
 
@@ -783,7 +795,7 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `list_webmcp_tools`
 
-**Description:** Lists all WebMCP tools the page exposes. (requires flag: --categoryExperimentalWebmcp=true)
+**Description:** Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via '[`list_3p_developer_tools`](#list_3p_developer_tools)'). (requires flag: --categoryExperimentalWebmcp=true)
 
 **Parameters:**
 

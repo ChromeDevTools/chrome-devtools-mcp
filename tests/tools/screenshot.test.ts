@@ -11,7 +11,7 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../../src/config/mcp-options.js';
+import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';

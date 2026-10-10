@@ -11,7 +11,8 @@ import {parseArgs} from 'node:util';
 
 import {GoogleGenAI, mcpToTool} from '@google/genai';
 
-import {Client, StdioClientTransport} from '../build/src/third_party/index.js';
+import {Client} from '@modelcontextprotocol/client';
+import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {TestServer} from '../build/tests/server.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');

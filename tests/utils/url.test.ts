@@ -96,6 +96,7 @@ describe('isLocalhost', () => {
 const defaultOptions = {
   javascriptEvaluation: undefined,
   categoryExtensions: undefined,
+  fileNavigations: undefined,
 };
 
 describe('validateUrl', () => {
@@ -143,6 +144,7 @@ describe('validateUrl', () => {
       validateUrl('javascript:alert(1)', {
         javascriptEvaluation: true,
         categoryExtensions: undefined,
+        fileNavigations: undefined,
       }).protocol,
       'javascript:',
     );
@@ -154,6 +156,7 @@ describe('validateUrl', () => {
       validateUrl('data:text/html,<div>test</div>', {
         javascriptEvaluation: true,
         categoryExtensions: undefined,
+        fileNavigations: undefined,
       }).protocol,
       'data:',
     );
@@ -165,6 +168,7 @@ describe('validateUrl', () => {
       validateUrl('vbscript:msgbox(1)', {
         javascriptEvaluation: true,
         categoryExtensions: undefined,
+        fileNavigations: undefined,
       }).protocol,
       'vbscript:',
     );
@@ -176,6 +180,7 @@ describe('validateUrl', () => {
         validateUrl('javascript:alert(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -184,6 +189,7 @@ describe('validateUrl', () => {
         validateUrl('JAVASCRIPT:alert(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -192,6 +198,7 @@ describe('validateUrl', () => {
         validateUrl('javascript:void(0)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to javascript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -200,6 +207,7 @@ describe('validateUrl', () => {
         validateUrl('data:text/html,<div>test</div>', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -208,6 +216,7 @@ describe('validateUrl', () => {
         validateUrl('DATA:text/html,<div>test</div>', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to data: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -216,6 +225,7 @@ describe('validateUrl', () => {
         validateUrl('vbscript:msgbox(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -224,6 +234,7 @@ describe('validateUrl', () => {
         validateUrl('VBSCRIPT:msgbox(1)', {
           javascriptEvaluation: false,
           categoryExtensions: undefined,
+          fileNavigations: undefined,
         }),
       /Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled\./,
     );
@@ -285,6 +296,7 @@ describe('validateUrl', () => {
         validateUrl('chrome-extension://abcdef/popup.html', {
           javascriptEvaluation: undefined,
           categoryExtensions: false,
+          fileNavigations: undefined,
         }),
       /Navigating to chrome-extension: URLs is not allowed without --categoryExtensions\./,
     );
@@ -292,8 +304,126 @@ describe('validateUrl', () => {
       validateUrl('chrome-extension://abcdef/popup.html', {
         javascriptEvaluation: undefined,
         categoryExtensions: true,
+        fileNavigations: undefined,
       }).href,
       'chrome-extension://abcdef/popup.html',
+    );
+  });
+
+  it('should allow file URLs when fileNavigations is true or omitted', () => {
+    assert.strictEqual(
+      validateUrl('file:///tmp/example.txt', defaultOptions).protocol,
+      'file:',
+    );
+    assert.strictEqual(
+      validateUrl('file:///tmp/example.txt', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: undefined,
+        fileNavigations: true,
+      }).href,
+      'file:///tmp/example.txt',
+    );
+  });
+
+  it('should reject file URLs when fileNavigations is false', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    assert.throws(
+      () => validateUrl('file:///tmp/example.txt', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    assert.throws(
+      () => validateUrl('file:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // The host form resolves to the same scheme and is rejected too.
+    assert.throws(
+      () => validateUrl('file://localhost/tmp/example.txt', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should reject view-source URLs that target a file URL when fileNavigations is false', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    // `view-source:` wraps the inner URL and Chrome resolves it, so this reads
+    // the file just as a bare `file:` URL would.
+    assert.throws(
+      () => validateUrl('view-source:file:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // An uppercase inner scheme normalises to `file:` when re-parsed.
+    assert.throws(
+      () => validateUrl('view-source:FILE:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // An uppercase outer scheme normalises too.
+    assert.throws(
+      () => validateUrl('VIEW-SOURCE:file:///etc/passwd', noFileNavigations),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+    // Nested wrapping unwraps to the same target.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:view-source:file:///etc/passwd',
+          noFileNavigations,
+        ),
+      /Navigating to file: URLs is not allowed when --file-navigations is disabled\./,
+    );
+  });
+
+  it('should not reject view-source URLs that target other schemes', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    assert.strictEqual(
+      validateUrl('view-source:http://example.com', noFileNavigations).protocol,
+      'view-source:',
+    );
+    assert.strictEqual(
+      validateUrl('view-source:https://example.com', noFileNavigations)
+        .protocol,
+      'view-source:',
+    );
+  });
+
+  it('should allow view-source of a file URL when fileNavigations is true', () => {
+    assert.strictEqual(
+      validateUrl('view-source:file:///etc/passwd', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: undefined,
+        fileNavigations: true,
+      }).protocol,
+      'view-source:',
+    );
+  });
+
+  it('should only reject file URLs when fileNavigations is false', () => {
+    const noFileNavigations = {
+      javascriptEvaluation: undefined,
+      categoryExtensions: undefined,
+      fileNavigations: false,
+    };
+    assert.strictEqual(
+      validateUrl('https://example.com', noFileNavigations).href,
+      'https://example.com/',
+    );
+    assert.strictEqual(
+      validateUrl('about:blank', noFileNavigations).href,
+      'about:blank',
+    );
+    assert.strictEqual(
+      validateUrl('data:text/html,<div>test</div>', noFileNavigations).protocol,
+      'data:',
     );
   });
 });
@@ -436,11 +566,14 @@ describe('isAllowedUrl', () => {
 });
 
 describe('findUnenforceablePattern', () => {
-  it('flags a hostname regexp group', () => {
-    assert.strictEqual(
-      findUnenforceablePattern([String.raw`*://(127\.\d+\.\d+\.\d+):*/*`]),
+  it('flags a regexp group', () => {
+    for (const pattern of [
       String.raw`*://(127\.\d+\.\d+\.\d+):*/*`,
-    );
+      '*://example.com/(foo|bar)',
+      '(http|https)://example.com/*',
+    ]) {
+      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+    }
   });
 
   it('returns the first offending pattern among several', () => {
@@ -454,56 +587,55 @@ describe('findUnenforceablePattern', () => {
     );
   });
 
-  it('allows an exact hostname', () => {
+  it('allows plain wildcard patterns', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://127.0.0.1:*/*']),
+      findUnenforceablePattern([
+        '*://127.0.0.1:*/*',
+        '*://*.example.com/*',
+        'https://127.0.0.1:8080/secret',
+      ]),
       undefined,
     );
   });
 
-  it('allows a wildcard hostname', () => {
+  it('flags a named group in any component', () => {
+    for (const pattern of [
+      '*://127.0.0.1::port/secret',
+      '*://127.0.0.1:{:port}/secret',
+      ':proto://example.com/*',
+      '*://:user@example.com/*',
+      '*://user::pass@example.com/*',
+      '*://:sub.example.com/*',
+      '*://{:sub}.example.com/*',
+      '*://127.0.0.:oct:*/blocked/:page',
+      '*://example.com/:path',
+      '*://example.com/{:path}',
+      '*://example.com/path?:query',
+      '*://example.com/path?token=:secret',
+      '*://example.com/*#:hash',
+    ]) {
+      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+    }
+  });
+
+  it('allows escaped colons unless an unescaped named group is also present', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://*.example.com/*']),
+      findUnenforceablePattern([
+        String.raw`http://[\:\:1]:8080/*`,
+        String.raw`*://example.com/path?foo=a\:b#bar\:c`,
+        String.raw`*://example.com/path?foo=a\\\:b#bar\\\:c`,
+      ]),
       undefined,
     );
-  });
-
-  it('allows a named group hostname', () => {
     assert.strictEqual(
-      findUnenforceablePattern(['*://:sub.example.com/*']),
-      undefined,
-    );
-  });
-
-  it('flags a regexp group in the pathname', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['*://example.com/(foo|bar)']),
-      '*://example.com/(foo|bar)',
-    );
-  });
-
-  it('flags a regexp group in the protocol', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['(http|https)://example.com/*']),
-      '(http|https)://example.com/*',
-    );
-  });
-
-  it('flags a regexp group in the port', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['*://example.com:(80|443)/*']),
-      '*://example.com:(80|443)/*',
-    );
-  });
-
-  it('flags a regexp group in the search or hash', () => {
-    assert.strictEqual(
-      findUnenforceablePattern(['*://example.com/*?(foo|bar)']),
-      '*://example.com/*?(foo|bar)',
+      findUnenforceablePattern([
+        String.raw`*://example.com/path?foo=a\:b&bar=:baz`,
+      ]),
+      String.raw`*://example.com/path?foo=a\:b&bar=:baz`,
     );
     assert.strictEqual(
-      findUnenforceablePattern(['*://example.com/*#(foo|bar)']),
-      '*://example.com/*#(foo|bar)',
+      findUnenforceablePattern([String.raw`*://example.com/path?foo\\:bar`]),
+      String.raw`*://example.com/path?foo\\:bar`,
     );
   });
 

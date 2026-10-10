@@ -5,47 +5,25 @@
  */
 
 import type {YargsOptions} from '../third_party/index.js';
-import {yargs, hideBin} from '../third_party/index.js';
 import os from 'node:os';
-import {readFileSync} from 'node:fs';
 import path from 'node:path';
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
 
-import {findUnenforceablePattern} from '../utils/url.js';
-
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
+import {puppeteerOptions} from './puppeteer-options.js';
+import {toolOptions} from './tool-options.js';
 
 export const mcpOptions = {
   ...getCategoryOptions(),
   ...getBrowserOptions(),
+  ...puppeteerOptions,
+  ...toolOptions,
   logFile: {
     type: 'string',
     describe:
       'Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
-  },
-  viewport: {
-    type: 'string',
-    describe:
-      'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
-    coerce: (arg: string | undefined) => {
-      if (arg === undefined) {
-        return;
-      }
-      const [width, height] = arg.split('x').map(Number);
-      if (!width || !height || Number.isNaN(width) || Number.isNaN(height)) {
-        throw new Error('Invalid viewport. Expected format is `1280x720`.');
-      }
-      return {
-        width,
-        height,
-      };
-    },
-  },
-  acceptInsecureCerts: {
-    type: 'boolean',
-    description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
   },
   pageIdRouting: {
     type: 'boolean',
@@ -62,10 +40,12 @@ export const mcpOptions = {
   },
   experimentalDevtools: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable automation over DevTools targets',
   },
   experimentalVision: {
     type: 'boolean',
+    default: false,
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
   },
@@ -82,12 +62,14 @@ export const mcpOptions = {
   },
   experimentalToonFormat: {
     type: 'boolean',
+    default: false,
     describe:
       'Deprecated: use --experimentalDataFormat=toon instead. Whether to format structured data using TOON (requires @toon-format/toon).',
     hidden: true,
   },
   experimentalDataFormat: {
     type: 'string',
+    defaultDescription: 'default',
     describe:
       'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
     choices: ['default', 'toon', 'gcf'] as const,
@@ -95,29 +77,30 @@ export const mcpOptions = {
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
+    default: false,
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
   },
   experimentalInteropTools: {
     type: 'boolean',
+    default: false,
     describe: 'Whether to enable interoperability tools',
     hidden: true,
   },
   experimentalScreencast: {
     type: 'boolean',
+    default: false,
     describe:
       'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
   },
   experimentalFfmpegPath: {
     type: 'string',
     describe: 'Path to ffmpeg executable for screencast recording.',
-    implies: 'experimentalScreencast',
   },
   experimentalScreencastFps: {
     type: 'number',
     describe:
       'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
-    implies: 'experimentalScreencast',
     coerce: (value: number | undefined) => {
       if (value === undefined) {
         return;
@@ -128,44 +111,6 @@ export const mcpOptions = {
         );
       }
       return value;
-    },
-  },
-  blockedUrlPattern: {
-    type: 'array',
-    string: true,
-    describe:
-      "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\\.\\d+\\.\\d+\\.\\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.",
-    conflicts: ['allowedUrlPattern'],
-    coerce: (arg: string[] | undefined) => {
-      if (arg === undefined) {
-        return undefined;
-      }
-      const pattern = findUnenforceablePattern(arg);
-      if (pattern) {
-        throw new Error(
-          `Invalid --blockedUrlPattern "${pattern}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*"/":name" wildcard instead.`,
-        );
-      }
-      return arg;
-    },
-  },
-  allowedUrlPattern: {
-    type: 'array',
-    string: true,
-    describe:
-      "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group in any component (for example `(127\\.\\d+\\.\\d+\\.\\d+)` in the hostname) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*`/`:name` wildcard instead.",
-    conflicts: ['blockedUrlPattern'],
-    coerce: (arg: string[] | undefined) => {
-      if (arg === undefined) {
-        return undefined;
-      }
-      const pattern = findUnenforceablePattern(arg);
-      if (pattern) {
-        throw new Error(
-          `Invalid --allowedUrlPattern "${pattern}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*"/":name" wildcard instead.`,
-        );
-      }
-      return arg;
     },
   },
   performanceCrux: {
@@ -186,6 +131,12 @@ export const mcpOptions = {
     describe:
       'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
   },
+  fileNavigations: {
+    type: 'boolean',
+    default: true,
+    describe:
+      'Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page and the slim navigate tool reject file: URLs, including view-source: URLs that target them. This restricts navigations the server performs. It is not a filesystem sandbox: it does not affect pages the browser already had open when the server connected, and the browser can reach the filesystem by other means. Use OS sandboxing for full filesystem confinement.',
+  },
   sourceMaps: {
     type: 'boolean',
     default: true,
@@ -204,70 +155,19 @@ export const mcpOptions = {
   },
   clearcutIncludePidHeader: {
     type: 'boolean',
+    default: false,
     hidden: true,
     describe: 'Include watchdog PID in Clearcut request headers (for testing).',
   },
-  screenshotFormat: {
-    type: 'string',
-    description:
-      'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
-    choices: ['jpeg', 'png', 'webp'] as const,
-  },
-  screenshotQuality: {
-    type: 'number',
-    description:
-      'Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.',
-    coerce: (value: number | undefined) => {
-      if (value === undefined) {
-        return;
-      }
-      if (!Number.isInteger(value) || value < 0 || value > 100) {
-        throw new Error(
-          `Invalid screenshotQuality ${value}. Expected an integer between 0 and 100.`,
-        );
-      }
-      return value;
-    },
-  },
-  screenshotMaxWidth: {
-    type: 'number',
-    description:
-      'Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.',
-    coerce: (value: number | undefined) => {
-      if (value === undefined) {
-        return;
-      }
-      if (!Number.isInteger(value) || value <= 0) {
-        throw new Error(
-          `Invalid screenshotMaxWidth ${value}. Expected a positive integer.`,
-        );
-      }
-      return value;
-    },
-  },
-  screenshotMaxHeight: {
-    type: 'number',
-    description:
-      'Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.',
-    coerce: (value: number | undefined) => {
-      if (value === undefined) {
-        return;
-      }
-      if (!Number.isInteger(value) || value <= 0) {
-        throw new Error(
-          `Invalid screenshotMaxHeight ${value}. Expected a positive integer.`,
-        );
-      }
-      return value;
-    },
-  },
   slim: {
     type: 'boolean',
+    default: false,
     describe:
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
   },
   viaCli: {
     type: 'boolean',
+    default: false,
     describe:
       'Set by Chrome DevTools CLI if the MCP server is started via the CLI client (this arg exists for usage stats)',
     hidden: true,
@@ -309,9 +209,10 @@ export const mcpOptions = {
   },
 } satisfies Record<string, YargsOptions>;
 
-export type ParsedArguments = ReturnType<typeof parseArguments>;
-
-export function getMcpOptionsForViaCli(): typeof mcpOptions {
+export function getMcpOptionsForViaCli(): Record<
+  keyof typeof mcpOptions,
+  YargsOptions
+> {
   if (!('default' in mcpOptions.headless)) {
     throw new Error('headless cli option unexpectedly does not have a default');
   }
@@ -319,9 +220,6 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
     throw new Error(
       'experimentalStructuredContent cli option unexpectedly does not have a default',
     );
-  }
-  if ('default' in mcpOptions.isolated) {
-    throw new Error('isolated cli option unexpectedly has a default');
   }
 
   return {
@@ -336,7 +234,8 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
     },
     categoryExtensions: {
       ...mcpOptions.categoryExtensions,
-      default: true,
+      defaultDescription:
+        'true unless autoConnect, browserUrl or wsEndpoint is set',
     },
     experimentalStructuredContent: {
       ...mcpOptions.experimentalStructuredContent,
@@ -346,6 +245,8 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
       ...mcpOptions.isolated,
       description:
         'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.',
+      defaultDescription:
+        'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
     },
   };
 }
@@ -353,9 +254,8 @@ export function getMcpOptionsForViaCli(): typeof mcpOptions {
 export function getCliOptions(): Partial<
   Record<keyof typeof mcpOptions, YargsOptions>
 > {
-  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> = {
-    ...getMcpOptionsForViaCli(),
-  };
+  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> =
+    withoutDefaults(getMcpOptionsForViaCli());
 
   // Missing CLI serialization.
   delete options.viewport;
@@ -364,201 +264,104 @@ export function getCliOptions(): Partial<
   delete options.experimentalStructuredContent;
   delete options.experimentalInteropTools;
 
-  const recordOptions: Record<string, YargsOptions | undefined> = options;
-  for (const [key, option] of Object.entries(recordOptions)) {
-    if (option?.default !== undefined) {
-      const copy: YargsOptions = {
-        ...option,
-        defaultDescription:
-          option.defaultDescription ?? JSON.stringify(option.default),
-      };
-      delete copy.default;
-      recordOptions[key] = copy;
-    }
-  }
-
   return options;
 }
 
-/**
- * Exported only for testing to not trigger process exit.
- */
-export function parser(
-  version: string,
-  argv = process.argv,
-  env = process.env,
-) {
-  const isViaCli = argv.includes('--viaCli') || argv.includes('--via-cli');
-  const options = isViaCli ? getMcpOptionsForViaCli() : mcpOptions;
+export const CLI_EXAMPLES: Array<[string, string]> = [
+  [
+    '$0 --browserUrl http://127.0.0.1:9222',
+    'Connect to an existing browser instance via HTTP',
+  ],
+  [
+    '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
+    'Connect to an existing browser instance via WebSocket',
+  ],
+  [
+    `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
+    'Connect via WebSocket with custom headers',
+  ],
+  ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
+  ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
+  ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
+  ['$0 --channel stable', 'Use stable Chrome installed on this system'],
+  ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
+  ['$0 --help', 'Print CLI options'],
+  [
+    '$0 --viewport 1280x720',
+    'Launch Chrome with the initial viewport size of 1280x720px',
+  ],
+  [
+    `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
+    'Launch Chrome without sandboxes. Use with caution.',
+  ],
+  [
+    `$0 --ignore-default-chrome-arg='--disable-extensions'`,
+    'Disable the default arguments provided by Puppeteer. Use with caution.',
+  ],
+  ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
+  ['$0 --no-category-performance', 'Disable tools in the performance category'],
+  ['$0 --no-category-network', 'Disable tools in the network category'],
+  ['$0 --user-data-dir=/tmp/user-data-dir', 'Use a custom user data directory'],
+  [
+    '$0 --auto-connect',
+    'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
+  ],
+  [
+    '$0 --auto-connect --channel=canary',
+    'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
+  ],
+  [
+    '$0 --no-usage-statistics',
+    'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
+  ],
+  [
+    '$0 --no-performance-crux',
+    'Disable CrUX (field data) integration in performance tools.',
+  ],
+  ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
+  [
+    '$0 --no-javascript-evaluation',
+    'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
+  ],
+  [
+    '$0 --slim',
+    'Only 3 tools: navigation, JavaScript execution and screenshot',
+  ],
+];
 
-  const yargsInstance = yargs(hideBin(argv))
-    .scriptName('npx chrome-devtools-mcp@latest')
-    .parserConfiguration({
-      'strip-aliased': true,
-      'strip-dashed': true,
-    })
-    .options(options)
-    .showHelpOnFail(false, 'Specify --help for available options')
-    .middleware(args => {
-      if (isViaCli) {
-        if (args.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
-          const cliFilesystemArgs: {
-            allowUnrestrictedPaths?: boolean;
-            filesystemRoot?: unknown;
-          } = args;
-          cliFilesystemArgs.allowUnrestrictedPaths = true;
-          cliFilesystemArgs.filesystemRoot = undefined;
-        }
-        // Defaults that cannot be set in options without affecting yargs conflict resolution.
-        if (
-          args.isolated === undefined &&
-          args.userDataDir === undefined &&
-          !args.autoConnect &&
-          !args.browserUrl &&
-          !args.wsEndpoint
-        ) {
-          args.isolated = true;
-        }
-      }
-      // We can't set default in the options else
-      // Yargs will complain
-      if (
-        !args.channel &&
-        !args.browserUrl &&
-        !args.wsEndpoint &&
-        !args.executablePath
-      ) {
-        args.channel = 'stable';
-      }
-      if (env['CI'] || env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-        console.error(
-          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-        );
-        args.usageStatistics = false;
-      }
+export const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
+  ['channel', 'executablePath', 'browserUrl', 'wsEndpoint'],
+  ['userDataDir', 'browserUrl', 'wsEndpoint'],
+  ['userDataDir', 'isolated'],
+  ['autoConnect', 'isolated'],
+  ['autoConnect', 'executablePath'],
+  ['blockedUrlPattern', 'allowedUrlPattern'],
+  ['allowUnrestrictedPaths', 'filesystemRoot'],
+  ['categoryPwa', 'autoConnect'],
+  ['categoryPwa', 'browserUrl', 'wsEndpoint'],
+  ['categoryExtensions', 'autoConnect'],
+  ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
+];
 
-      const cliOptionsAllowedArgs = [
-        ...Object.keys(options),
-        // Yargs populated with positional args
-        '_',
-        '$0',
-      ];
+export const IMPLICATIONS: Array<
+  [keyof typeof mcpOptions, keyof typeof mcpOptions]
+> = [
+  ['wsHeaders', 'wsEndpoint'],
+  ['experimentalFfmpegPath', 'experimentalScreencast'],
+  ['experimentalScreencastFps', 'experimentalScreencast'],
+];
 
-      const unknownArgs = Object.keys(args).filter(
-        arg => !cliOptionsAllowedArgs.includes(arg),
-      );
-
-      if (unknownArgs.length > 0) {
-        console.error(
-          `Unknown arguments: ${unknownArgs.map(arg => `--${arg}`)}`,
-        );
-      }
-    })
-    .example([
-      [
-        '$0 --browserUrl http://127.0.0.1:9222',
-        'Connect to an existing browser instance via HTTP',
-      ],
-      [
-        '$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123',
-        'Connect to an existing browser instance via WebSocket',
-      ],
-      [
-        `$0 --wsEndpoint ws://127.0.0.1:9222/devtools/browser/abc123 --wsHeaders '{"Authorization":"Bearer token"}'`,
-        'Connect via WebSocket with custom headers',
-      ],
-      ['$0 --channel beta', 'Use Chrome Beta installed on this system'],
-      ['$0 --channel canary', 'Use Chrome Canary installed on this system'],
-      ['$0 --channel dev', 'Use Chrome Dev installed on this system'],
-      ['$0 --channel stable', 'Use stable Chrome installed on this system'],
-      ['$0 --logFile /tmp/log.txt', 'Save logs to a file'],
-      ['$0 --help', 'Print CLI options'],
-      [
-        '$0 --viewport 1280x720',
-        'Launch Chrome with the initial viewport size of 1280x720px',
-      ],
-      [
-        `$0 --chrome-arg='--no-sandbox' --chrome-arg='--disable-setuid-sandbox'`,
-        'Launch Chrome without sandboxes. Use with caution.',
-      ],
-      [
-        `$0 --ignore-default-chrome-arg='--disable-extensions'`,
-        'Disable the default arguments provided by Puppeteer. Use with caution.',
-      ],
-      ['$0 --no-category-emulation', 'Disable tools in the emulation category'],
-      [
-        '$0 --no-category-performance',
-        'Disable tools in the performance category',
-      ],
-      ['$0 --no-category-network', 'Disable tools in the network category'],
-      [
-        '$0 --user-data-dir=/tmp/user-data-dir',
-        'Use a custom user data directory',
-      ],
-      [
-        '$0 --auto-connect',
-        'Connect to a stable Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --auto-connect --channel=canary',
-        'Connect to a canary Chrome instance (Chrome 144+) running instead of launching a new instance',
-      ],
-      [
-        '$0 --no-usage-statistics',
-        'Do not send usage statistics https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics.',
-      ],
-      [
-        '$0 --no-performance-crux',
-        'Disable CrUX (field data) integration in performance tools.',
-      ],
-      ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
-      [
-        '$0 --no-javascript-evaluation',
-        'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
-      ],
-      [
-        '$0 --slim',
-        'Only 3 tools: navigation, JavaScript execution and screenshot',
-      ],
-    ]);
-
-  return yargsInstance
-    .config('config', 'Path to JSON configuration file', configPath => {
-      try {
-        const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
-        if (
-          typeof parsed !== 'object' ||
-          parsed === null ||
-          Array.isArray(parsed)
-        ) {
-          throw new Error('Config must be a JSON object');
-        }
-
-        yargs()
-          .parserConfiguration({
-            'strip-aliased': true,
-            'camel-case-expansion': false,
-          })
-          .options(options)
-          .config(parsed)
-          .strict()
-          .fail(false)
-          .exitProcess(false)
-          .parseSync([]);
-        return parsed;
-      } catch (err) {
-        throw new Error(`Invalid JSON config file: ${(err as Error).message}`);
-      }
-    })
-    .wrap(Math.min(120, yargsInstance.terminalWidth()))
-    .help()
-    .version(version);
-}
-
-export function parseArguments(
-  version: string,
-  argv = process.argv,
-  env = process.env,
-) {
-  return parser(version, argv, env).parseSync();
+export function withoutDefaults(
+  options: Record<string, YargsOptions>,
+): Record<string, YargsOptions> {
+  const result: Record<string, YargsOptions> = {};
+  for (const [key, option] of Object.entries(options)) {
+    const copy: YargsOptions = {...option};
+    if (copy.default !== undefined) {
+      copy.defaultDescription ??= JSON.stringify(copy.default);
+      delete copy.default;
+    }
+    result[key] = copy;
+  }
+  return result;
 }

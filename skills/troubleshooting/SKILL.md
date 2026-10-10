@@ -41,9 +41,9 @@ If the server starts successfully but `list_pages` returns an empty list or crea
 - **Check for flag typos:** For example, `--autoBronnect` instead of `--autoConnect`.
 - **Verify the configuration:** Ensure the arguments match the expected flags exactly.
 
-#### Symptom: Missing Tools / Only 9 tools available
+#### Symptom: Missing Tools / Only a few tools available
 
-If the server starts successfully but only a limited subset of tools (like `list_pages`, `get_console_message`, `lighthouse_audit`, `take_heapsnapshot`) are available, this is likely because the MCP client is enforcing a **read-only mode**.
+If the server starts successfully but only a limited subset of tools (like `list_pages`, `list_console_messages`, `get_console_message`, `list_network_requests`) are available, this is likely because the MCP client is enforcing a **read-only mode**.
 
 All tools in `chrome-devtools-mcp` are annotated with `readOnlyHint: true` (for safe, non-modifying tools) or `readOnlyHint: false` (for tools that modify browser state, like `emulate`, `click`, `navigate_page`). To access the full suite of tools, the user must disable read-only mode in their MCP client (e.g., by exiting "Plan Mode" in Gemini CLI or adjusting their client's tool safety settings).
 
@@ -59,7 +59,7 @@ If the tools related to extensions (like `install_extension`) are not available,
 Identify other error messages from the failed tool call or the MCP initialization logs:
 
 - `Target closed`
-- "Tool not found" (check if they are using `--slim` which only enables navigation and screenshot tools).
+- "Tool not found" (check if they are using `--slim` which only enables navigation, script evaluation and screenshot tools).
 - Missing `pageId`: Page-scoped tools require a `pageId` argument. Call `list_pages` to find active page IDs.
 - `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`
 - `Error [ERR_MODULE_NOT_FOUND]: Cannot find module`
@@ -89,7 +89,7 @@ _If you are unsure of the user's configuration, ask the user to provide their cu
 If the issue is still unclear, run diagnostic commands to test the server directly:
 
 - Run `npx chrome-devtools-mcp@latest --help` to verify the installation and Node.js environment.
-- If you need more information, run `DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs. Analyze the output for errors.
+- If you need more information, run `NODE_DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs. Analyze the output for errors.
 
 ### Step 6: Check GitHub for Existing Issues
 

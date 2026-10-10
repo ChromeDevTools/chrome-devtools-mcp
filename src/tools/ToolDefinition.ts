@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/mcp-options.js';
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -16,7 +16,10 @@ import type {
 import type {McpPage} from '../McpPage.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
-import type {ContextFilterOptions} from '../formatters/HeapSnapshotFormatter.js';
+import type {
+  ContextFilterOptions,
+  HeapSnapshotFormatOptions,
+} from '../formatters/HeapSnapshotFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -32,14 +35,15 @@ import type {
   DevTools,
   Protocol,
   Page,
+  WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
-  ExtensionServiceWorker,
   CD4ACommentThread,
 } from '../types.js';
+import type {McpWorker} from '../McpWorker.js';
 import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
@@ -84,7 +88,12 @@ export interface BaseToolDefinition<
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
-    conditions?: string[];
+    /**
+     * If `'slim'` is included, the tool is only available with `--slim`. Tools
+     * without `'slim'` are only available without `--slim`. Slim tools may
+     * reuse the names of other tools, see {@link isAvailableInMode}.
+     */
+    conditions?: Array<keyof ParsedArguments>;
   };
   schema: Schema;
   blockedByDialog: boolean;
@@ -159,20 +168,23 @@ export interface Response {
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
   setHeapSnapshotDetailedClassDiff(
@@ -180,10 +192,13 @@ export interface Response {
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotContextAnalysis(
     analysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
-    options?: PaginationOptions & ContextFilterOptions,
+    options?: PaginationOptions &
+      ContextFilterOptions &
+      HeapSnapshotFormatOptions,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -276,6 +291,7 @@ export type Context = Readonly<{
     clientProvidedFilePath: string,
     extension: SupportedExtensions,
   ): Promise<{filename: string}>;
+  loadResource(path: string): Promise<string>;
 
   getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
   setScreenRecorder(
@@ -287,10 +303,8 @@ export type Context = Readonly<{
   listExtensions(): Promise<Map<string, Extension>>;
   getExtension(id: string): Promise<Extension | undefined>;
   getSelectedMcpPage(): McpPage;
-  getExtensionServiceWorkers(): ExtensionServiceWorker[];
-  getExtensionServiceWorkerId(
-    extensionServiceWorker: ExtensionServiceWorker,
-  ): string | undefined;
+  getWorkers(): McpWorker[];
+  getWorkerById(id: string): McpWorker | undefined;
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
@@ -396,6 +410,7 @@ export type ContextPage = Readonly<{
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult>;
+  getWebMcpTools(): WebMCPTool[];
   getThirdPartyDeveloperTools(): ToolGroups;
 
   executeThirdPartyDeveloperTool(
@@ -456,7 +471,7 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
     return {
       ...tool,
       schema: {
-        ...(args.pageIdRouting && !args.slim ? pageIdSchema : {}),
+        ...(args.pageIdRouting && !isSlimTool(tool) ? pageIdSchema : {}),
         ...tool.schema,
       },
       pageScoped: true,
@@ -550,4 +565,23 @@ export function geolocationTransform(arg: string | undefined) {
     latitude,
     longitude,
   };
+}
+
+export function isSlimTool(
+  tool: Pick<BaseToolDefinition, 'annotations'>,
+): boolean {
+  return Boolean(tool.annotations.conditions?.includes('slim'));
+}
+
+/**
+ * Slim mode replaces the regular tools with the slim tools. Only the tools of
+ * the current mode are registered, so a slim tool may share its name with a
+ * regular tool. `--slim` requires a restart, so the mode never changes while
+ * the server is running.
+ */
+export function isAvailableInMode(
+  tool: Pick<BaseToolDefinition, 'annotations'>,
+  serverArgs: Pick<ParsedArguments, 'slim'>,
+): boolean {
+  return isSlimTool(tool) === Boolean(serverArgs.slim);
 }
