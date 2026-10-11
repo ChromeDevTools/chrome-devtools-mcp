@@ -1366,6 +1366,15 @@ describe('McpResponse heap snapshot formatting', () => {
       objectCount: 15,
       totalSelfSize: 150,
     });
+    assert.deepStrictEqual(Reflect.get(structuredContent, 'heapSnapshotData'), [
+      {
+        id: 1,
+        className: 'ObjectA',
+        count: 10,
+        selfSize: 100,
+        retainedSize: 1000,
+      },
+    ]);
   });
 
   it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {

@@ -49,12 +49,27 @@ function truncateValue(value: string, maxLength = MAX_NAME_LENGTH): string {
   return value.slice(0, maxLength) + '...';
 }
 
+function formatCsvCell(
+  value: string | number | boolean,
+  alwaysQuote = false,
+): string {
+  const text = String(value);
+  if (!alwaysQuote && !/[",\r\n]/.test(text)) {
+    return text;
+  }
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function formatCsvRow(values: Array<string | number | boolean>): string {
+  return values.map(value => formatCsvCell(value)).join(',');
+}
+
 export interface FormattedSnapshotEntry {
   className: string;
   id?: number;
   count: number;
-  selfSize: string;
-  retainedSize: string;
+  selfSize: number;
+  retainedSize: number;
 }
 
 export interface ContextAnalysisReport {
@@ -160,11 +175,25 @@ export class HeapSnapshotFormatter {
     for (const item of items) {
       if (isNodeLike(item)) {
         lines.push(
-          `${item.id},${formatName(item.name, options)},${item.type},${item.distance},${formatBytesToKb(item.selfSize)},${formatBytesToKb(item.retainedSize)}`,
+          formatCsvRow([
+            item.id,
+            formatName(item.name, options),
+            item.type,
+            item.distance,
+            formatBytesToKb(item.selfSize),
+            formatBytesToKb(item.retainedSize),
+          ]),
         );
       } else if (isEdgeLike(item)) {
         lines.push(
-          `${formatName(item.name, options)},${item.type},${item.node.id},${formatName(item.node.name, options)},${formatBytesToKb(item.node.selfSize)},${formatBytesToKb(item.node.retainedSize)}`,
+          formatCsvRow([
+            formatName(item.name, options),
+            item.type,
+            item.node.id,
+            formatName(item.node.name, options),
+            formatBytesToKb(item.node.selfSize),
+            formatBytesToKb(item.node.retainedSize),
+          ]),
         );
       }
     }
@@ -206,7 +235,12 @@ export class HeapSnapshotFormatter {
     lines.push('nodeId,nodeName,selfSize,retainedSize');
     for (const node of dominators) {
       lines.push(
-        `${node.nodeId},${formatName(node.nodeName, options)},${formatBytesToKb(node.selfSize)},${formatBytesToKb(node.retainedSize)}`,
+        formatCsvRow([
+          node.nodeId,
+          formatName(node.nodeName, options),
+          formatBytesToKb(node.selfSize),
+          formatBytesToKb(node.retainedSize),
+        ]),
       );
     }
     return lines.join('\n');
@@ -223,7 +257,14 @@ export class HeapSnapshotFormatter {
       const truncated = group.truncated ?? false;
       const displayValue = truncateValue(group.value, options.maxNameLength);
       lines.push(
-        `${JSON.stringify(displayValue)},${group.count},${formatBytesToKb(group.totalSelfSize)},${formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}`,
+        [
+          formatCsvCell(displayValue, true),
+          formatCsvCell(group.count),
+          formatCsvCell(formatBytesToKb(group.totalSelfSize)),
+          formatCsvCell(formatBytesToKb(group.totalRetainedSize)),
+          formatCsvCell(truncated),
+          formatCsvCell(nodeIds),
+        ].join(','),
       );
     }
     return lines.join('\n');
@@ -240,7 +281,13 @@ export class HeapSnapshotFormatter {
     );
     for (const nc of sortedContexts) {
       lines.push(
-        `${nc.nodeId},${formatName(nc.nodeName, options)},${formatBytesToKb(nc.selfSize)},${formatBytesToKb(nc.retainedSize)},${formatBytesToKb(nc.attributedSize)}`,
+        formatCsvRow([
+          nc.nodeId,
+          formatName(nc.nodeName, options),
+          formatBytesToKb(nc.selfSize),
+          formatBytesToKb(nc.retainedSize),
+          formatBytesToKb(nc.attributedSize),
+        ]),
       );
     }
     lines.push(`Shared Size: ${formatBytesToKb(sizes.sharedSize)}`);
@@ -277,7 +324,13 @@ export class HeapSnapshotFormatter {
     for (const info of sorted) {
       const id = info[stableIdSymbol] ?? '';
       lines.push(
-        `${id},${info.name},${info.count},${formatBytesToKb(info.self)},${formatBytesToKb(info.maxRet)}`,
+        formatCsvRow([
+          id,
+          info.name,
+          info.count,
+          formatBytesToKb(info.self),
+          formatBytesToKb(info.maxRet),
+        ]),
       );
     }
 
@@ -290,8 +343,8 @@ export class HeapSnapshotFormatter {
       id: info[stableIdSymbol],
       className: info.name,
       count: info.count,
-      selfSize: formatBytesToKb(info.self),
-      retainedSize: formatBytesToKb(info.maxRet),
+      selfSize: info.self,
+      retainedSize: info.maxRet,
     }));
   }
 
@@ -315,7 +368,16 @@ export class HeapSnapshotFormatter {
     let index = 0;
     for (const diff of diffs) {
       lines.push(
-        `${index},${diff.className},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
+        formatCsvRow([
+          index,
+          diff.className,
+          diff.addedCount,
+          diff.removedCount,
+          diff.countDelta,
+          formatBytesToKb(diff.addedSize),
+          formatBytesToKb(diff.removedSize),
+          formatBytesToKb(diff.sizeDelta),
+        ]),
       );
       index++;
     }

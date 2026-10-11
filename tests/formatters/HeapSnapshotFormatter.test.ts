@@ -19,7 +19,10 @@ import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
-import {createMockContextAnalysisResult} from '../mocks.js';
+import {
+  createMockContextAnalysisResult,
+  createMockNativeContextSizes,
+} from '../mocks.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -89,6 +92,27 @@ describe('HeapSnapshotFormatter', () => {
       const result = formatter.toString();
       t.assert.snapshot(result);
     });
+
+    it('escapes commas in names and grouped sizes', () => {
+      const aggregates = {
+        Item: {
+          ...mockAggregates.ObjectA,
+          name: 'Item, "large"',
+          count: 1,
+          self: 1_000_000,
+          maxRet: 2_400_000,
+        },
+      };
+      const result = new HeapSnapshotFormatter(aggregates).toString();
+
+      assert.equal(
+        result,
+        [
+          'id,name,count,selfSize,retainedSize',
+          `1,"Item, ""large""",1,${JSON.stringify(formatBytesToKb(1_000_000))},${JSON.stringify(formatBytesToKb(2_400_000))}`,
+        ].join('\n'),
+      );
+    });
   });
 
   describe('toJSON', () => {
@@ -100,15 +124,37 @@ describe('HeapSnapshotFormatter', () => {
           id: 1,
           className: 'ObjectA',
           count: 10,
-          selfSize: formatBytesToKb(100),
-          retainedSize: formatBytesToKb(1000),
+          selfSize: 100,
+          retainedSize: 1000,
         },
         {
           id: 2,
           className: 'ObjectB',
           count: 5,
-          selfSize: formatBytesToKb(50),
-          retainedSize: formatBytesToKb(500),
+          selfSize: 50,
+          retainedSize: 500,
+        },
+      ]);
+    });
+
+    it('returns sizes as raw bytes for structured consumers', () => {
+      const aggregates = {
+        Item: {
+          ...mockAggregates.ObjectA,
+          name: 'Item, "large"',
+          count: 1,
+          self: 1_000_000,
+          maxRet: 2_400_000,
+        },
+      };
+
+      assert.deepStrictEqual(new HeapSnapshotFormatter(aggregates).toJSON(), [
+        {
+          id: 1,
+          className: 'Item, "large"',
+          count: 1,
+          selfSize: 1_000_000,
+          retainedSize: 2_400_000,
         },
       ]);
     });
@@ -193,6 +239,28 @@ describe('HeapSnapshotFormatter', () => {
       assert.ok(summarizedJson);
       assert.equal(summarizedJson.includes('addedIndexes'), false);
       assert.equal(summarizedJson.includes('deletedIndexes'), false);
+    });
+
+    it('escapes commas and quotes in class names and grouped sizes', () => {
+      const result = HeapSnapshotFormatter.formatDiffSummary([
+        {
+          className: 'Class, "large"',
+          addedCount: 1,
+          removedCount: 0,
+          countDelta: 1,
+          addedSize: 2_400_000,
+          removedSize: 0,
+          sizeDelta: 2_400_000,
+        },
+      ]);
+
+      assert.equal(
+        result,
+        [
+          'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
+          `0,"Class, ""large""",1,0,1,${JSON.stringify(formatBytesToKb(2_400_000))},${formatBytesToKb(0)},${JSON.stringify(formatBytesToKb(2_400_000))}`,
+        ].join('\n'),
+      );
     });
   });
 
@@ -373,6 +441,33 @@ describe('HeapSnapshotFormatter', () => {
       ].join('\n');
 
       assert.strictEqual(result, expected);
+    });
+
+    it('escapes commas in names and grouped sizes', () => {
+      const mockSizes = createMockNativeContextSizes();
+      mockSizes.nativeContexts.push({
+        nodeId: 10,
+        nodeIndex: 1,
+        nodeName: 'system / NativeContext, http://example.com',
+        attributedSize: 2_400_000,
+        retainedSize: 2_400_000,
+        selfSize: 1_000_000,
+      });
+
+      const result = HeapSnapshotFormatter.formatNativeContextSizes(
+        mockSizes,
+        {},
+      );
+
+      assert.equal(
+        result,
+        [
+          'nodeId,nodeName,selfSize,retainedSize,attributedSize',
+          `10,"system / NativeContext, http://example.com",${JSON.stringify(formatBytesToKb(1_000_000))},${JSON.stringify(formatBytesToKb(2_400_000))},${JSON.stringify(formatBytesToKb(2_400_000))}`,
+          `Shared Size: ${formatBytesToKb(0)}`,
+          `Unattributed Size: ${formatBytesToKb(0)}`,
+        ].join('\n'),
+      );
     });
   });
 
