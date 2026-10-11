@@ -104,10 +104,10 @@ To verify that no non-essential or tracking cookies are set before consent or wh
      - `SchemefulSameSite`: Cross-scheme cookie issues.
      - `PartitionedCookies`: Invalid CHIPS partitioning attributes.
 2. **Deep Audit: Lighthouse Third-Party Cookies**:
-   - Run `lighthouse_audit` with `mode: "navigation"` and `outputDirPath: "/tmp/lh-report"`.
+   - Run `lighthouse_audit` with `mode: "navigation"` and omit `outputDirPath`. Use the JSON report path at `reports[0]` in the tool result.
    - **Extract the specific cookie audit** without loading the full report into context:
      ```bash
-     node -e "const r=require('/tmp/lh-report/report.json'); const a=r.audits['third-party-cookies']; console.log(JSON.stringify({score: a?.score, displayValue: a?.displayValue, items: a?.details?.items}))"
+     node -e "const r=require(process.argv[1]); const a=r.audits['third-party-cookies']; console.log(JSON.stringify({score: a?.score, displayValue: a?.displayValue, items: a?.details?.items}))" "<reports[0] JSON path>"
      ```
 
 ### 4. Client-Side Cookie Inspection & Manipulation

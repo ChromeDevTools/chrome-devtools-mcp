@@ -19,7 +19,7 @@ Start by running a Lighthouse accessibility audit to get a comprehensive baselin
 
 1.  Run the audit:
     - Set `mode` to `"navigation"` to refresh the page and capture load issues.
-    - Set `outputDirPath` (e.g., `/tmp/lh-report`) to save the full JSON report.
+    - Omit `outputDirPath` to save reports under the permitted temporary directory. Use the JSON report path at `reports[0]` in the tool result below.
 2.  **Analyze the Summary**:
     - Check `scores` (0-1 scale). A score < 1 indicates violations.
     - Review `audits.failed` count.
@@ -27,7 +27,7 @@ Start by running a Lighthouse accessibility audit to get a comprehensive baselin
     - **Parsing**: Do not read the entire file line-by-line. Use a CLI tool like `jq` or a Node.js one-liner to filter for failures:
       ```bash
       # Extract failing audits with their details
-      node -e "const r=require('./report.json'); Object.values(r.audits).filter(a=>a.score!==null && a.score<1).forEach(a=>console.log(JSON.stringify({id:a.id, title:a.title, items:a.details?.items})))"
+      node -e "const r=require(process.argv[1]); Object.values(r.audits).filter(a=>a.score!==null && a.score<1).forEach(a=>console.log(JSON.stringify({id:a.id, title:a.title, items:a.details?.items})))" "<reports[0] JSON path>"
       ```
     - This efficiently extracts the `selector` and `snippet` of failing elements without loading the full report into context.
 
