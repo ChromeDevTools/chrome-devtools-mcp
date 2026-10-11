@@ -107,6 +107,11 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
       }
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('ENOENT') && message.includes('ffmpeg')) {
+        if (args?.experimentalFfmpegPath !== undefined) {
+          throw new Error(
+            `ffmpeg configured with --experimentalFfmpegPath could not be run at "${args.experimentalFfmpegPath}".`,
+          );
+        }
         throw new Error(
           'ffmpeg is required for screencast recording but was not found. ' +
             'Install ffmpeg (https://ffmpeg.org/) and ensure it is available in your PATH.',

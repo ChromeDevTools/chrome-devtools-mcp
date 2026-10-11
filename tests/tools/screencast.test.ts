@@ -201,7 +201,11 @@ describe('screencast', () => {
           response,
           context,
         ),
-        /ffmpeg is required for screencast recording/,
+        error =>
+          error instanceof Error &&
+          error.message ===
+            'ffmpeg is required for screencast recording but was not found. ' +
+              'Install ffmpeg (https://ffmpeg.org/) and ensure it is available in your PATH.',
       );
 
       sinon.assert.calledOnceWithExactly(
@@ -209,6 +213,40 @@ describe('screencast', () => {
         filePath,
         '.mp4',
       );
+      sinon.assert.notCalled(context.setScreenRecorder);
+    });
+
+    it('names a configured ffmpeg path when it cannot be run', async () => {
+      const {page, context, response} = createScreencastMocks();
+      const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
+      context.ensureExtension.resolves(filePath);
+
+      const experimentalFfmpegPath = '/custom/path/to/ffmpeg';
+      const args = new ConfigParser('test', [
+        'node',
+        'test',
+        '--experimental-screencast',
+        `--experimental-ffmpeg-path=${experimentalFfmpegPath}`,
+      ]).parse();
+      page.pptrPage.screencast.rejects(
+        new Error(`spawn ${experimentalFfmpegPath} ENOENT`),
+      );
+
+      await assert.rejects(
+        startScreencast(args).handler(
+          {
+            params: {filePath},
+            page,
+          },
+          response,
+          context,
+        ),
+        error =>
+          error instanceof Error &&
+          error.message ===
+            `ffmpeg configured with --experimentalFfmpegPath could not be run at "${experimentalFfmpegPath}".`,
+      );
+
       sinon.assert.notCalled(context.setScreenRecorder);
     });
 
