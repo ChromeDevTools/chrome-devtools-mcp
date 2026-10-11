@@ -436,14 +436,28 @@ describe('e2e', () => {
   });
 
   describe('Dialogs', () => {
+    function getFirstText(
+      result: Awaited<ReturnType<Client['callTool']>>,
+    ): string {
+      const first = Array.isArray(result.content)
+        ? result.content[0]
+        : undefined;
+      return first && 'text' in first && typeof first.text === 'string'
+        ? first.text
+        : '';
+    }
+
     async function createNewPageAndTriggerDialog(client: Client) {
       // Navigate to a page with a button that triggers a dialog on click
-      await client.callTool({
+      const newPageResult = await client.callTool({
         name: 'new_page',
         arguments: {
           url: `data:text/html,<button id="test" onclick="alert('test dialog')">Click me</button>`,
         },
       });
+      if (newPageResult.isError) {
+        throw new Error(getFirstText(newPageResult));
+      }
 
       const snapshotResult = await client.callTool({
         name: 'take_snapshot',
@@ -451,8 +465,11 @@ describe('e2e', () => {
           pageId: 2,
         },
       });
+      if (snapshotResult.isError) {
+        throw new Error(getFirstText(snapshotResult));
+      }
 
-      const snapshotText = (snapshotResult.content as TextContent[])[0].text;
+      const snapshotText = getFirstText(snapshotResult);
       const match = snapshotText.match(/uid=(\d+_\d+)\s+button "Click me"/);
       const uid = match ? match[1] : '1_1';
 
@@ -464,6 +481,9 @@ describe('e2e', () => {
           uid,
         },
       });
+      if (result.isError) {
+        throw new Error(getFirstText(result));
+      }
 
       return result;
     }

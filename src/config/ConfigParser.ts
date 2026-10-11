@@ -187,7 +187,10 @@ export class ConfigParser {
     }
 
     if (isViaCli) {
-      if (resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT) {
+      if (
+        resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
+        explicitArgs.allowUnrestrictedPaths !== false
+      ) {
         resolvedArgs.allowUnrestrictedPaths = true;
         resolvedArgs.filesystemRoot = undefined;
       }
@@ -215,6 +218,13 @@ export class ConfigParser {
         "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
       );
       resolvedArgs.usageStatistics = false;
+    }
+
+    if (
+      resolvedArgs.categoryExperimentalThirdParty === undefined &&
+      this.env['CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY']
+    ) {
+      resolvedArgs.categoryExperimentalThirdParty = true;
     }
 
     // The merge and the default loop lose the static type that yargs infers from

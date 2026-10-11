@@ -425,6 +425,30 @@ describe('cli args parsing', () => {
     assert.strictEqual(disabledArgs.usageStatistics, false);
   });
 
+  it('respects CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY env variable', async () => {
+    const enabledByEnv = parseConfig([], {
+      CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY: 'true',
+    });
+    assert.strictEqual(enabledByEnv.categoryExperimentalThirdParty, true);
+
+    const disabledByCli = parseConfig(
+      ['--no-category-experimental-third-party'],
+      {
+        CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY: 'true',
+      },
+    );
+    assert.strictEqual(disabledByCli.categoryExperimentalThirdParty, false);
+
+    using testConfig = createTempFile(
+      JSON.stringify({categoryExperimentalThirdParty: false}),
+      'cd4a.test.config.third-party.json',
+    );
+    const disabledByConfig = parseConfig(['--config', testConfig.path], {
+      CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY: 'true',
+    });
+    assert.strictEqual(disabledByConfig.categoryExperimentalThirdParty, false);
+  });
+
   it('parses performance crux flag', async () => {
     const defaultArgs = parseConfig(['main.js']);
     assert.strictEqual(defaultArgs.performanceCrux, true);

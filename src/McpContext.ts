@@ -357,16 +357,36 @@ export class McpContext implements Context {
     return !!(this.#options.allowlist || this.#options.blocklist);
   }
 
-  installPWA(options: InstallPWAOptions): Promise<string> {
-    return this.browser.installPWA(options);
+  async installPWA(options: InstallPWAOptions): Promise<string> {
+    try {
+      return await this.browser.installPWA(options);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Couldn't fetch install info")
+      ) {
+        return await this.browser.installPWA(options);
+      }
+      throw error;
+    }
   }
 
   uninstallPWA(options: UninstallPWAOptions): Promise<void> {
     return this.browser.uninstallPWA(options);
   }
 
-  launchPWA(options: LaunchPWAOptions): Promise<Page> {
-    return this.browser.launchPWA(options);
+  async launchPWA(options: LaunchPWAOptions): Promise<Page> {
+    const page = await this.browser.launchPWA(options);
+    if (!page.url() || page.url() === 'about:blank') {
+      await page
+        .waitForNavigation({
+          timeout: this.#options.navigationTimeout ?? 10_000,
+        })
+        .catch(() => {
+          // Ignore timeout if navigation already completed or failed.
+        });
+    }
+    return page;
   }
 
   getPWAState(options: GetPWAStateOptions): Promise<PWAState> {

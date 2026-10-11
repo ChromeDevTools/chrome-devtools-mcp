@@ -53,6 +53,8 @@ import {
   Target,
   TargetType,
   WebWorker,
+  WebMCP,
+  WebMCPTool,
 } from '../src/third_party/index.js';
 import type {
   Browser,
@@ -144,6 +146,14 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   browser.process.returns(null);
 
   const browserListener = mockListener();
+  browser.on.callsFake((eventName, handler) => {
+    browserListener.on(eventName, handler);
+    return browser;
+  });
+  browser.off.callsFake((eventName, handler) => {
+    browserListener.off(eventName, handler);
+    return browser;
+  });
   browser.once.callsFake((eventName, handler) => {
     const onceHandler = (data: unknown) => {
       browserListener.off(eventName, onceHandler);
@@ -160,7 +170,9 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   return browser;
 }
 
-export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
+export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
+  webmcp: sinon.SinonStubbedInstance<WebMCP>;
+} {
   const page = sinon.createStubInstance(
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
@@ -215,7 +227,31 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   // @ts-expect-error internal API
   page._client = sinon.stub().returns(cdpSession);
 
-  return page;
+  const webmcp = sinon.createStubInstance(WebMCP);
+  webmcp.tools.returns([]);
+  Object.defineProperty(page, 'webmcp', {
+    value: webmcp,
+    writable: true,
+    configurable: true,
+  });
+
+  page.evaluateHandle.resolves(createMockElementHandle().handle);
+
+  return Object.assign(page, {webmcp});
+}
+
+export function createMockWebMCPTool(options: {
+  name: string;
+  description?: string;
+  inputSchema?: object;
+  annotations?: Protocol.WebMCP.Annotation & {debugging?: boolean};
+}): sinon.SinonStubbedInstance<WebMCPTool> {
+  const tool = sinon.createStubInstance(WebMCPTool);
+  tool.name = options.name;
+  tool.description = options.description ?? '';
+  tool.inputSchema = options.inputSchema;
+  tool.annotations = options.annotations;
+  return tool;
 }
 
 export class MockTarget extends Target {
@@ -276,6 +312,7 @@ export function createMockMcpPage(
   } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
+  page.emulationSettings = {};
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
@@ -289,6 +326,7 @@ export function createMockMcpPage(
     await action(new AbortController().signal);
     return {};
   });
+  page.getWebMcpTools.returns([]);
   Object.defineProperty(page, 'pptrPage', {
     value: pptrPage,
     writable: true,
@@ -317,6 +355,7 @@ export function createMockElementHandle(): {
 } {
   const handle =
     sinon.createStubInstance<ElementHandle<Element>>(ElementHandle);
+  handle.remoteObject.returns({type: 'object', objectId: '<mock-object-id>'});
   handle.dispose.resolves();
   const locator = sinon.createStubInstance<Locator<Element>>(Locator);
   locator.setTimeout.returns(locator);

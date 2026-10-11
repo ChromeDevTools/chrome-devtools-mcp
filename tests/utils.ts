@@ -148,6 +148,8 @@ export async function withBrowser(
       const isRetryable =
         error instanceof Error &&
         (error.message === 'withBrowser timeout exceeded' ||
+          error.message.includes('Navigation timeout') ||
+          error.message.includes("Couldn't fetch install info") ||
           error.message.includes('closed') ||
           error.message.includes('crash') ||
           error.message.includes('hang'));
@@ -210,7 +212,12 @@ export async function withMcpContext(
 
     response.setPage(context.getSelectedMcpPage());
 
-    await cb(response, context, parsedArgs);
+    try {
+      await cb(response, context, parsedArgs);
+    } finally {
+      context.dispose();
+      context = undefined;
+    }
   }, options);
 }
 
