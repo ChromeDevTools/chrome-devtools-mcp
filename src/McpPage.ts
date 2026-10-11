@@ -4,6 +4,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
+import {
+  createTargetUniverse,
+  type TargetUniverse,
+} from './devtools/DevtoolsUtils.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './collectors/PageCollector.js';
+import {TextSnapshot} from './TextSnapshot.js';
+import type {Locator} from './third_party/index.js';
+import {
+  PredefinedNetworkConditions,
+  type Dialog,
+  type ElementHandle,
+  type Viewport,
+  type WebMCPTool,
+  type Protocol,
+  type Page,
+  type Target,
+  type ConsoleMessage,
+  type HTTPRequest,
+  DevTools,
+  type JSONSchema7Definition,
+} from './third_party/index.js';
+import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
+import type {
+  ContextPage,
+  DevToolsData,
+  MatchedStyles,
+  Response,
+} from './tools/ToolDefinition.js';
+import type {
+  EmulationSettings,
+  GeolocationOptions,
+  TextSnapshotNode,
+} from './types.js';
+import {logger} from './utils/logger.js';
+import {
+  getNetworkMultiplierFromString,
+  WaitForHelper,
+  type WaitForEventsResult,
+  type DialogAction,
+} from './utils/WaitForHelper.js';
+
+const DEFAULT_TIMEOUT = 5_000;
+const NAVIGATION_TIMEOUT = 10_000;
+
 export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   if (typeof schema === 'boolean') {
     return;
@@ -55,53 +105,13 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
-import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
-import {
-  createTargetUniverse,
-  type TargetUniverse,
-} from './devtools/DevtoolsUtils.js';
-import {
-  ConsoleCollector,
-  NetworkCollector,
-  type ListenerMap,
-  type UncaughtError,
-} from './collectors/PageCollector.js';
-import {TextSnapshot} from './TextSnapshot.js';
-import type {Locator} from './third_party/index.js';
-import {
-  PredefinedNetworkConditions,
-  type Dialog,
-  type ElementHandle,
-  type Viewport,
-  type WebMCPTool,
-  type Protocol,
-  type Page,
-  type ConsoleMessage,
-  type HTTPRequest,
-  DevTools,
-  type JSONSchema7Definition,
-} from './third_party/index.js';
-import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
-const DEFAULT_TIMEOUT = 5_000;
-const NAVIGATION_TIMEOUT = 10_000;
-import type {
-  ContextPage,
-  DevToolsData,
-  MatchedStyles,
-  Response,
-} from './tools/ToolDefinition.js';
-import type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshotNode,
-} from './types.js';
-import {logger} from './utils/logger.js';
-import {
-  getNetworkMultiplierFromString,
-  WaitForHelper,
-  type WaitForEventsResult,
-  type DialogAction,
-} from './utils/WaitForHelper.js';
+function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
+  return Boolean(
+    tool.annotations &&
+    'debugging' in tool.annotations &&
+    tool.annotations.debugging === true,
+  );
+}
 
 function isBackendNodeId(
   id: unknown,
@@ -115,11 +125,16 @@ function isBackendNodeId(
  *
  * Internal class consumed only by McpContext. Fields are public for direct
  * read/write access. The dialog field is private because it requires an
- * event listener lifecycle managed by the constructor/dispose pair.
+ * event listener lifecycle managed by the init/dispose pair.
  */
 export class McpPage implements ContextPage {
-  readonly pptrPage: Page;
+  readonly target: Target;
   readonly id: number;
+
+  #pptrPage?: Page;
+  #initPromise?: Promise<void>;
+  #disposed = false;
+  #closed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
@@ -137,10 +152,10 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  thirdPartyDeveloperTools: ToolGroups = [];
+  eventBasedThirdPartyTools: ToolGroups = [];
 
-  networkCollector: NetworkCollector;
-  consoleCollector: ConsoleCollector;
+  #networkCollector?: NetworkCollector;
+  #consoleCollector?: ConsoleCollector;
 
   #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
@@ -150,7 +165,7 @@ export class McpPage implements ContextPage {
   #onNotification?: (message: string) => void;
 
   constructor(
-    page: Page,
+    target: Target,
     id: number,
     options: {
       hasNetworkBlockOrAllowlist: boolean;
@@ -166,35 +181,127 @@ export class McpPage implements ContextPage {
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
     this.#onNotification = options.onNotification;
-    this.pptrPage = page;
+    this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
-    page.on('dialog', this.#dialogHandler);
+  }
 
-    this.networkCollector = new NetworkCollector(page);
-    this.consoleCollector = new ConsoleCollector(page, collect => {
-      return {
-        console: event => {
-          collect(event);
-        },
-        uncaughtError: event => {
-          collect(event);
-        },
-        devtoolsAggregatedIssue: event => {
-          collect(event);
-        },
-      } as ListenerMap;
-    });
+  get pptrPage(): Page {
+    if (!this.#pptrPage) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#pptrPage;
+  }
+
+  get networkCollector(): NetworkCollector {
+    if (!this.#networkCollector) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#networkCollector;
+  }
+
+  set networkCollector(collector: NetworkCollector) {
+    this.#networkCollector = collector;
+  }
+
+  get consoleCollector(): ConsoleCollector {
+    if (!this.#consoleCollector) {
+      throw new Error(
+        `McpPage (id=${this.id}) is not initialized. Call init() first.`,
+      );
+    }
+    return this.#consoleCollector;
+  }
+
+  url(): string {
+    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+  }
+
+  getTitle(): string {
+    // @ts-expect-error internal types
+    const info = this.target._getTargetInfo();
+    return info.title !== this.target.url() ? info.title : '';
+  }
+
+  isClosed(): boolean {
+    if (this.#closed) {
+      return true;
+    }
+    if (this.#pptrPage) {
+      return this.#pptrPage.isClosed();
+    }
+    return this.#disposed;
+  }
+
+  async close(): Promise<void> {
+    this.#closed = true;
+    const page =
+      this.#pptrPage ??
+      (await this.target.page()) ??
+      (await this.target.asPage());
+    this.dispose();
+    await page?.close({runBeforeUnload: false});
   }
 
   async init(): Promise<void> {
+    if (this.#disposed) {
+      throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
+    }
+    if (this.#initPromise) {
+      return this.#initPromise;
+    }
+    this.#initPromise = this.#doInit();
+    try {
+      await this.#initPromise;
+    } catch (err) {
+      this.#initPromise = undefined;
+      throw err;
+    }
+  }
+
+  async #doInit(): Promise<void> {
+    if (!this.#pptrPage) {
+      const page = (await this.target.page()) ?? (await this.target.asPage());
+      if (!page) {
+        throw new Error(
+          `Failed to initialize Puppeteer Page for target ${this.target.url()}`,
+        );
+      }
+      if (this.#disposed) {
+        return;
+      }
+      this.#pptrPage = page;
+      page.on('dialog', this.#dialogHandler);
+      this.#networkCollector = new NetworkCollector(page);
+      this.#consoleCollector = new ConsoleCollector(page, collect => {
+        return {
+          console: event => {
+            collect(event);
+          },
+          uncaughtError: event => {
+            collect(event);
+          },
+          devtoolsAggregatedIssue: event => {
+            collect(event);
+          },
+        };
+      });
+    }
+    this.updateTimeouts();
     await Promise.allSettled([
       this.#initDevToolsUniverseNoThrow(),
       this.#initFocusEmulationNoThrow(),
     ]);
+    if (this.#disposed) {
+      this.dispose();
+    }
   }
 
   async #initFocusEmulationNoThrow(): Promise<void> {
@@ -238,8 +345,34 @@ export class McpPage implements ContextPage {
     }
   }
 
+  #getDebuggingWebMcpToolGroups(): ToolGroups {
+    if (!this.#pptrPage) {
+      return [];
+    }
+    const webmcpTools = this.#pptrPage.webmcp
+      .tools()
+      .filter(isDebuggingWebMcpTool);
+    if (webmcpTools.length === 0) {
+      return [];
+    }
+    return [
+      {
+        name: 'WebMCP Tools',
+        description: 'Tools exposed via WebMCP',
+        tools: webmcpTools.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: structuredClone(tool.inputSchema ?? {}),
+        })),
+      },
+    ];
+  }
+
   getThirdPartyDeveloperTools(): ToolGroups {
-    return this.thirdPartyDeveloperTools;
+    return [
+      ...this.#getDebuggingWebMcpToolGroups(),
+      ...this.eventBasedThirdPartyTools,
+    ];
   }
 
   async getToolGroups(): Promise<ToolGroups> {
@@ -247,15 +380,16 @@ export class McpPage implements ContextPage {
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
     const client = this.pptrPage._client();
-    const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
+    const {listeners = []}: {listeners?: Protocol.DOMDebugger.EventListener[]} =
       await client.send('DOMDebugger.getEventListeners', {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      return [];
+      this.eventBasedThirdPartyTools = [];
+      return this.getThirdPartyDeveloperTools();
     }
 
-    const toolGroups = await this.pptrPage.evaluate(() => {
+    const eventToolGroups = await this.pptrPage.evaluate(() => {
       if (window.__dtmcp) {
         window.__dtmcp.toolGroups = [];
       }
@@ -332,19 +466,21 @@ export class McpPage implements ContextPage {
       });
     });
 
-    for (const group of toolGroups) {
+    for (const group of eventToolGroups) {
       for (const tool of group.tools ?? []) {
         replaceHtmlElementsWithUids(tool.inputSchema);
       }
     }
 
-    this.thirdPartyDeveloperTools = toolGroups;
+    this.eventBasedThirdPartyTools = eventToolGroups;
 
-    return toolGroups;
+    return this.getThirdPartyDeveloperTools();
   }
 
   getWebMcpTools(): WebMCPTool[] {
-    return this.pptrPage.webmcp.tools();
+    return this.pptrPage.webmcp
+      .tools()
+      .filter(tool => !isDebuggingWebMcpTool(tool));
   }
 
   resolveCdpRequestId(cdpRequestId: string): number | undefined {
@@ -496,11 +632,12 @@ export class McpPage implements ContextPage {
   }
 
   dispose(): void {
+    this.#disposed = true;
     this.#commentBridge?.dispose();
     this.#commentBridge = undefined;
-    this.pptrPage.off('dialog', this.#dialogHandler);
-    this.networkCollector.dispose();
-    this.consoleCollector.dispose();
+    this.#pptrPage?.off('dialog', this.#dialogHandler);
+    this.#networkCollector?.dispose();
+    this.#consoleCollector?.dispose();
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     devtoolsUniverse?.universe.dispose();
@@ -514,6 +651,22 @@ export class McpPage implements ContextPage {
     params: Record<string, unknown>,
     response: Response,
   ): Promise<void> {
+    const webmcpTool = this.pptrPage.webmcp
+      .tools()
+      .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
+    if (webmcpTool) {
+      const {status, output, errorText} = await webmcpTool.execute(params);
+      if (status !== 'Completed') {
+        throw new Error(errorText || `Tool execution failed: ${status}`);
+      }
+      if (output !== undefined) {
+        response.appendResponseLine(JSON.stringify(output, null, 2));
+      } else {
+        response.appendResponseLine('Tool returned no result.');
+      }
+      return;
+    }
+
     // Creates array of ElementHandles from the UIDs in the params.
     // We do not replace the uids with the ElementsHandles yet, because
     // the `evaluate` function only turns them into DOM elements if they
@@ -550,29 +703,23 @@ export class McpPage implements ContextPage {
 
         const toolResult = await window.__dtmcp.executeTool(name, args);
 
+        const stashedElements: Element[] = [];
+
         const stashDOMElement = (el: Element) => {
-          if (!window.__dtmcp) {
-            window.__dtmcp = {};
-          }
-          if (window.__dtmcp.stashedElements === undefined) {
-            window.__dtmcp.stashedElements = [];
-          }
-          window.__dtmcp.stashedElements.push(el);
+          stashedElements.push(el);
           return {
-            stashedId: `stashed-${window.__dtmcp.stashedElements.length - 1}`,
+            stashedId: `stashed-${stashedElements.length - 1}`,
           };
         };
 
-        const ancestors: unknown[] = [];
+        const ancestors = new Set<unknown>();
         // Recursively walks the tool result:
         // - Replaces DOM elements with an ID and stashes the DOM element on the window object
         // - Replaces non-plain objects with a string representation of the object
         // - Replaces circular references with the string '<Circular reference>'
         // - Replaces functions with the string '<Function object>'
-        const processToolResult = (
-          data: unknown,
-          parentEl?: unknown,
-        ): unknown => {
+        // - Replaces symbols and bigints with their string representation
+        const processToolResult = (data: unknown): unknown => {
           // 1. Handle DOM Elements
           if (data instanceof Element) {
             return stashDOMElement(data);
@@ -580,31 +727,38 @@ export class McpPage implements ContextPage {
 
           // 2. Handle Arrays
           if (Array.isArray(data)) {
-            return data.map((item: unknown) =>
-              processToolResult(item, parentEl),
-            );
+            if (ancestors.has(data)) {
+              return '<Circular reference>';
+            }
+            ancestors.add(data);
+            try {
+              return data.map((item: unknown) => processToolResult(item));
+            } finally {
+              ancestors.delete(data);
+            }
           }
 
           // 3. Handle Objects
           if (data !== null && typeof data === 'object') {
-            while (ancestors.length > 0 && ancestors.at(-1) !== parentEl) {
-              ancestors.pop();
+            const proto = Object.getPrototypeOf(data);
+            // If not a plain object, return a string representation of the object
+            if (proto !== null && proto !== Object.prototype) {
+              return `<${data.constructor?.name || 'Object'} instance>`;
             }
-            if (ancestors.includes(data)) {
+
+            if (ancestors.has(data)) {
               return '<Circular reference>';
             }
-            ancestors.push(data);
-
-            // If not a plain object, return a string representation of the object
-            if (Object.getPrototypeOf(data) !== Object.prototype) {
-              return `<${data.constructor.name} instance>`;
+            ancestors.add(data);
+            try {
+              const processedObj: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(data)) {
+                processedObj[key] = processToolResult(value);
+              }
+              return processedObj;
+            } finally {
+              ancestors.delete(data);
             }
-
-            const processedObj: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(data)) {
-              processedObj[key] = processToolResult(value, data);
-            }
-            return processedObj;
           }
 
           // 4. Handle Functions
@@ -612,13 +766,27 @@ export class McpPage implements ContextPage {
             return '<Function object>';
           }
 
-          // 5. Return primitives (strings, numbers, booleans) as-is
+          // 5. Handle Symbols and BigInts (not JSON/CDP-by-value serializable)
+          if (typeof data === 'symbol') {
+            return data.toString();
+          }
+          if (typeof data === 'bigint') {
+            return `${data.toString()}n`;
+          }
+
+          // 6. Return primitives (strings, numbers, booleans, undefined, null) as-is
           return data;
         };
 
+        const processed = processToolResult(toolResult);
+        const serialized =
+          processed !== undefined ? JSON.stringify(processed) : undefined;
+        if (stashedElements.length > 0) {
+          window.__dtmcp.stashedElements = stashedElements;
+        }
         return {
-          result: processToolResult(toolResult),
-          stashed: window.__dtmcp?.stashedElements?.length ?? 0,
+          result: serialized,
+          stashed: stashedElements.length,
         };
       },
       toolName,
@@ -627,22 +795,30 @@ export class McpPage implements ContextPage {
     );
 
     const elementHandles: ElementHandle[] = [];
-    for (let i = 0; i < (result.stashed ?? 0); i++) {
-      const elementHandle = await this.pptrPage.evaluateHandle(index => {
-        const el = window.__dtmcp?.stashedElements?.[index];
-        if (!el) {
-          throw new Error(`Stashed element at index ${index} not found`);
+    if (result.stashed > 0) {
+      try {
+        for (let i = 0; i < result.stashed; i++) {
+          const elementHandle = await this.pptrPage.evaluateHandle(index => {
+            const el = window.__dtmcp?.stashedElements?.[index];
+            if (!el) {
+              throw new Error(`Stashed element at index ${index} not found`);
+            }
+            return el;
+          }, i);
+          elementHandles.push(elementHandle);
         }
-        return el;
-      }, i);
-      elementHandles.push(elementHandle);
-    }
-
-    await this.pptrPage.evaluate(() => {
-      if (window.__dtmcp) {
-        window.__dtmcp.stashedElements = undefined;
+      } finally {
+        try {
+          await this.pptrPage.evaluate(() => {
+            if (window.__dtmcp) {
+              window.__dtmcp.stashedElements = undefined;
+            }
+          });
+        } catch (error) {
+          logger?.('Failed to clean up stashed elements', error);
+        }
       }
-    });
+    }
 
     if (elementHandles.length) {
       using stack = new DisposableStack();
@@ -699,8 +875,13 @@ export class McpPage implements ContextPage {
       return node;
     };
 
-    const resultWithUids = recursivelyReplaceStashedElements(result.result);
-    response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
+    if (result.result !== undefined) {
+      const parsedResult: unknown = JSON.parse(result.result);
+      const resultWithUids = recursivelyReplaceStashedElements(parsedResult);
+      response.appendResponseLine(JSON.stringify(resultWithUids, null, 2));
+    } else {
+      response.appendResponseLine('Tool returned no result.');
+    }
   }
 
   async getElementByUid(uid: string): Promise<ElementHandle<Element>> {
@@ -741,12 +922,18 @@ export class McpPage implements ContextPage {
   async resolveBackendNodeId(
     backendNodeId: number,
   ): Promise<string | undefined> {
-    if (!this.textSnapshot) {
-      this.textSnapshot = await TextSnapshot.create(this);
+    let id = this.textSnapshot?.resolveCdpElementId(backendNodeId);
+    if (id) {
+      return id;
     }
-    let id = this.textSnapshot.resolveCdpElementId(backendNodeId);
-    if (!id) {
-      this.textSnapshot = await TextSnapshot.create(this);
+    this.textSnapshot = await TextSnapshot.create(this, {
+      verbose: this.textSnapshot?.verbose ?? false,
+    });
+    id = this.textSnapshot.resolveCdpElementId(backendNodeId);
+    if (!id && !this.textSnapshot.verbose) {
+      this.textSnapshot = await TextSnapshot.create(this, {
+        verbose: true,
+      });
       id = this.textSnapshot.resolveCdpElementId(backendNodeId);
     }
     return id;
@@ -755,7 +942,7 @@ export class McpPage implements ContextPage {
   async resolveUidToBackendNodeId(
     uid: string,
   ): Promise<{backendNodeId: number; targetId?: string} | undefined> {
-    const target = this.pptrPage.target();
+    const target = this.target;
     const targetId =
       Boolean(target) &&
       '_targetId' in target &&
@@ -996,17 +1183,20 @@ export class McpPage implements ContextPage {
   }
 
   updateTimeouts() {
+    if (!this.#pptrPage) {
+      return;
+    }
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.pptrPage.setDefaultNavigationTimeout(
+    this.#pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }

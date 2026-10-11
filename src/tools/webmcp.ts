@@ -11,7 +11,7 @@ import {definePageTool} from './ToolDefinition.js';
 
 export const listWebMcpTools = definePageTool(() => ({
   name: 'list_webmcp_tools',
-  description: `Lists all WebMCP tools the page exposes.`,
+  description: `Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via 'list_3p_developer_tools').`,
   annotations: {
     category: ToolCategory.WEBMCP,
     readOnlyHint: true,
@@ -26,7 +26,7 @@ export const listWebMcpTools = definePageTool(() => ({
 
 export const executeWebMcpTool = definePageTool(() => ({
   name: 'execute_webmcp_tool',
-  description: `Executes a WebMCP tool exposed by the page.`,
+  description: `Executes a WebMCP tool exposed by the page (for debugging tools, use 'execute_3p_developer_tool').`,
   annotations: {
     category: ToolCategory.WEBMCP,
     readOnlyHint: false,
@@ -47,7 +47,11 @@ export const executeWebMcpTool = definePageTool(() => ({
     if (request.params.input) {
       try {
         const parsed = JSON.parse(request.params.input);
-        if (typeof parsed === 'object' && parsed !== null) {
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          !Array.isArray(parsed)
+        ) {
           input = parsed;
         } else {
           throw new Error('Parsed input is not an object');
@@ -58,7 +62,7 @@ export const executeWebMcpTool = definePageTool(() => ({
       }
     }
 
-    const tools = request.page.pptrPage.webmcp.tools();
+    const tools = request.page.getWebMcpTools();
     const tool = tools.find(t => t.name === toolName);
     if (!tool) {
       throw new Error(`Tool ${toolName} not found`);

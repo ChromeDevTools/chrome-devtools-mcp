@@ -11,6 +11,7 @@ import sinon from 'sinon';
 
 import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
+import {stableIdSymbol} from '../../src/utils/id.js';
 
 describe('HeapSnapshotManager', () => {
   afterEach(() => {
@@ -86,6 +87,72 @@ describe('HeapSnapshotManager', () => {
       });
     } finally {
       manager.dispose();
+    }
+  });
+
+  it('resolves class IDs in getNodesById without calling getAggregates first', async () => {
+    const manager1 = new HeapSnapshotManager();
+    const manager2 = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const {aggregates} = await manager1.getAggregates(filePath);
+      const functionAggregate = Object.values(aggregates).find(
+        a => a.name === 'Function',
+      );
+      assert.ok(functionAggregate);
+      const classId = functionAggregate[stableIdSymbol];
+      assert.ok(classId !== undefined);
+
+      const expectedNodes = await manager1.getNodesById(filePath, classId);
+      const nodesWithoutPriorAggregates = await manager2.getNodesById(
+        filePath,
+        classId,
+      );
+
+      assert.ok(nodesWithoutPriorAggregates.items.length > 0);
+      assert.deepStrictEqual(
+        nodesWithoutPriorAggregates.items,
+        expectedNodes.items,
+      );
+    } finally {
+      manager1.dispose();
+      manager2.dispose();
+    }
+  });
+
+  it('assigns deterministic class IDs even when getAggregates is called with a filter first', async () => {
+    const unfilteredFirstManager = new HeapSnapshotManager();
+    const filteredFirstManager = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const unfilteredFirst =
+        await unfilteredFirstManager.getAggregates(filePath);
+
+      const filteredFirst = await filteredFirstManager.getAggregates(
+        filePath,
+        'sharedNativeContext',
+      );
+      const unfilteredSecond =
+        await filteredFirstManager.getAggregates(filePath);
+
+      for (const [key, aggregate] of Object.entries(filteredFirst.aggregates)) {
+        assert.strictEqual(
+          aggregate[stableIdSymbol],
+          unfilteredFirst.aggregates[key]?.[stableIdSymbol],
+        );
+      }
+
+      for (const [key, aggregate] of Object.entries(
+        unfilteredSecond.aggregates,
+      )) {
+        assert.strictEqual(
+          aggregate[stableIdSymbol],
+          unfilteredFirst.aggregates[key]?.[stableIdSymbol],
+        );
+      }
+    } finally {
+      unfilteredFirstManager.dispose();
+      filteredFirstManager.dispose();
     }
   });
 

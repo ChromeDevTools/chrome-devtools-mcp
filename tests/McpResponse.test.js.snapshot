@@ -367,7 +367,7 @@ exports[`McpResponse > returns correctly formatted snapshot for a simple tree 2`
 exports[`McpResponse > returns values for textboxes 1`] = `
 ## Latest page snapshot
 uid=1_0 RootWebArea "My test page" url="about:blank"
-  uid=1_1 StaticText "username"
+  uid=1_1 "username"
   uid=1_2 textbox "username" focusable focused value="mcp"
 
 `;
@@ -404,7 +404,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 ignored
     uid=1_2 ignored
       uid=1_3 complementary
-        uid=1_4 StaticText "test"
+        uid=1_4 "test"
           uid=1_5 InlineTextBox "test"
 
 `;
@@ -467,7 +467,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
   uid=1_1 ignored
     uid=1_2 ignored
       uid=1_3 complementary
-        uid=1_4 StaticText "test"
+        uid=1_4 "test"
           uid=1_5 InlineTextBox "test"
 
 `;
@@ -1401,7 +1401,7 @@ exports[`third-party developer tools > lists third-party developer tools 2`] = `
 
 exports[`webmcp > includes webmcp tools in list_pages response 1`] = `
 ## Pages
-1: My test page (about:blank) [selected]
+1: about:blank [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1412,7 +1412,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "My test page",
+      "title": "",
       "selected": true
     }
   ],
@@ -1433,7 +1433,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
 exports[`webmcp > includes webmcp tools in navigate_page response 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: My test page (about:blank) [selected]
+1: about:blank [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1445,7 +1445,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "My test page",
+      "title": "",
       "selected": true
     }
   ],
@@ -1465,7 +1465,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
 
 exports[`webmcp > includes webmcp tools in select_page response 1`] = `
 ## Pages
-1: My test page (about:blank) [selected]
+1: about:blank [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1476,7 +1476,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "My test page",
+      "title": "",
       "selected": true
     }
   ],
@@ -1497,7 +1497,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: My test page (about:blank) [selected]
+1: about:blank [selected]
 `;
 
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
@@ -1507,7 +1507,7 @@ exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "My test page",
+      "title": "",
       "selected": true
     }
   ]

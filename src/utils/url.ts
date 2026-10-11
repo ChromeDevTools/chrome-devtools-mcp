@@ -52,6 +52,7 @@ export function isLocalhost(url?: string): boolean {
 export interface ValidateUrlOptions {
   javascriptEvaluation: boolean | undefined;
   categoryExtensions: boolean | undefined;
+  fileNavigations: boolean | undefined;
 }
 
 export interface IsAllowedUrlOptions {
@@ -113,18 +114,20 @@ export function isAllowedUrl(
 const DISALLOWED_PROTOCOLS = new Set(['javascript:', 'data:', 'vbscript:']);
 
 /**
- * Finds the first pattern that uses a URLPattern regexp group (for example
- * `(127\.\d+\.\d+\.\d+)`) in any component -- protocol, username, password,
- * hostname, port, pathname, search, or hash. Chromium's
- * `SimpleUrlPatternMatcher::Component::Create` rejects any component whose
- * `HasRegexGroups()` is true and silently drops the rule, so
- * `Network.emulateNetworkConditionsByRule` does not enforce these patterns
- * on redirects or subresources, unlike the initial navigation check. A plain
- * wildcard (`*`) or named group (`:name`) has no regexp group and is
- * unaffected.
+ * Checks whether a compiled URLPattern component contains an unescaped `:`
+ * (which always represents a `:name` group in URLPattern syntax).
+ */
+function hasNamedGroup(component: string): boolean {
+  return component.replaceAll('\\\\', '').replaceAll('\\:', '').includes(':');
+}
+
+/**
+ * Finds the first pattern that Chrome can't enforce on redirects or subresources:
+ * - Any pattern containing a regexp group (for example `(foo|bar)`).
+ * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/*`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
- * @returns The first unenforceable pattern, or undefined if all are safe.
+ * @returns The first unenforceable pattern, or undefined if all are valid.
  * @throws Error if a pattern's syntax is invalid (via `new URLPattern`).
  */
 export function findUnenforceablePattern(
@@ -135,21 +138,58 @@ export function findUnenforceablePattern(
     if (parsed.hasRegExpGroups) {
       return raw;
     }
+    const components = [
+      parsed.protocol,
+      parsed.username,
+      parsed.password,
+      parsed.hostname,
+      parsed.port,
+      parsed.pathname,
+      parsed.search,
+      parsed.hash,
+    ];
+    if (components.some(hasNamedGroup)) {
+      return raw;
+    }
   }
   return undefined;
+}
+
+/**
+ * Reports whether a URL ultimately targets the `file:` scheme.
+ *
+ * `view-source:` wraps another URL and Chrome resolves the inner target, so
+ * `view-source:file:///etc/passwd` reads the file just as `file:///etc/passwd`
+ * does. The inner URL is re-parsed rather than string-matched so that an
+ * uppercase inner scheme (`view-source:FILE:///etc/passwd`) is normalised.
+ *
+ * @param url The already-parsed URL to inspect.
+ * @returns true if the URL, after unwrapping any `view-source:` prefixes, uses `file:`.
+ */
+function targetsFileScheme(url: URL): boolean {
+  let current = url;
+  // Bounded in case of a pathologically nested `view-source:` chain.
+  for (let i = 0; i < 5 && current.protocol === 'view-source:'; i++) {
+    try {
+      current = new URL(current.pathname);
+    } catch {
+      return false;
+    }
+  }
+  return current.protocol === 'file:';
 }
 
 /**
  * Validates a URL string by parsing it with `new URL` and checking for disallowed protocols and restricted schemes.
  *
  * @param url The URL string to validate.
- * @param options Options object containing javascriptEvaluation and categoryExtensions.
+ * @param options Options object containing javascriptEvaluation, categoryExtensions and fileNavigations.
  * @returns The parsed URL.
  * @throws Error if the URL does not parse with `new URL`, or if JavaScript evaluation is disabled and a disallowed URL is passed,
- * or if navigating to a restricted scheme.
+ * or if file navigations are disabled and a `file:` URL is passed, or if navigating to a restricted scheme.
  */
 export function validateUrl(url: string, options: ValidateUrlOptions): URL {
-  const {javascriptEvaluation, categoryExtensions} = options;
+  const {javascriptEvaluation, categoryExtensions, fileNavigations} = options;
 
   let parsed: URL;
   try {
@@ -166,6 +206,12 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
   ) {
     throw new Error(
       `Navigating to ${parsed.protocol} URLs is not allowed when JavaScript evaluation is disabled.`,
+    );
+  }
+
+  if (fileNavigations === false && targetsFileScheme(parsed)) {
+    throw new Error(
+      `Navigating to file: URLs is not allowed when --file-navigations is disabled.`,
     );
   }
 

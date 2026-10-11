@@ -143,6 +143,14 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "source_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "format",
+        "argType": "string"
       }
     ]
   },
@@ -833,6 +841,10 @@
       {
         "name": "object_id",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -879,6 +891,10 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -887,6 +903,10 @@
     "args": [
       {
         "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -935,6 +955,10 @@
       {
         "name": "max_siblings",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -973,6 +997,10 @@
       {
         "name": "retained_size_length",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -985,6 +1013,10 @@
       },
       {
         "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -1052,6 +1084,10 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -1064,6 +1100,10 @@
       },
       {
         "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -1178,6 +1218,10 @@
       {
         "name": "self_size_length",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -1219,6 +1263,58 @@
       },
       {
         "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "get_devtools_comments",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "open_devtools",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "resolve_devtools_comment",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "thread_id_length",
+        "argType": "number"
+      },
+      {
+        "name": "reply_text_length",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "reveal_in_devtools",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "panel_name_length",
         "argType": "number"
       }
     ]

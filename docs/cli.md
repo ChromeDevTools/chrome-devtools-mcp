@@ -111,10 +111,13 @@ If the CLI hangs or fails to connect, try stopping the background process:
 chrome-devtools stop
 ```
 
-For more verbose logs, set the `DEBUG` environment variable:
+For more verbose logs, set the `NODE_DEBUG` environment variable. The background
+process does not write to the terminal, so restart it with `--logFile` to
+capture its logs in a file:
 
 ```sh
-DEBUG=* chrome-devtools list_pages
+NODE_DEBUG=* chrome-devtools start --logFile=/tmp/chrome-devtools.log
+chrome-devtools list_pages
 ```
 
 ## CLI generation

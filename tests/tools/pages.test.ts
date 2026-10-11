@@ -11,7 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {parseArguments} from '../../src/config/mcp-options.js';
+import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {
   listPages,
   newPage,
@@ -246,11 +246,11 @@ describe('pages', () => {
     });
     it('throws when navigating to a javascript URL and javascriptEvaluation is false', async () => {
       await withMcpContext(async (response, context) => {
-        const disabledArgs = parseArguments(
+        const disabledArgs = new ConfigParser(
           '1.0.0',
           ['node', 'script.js', '--no-javascript-evaluation'],
           {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
+        ).parse();
         const tool = newPage(disabledArgs);
         await assert.rejects(
           async () => {
@@ -289,6 +289,42 @@ describe('pages', () => {
           {
             message:
               'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
+          },
+        );
+      });
+    });
+    it('throws when navigating to a file URL and fileNavigations is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const disabledArgs = new ConfigParser(
+          '1.0.0',
+          ['node', 'script.js', '--no-file-navigations'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        ).parse();
+        const tool = newPage(disabledArgs);
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'file:///etc/passwd'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
+          },
+        );
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'view-source:file:///etc/passwd'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
           },
         );
       });
@@ -859,6 +895,37 @@ describe('pages', () => {
       });
     });
 
+    it('throws when navigating to a file URL and fileNavigations is false', async () => {
+      await withMcpContext(async (response, context) => {
+        const disabledArgs = new ConfigParser(
+          '1.0.0',
+          ['node', 'script.js', '--no-file-navigations'],
+          {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+        ).parse();
+        await assert.rejects(
+          async () => {
+            await navigatePage(disabledArgs).handler(
+              {
+                params: {url: 'file:///etc/passwd'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
+          },
+        );
+        // The page must not have left about:blank.
+        assert.strictEqual(
+          context.getSelectedMcpPage().pptrPage.url(),
+          'about:blank',
+        );
+      });
+    });
+
     it('throws an error if the page was closed not by the MCP server', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = await context.newPage();
@@ -1102,22 +1169,22 @@ describe('pages', () => {
       const defaultTool = navigatePage(createMockParsedArguments());
       assert.strictEqual('initScript' in defaultTool.schema, true);
 
-      const disabledArgs = parseArguments(
+      const disabledArgs = new ConfigParser(
         '1.0.0',
         ['node', 'script.js', '--no-javascript-evaluation'],
         {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-      );
+      ).parse();
       const disabledTool = navigatePage(disabledArgs);
       assert.strictEqual('initScript' in disabledTool.schema, false);
     });
 
     it('throws when navigating to a javascript, data, or vbscript URL and javascriptEvaluation is false', async () => {
       await withMcpContext(async (response, context) => {
-        const disabledArgs = parseArguments(
+        const disabledArgs = new ConfigParser(
           '1.0.0',
           ['node', 'script.js', '--no-javascript-evaluation'],
           {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-        );
+        ).parse();
         const tool = navigatePage(disabledArgs);
         await assert.rejects(
           async () => {

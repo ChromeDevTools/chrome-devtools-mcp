@@ -79,7 +79,7 @@ chrome-devtools select_page 1 --bringToFront true # Select a page and bring it t
 
 ```bash
 chrome-devtools emulate 1 --networkConditions "Offline" # Emulate network conditions
-chrome-devtools emulate 1 --cpuThrottlingRate 4 --geolocation "0x0" # Emulate CPU throttling and geolocation
+chrome-devtools emulate 1 --cpuThrottlingRate 4 --geolocation "0,0" # Emulate CPU throttling and geolocation
 chrome-devtools emulate 1 --colorScheme "dark" --viewport "1920x1080" # Emulate color scheme and viewport
 chrome-devtools emulate 1 --userAgent "Mozilla/5.0..." # Emulate user agent
 chrome-devtools resize_page 1 1920 1080 # Resizes the selected page's window
@@ -106,8 +106,8 @@ chrome-devtools take_heapsnapshot 1 "./snap.heapsnapshot" # Capture a memory hea
 ```bash
 chrome-devtools get_heapsnapshot_summary "./snap.heapsnapshot" # Get snapshot summary stats
 chrome-devtools compare_heapsnapshots "./base.heapsnapshot" "./target.heapsnapshot" # Compare two snapshots
-chrome-devtools get_heapsnapshot_class_nodes "./snap.heapsnapshot" "Array" # Inspect class instances
-chrome-devtools get_heapsnapshot_details "./snap.heapsnapshot" 123 # Detailed object properties
+chrome-devtools get_heapsnapshot_details "./snap.heapsnapshot" # Snapshot statistics and per-class aggregates (with class IDs)
+chrome-devtools get_heapsnapshot_class_nodes "./snap.heapsnapshot" 18 # Inspect instances of a class (class ID from get_heapsnapshot_details)
 chrome-devtools get_heapsnapshot_dominators "./snap.heapsnapshot" 123 # Dominator tree for node
 chrome-devtools get_heapsnapshot_duplicate_strings "./snap.heapsnapshot" # Find duplicated strings
 chrome-devtools get_heapsnapshot_edges "./snap.heapsnapshot" 123 # Node edges/references
@@ -134,6 +134,7 @@ chrome-devtools list_network_requests 1 --includePreservedRequests true # Includ
 ```bash
 chrome-devtools evaluate_script "() => document.title" --pageId 1 # Evaluate a JavaScript function on page 1
 chrome-devtools evaluate_script "(a) => a.innerText" --pageId 1 --args 1_4 # Evaluate JS with UID arguments on page 1
+chrome-devtools evaluate_script --pageId 1 --sourcePath /path/to/script.js --format script # Evaluate a local classic JavaScript file on page 1
 chrome-devtools get_console_message 1 1 # Gets a console message by its ID
 chrome-devtools get_css_styles 1 "1_4" # Get CSS styles with pagination on page 1 (default: 10 rules, pageIdx 0)
 chrome-devtools get_css_styles 1 "1_4" --pageSize 20 --pageIdx 1 # Paginate CSS rules with custom page size and custom 0-based page index
@@ -164,7 +165,7 @@ chrome-devtools trigger_extension_action "extension_id" # Triggers the default a
 ## Progressive Web Apps (requires `--categoryPwa=true`)
 
 ```bash
-chrome-devtools install_pwa "https://example.com/" # Install PWA by manifest ID or URL
+chrome-devtools install_pwa "https://example.com/" "https://example.com/" # Install PWA by manifest ID and install URL
 chrome-devtools launch_pwa "https://example.com/" # Launch installed PWA
 chrome-devtools get_os_app_state "https://example.com/" # Get OS app installation state
 chrome-devtools uninstall_pwa "https://example.com/" # Uninstall PWA and close windows

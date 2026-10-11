@@ -90,6 +90,7 @@ export const skill = {
 export default skill;
 `;
   writeFile(path.join(skillsDir, 'accessibility.skill.js'), skillMockContent);
+  writeFile(path.join(skillsDir, 'lighthouse.skill.js'), skillMockContent);
   writeFile(path.join(skillsDir, 'network.skill.js'), skillMockContent);
   writeFile(path.join(skillsDir, 'performance.skill.js'), skillMockContent);
   writeFile(path.join(skillsDir, 'sources.skill.js'), skillMockContent);

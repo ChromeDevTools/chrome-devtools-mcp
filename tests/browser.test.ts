@@ -103,6 +103,25 @@ describe('browser', () => {
       sinon.assert.notCalled(pptrBrowser.disconnect);
     });
 
+    it('does not pass a channel to Puppeteer when executablePath is set', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
+
+      const args = createMockParsedArguments({
+        isolated: true,
+        channel: 'stable',
+        executablePath: '/path/to/chrome',
+      });
+      const manager = new BrowserManager(args);
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(launchStub, {
+        channel: undefined,
+        executablePath: '/path/to/chrome',
+      });
+    });
+
     it('connects to a browser when browserUrl is set and disconnects on close()', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();
       const launchStub = sinon.stub(puppeteer, 'launch');
@@ -282,6 +301,274 @@ describe('browser', () => {
 
       sinon.assert.calledOnce(launchStub);
       sinon.assert.calledOnceWithExactly(pptrBrowser.close);
+    });
+
+    describe('forget', () => {
+      it('does nothing when the candidate is not the current browser', async () => {
+        const pptrBrowser = createMockPuppeteerBrowser();
+        const other = createMockPuppeteerBrowser();
+        sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+        await manager.ensureBrowser();
+
+        manager.forget(other);
+
+        sinon.assert.notCalled(other.close);
+        sinon.assert.notCalled(other.disconnect);
+        sinon.assert.notCalled(pptrBrowser.close);
+        sinon.assert.notCalled(pptrBrowser.disconnect);
+      });
+
+      it('disconnects the current browser when it was connected', async () => {
+        const pptrBrowser = createMockPuppeteerBrowser();
+        sinon.stub(puppeteer, 'connect').resolves(pptrBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({browserUrl: 'http://127.0.0.1:9222'}),
+        );
+        const browser = await manager.ensureBrowser();
+
+        manager.forget(browser);
+
+        sinon.assert.calledOnceWithExactly(pptrBrowser.disconnect);
+        sinon.assert.notCalled(pptrBrowser.close);
+      });
+
+      it('closes the current browser when it was launched', async () => {
+        const pptrBrowser = createMockPuppeteerBrowser();
+        sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+        const browser = await manager.ensureBrowser();
+
+        manager.forget(browser);
+
+        sinon.assert.calledOnceWithExactly(pptrBrowser.close);
+        sinon.assert.notCalled(pptrBrowser.disconnect);
+      });
+    });
+
+    describe('push-based disconnect eviction', () => {
+      it('proactively evicts a disconnected browser without waiting for a lazy connected check', async () => {
+        const firstBrowser = createMockPuppeteerBrowser();
+        const secondBrowser = createMockPuppeteerBrowser();
+        const launchStub = sinon
+          .stub(puppeteer, 'launch')
+          .onFirstCall()
+          .resolves(firstBrowser)
+          .onSecondCall()
+          .resolves(secondBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const first = await manager.ensureBrowser();
+        assert.strictEqual(first, firstBrowser);
+
+        firstBrowser.emit('disconnected', undefined);
+
+        // The mock's `connected` getter still reports true — proves the next
+        // ensureBrowser() reconnected because of the push-based eviction,
+        // not because a lazy `!browser.connected` check caught it.
+        assert.strictEqual(firstBrowser.connected, true);
+
+        const second = await manager.ensureBrowser();
+        assert.strictEqual(second, secondBrowser);
+        sinon.assert.calledTwice(launchStub);
+      });
+
+      it('does not evict the current browser when disconnected fires on an already-superseded one', async () => {
+        const oldBrowser = createMockPuppeteerBrowser();
+        const newBrowser = createMockPuppeteerBrowser();
+        let oldConnected = true;
+        sinon.stub(oldBrowser, 'connected').get(() => oldConnected);
+        const launchStub = sinon
+          .stub(puppeteer, 'launch')
+          .onFirstCall()
+          .resolves(oldBrowser)
+          .onSecondCall()
+          .resolves(newBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const first = await manager.ensureBrowser();
+        assert.strictEqual(first, oldBrowser);
+
+        oldConnected = false;
+        const second = await manager.ensureBrowser();
+        assert.strictEqual(second, newBrowser);
+
+        oldBrowser.emit('disconnected', undefined);
+
+        const third = await manager.ensureBrowser();
+        assert.strictEqual(third, newBrowser);
+        sinon.assert.calledTwice(launchStub);
+      });
+    });
+
+    describe('abandonPendingAttempt', () => {
+      it('discards a connect() resolution that arrives after being abandoned, and a fresh call still succeeds', async () => {
+        const abandonedBrowser = createMockPuppeteerBrowser();
+        const freshBrowser = createMockPuppeteerBrowser();
+        const connectStarted = Promise.withResolvers<void>();
+        const connectDeferred = Promise.withResolvers<Browser>();
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .onFirstCall()
+          .callsFake(() => {
+            connectStarted.resolve();
+            return connectDeferred.promise;
+          })
+          .onSecondCall()
+          .resolves(freshBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({browserUrl: 'http://127.0.0.1:9222'}),
+        );
+
+        const ensurePromise1 = manager.ensureBrowser();
+        await connectStarted.promise;
+
+        manager.abandonPendingAttempt();
+        const ensurePromise2 = manager.ensureBrowser();
+
+        connectDeferred.resolve(abandonedBrowser);
+
+        await assert.rejects(
+          ensurePromise1,
+          /Connection attempt was abandoned before it completed/,
+        );
+        assert.strictEqual(await ensurePromise2, freshBrowser);
+
+        sinon.assert.calledOnceWithExactly(abandonedBrowser.disconnect);
+        sinon.assert.notCalled(freshBrowser.disconnect);
+        sinon.assert.calledTwice(connectStub);
+      });
+
+      it('discards a launch() resolution that arrives after being abandoned, and a fresh call still succeeds', async () => {
+        const abandonedBrowser = createMockPuppeteerBrowser();
+        const freshBrowser = createMockPuppeteerBrowser();
+        const launchStarted = Promise.withResolvers<void>();
+        const launchDeferred = Promise.withResolvers<Browser>();
+        const launchStub = sinon
+          .stub(puppeteer, 'launch')
+          .onFirstCall()
+          .callsFake(() => {
+            launchStarted.resolve();
+            return launchDeferred.promise;
+          })
+          .onSecondCall()
+          .resolves(freshBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const ensurePromise1 = manager.ensureBrowser();
+        await launchStarted.promise;
+
+        manager.abandonPendingAttempt();
+        const ensurePromise2 = manager.ensureBrowser();
+
+        launchDeferred.resolve(abandonedBrowser);
+
+        await assert.rejects(
+          ensurePromise1,
+          /Connection attempt was abandoned before it completed/,
+        );
+        assert.strictEqual(await ensurePromise2, freshBrowser);
+
+        sinon.assert.calledOnceWithExactly(abandonedBrowser.close);
+        sinon.assert.notCalled(freshBrowser.close);
+        sinon.assert.calledTwice(launchStub);
+      });
+
+      it('discards a queued attempt whose own timeout fires while still waiting for the mutex', async () => {
+        const firstBrowser = createMockPuppeteerBrowser();
+        const launchStarted = Promise.withResolvers<void>();
+        const launchDeferred = Promise.withResolvers<Browser>();
+        const launchStub = sinon.stub(puppeteer, 'launch').callsFake(() => {
+          launchStarted.resolve();
+          return launchDeferred.promise;
+        });
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const ensurePromise1 = manager.ensureBrowser();
+        await launchStarted.promise;
+
+        // Abandon call 1's own caller while its launch() is still pending
+        // and still holding #mutex.
+        manager.abandonPendingAttempt();
+
+        // #initPromise was just cleared, so this starts a genuinely new
+        // #ensureBrowserLocked() call that queues on #mutex (call 1 hasn't
+        // released it yet) instead of sharing call 1's promise.
+        const ensurePromise2 = manager.ensureBrowser();
+        // Abandon call 2's own caller too, while call 2 is still queued
+        // waiting for #mutex — the exact race being guarded against: call 2
+        // must not silently adopt this rotation as its own baseline once it
+        // gets the lock.
+        manager.abandonPendingAttempt();
+
+        launchDeferred.resolve(firstBrowser);
+
+        await assert.rejects(
+          ensurePromise1,
+          /Connection attempt was abandoned before it completed/,
+        );
+        await assert.rejects(
+          ensurePromise2,
+          /Connection attempt was abandoned before it completed/,
+        );
+
+        // Call 2 was already abandoned before it ever reached the front of
+        // #mutex, so it must bail immediately instead of starting (and then
+        // silently keeping) a second, unwanted browser.
+        sinon.assert.calledOnce(launchStub);
+        sinon.assert.calledOnceWithExactly(firstBrowser.close);
+      });
+
+      it('forgets the already-cached browser when abandoned after ensureBrowser() already resolved', async () => {
+        const firstBrowser = createMockPuppeteerBrowser();
+        const secondBrowser = createMockPuppeteerBrowser();
+        const launchStub = sinon
+          .stub(puppeteer, 'launch')
+          .onFirstCall()
+          .resolves(firstBrowser)
+          .onSecondCall()
+          .resolves(secondBrowser);
+
+        const manager = new BrowserManager(
+          createMockParsedArguments({headless: true, isolated: true}),
+        );
+
+        const first = await manager.ensureBrowser();
+        assert.strictEqual(first, firstBrowser);
+
+        // Simulates a getContext()-level timeout firing after ensureBrowser()
+        // had already resolved — e.g. McpContext.from()'s own CDP
+        // initialization hanging on a transport that died silently. Token
+        // rotation alone wouldn't help here: there's no in-flight
+        // connect()/launch() left to discard, #browser is already cached.
+        manager.abandonPendingAttempt();
+
+        sinon.assert.calledOnceWithExactly(firstBrowser.close);
+
+        const second = await manager.ensureBrowser();
+        assert.strictEqual(second, secondBrowser);
+        sinon.assert.calledTwice(launchStub);
+      });
     });
   });
 

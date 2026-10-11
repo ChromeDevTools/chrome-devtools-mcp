@@ -11,7 +11,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {parseArguments} from '../../../src/config/mcp-options.js';
+import {ConfigParser} from '../../../src/config/ConfigParser.js';
 import {evaluate, navigate, screenshot} from '../../../src/tools/slim/tools.js';
 import {createHandlerMocks} from '../../mocks.js';
 import {screenshots} from '../../snapshot.js';
@@ -89,11 +89,11 @@ describe('slim', () => {
 
   it('disallows javascript, data, and vbscript URLs when javascriptEvaluation is false', async () => {
     const {page, context, response} = createHandlerMocks();
-    const disabledArgs = parseArguments(
+    const disabledArgs = new ConfigParser(
       '1.0.0',
       ['node', 'script.js', '--slim', '--no-javascript-evaluation'],
       {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    );
+    ).parse();
     const tool = navigate(disabledArgs);
     await assert.rejects(
       async () => {
@@ -132,6 +132,31 @@ describe('slim', () => {
       {
         message:
           'Navigating to vbscript: URLs is not allowed when JavaScript evaluation is disabled.',
+      },
+    );
+
+    sinon.assert.notCalled(page.pptrPage.goto);
+  });
+
+  it('disallows file URLs when fileNavigations is false', async () => {
+    const {page, context, response} = createHandlerMocks();
+    const disabledArgs = new ConfigParser(
+      '1.0.0',
+      ['node', 'script.js', '--slim', '--no-file-navigations'],
+      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
+    ).parse();
+    const tool = navigate(disabledArgs);
+    await assert.rejects(
+      async () => {
+        await tool.handler(
+          {params: {url: 'file:///etc/passwd'}, page},
+          response,
+          context,
+        );
+      },
+      {
+        message:
+          'Navigating to file: URLs is not allowed when --file-navigations is disabled.',
       },
     );
 

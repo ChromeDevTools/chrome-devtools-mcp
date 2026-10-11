@@ -13,7 +13,7 @@ import type {
   Protocol,
   Browser,
 } from '../third_party/index.js';
-import type {ExtensionServiceWorker} from '../types.js';
+import type {McpWorker} from '../McpWorker.js';
 import type {WithSymbolId} from '../utils/id.js';
 import {createIdGenerator, stableIdSymbol} from '../utils/id.js';
 
@@ -81,7 +81,7 @@ export class ServiceWorkerConsoleCollector {
     this.#maxLogs = maxLogs;
   }
 
-  async init(workers: ExtensionServiceWorker[]) {
+  async init(workers: McpWorker[]) {
     if (!this.#browser) {
       return;
     }
@@ -101,11 +101,7 @@ export class ServiceWorkerConsoleCollector {
     this.#browser.off('targetdestroyed', this.#onTargetDestroyed);
     for (const subscriber of this.#serviceWorkerSubscribers.values()) {
       subscriber.unsubscribe().catch(err => {
-        if (
-          err instanceof Error &&
-          !err.message.includes('Target closed') &&
-          !err.message.includes('Session closed')
-        ) {
+        if (!isIgnoredTargetError(err)) {
           // Swallow error as we are tearing down the system
         }
       });
@@ -128,36 +124,34 @@ export class ServiceWorkerConsoleCollector {
       const subscriber = new ServiceWorkerSubscriber(target, item => {
         this.addLog(extensionId, item);
       });
+      this.#serviceWorkerSubscribers.set(target, subscriber);
       try {
         await subscriber.subscribe();
+        if (this.#serviceWorkerSubscribers.get(target) !== subscriber) {
+          await subscriber.unsubscribe();
+        }
       } catch (err) {
-        if (
-          err instanceof Error &&
-          !err.message.includes('Target closed') &&
-          !err.message.includes('Session closed')
-        ) {
+        if (this.#serviceWorkerSubscribers.get(target) === subscriber) {
+          this.#serviceWorkerSubscribers.delete(target);
+        }
+        if (!isIgnoredTargetError(err)) {
           throw err;
         }
       }
-      this.#serviceWorkerSubscribers.set(target, subscriber);
     }
   };
 
   #onTargetDestroyed = async (target: Target) => {
     const subscriber = this.#serviceWorkerSubscribers.get(target);
     if (subscriber) {
+      this.#serviceWorkerSubscribers.delete(target);
       try {
         await subscriber.unsubscribe();
       } catch (err) {
-        if (
-          err instanceof Error &&
-          !err.message.includes('Target closed') &&
-          !err.message.includes('Session closed')
-        ) {
+        if (!isIgnoredTargetError(err)) {
           throw err;
         }
       }
-      this.#serviceWorkerSubscribers.delete(target);
     }
   };
 
@@ -224,4 +218,14 @@ function extractExtensionId(origin: string): string | null {
 
 function isExtensionOrigin(origin: string) {
   return origin.startsWith(CHROME_EXTENSION_PREFIX);
+}
+
+function isIgnoredTargetError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err.message.includes('Target closed') ||
+      err.message.includes('Session closed') ||
+      err.message.includes('No target with given id found') ||
+      err.message.includes('No session with given id'))
+  );
 }

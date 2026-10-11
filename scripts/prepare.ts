@@ -73,7 +73,7 @@ function ensureSubmodule(): void {
 
     // 1. Clone only the tree structure of the default branch (no blobs)
     execSync(
-      'git clone --no-checkout --depth 1 --filter=blob:none https://github.com/ChromeDevTools/devtools-frontend.git third_party/devtools-frontend',
+      'git clone --no-checkout --depth 1 --no-tags --filter=blob:none https://github.com/ChromeDevTools/devtools-frontend.git third_party/devtools-frontend',
       {
         cwd: projectRoot,
         stdio: 'inherit',
@@ -97,7 +97,7 @@ function ensureSubmodule(): void {
 
     // 4. Update the submodule to the correct commit (this fetches the commit and only downloads the blobs for the sparse checkout)
     execSync(
-      'git submodule update --force --checkout third_party/devtools-frontend',
+      'git submodule update --init --force --checkout third_party/devtools-frontend',
       {
         cwd: projectRoot,
         stdio: 'inherit',

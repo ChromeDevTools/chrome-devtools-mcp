@@ -30,13 +30,11 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand} from '../config/cli-commands.js';
+import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
-import {
-  mcpOptions,
-  parseArguments,
-  getCliOptions,
-} from '../config/mcp-options.js';
+import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
+
+import {ConfigParser} from '../config/ConfigParser.js';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
@@ -46,11 +44,12 @@ const DEFAULT_CLI_ARGS = ['--viaCli'];
 
 async function start(args: string[], sessionId: string, stopExisting = false) {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
-  const parsedArgs = parseArguments(VERSION, [
+  // Validates the arguments and the config file before starting the daemon.
+  const parsedArgs = new ConfigParser(VERSION, [
     process.execPath,
     process.argv[1],
     ...combinedArgs,
-  ]);
+  ]).parse();
   if (stopExisting && isDaemonRunning(sessionId)) {
     await stopDaemon(sessionId);
   }
@@ -100,7 +99,10 @@ const y = yargs(hideBin(process.argv))
         );
         console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
         console.error(
-          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true).',
+          '   - CORRECT:   chrome-devtools evaluate_script "() => document.title" --pageId 1',
+        );
+        console.error(
+          '2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except optional positional parameters shown in command help.',
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
@@ -206,7 +208,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required) {
+        if (opt.required || isOptionalPositionalArg(commandName, argName)) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],

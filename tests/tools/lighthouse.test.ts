@@ -6,16 +6,16 @@
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
 import {lighthouseRunner} from '../../src/third_party/index.js';
 import {lighthouseAudit} from '../../src/tools/lighthouse.js';
-import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {createHandlerMocks, createMockRunnerResult} from '../mocks.js';
 import {serverHooks} from '../server.js';
-import {createTempDir, html, withMcpContext} from '../utils.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('lighthouse', () => {
   afterEach(() => {
@@ -185,65 +185,77 @@ describe('lighthouse', () => {
     });
 
     it('runs Lighthouse in snapshot mode with mobile device', async () => {
-      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+      const {page, context, response, args} = createHandlerMocks();
+      context.saveTemporaryFile
+        .withArgs(sinon.match.instanceOf(Uint8Array), 'report.json')
+        .resolves({filepath: '/tmp/report.json'});
+      context.saveTemporaryFile
+        .withArgs(sinon.match.instanceOf(Uint8Array), 'report.html')
+        .resolves({filepath: '/tmp/report.html'});
+      const snapshot = sinon
+        .stub(lighthouseRunner, 'snapshot')
+        .resolves(createMockRunnerResult());
+      const navigation = sinon.stub(lighthouseRunner, 'navigation');
 
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/test-mobile'));
-
-        await lighthouseAudit(args).handler(
-          {
-            params: {
-              mode: 'snapshot',
-              device: 'mobile',
-            },
-            page: context.getSelectedMcpPage(),
+      await lighthouseAudit(args).handler(
+        {
+          params: {
+            mode: 'snapshot',
+            device: 'mobile',
           },
-          response,
-          context,
-        );
+          page,
+        },
+        response,
+        context,
+      );
 
-        const data = response.attachedLighthouseResult;
-        assert.ok(data);
-
-        assert.equal(data.summary.mode, 'snapshot');
-        assert.equal(data.summary.device, 'mobile');
-        assert.ok(data.reports.length === 2);
-      });
+      sinon.assert.calledOnce(snapshot);
+      sinon.assert.notCalled(navigation);
+      sinon.assert.calledTwice(context.saveTemporaryFile);
+      sinon.assert.notCalled(context.saveFile);
+      sinon.assert.calledOnce(response.attachLighthouseResult);
+      const {summary, reports} =
+        response.attachLighthouseResult.firstCall.args[0];
+      assert.equal(summary.mode, 'snapshot');
+      assert.equal(summary.device, 'mobile');
+      assert.deepEqual(reports, ['/tmp/report.json', '/tmp/report.html']);
     });
 
     it('runs Lighthouse with custom output dir', async () => {
-      server.addHtmlRoute('/test-mobile', html`<div>Test Mobile</div>`);
+      const {page, context, response, args} = createHandlerMocks();
+      const outputDirPath = path.join('custom', 'reports');
+      const reportPath = path.join(outputDirPath, 'report');
+      context.saveFile
+        .withArgs(sinon.match.instanceOf(Uint8Array), reportPath, '.json')
+        .resolves({filename: `${reportPath}.json`});
+      context.saveFile
+        .withArgs(sinon.match.instanceOf(Uint8Array), reportPath, '.html')
+        .resolves({filename: `${reportPath}.html`});
+      sinon
+        .stub(lighthouseRunner, 'snapshot')
+        .resolves(createMockRunnerResult());
 
-      using folder = createTempDir('temp-folder-');
-
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/test-mobile'));
-
-        await lighthouseAudit(args).handler(
-          {
-            params: {
-              mode: 'snapshot',
-              device: 'mobile',
-              outputDirPath: folder.path,
-            },
-            page: context.getSelectedMcpPage(),
+      await lighthouseAudit(args).handler(
+        {
+          params: {
+            mode: 'snapshot',
+            device: 'mobile',
+            outputDirPath,
           },
-          response,
-          context,
-        );
+          page,
+        },
+        response,
+        context,
+      );
 
-        const data = response.attachedLighthouseResult;
-        assert.ok(data);
-        assert.equal(data.summary.mode, 'snapshot');
-        assert.equal(data.summary.device, 'mobile');
-        assert.ok(data.reports.length === 2);
-        const canonicalFolderPath = await resolveCanonicalPath(folder.path);
-        for (const report of data.reports) {
-          assert.ok(report.startsWith(canonicalFolderPath));
-        }
-      });
+      sinon.assert.calledTwice(context.saveFile);
+      sinon.assert.notCalled(context.saveTemporaryFile);
+      sinon.assert.calledOnce(response.attachLighthouseResult);
+      const {summary, reports} =
+        response.attachLighthouseResult.firstCall.args[0];
+      assert.equal(summary.mode, 'snapshot');
+      assert.equal(summary.device, 'mobile');
+      assert.deepEqual(reports, [`${reportPath}.json`, `${reportPath}.html`]);
     });
   });
 });
