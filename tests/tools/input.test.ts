@@ -1559,6 +1559,48 @@ describe('input', () => {
       });
     });
 
+    it('reports when a file input does not accept multiple files', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<form>
+            <input
+              type="file"
+              id="file-input"
+              onclick="this.dataset.clicked = 'yes'"
+            />
+          </form>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {
+              params: {
+                uid: '1_2',
+                filePaths: [firstFile.path, secondFile.path],
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /multiple/i,
+        );
+        assert.strictEqual(
+          await page.$eval('#file-input', el =>
+            el.getAttribute('data-clicked'),
+          ),
+          null,
+        );
+      });
+    });
+
     it('uploads a file when clicking an element opens a file uploader', async () => {
       using testFile = createTempFile('test file content', 'test.txt');
 
@@ -1630,7 +1672,7 @@ describe('input', () => {
           ),
           {
             message:
-              'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
+              /Failed to upload file through direct upload and file chooser:/,
           },
         );
 

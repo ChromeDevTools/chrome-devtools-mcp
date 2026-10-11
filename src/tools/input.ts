@@ -577,9 +577,23 @@ export const uploadFile = definePageTool(() => ({
       uid,
     )) as ElementHandle<HTMLInputElement>;
 
+    if (filePaths.length > 1) {
+      const isSingleFileInput = await handle.evaluate(
+        element =>
+          element instanceof HTMLInputElement &&
+          element.type === 'file' &&
+          !element.multiple,
+      );
+      if (isSingleFileInput) {
+        throw new Error(
+          'Failed to upload multiple files. The file input does not accept multiple files.',
+        );
+      }
+    }
+
     try {
       await handle.uploadFile(...filePaths);
-    } catch {
+    } catch (uploadError) {
       // Some sites use a proxy element to trigger file upload instead of
       // a type=file element. In this case, we want to default to
       // Page.waitForFileChooser() and upload the file this way.
@@ -589,9 +603,19 @@ export const uploadFile = definePageTool(() => ({
           handle.asLocator().click(),
         ]);
         await fileChooser.accept(filePaths);
-      } catch {
+      } catch (fileChooserError) {
+        const reason =
+          fileChooserError instanceof Error
+            ? fileChooserError.message
+            : String(fileChooserError);
         throw new Error(
-          `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
+          `Failed to upload file through direct upload and file chooser: ${reason}`,
+          {
+            cause: new AggregateError(
+              [uploadError, fileChooserError],
+              'Direct upload and file chooser upload both failed',
+            ),
+          },
         );
       }
     }
