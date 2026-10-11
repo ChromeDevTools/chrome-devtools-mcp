@@ -282,7 +282,7 @@ export class ToolHandler {
       await validateToolFiles(tool, params, context, true);
       await tool.handler({params}, response, context);
     } catch (err) {
-      response.setError(err);
+      response.setError(err instanceof Error ? err : new Error(String(err)));
     }
     return await response.handle(context, this.#dataFormat());
   }
@@ -345,7 +345,7 @@ export class ToolHandler {
         );
       }
     } catch (err) {
-      response.setError(err);
+      response.setError(err instanceof Error ? err : new Error(String(err)));
     }
     onTelemetryData(
       await context.getDevToolsData(page),
@@ -409,8 +409,9 @@ export class ToolHandler {
       return result;
     } catch (err) {
       logger?.(`${this.tool.name} error:`, err, err?.stack);
-      let errorText = err && 'message' in err ? err.message : String(err);
-      if ('cause' in err && err.cause) {
+      const isObject = err instanceof Object;
+      let errorText = isObject && 'message' in err ? err.message : String(err);
+      if (isObject && 'cause' in err && err.cause) {
         errorText += `\nCause: ${err.cause.message}`;
       }
       return {
