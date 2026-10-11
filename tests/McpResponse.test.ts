@@ -775,6 +775,58 @@ describe('McpResponse network pagination', () => {
   });
 
   describe('trace summaries', () => {
+    it('reports no CrUX data when an enabled lookup has no result', async () => {
+      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+      const result = await parseRawTraceBuffer(rawData);
+      if (!traceResultIsSuccess(result)) {
+        throw new Error(result.error);
+      }
+      result.parsedTrace.metadata.cruxFieldData = [];
+
+      const response = new McpResponse(
+        createMockParsedArguments({performanceCrux: true}),
+      );
+      const {structuredContent} = await response.format(
+        createMockMcpContext(),
+        {
+          detailedConsoleMessage: undefined,
+          consoleMessages: undefined,
+          snapshot: undefined,
+          traceSummary: result,
+        },
+      );
+      assert.ok('traceSummary' in structuredContent);
+      const summary = structuredContent.traceSummary;
+      assert.ok(typeof summary === 'string');
+      assert.match(summary, /no data for this page in CrUX/i);
+    });
+
+    it('does not report missing CrUX data when lookup is disabled', async () => {
+      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+      const result = await parseRawTraceBuffer(rawData);
+      if (!traceResultIsSuccess(result)) {
+        throw new Error(result.error);
+      }
+
+      const response = new McpResponse(
+        createMockParsedArguments({performanceCrux: false}),
+      );
+      const {structuredContent} = await response.format(
+        createMockMcpContext(),
+        {
+          detailedConsoleMessage: undefined,
+          consoleMessages: undefined,
+          snapshot: undefined,
+          traceSummary: result,
+        },
+      );
+      assert.ok('traceSummary' in structuredContent);
+      const summary = structuredContent.traceSummary;
+      assert.ok(typeof summary === 'string');
+      assert.match(summary, /CrUX.*not requested/i);
+      assert.doesNotMatch(summary, /no data for this page in CrUX/i);
+    });
+
     it('includes the trace summary text and structured data', async t => {
       const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
       const result = await parseRawTraceBuffer(rawData);
