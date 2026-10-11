@@ -17,7 +17,7 @@ import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import type {Page} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
-import {createMockPuppeteerPage} from './mocks.js';
+import {createMockHTTPRequest, createMockPuppeteerPage} from './mocks.js';
 import {serverHooks} from './server.js';
 import {getMockRequest, html, withMcpContext} from './utils.js';
 
@@ -604,6 +604,71 @@ describe('McpPage', () => {
       const result = mcpPage.getNetworkRequestById(42);
       sinon.assert.calledOnceWithExactly(stub, 42);
       assert.strictEqual(result, mockRequest);
+    });
+  });
+
+  describe('resendNetworkRequest', () => {
+    afterEach(() => sinon.restore());
+
+    it('replays on the original request session', async () => {
+      const {mcpPage, pptrPage, mockSession} = createMcpPage();
+      const {request, client} = createMockHTTPRequest();
+      request.id = '12345.67';
+      request.resourceType.returns('xhr');
+      const lookup = sinon
+        .stub(mcpPage.networkCollector, 'getById')
+        .returns(request);
+
+      await mcpPage.resendNetworkRequest(7);
+
+      sinon.assert.calledOnceWithExactly(lookup, 7);
+      sinon.assert.calledOnceWithExactly(client.send, 'Network.replayXHR', {
+        requestId: '12345.67',
+      });
+      sinon.assert.notCalled(pptrPage.createCDPSession);
+      sinon.assert.notCalled(mockSession.send);
+    });
+
+    it('rejects fetch requests without sending', async () => {
+      const {mcpPage} = createMcpPage();
+      const {request, client} = createMockHTTPRequest();
+      request.resourceType.returns('fetch');
+      sinon.stub(mcpPage.networkCollector, 'getById').returns(request);
+
+      await assert.rejects(
+        mcpPage.resendNetworkRequest(7),
+        /XHR requests only/,
+      );
+
+      sinon.assert.notCalled(client.send);
+    });
+
+    it('rejects an unavailable CDP request ID without sending', async () => {
+      const {mcpPage} = createMcpPage();
+      const {request, client} = createMockHTTPRequest();
+      request.id = '';
+      request.resourceType.returns('xhr');
+      sinon.stub(mcpPage.networkCollector, 'getById').returns(request);
+
+      await assert.rejects(mcpPage.resendNetworkRequest(7), /No CDP requestId/);
+
+      sinon.assert.notCalled(client.send);
+    });
+
+    it('propagates a CDP failure without retrying', async () => {
+      const {mcpPage} = createMcpPage();
+      const {request, client} = createMockHTTPRequest();
+      request.id = '12345.67';
+      request.resourceType.returns('xhr');
+      const error = new Error('Session closed');
+      client.send.rejects(error);
+      sinon.stub(mcpPage.networkCollector, 'getById').returns(request);
+
+      await assert.rejects(mcpPage.resendNetworkRequest(7), error);
+
+      sinon.assert.calledOnceWithExactly(client.send, 'Network.replayXHR', {
+        requestId: '12345.67',
+      });
     });
   });
 

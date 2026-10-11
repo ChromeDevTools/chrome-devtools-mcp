@@ -378,6 +378,7 @@ export type ContextPage = Readonly<{
    */
   resolveCdpRequestId(cdpRequestId: string): number | undefined;
   resolveReqidToCdpRequestId(reqid: number): string | undefined;
+  resendNetworkRequest(reqid: number): Promise<void>;
   resolveBackendNodeId(backendNodeId: number): Promise<string | undefined>;
   resolveUidToBackendNodeId(
     uid: string,

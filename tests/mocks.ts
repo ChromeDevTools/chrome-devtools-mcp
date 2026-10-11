@@ -38,7 +38,9 @@ import type {
 } from '../src/processors/HeapSnapshotManager.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 import {
+  CDPSession,
   CdpBrowser,
+  HTTPRequest,
   CdpExtension,
   CdpFrame,
   CdpPage,
@@ -54,6 +56,7 @@ import type {
   Protocol,
   Result,
   RunnerResult,
+  ResourceType,
 } from '../src/third_party/index.js';
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -190,6 +193,19 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   page._client = sinon.stub().returns(cdpSession);
 
   return page;
+}
+
+export function createMockHTTPRequest() {
+  // Abstract API members are not present on the class prototypes.
+  const client = Object.assign(sinon.createStubInstance(CDPSession), {
+    send: sinon.stub().resolves({}),
+  });
+  const request = Object.assign(sinon.createStubInstance(HTTPRequest), {
+    id: '',
+    client,
+    resourceType: sinon.stub<[], ResourceType>(),
+  });
+  return {request, client};
 }
 
 export function createMockMcpPage(

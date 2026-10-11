@@ -27,9 +27,10 @@
   - [`performance_analyze_insight`](#performance_analyze_insight)
   - [`performance_start_trace`](#performance_start_trace)
   - [`performance_stop_trace`](#performance_stop_trace)
-- **[Network](#network)** (2 tools)
+- **[Network](#network)** (3 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
+  - [`resend_network_request`](#resend_network_request)
 - **[Debugging](#debugging)** (9 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
@@ -368,6 +369,17 @@
 - **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
+
+---
+
+### `resend_network_request`
+
+**Description:** Replays a captured XHR using the original CDP session. Other request types are not supported. May repeat server-side changes. Returns a submission acknowledgement; use the network tools to inspect the new request and response. Never automatically retry an error: the request may already have been sent.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **reqid** (integer) **(required)**: The reqid returned by [`list_network_requests`](#list_network_requests) for the target page.
 
 ---
 

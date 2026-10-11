@@ -372,6 +372,24 @@ export class McpPage implements ContextPage {
     return request.id;
   }
 
+  async resendNetworkRequest(reqid: number): Promise<void> {
+    const request = this.getNetworkRequestById(reqid);
+    if (request.resourceType() !== 'xhr') {
+      throw new Error(
+        'Replay supports XHR requests only. No request was sent.',
+      );
+    }
+    const requestId =
+      'id' in request && typeof request.id === 'string'
+        ? request.id
+        : undefined;
+    if (!requestId) {
+      throw new Error(`No CDP requestId available for reqid ${reqid}.`);
+    }
+    // Request IDs belong to the original CDP session. Do not retry a failed send.
+    await request.client.send('Network.replayXHR', {requestId});
+  }
+
   getNetworkRequests(includePreservedRequests?: boolean): HTTPRequest[] {
     return this.networkCollector.getData(includePreservedRequests);
   }

@@ -1397,6 +1397,26 @@ export const commands: Commands = {
       },
     },
   },
+  resend_network_request: {
+    description:
+      'Replays a captured XHR using the original CDP session. Other request types are not supported. May repeat server-side changes. Returns a submission acknowledgement; use the network tools to inspect the new request and response. Never automatically retry an error: the request may already have been sent.',
+    category: 'Network',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+      },
+      reqid: {
+        name: 'reqid',
+        type: 'integer',
+        description:
+          'The reqid returned by list_network_requests for the target page.',
+        required: true,
+      },
+    },
+  },
   resize_page: {
     description:
       "Resizes the page's window so that the page has specified dimension",

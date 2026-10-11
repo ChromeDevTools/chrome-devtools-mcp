@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import os from 'node:os';
+import {createServer} from 'node:http';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
@@ -98,6 +99,99 @@ describe('e2e', () => {
       [],
       {versionNegotiation: {mode: 'auto'}},
     );
+  });
+
+  it('replays an XHR through MCP preserving POST body, headers and cookies', async () => {
+    const received: Array<{
+      body: string;
+      cookie: string | undefined;
+      token: string | string[] | undefined;
+      method: string | undefined;
+    }> = [];
+    const server = createServer((req, res) => {
+      if (req.url === '/api') {
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk;
+        });
+        req.on('end', () => {
+          received.push({
+            body,
+            cookie: req.headers.cookie,
+            token: req.headers['x-replay-test'],
+            method: req.method,
+          });
+          res.end('ok');
+        });
+        return;
+      }
+      res.setHeader('Set-Cookie', 'replay=secret; HttpOnly; SameSite=Lax');
+      res.setHeader('Content-Type', 'text/html');
+      res.end(
+        `<html><head><link rel="icon" href="data:,"></head><body><script>const x=new XMLHttpRequest();x.open('POST','/api');x.setRequestHeader('X-Replay-Test','kept');x.send('replay-body');</script></body></html>`,
+      );
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address();
+      assert.ok(address && typeof address !== 'string');
+      await withClient(async client => {
+        const {tools} = await client.listTools();
+        const tool = tools.find(tool => tool.name === 'resend_network_request');
+        assert.ok(tool);
+        assert.equal(tool.annotations?.readOnlyHint, false);
+        const opened = await client.callTool({
+          name: 'new_page',
+          arguments: {url: `http://127.0.0.1:${address.port}/`},
+        });
+        assert.ok(!opened.isError);
+        const listed = await client.callTool({
+          name: 'list_network_requests',
+          arguments: {pageId: 2, resourceTypes: ['xhr']},
+        });
+        const listing = JSON.stringify(listed.content);
+        const match = /reqid=(\d+)/.exec(listing);
+        assert.ok(match, listing);
+        assert.equal(received.length, 1);
+        const result = await client.callTool({
+          name: 'resend_network_request',
+          arguments: {pageId: 2, reqid: Number(match[1])},
+        });
+        assert.ok(!result.isError, JSON.stringify(result));
+        const text = JSON.stringify(result.content);
+        assert.match(text, /XHR replay submitted/);
+        for (let attempt = 0; attempt < 100 && received.length < 2; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        assert.equal(received.length, 2);
+        assert.deepEqual(received[1], received[0]);
+        assert.deepEqual(received[1], {
+          body: 'replay-body',
+          cookie: 'replay=secret',
+          token: 'kept',
+          method: 'POST',
+        });
+        const documents = await client.callTool({
+          name: 'list_network_requests',
+          arguments: {pageId: 2, resourceTypes: ['document']},
+        });
+        const documentId = /reqid=(\d+)/.exec(
+          JSON.stringify(documents.content),
+        );
+        assert.ok(documentId);
+        const rejected = await client.callTool({
+          name: 'resend_network_request',
+          arguments: {pageId: 2, reqid: Number(documentId[1])},
+        });
+        assert.equal(rejected.isError, true);
+        assert.match(JSON.stringify(rejected.content), /XHR requests only/);
+        assert.equal(received.length, 2);
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   it('calls a tool', async t => {

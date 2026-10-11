@@ -145,3 +145,32 @@ export const getNetworkRequest = definePageTool(() => ({
     }
   },
 }));
+
+export const resendNetworkRequest = definePageTool(() => ({
+  name: 'resend_network_request',
+  description:
+    'Replays a captured XHR using the original CDP session. Other request types are not supported. May repeat server-side changes. Returns a submission acknowledgement; use the network tools to inspect the new request and response. Never automatically retry an error: the request may already have been sent.',
+  annotations: {
+    category: ToolCategory.NETWORK,
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+  },
+  schema: {
+    reqid: zod
+      .number()
+      .int()
+      .positive()
+      .describe(
+        'The reqid returned by list_network_requests for the target page.',
+      ),
+  },
+  blockedByDialog: true,
+  verifyFilesSchema: {},
+  handler: async (request, response) => {
+    await request.page.resendNetworkRequest(request.params.reqid);
+    response.appendResponseLine(
+      'XHR replay submitted. Inspect list_network_requests for the new request and its response.',
+    );
+  },
+}));

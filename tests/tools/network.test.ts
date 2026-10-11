@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert/strict';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -11,6 +12,7 @@ import sinon from 'sinon';
 import {
   getNetworkRequest,
   listNetworkRequests,
+  resendNetworkRequest,
 } from '../../src/tools/network.js';
 import {createHandlerMocks} from '../mocks.js';
 
@@ -226,5 +228,48 @@ describe('network', () => {
       );
       sinon.assert.notCalled(response.attachNetworkRequest);
     });
+  });
+});
+
+describe('resend_network_request', () => {
+  afterEach(() => sinon.restore());
+
+  it('submits replay on the selected page', async () => {
+    const {page, context, response, args} = createHandlerMocks();
+    page.resendNetworkRequest.resolves();
+    await resendNetworkRequest(args).handler(
+      {params: {reqid: 7}, page},
+      response,
+      context,
+    );
+    sinon.assert.calledOnceWithExactly(page.resendNetworkRequest, 7);
+    sinon.assert.calledOnceWithExactly(
+      response.appendResponseLine,
+      'XHR replay submitted. Inspect list_network_requests for the new request and its response.',
+    );
+  });
+
+  it('propagates unknown request errors from the collector', async () => {
+    const {page, context, response, args} = createHandlerMocks();
+    const error = new Error('Request not found');
+    page.resendNetworkRequest.rejects(error);
+    await assert.rejects(
+      resendNetworkRequest(args).handler(
+        {params: {reqid: 999}, page},
+        response,
+        context,
+      ),
+      error,
+    );
+    sinon.assert.notCalled(response.appendResponseLine);
+  });
+
+  it('rejects non-positive and fractional reqids', () => {
+    const {args} = createHandlerMocks();
+    const {reqid} = resendNetworkRequest(args).schema;
+    for (const value of [0, -1, 1.5, '7']) {
+      assert.equal(reqid.safeParse(value).success, false);
+    }
+    assert.equal(reqid.safeParse(7).success, true);
   });
 });

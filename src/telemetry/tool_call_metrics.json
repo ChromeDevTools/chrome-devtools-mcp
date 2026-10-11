@@ -1222,5 +1222,14 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "resend_network_request",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
   }
 ]
