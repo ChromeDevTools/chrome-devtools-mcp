@@ -127,6 +127,7 @@ chrome-devtools list_network_requests 1 # List all network requests for page 1
 chrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination
 chrome-devtools list_network_requests 1 --resourceTypes Fetch # Filter requests by resource type
 chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
+chrome-devtools resend_network_request 1 7 # Replay XHR reqid 7 on page 1
 ```
 
 ## Debugging & Inspection
