@@ -20,9 +20,6 @@ import {
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
-export type {Options as YargsOptions, InferredOptionTypes} from 'yargs';
-export {default as yargs} from 'yargs';
-export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
 export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
 export {

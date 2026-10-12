@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Argv} from 'yargs';
-import type {YargsOptions, InferredOptionTypes} from '../third_party/index.js';
-
-import {yargs, hideBin} from '../third_party/index.js';
-
 import {readFileSync} from 'node:fs';
 
 import {
@@ -21,25 +16,82 @@ import {
   withoutDefaults,
 } from './mcp-options.js';
 import {ConfigLocator} from './ConfigLocator.js';
+import type {CliOption, InferOptionTypes} from './types.js';
+import {parseOptionTokens} from './cli-parser.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isParsedArguments(
+  _args: Partial<ParsedArguments>,
+): _args is ParsedArguments {
+  return true;
 }
 
 function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
-  parsed: T,
-): Omit<T, '_' | '$0'> {
-  const copy = {...parsed};
-  delete copy._;
-  delete copy.$0;
-  return copy;
+function formatHelp(
+  scriptName: string,
+  options: Record<string, CliOption>,
+  examples: Array<[string, string]>,
+): string {
+  const lines: string[] = [];
+  lines.push(scriptName);
+  lines.push('');
+  lines.push('Options:');
+  lines.push(
+    '  --help     Show help                                                 [boolean]',
+  );
+  lines.push(
+    '  --version  Show version number                                       [boolean]',
+  );
+  for (const [key, opt] of Object.entries(options)) {
+    if (opt.hidden) {
+      continue;
+    }
+    const kebab = key.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`);
+    let flagStr = kebab !== key ? `--${key}, --${kebab}` : `--${key}`;
+    if (opt.alias) {
+      const aliasStr =
+        opt.alias.length === 1 ? `-${opt.alias}` : `--${opt.alias}`;
+      flagStr = `${aliasStr}, ${flagStr}`;
+    }
+    const desc = opt.describe || opt.description || '';
+    lines.push(`  ${flagStr}`);
+    if (desc) {
+      lines.push(`      ${desc}`);
+    }
+  }
+  if (examples.length > 0) {
+    lines.push('');
+    lines.push('Examples:');
+    for (const [cmd, desc] of examples) {
+      const renderedCmd = cmd.replace('$0', scriptName);
+      lines.push(`  ${renderedCmd}  ${desc}`);
+    }
+  }
+  return lines.join('\n');
 }
 
-export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
+export interface CliBuilder {
+  scriptName(name: string): this;
+  parserConfiguration(config: Record<string, boolean>): this;
+  options(opts: Record<string, CliOption>): this;
+  showHelpOnFail(show: boolean, msg?: string): this;
+  example(examples: Array<[string, string]> | string, desc?: string): this;
+  wrap(width: number): this;
+  terminalWidth(): number;
+  help(): this;
+  version(ver?: string): this;
+  fail(handler: ((msg: string, err?: unknown) => void) | false): this;
+  getHelp(): Promise<string>;
+  parseSync(): Partial<ParsedArguments>;
+}
+
+export type ParsedArguments = InferOptionTypes<typeof mcpOptions>;
 
 export class ConfigParser {
   #configPath?: string;
@@ -59,21 +111,79 @@ export class ConfigParser {
   }
 
   buildCliParser(
-    options: Record<string, YargsOptions> = mcpOptions,
-  ): Argv<InferredOptionTypes<Record<string, YargsOptions>>> {
-    const yargsInstance = yargs(hideBin(this.argv));
-    return yargsInstance
-      .scriptName('npx chrome-devtools-mcp@latest')
-      .parserConfiguration({
-        'strip-aliased': true,
-        'strip-dashed': true,
-      })
-      .options(options)
-      .showHelpOnFail(false, 'Specify --help for available options')
-      .example(CLI_EXAMPLES)
-      .wrap(Math.min(120, yargsInstance.terminalWidth()))
-      .help()
-      .version(this.version);
+    options: Record<string, CliOption> = mcpOptions,
+  ): CliBuilder {
+    let customScriptName = 'npx chrome-devtools-mcp@latest';
+    let customVersion = this.version;
+    let activeOptions = options;
+    let examples = CLI_EXAMPLES;
+    const argvToUse = this.argv;
+    const exitProc = this.exitProcess;
+
+    const builder: CliBuilder = {
+      scriptName(name: string) {
+        customScriptName = name;
+        return this;
+      },
+      parserConfiguration(_config: Record<string, boolean>) {
+        return this;
+      },
+      options(opts: Record<string, CliOption>) {
+        activeOptions = opts;
+        return this;
+      },
+      showHelpOnFail(_show: boolean, _msg?: string) {
+        return this;
+      },
+      example(ex: Array<[string, string]> | string, _desc?: string) {
+        if (Array.isArray(ex)) {
+          examples = ex;
+        }
+        return this;
+      },
+      wrap(_width: number) {
+        return this;
+      },
+      terminalWidth() {
+        return 120;
+      },
+      help() {
+        return this;
+      },
+      version(ver?: string) {
+        if (ver) {
+          customVersion = ver;
+        }
+        return this;
+      },
+      fail(_handler: ((msg: string, err?: unknown) => void) | false) {
+        return this;
+      },
+      getHelp(): Promise<string> {
+        return Promise.resolve(
+          formatHelp(customScriptName, activeOptions, examples),
+        );
+      },
+      parseSync(): Partial<ParsedArguments> {
+        const rawArgs = argvToUse.slice(2);
+        if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
+          const helpText = formatHelp(customScriptName, activeOptions, examples);
+          if (exitProc) {
+            console.log(helpText);
+            process.exit(0);
+          }
+        }
+        if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
+          if (exitProc) {
+            console.log(customVersion);
+            process.exit(0);
+          }
+        }
+        return parseOptionTokens(rawArgs, activeOptions);
+      },
+    };
+
+    return builder;
   }
 
   /**
@@ -82,14 +192,13 @@ export class ConfigParser {
    * process; parse errors throw.
    */
   parseCliArgs(): Partial<ParsedArguments> {
-    const parsed = this.buildCliParser(withoutDefaults(mcpOptions))
+    return this.buildCliParser(withoutDefaults(mcpOptions))
       .fail(false)
       .parseSync();
-    return stripYargsPositionalArgs(parsed);
   }
 
   /**
-   * Step 2: reads the JSON config file and runs it through yargs to reject
+   * Step 2: reads the JSON config file and validates it against options to reject
    * unknown keys and apply coercions, without applying defaults.
    */
   parseConfigFile(configPath: string): Partial<ParsedArguments> {
@@ -100,18 +209,57 @@ export class ConfigParser {
       if (!isPlainObject(fileContent)) {
         throw new Error('Config must be a JSON object');
       }
-      const parsed = yargs([])
-        .parserConfiguration({
-          'strip-aliased': true,
-          'camel-case-expansion': false,
-        })
-        .options(withoutDefaults(mcpOptions))
-        .config(fileContent)
-        .strict()
-        .fail(false)
-        .exitProcess(false)
-        .parseSync([]);
-      return stripYargsPositionalArgs(parsed);
+      const options = withoutDefaults(mcpOptions);
+      const parsed: Record<string, unknown> = {};
+
+      for (const [key, rawValue] of Object.entries(fileContent)) {
+        if (!(key in options)) {
+          throw new Error(`Unknown argument: ${key}`);
+        }
+        const opt = options[key];
+        if (opt.choices) {
+          let match = false;
+          for (const choice of opt.choices) {
+            if (choice === rawValue) {
+              match = true;
+              break;
+            }
+          }
+          if (!match) {
+            throw new Error(
+              `Invalid value for --${key}: "${String(rawValue)}". Allowed choices: ${opt.choices.join(', ')}`,
+            );
+          }
+        }
+        if (
+          opt.type === 'string' &&
+          'coerce' in opt &&
+          typeof opt.coerce === 'function'
+        ) {
+          parsed[key] = opt.coerce(
+            typeof rawValue === 'string' ? rawValue : undefined,
+          );
+        } else if (
+          opt.type === 'number' &&
+          'coerce' in opt &&
+          typeof opt.coerce === 'function'
+        ) {
+          parsed[key] = opt.coerce(
+            typeof rawValue === 'number' ? rawValue : undefined,
+          );
+        } else if (
+          opt.type === 'array' &&
+          'coerce' in opt &&
+          typeof opt.coerce === 'function'
+        ) {
+          parsed[key] = opt.coerce(
+            Array.isArray(rawValue) ? rawValue : undefined,
+          );
+        } else {
+          parsed[key] = rawValue;
+        }
+      }
+      return parsed;
     } catch (err) {
       throw new Error(`Invalid JSON config file: ${getErrorMessage(err)}`);
     }
@@ -179,15 +327,13 @@ export class ConfigParser {
       !resolvedArgs.wsEndpoint &&
       !resolvedArgs.executablePath;
 
+    const resolvedRecord: Record<string, unknown> = resolvedArgs;
     for (const [key, option] of Object.entries(baseOptions)) {
       if (key === 'channel' && !launchesByChannel) {
         continue;
       }
-      if (
-        resolvedArgs[key as keyof ParsedArguments] === undefined &&
-        'default' in option
-      ) {
-        resolvedArgs[key as keyof ParsedArguments] = option.default;
+      if (resolvedRecord[key] === undefined && 'default' in option) {
+        resolvedRecord[key] = option.default;
       }
     }
 
@@ -232,10 +378,10 @@ export class ConfigParser {
       resolvedArgs.categoryExperimentalThirdParty = true;
     }
 
-    // The merge and the default loop lose the static type that yargs infers from
-    // `mcpOptions`. Every value was produced by the same option definitions (CLI
-    // parser, strict config-file parser, option defaults), so the shape matches.
-    return resolvedArgs as unknown as ParsedArguments;
+    if (isParsedArguments(resolvedArgs)) {
+      return resolvedArgs;
+    }
+    throw new Error('Failed to resolve all required arguments');
   }
 
   parse(): ParsedArguments {

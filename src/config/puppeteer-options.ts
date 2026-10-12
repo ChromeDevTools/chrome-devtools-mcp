@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {CliOption} from './types.js';
 import {findUnenforceablePattern} from '../utils/url.js';
 
 /**
@@ -76,4 +76,4 @@ export const puppeteerOptions = {
       return arg;
     },
   },
-} satisfies Record<string, YargsOptions>;
+} satisfies Record<string, CliOption>;

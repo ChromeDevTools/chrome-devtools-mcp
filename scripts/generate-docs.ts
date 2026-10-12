@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 
-import type {Options as YargsOptions} from 'yargs';
+import type {CliOption} from '../src/config/types.js';
 
 import {mcpOptions} from '../build/src/config/mcp-options.js';
 import {
@@ -113,9 +113,8 @@ function sortTools(a: ToolWithAnnotations, b: ToolWithAnnotations): number {
 function generateConfigOptionsMarkdown(): string {
   let markdown = '';
 
-  for (const [optionName, optionConfig] of Object.entries(
-    mcpOptions as Record<string, Partial<YargsOptions>>,
-  )) {
+  const options: Record<string, CliOption> = mcpOptions;
+  for (const [optionName, optionConfig] of Object.entries(options)) {
     // Skip hidden options
     if (optionConfig.hidden) {
       continue;

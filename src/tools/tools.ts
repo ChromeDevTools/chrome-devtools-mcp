@@ -6,7 +6,7 @@
 
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {mcpOptions} from '../config/mcp-options.js';
-import type {YargsOptions} from '../third_party/index.js';
+import type {CliOption} from '../config/types.js';
 
 import * as commentsTools from './comments.js';
 import * as consoleTools from './console.js';
@@ -72,7 +72,7 @@ export function requiresHiddenFlag(
   tool: ToolDefinition | DefinedPageTool,
 ): boolean {
   for (const condition of tool.annotations.conditions ?? []) {
-    const option: YargsOptions = mcpOptions[condition];
+    const option: CliOption = mcpOptions[condition];
     if (option.hidden) {
       return true;
     }

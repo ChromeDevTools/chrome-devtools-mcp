@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {CliOption} from './types.js';
 
 export const browserOptions = {
   autoConnect: {
@@ -120,7 +120,7 @@ export const browserOptions = {
     describe:
       'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
-} satisfies Record<string, YargsOptions>;
+} satisfies Record<string, CliOption>;
 
 export function getBrowserOptions(): typeof browserOptions {
   return browserOptions;

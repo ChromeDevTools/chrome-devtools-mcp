@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {CliOption} from './types.js';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -207,11 +207,11 @@ export const mcpOptions = {
       return path.resolve(configPath);
     },
   },
-} satisfies Record<string, YargsOptions>;
+} satisfies Record<string, CliOption>;
 
 export function getMcpOptionsForViaCli(): Record<
   keyof typeof mcpOptions,
-  YargsOptions
+  CliOption
 > {
   if (!('default' in mcpOptions.headless)) {
     throw new Error('headless cli option unexpectedly does not have a default');
@@ -252,9 +252,9 @@ export function getMcpOptionsForViaCli(): Record<
 }
 
 export function getCliOptions(): Partial<
-  Record<keyof typeof mcpOptions, YargsOptions>
+  Record<keyof typeof mcpOptions, CliOption>
 > {
-  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> =
+  const options: Partial<Record<keyof typeof mcpOptions, CliOption>> =
     withoutDefaults(getMcpOptionsForViaCli());
 
   // Missing CLI serialization.
@@ -352,11 +352,11 @@ export const IMPLICATIONS: Array<
 ];
 
 export function withoutDefaults(
-  options: Record<string, YargsOptions>,
-): Record<string, YargsOptions> {
-  const result: Record<string, YargsOptions> = {};
+  options: Record<string, CliOption>,
+): Record<string, CliOption> {
+  const result: Record<string, CliOption> = {};
   for (const [key, option] of Object.entries(options)) {
-    const copy: YargsOptions = {...option};
+    const copy: CliOption = {...option};
     if (copy.default !== undefined) {
       copy.defaultDescription ??= JSON.stringify(copy.default);
       delete copy.default;

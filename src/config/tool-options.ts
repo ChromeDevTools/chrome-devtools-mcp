@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {CliOption} from './types.js';
 
 /**
  * Options that change the default behavior of tools.
@@ -65,4 +65,4 @@ export const toolOptions = {
       return value;
     },
   },
-} satisfies Record<string, YargsOptions>;
+} satisfies Record<string, CliOption>;

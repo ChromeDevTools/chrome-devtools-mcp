@@ -16,6 +16,7 @@ import {
 } from '../src/config/mcp-options.js';
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
+import {parseCliCommand} from '../src/config/cli-parser.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 
 import {createTempFile} from './utils.js';
@@ -1287,7 +1288,7 @@ describe('cli command strings', () => {
     assert.ok(usage.includes('[--optArg]'));
   });
 
-  it('keeps every generated command parsable by yargs', () => {
+  it('keeps every generated command parsable', () => {
     for (const [name, {args}] of Object.entries(commands)) {
       const {command} = buildCommand(name, args);
 
@@ -1314,6 +1315,159 @@ describe('cli command strings', () => {
         }
       }
     }
+  });
+});
+
+describe('cli command parser', () => {
+  it('parses fill with - as positional value', () => {
+    const parsed = parseCliCommand(
+      ['fill', '1', '1_2', '-'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'fill');
+    assert.deepStrictEqual(parsed.toolArgs, {
+      pageId: 1,
+      uid: '1_2',
+      value: '-',
+    });
+  });
+
+  it('parses fill with -- followed by flag-like positional value', () => {
+    const parsed = parseCliCommand(
+      ['fill', '1', '1_2', '--', '--weird'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'fill');
+    assert.deepStrictEqual(parsed.toolArgs, {
+      pageId: 1,
+      uid: '1_2',
+      value: '--weird',
+    });
+  });
+
+  it('parses variadic positional with -- and flag-like values', () => {
+    const parsed = parseCliCommand(
+      [
+        'upload_file',
+        '1',
+        '1_2',
+        '--',
+        'file1.txt',
+        '--flag-like.png',
+        'file3.txt',
+      ],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'upload_file');
+    assert.deepStrictEqual(parsed.toolArgs, {
+      pageId: 1,
+      uid: '1_2',
+      filePaths: ['file1.txt', '--flag-like.png', 'file3.txt'],
+    });
+  });
+
+  it('parses evaluate_script with optional positional function', () => {
+    const parsed = parseCliCommand(
+      ['evaluate_script', '() => 6 * 7', '--pageId', '1'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'evaluate_script');
+    assert.strictEqual(parsed.toolArgs?.function, '() => 6 * 7');
+    assert.strictEqual(parsed.toolArgs?.pageId, 1);
+  });
+
+  it('parses evaluate_script without optional positional function', () => {
+    const parsed = parseCliCommand(
+      ['evaluate_script', '--pageId', '1', '--sourcePath', '/tmp/foo.js'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'evaluate_script');
+    assert.strictEqual(parsed.toolArgs?.function, undefined);
+    assert.strictEqual(parsed.toolArgs?.pageId, 1);
+    assert.strictEqual(parsed.toolArgs?.sourcePath, '/tmp/foo.js');
+  });
+
+  it('rejects not enough positionals with expected error', () => {
+    assert.throws(
+      () => parseCliCommand(['fill', '1'], commands, getCliOptions),
+      /Not enough non-option arguments/,
+    );
+  });
+
+  it('rejects unexpected excess positionals', () => {
+    assert.throws(
+      () =>
+        parseCliCommand(
+          ['fill', '1', '1_2', 'val', 'extra'],
+          commands,
+          getCliOptions,
+        ),
+      /Unknown argument: extra/,
+    );
+  });
+
+  it('rejects unknown flag', () => {
+    assert.throws(
+      () =>
+        parseCliCommand(
+          ['fill', '1', '1_2', 'val', '--unknownFlag'],
+          commands,
+          getCliOptions,
+        ),
+      /Unknown argument: --unknownFlag/,
+    );
+  });
+
+  it('treats --help after -- as a positional value rather than help flag', () => {
+    const parsed = parseCliCommand(
+      ['fill', '1', '1_2', '--', '--help'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'fill');
+    assert.strictEqual(parsed.help, undefined);
+    assert.deepStrictEqual(parsed.toolArgs, {
+      pageId: 1,
+      uid: '1_2',
+      value: '--help',
+    });
+  });
+
+  it('sets help=true when --help is passed to a subcommand before --', () => {
+    const parsed = parseCliCommand(
+      ['fill', '--help'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'fill');
+    assert.strictEqual(parsed.help, true);
+  });
+
+  it('parses global --sessionId with space-separated value without leaking positional', () => {
+    const parsed = parseCliCommand(
+      ['--sessionId', 'custom-session', 'status'],
+      commands,
+      getCliOptions,
+    );
+    assert.strictEqual(parsed.command, 'status');
+    assert.strictEqual(parsed.sessionId, 'custom-session');
+  });
+
+  it('rejects invalid enum value on --output-format', () => {
+    assert.throws(
+      () =>
+        parseCliCommand(
+          ['list_pages', '--output-format', 'xml'],
+          commands,
+          getCliOptions,
+        ),
+      /Invalid value for --output-format/,
+    );
   });
 });
 

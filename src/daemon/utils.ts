@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {CliOption} from '../config/types.js';
 import {logger} from '../utils/logger.js';
 
 export const DAEMON_SCRIPT_PATH = path.join(import.meta.dirname, 'daemon.js');
@@ -108,7 +108,7 @@ export function isDaemonRunning(sessionId: string): boolean {
 }
 
 export function serializeArgs(
-  options: Record<string, YargsOptions>,
+  options: Record<string, CliOption>,
   argv: Record<string, unknown>,
 ): string[] {
   const args: string[] = [];
