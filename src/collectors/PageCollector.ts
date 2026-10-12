@@ -213,7 +213,7 @@ export class ConsoleCollector extends PageCollector<
         item: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
       ) => void,
     ) => ListenerMap<PageEvents>,
-    maxMessagesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
+    maxMessagesPerNavigation: number = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
   ) {
     super(page, listeners, maxMessagesPerNavigation);
     this.#subscriber = new PageEventSubscriber(this.pptrPage);
@@ -386,7 +386,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
 
   constructor(
     page: Page,
-    maxRequestsPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
+    maxRequestsPerNavigation: number = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
     listeners: (
       collector: (item: HTTPRequest) => void,
     ) => ListenerMap<PageEvents> = collect => {

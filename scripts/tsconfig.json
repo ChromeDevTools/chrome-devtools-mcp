@@ -14,9 +14,10 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "incremental": true,
-    "allowJs": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    "declaration": false,
+    "isolatedDeclarations": false,
     "useUnknownInCatchVariables": false
   },
   "include": ["./**/*.ts", "./**/*.js", "./**/*.mjs"]

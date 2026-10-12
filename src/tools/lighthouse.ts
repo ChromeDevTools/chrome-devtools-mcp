@@ -19,7 +19,7 @@ import {
 
 import {ToolCategory} from './categories.js';
 import {startTrace} from './performance.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 // Kept in sync with `constants.userAgents` in Lighthouse's
 // core/config/constants.js, which `lighthouse:default` and the `desktop`
@@ -31,164 +31,166 @@ const MOBILE_USER_AGENT =
 const DESKTOP_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
 
-export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
-  name: 'lighthouse_audit',
-  description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace(args).name}`,
-  annotations: {
-    category: ToolCategory.DEBUGGING,
-    readOnlyHint: false,
-  },
-  schema: {
-    mode: zod
-      .enum(['navigation', 'snapshot'])
-      .default('navigation')
-      .describe(
-        '"navigation" reloads & audits. "snapshot" analyzes current state.',
-      ),
-    device: zod
-      .enum(['desktop', 'mobile'])
-      .default('desktop')
-      .describe('Device to emulate.'),
-    outputDirPath: zod
-      .string()
-      .optional()
-      .describe('Directory for reports. If omitted, uses temporary files.'),
-  },
-  blockedByDialog: true,
-  verifyFilesSchema: {
-    outputDirPath: true,
-  },
-  handler: async (request, response, context) => {
-    const page = request.page;
-    const categories = [
-      'accessibility',
-      'seo',
-      'best-practices',
-      'agentic-browsing',
-    ];
-    const formats = ['json', 'html'] as OutputMode[];
-    const {
-      mode = 'navigation',
-      device = 'desktop',
-      outputDirPath,
-    } = request.params;
+export const lighthouseAudit: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => ({
+    name: 'lighthouse_audit',
+    description: `Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run ${startTrace(args).name}`,
+    annotations: {
+      category: ToolCategory.DEBUGGING,
+      readOnlyHint: false,
+    },
+    schema: {
+      mode: zod
+        .enum(['navigation', 'snapshot'])
+        .default('navigation')
+        .describe(
+          '"navigation" reloads & audits. "snapshot" analyzes current state.',
+        ),
+      device: zod
+        .enum(['desktop', 'mobile'])
+        .default('desktop')
+        .describe('Device to emulate.'),
+      outputDirPath: zod
+        .string()
+        .optional()
+        .describe('Directory for reports. If omitted, uses temporary files.'),
+    },
+    blockedByDialog: true,
+    verifyFilesSchema: {
+      outputDirPath: true,
+    },
+    handler: async (request, response, context) => {
+      const page = request.page;
+      const categories = [
+        'accessibility',
+        'seo',
+        'best-practices',
+        'agentic-browsing',
+      ];
+      const formats = ['json', 'html'] as OutputMode[];
+      const {
+        mode = 'navigation',
+        device = 'desktop',
+        outputDirPath,
+      } = request.params;
 
-    const flags: Flags = {
-      onlyCategories: categories,
-      output: formats,
-      // Default 30 second timeout for page load.
-      maxWaitForLoad: 30_000,
-    };
-
-    if (device === 'desktop') {
-      flags.formFactor = 'desktop';
-      flags.screenEmulation = {
-        mobile: false,
-        width: 1350,
-        height: 940,
-        deviceScaleFactor: 1,
-        disabled: false,
+      const flags: Flags = {
+        onlyCategories: categories,
+        output: formats,
+        // Default 30 second timeout for page load.
+        maxWaitForLoad: 30_000,
       };
-      flags.emulatedUserAgent = DESKTOP_USER_AGENT;
-    } else {
-      flags.formFactor = 'mobile';
-      flags.screenEmulation = {
-        mobile: true,
-        width: 412,
-        height: 823,
-        deviceScaleFactor: 1.75,
-        disabled: false,
-      };
-      flags.emulatedUserAgent = MOBILE_USER_AGENT;
-    }
 
-    let result: RunnerResult | undefined;
-    try {
-      if (mode === 'navigation') {
-        result = await lighthouseRunner.navigation(
-          page.pptrPage,
-          page.pptrPage.url(),
-          {
-            flags,
-          },
-        );
+      if (device === 'desktop') {
+        flags.formFactor = 'desktop';
+        flags.screenEmulation = {
+          mobile: false,
+          width: 1350,
+          height: 940,
+          deviceScaleFactor: 1,
+          disabled: false,
+        };
+        flags.emulatedUserAgent = DESKTOP_USER_AGENT;
       } else {
-        result = await lighthouseRunner.snapshot(page.pptrPage, {
-          flags,
-        });
+        flags.formFactor = 'mobile';
+        flags.screenEmulation = {
+          mobile: true,
+          width: 412,
+          height: 823,
+          deviceScaleFactor: 1.75,
+          disabled: false,
+        };
+        flags.emulatedUserAgent = MOBILE_USER_AGENT;
       }
 
-      if (!result) {
-        throw new Error('Lighthouse audit failed.');
+      let result: RunnerResult | undefined;
+      try {
+        if (mode === 'navigation') {
+          result = await lighthouseRunner.navigation(
+            page.pptrPage,
+            page.pptrPage.url(),
+            {
+              flags,
+            },
+          );
+        } else {
+          result = await lighthouseRunner.snapshot(page.pptrPage, {
+            flags,
+          });
+        }
+
+        if (!result) {
+          throw new Error('Lighthouse audit failed.');
+        }
+      } finally {
+        await page.restoreEmulation();
       }
-    } finally {
-      await page.restoreEmulation();
-    }
 
-    const lhr = result.lhr;
-    const reportPaths: string[] = [];
+      const lhr = result.lhr;
+      const reportPaths: string[] = [];
 
-    const encoder = new TextEncoder();
-    const savePromises = formats.map(async format => {
-      const report = generateReport(lhr, format);
-      const data = encoder.encode(report);
-      if (outputDirPath) {
-        const reportPath = path.join(outputDirPath, `report`);
-        const {filename} = await context.saveFile(
+      const encoder = new TextEncoder();
+      const savePromises = formats.map(async format => {
+        const report = generateReport(lhr, format);
+        const data = encoder.encode(report);
+        if (outputDirPath) {
+          const reportPath = path.join(outputDirPath, `report`);
+          const {filename} = await context.saveFile(
+            data,
+            reportPath,
+            `.${format}`,
+          );
+          return filename;
+        }
+        const {filepath} = await context.saveTemporaryFile(
           data,
-          reportPath,
-          `.${format}`,
+          `report.${format}`,
         );
-        return filename;
+        return filepath;
+      });
+
+      const results = await Promise.allSettled(savePromises);
+      for (const res of results) {
+        if (res.status === 'rejected') {
+          throw res.reason;
+        }
+        reportPaths.push(res.value);
       }
-      const {filepath} = await context.saveTemporaryFile(
-        data,
-        `report.${format}`,
-      );
-      return filepath;
-    });
 
-    const results = await Promise.allSettled(savePromises);
-    for (const res of results) {
-      if (res.status === 'rejected') {
-        throw res.reason;
-      }
-      reportPaths.push(res.value);
-    }
+      const categoryScores = Object.values(lhr.categories).map(c => ({
+        id: c.id,
+        title: c.title,
+        score: c.score,
+      }));
 
-    const categoryScores = Object.values(lhr.categories).map(c => ({
-      id: c.id,
-      title: c.title,
-      score: c.score,
-    }));
+      const failedAudits = Object.values(lhr.audits).filter(
+        a => a.score !== null && a.score < 1,
+      ).length;
 
-    const failedAudits = Object.values(lhr.audits).filter(
-      a => a.score !== null && a.score < 1,
-    ).length;
+      const passedAudits = Object.values(lhr.audits).filter(
+        a => a.score === 1,
+      ).length;
 
-    const passedAudits = Object.values(lhr.audits).filter(
-      a => a.score === 1,
-    ).length;
-
-    const output = {
-      summary: {
-        mode,
-        device,
-        // `mainDocumentUrl` is only set for navigations, whereas
-        // `finalDisplayedUrl` is populated for every gather mode.
-        url: lhr.finalDisplayedUrl,
-        scores: categoryScores,
-        audits: {
-          failed: failedAudits,
-          passed: passedAudits,
+      const output = {
+        summary: {
+          mode,
+          device,
+          // `mainDocumentUrl` is only set for navigations, whereas
+          // `finalDisplayedUrl` is populated for every gather mode.
+          url: lhr.finalDisplayedUrl,
+          scores: categoryScores,
+          audits: {
+            failed: failedAudits,
+            passed: passedAudits,
+          },
+          timing: {
+            total: lhr.timing.total,
+          },
         },
-        timing: {
-          total: lhr.timing.total,
-        },
-      },
-      reports: reportPaths,
-    };
+        reports: reportPaths,
+      };
 
-    response.attachLighthouseResult(output);
-  },
-}));
+      response.attachLighthouseResult(output);
+    },
+  }),
+);
