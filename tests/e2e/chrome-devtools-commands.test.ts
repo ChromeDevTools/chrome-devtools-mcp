@@ -56,6 +56,45 @@ describe('chrome-devtools', () => {
     await assertDaemonIsRunning(sessionId);
   });
 
+  it('does not reuse an emulated viewport as the daemon startup viewport', async () => {
+    const emulateResult = await runCli(
+      ['emulate', '1', '--viewport', '500x400x1'],
+      sessionId,
+    );
+    assert.strictEqual(
+      emulateResult.status,
+      0,
+      `emulate command failed: ${emulateResult.stderr}`,
+    );
+
+    const currentPageResult = await runCli(
+      ['evaluate_script', '() => innerWidth === 500', '--pageId', '1'],
+      sessionId,
+    );
+    assert.strictEqual(currentPageResult.status, 0);
+    assert.match(
+      currentPageResult.stdout,
+      /^Script ran on page and returned:\n```json\ntrue\n```\n?$/,
+    );
+
+    const newPageResult = await runCli(['new_page', 'about:blank'], sessionId);
+    assert.strictEqual(
+      newPageResult.status,
+      0,
+      `new_page command failed: ${newPageResult.stderr}`,
+    );
+
+    const newPageWidthResult = await runCli(
+      ['evaluate_script', '() => innerWidth === 500', '--pageId', '2'],
+      sessionId,
+    );
+    assert.strictEqual(newPageWidthResult.status, 0);
+    assert.match(
+      newPageWidthResult.stdout,
+      /^Script ran on page and returned:\n```json\nfalse\n```\n?$/,
+    );
+  });
+
   it('can take screenshot', async () => {
     const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
