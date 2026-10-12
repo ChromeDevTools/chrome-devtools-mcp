@@ -35,7 +35,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--categoryExtensions`/ `--category-extensions`**
-  Set to true to include tools related to extensions. With autoConnect, browserUrl or wsEndpoint, this requires Chrome 149 or later.
+  Set to true to include tools related to extensions.
   - **Type:** boolean
   - **Default:** `false`
 

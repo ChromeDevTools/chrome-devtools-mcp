@@ -42,8 +42,7 @@ const categoryOverrides: Record<
     offByDefault: true,
   },
   [ToolCategory.EXTENSIONS]: {
-    describe:
-      'Set to true to include tools related to extensions. With autoConnect, browserUrl or wsEndpoint, this requires Chrome 149 or later.',
+    describe: 'Set to true to include tools related to extensions.',
     offByDefault: true,
   },
   [ToolCategory.THIRD_PARTY]: {
