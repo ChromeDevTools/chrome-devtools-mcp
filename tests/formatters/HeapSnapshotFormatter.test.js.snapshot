@@ -198,9 +198,9 @@ nodeId,nodeName,type,distance,selfSize,retainedSize
 32995,Window (internal cache) / https://example.com,object,3,0.2 kB,10.1 kB
 41995,Window (internal cache) / https://example.com,object,3,0.2 kB,10.1 kB
 16321,Window / https://example.com,native,2,0.9 kB,1.9 kB
-16329,Window,closure,3,0.1 kB,0.4 kB
-16341,Window,closure,3,0.1 kB,0.4 kB
 30975,Window (prototype) / https://example.com,object,3,0.0 kB,0.2 kB
+36637,Window (prototype) / https://example.com,object,3,0.0 kB,0.2 kB
+36647,WindowProperties,object,4,0.0 kB,0.1 kB
 `;
 
 exports[`HeapSnapshotFormatter > with real fixtures > formatNodes with queryObjects > formats queried objects with default options 1`] = `

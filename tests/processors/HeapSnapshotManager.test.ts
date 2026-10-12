@@ -5,6 +5,8 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
@@ -12,6 +14,35 @@ import sinon from 'sinon';
 import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
+import {createTempDir} from '../utils.js';
+
+async function createDetachedDomSnapshotFixture(
+  filePath: string,
+): Promise<void> {
+  const fixture = JSON.parse(
+    await fs.readFile('tests/fixtures/example.heapsnapshot', 'utf8'),
+  );
+  const fields = fixture.snapshot.meta.node_fields;
+  const typeOffset = fields.indexOf('type');
+  const nameOffset = fields.indexOf('name');
+  const nodeTypes = fixture.snapshot.meta.node_types[typeOffset];
+  let targetOffset = -1;
+
+  for (let offset = 0; offset < fixture.nodes.length; offset += fields.length) {
+    const nodeType = nodeTypes[fixture.nodes[offset + typeOffset]];
+    const nodeName = fixture.strings[fixture.nodes[offset + nameOffset]];
+    if (nodeType === 'native' && nodeName === '<div>') {
+      targetOffset = offset;
+      break;
+    }
+  }
+
+  assert.notEqual(targetOffset, -1);
+  fixture.strings.push('Detached <div class="detached-node">');
+  fixture.nodes[targetOffset + nameOffset] = fixture.strings.length - 1;
+
+  await fs.writeFile(filePath, JSON.stringify(fixture));
+}
 
 describe('HeapSnapshotManager', () => {
   afterEach(() => {
@@ -117,6 +148,197 @@ describe('HeapSnapshotManager', () => {
     } finally {
       manager1.dispose();
       manager2.dispose();
+    }
+  });
+
+  it('queries nodes by aggregate class names', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const {aggregates} = await manager.getAggregates(filePath);
+      const nativeClass = Object.values(aggregates).find(
+        aggregate => aggregate.name === 'HTMLBodyElement',
+      );
+      const specialClass = Object.values(aggregates).find(
+        aggregate => aggregate.name === '(array)',
+      );
+      assert.ok(nativeClass);
+      assert.ok(specialClass);
+
+      const nativeClassId = nativeClass[stableIdSymbol];
+      const specialClassId = specialClass[stableIdSymbol];
+      assert.ok(nativeClassId !== undefined);
+      assert.ok(specialClassId !== undefined);
+
+      const expectedNativeNodes = await manager.getNodesById(
+        filePath,
+        nativeClassId,
+      );
+      const actualNativeNodes = await manager.queryObjects(filePath, {
+        className: 'HTMLBodyElement',
+      });
+      const actualEmptyTypeNodes = await manager.queryObjects(filePath, {
+        className: 'HTMLBodyElement',
+        nodeType: '',
+      });
+      assert.deepStrictEqual(
+        actualNativeNodes.items
+          .map(node => {
+            assert.ok('id' in node);
+            return node.id;
+          })
+          .sort(),
+        expectedNativeNodes.items
+          .map(node => {
+            assert.ok('id' in node);
+            return node.id;
+          })
+          .sort(),
+      );
+      const expectedNativeOrder = expectedNativeNodes.items
+        .filter(node => 'id' in node)
+        .toSorted(
+          (a, b) =>
+            b.retainedSize - a.retainedSize || a.nodeIndex - b.nodeIndex,
+        )
+        .map(node => node.id);
+      assert.deepStrictEqual(
+        actualNativeNodes.items.map(node => {
+          assert.ok('id' in node);
+          return node.id;
+        }),
+        expectedNativeOrder,
+      );
+      assert.deepStrictEqual(
+        actualEmptyTypeNodes.items.map(node => {
+          assert.ok('id' in node);
+          return node.id;
+        }),
+        actualNativeNodes.items.map(node => {
+          assert.ok('id' in node);
+          return node.id;
+        }),
+      );
+      const actualAnchoredNativeNodes = await manager.queryObjects(filePath, {
+        className: '^HTMLBodyElement$',
+      });
+      assert.deepStrictEqual(
+        actualAnchoredNativeNodes.items
+          .map(node => {
+            assert.ok('id' in node);
+            return node.id;
+          })
+          .sort(),
+        expectedNativeNodes.items
+          .map(node => {
+            assert.ok('id' in node);
+            return node.id;
+          })
+          .sort(),
+      );
+
+      const expectedSpecialNodes = await manager.getNodesById(
+        filePath,
+        specialClassId,
+      );
+      const matchingSpecialNode = expectedSpecialNodes.items.find(
+        (node): node is DevTools.HeapSnapshotModel.HeapSnapshotModel.Node =>
+          'id' in node && node.type === 'array',
+      );
+      assert.ok(matchingSpecialNode);
+      const actualSpecialNodes = await manager.queryObjects(filePath, {
+        className: '(array)',
+        nodeType: 'array',
+        sortBy: 'id',
+        minSelfSize: matchingSpecialNode.selfSize,
+        maxSelfSize: matchingSpecialNode.selfSize,
+      });
+      const expectedSpecialIds = expectedSpecialNodes.items
+        .filter(
+          node =>
+            'id' in node &&
+            node.type === 'array' &&
+            node.selfSize === matchingSpecialNode.selfSize,
+        )
+        .map(node => {
+          assert.ok('id' in node);
+          return node.id;
+        });
+      const actualSpecialIds = actualSpecialNodes.items.map(node => {
+        assert.ok('id' in node);
+        return node.id;
+      });
+      assert.deepStrictEqual(
+        actualSpecialIds,
+        expectedSpecialIds.sort((a, b) => a - b),
+      );
+
+      const queriedSpecialNodes = await manager.queryObjects(filePath, {
+        propertyName: '.+',
+      });
+      const actualSpecialPropertyNodes = await manager.queryObjects(filePath, {
+        className: '(array)',
+        propertyName: '.+',
+      });
+      const expectedSpecialNodeIds = new Set(
+        expectedSpecialNodes.items.map(node => {
+          assert.ok('id' in node);
+          return node.id;
+        }),
+      );
+      const queriedSpecialIds = queriedSpecialNodes.items
+        .filter(
+          (node): node is DevTools.HeapSnapshotModel.HeapSnapshotModel.Node =>
+            'id' in node && expectedSpecialNodeIds.has(node.id),
+        )
+        .map(node => node.id);
+      assert.deepStrictEqual(
+        actualSpecialPropertyNodes.items.map(node => {
+          assert.ok('id' in node);
+          return node.id;
+        }),
+        queriedSpecialIds,
+      );
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('matches detached DOM class names instead of node display names', async () => {
+    using directory = createTempDir('heap-snapshot-class-filter-');
+    const filePath = path.join(directory.path, 'detached.heapsnapshot');
+    await createDetachedDomSnapshotFixture(filePath);
+    const manager = new HeapSnapshotManager();
+    try {
+      const {aggregates} = await manager.getAggregates(filePath);
+      const detachedClass = Object.values(aggregates).find(
+        aggregate => aggregate.name === 'Detached <div>',
+      );
+      assert.ok(detachedClass);
+
+      const classId = detachedClass[stableIdSymbol];
+      assert.ok(classId !== undefined);
+      const expectedNodes = await manager.getNodesById(filePath, classId);
+      const actualNodes = await manager.queryObjects(filePath, {
+        className: 'Detached <div>',
+        isDetached: false,
+      });
+      const expectedIds = expectedNodes.items.map(node => {
+        assert.ok('id' in node);
+        return node.id;
+      });
+      const actualIds = actualNodes.items.map(node => {
+        assert.ok('id' in node);
+        return node.id;
+      });
+
+      assert.deepStrictEqual(actualIds, expectedIds);
+      assert.equal(
+        actualNodes.items[0]?.name,
+        'Detached <div class="detached-node">',
+      );
+    } finally {
+      manager.dispose();
     }
   });
 

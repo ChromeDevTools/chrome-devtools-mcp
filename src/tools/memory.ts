@@ -514,7 +514,9 @@ export const queryHeapSnapshotObjects = defineTool(() => ({
     className: zod
       .string()
       .optional()
-      .describe('Optional regex or text matching object class name.'),
+      .describe(
+        'Optional class name. Exact class names take precedence; otherwise treated as a case-insensitive regex.',
+      ),
     propertyName: zod
       .string()
       .optional()

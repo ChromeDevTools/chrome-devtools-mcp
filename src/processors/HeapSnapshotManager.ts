@@ -442,8 +442,99 @@ export class HeapSnapshotManager {
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
     const snapshot = await this.getSnapshot(filePath);
-    const provider = snapshot.queryObjects(options);
-    return await provider.serializeItemsRange(0, Infinity);
+    const className = options.className;
+    if (!className) {
+      const provider = snapshot.queryObjects(options);
+      return await provider.serializeItemsRange(0, Infinity);
+    }
+
+    const aggregates = await snapshot.aggregatesWithFilter(
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter(),
+    );
+    const exactClassKeys = Object.entries(aggregates).filter(
+      ([, aggregate]) =>
+        aggregate.name.toLowerCase() === className.toLowerCase(),
+    );
+    let matchingClassKeys = exactClassKeys;
+    if (matchingClassKeys.length === 0) {
+      const classNamePattern = new RegExp(className, 'i');
+      matchingClassKeys = Object.entries(aggregates).filter(([, aggregate]) =>
+        classNamePattern.test(aggregate.name),
+      );
+    }
+
+    const needsWorkerFiltering = options.propertyName !== undefined;
+    const matchingNodeIds = new Set<number>();
+    const matchingNodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.Node[] =
+      [];
+    for (const [classKey] of matchingClassKeys) {
+      const classProvider = snapshot.createNodesProviderForClass(
+        classKey,
+        new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter(),
+      );
+      const classNodes = await classProvider.serializeItemsRange(0, Infinity);
+      for (const node of classNodes.items) {
+        if ('id' in node) {
+          if (needsWorkerFiltering) {
+            matchingNodeIds.add(node.id);
+          } else {
+            matchingNodes.push(node);
+          }
+        }
+      }
+    }
+
+    if (matchingNodeIds.size === 0 && matchingNodes.length === 0) {
+      return new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+        0,
+        0,
+        0,
+        [],
+      );
+    }
+
+    let items: DevTools.HeapSnapshotModel.HeapSnapshotModel.Node[];
+    if (needsWorkerFiltering) {
+      const provider = snapshot.queryObjects({
+        ...options,
+        className: undefined,
+      });
+      const result = await provider.serializeItemsRange(0, Infinity);
+      items = result.items.filter(
+        (item): item is DevTools.HeapSnapshotModel.HeapSnapshotModel.Node =>
+          'id' in item && matchingNodeIds.has(item.id),
+      );
+    } else {
+      items = matchingNodes.filter(
+        node =>
+          (!options.nodeType ||
+            node.type.toLowerCase() === options.nodeType.toLowerCase()) &&
+          (options.isDetached === undefined ||
+            (node.detachedDOMTreeNode === true) === options.isDetached) &&
+          (options.minSelfSize === undefined ||
+            node.selfSize >= options.minSelfSize) &&
+          (options.maxSelfSize === undefined ||
+            node.selfSize <= options.maxSelfSize) &&
+          (options.minRetainedSize === undefined ||
+            node.retainedSize >= options.minRetainedSize) &&
+          (options.maxRetainedSize === undefined ||
+            node.retainedSize <= options.maxRetainedSize),
+      );
+      const sortBy = options.sortBy ?? 'retainedSize';
+      items.sort((a, b) => {
+        if (sortBy === 'id') {
+          return a.id - b.id;
+        }
+        const size = sortBy === 'selfSize' ? 'selfSize' : 'retainedSize';
+        return b[size] - a[size] || a.nodeIndex - b.nodeIndex;
+      });
+    }
+    return new DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange(
+      0,
+      items.length,
+      items.length,
+      items,
+    );
   }
 
   hasSnapshots(): boolean {

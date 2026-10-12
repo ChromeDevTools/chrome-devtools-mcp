@@ -683,7 +683,7 @@ in the DevTools Elements panel (if any).
 **Parameters:**
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
-- **className** (string) _(optional)_: Optional regex or text matching object class name.
+- **className** (string) _(optional)_: Optional class name. Exact class names take precedence; otherwise treated as a case-insensitive regex.
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).

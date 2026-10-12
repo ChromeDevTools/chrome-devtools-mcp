@@ -1428,7 +1428,8 @@ export const commands: Commands = {
       className: {
         name: 'className',
         type: 'string',
-        description: 'Optional regex or text matching object class name.',
+        description:
+          'Optional class name. Exact class names take precedence; otherwise treated as a case-insensitive regex.',
         required: false,
       },
       propertyName: {
