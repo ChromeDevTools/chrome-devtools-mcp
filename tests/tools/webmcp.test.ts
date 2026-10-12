@@ -10,9 +10,15 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {McpPage} from '../../src/McpPage.js';
+import {ToolHandler} from '../../src/ToolHandler.js';
+import {Mutex} from '../../src/third_party/index.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
-import {createHandlerMocks, createMockWebMCPTool} from '../mocks.js';
+import {
+  createHandlerMocks,
+  createMockPuppeteerBrowser,
+  createMockWebMCPTool,
+} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
@@ -66,6 +72,36 @@ describe('webmcp', () => {
             };
           </script>`,
       );
+    }
+
+    function createFailedToolCall(options: {
+      errorText?: string;
+      exceptionDescription?: string;
+    }) {
+      const {page, context, response, args} = createHandlerMocks();
+      const tool = createMockWebMCPTool({name: 'failing_tool'});
+      tool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        output: undefined,
+        errorText: options.errorText ?? '',
+        exception:
+          options.exceptionDescription !== undefined
+            ? {
+                type: 'object',
+                subtype: 'error',
+                className: 'Error',
+                description: options.exceptionDescription,
+              }
+            : undefined,
+      });
+      page.getWebMcpTools.returns([tool]);
+      const run = executeWebMcpTool(args).handler(
+        {params: {toolName: 'failing_tool'}, page},
+        response,
+        context,
+      );
+      return {page, context, response, args, run};
     }
 
     it('executes a tool successfully', async () => {
@@ -167,6 +203,73 @@ describe('webmcp', () => {
           2,
         ),
       );
+    });
+
+    it('surfaces the page exception description', async () => {
+      const {response, run} = createFailedToolCall({
+        exceptionDescription: 'Error: boom from page',
+        errorText: 'A less useful tool error',
+      });
+
+      await assert.rejects(run, {message: 'Error: boom from page'});
+      sinon.assert.notCalled(response.appendResponseLine);
+    });
+
+    it('uses errorText when the exception has no description', async () => {
+      const {run} = createFailedToolCall({errorText: 'Tool execution failed'});
+
+      await assert.rejects(run, {message: 'Tool execution failed'});
+    });
+
+    it('uses errorText when the exception description is empty', async () => {
+      const {run} = createFailedToolCall({
+        exceptionDescription: '',
+        errorText: 'Tool execution failed',
+      });
+
+      await assert.rejects(run, {message: 'Tool execution failed'});
+    });
+
+    it('uses a status message when no error text is available', async () => {
+      const {run} = createFailedToolCall({});
+
+      await assert.rejects(run, {message: 'Tool execution failed: Error'});
+    });
+
+    it('maps a page exception to an MCP tool error', async () => {
+      const {page, context, args} = createHandlerMocks({
+        categoryExperimentalWebmcp: true,
+      });
+      const tool = createMockWebMCPTool({name: 'failing_tool'});
+      tool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        output: undefined,
+        errorText: '',
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          className: 'Error',
+          description: 'Error: boom from page',
+        },
+      });
+      page.getWebMcpTools.returns([tool]);
+      context.browser = createMockPuppeteerBrowser();
+      const toolHandler = new ToolHandler(
+        executeWebMcpTool(args),
+        args,
+        async () => context,
+        new Mutex(),
+        sinon.spy(),
+        sinon.spy(),
+      );
+
+      const result = await toolHandler.handle({toolName: 'failing_tool'});
+
+      assert.strictEqual(result.isError, true);
+      const text = result.content.find(content => content.type === 'text');
+      assert.ok(text && text.type === 'text');
+      assert.match(text.text, /Error: boom from page/);
     });
 
     it('rejects JSON array input', async () => {

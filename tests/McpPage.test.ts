@@ -1569,6 +1569,33 @@ describe('McpPage', () => {
       );
     });
 
+    it('uses the exception description when WebMCP errorText is empty', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        errorText: '',
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          className: 'Error',
+          description: 'Error: boom from page',
+        },
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+
+      await assert.rejects(
+        () =>
+          mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response),
+        {message: 'Error: boom from page'},
+      );
+    });
+
     it('excludes debugging WebMCP tools from getWebMcpTools()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 
