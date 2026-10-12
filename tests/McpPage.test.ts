@@ -10,8 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
-import {McpPage} from '../src/McpPage.js';
-import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -854,6 +853,7 @@ describe('McpPage', () => {
     it('creates and attaches commentBridge when openDevTools is called', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
       assert.strictEqual(mcpPage.commentBridge, undefined);
@@ -862,6 +862,28 @@ describe('McpPage', () => {
       assert.strictEqual(result, devtoolsPage);
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    });
+
+    it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
+      const {mcpPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.notStrictEqual(bridge, undefined);
+      assert.strictEqual(bridge, mcpPage.commentBridge);
+    });
+
+    it('returns undefined when the DevTools page has no CD4A bridge', async () => {
+      const {mcpPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(false);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.strictEqual(bridge, undefined);
+      sinon.assert.notCalled(devtoolsPage.exposeFunction);
     });
 
     it('disposes commentBridge on mcpPage.dispose()', async () => {
@@ -886,7 +908,8 @@ describe('McpPage', () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
       const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves({
+      devtoolsPage.evaluate.resolves(true);
+      devtoolsPage.evaluate.onThirdCall().resolves({
         cdpRequestId: 'req-1',
         cdpBackendNodeId: 10,
       });
@@ -901,7 +924,7 @@ describe('McpPage', () => {
       });
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-      sinon.assert.calledTwice(devtoolsPage.evaluate);
+      sinon.assert.calledThrice(devtoolsPage.evaluate);
     });
   });
 

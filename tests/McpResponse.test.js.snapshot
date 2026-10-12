@@ -1367,6 +1367,64 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
 }
 `;
 
+exports[`lighthouse > rounds category scores and shows unscored categories as n/a 1`] = `
+## Lighthouse Audit Results
+Mode: navigation
+Device: desktop
+URL: https://example.com
+### Category Scores
+- Accessibility: 57 (accessibility)
+- SEO: 0 (seo)
+- Agentic Browsing: n/a (agentic-browsing)
+### Audit Summary
+Passed: 10
+Failed: 1
+Total Timing: 1000ms
+### Reports
+- /tmp/report.json
+- /tmp/report.html
+`;
+
+exports[`lighthouse > rounds category scores and shows unscored categories as n/a 2`] = `
+{
+  "lighthouseResult": {
+    "summary": {
+      "mode": "navigation",
+      "device": "desktop",
+      "url": "https://example.com",
+      "scores": [
+        {
+          "id": "accessibility",
+          "title": "Accessibility",
+          "score": 0.57
+        },
+        {
+          "id": "seo",
+          "title": "SEO",
+          "score": 0
+        },
+        {
+          "id": "agentic-browsing",
+          "title": "Agentic Browsing",
+          "score": null
+        }
+      ],
+      "audits": {
+        "failed": 1,
+        "passed": 10
+      },
+      "timing": {
+        "total": 1000
+      }
+    },
+    "reports": [
+      "/tmp/report.json",
+      "/tmp/report.html"
+    ]
+  }
+}
+`;
+
 exports[`third-party developer tools > lists third-party developer tools 1`] = `
 ## Third-party developer tools
 My Tool Group: A group of tools

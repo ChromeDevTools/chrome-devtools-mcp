@@ -337,7 +337,12 @@ export class HeapSnapshotManager {
     };
   }
 
-  #getCachedSnapshot(filePath: string) {
+  #getCachedSnapshot(filePath: string): {
+    snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
+    worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+    idToClassKey: string[];
+    classKeyToId: Map<string, number>;
+  } {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (!cached) {

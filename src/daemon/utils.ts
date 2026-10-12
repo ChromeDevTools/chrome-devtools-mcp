@@ -67,13 +67,13 @@ export function getRuntimeHome(sessionId: string): string {
 
 export const IS_WINDOWS = os.platform() === 'win32';
 
-export function getPidFilePath(sessionId: string) {
+export function getPidFilePath(sessionId: string): string {
   assertValidSessionId(sessionId);
   const runtimeDir = getRuntimeHome(sessionId);
   return path.join(runtimeDir, 'daemon.pid');
 }
 
-export function getDaemonPid(sessionId: string) {
+export function getDaemonPid(sessionId: string): number | null {
   assertValidSessionId(sessionId);
   try {
     const pidFile = getPidFilePath(sessionId);

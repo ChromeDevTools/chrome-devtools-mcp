@@ -165,7 +165,7 @@ async function setupServerWithRetry(): Promise<Server> {
       await new Promise(r => setTimeout(r, 500));
     }
   }
-  throw lastError;
+  throw lastError ?? new Error('Failed without an error');
 }
 
 describe('shutdown', () => {

@@ -514,7 +514,7 @@ in the DevTools Elements panel (if any).
 
 ### `analyze_heapsnapshot_contexts`
 
-**Description:** Loads a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot to identify and rank closure contexts holding dead captured fields—variables no remaining live closure can read. Scopes are ranked globally by the retained size of these dead values to provide a prioritizing heuristic, rather than an exact measure of reclaimable bytes. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -529,7 +529,7 @@ in the DevTools Elements panel (if any).
 
 ### `close_heapsnapshot`
 
-**Description:** Closes a previously loaded memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)
+**Description:** Closes a previously loaded and cached memory heapsnapshot, freeing its memory. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -539,7 +539,7 @@ in the DevTools Elements panel (if any).
 
 ### `compare_heapsnapshots`
 
-**Description:** Loads two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches two memory heapsnapshots and returns the comparison. If classIndex is provided, returns detailed diff for that class, otherwise returns summary diff. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -551,7 +551,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_class_nodes`
 
-**Description:** Loads a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns instances of a specific class with their IDs. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -567,7 +567,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_details`
 
-**Description:** Loads a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns all available information including statistics, static data, and aggregated node information. Supports pagination for aggregates. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -581,7 +581,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_dominators`
 
-**Description:** Loads a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns the dominator chain for a specific node ID. This helps to identify which objects are keeping the target node alive. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -593,7 +593,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_duplicate_strings`
 
-**Description:** Loads a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns duplicate strings grouped by their value. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -606,7 +606,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_edges`
 
-**Description:** Loads a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns outgoing edges (references) for a specific node ID. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -623,7 +623,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_object_details`
 
-**Description:** Loads a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns detailed information about a specific object by its node ID, including size, type, distance, and DOM detachedness. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -635,7 +635,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_retainers`
 
-**Description:** Loads a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns retainers for a specific node ID. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -649,7 +649,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_retaining_paths`
 
-**Description:** Loads a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns retaining paths for a specific node ID. This helps to understand why a node is not being garbage collected. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -664,7 +664,7 @@ in the DevTools Elements panel (if any).
 
 ### `get_heapsnapshot_summary`
 
-**Description:** Loads a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and returns snapshot summary stats, including native contexts and their sizes, and retained by context summary. (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 
@@ -675,7 +675,7 @@ in the DevTools Elements panel (if any).
 
 ### `query_heapsnapshot_objects`
 
-**Description:** Loads a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)
+**Description:** Loads and caches a memory heapsnapshot and queries objects matching specific filters (className, propertyName, nodeType, retainedSize, selfSize, isDetached, sortBy). (requires flag: --memoryDebugging=true)
 
 **Parameters:**
 

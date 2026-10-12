@@ -9,11 +9,14 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ConfigParser} from '../src/config/ConfigParser.js';
-import {getCliOptions, mcpOptions} from '../src/config/mcp-options.js';
+import {
+  getCliOptions,
+  mcpOptions,
+  DEFAULT_FILESYSTEM_ROOT,
+} from '../src/config/mcp-options.js';
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
-import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
 
 import {createTempFile} from './utils.js';
 

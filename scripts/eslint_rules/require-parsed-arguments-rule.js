@@ -87,9 +87,8 @@ export default {
                       const output = `${left}: ParsedArguments = ${right}`;
                       if (hasParens) {
                         return fixer.replaceText(firstParam, output);
-                      } else {
-                        return fixer.replaceText(firstParam, `(${output})`);
                       }
+                      return fixer.replaceText(firstParam, `(${output})`);
                     } else {
                       const text = sourceCode.getText(firstParam);
                       paramName = text.split(':')[0].trim();
@@ -101,12 +100,11 @@ export default {
                       firstParam,
                       `${paramName}: ParsedArguments`,
                     );
-                  } else {
-                    return fixer.replaceText(
-                      firstParam,
-                      `(${paramName}: ParsedArguments)`,
-                    );
                   }
+                  return fixer.replaceText(
+                    firstParam,
+                    `(${paramName}: ParsedArguments)`,
+                  );
                 },
               });
             }
