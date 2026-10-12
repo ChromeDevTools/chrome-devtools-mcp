@@ -174,6 +174,8 @@ const bundleDependency = (
       // http://b/390559299 and
       // https://github.com/microsoft/TypeScript/issues/60811.
       comments: [/Copyright/i],
+      // Minifed code hits RegEx timeout in cleanup plugin
+      exclude: ['**/marked.esm.js'],
     }),
     license({
       thirdParty: {

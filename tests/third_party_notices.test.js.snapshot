@@ -984,13 +984,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
-Name: marked
-URL: https://marked.js.org
-Version: <VERSION>
-License: MIT
-
--------------------- DEPENDENCY DIVIDER --------------------
-
 Name: devtools-frontend
 URL: https://github.com/ChromeDevTools/devtools-frontend
 Version: <VERSION>
