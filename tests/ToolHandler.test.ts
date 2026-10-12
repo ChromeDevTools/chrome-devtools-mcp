@@ -83,6 +83,133 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, true);
   });
 
+  it('releases the tool lock when a running request is cancelled', async () => {
+    let resolveExecution: (() => void) | undefined;
+    let resolveExecutionStarted: (() => void) | undefined;
+    const executionStarted = new Promise<void>(resolve => {
+      resolveExecutionStarted = resolve;
+    });
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parse();
+    const tool = definePageTool(() => ({
+      name: 'page_tool',
+      description: 'A page scoped tool',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        resolveExecutionStarted?.();
+        await new Promise<void>(resolve => {
+          resolveExecution = resolve;
+        });
+      },
+    }))(serverArgs);
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.browser = getMockBrowser({
+      process: sinon.createStubInstance(ChildProcess),
+    });
+    const mockPage = sinon.createStubInstance(McpPage);
+    mockContext.getSelectedMcpPage.returns(mockPage);
+    sinon.stub(McpResponse.prototype, 'handle').resolves({
+      content: [],
+      structuredContent: {},
+    });
+    const forgetBrowser = sinon.spy();
+    const mutex = new Mutex();
+    const abortController = new AbortController();
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      mutex,
+      forgetBrowser,
+      sinon.spy(),
+    );
+
+    const resultPromise = toolHandler.handle({}, abortController.signal);
+    await executionStarted;
+    abortController.abort();
+    const result = await resultPromise;
+
+    sinon.assert.notCalled(forgetBrowser);
+    assert.strictEqual(result.isError, true);
+
+    const nextHandler = new ToolHandler(
+      {
+        name: 'next_tool',
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: async () => undefined,
+      },
+      serverArgs,
+      async () => mockContext,
+      mutex,
+      sinon.spy(),
+      sinon.spy(),
+    );
+    const nextResult = await nextHandler.handle({});
+    assert.strictEqual(nextResult.isError, undefined);
+    resolveExecution?.();
+  });
+
+  it('does not run a request cancelled while waiting for the tool lock', async () => {
+    let handlerCalled = false;
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parse();
+    const tool: ToolDefinition = {
+      name: 'global_tool',
+      description: 'A global tool',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+    const mockContext = sinon.createStubInstance(McpContext);
+    mockContext.browser = getMockBrowser({
+      process: sinon.createStubInstance(ChildProcess),
+    });
+    sinon.stub(McpResponse.prototype, 'handle').resolves({
+      content: [],
+      structuredContent: {},
+    });
+    const mutex = new Mutex();
+    const guard = await mutex.acquire();
+    const abortController = new AbortController();
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      mutex,
+      sinon.spy(),
+      sinon.spy(),
+    );
+
+    const resultPromise = toolHandler.handle({}, abortController.signal);
+    abortController.abort();
+    guard[Symbol.dispose]();
+    await assert.rejects(resultPromise, /aborted/i);
+
+    assert.strictEqual(handlerCalled, false);
+  });
+
   it('calls getSelectedMcpPage for page scoped tools when pageIdRouting is disabled', async () => {
     let handlerCalled = false;
     const serverArgs = new ConfigParser(

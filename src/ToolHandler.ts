@@ -212,6 +212,7 @@ export class ToolHandler {
   async #raceWithTimeout<T>(
     promise: Promise<T>,
     onTimeout: () => void,
+    signal?: AbortSignal,
   ): Promise<T> {
     const timeoutError = new ToolCallTimeoutError(
       `Tool "${this.tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting on the browser connection. The connection may have been lost (for example, the debugged browser or app restarted). It will be re-established automatically on the next tool call.`,
@@ -221,8 +222,21 @@ export class ToolHandler {
       timer = setTimeout(() => reject(timeoutError), TOOL_CALL_TIMEOUT_MS);
       timer.unref?.();
     });
+    let onAbort: (() => void) | undefined;
+    const cancellation = signal
+      ? new Promise<never>((_, reject) => {
+          onAbort = () => reject(signal.reason);
+          if (signal.aborted) {
+            onAbort();
+          } else {
+            signal.addEventListener('abort', onAbort, {once: true});
+          }
+        })
+      : undefined;
     try {
-      return await Promise.race([promise, timeout]);
+      return await Promise.race(
+        cancellation ? [promise, timeout, cancellation] : [promise, timeout],
+      );
     } catch (err) {
       if (err === timeoutError) {
         onTimeout();
@@ -230,11 +244,19 @@ export class ToolHandler {
       throw err;
     } finally {
       clearTimeout(timer);
+      if (onAbort) {
+        signal?.removeEventListener('abort', onAbort);
+      }
     }
   }
 
-  handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
+  handle = async (
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<CallToolResult> => {
     using _guard = await this.toolMutex.acquire();
+
+    signal?.throwIfAborted();
 
     if (this.disabledReason) {
       return {
@@ -262,8 +284,10 @@ export class ToolHandler {
       // discard that attempt if it succeeds later instead of handing it to a
       // subsequent caller — see BrowserManager#abandonPendingAttempt()'s doc
       // comment for the full mechanism.
-      const context = await this.#raceWithTimeout(this.getContext(), () =>
-        this.abandonPendingBrowserAttemptOnTimeout(),
+      const context = await this.#raceWithTimeout(
+        this.getContext(),
+        () => this.abandonPendingBrowserAttemptOnTimeout(),
+        signal,
       );
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
@@ -295,10 +319,12 @@ export class ToolHandler {
                   ? context.getPageById(pageId)
                   : context.getSelectedMcpPage();
               await page?.init();
+              signal?.throwIfAborted();
               response.setPage(page);
               if (this.tool.blockedByDialog) {
                 page.throwIfDialogOpen();
               }
+              signal?.throwIfAborted();
               await this.tool.handler(
                 {
                   params,
@@ -329,6 +355,7 @@ export class ToolHandler {
           return await response.handle(context, dataFormat);
         })(),
         () => this.forgetBrowserOnTimeout(context.browser),
+        signal,
       );
       const result: CallToolResult & {
         structuredContent?: Record<string, unknown>;

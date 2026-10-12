@@ -107,6 +107,45 @@ describe('e2e', () => {
     });
   });
 
+  it('cancels a running page evaluation without restarting Chrome', async () => {
+    await withClient(async client => {
+      const initialPages = await client.callTool({
+        name: 'list_pages',
+        arguments: {},
+      });
+      assert.match(JSON.stringify(initialPages.content), /about:blank/);
+
+      const abortController = new AbortController();
+      const pendingEvaluation = client.callTool(
+        {
+          name: 'evaluate_script',
+          arguments: {
+            pageId: 1,
+            function: '() => new Promise(() => {})',
+            waitForStableDom: false,
+          },
+        },
+        {signal: abortController.signal},
+      );
+      await new Promise(resolve => setTimeout(resolve, 1_000));
+      abortController.abort();
+      await assert.rejects(pendingEvaluation);
+
+      const pagesAfterCancellation = await client.callTool({
+        name: 'list_pages',
+        arguments: {},
+      });
+      assert.match(
+        JSON.stringify(pagesAfterCancellation.content),
+        /about:blank/,
+      );
+      assert.doesNotMatch(
+        JSON.stringify(pagesAfterCancellation.content),
+        /reconnect|restart/i,
+      );
+    });
+  });
+
   it('calls a tool multiple times', async t => {
     await withClient(async client => {
       let result = await client.callTool({
