@@ -28,7 +28,11 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
+import {
+  buildCommand,
+  isOptionalPositionalArg,
+  shieldLiteralArgs,
+} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
 
@@ -61,7 +65,11 @@ async function start(
   logDisclaimers(parsedArgs);
 }
 
-const y = yargs(hideBin(process.argv))
+const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
+  hideBin(process.argv),
+);
+
+const y = yargs(cliArgs)
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
@@ -110,6 +118,9 @@ const y = yargs(hideBin(process.argv))
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
+        );
+        console.error(
+          '4. To pass a value that starts with "-", put it after "--" (e.g. chrome-devtools fill 1 "1_2" -- "--flag").',
         );
         console.error(
           'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',
@@ -255,7 +266,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
         const commandArgs: Record<string, unknown> = {};
         for (const argName of Object.keys(args)) {
           if (argName in argv) {
-            commandArgs[argName] = argv[argName];
+            commandArgs[argName] = restoreLiteralArg(argv[argName]);
           }
         }
 

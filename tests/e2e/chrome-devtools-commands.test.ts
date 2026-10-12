@@ -161,6 +161,101 @@ describe('chrome-devtools', () => {
     }
   });
 
+  it('passes positional text values starting with a hyphen', async () => {
+    const startResult = await runCli(['start'], sessionId);
+    assert.strictEqual(
+      startResult.status,
+      0,
+      `start command failed: ${startResult.stderr}`,
+    );
+
+    const navigateResult = await runCli(
+      [
+        'navigate_page',
+        '1',
+        '--url',
+        'data:text/html,<textarea id="t">x</textarea>',
+      ],
+      sessionId,
+    );
+    assert.strictEqual(
+      navigateResult.status,
+      0,
+      `navigate_page command failed: ${navigateResult.stderr}`,
+    );
+
+    const snapshotResult = await runCli(['take_snapshot', '1'], sessionId);
+    assert.strictEqual(
+      snapshotResult.status,
+      0,
+      `take_snapshot command failed: ${snapshotResult.stderr}`,
+    );
+    const uidMatch = snapshotResult.stdout.match(/uid=(\S+) textbox/);
+    assert.ok(
+      uidMatch,
+      'textarea uid not found in snapshot: ' + snapshotResult.stdout,
+    );
+    const uid = uidMatch[1];
+
+    async function readValue(): Promise<string> {
+      const result = await runCli(
+        [
+          'evaluate_script',
+          '() => document.getElementById("t").value',
+          '--pageId',
+          '1',
+        ],
+        sessionId,
+      );
+      assert.strictEqual(
+        result.status,
+        0,
+        `evaluate_script command failed: ${result.stderr}`,
+      );
+      const match = result.stdout.match(/"(.*)"/);
+      assert.ok(match, 'unexpected evaluate_script output: ' + result.stdout);
+      return JSON.parse(`"${match[1]}"`);
+    }
+
+    const cases: Array<{args: string[]; expected: string}> = [
+      {args: ['fill', '1', uid, '-'], expected: '-'},
+      {args: ['fill', '1', uid, '-5'], expected: '-5'},
+      {args: ['fill', '1', uid, 'a-b'], expected: 'a-b'},
+      {args: ['fill', '1', uid, '--', '--weird'], expected: '--weird'},
+      {args: ['fill', '1', uid, '--', '- item'], expected: '- item'},
+      {args: ['fill', '1', uid, '--', '-abc'], expected: '-abc'},
+    ];
+    for (const {args, expected} of cases) {
+      const result = await runCli(args, sessionId);
+      assert.strictEqual(
+        result.status,
+        0,
+        `${args.join(' ')} failed: ${result.stderr}`,
+      );
+      assert.strictEqual(
+        await readValue(),
+        expected,
+        `unexpected value after: ${args.join(' ')}`,
+      );
+    }
+
+    const typeTextResult = await runCli(['type_text', '1', '-'], sessionId);
+    assert.strictEqual(
+      typeTextResult.status,
+      0,
+      `type_text command failed: ${typeTextResult.stderr}`,
+    );
+    assert.match(typeTextResult.stdout, /Typed text "-"/);
+
+    const pressKeyResult = await runCli(['press_key', '1', '-'], sessionId);
+    assert.strictEqual(
+      pressKeyResult.status,
+      0,
+      `press_key command failed: ${pressKeyResult.stderr}`,
+    );
+    assert.match(pressKeyResult.stdout, /Successfully pressed key: -/);
+  });
+
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {
     await runCli(['start', '--categoryNetwork=false'], sessionId);
 

@@ -41,3 +41,54 @@ export function buildCommand(
 
   return {command, usage: `$0 ${command}${flags}`};
 }
+
+const LITERAL_ARG_PREFIX = '\0literal:';
+
+/**
+ * Shields positional values that yargs cannot carry through its parsing.
+ *
+ * yargs re-parses command positionals as `--name value` pairs, and in that
+ * pass yargs-parser treats any value starting with `-` (other than a negative
+ * number) as the next flag, replacing the value with `''`. It also never fills
+ * positionals from the tokens after `--`. See
+ * https://github.com/yargs/yargs/issues/1312 and
+ * https://github.com/yargs/yargs/issues/1821.
+ *
+ * A lone `-` can never be an option, so it is always shielded. Everything
+ * after the first `--` is shielded as well and the `--` itself is dropped, so
+ * that those tokens populate positionals. Shielded tokens are replaced by
+ * opaque placeholders that `restore` maps back to the original values.
+ */
+export function shieldLiteralArgs(argv: readonly string[]): {
+  argv: string[];
+  restore: (value: unknown) => unknown;
+} {
+  const literals = new Map<string, string>();
+  const result: string[] = [];
+  let afterDoubleDash = false;
+  for (const token of argv) {
+    if (!afterDoubleDash && token === '--') {
+      afterDoubleDash = true;
+      continue;
+    }
+    if (afterDoubleDash || token === '-') {
+      const placeholder = `${LITERAL_ARG_PREFIX}${literals.size}`;
+      literals.set(placeholder, token);
+      result.push(placeholder);
+    } else {
+      result.push(token);
+    }
+  }
+
+  const restore = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return literals.get(value) ?? value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(restore);
+    }
+    return value;
+  };
+
+  return {argv: result, restore};
+}
