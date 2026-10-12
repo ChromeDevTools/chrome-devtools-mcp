@@ -162,6 +162,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  setPage(page: McpPage): void;
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,

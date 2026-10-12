@@ -19,6 +19,7 @@ import {DevTools, type Extension} from '../src/third_party/index.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {stableIdSymbol} from '../src/utils/id.js';
+import {executeThirdPartyDeveloperTool} from '../src/tools/thirdPartyDeveloper.js';
 import {
   closePage,
   listPages,
@@ -1051,13 +1052,18 @@ describe('third-party developer tools', () => {
       response: McpResponse,
       context: McpContext,
       args: ParsedArguments,
+      initScript: string,
     ) => Promise<void>,
     toolName: string,
+    useUnboundResponse = false,
+    setupSelectedPage = true,
   ) {
     await withMcpContext(
       async (response, context, args) => {
+        const handlerResponse = useUnboundResponse
+          ? new McpResponse(args)
+          : response;
         const mcpPage = context.getSelectedMcpPage();
-        stubToolDiscovery(mcpPage.pptrPage);
 
         const initScript = `
           window.__dtmcp = {
@@ -1081,12 +1087,15 @@ describe('third-party developer tools', () => {
             e.respondWith(window.__dtmcp?.toolGroup);
           });
         `;
-        await mcpPage.pptrPage.evaluateOnNewDocument(initScript);
-        await mcpPage.pptrPage.evaluate(initScript);
+        if (setupSelectedPage) {
+          stubToolDiscovery(mcpPage.pptrPage);
+          await mcpPage.pptrPage.evaluateOnNewDocument(initScript);
+          await mcpPage.pptrPage.evaluate(initScript);
+        }
 
-        await handlerAction(response, context, args);
+        await handlerAction(handlerResponse, context, args, initScript);
 
-        const {content} = await response.handle(context);
+        const {content} = await handlerResponse.handle(context);
         const responseText = getTextContent(content[0]);
         assert.ok(
           responseText.includes('3pDeveloperTool'),
@@ -1146,9 +1155,13 @@ describe('third-party developer tools', () => {
 
   it('includes third-party developer tools in new_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(
-      async (response, context, args) => {
-        // Workaround to ensure the test environment's new page contain third-party developer tools
-        sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
+      async (response, context, args, initScript) => {
+        const createPage = context.newPage.bind(context);
+        sinon.stub(context, 'newPage').callsFake(async (background, name) => {
+          const page = await createPage(background, name);
+          await page.pptrPage.evaluateOnNewDocument(initScript);
+          return page;
+        });
 
         await newPage(args).handler(
           {
@@ -1157,8 +1170,22 @@ describe('third-party developer tools', () => {
           response,
           context,
         );
+
+        const {content} = await response.handle(context);
+        assert.ok(getTextContent(content[0]).includes('3pDeveloperTool'));
+        const page = context.getSelectedMcpPage();
+        const executionResponse = new McpResponse(args);
+        executionResponse.setPage(page);
+        await executeThirdPartyDeveloperTool(args).handler(
+          {params: {toolName: '3pDeveloperTool'}, page},
+          executionResponse,
+          context,
+        );
+        assert.ok(executionResponse.responseLines.includes('"result"'));
       },
       'new_page',
+      true,
+      false,
     );
   });
 });

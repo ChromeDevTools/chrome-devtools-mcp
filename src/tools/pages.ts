@@ -148,6 +148,7 @@ export const newPage = defineTool((args: ParsedArguments) => {
         {timeout: request.params.timeout},
       );
 
+      response.setPage(context.getSelectedMcpPage());
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();
     },
