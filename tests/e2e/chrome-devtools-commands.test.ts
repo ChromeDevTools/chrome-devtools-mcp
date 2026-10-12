@@ -221,9 +221,10 @@ describe('chrome-devtools', () => {
       {args: ['fill', '1', uid, '-'], expected: '-'},
       {args: ['fill', '1', uid, '-5'], expected: '-5'},
       {args: ['fill', '1', uid, 'a-b'], expected: 'a-b'},
+      {args: ['fill', '1', uid, '--weird'], expected: '--weird'},
+      {args: ['fill', '1', uid, '- item'], expected: '- item'},
+      {args: ['fill', '1', uid, '-abc'], expected: '-abc'},
       {args: ['fill', '1', uid, '--', '--weird'], expected: '--weird'},
-      {args: ['fill', '1', uid, '--', '- item'], expected: '- item'},
-      {args: ['fill', '1', uid, '--', '-abc'], expected: '-abc'},
     ];
     for (const {args, expected} of cases) {
       const result = await runCli(args, sessionId);
@@ -254,6 +255,13 @@ describe('chrome-devtools', () => {
       `press_key command failed: ${pressKeyResult.stderr}`,
     );
     assert.match(pressKeyResult.stdout, /Successfully pressed key: -/);
+
+    const unknownFlagResult = await runCli(
+      ['fill', '1', uid, 'x', '--pageid', '2'],
+      sessionId,
+    );
+    assert.strictEqual(unknownFlagResult.status, 1);
+    assert.match(unknownFlagResult.stderr, /Unknown arguments?: .*pageid/);
   });
 
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {

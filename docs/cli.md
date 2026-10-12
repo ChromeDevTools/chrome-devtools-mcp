@@ -54,7 +54,6 @@ chrome-devtools <tool> [arguments] [flags]
 
 - **Required Arguments**: Passed as positional arguments. Page-scoped tools require `<pageId>` as their first positional argument.
 - **Optional Arguments**: Passed as flags (e.g., `--filePath`, `--fullPage`).
-- **Values starting with `-`**: A lone `-` and negative numbers can be passed as-is. Any other value starting with `-` must be placed after `--`, which marks the end of flags (e.g., `chrome-devtools fill 1 "input-uid-456" -- "--flag"`).
 
 ### Examples
 

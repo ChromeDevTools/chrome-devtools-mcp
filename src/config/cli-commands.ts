@@ -42,7 +42,68 @@ export function buildCommand(
   return {command, usage: `$0 ${command}${flags}`};
 }
 
+export type OptionKind = 'boolean' | 'array' | 'value';
+
+/**
+ * Describes what a CLI command accepts, as needed by `shieldLiteralArgs`.
+ */
+export interface CommandArgSpec {
+  /** Known option names (camelCase and aliases) and how they take values. */
+  options: Map<string, OptionKind>;
+  /** Number of positional arguments. */
+  positionalCount: number;
+  /** Whether the last positional is variadic. */
+  variadic: boolean;
+}
+
+/**
+ * Builds a `CommandArgSpec` for a tool command from its arg definitions and
+ * the options available on every command.
+ */
+export function getCommandArgSpec(
+  commandName: string,
+  args: Record<string, ArgDef>,
+  globalOptions: Map<string, OptionKind>,
+): CommandArgSpec {
+  const options = new Map(globalOptions);
+  let positionalCount = 0;
+  let variadic = false;
+  for (const [name, arg] of Object.entries(args)) {
+    if (arg.required || isOptionalPositionalArg(commandName, name)) {
+      positionalCount++;
+      variadic = arg.type === 'array';
+    } else {
+      options.set(name, toOptionKind(arg.type));
+    }
+  }
+  return {options, positionalCount, variadic};
+}
+
+export function toOptionKind(type: string | undefined): OptionKind {
+  if (type === 'boolean') {
+    return 'boolean';
+  }
+  if (type === 'array') {
+    return 'array';
+  }
+  return 'value';
+}
+
 const LITERAL_ARG_PREFIX = '\0literal:';
+// Mirrors yargs-parser's negative number detection.
+const NEGATIVE_NUMBER = /^-\d+(\.\d*)?(e-?\d+)?$/;
+
+function optionName(token: string): string {
+  let name = token.replace(/^-+/, '');
+  const eq = name.indexOf('=');
+  if (eq !== -1) {
+    name = name.slice(0, eq);
+  }
+  if (name.startsWith('no-')) {
+    name = name.slice(3);
+  }
+  return name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+}
 
 /**
  * Shields positional values that yargs cannot carry through its parsing.
@@ -54,27 +115,91 @@ const LITERAL_ARG_PREFIX = '\0literal:';
  * https://github.com/yargs/yargs/issues/1312 and
  * https://github.com/yargs/yargs/issues/1821.
  *
- * A lone `-` can never be an option, so it is always shielded. Everything
- * after the first `--` is shielded as well and the `--` itself is dropped, so
- * that those tokens populate positionals. Shielded tokens are replaced by
- * opaque placeholders that `restore` maps back to the original values.
+ * Shielded tokens are replaced by opaque placeholders that `restore` maps back
+ * to the original values. A token is shielded when:
+ *
+ * - it is a lone `-`, which can never be an option;
+ * - it follows the first `--`, which is dropped so the tokens populate
+ *   positionals;
+ * - it starts with `-`, is not a known option of the command, and the command
+ *   still has an unfilled positional. Known options and their values are
+ *   skipped the way yargs consumes them, so a dash-prefixed value such as
+ *   `--flag` in a positional slot is passed through as text, while an unknown
+ *   flag after all positionals are filled is still rejected by yargs.
+ *
+ * `getSpec` resolves the spec of a command by name and returns `undefined`
+ * for tokens that are not a command.
  */
-export function shieldLiteralArgs(argv: readonly string[]): {
+export function shieldLiteralArgs(
+  argv: readonly string[],
+  getSpec: (commandName: string) => CommandArgSpec | undefined,
+): {
   argv: string[];
   restore: (value: unknown) => unknown;
 } {
   const literals = new Map<string, string>();
   const result: string[] = [];
+  const shield = (token: string): void => {
+    const placeholder = `${LITERAL_ARG_PREFIX}${literals.size}`;
+    literals.set(placeholder, token);
+    result.push(placeholder);
+  };
+
+  let spec: CommandArgSpec | undefined;
+  let filled = 0;
   let afterDoubleDash = false;
-  for (const token of argv) {
-    if (!afterDoubleDash && token === '--') {
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (afterDoubleDash) {
+      shield(token);
+      continue;
+    }
+    if (token === '--') {
       afterDoubleDash = true;
       continue;
     }
-    if (afterDoubleDash || token === '-') {
-      const placeholder = `${LITERAL_ARG_PREFIX}${literals.size}`;
-      literals.set(placeholder, token);
-      result.push(placeholder);
+    if (token === '-') {
+      shield(token);
+      filled++;
+      continue;
+    }
+    if (!token.startsWith('-') || NEGATIVE_NUMBER.test(token)) {
+      result.push(token);
+      if (!spec) {
+        spec = getSpec(token);
+      } else {
+        filled++;
+      }
+      continue;
+    }
+
+    const kind = spec?.options.get(optionName(token));
+    if (kind !== undefined) {
+      result.push(token);
+      if (token.includes('=')) {
+        continue;
+      }
+      if (kind === 'boolean') {
+        if (/^(true|false)$/.test(argv[i + 1] ?? '')) {
+          result.push(argv[++i]);
+        }
+      } else if (kind === 'array') {
+        while (i + 1 < argv.length && !argv[i + 1].startsWith('-')) {
+          result.push(argv[++i]);
+        }
+      } else if (i + 1 < argv.length) {
+        result.push(argv[++i]);
+      }
+      continue;
+    }
+
+    const hasUnfilledPositional =
+      spec !== undefined &&
+      (filled < spec.positionalCount ||
+        (spec.variadic && spec.positionalCount > 0));
+    if (hasUnfilledPositional) {
+      shield(token);
+      filled++;
     } else {
       result.push(token);
     }

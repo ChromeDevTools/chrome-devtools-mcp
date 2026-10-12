@@ -30,8 +30,10 @@ import {VERSION} from '../version.js';
 
 import {
   buildCommand,
+  getCommandArgSpec,
   isOptionalPositionalArg,
   shieldLiteralArgs,
+  type OptionKind,
 } from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
@@ -67,6 +69,22 @@ async function start(
 
 const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
   hideBin(process.argv),
+  commandName => {
+    const commandDef = commands[commandName];
+    if (!commandDef) {
+      return undefined;
+    }
+    return getCommandArgSpec(
+      commandName,
+      commandDef.args,
+      new Map<string, OptionKind>([
+        ['sessionId', 'value'],
+        ['outputFormat', 'value'],
+        ['help', 'boolean'],
+        ['version', 'boolean'],
+      ]),
+    );
+  },
 );
 
 const y = yargs(cliArgs)
@@ -118,9 +136,6 @@ const y = yargs(cliArgs)
         );
         console.error(
           '3. Make sure to escape quotes properly for your shell environment.',
-        );
-        console.error(
-          '4. To pass a value that starts with "-", put it after "--" (e.g. chrome-devtools fill 1 "1_2" -- "--flag").',
         );
         console.error(
           'Run `chrome-devtools <command> --help` to see exact positional and optional parameters.',

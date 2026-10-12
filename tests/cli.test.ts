@@ -14,7 +14,12 @@ import {
   mcpOptions,
   DEFAULT_FILESYSTEM_ROOT,
 } from '../src/config/mcp-options.js';
-import {buildCommand, shieldLiteralArgs} from '../src/config/cli-commands.js';
+import {
+  buildCommand,
+  getCommandArgSpec,
+  shieldLiteralArgs,
+  type OptionKind,
+} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {puppeteerOptions} from '../src/config/puppeteer-options.js';
@@ -1337,31 +1342,106 @@ describe('cli command strings', () => {
 });
 
 describe('cli literal args', () => {
+  const globalOptions = new Map<string, OptionKind>([
+    ['sessionId', 'value'],
+    ['outputFormat', 'value'],
+    ['help', 'boolean'],
+  ]);
+  const getSpec = (name: string) =>
+    name in commands
+      ? getCommandArgSpec(name, commands[name].args, globalOptions)
+      : undefined;
+
+  function shield(argv: string[]) {
+    const {argv: shielded, restore} = shieldLiteralArgs(argv, getSpec);
+    return {
+      shielded,
+      restored: shielded.map(restore),
+      literalIndexes: shielded.flatMap((t, i) => (t !== argv[i] ? [i] : [])),
+    };
+  }
+
   it('passes regular args through unchanged', () => {
-    const input = ['fill', '1', '1_1', 'a-b', '-5', '--pageId', '1'];
-    const {argv, restore} = shieldLiteralArgs(input);
-    assert.deepStrictEqual(argv, input);
-    assert.strictEqual(restore('a-b'), 'a-b');
+    const input = ['fill', '1', '1_1', 'a-b', '-5', '--output-format', 'json'];
+    assert.deepStrictEqual(shield(input).shielded, input);
   });
 
   it('shields a lone dash', () => {
-    const {argv, restore} = shieldLiteralArgs(['fill', '1', '1_1', '-']);
-    assert.notStrictEqual(argv[3], '-');
-    assert.ok(!argv[3].startsWith('-'));
-    assert.deepStrictEqual(argv.slice(0, 3), ['fill', '1', '1_1']);
-    assert.strictEqual(restore(argv[3]), '-');
+    const {shielded, restored} = shield(['fill', '1', '1_1', '-']);
+    assert.ok(!shielded[3].startsWith('-'));
+    assert.deepStrictEqual(restored, ['fill', '1', '1_1', '-']);
+  });
+
+  it('shields unknown dash tokens in unfilled positional slots', () => {
+    for (const value of ['--weird', '-abc', '- item', '--pageId=2']) {
+      const {shielded, restored} = shield(['fill', '1', '1_1', value]);
+      assert.ok(!shielded[3].startsWith('-'), value);
+      assert.deepStrictEqual(restored, ['fill', '1', '1_1', value]);
+    }
+  });
+
+  it('leaves unknown dash tokens alone once positionals are filled', () => {
+    const input = ['fill', '1', '1_1', 'x', '--pageid', '2'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('skips known options and their values', () => {
+    const input = [
+      '--sessionId',
+      'abc',
+      'click',
+      '--dblClick',
+      'true',
+      '--output-format=json',
+      '1',
+      '1_1',
+      '--help',
+    ];
+    assert.deepStrictEqual(shield(input).shielded, input);
+
+    const {restored, literalIndexes} = shield([
+      'evaluate_script',
+      '--pageId',
+      '1',
+      '--args',
+      'a',
+      'b',
+      '--weird',
+    ]);
+    assert.deepStrictEqual(literalIndexes, [6]);
+    assert.strictEqual(restored[6], '--weird');
+  });
+
+  it('accepts kebab-case and negated forms of known options', () => {
+    const input = ['click', '1', '1_1', '--dbl-click', '--no-dblClick'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('fills a variadic positional with any dash tokens', () => {
+    const {restored, literalIndexes} = shield([
+      'upload_file',
+      '1',
+      '1_1',
+      '-',
+      '--a',
+      '-b',
+    ]);
+    assert.deepStrictEqual(literalIndexes, [3, 4, 5]);
+    assert.deepStrictEqual(restored, [
+      'upload_file',
+      '1',
+      '1_1',
+      '-',
+      '--a',
+      '-b',
+    ]);
   });
 
   it('shields every token after -- and drops the separator', () => {
-    const {argv, restore} = shieldLiteralArgs([
-      'fill',
-      '1',
-      '--',
-      '--weird',
-      '- item',
-      '--',
-      '-abc',
-    ]);
+    const {argv, restore} = shieldLiteralArgs(
+      ['fill', '1', '--', '--weird', '- item', '--', '-abc'],
+      getSpec,
+    );
     assert.strictEqual(argv.length, 6);
     assert.deepStrictEqual(argv.slice(0, 2), ['fill', '1']);
     for (const token of argv.slice(2)) {
@@ -1375,8 +1455,16 @@ describe('cli literal args', () => {
     ]);
   });
 
+  it('does not shield unknown flags of non-tool commands', () => {
+    const input = ['start', '--weird', 'status', '-x'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
   it('restores values nested in arrays and leaves other values alone', () => {
-    const {argv, restore} = shieldLiteralArgs(['cmd', '--', '-a', '-b']);
+    const {argv, restore} = shieldLiteralArgs(
+      ['cmd', '--', '-a', '-b'],
+      getSpec,
+    );
     assert.deepStrictEqual(restore([argv[1], argv[2], 'x']), ['-a', '-b', 'x']);
     assert.strictEqual(restore(42), 42);
     assert.strictEqual(restore(undefined), undefined);
