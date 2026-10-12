@@ -320,7 +320,7 @@ export class McpServer {
         inputSchema: handler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      handler.handle,
+      (params, context) => handler.handle(params, context.mcpReq.signal),
     );
 
     if (handler.disabled) {
