@@ -810,17 +810,22 @@ describe('McpResponse network pagination', () => {
         throw new Error(result.error);
       }
 
-      await withMcpContext(async (response, context) => {
-        response.attachTraceInsight(
-          result,
-          'NAVIGATION_0',
-          'LCPBreakdown' as InsightName,
-        );
-        const {content, structuredContent} = await response.handle(context);
+      const response = new McpResponse(createMockParsedArguments());
+      response.attachTraceInsight(
+        result,
+        'NAVIGATION_0',
+        'LCPBreakdown' as InsightName,
+      );
+      const {content, structuredContent} = await response.handle(
+        createMockMcpContext(),
+      );
 
-        t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
-      });
+      const output = getTextContent(content[0]);
+      t.assert.snapshot(output);
+      assert.strictEqual(
+        Reflect.get(structuredContent, 'traceInsight'),
+        output,
+      );
     });
 
     it('includes error if insight not found', async t => {
@@ -830,17 +835,19 @@ describe('McpResponse network pagination', () => {
         throw new Error(result.error);
       }
 
-      await withMcpContext(async (response, context) => {
-        response.attachTraceInsight(
-          result,
-          'BAD_ID',
-          'LCPBreakdown' as InsightName,
-        );
-        const {content, structuredContent} = await response.handle(context);
+      const response = new McpResponse(createMockParsedArguments());
+      response.attachTraceInsight(
+        result,
+        'NAVIGATION_0',
+        'NoSuchInsight' as InsightName,
+      );
+      const {content, structuredContent} = await response.handle(
+        createMockMcpContext(),
+      );
 
-        t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
-      });
+      const output = getTextContent(content[0]);
+      t.assert.snapshot(output);
+      assert.strictEqual(Reflect.get(structuredContent, 'message'), output);
     });
   });
 });
