@@ -84,6 +84,10 @@ export function extractExtensionId(response: McpResponse): string {
   return extensionId;
 }
 
+export async function settle(): Promise<void> {
+  await new Promise(resolve => setImmediate(resolve));
+}
+
 const browsers = new Map<string, Browser>();
 let context: McpContext | undefined;
 
