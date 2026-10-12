@@ -6,6 +6,7 @@
 
 import assert from 'node:assert';
 import {ChildProcess} from 'node:child_process';
+import {getEventListeners} from 'node:events';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
@@ -33,12 +34,13 @@ import {
   type DefinedPageTool,
   type DevToolsData,
   type ToolDefinition,
+  type ToolConcurrency,
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
 import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
 import {createMockMcpContext, createMockMcpPage} from './mocks.js';
-import {getMockBrowser, withMcpContext} from './utils.js';
+import {getMockBrowser, settle, withMcpContext} from './utils.js';
 
 describe('ToolHandler', () => {
   /** Runs `fn` as a task on `queue`. */
@@ -102,6 +104,341 @@ describe('ToolHandler', () => {
     sinon.assert.calledOnceWithExactly(mockContext.getPageById, 1);
     sinon.assert.calledOnceWithExactly(mockPage.init, {emulateFocus: true});
     assert.strictEqual(handlerCalled, true);
+  });
+
+  describe('cancellation', {timeout: 30_000}, () => {
+    const modes: Array<ToolConcurrency | 'browserless'> = [
+      'exclusive',
+      'page',
+      'none',
+      'browserless',
+    ];
+    for (const mode of modes) {
+      for (const rejects of [false, true]) {
+        const outcome = rejects ? 'failure' : 'completion';
+        it(`logs abort before late ${outcome} (${mode})`, async () => {
+          const started = Promise.withResolvers<void>();
+          const execution = Promise.withResolvers<void>();
+          const config = parseConfig();
+          const definition = {
+            name: 'cancelled_tool',
+            description: 'A tool awaiting an external operation',
+            annotations: {category: ToolCategory.INPUT, readOnlyHint: false},
+            schema: {},
+            blockedByDialog: false,
+            verifyFilesSchema: {},
+            handler: async () => {
+              started.resolve();
+              await execution.promise;
+            },
+          } satisfies Omit<
+            BrowserlessToolDefinition,
+            'browserless' | 'concurrency'
+          >;
+          const tool =
+            mode === 'browserless'
+              ? defineBrowserlessTool(() => definition)(config.resolved)
+              : definePageTool(() => ({...definition, concurrency: mode}))(
+                  config.resolved,
+                );
+          const runner = new TaskRunner();
+          const page = createMockMcpPage();
+          const context = createMockMcpContext({taskRunner: runner});
+          context.ensureBrowser.resolves(getMockBrowser());
+          context.getPageById.returns(page);
+          const queue =
+            mode === 'page' ? context.pageTaskQueue(1) : context.taskQueue;
+          const schedule = sinon.spy(queue, 'scheduleTask');
+          const responseHandle = sinon
+            .stub(McpResponse.prototype, 'handle')
+            .resolves({content: [], structuredContent: {}});
+          const responseError = sinon.spy(McpResponse.prototype, 'setError');
+          const telemetry = sinon.createStubInstance(ClearcutLogger);
+          sinon.stub(ClearcutLogger, 'get').returns(telemetry);
+          sinon.stub(Date, 'now').returns(1_000);
+          const abandonBrowser = sinon.spy();
+          const controller = new AbortController();
+          const handler = new ToolHandler(
+            tool,
+            config,
+            async () => context,
+            abandonBrowser,
+          );
+          const args = mode === 'browserless' ? {} : {pageId: 1};
+          const pending = handler.handle(args, {signal: controller.signal});
+          await started.promise;
+          if (mode === 'none' || mode === 'browserless') {
+            sinon.assert.notCalled(schedule);
+          } else {
+            sinon.assert.calledOnceWithExactly(schedule, controller.signal);
+          }
+          controller.abort();
+          await assert.rejects(pending, {name: 'AbortError'});
+          const invocation = {
+            toolName: tool.name,
+            params: args,
+            schema: tool.schema,
+            success: false,
+            latencyMs: 0,
+            devToolsData: undefined,
+            pageUrl: undefined,
+          };
+          sinon.assert.calledOnceWithExactly(
+            telemetry.logToolInvocation,
+            invocation,
+          );
+          assert.deepStrictEqual(
+            getEventListeners(controller.signal, 'abort'),
+            [],
+          );
+          const probe = await queue.scheduleTask();
+          probe[Symbol.dispose]();
+
+          if (rejects) {
+            execution.reject(new Error('late failure'));
+          } else {
+            execution.resolve();
+          }
+          await settle();
+          sinon.assert.notCalled(responseHandle);
+          sinon.assert.notCalled(responseError);
+          sinon.assert.notCalled(context.getDevToolsData);
+          sinon.assert.calledOnceWithExactly(
+            telemetry.logToolInvocation,
+            invocation,
+          );
+          sinon.assert.notCalled(abandonBrowser);
+          const lateProbe = await queue.scheduleTask();
+          lateProbe[Symbol.dispose]();
+          const pause = await runner.pause();
+          pause[Symbol.dispose]();
+
+          const nextRun = sinon.stub().resolves();
+          const nextHandler = new ToolHandler(
+            {...tool, name: 'next_tool', handler: nextRun},
+            config,
+            async () => context,
+            abandonBrowser,
+          );
+          assert.strictEqual(
+            (await nextHandler.handle(args)).isError,
+            undefined,
+          );
+          sinon.assert.calledOnceWithExactly(
+            nextRun,
+            mode === 'browserless' ? {params: args} : {params: args, page},
+            responseHandle.firstCall.thisValue,
+            context,
+          );
+        });
+      }
+    }
+
+    for (const concurrency of [
+      'exclusive',
+      'page',
+    ] satisfies ToolConcurrency[]) {
+      it(`cancels a queued ${concurrency} tool`, async () => {
+        const config = parseConfig();
+        const run = sinon.stub().resolves();
+        const tool = definePageTool(() => ({
+          name: 'queued_tool',
+          description: 'A queued tool',
+          annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
+          schema: {},
+          blockedByDialog: false,
+          concurrency,
+          verifyFilesSchema: {},
+          handler: run,
+        }))(config.resolved);
+        const context = createMockMcpContext();
+        const queue =
+          concurrency === 'page' ? context.pageTaskQueue(1) : context.taskQueue;
+        const holder = await queue.scheduleTask();
+        const controller = new AbortController();
+        const handler = new ToolHandler(
+          tool,
+          config,
+          async () => context,
+          sinon.spy(),
+        );
+        const pending = handler.handle(
+          {pageId: 1},
+          {signal: controller.signal},
+        );
+        await settle();
+        controller.abort();
+        await assert.rejects(pending, {name: 'AbortError'});
+        holder[Symbol.dispose]();
+        using probe = await queue.scheduleTask();
+        sinon.assert.notCalled(context.ensureBrowser);
+        sinon.assert.notCalled(run);
+        assert.deepStrictEqual(
+          getEventListeners(controller.signal, 'abort'),
+          [],
+        );
+      });
+    }
+
+    it('releases a guard acquired just before cancellation', async () => {
+      const config = parseConfig();
+      const context = createMockMcpContext();
+      const controller = new AbortController();
+      const scheduleTask = context.taskQueue.scheduleTask.bind(
+        context.taskQueue,
+      );
+      sinon.stub(context.taskQueue, 'scheduleTask').callsFake(async signal => {
+        const guard = await scheduleTask(signal);
+        controller.abort();
+        return guard;
+      });
+      const handler = new ToolHandler(
+        evaluateScript(config.resolved),
+        config,
+        async () => context,
+        sinon.spy(),
+      );
+      await assert.rejects(handler.handle({}, {signal: controller.signal}), {
+        name: 'AbortError',
+      });
+      using probe = await scheduleTask();
+      sinon.assert.notCalled(context.ensureBrowser);
+      assert.deepStrictEqual(getEventListeners(controller.signal, 'abort'), []);
+    });
+
+    for (const stage of ['context', 'browser', 'page', 'files', 'telemetry']) {
+      it(`skips work after ${stage} cancellation`, async () => {
+        const started = Promise.withResolvers<void>();
+        const initialization = Promise.withResolvers<void>();
+        const config = parseConfig(['--no-page-id-routing']);
+        const run = sinon.stub().resolves();
+        const tool = definePageTool(() => ({
+          name: 'page_tool',
+          description: 'A page tool',
+          annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
+          schema: {file: zod.string()},
+          blockedByDialog: false,
+          concurrency: 'page',
+          verifyFilesSchema: {file: true},
+          handler: run,
+        }))(config.resolved);
+        const page = createMockMcpPage();
+        const context = createMockMcpContext({selectedPage: page});
+        const browser = getMockBrowser();
+        context.ensureBrowser.resolves(browser);
+        context.validatePath.resolves('/tmp/file');
+        const waitForInitialization = async () => {
+          started.resolve();
+          await initialization.promise;
+        };
+        const getContext = async () => {
+          if (stage === 'context') {
+            await waitForInitialization();
+          }
+          return context;
+        };
+        if (stage === 'browser') {
+          context.ensureBrowser.callsFake(async () => {
+            await waitForInitialization();
+            return browser;
+          });
+        } else if (stage === 'page') {
+          page.init.callsFake(waitForInitialization);
+        } else if (stage === 'files') {
+          context.validatePath.callsFake(async () => {
+            await waitForInitialization();
+            return '/tmp/file';
+          });
+        } else if (stage === 'telemetry') {
+          context.getDevToolsData.callsFake(async () => {
+            await waitForInitialization();
+            return {};
+          });
+        }
+        const responseHandle = sinon.stub(McpResponse.prototype, 'handle');
+        const setPage = sinon.spy(McpResponse.prototype, 'setPage');
+        const telemetry = sinon.createStubInstance(ClearcutLogger);
+        sinon.stub(ClearcutLogger, 'get').returns(telemetry);
+        sinon.stub(Date, 'now').returns(1_000);
+        const controller = new AbortController();
+        const abandonBrowser = sinon.spy();
+        const handler = new ToolHandler(
+          tool,
+          config,
+          getContext,
+          abandonBrowser,
+        );
+        const pending = handler.handle(
+          {file: '/tmp/file'},
+          {signal: controller.signal},
+        );
+        await started.promise;
+        controller.abort();
+        await assert.rejects(pending, {name: 'AbortError'});
+        const invocation = {
+          toolName: tool.name,
+          params: {file: '/tmp/file'},
+          schema: tool.schema,
+          success: false,
+          latencyMs: 0,
+          devToolsData: undefined,
+          pageUrl: undefined,
+        };
+        if (stage === 'context') {
+          sinon.assert.notCalled(telemetry.logToolInvocation);
+        } else {
+          sinon.assert.calledOnceWithExactly(
+            telemetry.logToolInvocation,
+            invocation,
+          );
+        }
+        using probe = await context.taskQueue.scheduleTask();
+        initialization.resolve();
+        await settle();
+        if (stage === 'context') {
+          sinon.assert.notCalled(context.ensureBrowser);
+        } else if (stage === 'browser') {
+          sinon.assert.notCalled(context.consumeReconnectNotice);
+        } else if (stage === 'files') {
+          sinon.assert.notCalled(context.getSelectedMcpPage);
+        } else if (stage === 'page') {
+          sinon.assert.notCalled(setPage);
+        } else {
+          sinon.assert.notCalled(context.getSelectedMcpPageUrl);
+        }
+        sinon.assert.notCalled(responseHandle);
+        if (stage === 'context') {
+          sinon.assert.notCalled(telemetry.logToolInvocation);
+        } else {
+          sinon.assert.calledOnceWithExactly(
+            telemetry.logToolInvocation,
+            invocation,
+          );
+        }
+        sinon.assert.notCalled(abandonBrowser);
+        assert.deepStrictEqual(
+          getEventListeners(controller.signal, 'abort'),
+          [],
+        );
+      });
+    }
+
+    it('skips context for an already cancelled request', async () => {
+      const getContext = sinon.stub().resolves(createMockMcpContext());
+      const config = parseConfig();
+      const handler = new ToolHandler(
+        evaluateScript(config.resolved),
+        config,
+        getContext,
+        sinon.spy(),
+      );
+      const controller = new AbortController();
+      controller.abort();
+      await assert.rejects(handler.handle({}, {signal: controller.signal}), {
+        name: 'AbortError',
+      });
+      sinon.assert.notCalled(getContext);
+    });
   });
 
   it('calls getSelectedMcpPage for page scoped tools when pageIdRouting is disabled', async () => {
@@ -251,9 +588,9 @@ describe('ToolHandler', () => {
       const otherHandler = createHandler(otherTool, mockContext);
 
       const blockingResult = blockingHandler.handle({});
-      await new Promise(resolve => setImmediate(resolve));
+      await settle();
       const otherResult = otherHandler.handle({});
-      await new Promise(resolve => setImmediate(resolve));
+      await settle();
       finishWait();
       await Promise.all([blockingResult, otherResult]);
 
@@ -300,7 +637,7 @@ describe('ToolHandler', () => {
       const blockingResult = createHandler(blockingTool, mockContext).handle(
         {},
       );
-      await new Promise(resolve => setImmediate(resolve));
+      await settle();
       const waitingResult = await createHandler(
         waitingTool,
         mockContext,
@@ -382,10 +719,6 @@ describe('ToolHandler', () => {
         async () => mockContext,
         sinon.spy(),
       );
-    }
-
-    async function settle() {
-      await new Promise(resolve => setImmediate(resolve));
     }
 
     it('runs page tools on different pages at the same time', async () => {
