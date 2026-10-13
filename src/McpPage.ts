@@ -226,7 +226,7 @@ export class McpPage implements ContextPage {
   }
 
   url(): string {
-    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+    return this.#pptrPage?.url() ?? this.target.url();
   }
 
   getTitle(): string {
@@ -351,10 +351,7 @@ export class McpPage implements ContextPage {
   }
 
   #getDebuggingWebMcpToolGroups(): ToolGroups {
-    if (!this.#pptrPage) {
-      return [];
-    }
-    const webmcpTools = this.#pptrPage.webmcp
+    const webmcpTools = this.pptrPage.webmcp
       .tools()
       .filter(isDebuggingWebMcpTool);
     if (webmcpTools.length === 0) {
@@ -1227,14 +1224,14 @@ export class McpPage implements ContextPage {
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.#pptrPage.setDefaultNavigationTimeout(
+    this.pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }

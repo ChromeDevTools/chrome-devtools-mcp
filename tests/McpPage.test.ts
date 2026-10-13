@@ -327,6 +327,11 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.page);
       sinon.assert.notCalled(target.asPage);
       assert.throws(() => mcpPage.pptrPage, /not initialized/);
+      assert.throws(
+        () => mcpPage.getThirdPartyDeveloperTools(),
+        /not initialized/,
+      );
+      assert.throws(() => mcpPage.getWebMcpTools(), /not initialized/);
       assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
       assert.strictEqual(mcpPage.getTitle(), 'Target Title');
 
