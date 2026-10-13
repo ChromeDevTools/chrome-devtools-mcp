@@ -1569,6 +1569,34 @@ describe('McpPage', () => {
       );
     });
 
+    it('throws the exception description when the WebMCP tool throws in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        errorText: '',
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          className: 'Error',
+          description: 'Error: boom\n    at foo (app.js:1:1)',
+          objectId: '1',
+        },
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+
+      await assert.rejects(
+        () =>
+          mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response),
+        {message: 'Error: boom\n    at foo (app.js:1:1)'},
+      );
+    });
+
     it('excludes debugging WebMCP tools from getWebMcpTools()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 

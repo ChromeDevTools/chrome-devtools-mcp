@@ -658,9 +658,13 @@ export class McpPage implements ContextPage {
       .tools()
       .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
     if (webmcpTool) {
-      const {status, output, errorText} = await webmcpTool.execute(params);
+      const {status, output, errorText, exception} =
+        await webmcpTool.execute(params);
       if (status !== 'Completed') {
-        throw new Error(errorText || `Tool execution failed: ${status}`);
+        const error = exception?.description ?? exception?.value ?? errorText;
+        throw new Error(
+          error ? String(error) : `Tool execution failed: ${status}`,
+        );
       }
       if (output !== undefined) {
         response.appendResponseLine(JSON.stringify(output, null, 2));
