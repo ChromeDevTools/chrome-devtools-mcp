@@ -9,14 +9,7 @@ import 'core-js/modules/es.set.union.v2.js';
 import 'core-js/proposals/iterator-helpers.js';
 
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
-import type {Page} from 'puppeteer-core';
 import {z as zod} from 'zod';
-
-import {
-  snapshot as snapshotImpl,
-  navigation as navigationImpl,
-  generateReport as generateReportImpl,
-} from './lighthouse-devtools-mcp-bundle.js';
 
 export type {Flags, Result, RunnerResult, OutputMode};
 
@@ -97,21 +90,10 @@ export async function getGcfEncode(): Promise<(val: unknown) => string> {
   return encodeGeneric;
 }
 
-export const lighthouseRunner = {
-  snapshot: snapshotImpl as (
-    page: Page,
-    options: {flags?: Flags},
-  ) => Promise<RunnerResult>,
-  navigation: navigationImpl as (
-    page: Page,
-    url: string,
-    options: {flags?: Flags},
-  ) => Promise<RunnerResult>,
-};
-
-export const generateReport = generateReportImpl as (
-  lhr: Result,
-  format: string,
-) => string;
+export {
+  snapshot as lighthouseSnapshot,
+  navigation as lighthouseNavigation,
+  generateReport,
+} from './lighthouse-devtools-mcp-bundle.js';
 
 export * as DevTools from '../../third_party/devtools-frontend/mcp/mcp.js';

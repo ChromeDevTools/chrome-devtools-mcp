@@ -33,8 +33,10 @@ import type {
   UninstallPWAOptions,
   Viewport,
   DevTools,
+  Flags,
   Protocol,
   Page,
+  RunnerResult,
   WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
@@ -440,11 +442,17 @@ export type ContextPage = Readonly<{
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined>;
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
 }>;
 
+export type ToolFactory<Schema extends zod.ZodRawShape = zod.ZodRawShape> = (
+  args: ParsedArguments,
+) => ToolDefinition<Schema>;
+
 export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: (args: ParsedArguments) => ToolDefinition<Schema>,
-): (args: ParsedArguments) => ToolDefinition<Schema> {
+  definition: ToolFactory<Schema>,
+): ToolFactory<Schema> {
   return definition;
 }
 
@@ -469,9 +477,12 @@ export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
     ): Promise<void>;
   };
 
+export type PageToolFactory<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
+  (args: ParsedArguments) => DefinedPageTool<Schema>;
+
 export function definePageTool<Schema extends zod.ZodRawShape>(
   definition: (args: ParsedArguments) => PageToolDefinition<Schema>,
-): (args: ParsedArguments) => DefinedPageTool<Schema> {
+): PageToolFactory<Schema> {
   return (args: ParsedArguments): DefinedPageTool<Schema> => {
     const tool = definition(args);
     return {
@@ -488,11 +499,17 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
-export const pageIdSchema = {
+export const pageIdSchema: {
+  pageId: zod.ZodNumber;
+} = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
-export const timeoutSchema = {
+export const timeoutSchema: {
+  timeout: zod.ZodOptional<
+    zod.ZodPipe<zod.ZodNumber, zod.ZodTransform<number | undefined, number>>
+  >;
+} = {
   timeout: zod
     .number()
     .int()

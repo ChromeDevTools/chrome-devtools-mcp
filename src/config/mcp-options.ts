@@ -102,7 +102,7 @@ export const mcpOptions = {
     type: 'number',
     describe:
       'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }

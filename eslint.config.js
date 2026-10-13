@@ -519,6 +519,7 @@ export default defineConfig([
           allowIIFEs: true,
         },
       ],
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@local/no-direct-third-party-imports': 'error',
       'no-restricted-imports': [
         'error',

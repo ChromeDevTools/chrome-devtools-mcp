@@ -51,8 +51,8 @@ export class ConfigParser {
    */
   constructor(
     private version: string,
-    private argv = process.argv,
-    private env = process.env,
+    private argv: string[] = process.argv,
+    private env: NodeJS.ProcessEnv = process.env,
     private exitProcess = true,
   ) {
     this.configLocator = new ConfigLocator();
