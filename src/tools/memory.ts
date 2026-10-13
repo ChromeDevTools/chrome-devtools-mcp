@@ -416,6 +416,7 @@ export const compareHeapSnapshots = defineTool(() => ({
       .describe(
         'Optional 0-based index of the class in the summary list to filter results, showing individual objects.',
       ),
+    maxNameLength: maxNameLengthSchema,
   },
   blockedByDialog: false,
   handler: async (request, response, context) => {
@@ -425,13 +426,17 @@ export const compareHeapSnapshots = defineTool(() => ({
         request.params.currentFilePath,
         request.params.classIndex,
       );
-      response.setHeapSnapshotDetailedClassDiff(classDiffResult);
+      response.setHeapSnapshotDetailedClassDiff(classDiffResult, {
+        maxNameLength: request.params.maxNameLength,
+      });
     } else {
       const diff = await context.getHeapSnapshotClassDiffs(
         request.params.baseFilePath,
         request.params.currentFilePath,
       );
-      response.setHeapSnapshotClassDiffs(diff);
+      response.setHeapSnapshotClassDiffs(diff, {
+        maxNameLength: request.params.maxNameLength,
+      });
     }
   },
 }));

@@ -550,6 +550,7 @@ in the DevTools Elements panel (if any).
 - **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
 - **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
 - **classIndex** (number) _(optional)_: Optional 0-based index of the class in the summary list to filter results, showing individual objects.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 
 ---
 

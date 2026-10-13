@@ -1592,6 +1592,29 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
   });
 
+  it('truncates class diff names in compact format', async () => {
+    const context = createMockMcpContext();
+    const diffs = createMockClassDiffs();
+
+    const toonDiffResponse = new McpResponse(createMockParsedArguments());
+    toonDiffResponse.setHeapSnapshotClassDiffs(diffs, {maxNameLength: 4});
+    const toonDiffResult = await toonDiffResponse.handle(context, 'toon');
+    const toonDiffText = getTextContent(toonDiffResult.content[0]);
+    assert.ok(toonDiffText.includes('Test...'));
+
+    const detailedDiff = createMockDetailedClassDiff();
+    const toonDetailedResponse = new McpResponse(createMockParsedArguments());
+    toonDetailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff, {
+      maxNameLength: 4,
+    });
+    const toonDetailedResult = await toonDetailedResponse.handle(
+      context,
+      'toon',
+    );
+    const toonDetailedText = getTextContent(toonDetailedResult.content[0]);
+    assert.ok(toonDetailedText.includes('Test...'));
+  });
+
   it('formats duplicate strings with pagination and object details', async () => {
     const response = new McpResponse(createMockParsedArguments());
     const duplicateStrings = [

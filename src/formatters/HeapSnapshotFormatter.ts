@@ -306,7 +306,10 @@ export class HeapSnapshotFormatter {
     return Object.entries(aggregates).sort((a, b) => b[1].maxRet - a[1].maxRet);
   }
 
-  static formatDiffSummary(diffs: HeapSnapshotClassDiff[]): string {
+  static formatDiffSummary(
+    diffs: HeapSnapshotClassDiff[],
+    options: HeapSnapshotFormatOptions,
+  ): string {
     const lines: string[] = [];
     lines.push(
       'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
@@ -315,7 +318,7 @@ export class HeapSnapshotFormatter {
     let index = 0;
     for (const diff of diffs) {
       lines.push(
-        `${index},${diff.className},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
+        `${index},${formatName(diff.className, options)},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
       );
       index++;
     }
@@ -323,10 +326,13 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
-  static formatDiffDetails(diff: HeapSnapshotDetailedClassDiff): string {
+  static formatDiffDetails(
+    diff: HeapSnapshotDetailedClassDiff,
+    options: HeapSnapshotFormatOptions,
+  ): string {
     const lines: string[] = [];
     lines.push(
-      `${diff.className}: # new: ${diff.addedCount}, # deleted: ${diff.removedCount}, # delta: ${formatSignedCount(diff.countDelta)}, alloc size: ${formatSignedSize(diff.addedSize)}, freed size: ${formatSignedSize(diff.removedSize)}, size delta: ${formatSignedSize(diff.sizeDelta)}`,
+      `${formatName(diff.className, options)}: # new: ${diff.addedCount}, # deleted: ${diff.removedCount}, # delta: ${formatSignedCount(diff.countDelta)}, alloc size: ${formatSignedSize(diff.addedSize)}, freed size: ${formatSignedSize(diff.removedSize)}, size delta: ${formatSignedSize(diff.sizeDelta)}`,
     );
 
     const addedIds = diff.addedIds;

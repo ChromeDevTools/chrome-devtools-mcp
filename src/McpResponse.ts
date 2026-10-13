@@ -455,21 +455,27 @@ export class McpResponse implements Response {
     };
   }
 
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void {
+  setHeapSnapshotClassDiffs(
+    classDiffs: HeapSnapshotClassDiff[],
+    options?: HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       classDiffs,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+    options?: HeapSnapshotFormatOptions,
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+      formatOptions: options,
     };
   }
 
@@ -1371,8 +1377,16 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         response.push('### Heap Snapshot Diff');
         response.push(
           compactEncode
-            ? compactEncode(classDiffs)
-            : HeapSnapshotFormatter.formatDiffSummary(classDiffs),
+            ? compactEncode(
+                classDiffs.map(diff => ({
+                  ...diff,
+                  className: formatName(diff.className, formatOptions),
+                })),
+              )
+            : HeapSnapshotFormatter.formatDiffSummary(
+                classDiffs,
+                formatOptions,
+              ),
         );
         structuredContent.heapSnapshotClassDiffs = classDiffs;
       }
@@ -1381,8 +1395,17 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         response.push('### Heap Snapshot Detailed Diff');
         response.push(
           compactEncode
-            ? compactEncode(detailedClassDiff)
-            : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
+            ? compactEncode({
+                ...detailedClassDiff,
+                className: formatName(
+                  detailedClassDiff.className,
+                  formatOptions,
+                ),
+              })
+            : HeapSnapshotFormatter.formatDiffDetails(
+                detailedClassDiff,
+                formatOptions,
+              ),
         );
         structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
       }

@@ -189,9 +189,13 @@ export interface Response {
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
     options?: HeapSnapshotFormatOptions,
   ): void;
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
+  setHeapSnapshotClassDiffs(
+    classDiffs: HeapSnapshotClassDiff[],
+    options?: HeapSnapshotFormatOptions,
+  ): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,

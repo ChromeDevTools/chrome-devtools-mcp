@@ -197,6 +197,13 @@ export const commands: Commands = {
           'Optional 0-based index of the class in the summary list to filter results, showing individual objects.',
         required: false,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
     },
   },
   drag: {

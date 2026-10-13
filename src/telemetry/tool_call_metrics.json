@@ -1083,6 +1083,10 @@
       {
         "name": "class_index",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
