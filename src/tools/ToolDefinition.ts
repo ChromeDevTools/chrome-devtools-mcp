@@ -42,9 +42,12 @@ import type {
   TextSnapshotNode,
   GeolocationOptions,
   CD4ACommentThread,
+  PaginationOptions,
+  ForcedColors,
+  PrefersContrast,
+  PrefersReducedMotion,
 } from '../types.js';
 import type {McpWorker} from '../McpWorker.js';
-import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
   DialogAction,
@@ -426,6 +429,9 @@ export type ContextPage = Readonly<{
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
   }): Promise<void>;
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
@@ -433,7 +439,7 @@ export type ContextPage = Readonly<{
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge>;
+  ): Promise<DevToolsCommentBridge | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
@@ -540,13 +546,15 @@ export function viewportTransform(arg: string | undefined):
     width,
     height,
     deviceScaleFactor: dpr,
-    isMobile: isMobile,
-    isLandscape: isLandscape,
-    hasTouch: hasTouch,
+    isMobile,
+    isLandscape,
+    hasTouch,
   };
 }
 
-export function geolocationTransform(arg: string | undefined) {
+export function geolocationTransform(
+  arg: string | undefined,
+): {latitude: number; longitude: number} | undefined {
   if (!arg) {
     return undefined;
   }

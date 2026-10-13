@@ -141,7 +141,7 @@ export class BrowserManager {
     // a call silently adopt the freshly-rotated token as its own baseline
     // once the lock frees up, defeating the abandonment check entirely.
     const attempt = this.#browserAttempt;
-    using _guard = await this.#mutex.acquire();
+    using guard = await this.#mutex.acquire();
     if (this.#closingCount > 0) {
       throw new Error('Browser was closed while initializing.');
     }
@@ -518,7 +518,7 @@ export class BrowserManager {
   async close(): Promise<void> {
     this.#initPromise = undefined;
     this.#closingCount++;
-    using _guard = await this.#mutex.acquire();
+    using guard = await this.#mutex.acquire();
     try {
       await this.#closeBrowser();
     } finally {

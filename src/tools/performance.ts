@@ -45,6 +45,12 @@ export const startTrace = definePageTool(() => ({
       .describe(
         'Determines if the trace recording should be automatically stopped.',
       ),
+    ignoreCache: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
+      ),
     filePath: filePathSchema,
   },
   blockedByDialog: true,
@@ -85,9 +91,21 @@ export const startTrace = definePageTool(() => ({
       });
 
       if (request.params.reload) {
-        await page.pptrPage.goto(pageUrlForTracing, {
-          waitUntil: ['load'],
-        });
+        const ignoreCache = request.params.ignoreCache ?? false;
+        if (ignoreCache) {
+          // Disable the HTTP cache so that the main document and all
+          // subresources are fetched from the network, like a hard reload.
+          await page.pptrPage.setCacheEnabled(false);
+        }
+        try {
+          await page.pptrPage.goto(pageUrlForTracing, {
+            waitUntil: ['load'],
+          });
+        } finally {
+          if (ignoreCache) {
+            await page.pptrPage.setCacheEnabled(true);
+          }
+        }
       }
 
       if (request.params.autoStop) {

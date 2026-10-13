@@ -354,7 +354,7 @@ export async function createMcpServer(
   return {server: server.server};
 }
 
-export const logDisclaimers = (args: ParsedArguments) => {
+export const logDisclaimers = (args: ParsedArguments): void => {
   console.error(
     `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
 debug, and modify any data in the browser or DevTools.

@@ -52,6 +52,7 @@ import {
   Locator,
   Target,
   TargetType,
+  Tracing,
   WebWorker,
   WebMCP,
   WebMCPTool,
@@ -231,6 +232,15 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
   webmcp.tools.returns([]);
   Object.defineProperty(page, 'webmcp', {
     value: webmcp,
+    writable: true,
+    configurable: true,
+  });
+
+  // The real `tracing` getter reads a private field, which throws on a stub
+  // instance, so it is replaced with a stubbed Tracing instance.
+  const tracing = sinon.createStubInstance(Tracing);
+  Object.defineProperty(page, 'tracing', {
+    value: tracing,
     writable: true,
     configurable: true,
   });
@@ -585,7 +595,7 @@ export function synthesizeRuleTypes(
   ];
   for (const [items, ruleType] of mappings) {
     if (items) {
-      for (const _ of items) {
+      for (let i = 0; i < items.length; i++) {
         ruleTypes.push(ruleType);
       }
     }

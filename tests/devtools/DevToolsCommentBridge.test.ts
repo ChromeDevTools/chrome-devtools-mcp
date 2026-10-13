@@ -26,30 +26,101 @@ describe('DevToolsCommentBridge', () => {
 
   it('attaches to DevTools page and registers function and evaluation', async () => {
     const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(true);
     const bridge = new DevToolsCommentBridge();
 
     assert.strictEqual(bridge.isAttached(devtoolsPage), false);
 
-    await bridge.attach(devtoolsPage);
+    assert.strictEqual(await bridge.attach(devtoolsPage), true);
 
     assert.strictEqual(bridge.isAttached(devtoolsPage), true);
     sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-    sinon.assert.calledOnce(devtoolsPage.evaluate);
+    sinon.assert.calledTwice(devtoolsPage.evaluate);
   });
 
   it('is idempotent when attaching to the same DevTools page', async () => {
     const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(true);
     const bridge = new DevToolsCommentBridge();
 
-    await bridge.attach(devtoolsPage);
-    await bridge.attach(devtoolsPage);
+    assert.strictEqual(await bridge.attach(devtoolsPage), true);
+    assert.strictEqual(await bridge.attach(devtoolsPage), true);
 
     sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    sinon.assert.calledTwice(devtoolsPage.evaluate);
+  });
+
+  it('does not attach when the DevTools page has no CD4A bridge', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(false);
+    const bridge = new DevToolsCommentBridge();
+
+    assert.strictEqual(await bridge.attach(devtoolsPage), false);
+
+    assert.strictEqual(bridge.isAttached(devtoolsPage), false);
     sinon.assert.calledOnce(devtoolsPage.evaluate);
+    sinon.assert.notCalled(devtoolsPage.exposeFunction);
+  });
+
+  it('checks for the CD4A bridge again after a failed attach', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(true);
+    devtoolsPage.evaluate.onFirstCall().resolves(false);
+    const bridge = new DevToolsCommentBridge();
+
+    assert.strictEqual(await bridge.attach(devtoolsPage), false);
+    assert.strictEqual(await bridge.attach(devtoolsPage), true);
+
+    assert.strictEqual(bridge.isAttached(devtoolsPage), true);
+    sinon.assert.calledThrice(devtoolsPage.evaluate);
+    sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+  });
+
+  it('does not attach when evaluation fails', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.rejects(new Error('Target closed'));
+    const bridge = new DevToolsCommentBridge();
+
+    assert.strictEqual(await bridge.attach(devtoolsPage), false);
+
+    assert.strictEqual(bridge.isAttached(devtoolsPage), false);
+    sinon.assert.notCalled(devtoolsPage.exposeFunction);
+  });
+
+  it('attaches when the comment event binding already exists', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(true);
+    devtoolsPage.exposeFunction.rejects(
+      new Error(
+        "Failed to add page binding with name __onDevToolsCommentEvent: window['__onDevToolsCommentEvent'] already exists!",
+      ),
+    );
+    const bridge = new DevToolsCommentBridge();
+
+    assert.strictEqual(await bridge.attach(devtoolsPage), true);
+
+    assert.strictEqual(bridge.isAttached(devtoolsPage), true);
+    sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    sinon.assert.calledTwice(devtoolsPage.evaluate);
+  });
+
+  it('does not attach when the comment event binding is unavailable', async () => {
+    const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.onFirstCall().resolves(true);
+    devtoolsPage.evaluate.onSecondCall().resolves(false);
+    devtoolsPage.exposeFunction.rejects(new Error('Target closed'));
+    const bridge = new DevToolsCommentBridge();
+
+    assert.strictEqual(await bridge.attach(devtoolsPage), false);
+
+    assert.strictEqual(bridge.isAttached(devtoolsPage), false);
+    sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    sinon.assert.calledTwice(devtoolsPage.evaluate);
   });
 
   it('debounces comment notifications', async () => {
     const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(true);
     const onNotification = sinon.stub();
     let exposedCallback: (() => void) | undefined;
 
@@ -89,6 +160,7 @@ describe('DevToolsCommentBridge', () => {
 
   it('clears debounce timer on dispose', async () => {
     const devtoolsPage = createMockPuppeteerPage();
+    devtoolsPage.evaluate.resolves(true);
     const onNotification = sinon.stub();
     let exposedCallback: (() => void) | undefined;
 
@@ -117,7 +189,7 @@ describe('DevToolsCommentBridge', () => {
 
     clock.tick(200);
     sinon.assert.notCalled(onNotification);
-    sinon.assert.calledTwice(devtoolsPage.evaluate);
+    sinon.assert.calledThrice(devtoolsPage.evaluate);
   });
 
   it('retrieves comments via getComments', async () => {

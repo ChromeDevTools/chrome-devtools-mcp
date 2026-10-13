@@ -10,8 +10,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
-import {McpPage} from '../src/McpPage.js';
-import {replaceHtmlElementsWithUids} from '../src/McpPage.js';
+import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -540,24 +539,74 @@ describe('McpPage', () => {
       });
     });
 
-    it('calls emulateMediaFeatures with dark color scheme', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      await mcpPage.emulate({colorScheme: 'dark'});
-      assert.strictEqual(mcpPage.colorScheme, 'dark');
-      sinon.assert.calledOnceWithExactly(pptrPage.emulateMediaFeatures, [
-        {name: 'prefers-color-scheme', value: 'dark'},
-      ]);
-    });
+    describe('media features', () => {
+      it('emulates all media features in a single call', async () => {
+        const {mcpPage, pptrPage} = await createMcpPage();
+        await mcpPage.emulate({
+          colorScheme: 'dark',
+          forcedColors: 'active',
+          prefersContrast: 'more',
+          prefersReducedMotion: 'reduce',
+        });
+        assert.strictEqual(mcpPage.colorScheme, 'dark');
+        assert.strictEqual(mcpPage.forcedColors, 'active');
+        assert.strictEqual(mcpPage.prefersContrast, 'more');
+        assert.strictEqual(mcpPage.prefersReducedMotion, 'reduce');
+        sinon.assert.calledOnceWithExactly(pptrPage.emulateMediaFeatures, [
+          {name: 'prefers-color-scheme', value: 'dark'},
+          {name: 'forced-colors', value: 'active'},
+          {name: 'prefers-contrast', value: 'more'},
+          {name: 'prefers-reduced-motion', value: 'reduce'},
+        ]);
+      });
 
-    it('calls emulateMediaFeatures with empty string to reset color scheme', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      await mcpPage.emulate({colorScheme: 'dark'});
-      await mcpPage.emulate({colorScheme: 'auto'});
-      assert.strictEqual(mcpPage.colorScheme, null);
-      sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
-      sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
-        {name: 'prefers-color-scheme', value: ''},
-      ]);
+      it('resets media features set to auto', async () => {
+        const {mcpPage, pptrPage} = await createMcpPage();
+        await mcpPage.emulate({
+          colorScheme: 'dark',
+          forcedColors: 'active',
+          prefersContrast: 'more',
+          prefersReducedMotion: 'reduce',
+        });
+        await mcpPage.emulate({
+          colorScheme: 'auto',
+          forcedColors: 'auto',
+          prefersContrast: 'auto',
+          prefersReducedMotion: 'auto',
+        });
+        assert.strictEqual(mcpPage.colorScheme, null);
+        assert.strictEqual(mcpPage.forcedColors, null);
+        assert.strictEqual(mcpPage.prefersContrast, null);
+        assert.strictEqual(mcpPage.prefersReducedMotion, null);
+        sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
+        sinon.assert.calledWithExactly(
+          pptrPage.emulateMediaFeatures.secondCall,
+          [
+            {name: 'prefers-color-scheme', value: ''},
+            {name: 'forced-colors', value: ''},
+            {name: 'prefers-contrast', value: ''},
+            {name: 'prefers-reduced-motion', value: ''},
+          ],
+        );
+      });
+
+      it('resets omitted media features', async () => {
+        const {mcpPage, pptrPage} = await createMcpPage();
+        await mcpPage.emulate({forcedColors: 'active'});
+        await mcpPage.emulate({prefersContrast: 'less'});
+        assert.strictEqual(mcpPage.forcedColors, null);
+        assert.strictEqual(mcpPage.prefersContrast, 'less');
+        sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
+        sinon.assert.calledWithExactly(
+          pptrPage.emulateMediaFeatures.secondCall,
+          [
+            {name: 'prefers-color-scheme', value: ''},
+            {name: 'forced-colors', value: ''},
+            {name: 'prefers-contrast', value: 'less'},
+            {name: 'prefers-reduced-motion', value: ''},
+          ],
+        );
+      });
     });
 
     it('calls setViewport with the given dimensions merged with defaults', async () => {
@@ -854,6 +903,7 @@ describe('McpPage', () => {
     it('creates and attaches commentBridge when openDevTools is called', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
       pptrPage.openDevTools.resolves(devtoolsPage);
 
       assert.strictEqual(mcpPage.commentBridge, undefined);
@@ -862,6 +912,28 @@ describe('McpPage', () => {
       assert.strictEqual(result, devtoolsPage);
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+    });
+
+    it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
+      const {mcpPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.notStrictEqual(bridge, undefined);
+      assert.strictEqual(bridge, mcpPage.commentBridge);
+    });
+
+    it('returns undefined when the DevTools page has no CD4A bridge', async () => {
+      const {mcpPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(false);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.strictEqual(bridge, undefined);
+      sinon.assert.notCalled(devtoolsPage.exposeFunction);
     });
 
     it('disposes commentBridge on mcpPage.dispose()', async () => {
@@ -886,7 +958,8 @@ describe('McpPage', () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
       const devtoolsPage = createMockPuppeteerPage();
-      devtoolsPage.evaluate.resolves({
+      devtoolsPage.evaluate.resolves(true);
+      devtoolsPage.evaluate.onThirdCall().resolves({
         cdpRequestId: 'req-1',
         cdpBackendNodeId: 10,
       });
@@ -901,7 +974,7 @@ describe('McpPage', () => {
       });
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
-      sinon.assert.calledTwice(devtoolsPage.evaluate);
+      sinon.assert.calledThrice(devtoolsPage.evaluate);
     });
   });
 

@@ -88,7 +88,7 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
     try {
       recorder = await page.pptrPage.screencast({
         path: resolvedPath,
-        format: format,
+        format,
         ffmpegPath: args?.experimentalFfmpegPath,
         fps: args?.experimentalScreencastFps,
       });

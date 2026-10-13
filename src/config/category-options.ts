@@ -42,8 +42,7 @@ const categoryOverrides: Record<
     offByDefault: true,
   },
   [ToolCategory.EXTENSIONS]: {
-    describe:
-      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
+    describe: 'Set to true to include tools related to extensions.',
     offByDefault: true,
   },
   [ToolCategory.THIRD_PARTY]: {

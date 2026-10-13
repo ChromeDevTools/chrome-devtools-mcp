@@ -16,8 +16,8 @@ import {
   type UncaughtError,
 } from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import type {Locator} from './third_party/index.js';
 import {
+  type Locator,
   PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
@@ -40,7 +40,10 @@ import type {
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
+  ForcedColors,
   GeolocationOptions,
+  PrefersContrast,
+  PrefersReducedMotion,
   TextSnapshotNode,
 } from './types.js';
 import {logger} from './utils/logger.js';
@@ -51,10 +54,9 @@ import {
   type DialogAction,
 } from './utils/WaitForHelper.js';
 
-const DEFAULT_TIMEOUT = 5_000;
-const NAVIGATION_TIMEOUT = 10_000;
-
-export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
+export function replaceHtmlElementsWithUids(
+  schema: JSONSchema7Definition,
+): void {
   if (typeof schema === 'boolean') {
     return;
   }
@@ -112,6 +114,9 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
     tool.annotations.debugging === true,
   );
 }
+
+const DEFAULT_TIMEOUT = 5_000;
+const NAVIGATION_TIMEOUT = 10_000;
 
 function isBackendNodeId(
   id: unknown,
@@ -255,7 +260,7 @@ export class McpPage implements ContextPage {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
     if (this.#initPromise) {
-      return this.#initPromise;
+      return await this.#initPromise;
     }
     this.#initPromise = this.#doInit();
     try {
@@ -516,16 +521,20 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  /**
+   * Returns the comment bridge attached to the DevTools page, or undefined if
+   * the DevTools page does not support DevTools comments.
+   */
   async ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge> {
+  ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
       this.#commentBridge = new DevToolsCommentBridge({
         onNotification: this.#onNotification,
       });
     }
-    await this.#commentBridge.attach(devtoolsPage);
-    return this.#commentBridge;
+    const attached = await this.#commentBridge.attach(devtoolsPage);
+    return attached ? this.#commentBridge : undefined;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {
@@ -586,6 +595,18 @@ export class McpPage implements ContextPage {
 
   get colorScheme(): 'dark' | 'light' | null {
     return this.emulationSettings.colorScheme ?? null;
+  }
+
+  get forcedColors(): ForcedColors | null {
+    return this.emulationSettings.forcedColors ?? null;
+  }
+
+  get prefersContrast(): PrefersContrast | null {
+    return this.emulationSettings.prefersContrast ?? null;
+  }
+
+  get prefersReducedMotion(): PrefersReducedMotion | null {
+    return this.emulationSettings.prefersReducedMotion ?? null;
   }
 
   // Public for testability: tests spy on this method to verify throttle multipliers.
@@ -687,7 +708,7 @@ export class McpPage implements ContextPage {
 
         const stashedElements: Element[] = [];
 
-        const stashDOMElement = (el: Element) => {
+        const stashDOMElement = (el: Element): {stashedId: string} => {
           stashedElements.push(el);
           return {
             stashedId: `stashed-${stashedElements.length - 1}`,
@@ -845,7 +866,7 @@ export class McpPage implements ContextPage {
           node.stashedId.startsWith('stashed-') &&
           Object.keys(node).length === 1
         ) {
-          const index = parseInt(node.stashedId.split('-')[1]);
+          const index = parseInt(node.stashedId.split('-')[1], 10);
           return {uid: cdpElementIds[index]};
         }
         const resultObj: Record<string, unknown> = {};
@@ -876,7 +897,7 @@ export class McpPage implements ContextPage {
     if (!node) {
       throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
     }
-    return this.#resolveElementHandle(node, uid);
+    return await this.#resolveElementHandle(node, uid);
   }
 
   async #resolveElementHandle(
@@ -897,7 +918,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  getAXNodeByUid(uid: string) {
+  getAXNodeByUid(uid: string): TextSnapshotNode | undefined {
     return this.textSnapshot?.idToNode.get(uid);
   }
 
@@ -1044,9 +1065,24 @@ export class McpPage implements ContextPage {
     return {};
   }
 
-  async restoreEmulation() {
+  async restoreEmulation(): Promise<void> {
     const currentSetting = this.emulationSettings;
     await this.emulate(currentSetting);
+  }
+
+  async #emulateMediaFeatures(settings: EmulationSettings): Promise<void> {
+    // `page.emulateMediaFeatures` replaces all previously emulated media
+    // features, so every supported feature is sent on each call. An empty
+    // value disables the override for that feature.
+    await this.pptrPage.emulateMediaFeatures([
+      {name: 'prefers-color-scheme', value: settings.colorScheme ?? ''},
+      {name: 'forced-colors', value: settings.forcedColors ?? ''},
+      {name: 'prefers-contrast', value: settings.prefersContrast ?? ''},
+      {
+        name: 'prefers-reduced-motion',
+        value: settings.prefersReducedMotion ?? '',
+      },
+    ]);
   }
 
   async emulate(options: {
@@ -1055,6 +1091,9 @@ export class McpPage implements ContextPage {
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
     extraHttpHeaders?: Record<string, string> | undefined;
   }): Promise<void> {
@@ -1124,16 +1163,33 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.colorScheme || options.colorScheme === 'auto') {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: ''},
-      ]);
       delete newSettings.colorScheme;
     } else {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: options.colorScheme},
-      ]);
       newSettings.colorScheme = options.colorScheme;
     }
+
+    if (!options.forcedColors || options.forcedColors === 'auto') {
+      delete newSettings.forcedColors;
+    } else {
+      newSettings.forcedColors = options.forcedColors;
+    }
+
+    if (!options.prefersContrast || options.prefersContrast === 'auto') {
+      delete newSettings.prefersContrast;
+    } else {
+      newSettings.prefersContrast = options.prefersContrast;
+    }
+
+    if (
+      !options.prefersReducedMotion ||
+      options.prefersReducedMotion === 'auto'
+    ) {
+      delete newSettings.prefersReducedMotion;
+    } else {
+      newSettings.prefersReducedMotion = options.prefersReducedMotion;
+    }
+
+    await this.#emulateMediaFeatures(newSettings);
 
     if (!options.viewport) {
       delete newSettings.viewport;
@@ -1164,7 +1220,7 @@ export class McpPage implements ContextPage {
     await page.setViewport(newSettings.viewport ?? null);
   }
 
-  updateTimeouts() {
+  updateTimeouts(): void {
     if (!this.#pptrPage) {
       return;
     }
@@ -1205,7 +1261,7 @@ export class McpPage implements ContextPage {
   /**
    * We need to ignore favicon request as they make our test flaky
    */
-  async setUpNetworkCollectorForTesting() {
+  async setUpNetworkCollectorForTesting(): Promise<void> {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,

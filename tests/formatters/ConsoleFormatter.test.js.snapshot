@@ -321,6 +321,27 @@ at schedule (util.ts:5:2)
 Note: line and column numbers use 1-based indexing
 `;
 
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats an async fragment with a description longer than the separator line toJSONDetailed 1`] = `
+{
+  "id": 17,
+  "type": "error",
+  "text": "TypeError: Cannot read properties of undefined",
+  "argsCount": 0,
+  "args": [],
+  "stackTrace": "at MyVeryLongReactComponentNameThatExceedsFortyCharacters (Component.tsx:10:2)\\n--- <MyVeryLongReactComponentNameThatExceedsFortyCharacters> \\nat App (App.tsx:5:2)\\nNote: line and column numbers use 1-based indexing"
+}
+`;
+
+exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats an async fragment with a description longer than the separator line toStringDetailed 1`] = `
+ID: 17
+Message: error> TypeError: Cannot read properties of undefined
+### Stack trace
+at MyVeryLongReactComponentNameThatExceedsFortyCharacters (Component.tsx:10:2)
+--- <MyVeryLongReactComponentNameThatExceedsFortyCharacters> 
+at App (App.tsx:5:2)
+Note: line and column numbers use 1-based indexing
+`;
+
 exports[`ConsoleFormatter > toStringDetailed/toJSONDetailed > formats frames without a name or url and unnamed async fragments toJSONDetailed 1`] = `
 {
   "id": 16,
