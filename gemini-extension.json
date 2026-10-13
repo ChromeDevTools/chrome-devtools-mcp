@@ -1,5 +1,5 @@
 {
-  "name": "chrome-devtools-mcp",
+  "name": "chrome-devtools",
   "version": "1.12.0",
   "mcpServers": {
     "chrome-devtools": {
