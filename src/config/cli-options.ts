@@ -276,6 +276,30 @@ export const commands: Commands = {
         required: false,
         enum: ['dark', 'light', 'auto'],
       },
+      forcedColors: {
+        name: 'forcedColors',
+        type: 'string',
+        description:
+          'Emulate the `forced-colors` CSS media feature. Set to "auto" to reset to the default.',
+        required: false,
+        enum: ['active', 'none', 'auto'],
+      },
+      prefersContrast: {
+        name: 'prefersContrast',
+        type: 'string',
+        description:
+          'Emulate the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.',
+        required: false,
+        enum: ['more', 'less', 'custom', 'no-preference', 'auto'],
+      },
+      prefersReducedMotion: {
+        name: 'prefersReducedMotion',
+        type: 'string',
+        description:
+          'Emulate the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.',
+        required: false,
+        enum: ['reduce', 'no-preference', 'auto'],
+      },
       viewport: {
         name: 'viewport',
         type: 'string',
@@ -1333,6 +1357,13 @@ export const commands: Commands = {
           'Determines if the trace recording should be automatically stopped.',
         required: false,
         default: true,
+      },
+      ignoreCache: {
+        name: 'ignoreCache',
+        type: 'boolean',
+        description:
+          'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
+        required: false,
       },
       filePath: {
         name: 'filePath',

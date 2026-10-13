@@ -71,6 +71,7 @@
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "core-js": "3.50.0",
     "eslint": "^10.7.0",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -87,7 +88,7 @@
     "rollup-plugin-license": "^3.6.0",
     "semver": "^7.7.4",
     "sinon": "^22.0.0",
-    "typescript": "^6.0.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.43.0",
     "yargs": "18.2.0",
     "zod": "^4.4.3"

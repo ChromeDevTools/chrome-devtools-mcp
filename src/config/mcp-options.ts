@@ -339,8 +339,6 @@ export const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
   ['allowUnrestrictedPaths', 'filesystemRoot'],
   ['categoryPwa', 'autoConnect'],
   ['categoryPwa', 'browserUrl', 'wsEndpoint'],
-  ['categoryExtensions', 'autoConnect'],
-  ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
 ];
 
 export const IMPLICATIONS: Array<
