@@ -68,9 +68,10 @@ export const executeWebMcpTool = definePageTool(() => ({
       throw new Error(`Tool ${toolName} not found`);
     }
 
-    const {status, output, errorText} = await tool.execute(input);
+    const {status, output, errorText, exception} = await tool.execute(input);
+    const error = exception?.description ?? exception?.value ?? errorText;
     response.appendResponseLine(
-      JSON.stringify({status, output, errorText}, null, 2),
+      JSON.stringify({status, output, error}, null, 2),
     );
   },
 }));
