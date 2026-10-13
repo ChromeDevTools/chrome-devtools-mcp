@@ -26,7 +26,7 @@ import {
   Locator,
   type Browser,
   type BrowserContext,
-  type CDPSession,
+  type Connection,
   type ConsoleMessage,
   type GetPWAStateOptions,
   type InstallPWAOptions,
@@ -119,7 +119,6 @@ export class McpContext implements Context {
   #heapSnapshotManager = new HeapSnapshotManager();
   #roots: Root[] | undefined = undefined;
   #allowUnrestrictedPaths: boolean;
-  #browserSession?: Promise<CDPSession>;
 
   private constructor(
     browser: Browser,
@@ -160,10 +159,6 @@ export class McpContext implements Context {
 
     this.#serviceWorkerConsoleCollector.dispose();
     this.#heapSnapshotManager.dispose();
-    void this.#browserSession
-      ?.then(session => session.detach())
-      .catch(() => undefined);
-    this.#browserSession = undefined;
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
@@ -434,23 +429,14 @@ export class McpContext implements Context {
    */
   async getTargetInfos(): Promise<Map<string, Protocol.Target.TargetInfo>> {
     try {
-      const session = await this.#getBrowserSession();
-      const {targetInfos} = await session.send('Target.getTargets');
+      // @ts-expect-error use existing browser connection (internal Puppeteer API).
+      const connection: Connection = this.browser._connection;
+      const {targetInfos} = await connection.send('Target.getTargets');
       return new Map(targetInfos.map(info => [info.targetId, info]));
     } catch (err) {
       this.logger?.('Failed to fetch target infos', err);
       return new Map();
     }
-  }
-
-  async #getBrowserSession(): Promise<CDPSession> {
-    const existing = await this.#browserSession?.catch(() => undefined);
-    if (existing && !existing.detached) {
-      return existing;
-    }
-    const session = this.browser.target().createCDPSession();
-    this.#browserSession = session;
-    return await session;
   }
 
   getSelectedMcpPage(): McpPage {
