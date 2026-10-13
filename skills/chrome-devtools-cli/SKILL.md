@@ -66,7 +66,7 @@ chrome-devtools list_pages # Get a list of pages open in the browser
 chrome-devtools navigate_page 1 --url "https://example.com" # Navigates the currently selected page to a URL
 chrome-devtools navigate_page 1 --type "reload" --ignoreCache true # Reload page ignoring cache
 chrome-devtools navigate_page 1 --url "https://example.com" --timeout 5000 # Navigate with a timeout
-chrome-devtools navigate_page 1 --handleBeforeUnload "accept" # Handle before unload dialog
+chrome-devtools navigate_page 1 --type "reload" --handleBeforeUnload "accept" # Handle before unload dialog
 chrome-devtools navigate_page 1 --type "back" --initScript "foo()" # Navigate back and run an init script
 chrome-devtools new_page "https://example.com" # Creates a new page
 chrome-devtools new_page "https://example.com" --background true --timeout 5000 # Create new page in background
@@ -77,18 +77,20 @@ chrome-devtools select_page 1 --bringToFront true # Select a page and bring it t
 
 ## Emulation
 
+Each `emulate` call replaces all previously configured emulation settings (except `--extraHttpHeaders`), so pass all desired settings in a single call.
+
 ```bash
-chrome-devtools emulate 1 --networkConditions "Offline" # Emulate network conditions
-chrome-devtools emulate 1 --cpuThrottlingRate 4 --geolocation "0,0" # Emulate CPU throttling and geolocation
-chrome-devtools emulate 1 --colorScheme "dark" --viewport "1920x1080" # Emulate color scheme and viewport
-chrome-devtools emulate 1 --userAgent "Mozilla/5.0..." # Emulate user agent
+chrome-devtools emulate 1 --networkConditions "Offline" # Emulate network conditions (resets other settings)
+chrome-devtools emulate 1 --cpuThrottlingRate 4 --geolocation "0,0" # Emulate CPU throttling and geolocation (resets other settings)
+chrome-devtools emulate 1 --colorScheme "dark" --viewport "1920x1080" # Emulate color scheme and viewport (resets other settings)
+chrome-devtools emulate 1 --userAgent "Mozilla/5.0..." # Emulate user agent (resets other settings)
 chrome-devtools resize_page 1 1920 1080 # Resizes the selected page's window
 ```
 
 ## Performance
 
 ```bash
-chrome-devtools performance_analyze_insight 1 "1" "LCPBreakdown" # Get more details on a specific Performance Insight (pageId, insightSetId, insightName)
+chrome-devtools performance_analyze_insight 1 "NAVIGATION_0" "LCPBreakdown" # Get more details on a specific Performance Insight (pageId, insightSetId, insightName)
 chrome-devtools performance_start_trace 1 --reload true --autoStop false # Starts a performance trace recording (reload, autoStop)
 chrome-devtools performance_start_trace 1 --reload true --autoStop true --filePath "t.json.gz" # Start trace and save to a file
 chrome-devtools performance_stop_trace 1 # Stops the active performance trace
@@ -122,10 +124,10 @@ chrome-devtools close_heapsnapshot "./snap.heapsnapshot" # Free memory from load
 ```bash
 chrome-devtools get_network_request 1 # Get the currently selected network request for page 1
 chrome-devtools get_network_request 1 --reqid 1 --requestFilePath "req.md" # Get request by id and save to file
-chrome-devtools get_network_request 1 --responseFilePath "res.md" # Save response body to file
+chrome-devtools get_network_request 1 --reqid 1 --responseFilePath "res.md" # Save response body to file
 chrome-devtools list_network_requests 1 # List all network requests for page 1
 chrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination
-chrome-devtools list_network_requests 1 --resourceTypes Fetch # Filter requests by resource type
+chrome-devtools list_network_requests 1 --resourceTypes fetch # Filter requests by resource type
 chrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests
 ```
 

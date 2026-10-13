@@ -277,21 +277,21 @@
 
 ### `emulate`
 
-**Description:** Emulates various features on the target page.
+**Description:** Emulates various features on the target page. Each call replaces all emulation settings (except extraHttpHeaders), so pass all desired settings in a single call.
 
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Set to "auto" to reset to the default.
+- **colorScheme** (enum: "dark", "light", "auto") _(optional)_: [`Emulate`](#emulate) the dark or the light mode. Omit or set to "auto" to reset to the default.
 - **cpuThrottlingRate** (number) _(optional)_: Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling
 - **extraHttpHeaders** (string) _(optional)_: Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.
-- **forcedColors** (enum: "active", "none", "auto") _(optional)_: [`Emulate`](#emulate) the `forced-colors` CSS media feature. Set to "auto" to reset to the default.
+- **forcedColors** (enum: "active", "none", "auto") _(optional)_: [`Emulate`](#emulate) the `forced-colors` CSS media feature. Omit or set to "auto" to reset to the default.
 - **geolocation** (string) _(optional)_: Geolocation (`&lt;latitude&gt;,&lt;longitude&gt;`) to [`emulate`](#emulate). Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.
 - **networkConditions** (enum: "Offline", "Slow 3G", "Fast 3G", "Slow 4G", "Fast 4G") _(optional)_: Throttle network. Omit to disable throttling.
-- **prefersContrast** (enum: "more", "less", "custom", "no-preference", "auto") _(optional)_: [`Emulate`](#emulate) the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.
-- **prefersReducedMotion** (enum: "reduce", "no-preference", "auto") _(optional)_: [`Emulate`](#emulate) the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.
-- **userAgent** (string) _(optional)_: User agent to [`emulate`](#emulate). Set to empty string to clear the user agent override.
-- **viewport** (string) _(optional)_: [`Emulate`](#emulate) device viewports '&lt;width&gt;x&lt;height&gt;x&lt;devicePixelRatio&gt;[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to [`emulate`](#emulate) mobile devices. 'landscape' to [`emulate`](#emulate) landscape mode.
+- **prefersContrast** (enum: "more", "less", "custom", "no-preference", "auto") _(optional)_: [`Emulate`](#emulate) the `prefers-contrast` CSS media feature. Omit or set to "auto" to reset to the default.
+- **prefersReducedMotion** (enum: "reduce", "no-preference", "auto") _(optional)_: [`Emulate`](#emulate) the `prefers-reduced-motion` CSS media feature. Omit or set to "auto" to reset to the default.
+- **userAgent** (string) _(optional)_: User agent to [`emulate`](#emulate). Omit or set to empty string to clear the user agent override.
+- **viewport** (string) _(optional)_: [`Emulate`](#emulate) device viewports '&lt;width&gt;x&lt;height&gt;x&lt;devicePixelRatio&gt;[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to [`emulate`](#emulate) mobile devices. 'landscape' to [`emulate`](#emulate) landscape mode. Omit to clear the viewport override.
 
 ---
 
@@ -384,7 +384,7 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **args** (array) _(optional)_: An optional list of arguments to pass to the function.
+- **args** (array) _(optional)_: An optional list of arguments (element uids from the page content snapshot) to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
 - **format** (enum: "function", "script") _(optional)_: How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.

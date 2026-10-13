@@ -65,8 +65,9 @@ interface McpContextOptions {
   // The block list of URL patterns to block loading resources.
   blocklist?: string[];
   // Whether to skip path validation when the client did not negotiate the roots
-  // capability. When false (default), file-writing tools are restricted to the
-  // OS temp directory. When true, the previous permissive behavior is restored.
+  // capability. When false (default), tools that read or write local files are
+  // restricted to the OS temp directory. When true, the previous permissive
+  // behavior is restored.
   allowUnrestrictedPaths?: boolean;
   // Whether this context replaces a previous one after a browser reconnect.
   // Surfaces a one-time note in the next response.
@@ -867,7 +868,7 @@ export class McpContext implements Context {
   }
 
   async closeHeapSnapshot(filePath: string): Promise<boolean> {
-    return this.#heapSnapshotManager.disposeSnapshot(filePath);
+    return await this.#heapSnapshotManager.disposeSnapshot(filePath);
   }
 
   hasHeapSnapshots(): boolean {
