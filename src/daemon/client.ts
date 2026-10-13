@@ -221,11 +221,9 @@ export async function stopDaemon(sessionId: string): Promise<void> {
   try {
     await waitFor(
       () => !isDaemonRunning(sessionId),
-      `Timeout: file ${pidFilePath} not removed within ${FILE_TIMEOUT}ms`,
+      `Timeout: daemon (pid ${pid}) did not exit within ${FILE_TIMEOUT}ms`,
     );
-    if (fs.existsSync(pidFilePath)) {
-      fs.unlinkSync(pidFilePath);
-    }
+    fs.rmSync(pidFilePath, {force: true});
   } catch (error) {
     if (pid) {
       try {
