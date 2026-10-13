@@ -47,59 +47,31 @@ export const evaluateScript: ToolFactory = defineTool(
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
 Example with arguments: \`(el) => el.innerText\`
 `,
-        ),
-      sourcePath: zod
-        .string()
-        .optional()
-        .describe(
-          "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
-        ),
-      format: zod
-        .enum(['function', 'script'])
-        .optional()
-        .describe(
-          'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
-        ),
-      args: zod
-        .array(
-          zod
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
-        )
-        .optional()
-        .describe(
-          `An optional list of arguments (element uids from the page content snapshot) to pass to the function.`,
-        ),
-      filePath: zod
-        .string()
-        .optional()
-        .describe(
-          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
-        ),
-      dialogAction: zod
-        .string()
-        .optional()
-        .describe(
-          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
-        ),
-      waitForStableDom: zod
-        .boolean()
-        .optional()
-        .describe(
-          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
-        ),
-      ...(cliArgs.categoryExtensions
-        ? {
-            serviceWorkerId: zod
+          ),
+        sourcePath: zod
+          .string()
+          .optional()
+          .describe(
+            "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
+          ),
+        format: zod
+          .enum(['function', 'script'])
+          .optional()
+          .describe(
+            'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
+          ),
+        args: zod
+          .array(
+            zod
               .string()
               .describe(
                 'The uid of an element on the page from the page content snapshot',
               ),
           )
           .optional()
-          .describe(`An optional list of arguments to pass to the function.`),
+          .describe(
+            `An optional list of arguments (element uids from the page content snapshot) to pass to the function.`,
+          ),
         filePath: zod
           .string()
           .optional()

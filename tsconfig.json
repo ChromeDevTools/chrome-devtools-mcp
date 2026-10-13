@@ -8,25 +8,8 @@
       "ES2024.Promise",
       "ESNext.Disposable",
       "ESNext.Iterator",
-      "ESNext.Collection",
-      "ESNext.Array"
+      "ESNext.Collection"
     ],
-    "noEmitOnError": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "useUnknownInCatchVariables": false,
-    "noUnusedParameters": false,
-    "noUnusedLocals": false,
-    "noImplicitReturns": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "preserveConstEnums": true,
-    "declaration": true,
-    "isolatedDeclarations": false,
-    "sourceMap": true,
-    "inlineSources": true,
     "typeRoots": ["./node_modules/@types"],
     "types": ["node", "filesystem"],
     "moduleResolution": "bundler",
@@ -34,7 +17,15 @@
     "rootDir": ".",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "incremental": true
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "incremental": true,
+    "sourceMap": true,
+    "allowJs": true,
+    "preserveConstEnums": true,
+    "useUnknownInCatchVariables": false
   },
   "include": [
     "src/**/*.ts",
@@ -108,7 +99,11 @@
     "third_party/devtools-frontend/front_end/models/ai_assistance/tools/**",
     "third_party/devtools-frontend/front_end/models/ai_assistance/contexts/**",
     "third_party/devtools-frontend/front_end/third_party/puppeteer/**",
+    "third_party/devtools-frontend/front_end/third_party/puppeteer-legacy/**",
     "third_party/devtools-frontend/front_end/panels/recorder/**",
     "third_party/devtools-frontend/front_end/services/puppeteer/**"
+  ],
+  "files": [
+    "third_party/devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
   ]
 }

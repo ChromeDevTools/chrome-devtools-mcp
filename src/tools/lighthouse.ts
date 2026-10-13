@@ -67,7 +67,7 @@ export const lighthouseAudit: PageToolFactory = definePageTool(
         'best-practices',
         'agentic-browsing',
       ];
-      const formats = ['json', 'html'] as OutputMode[];
+      const formats: OutputMode[] = ['json', 'html'];
       const {
         mode = 'navigation',
         device = 'desktop',

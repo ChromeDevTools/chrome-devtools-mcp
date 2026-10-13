@@ -484,7 +484,7 @@ describe('screenshot', () => {
         // No explicit format passed: zod should apply the CLI-driven default.
         await tool.handler(
           {
-            params: zod.object(tool.schema).parse({}),
+            params: {format: zod.object(tool.schema).parse({}).format},
             page: context.getSelectedMcpPage(),
           },
           response,

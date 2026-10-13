@@ -151,26 +151,34 @@ export const ExperimentName = {
   `;
   writeFile(runtimeFile, runtimeContent);
 
-  // Copy third-party .js and .mjs files not emitted by tsc (since allowJs is disabled).
-  const devtoolsThirdPartyFiles = [
-    'acorn/package/dist/acorn.mjs',
-    'codemirror/package/addon/runmode/runmode-standalone.mjs',
-    'codemirror/package/mode/css/css.mjs',
-    'codemirror/package/mode/javascript/javascript.mjs',
-    'codemirror/package/mode/xml/xml.mjs',
-    'diff/diff_match_patch.js',
-    'intl-messageformat/package/intl-messageformat.esm.js',
-    'legacy-javascript/lib/legacy-javascript.js',
-    'marked/package/lib/marked.esm.js',
-    'third-party-web/lib/nostats-subset.js',
+  // Copy missing CodeMirror .mjs files that tsc ignores due to .d.mts renames
+  const codemirrorDir = path.join(
+    BUILD_DIR,
+    devtoolsThirdPartyPath,
+    'codemirror',
+  );
+  const codemirrorSrcDir = path.join(
+    process.cwd(),
+    'third_party',
+    'devtools-frontend',
+    'front_end',
+    'third_party',
+    'codemirror',
+  );
+  const filesToCopy = [
+    'package/addon/runmode/runmode-standalone.mjs',
+    'package/mode/css/css.mjs',
+    'package/mode/javascript/javascript.mjs',
+    'package/mode/xml/xml.mjs',
   ];
-  for (const file of devtoolsThirdPartyFiles) {
-    const src = path.join(process.cwd(), devtoolsThirdPartyPath, file);
-    const dest = path.join(BUILD_DIR, devtoolsThirdPartyPath, file);
+  for (const file of filesToCopy) {
+    const src = path.join(codemirrorSrcDir, file);
+    const dest = path.join(codemirrorDir, file);
     fs.mkdirSync(path.dirname(dest), {recursive: true});
     fs.copyFileSync(src, dest);
   }
 
+  // Copy lighthouse bundle that tsc ignores due to lighthouse-devtools-mcp-bundle.d.ts
   const lighthouseBundle = 'src/third_party/lighthouse-devtools-mcp-bundle.js';
   const lighthouseBundleDest = path.join(BUILD_DIR, lighthouseBundle);
   fs.mkdirSync(path.dirname(lighthouseBundleDest), {recursive: true});
