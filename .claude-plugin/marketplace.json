@@ -9,7 +9,7 @@
   },
   "plugins": [
     {
-      "name": "chrome-devtools-mcp",
+      "name": "chrome-devtools",
       "source": "./",
       "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer"
     }
