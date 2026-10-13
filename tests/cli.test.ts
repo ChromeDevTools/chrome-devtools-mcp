@@ -9,11 +9,14 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ConfigParser} from '../src/config/ConfigParser.js';
-import {getCliOptions, mcpOptions} from '../src/config/mcp-options.js';
+import {
+  getCliOptions,
+  mcpOptions,
+  DEFAULT_FILESYSTEM_ROOT,
+} from '../src/config/mcp-options.js';
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
-import {DEFAULT_FILESYSTEM_ROOT} from '../src/config/mcp-options.js';
 
 import {createTempFile} from './utils.js';
 
@@ -423,6 +426,30 @@ describe('cli args parsing', () => {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     });
     assert.strictEqual(disabledArgs.usageStatistics, false);
+  });
+
+  it('respects CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY env variable', async () => {
+    const enabledByEnv = parseConfig([], {
+      CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY: 'true',
+    });
+    assert.strictEqual(enabledByEnv.categoryExperimentalThirdParty, true);
+
+    const disabledByCli = parseConfig(
+      ['--no-category-experimental-third-party'],
+      {
+        CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY: 'true',
+      },
+    );
+    assert.strictEqual(disabledByCli.categoryExperimentalThirdParty, false);
+
+    using testConfig = createTempFile(
+      JSON.stringify({categoryExperimentalThirdParty: false}),
+      'cd4a.test.config.third-party.json',
+    );
+    const disabledByConfig = parseConfig(['--config', testConfig.path], {
+      CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY: 'true',
+    });
+    assert.strictEqual(disabledByConfig.categoryExperimentalThirdParty, false);
   });
 
   it('parses performance crux flag', async () => {
@@ -1140,36 +1167,16 @@ describe('cli args parsing', () => {
       assert.strictEqual(args.executablePath, '/bin/chrome');
     });
 
-    it('rejects categoryExtensions with autoConnect', async () => {
-      assert.throws(
-        () => parseConfig(['--category-extensions', '--auto-connect']),
-        /Arguments categoryExtensions and autoConnect are mutually exclusive/,
-      );
-    });
-
-    it('rejects categoryExtensions with browserUrl', async () => {
-      assert.throws(
-        () =>
-          parseConfig([
-            '--category-extensions',
-            '--browserUrl',
-            'http://localhost:9222',
-          ]),
-        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
-      );
-    });
-
-    it('rejects categoryExtensions with wsEndpoint', async () => {
-      assert.throws(
-        () =>
-          parseConfig([
-            '--category-extensions',
-            '--wsEndpoint',
-            'ws://localhost:9222',
-          ]),
-        /Arguments categoryExtensions and wsEndpoint are mutually exclusive/,
-      );
-    });
+    for (const connectArgs of [
+      ['--auto-connect'],
+      ['--browserUrl', 'http://localhost:9222'],
+      ['--wsEndpoint', 'ws://localhost:9222'],
+    ]) {
+      it(`allows categoryExtensions with ${connectArgs[0]}`, async () => {
+        const args = parseConfig(['--category-extensions', ...connectArgs]);
+        assert.strictEqual(args.categoryExtensions, true);
+      });
+    }
 
     for (const connectArgs of [
       ['--browserUrl', 'http://localhost:9222'],
@@ -1194,17 +1201,14 @@ describe('cli args parsing', () => {
       });
     }
 
-    it('rejects explicit categoryExtensions with browserUrl in viaCli', async () => {
-      assert.throws(
-        () =>
-          parseConfig([
-            '--viaCli',
-            '--category-extensions',
-            '--browserUrl',
-            'http://localhost:9222',
-          ]),
-        /Arguments categoryExtensions and browserUrl are mutually exclusive/,
-      );
+    it('allows explicit categoryExtensions with browserUrl in viaCli', async () => {
+      const args = parseConfig([
+        '--viaCli',
+        '--category-extensions',
+        '--browserUrl',
+        'http://localhost:9222',
+      ]);
+      assert.strictEqual(args.categoryExtensions, true);
     });
   });
 

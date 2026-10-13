@@ -22,7 +22,9 @@ import {
   collectRankedContexts,
   type ContextAnalysisReport,
   type ContextFilterOptions,
+  formatName,
   HeapSnapshotFormatter,
+  type HeapSnapshotFormatOptions,
   isEdgeLike,
   isNodeLike,
 } from './formatters/HeapSnapshotFormatter.js';
@@ -81,7 +83,7 @@ interface TraceInsightData {
 }
 
 interface ContextAnalysisOptions
-  extends PaginationOptions, ContextFilterOptions {}
+  extends PaginationOptions, ContextFilterOptions, HeapSnapshotFormatOptions {}
 
 export class McpResponse implements Response {
   #includePages = false;
@@ -116,6 +118,7 @@ export class McpResponse implements Response {
     objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
     contextAnalysis?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult;
     contextAnalysisOptions?: ContextAnalysisOptions;
+    formatOptions?: HeapSnapshotFormatOptions;
   };
   #networkRequestsOptions?: {
     include: boolean;
@@ -375,7 +378,7 @@ export class McpResponse implements Response {
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -389,7 +392,8 @@ export class McpResponse implements Response {
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
-  ) {
+    options?: HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -397,54 +401,61 @@ export class McpResponse implements Response {
       staticData,
       nativeContextSizes,
       retainedByContextSummary,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions,
-  ) {
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       nodes,
       pagination: options,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions,
-  ) {
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       duplicateStrings,
       pagination: options,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
-  ) {
+    options?: HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       retainingPaths,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
-  ) {
+    options?: HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       dominators,
+      formatOptions: options,
     };
   }
 
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]) {
+  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -454,7 +465,7 @@ export class McpResponse implements Response {
 
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -464,23 +475,26 @@ export class McpResponse implements Response {
 
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
-  ) {
+    options?: HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       objectInfo,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotContextAnalysis(
     contextAnalysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
     options?: ContextAnalysisOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       contextAnalysis,
       contextAnalysisOptions: options,
+      formatOptions: options,
     };
   }
 
@@ -528,9 +542,8 @@ export class McpResponse implements Response {
         '.txt',
       );
       return result.filename;
-    } else {
-      return formatter;
     }
+    return formatter;
   }
 
   async #handleAttachedNetworkRequest(
@@ -577,7 +590,8 @@ export class McpResponse implements Response {
         fetchDetailedData: true,
         devTools: this.#page.devtoolsUniverse,
       });
-    } else if (message instanceof DevTools.AggregatedIssue) {
+    }
+    if (message instanceof DevTools.AggregatedIssue) {
       const formatter = new IssueFormatter(message, {
         id: consoleMessageStableId,
         requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
@@ -591,9 +605,8 @@ export class McpResponse implements Response {
         );
       }
       return formatter;
-    } else {
-      return undefined;
     }
+    return undefined;
   }
 
   async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
@@ -791,7 +804,7 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    return this.format(
+    return await this.format(
       context,
       {
         detailedConsoleMessage,
@@ -872,6 +885,9 @@ export class McpResponse implements Response {
       userAgent?: string;
       cpuThrottlingRate?: number;
       colorScheme?: string;
+      forcedColors?: string;
+      prefersContrast?: string;
+      prefersReducedMotion?: string;
       dialog?: {
         type: string;
         message: string;
@@ -956,9 +972,10 @@ export class McpResponse implements Response {
       }
     }
 
-    const networkConditions = this.#page?.networkConditions;
-    if (networkConditions) {
-      const timeout = this.#page!.pptrPage.getDefaultNavigationTimeout();
+    const page = this.#page;
+    const networkConditions = page?.networkConditions;
+    if (page && networkConditions) {
+      const timeout = page.pptrPage.getDefaultNavigationTimeout();
       response.push(`Emulating network conditions: ${networkConditions}`);
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
@@ -995,6 +1012,26 @@ export class McpResponse implements Response {
     if (colorScheme) {
       response.push(`Emulating color scheme: ${colorScheme}`);
       structuredContent.colorScheme = colorScheme;
+    }
+
+    const forcedColors = this.#page?.forcedColors;
+    if (forcedColors) {
+      response.push(`Emulating forced-colors: ${forcedColors}`);
+      structuredContent.forcedColors = forcedColors;
+    }
+
+    const prefersContrast = this.#page?.prefersContrast;
+    if (prefersContrast) {
+      response.push(`Emulating prefers-contrast: ${prefersContrast}`);
+      structuredContent.prefersContrast = prefersContrast;
+    }
+
+    const prefersReducedMotion = this.#page?.prefersReducedMotion;
+    if (prefersReducedMotion) {
+      response.push(
+        `Emulating prefers-reduced-motion: ${prefersReducedMotion}`,
+      );
+      structuredContent.prefersReducedMotion = prefersReducedMotion;
     }
 
     const dialog = this.#page?.getDialog();
@@ -1160,9 +1197,11 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       response.push(`URL: ${summary.url}`);
       response.push('### Category Scores');
       for (const score of summary.scores) {
-        response.push(
-          `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
-        );
+        // Lighthouse uses a null score for categories that could not be
+        // scored and renders scores as Math.round(score * 100).
+        const formattedScore =
+          score.score === null ? 'n/a' : Math.round(score.score * 100);
+        response.push(`- ${score.title}: ${formattedScore} (${score.id})`);
       }
       response.push('### Audit Summary');
       response.push(`Passed: ${summary.audits.passed}`);
@@ -1191,6 +1230,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
 
     if (this.#heapSnapshotOptions?.include) {
       response.push('## Heap Snapshot Data');
+      const formatOptions = this.#heapSnapshotOptions.formatOptions ?? {};
       const stats = this.#heapSnapshotOptions.stats;
       const staticData = this.#heapSnapshotOptions.staticData;
       if (stats) {
@@ -1207,7 +1247,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       if (nativeContextSizes) {
         response.push('### Native Contexts');
         response.push(
-          HeapSnapshotFormatter.formatNativeContextSizes(nativeContextSizes),
+          HeapSnapshotFormatter.formatNativeContextSizes(
+            nativeContextSizes,
+            formatOptions,
+          ),
         );
         structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
         structuredContent.heapSnapshot.nativeContextSizes = nativeContextSizes;
@@ -1277,7 +1320,12 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           this.#heapSnapshotOptions.pagination,
         );
 
-        response.push(HeapSnapshotFormatter.formatNodes(paginationData.items));
+        response.push(
+          HeapSnapshotFormatter.formatNodes(
+            paginationData.items,
+            formatOptions,
+          ),
+        );
 
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
@@ -1291,7 +1339,9 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         if (paths.length === 0) {
           response.push('No retaining paths found.');
         } else {
-          response.push(HeapSnapshotFormatter.formatRetainingPaths(paths));
+          response.push(
+            HeapSnapshotFormatter.formatRetainingPaths(paths, formatOptions),
+          );
         }
         const reached = Object.entries(limitsReached)
           .filter(([, hit]) => hit)
@@ -1310,7 +1360,9 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         if (dominators.length === 0) {
           response.push('No dominators found.');
         } else {
-          response.push(HeapSnapshotFormatter.formatDominators(dominators));
+          response.push(
+            HeapSnapshotFormatter.formatDominators(dominators, formatOptions),
+          );
         }
         structuredContent.heapSnapshotDominators = dominators;
       }
@@ -1347,6 +1399,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
 
         const formatted = HeapSnapshotFormatter.formatDuplicateStrings(
           paginationData.items,
+          formatOptions,
         );
         response.push(formatted);
 
@@ -1355,11 +1408,18 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       const objectInfo = this.#heapSnapshotOptions.objectInfo;
       if (objectInfo) {
         response.push('### Object Details');
-        response.push(
-          compactEncode
-            ? compactEncode(objectInfo)
-            : HeapSnapshotFormatter.formatObjectInfo(objectInfo),
-        );
+        if (compactEncode) {
+          response.push(
+            compactEncode({
+              ...objectInfo,
+              name: formatName(objectInfo.name, formatOptions),
+            }),
+          );
+        } else {
+          response.push(
+            HeapSnapshotFormatter.formatObjectInfo(objectInfo, formatOptions),
+          );
+        }
         structuredContent.heapSnapshotObjectDetails = objectInfo;
       }
       const contextAnalysis = this.#heapSnapshotOptions.contextAnalysis;
@@ -1385,7 +1445,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         response.push(
           compactEncode
             ? compactEncode(report)
-            : HeapSnapshotFormatter.formatContextAnalysis(report),
+            : HeapSnapshotFormatter.formatContextAnalysis(
+                report,
+                formatOptions,
+              ),
         );
         structuredContent.heapSnapshotContextAnalysis = report;
       }
@@ -1537,7 +1600,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     if (this.#cssStylesData) {
-      const resolveUid = (backendNodeId: number) =>
+      const resolveUid = (backendNodeId: number): string | undefined =>
         this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
 
       const containerDetails = await resolveContainerQueries(
@@ -1608,7 +1671,22 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     };
   }
 
-  #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
+  #dataWithPagination<T>(
+    data: T[],
+    pagination?: PaginationOptions,
+  ): {
+    info: string[];
+    items: readonly T[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startIndex: number;
+      endIndex: number;
+      invalidPage: boolean;
+    };
+  } {
     const response = [];
     const paginationResult = paginate<T>(data, pagination);
     if (paginationResult.invalidPage) {
@@ -1644,7 +1722,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     };
   }
 
-  resetResponseLineForTesting() {
+  resetResponseLineForTesting(): void {
     this.#textResponseLines = [];
   }
 }
@@ -1659,7 +1737,13 @@ function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
   rawTitle: string,
-) {
+): {
+  id: number | undefined;
+  url: string;
+  title: string;
+  selected: boolean;
+  isolatedContext?: string;
+} {
   const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
   const entry: {

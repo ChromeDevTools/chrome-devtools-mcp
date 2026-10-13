@@ -529,6 +529,7 @@ describe('McpResponse', () => {
         });
       });
       page.evaluate(() => {
+        // eslint-disable-next-line no-console
         console.log('Hello from the test');
       });
       await consoleMessagePromise;
@@ -859,7 +860,7 @@ describe('extensions', () => {
       response.resetResponseLineForTesting();
       // Testing with extensions
       context.listExtensions = async () =>
-        Promise.resolve(
+        await Promise.resolve(
           new Map<string, Extension>([
             [
               'id1',
@@ -927,6 +928,54 @@ describe('lighthouse', () => {
       assert.ok(text.includes('- /tmp/report.html'));
 
       t.assert.snapshot(getTextContent(content[0]));
+      t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+    });
+  });
+
+  it('rounds category scores and shows unscored categories as n/a', async t => {
+    await withMcpContext(async (response, context) => {
+      const lighthouseResult = {
+        summary: {
+          mode: 'navigation',
+          device: 'desktop',
+          url: 'https://example.com',
+          scores: [
+            {
+              id: 'accessibility',
+              title: 'Accessibility',
+              score: 0.57,
+            },
+            {
+              id: 'seo',
+              title: 'SEO',
+              score: 0,
+            },
+            {
+              id: 'agentic-browsing',
+              title: 'Agentic Browsing',
+              score: null,
+            },
+          ],
+          audits: {
+            failed: 1,
+            passed: 10,
+          },
+          timing: {
+            total: 1000,
+          },
+        },
+        reports: ['/tmp/report.json', '/tmp/report.html'],
+      };
+
+      response.attachLighthouseResult(lighthouseResult);
+      const {content, structuredContent} = await response.handle(context);
+
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('- Accessibility: 57 (accessibility)'));
+      assert.ok(text.includes('- SEO: 0 (seo)'));
+      assert.ok(text.includes('- Agentic Browsing: n/a (agentic-browsing)'));
+
+      t.assert.snapshot(text);
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
   });
@@ -1579,6 +1628,23 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(objectText.includes('### Object Details'));
     assert.ok(objectText.includes('id: @1'));
     assert.ok(objectText.includes('name: Object'));
+  });
+
+  it('truncates object details name in compact format', async () => {
+    const context = createMockMcpContext();
+    const toonResponse = new McpResponse(createMockParsedArguments());
+    const longNameObjectInfo = {
+      ...createMockObjectInfo(),
+      name: 'Object_' + 'x'.repeat(150),
+    };
+    toonResponse.setHeapSnapshotObjectDetails(longNameObjectInfo, {
+      maxNameLength: 10,
+    });
+
+    const toonResult = await toonResponse.handle(context, 'toon');
+    const toonText = getTextContent(toonResult.content[0]);
+    assert.ok(toonText.includes('### Object Details'));
+    assert.ok(toonText.includes('Object_xxx...'));
   });
 
   it('renders the context field usage section for the filtered contexts', async () => {

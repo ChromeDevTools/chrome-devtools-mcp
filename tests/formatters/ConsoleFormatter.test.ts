@@ -9,8 +9,11 @@ import {describe, it} from 'node:test';
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
-import type {ConsoleMessage, Protocol} from '../../src/third_party/index.js';
-import type {DevTools} from '../../src/third_party/index.js';
+import type {
+  ConsoleMessage,
+  Protocol,
+  DevTools,
+} from '../../src/third_party/index.js';
 
 interface MockConsoleMessage {
   type: () => string;
@@ -799,6 +802,47 @@ describe('ConsoleFormatter', () => {
 
         return await ConsoleFormatter.from(message, {
           id: 16,
+          resolvedStackTraceForTesting: stackTrace,
+        });
+      },
+    );
+
+    formatterTestDetailed(
+      'formats an async fragment with a description longer than the separator line',
+      async () => {
+        const message = createMockMessage({
+          type: () => 'error',
+          text: () => 'TypeError: Cannot read properties of undefined',
+        });
+        const stackTrace = {
+          syncFragment: {
+            frames: [
+              {
+                line: 10,
+                column: 2,
+                url: 'Component.tsx',
+                name: 'MyVeryLongReactComponentNameThatExceedsFortyCharacters',
+              },
+            ],
+          },
+          asyncFragments: [
+            {
+              description:
+                '<MyVeryLongReactComponentNameThatExceedsFortyCharacters>',
+              frames: [
+                {
+                  line: 5,
+                  column: 2,
+                  url: 'App.tsx',
+                  name: 'App',
+                },
+              ],
+            },
+          ],
+        } as unknown as DevTools.StackTrace.StackTrace.StackTrace;
+
+        return await ConsoleFormatter.from(message, {
+          id: 17,
           resolvedStackTraceForTesting: stackTrace,
         });
       },

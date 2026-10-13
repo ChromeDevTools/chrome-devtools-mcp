@@ -17,7 +17,7 @@ import {logger} from './utils/logger.js';
 export class TextSnapshot {
   static nextSnapshotId = 1;
 
-  static resetCounter() {
+  static resetCounter(): void {
     TextSnapshot.nextSnapshotId = 1;
   }
 
@@ -155,14 +155,15 @@ export class TextSnapshot {
     }
     // TODO: index by backendNodeId instead.
     const queue = [this.root];
-    while (queue.length) {
-      const current = queue.pop()!;
+    let current = queue.pop();
+    while (current) {
       if (current.backendNodeId === cdpBackendNodeId) {
         return current.id;
       }
       for (const child of current.children) {
         queue.push(child);
       }
+      current = queue.pop();
     }
     return;
   }
@@ -268,7 +269,7 @@ export class TextSnapshot {
               pierce: true,
             },
           );
-          const collect = (node: Protocol.DOM.Node) => {
+          const collect = (node: Protocol.DOM.Node): void => {
             if (node.backendNodeId && node.backendNodeId !== backendNodeId) {
               descendantIds.add(node.backendNodeId);
             }

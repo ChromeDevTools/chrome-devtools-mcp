@@ -89,6 +89,15 @@ export class HeapSnapshotManager {
       idToClassKey: [''],
       classKeyToId: new Map<string, number>(),
     });
+    // Assign ids to all aggregates of this snapshot. This ensures ids are available
+    // even without calling getAggregates() and deterministic (do not depend on
+    // the filter used on the getAggregates() call).
+    const aggregates = await snapshot.aggregatesWithFilter(
+      new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter(),
+    );
+    for (const key of Object.keys(aggregates)) {
+      this.getOrCreateIdForClassKey(filePath, key);
+    }
 
     return snapshot;
   }
@@ -130,7 +139,7 @@ export class HeapSnapshotManager {
     let totalSelfSize = 0;
 
     for (const [key, aggregate] of Object.entries(aggregates)) {
-      const id = await this.getOrCreateIdForClassKey(filePath, key);
+      const id = this.getOrCreateIdForClassKey(filePath, key);
       aggregate[stableIdSymbol] = id;
       objectCount += aggregate.count;
       totalSelfSize += aggregate.self;
@@ -171,10 +180,7 @@ export class HeapSnapshotManager {
     return await snapshot.getRetainedByContextSummary();
   }
 
-  async getOrCreateIdForClassKey(
-    filePath: string,
-    classKey: string,
-  ): Promise<number> {
+  getOrCreateIdForClassKey(filePath: string, classKey: string): number {
     const cached = this.#getCachedSnapshot(filePath);
     let id = cached.classKeyToId.get(classKey);
     if (!id) {
@@ -195,7 +201,7 @@ export class HeapSnapshotManager {
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
     await this.#applyNodeFilter(snapshot, filter, filterName, objectId);
-    const className = await this.resolveClassKeyFromId(filePath, id);
+    const className = this.resolveClassKeyFromId(filePath, id);
     if (!className) {
       throw new Error(`Class with ID ${id} not found in heap snapshot`);
     }
@@ -331,7 +337,12 @@ export class HeapSnapshotManager {
     };
   }
 
-  #getCachedSnapshot(filePath: string) {
+  #getCachedSnapshot(filePath: string): {
+    snapshot: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
+    worker: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy;
+    idToClassKey: string[];
+    classKeyToId: Map<string, number>;
+  } {
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (!cached) {
@@ -369,10 +380,7 @@ export class HeapSnapshotManager {
       .sort((a, b) => b.sizeDelta - a.sizeDelta);
   }
 
-  async resolveClassKeyFromId(
-    filePath: string,
-    id: number,
-  ): Promise<string | undefined> {
+  resolveClassKeyFromId(filePath: string, id: number): string | undefined {
     const cached = this.#getCachedSnapshot(filePath);
     return cached.idToClassKey[id];
   }

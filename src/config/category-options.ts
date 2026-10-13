@@ -38,17 +38,16 @@ const categoryOverrides: Record<
   [ToolCategory.MEMORY]: {},
   [ToolCategory.WEBMCP]: {
     describe:
-      'Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
+      'Set to true to enable WebMCP tools (excluding debugging tools, which are exposed under the third-party developer tools category). Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`',
     offByDefault: true,
   },
   [ToolCategory.EXTENSIONS]: {
-    describe:
-      'Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.',
+    describe: 'Set to true to include tools related to extensions.',
     offByDefault: true,
   },
   [ToolCategory.THIRD_PARTY]: {
     describe:
-      'Set to true to enable third-party developer tools exposed by the inspected page itself',
+      'Set to true to enable third-party developer tools exposed by the inspected page itself (via WebMCP or devtoolstooldiscovery)',
     offByDefault: true,
   },
   [ToolCategory.PWA]: {

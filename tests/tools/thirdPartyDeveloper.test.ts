@@ -500,7 +500,7 @@ describe('thirdPartyDeveloperTools', () => {
         const page = await context.newPage();
         response.setPage(page);
 
-        page.thirdPartyDeveloperTools = [
+        page.eventBasedThirdPartyTools = [
           {
             name: 'test-group',
             description: 'test description',
@@ -567,7 +567,7 @@ describe('thirdPartyDeveloperTools', () => {
               toolName: 'test-tool',
               params: JSON.stringify({element: {uid: 'some-uid'}}),
             },
-            page: page,
+            page,
           },
           response,
           context,
@@ -740,7 +740,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -816,7 +816,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -847,7 +847,7 @@ describe('thirdPartyDeveloperTools', () => {
                 toolName: 'test-tool',
                 params: JSON.stringify({}),
               },
-              page: page,
+              page,
             },
             response,
             context,
@@ -869,7 +869,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -900,7 +900,7 @@ describe('thirdPartyDeveloperTools', () => {
                 toolName: 'test-tool',
                 params: JSON.stringify({}),
               },
-              page: page,
+              page,
             },
             response,
             context,
@@ -922,7 +922,7 @@ describe('thirdPartyDeveloperTools', () => {
           const page = await context.newPage();
           response.setPage(page);
 
-          page.thirdPartyDeveloperTools = [
+          page.eventBasedThirdPartyTools = [
             {
               name: 'test-group',
               description: 'test description',
@@ -954,7 +954,7 @@ describe('thirdPartyDeveloperTools', () => {
                 toolName: 'test-tool',
                 params: JSON.stringify({}),
               },
-              page: page,
+              page,
             },
             response,
             context,

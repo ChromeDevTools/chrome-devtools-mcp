@@ -16,7 +16,10 @@ import type {
 import type {McpPage} from '../McpPage.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
-import type {ContextFilterOptions} from '../formatters/HeapSnapshotFormatter.js';
+import type {
+  ContextFilterOptions,
+  HeapSnapshotFormatOptions,
+} from '../formatters/HeapSnapshotFormatter.js';
 import {zod} from '../third_party/index.js';
 import type {
   Dialog,
@@ -32,15 +35,19 @@ import type {
   DevTools,
   Protocol,
   Page,
+  WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
   CD4ACommentThread,
+  PaginationOptions,
+  ForcedColors,
+  PrefersContrast,
+  PrefersReducedMotion,
 } from '../types.js';
 import type {McpWorker} from '../McpWorker.js';
-import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
   DialogAction,
@@ -164,20 +171,23 @@ export interface Response {
     staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null,
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
   setHeapSnapshotDetailedClassDiff(
@@ -185,10 +195,13 @@ export interface Response {
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotContextAnalysis(
     analysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
-    options?: PaginationOptions & ContextFilterOptions,
+    options?: PaginationOptions &
+      ContextFilterOptions &
+      HeapSnapshotFormatOptions,
   ): void;
   setIncludePages(value: boolean): void;
   setIncludeNetworkRequests(
@@ -400,6 +413,7 @@ export type ContextPage = Readonly<{
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult>;
+  getWebMcpTools(): WebMCPTool[];
   getThirdPartyDeveloperTools(): ToolGroups;
 
   executeThirdPartyDeveloperTool(
@@ -415,6 +429,9 @@ export type ContextPage = Readonly<{
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
   }): Promise<void>;
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
@@ -422,7 +439,7 @@ export type ContextPage = Readonly<{
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge>;
+  ): Promise<DevToolsCommentBridge | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
@@ -529,13 +546,15 @@ export function viewportTransform(arg: string | undefined):
     width,
     height,
     deviceScaleFactor: dpr,
-    isMobile: isMobile,
-    isLandscape: isLandscape,
-    hasTouch: hasTouch,
+    isMobile,
+    isLandscape,
+    hasTouch,
   };
 }
 
-export function geolocationTransform(arg: string | undefined) {
+export function geolocationTransform(
+  arg: string | undefined,
+): {latitude: number; longitude: number} | undefined {
   if (!arg) {
     return undefined;
   }

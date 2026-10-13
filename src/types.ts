@@ -22,12 +22,33 @@ export interface GeolocationOptions {
   longitude: number;
 }
 
+export const FORCED_COLORS_VALUES = ['active', 'none'] as const;
+export type ForcedColors = (typeof FORCED_COLORS_VALUES)[number];
+
+export const PREFERS_CONTRAST_VALUES = [
+  'more',
+  'less',
+  'custom',
+  'no-preference',
+] as const;
+export type PrefersContrast = (typeof PREFERS_CONTRAST_VALUES)[number];
+
+export const PREFERS_REDUCED_MOTION_VALUES = [
+  'reduce',
+  'no-preference',
+] as const;
+export type PrefersReducedMotion =
+  (typeof PREFERS_REDUCED_MOTION_VALUES)[number];
+
 export interface EmulationSettings {
   networkConditions?: string;
   cpuThrottlingRate?: number;
   geolocation?: GeolocationOptions;
   userAgent?: string;
   colorScheme?: 'dark' | 'light';
+  forcedColors?: ForcedColors;
+  prefersContrast?: PrefersContrast;
+  prefersReducedMotion?: PrefersReducedMotion;
   viewport?: Viewport;
   extraHttpHeaders?: Record<string, string>;
 }
@@ -68,7 +89,9 @@ declare global {
     universe?: {
       cd4aBridge?: CD4ABridge | null;
     };
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     __onDevToolsCommentEvent?: () => void;
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     __onDevToolsCommentListener?: () => void;
   }
 }

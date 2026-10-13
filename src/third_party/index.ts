@@ -12,6 +12,12 @@ import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import type {Page} from 'puppeteer-core';
 import {z as zod} from 'zod';
 
+import {
+  snapshot as snapshotImpl,
+  navigation as navigationImpl,
+  generateReport as generateReportImpl,
+} from './lighthouse-devtools-mcp-bundle.js';
+
 export type {Flags, Result, RunnerResult, OutputMode};
 
 export type {Options as YargsOptions, InferredOptionTypes} from 'yargs';
@@ -54,7 +60,10 @@ export {
   Target,
   TargetType,
   TimeoutError,
+  Tracing,
   WebWorker,
+  WebMCP,
+  WebMCPTool,
 } from 'puppeteer-core';
 export {default as puppeteer} from 'puppeteer-core';
 export type * from 'puppeteer-core';
@@ -87,12 +96,6 @@ export async function getGcfEncode(): Promise<(val: unknown) => string> {
   const {encodeGeneric} = await import('@blackwell-systems/gcf');
   return encodeGeneric;
 }
-
-import {
-  snapshot as snapshotImpl,
-  navigation as navigationImpl,
-  generateReport as generateReportImpl,
-} from './lighthouse-devtools-mcp-bundle.js';
 
 export const lighthouseRunner = {
   snapshot: snapshotImpl as (
