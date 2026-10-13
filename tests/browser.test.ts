@@ -18,6 +18,7 @@ import {puppeteer, type Browser} from '../src/third_party/index.js';
 import {
   createMockParsedArguments,
   createMockPuppeteerBrowser,
+  createMockPuppeteerTarget,
 } from './mocks.js';
 import {serverHooks} from './server.js';
 
@@ -161,13 +162,12 @@ describe('browser', () => {
         });
         await new BrowserManager(args).ensureBrowser();
 
-        const {targetFilter} = connectStub.firstCall.args[0]!;
+        const {targetFilter} = connectStub.firstCall.args[0];
         assert.ok(targetFilter);
-        const target = {url: () => 'chrome-extension://abcdefgh/popup.html'};
-        assert.strictEqual(
-          targetFilter(target as Parameters<typeof targetFilter>[0]),
-          categoryExtensions,
-        );
+        const target = createMockPuppeteerTarget({
+          url: 'chrome-extension://abcdefgh/popup.html',
+        });
+        assert.strictEqual(targetFilter(target), categoryExtensions);
       });
     }
 
