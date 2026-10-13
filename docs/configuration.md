@@ -281,10 +281,9 @@ The server uses the first config file it finds in the following locations,
 from highest to lowest priority. Config files are not merged.
 
 1. The path passed via `--config`.
-2. `cd4a.config.json` in the current working directory.
-3. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
+2. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
    [agent plugin](https://agent-plugins.org/specification).
-4. The global config file:
+3. The global config file:
    - macOS and Linux: `$XDG_CONFIG_HOME/cd4a/config.json`, falling back to
      `~/.config/cd4a/config.json`.
    - Windows: `%LOCALAPPDATA%/Google/cd4a/config.json`, falling back to
@@ -296,6 +295,18 @@ file.
 Set the `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable to turn off the
 search for config files, for example in tests. A config file passed via
 `--config` is still used.
+
+### Locking down the configuration file from agent access
+
+> [!WARNING]
+> Ensure that the configuration file and its parent directory are not writable
+> by the agent.
+
+The configuration file can set security-sensitive options such as
+`executablePath`, `chromeArg`, `allowedUrlPattern`, `blockedUrlPattern`, etc.
+If an agent can create or modify the configuration file in any of the
+discovered locations (or at the path passed via `--config`), it can alter
+these settings to bypass restrictions.
 
 ## Connecting via WebSocket with custom headers
 
