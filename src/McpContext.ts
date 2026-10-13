@@ -936,7 +936,7 @@ export class McpContext implements Context {
         if (!response.ok) {
           throw new Error(`Failed to load resource: ${currentUrl}`);
         }
-        return response.text();
+        return await response.text();
       }
 
       const location = response.headers.get('location');
