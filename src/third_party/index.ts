@@ -11,12 +11,6 @@ import 'core-js/proposals/iterator-helpers.js';
 import type {Flags, OutputMode, Result, RunnerResult} from 'lighthouse';
 import {z as zod} from 'zod';
 
-import {
-  snapshot as snapshotImpl,
-  navigation as navigationImpl,
-  generateReport as generateReportImpl,
-} from './lighthouse-devtools-mcp-bundle.js';
-
 export type {Flags, Result, RunnerResult, OutputMode};
 
 export type {Options as YargsOptions, InferredOptionTypes} from 'yargs';
@@ -96,11 +90,10 @@ export async function getGcfEncode(): Promise<(val: unknown) => string> {
   return encodeGeneric;
 }
 
-export const lighthouseRunner = {
-  snapshot: snapshotImpl,
-  navigation: navigationImpl,
-};
-
-export const generateReport = generateReportImpl;
+export {
+  snapshot as lighthouseSnapshot,
+  navigation as lighthouseNavigation,
+  generateReport,
+} from './lighthouse-devtools-mcp-bundle.js';
 
 export * as DevTools from '../../third_party/devtools-frontend/mcp/mcp.js';

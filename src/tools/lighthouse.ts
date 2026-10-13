@@ -9,7 +9,6 @@ import path from 'node:path';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 
 import {
-  lighthouseRunner,
   generateReport,
   zod,
   type Flags,
@@ -106,17 +105,9 @@ export const lighthouseAudit: PageToolFactory = definePageTool(
       let result: RunnerResult | undefined;
       try {
         if (mode === 'navigation') {
-          result = await lighthouseRunner.navigation(
-            page.pptrPage,
-            page.pptrPage.url(),
-            {
-              flags,
-            },
-          );
+          result = await page.lighthouseNavigation(flags);
         } else {
-          result = await lighthouseRunner.snapshot(page.pptrPage, {
-            flags,
-          });
+          result = await page.lighthouseSnapshot(flags);
         }
 
         if (!result) {
