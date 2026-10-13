@@ -157,7 +157,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--experimentalDevtools`/ `--experimental-devtools`**
-  Whether to enable automation over DevTools targets
+  Whether to enable automation over DevTools targets. This exposes the DevTools UI to input tools, including the Console, which can evaluate JavaScript in the inspected page. --no-javascript-evaluation does not restrict this path.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -205,7 +205,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--javascriptEvaluation`/ `--javascript-evaluation`**
-  Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.
+  Set to false to disable the server entry points for evaluating caller-provided JavaScript: evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed. This is not a JavaScript sandbox: page scripts and JavaScript triggered through other permitted browser interactions (e.g. clicks or typing) still run. If --experimentalDevtools is also enabled, the DevTools UI, including the Console that evaluates code in the inspected page, can be automated and is not restricted by this option. The client remains responsible for validating tool calls and parameters.
   - **Type:** boolean
   - **Default:** `true`
 

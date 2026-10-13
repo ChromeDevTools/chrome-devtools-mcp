@@ -41,7 +41,8 @@ export const mcpOptions = {
   experimentalDevtools: {
     type: 'boolean',
     default: false,
-    describe: 'Whether to enable automation over DevTools targets',
+    describe:
+      'Whether to enable automation over DevTools targets. This exposes the DevTools UI to input tools, including the Console, which can evaluate JavaScript in the inspected page. --no-javascript-evaluation does not restrict this path.',
   },
   experimentalVision: {
     type: 'boolean',
@@ -129,7 +130,7 @@ export const mcpOptions = {
     type: 'boolean',
     default: true,
     describe:
-      'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
+      'Set to false to disable the server entry points for evaluating caller-provided JavaScript: evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed. This is not a JavaScript sandbox: page scripts and JavaScript triggered through other permitted browser interactions (e.g. clicks or typing) still run. If --experimentalDevtools is also enabled, the DevTools UI, including the Console that evaluates code in the inspected page, can be automated and is not restricted by this option. The client remains responsible for validating tool calls and parameters.',
   },
   fileNavigations: {
     type: 'boolean',
@@ -321,7 +322,7 @@ export const CLI_EXAMPLES: Array<[string, string]> = [
   ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
   [
     '$0 --no-javascript-evaluation',
-    'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
+    'Disable server JavaScript evaluation entry points (evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs). Page scripts still run.',
   ],
   [
     '$0 --slim',
