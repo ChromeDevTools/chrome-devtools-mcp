@@ -420,6 +420,7 @@ export function createMockMcpContext(
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
+  context.getTargetInfos.resolves(new Map());
 
   return context;
 }

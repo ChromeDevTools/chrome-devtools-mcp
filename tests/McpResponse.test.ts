@@ -262,6 +262,35 @@ describe('McpResponse', () => {
   describe('navigation', () => {
     const server = serverHooks();
 
+    it('lists current page titles', async () => {
+      await withMcpContext(async (response, context) => {
+        server.addHtmlRoute(
+          '/titled.html',
+          '<!doctype html><title>Real Title</title><h1>Titled</h1>',
+        );
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.goto(server.getRoute('/titled.html'));
+
+        response.setIncludePages(true);
+        const res1 = await response.handle(context);
+        assert.ok(
+          getTextContent(res1.content[0]).includes(
+            `Real Title (${server.getRoute('/titled.html')})`,
+          ),
+        );
+
+        await page.evaluate(() => {
+          document.title = 'Changed By Script';
+        });
+        const res2 = await response.handle(context);
+        assert.ok(
+          getTextContent(res2.content[0]).includes(
+            `Changed By Script (${server.getRoute('/titled.html')})`,
+          ),
+        );
+      });
+    });
+
     it('resets ids after navigation', async () => {
       await withMcpContext(async (response, context) => {
         server.addHtmlRoute(

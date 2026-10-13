@@ -118,6 +118,19 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 
+/**
+ * Chrome reports a URL-derived placeholder as the target title until the
+ * document provides one. The placeholder omits the `http://` / `https://`
+ * scheme and the trailing slash of a bare hostname.
+ */
+function isPlaceholderTitle(title: string, url: string): boolean {
+  if (title === url) {
+    return true;
+  }
+  const withoutScheme = url.replace(/^https?:\/\//, '');
+  return title === withoutScheme || title === withoutScheme.replace(/\/$/, '');
+}
+
 function isBackendNodeId(
   id: unknown,
 ): id is DevTools.Protocol.DOM.BackendNodeId {
@@ -229,10 +242,26 @@ export class McpPage implements ContextPage {
     return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
   }
 
-  getTitle(): string {
+  get targetId(): string {
     // @ts-expect-error internal types
-    const info = this.target._getTargetInfo();
-    return info.title !== this.target.url() ? info.title : '';
+    const info: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    return info.targetId;
+  }
+
+  /**
+   * Returns the page title or an empty string if the target only has Chrome's
+   * URL-based placeholder title.
+   *
+   * Puppeteer's cached target info is only refreshed by
+   * `Target.targetInfoChanged`, which Chrome emits on navigation commit (before
+   * the document title is known) but not on title changes. Callers should pass
+   * fresh target info (e.g., from `Target.getTargets`) when available.
+   */
+  getTitle(freshTargetInfo?: Protocol.Target.TargetInfo): string {
+    // @ts-expect-error internal types
+    const cachedInfo: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    const info = freshTargetInfo ?? cachedInfo;
+    return isPlaceholderTitle(info.title, info.url) ? '' : info.title;
   }
 
   isClosed(): boolean {

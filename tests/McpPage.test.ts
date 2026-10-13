@@ -391,6 +391,69 @@ describe('McpPage', () => {
     });
   });
 
+  describe('getTitle()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    function createPage(url: string, title: string): McpPage {
+      const target = createMockPuppeteerTarget({url, title});
+      return new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+    }
+
+    function targetInfo(url: string, title: string) {
+      return {
+        targetId: '<mock-target-id>',
+        type: 'page',
+        title,
+        url,
+        attached: true,
+        canAccessOpener: false,
+      };
+    }
+
+    it('prefers fresh target info over cached target info', () => {
+      const mcpPage = createPage(
+        'http://127.0.0.1:8080/titled.html',
+        '127.0.0.1:8080/titled.html',
+      );
+      assert.strictEqual(
+        mcpPage.getTitle(
+          targetInfo('http://127.0.0.1:8080/titled.html', 'Real Title'),
+        ),
+        'Real Title',
+      );
+    });
+
+    it('ignores Chrome URL placeholder titles', () => {
+      assert.strictEqual(
+        createPage(
+          'http://127.0.0.1:8080/titled.html',
+          '127.0.0.1:8080/titled.html',
+        ).getTitle(),
+        '',
+      );
+      assert.strictEqual(
+        createPage('https://example.com/', 'example.com').getTitle(),
+        '',
+      );
+      assert.strictEqual(
+        createPage('about:blank', 'about:blank').getTitle(),
+        '',
+      );
+    });
+
+    it('exposes the target id', () => {
+      assert.strictEqual(
+        createPage('https://example.com', '').targetId,
+        '<mock-target-id>',
+      );
+    });
+  });
+
   describe('emulate()', () => {
     afterEach(() => {
       sinon.restore();

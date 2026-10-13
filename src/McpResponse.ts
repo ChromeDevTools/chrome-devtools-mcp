@@ -49,6 +49,7 @@ import type {
   TextContent,
   Extension,
   HTTPRequest,
+  Protocol,
 } from './third_party/index.js';
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -1080,6 +1081,11 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
         );
       }
+      const targetInfos =
+        regularPages.length ||
+        (this.#includeExtensionPages && extensionPages.length)
+          ? await context.getTargetInfos()
+          : new Map<string, Protocol.Target.TargetInfo>();
       if (regularPages.length) {
         const parts = [`## Pages`];
         const structuredPages = [];
@@ -1088,7 +1094,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = mcpPage.getTitle();
+          const title = mcpPage.getTitle(targetInfos.get(mcpPage.targetId));
           const pageLabel = title
             ? `${truncateTitle(title)} (${mcpPage.url()})`
             : mcpPage.url();
@@ -1110,7 +1116,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = mcpPage.getTitle();
+            const title = mcpPage.getTitle(targetInfos.get(mcpPage.targetId));
             const pageLabel = title
               ? `${truncateTitle(title)} (${mcpPage.url()})`
               : mcpPage.url();

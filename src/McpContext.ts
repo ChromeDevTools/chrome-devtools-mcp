@@ -26,11 +26,13 @@ import {
   Locator,
   type Browser,
   type BrowserContext,
+  type CDPSession,
   type ConsoleMessage,
   type GetPWAStateOptions,
   type InstallPWAOptions,
   type LaunchPWAOptions,
   type Page,
+  type Protocol,
   type PWAState,
   type ScreenRecorder,
   type Target,
@@ -117,6 +119,7 @@ export class McpContext implements Context {
   #heapSnapshotManager = new HeapSnapshotManager();
   #roots: Root[] | undefined = undefined;
   #allowUnrestrictedPaths: boolean;
+  #browserSession?: Promise<CDPSession>;
 
   private constructor(
     browser: Browser,
@@ -157,6 +160,10 @@ export class McpContext implements Context {
 
     this.#serviceWorkerConsoleCollector.dispose();
     this.#heapSnapshotManager.dispose();
+    void this.#browserSession
+      ?.then(session => session.detach())
+      .catch(() => undefined);
+    this.#browserSession = undefined;
     for (const mcpPage of this.#mcpPages.values()) {
       mcpPage.dispose();
     }
@@ -417,6 +424,33 @@ export class McpContext implements Context {
 
   getPages(): McpPage[] {
     return Array.from(this.#mcpPages.values());
+  }
+
+  /**
+   * Fetches current target info for all targets from the browser, keyed by
+   * target id. Unlike Puppeteer's cached target info, this reflects title
+   * changes, which Chrome does not report via `Target.targetInfoChanged`.
+   * Returns an empty map if the browser cannot be queried.
+   */
+  async getTargetInfos(): Promise<Map<string, Protocol.Target.TargetInfo>> {
+    try {
+      const session = await this.#getBrowserSession();
+      const {targetInfos} = await session.send('Target.getTargets');
+      return new Map(targetInfos.map(info => [info.targetId, info]));
+    } catch (err) {
+      this.logger?.('Failed to fetch target infos', err);
+      return new Map();
+    }
+  }
+
+  async #getBrowserSession(): Promise<CDPSession> {
+    const existing = await this.#browserSession?.catch(() => undefined);
+    if (existing && !existing.detached) {
+      return existing;
+    }
+    const session = this.browser.target().createCDPSession();
+    this.#browserSession = session;
+    return await session;
   }
 
   getSelectedMcpPage(): McpPage {
