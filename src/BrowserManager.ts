@@ -336,12 +336,13 @@ export class BrowserManager {
       userDataDir,
       blockedUrlPattern: blocklist,
       allowedUrlPattern: allowlist,
+      categoryExtensions: enableExtensions,
     } = this.#serverArgs;
     // Important: only pass channel, if autoConnect is true.
     const channel = isAutoConnect ? this.#serverArgs.channel : undefined;
 
     const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-      targetFilter: BrowserManager.makeTargetFilter(),
+      targetFilter: BrowserManager.makeTargetFilter(enableExtensions),
       defaultViewport: null,
       handleDevToolsAsPage: true,
       blocklist,

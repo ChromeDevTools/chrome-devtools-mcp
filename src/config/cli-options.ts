@@ -231,7 +231,8 @@ export const commands: Commands = {
     },
   },
   emulate: {
-    description: 'Emulates various features on the target page.',
+    description:
+      'Emulates various features on the target page. Each call replaces all emulation settings (except extraHttpHeaders), so pass all desired settings in a single call.',
     category: 'Emulation',
     args: {
       pageId: {
@@ -265,14 +266,14 @@ export const commands: Commands = {
         name: 'userAgent',
         type: 'string',
         description:
-          'User agent to emulate. Set to empty string to clear the user agent override.',
+          'User agent to emulate. Omit or set to empty string to clear the user agent override.',
         required: false,
       },
       colorScheme: {
         name: 'colorScheme',
         type: 'string',
         description:
-          'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+          'Emulate the dark or the light mode. Omit or set to "auto" to reset to the default.',
         required: false,
         enum: ['dark', 'light', 'auto'],
       },
@@ -280,7 +281,7 @@ export const commands: Commands = {
         name: 'forcedColors',
         type: 'string',
         description:
-          'Emulate the `forced-colors` CSS media feature. Set to "auto" to reset to the default.',
+          'Emulate the `forced-colors` CSS media feature. Omit or set to "auto" to reset to the default.',
         required: false,
         enum: ['active', 'none', 'auto'],
       },
@@ -288,7 +289,7 @@ export const commands: Commands = {
         name: 'prefersContrast',
         type: 'string',
         description:
-          'Emulate the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.',
+          'Emulate the `prefers-contrast` CSS media feature. Omit or set to "auto" to reset to the default.',
         required: false,
         enum: ['more', 'less', 'custom', 'no-preference', 'auto'],
       },
@@ -296,7 +297,7 @@ export const commands: Commands = {
         name: 'prefersReducedMotion',
         type: 'string',
         description:
-          'Emulate the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.',
+          'Emulate the `prefers-reduced-motion` CSS media feature. Omit or set to "auto" to reset to the default.',
         required: false,
         enum: ['reduce', 'no-preference', 'auto'],
       },
@@ -304,7 +305,7 @@ export const commands: Commands = {
         name: 'viewport',
         type: 'string',
         description:
-          "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.",
+          "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode. Omit to clear the viewport override.",
         required: false,
       },
       extraHttpHeaders: {
@@ -353,7 +354,8 @@ export const commands: Commands = {
       args: {
         name: 'args',
         type: 'array',
-        description: 'An optional list of arguments to pass to the function.',
+        description:
+          'An optional list of arguments (element uids from the page content snapshot) to pass to the function.',
         required: false,
       },
       filePath: {

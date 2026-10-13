@@ -157,7 +157,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--experimentalDevtools`/ `--experimental-devtools`**
-  Whether to enable automation over DevTools targets
+  Whether to enable automation over DevTools targets. This exposes the DevTools UI to input tools, including the Console, which can evaluate JavaScript in the inspected page. --no-javascript-evaluation does not restrict this path.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -205,7 +205,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--javascriptEvaluation`/ `--javascript-evaluation`**
-  Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.
+  Set to false to disable the server entry points for evaluating caller-provided JavaScript: evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed. This is not a JavaScript sandbox: page scripts and JavaScript triggered through other permitted browser interactions (e.g. clicks or typing) still run. If --experimentalDevtools is also enabled, the DevTools UI, including the Console that evaluates code in the inspected page, can be automated and is not restricted by this option. The client remains responsible for validating tool calls and parameters.
   - **Type:** boolean
   - **Default:** `true`
 
@@ -230,7 +230,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--allowUnrestrictedPaths`/ `--allow-unrestricted-paths`**
-  If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, file-writing tools are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
+  If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, tools that read or write local files are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -281,10 +281,9 @@ The server uses the first config file it finds in the following locations,
 from highest to lowest priority. Config files are not merged.
 
 1. The path passed via `--config`.
-2. `cd4a.config.json` in the current working directory.
-3. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
+2. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
    [agent plugin](https://agent-plugins.org/specification).
-4. The global config file:
+3. The global config file:
    - macOS and Linux: `$XDG_CONFIG_HOME/cd4a/config.json`, falling back to
      `~/.config/cd4a/config.json`.
    - Windows: `%LOCALAPPDATA%/Google/cd4a/config.json`, falling back to
@@ -296,6 +295,18 @@ file.
 Set the `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable to turn off the
 search for config files, for example in tests. A config file passed via
 `--config` is still used.
+
+### Locking down the configuration file from agent access
+
+> [!WARNING]
+> Ensure that the configuration file and its parent directory are not writable
+> by the agent.
+
+The configuration file can set security-sensitive options such as
+`executablePath`, `chromeArg`, `allowedUrlPattern`, `blockedUrlPattern`, etc.
+If an agent can create or modify the configuration file in any of the
+discovered locations (or at the path passed via `--config`), it can alter
+these settings to bypass restrictions.
 
 ## Connecting via WebSocket with custom headers
 

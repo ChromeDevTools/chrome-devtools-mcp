@@ -9,7 +9,7 @@ You are acting as a troubleshooting wizard to help the user configure and fix th
 
 ### Step 1: Find and Read Configuration
 
-Your first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `gemini-extension.json`, `.claude/settings.json`, `.vscode/launch.json`, or `.gemini/settings.json`.
+Your first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `.vscode/mcp.json`, `gemini-extension.json`, or `.gemini/settings.json` (or user-scoped files such as `~/.claude.json` if accessible).
 
 If you find a configuration file, read and interpret it to identify potential issues such as:
 

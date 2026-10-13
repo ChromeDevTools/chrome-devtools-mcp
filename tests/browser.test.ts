@@ -18,6 +18,7 @@ import {puppeteer, type Browser} from '../src/third_party/index.js';
 import {
   createMockParsedArguments,
   createMockPuppeteerBrowser,
+  createMockPuppeteerTarget,
 } from './mocks.js';
 import {serverHooks} from './server.js';
 
@@ -148,6 +149,27 @@ describe('browser', () => {
       sinon.assert.calledOnceWithExactly(pptrBrowser.disconnect);
       sinon.assert.notCalled(pptrBrowser.close);
     });
+
+    for (const categoryExtensions of [false, true]) {
+      it(`${categoryExtensions ? 'keeps' : 'drops'} extension targets when connecting with categoryExtensions=${categoryExtensions}`, async () => {
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .resolves(createMockPuppeteerBrowser());
+
+        const args = createMockParsedArguments({
+          browserUrl: 'http://127.0.0.1:9222',
+          categoryExtensions,
+        });
+        await new BrowserManager(args).ensureBrowser();
+
+        const {targetFilter} = connectStub.firstCall.args[0];
+        assert.ok(targetFilter);
+        const target = createMockPuppeteerTarget({
+          url: 'chrome-extension://abcdefgh/popup.html',
+        });
+        assert.strictEqual(targetFilter(target), categoryExtensions);
+      });
+    }
 
     it('deduplicates concurrent ensureBrowser() calls while launch is in-flight', async () => {
       const pptrBrowser = createMockPuppeteerBrowser();

@@ -52,7 +52,7 @@ const throttlingOptions: [string, ...string[]] = [
 
 export const emulate = definePageTool(() => ({
   name: 'emulate',
-  description: `Emulates various features on the target page.`,
+  description: `Emulates various features on the target page. Each call replaces all emulation settings (except extraHttpHeaders), so pass all desired settings in a single call.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -81,38 +81,38 @@ export const emulate = definePageTool(() => ({
       .string()
       .optional()
       .describe(
-        'User agent to emulate. Set to empty string to clear the user agent override.',
+        'User agent to emulate. Omit or set to empty string to clear the user agent override.',
       ),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
       .optional()
       .describe(
-        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+        'Emulate the dark or the light mode. Omit or set to "auto" to reset to the default.',
       ),
     forcedColors: zod
       .enum([...FORCED_COLORS_VALUES, 'auto'])
       .optional()
       .describe(
-        'Emulate the `forced-colors` CSS media feature. Set to "auto" to reset to the default.',
+        'Emulate the `forced-colors` CSS media feature. Omit or set to "auto" to reset to the default.',
       ),
     prefersContrast: zod
       .enum([...PREFERS_CONTRAST_VALUES, 'auto'])
       .optional()
       .describe(
-        'Emulate the `prefers-contrast` CSS media feature. Set to "auto" to reset to the default.',
+        'Emulate the `prefers-contrast` CSS media feature. Omit or set to "auto" to reset to the default.',
       ),
     prefersReducedMotion: zod
       .enum([...PREFERS_REDUCED_MOTION_VALUES, 'auto'])
       .optional()
       .describe(
-        'Emulate the `prefers-reduced-motion` CSS media feature. Set to "auto" to reset to the default.',
+        'Emulate the `prefers-reduced-motion` CSS media feature. Omit or set to "auto" to reset to the default.',
       ),
     viewport: zod
       .string()
       .transform(viewportTransform)
       .optional()
       .describe(
-        `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
+        `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode. Omit to clear the viewport override.`,
       ),
     extraHttpHeaders: zod
       .string()

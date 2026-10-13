@@ -122,7 +122,7 @@ export class McpServer {
       ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
-            'capability. File-writing tools will be restricted to the OS temp directory. ' +
+            'capability. Tools that read or write local files will be restricted to the OS temp directory. ' +
             'To restore the previous unrestricted behavior, start the server with ' +
             '--allow-unrestricted-paths.',
         );
