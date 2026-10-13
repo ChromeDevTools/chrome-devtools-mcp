@@ -12,6 +12,7 @@ import {dirname} from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
 import {
+  getCommandResponseTimeout,
   handleResponse,
   startDaemon,
   stopDaemon,
@@ -145,6 +146,55 @@ describe('daemon client', () => {
         undefined,
         'Should not return warning when daemon is stopped',
       );
+    });
+  });
+
+  describe('getCommandResponseTimeout', () => {
+    it('allows the tool timeout plus a daemon response grace period', () => {
+      assert.strictEqual(
+        getCommandResponseTimeout({
+          method: 'invoke_tool',
+          tool: 'navigate_page',
+          args: {timeout: 120_000},
+        }),
+        180_000,
+      );
+      assert.strictEqual(
+        getCommandResponseTimeout({
+          method: 'invoke_tool',
+          tool: 'navigate_page',
+          args: {timeout: 60_000},
+        }),
+        120_000,
+      );
+    });
+
+    it('keeps the default response timeout for default and non-tool commands', () => {
+      assert.strictEqual(
+        getCommandResponseTimeout({
+          method: 'invoke_tool',
+          tool: 'navigate_page',
+          args: {timeout: 5_000},
+        }),
+        60_000,
+      );
+      assert.strictEqual(
+        getCommandResponseTimeout({
+          method: 'invoke_tool',
+          tool: 'navigate_page',
+          args: {timeout: 0},
+        }),
+        60_000,
+      );
+      assert.strictEqual(
+        getCommandResponseTimeout({
+          method: 'invoke_tool',
+          tool: 'navigate_page',
+          args: {},
+        }),
+        60_000,
+      );
+      assert.strictEqual(getCommandResponseTimeout({method: 'status'}), 60_000);
     });
   });
 
