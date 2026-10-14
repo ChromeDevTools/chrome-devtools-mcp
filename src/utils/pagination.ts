@@ -17,28 +17,27 @@ export interface PaginationResult<Item> {
   invalidPage: boolean;
 }
 
-const DEFAULT_PAGE_SIZE = 20;
-
 export function paginate<Item>(
   items: readonly Item[],
   options?: PaginationOptions,
 ): PaginationResult<Item> {
   const total = items.length;
 
-  if (!options || noPaginationOptions(options)) {
+  if (!options || options.pageSize === undefined) {
+    const {currentPage, invalidPage} = resolvePageIndex(options?.pageIdx, 1);
     return {
       items,
-      currentPage: 0,
+      currentPage,
       totalPages: 1,
       hasNextPage: false,
       hasPreviousPage: false,
       startIndex: 0,
       endIndex: total,
-      invalidPage: false,
+      invalidPage,
     };
   }
 
-  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+  const pageSize = options.pageSize;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const {currentPage, invalidPage} = resolvePageIndex(
     options.pageIdx,
@@ -59,10 +58,6 @@ export function paginate<Item>(
     endIndex,
     invalidPage,
   };
-}
-
-function noPaginationOptions(options: PaginationOptions): boolean {
-  return options.pageSize === undefined && options.pageIdx === undefined;
 }
 
 function resolvePageIndex(

@@ -740,19 +740,17 @@ describe('McpResponse network pagination', () => {
     });
   });
 
-  it('paginates the first page when pageIdx is 0 without pageSize', async () => {
+  it('returns all items when pageIdx is 0 without pageSize', async () => {
     await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 30}, (_, idx) =>
         getMockRequest({method: `GET-${idx}`}),
       );
       context.getSelectedMcpPage().getNetworkRequests = () => requests;
-      // pageIdx 0 is a valid page, not "no pagination" — it must apply the
-      // default page size like any other page.
       response.setIncludeNetworkRequests(true, {pageIdx: 0});
       const {content} = await response.handle(context);
       const text = getTextContent(content[0]);
-      assert.ok(text.includes('Showing 1-20 of 30 (Page 1 of 2).'));
-      assert.ok(text.includes('Next page: 1'));
+      assert.ok(text.includes('Showing 1-30 of 30 (Page 1 of 1).'));
+      assert.ok(!text.includes('Next page:'));
       assert.ok(!text.includes('Previous page:'));
     });
   });
