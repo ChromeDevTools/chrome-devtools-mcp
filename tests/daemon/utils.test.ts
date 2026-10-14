@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {spawn} from 'node:child_process';
+import childProcess, {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,8 +13,11 @@ import path from 'node:path';
 import process from 'node:process';
 import {afterEach, beforeEach, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {
+  DAEMON_SCRIPT_PATH,
   serializeArgs,
   assertValidSessionId,
   getSocketPath,
@@ -283,6 +286,7 @@ describe('daemon pid handling', () => {
   });
 
   afterEach(() => {
+    sinon.restore();
     if (savedXdgRuntimeDir === undefined) {
       delete process.env['XDG_RUNTIME_DIR'];
     } else {
@@ -342,11 +346,114 @@ describe('daemon pid handling', () => {
       assert.strictEqual(isDaemonRunning(SESSION_ID), false);
     });
 
-    it('returns true when the pid file points to a live process', () => {
+    it('returns true when the pid file points to a live daemon process', () => {
+      using tempDir = createTempDir('cdm-daemon-utils-test-');
+      process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
+        {stdio: 'ignore'},
+      );
+      child.unref();
+      assert.ok(child.pid);
+      try {
+        writePidFile(SESSION_ID, `${child.pid}\n`);
+        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+      } finally {
+        child.kill();
+      }
+    });
+
+    it('caches the verified process identity across repeated checks', async () => {
+      using tempDir = createTempDir('cdm-daemon-utils-test-');
+      process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
+        {stdio: 'ignore'},
+      );
+      assert.ok(child.pid);
+      try {
+        writePidFile(SESSION_ID, `${child.pid}\n`);
+        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+
+        const readFileSyncSpy = sinon.spy(fs, 'readFileSync');
+        const execFileSyncSpy = sinon.spy(childProcess, 'execFileSync');
+
+        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+        sinon.assert.calledOnceWithExactly(
+          readFileSyncSpy,
+          getPidFilePath(SESSION_ID),
+          sinon.match('utf-8'),
+        );
+        sinon.assert.notCalled(execFileSyncSpy);
+
+        child.kill();
+        await once(child, 'exit');
+        assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+      } finally {
+        child.kill();
+        child.unref();
+      }
+    });
+
+    it('returns false when the pid file points to an unrelated live process', () => {
       using tempDir = createTempDir('cdm-daemon-utils-test-');
       process.env['XDG_RUNTIME_DIR'] = tempDir.path;
       writePidFile(SESSION_ID, `${process.pid}\n`);
-      assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+      assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+    });
+
+    it('falls back to true when command line lookup throws for a live process', () => {
+      using tempDir = createTempDir('cdm-daemon-utils-test-');
+      process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        {stdio: 'ignore'},
+      );
+      child.unref();
+      assert.ok(child.pid);
+      try {
+        writePidFile(SESSION_ID, `${child.pid}\n`);
+        sinon
+          .stub(fs, 'existsSync')
+          .callThrough()
+          .withArgs('/proc')
+          .returns(false);
+        sinon
+          .stub(childProcess, 'execFileSync')
+          .throws(new Error('lookup failed'));
+
+        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+      } finally {
+        child.kill();
+      }
+    });
+
+    it('falls back to true when command line lookup returns an empty string for a live process', () => {
+      using tempDir = createTempDir('cdm-daemon-utils-test-');
+      process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        {stdio: 'ignore'},
+      );
+      child.unref();
+      assert.ok(child.pid);
+      try {
+        writePidFile(SESSION_ID, `${child.pid}\n`);
+        sinon
+          .stub(fs, 'existsSync')
+          .callThrough()
+          .withArgs('/proc')
+          .returns(false);
+        sinon.stub(childProcess, 'execFileSync').returns('\r\n');
+
+        assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+      } finally {
+        child.kill();
+      }
     });
 
     it('returns false when the pid file points to a dead process', async () => {

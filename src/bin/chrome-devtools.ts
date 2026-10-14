@@ -256,11 +256,12 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     async argv => {
       const sessionId = argv.sessionId as string;
       try {
-        const versionWarningPromise = isDaemonRunning(sessionId)
+        const daemonRunning = isDaemonRunning(sessionId);
+        const versionWarningPromise = daemonRunning
           ? verifyDaemonVersion(sessionId, VERSION)
           : Promise.resolve(undefined);
 
-        if (!isDaemonRunning(sessionId)) {
+        if (!daemonRunning) {
           await start(serializeArgs(mcpOptions, argv), sessionId);
         }
 

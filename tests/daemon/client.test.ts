@@ -18,6 +18,7 @@ import {
   verifyDaemonVersion,
 } from '../../src/daemon/client.js';
 import {
+  DAEMON_SCRIPT_PATH,
   getDaemonPid,
   getPidFilePath,
   isDaemonRunning,
@@ -82,7 +83,7 @@ describe('daemon client', () => {
     it('should stop and allow restarting a daemon when its socket is unreachable', async () => {
       const child = spawn(
         process.execPath,
-        ['-e', 'setInterval(() => {}, 1000)'],
+        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
         {
           stdio: 'ignore',
         },
@@ -111,6 +112,44 @@ describe('daemon client', () => {
           'New daemon should start after stopping unreachable daemon',
         );
         assert.notStrictEqual(getDaemonPid(sessionId), child.pid);
+      } finally {
+        child.kill();
+      }
+    });
+
+    it('should not signal an unrelated process when its PID is in the PID file', async () => {
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        {
+          stdio: 'ignore',
+        },
+      );
+      child.unref();
+      const childPid = child.pid;
+      assert.ok(childPid, 'Child process should have a PID');
+
+      try {
+        const pidFilePath = getPidFilePath(sessionId);
+        mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+        writeFileSync(pidFilePath, String(childPid), 'utf-8');
+
+        await stopDaemon(sessionId);
+        assert.doesNotThrow(
+          () => process.kill(childPid, 0),
+          'stopDaemon must not kill the unrelated process',
+        );
+
+        await startDaemon([], sessionId);
+        assert.ok(
+          isDaemonRunning(sessionId),
+          'New daemon should start when PID file points to an unrelated process',
+        );
+        assert.notStrictEqual(getDaemonPid(sessionId), childPid);
+        assert.doesNotThrow(
+          () => process.kill(childPid, 0),
+          'startDaemon must not kill the unrelated process',
+        );
       } finally {
         child.kill();
       }
