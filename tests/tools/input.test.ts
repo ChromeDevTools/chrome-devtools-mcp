@@ -1579,30 +1579,40 @@ describe('input', () => {
                 });
             </script>`,
         );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await uploadFile(args).handler(
-          {
-            params: {
-              uid: '1_1',
-              filePaths: [testFile.path],
+        const mcpPage = context.getSelectedMcpPage();
+        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+        const buttonHandle = await mcpPage.getElementByUid('1_1');
+        const uploadFileStub = sinon
+          .stub(buttonHandle, 'uploadFile')
+          .resolves();
+        sinon.stub(mcpPage, 'getElementByUid').resolves(buttonHandle);
+
+        try {
+          await uploadFile(args).handler(
+            {
+              params: {
+                uid: '1_1',
+                filePaths: [testFile.path],
+              },
+              page: mcpPage,
             },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          `File uploaded from ${testFile.path}.`,
-        );
-        const uploadedFileName = await page.$eval('#file-input', el => {
-          const input = el as HTMLInputElement;
-          return input.files?.[0]?.name;
-        });
-        assert.strictEqual(uploadedFileName, 'test.txt');
+            response,
+            context,
+          );
+          assert.strictEqual(uploadFileStub.called, false);
+          assert.ok(response.includeSnapshot);
+          assert.strictEqual(
+            response.responseLines[0],
+            `File uploaded from ${testFile.path}.`,
+          );
+          const uploadedFileName = await page.$eval('#file-input', el => {
+            const input = el as HTMLInputElement;
+            return input.files?.[0]?.name;
+          });
+          assert.strictEqual(uploadedFileName, 'test.txt');
+        } finally {
+          sinon.restore();
+        }
       });
     });
 
