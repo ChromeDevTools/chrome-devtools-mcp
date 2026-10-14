@@ -431,6 +431,95 @@ describe('performance', () => {
       });
     });
 
+    it('rejects stopping with a different pageId and preserves the active recording', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page1 = context.getSelectedMcpPage();
+        const page2 = await context.newPage();
+        const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+
+        sinon.stub(page1.pptrPage.tracing, 'start').resolves();
+        const page1StopStub = sinon
+          .stub(page1.pptrPage.tracing, 'stop')
+          .resolves(rawData);
+        const page2StopStub = sinon
+          .stub(page2.pptrPage.tracing, 'stop')
+          .rejects(new Error('Tracing is not started'));
+
+        // Start trace on page 1
+        await startTrace(args).handler(
+          {params: {reload: false, autoStop: false}, page: page1},
+          response,
+          context,
+        );
+        assert.strictEqual(context.isRunningPerformanceTrace(), true);
+
+        // Attempt to stop trace using page 2
+        await assert.rejects(
+          stopTrace(args).handler({params: {}, page: page2}, response, context),
+          /A performance trace is currently recording on page 1, not page 2/,
+        );
+
+        // The recording on page 1 must be preserved and still running
+        sinon.assert.notCalled(page2StopStub);
+        sinon.assert.notCalled(page1StopStub);
+        assert.strictEqual(context.isRunningPerformanceTrace(), true);
+
+        // Stopping page 1 succeeds and returns the trace
+        await stopTrace(args).handler(
+          {params: {}, page: page1},
+          response,
+          context,
+        );
+        sinon.assert.calledOnce(page1StopStub);
+        assert.strictEqual(context.isRunningPerformanceTrace(), false);
+      });
+    });
+
+    it('reports trace ended when traced page was closed and allows tracing on another page', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page1 = context.getSelectedMcpPage();
+        const page2 = await context.newPage();
+        const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+
+        sinon.stub(page2.pptrPage.tracing, 'start').resolves();
+        sinon.stub(page1.pptrPage.tracing, 'start').resolves();
+        const page1StopStub = sinon
+          .stub(page1.pptrPage.tracing, 'stop')
+          .resolves(rawData);
+
+        // Start trace on page 2
+        await startTrace(args).handler(
+          {params: {reload: false, autoStop: false}, page: page2},
+          response,
+          context,
+        );
+        assert.strictEqual(context.isRunningPerformanceTrace(), true);
+
+        // Close page 2
+        await context.closePage(page2.id);
+
+        // Stopping on page 1 reports trace ended because page 2 was closed
+        await assert.rejects(
+          stopTrace(args).handler({params: {}, page: page1}, response, context),
+          /The performance trace ended because page 2 was closed/,
+        );
+        assert.strictEqual(context.isRunningPerformanceTrace(), false);
+
+        // Start/stop cycle on page 1 now works cleanly
+        await startTrace(args).handler(
+          {params: {reload: false, autoStop: false}, page: page1},
+          response,
+          context,
+        );
+        await stopTrace(args).handler(
+          {params: {}, page: page1},
+          response,
+          context,
+        );
+        sinon.assert.calledOnce(page1StopStub);
+      });
+    });
+
     it('throws an error if parsing the trace buffer fails', async () => {
       await withMcpContext(async (response, context, args) => {
         context.setIsRunningPerformanceTrace(true);

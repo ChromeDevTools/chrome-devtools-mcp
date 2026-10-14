@@ -59,14 +59,28 @@ export const startTrace = definePageTool(() => ({
   },
   handler: async (request, response, context) => {
     if (context.isRunningPerformanceTrace()) {
-      response.appendResponseLine(
-        'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
-      );
-      return;
+      const currentTracedPageId = context.getPerformanceTracedPageId();
+      if (currentTracedPageId !== undefined) {
+        let isClosed = false;
+        try {
+          const tracedPage = context.getPageById(currentTracedPageId);
+          isClosed = tracedPage.isClosed();
+        } catch {
+          isClosed = true;
+        }
+        if (isClosed) {
+          context.setIsRunningPerformanceTrace(false);
+        }
+      }
+      if (context.isRunningPerformanceTrace()) {
+        response.appendResponseLine(
+          'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
+        );
+        return;
+      }
     }
-    context.setIsRunningPerformanceTrace(true);
-
     const page = request.page;
+    context.setIsRunningPerformanceTrace(true, page.id);
     const pageUrlForTracing = page.pptrPage.url();
 
     try {
@@ -162,6 +176,26 @@ export const stopTrace = definePageTool(() => ({
         'Error: no active performance trace recording to stop.',
       );
       return;
+    }
+    const tracedPageId = context.getPerformanceTracedPageId();
+    if (tracedPageId !== undefined) {
+      let tracedPage: ContextPage | undefined;
+      try {
+        tracedPage = context.getPageById(tracedPageId);
+      } catch {
+        // Page was closed / not found
+      }
+      if (!tracedPage || tracedPage.isClosed()) {
+        context.setIsRunningPerformanceTrace(false);
+        throw new Error(
+          `The performance trace ended because page ${tracedPageId} was closed.`,
+        );
+      }
+      if (request.page.id !== tracedPageId) {
+        throw new Error(
+          `A performance trace is currently recording on page ${tracedPageId}, not page ${request.page.id}. Use pageId ${tracedPageId} to stop it.`,
+        );
+      }
     }
     const page = request.page;
     await stopTracingAndAppendOutput(
