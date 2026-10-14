@@ -30,6 +30,20 @@ const maxNameLengthSchema = zod
     `Maximum length of names before truncation. Defaults to ${MAX_NAME_LENGTH}.`,
   );
 
+const pageIdxSchema = zod
+  .number()
+  .int()
+  .nonnegative()
+  .optional()
+  .describe('The page index for pagination.');
+
+const pageSizeSchema = zod
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .describe('The page size for pagination.');
+
 export const takeHeapSnapshot = definePageTool(() => ({
   name: 'take_heapsnapshot',
   description: `Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.`,
@@ -126,10 +140,14 @@ export const getHeapSnapshotDetails = defineTool(() => ({
       ),
     pageIdx: zod
       .number()
+      .int()
+      .nonnegative()
       .optional()
       .describe('The page index for pagination of aggregates.'),
     pageSize: zod
       .number()
+      .int()
+      .positive()
       .optional()
       .describe('The page size for pagination of aggregates.'),
   },
@@ -174,8 +192,8 @@ export const getHeapSnapshotClassNodes = defineTool(() => ({
         'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
       ),
     maxNameLength: maxNameLengthSchema,
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
   },
   blockedByDialog: false,
   verifyFilesSchema: {
@@ -214,8 +232,8 @@ export const getHeapSnapshotRetainers = defineTool(() => ({
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
     nodeId: zod.number().describe('The node ID to get retainers for.'),
     maxNameLength: maxNameLengthSchema,
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
   },
   handler: async (request, response, context) => {
     const retainers = await context.getHeapSnapshotRetainers(
@@ -335,8 +353,8 @@ export const getHeapSnapshotEdges = defineTool(() => ({
       .optional()
       .describe('Whether to exclude primitive target nodes. Default is true.'),
     maxNameLength: maxNameLengthSchema,
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
   },
   handler: async (request, response, context) => {
     const edges = await context.getHeapSnapshotEdges(
@@ -451,8 +469,8 @@ export const getHeapSnapshotDuplicateStrings = defineTool(() => ({
   },
   schema: {
     filePath: zod.string().describe('A path to a .heapsnapshot file to read.'),
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
     maxNameLength: maxNameLengthSchema,
   },
   handler: async (request, response, context) => {
@@ -539,8 +557,8 @@ export const queryHeapSnapshotObjects = defineTool(() => ({
       .enum(['retainedSize', 'selfSize', 'id'])
       .optional()
       .describe('Sort order for results. Default is retainedSize.'),
-    pageIdx: zod.number().optional().describe('The page index for pagination.'),
-    pageSize: zod.number().optional().describe('The page size for pagination.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
     maxNameLength: maxNameLengthSchema,
   },
   handler: async (request, response, context) => {

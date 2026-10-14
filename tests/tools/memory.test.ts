@@ -11,6 +11,8 @@ import {describe, it, afterEach} from 'node:test';
 
 import sinon from 'sinon';
 
+import {zod} from '../../src/third_party/index.js';
+
 import {
   takeHeapSnapshot,
   getHeapSnapshotSummary,
@@ -768,5 +770,81 @@ describe('memory', () => {
         maxNameLength: 500,
       });
     });
+  });
+
+  describe('pagination parameters validation', () => {
+    const {args} = createHandlerMocks();
+
+    const toolsToTest = [
+      {
+        name: 'get_heapsnapshot_details',
+        tool: getHeapSnapshotDetails(args),
+        baseParams: {filePath: 'test.heapsnapshot'},
+      },
+      {
+        name: 'get_heapsnapshot_class_nodes',
+        tool: getHeapSnapshotClassNodes(args),
+        baseParams: {filePath: 'test.heapsnapshot', id: 1},
+      },
+      {
+        name: 'get_heapsnapshot_edges',
+        tool: getHeapSnapshotEdges(args),
+        baseParams: {filePath: 'test.heapsnapshot', nodeId: 1},
+      },
+      {
+        name: 'get_heapsnapshot_retainers',
+        tool: getHeapSnapshotRetainers(args),
+        baseParams: {filePath: 'test.heapsnapshot', nodeId: 1},
+      },
+      {
+        name: 'get_heapsnapshot_duplicate_strings',
+        tool: getHeapSnapshotDuplicateStrings(args),
+        baseParams: {filePath: 'test.heapsnapshot'},
+      },
+      {
+        name: 'query_heapsnapshot_objects',
+        tool: queryHeapSnapshotObjects(args),
+        baseParams: {filePath: 'test.heapsnapshot'},
+      },
+    ];
+
+    for (const {name, tool, baseParams} of toolsToTest) {
+      describe(name, () => {
+        const schema = zod.object(tool.schema);
+
+        it('rejects pageSize: 0', () => {
+          const res = schema.safeParse({...baseParams, pageSize: 0});
+          assert.strictEqual(res.success, false);
+        });
+
+        it('rejects negative pageSize', () => {
+          const res = schema.safeParse({...baseParams, pageSize: -3});
+          assert.strictEqual(res.success, false);
+        });
+
+        it('rejects fractional pageSize and pageIdx', () => {
+          const res = schema.safeParse({
+            ...baseParams,
+            pageIdx: 1.5,
+            pageSize: 2.5,
+          });
+          assert.strictEqual(res.success, false);
+        });
+
+        it('rejects negative pageIdx', () => {
+          const res = schema.safeParse({...baseParams, pageIdx: -1});
+          assert.strictEqual(res.success, false);
+        });
+
+        it('accepts valid positive integer pageSize and non-negative pageIdx', () => {
+          const res = schema.safeParse({
+            ...baseParams,
+            pageIdx: 1,
+            pageSize: 5,
+          });
+          assert.strictEqual(res.success, true);
+        });
+      });
+    }
   });
 });
