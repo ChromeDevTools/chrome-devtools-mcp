@@ -531,7 +531,7 @@ describe('script', () => {
             t => t.type() === 'service_worker' && t.url().includes(extensionId),
           );
 
-          context.createWorkersSnapshot();
+          await context.createWorkersSnapshot();
           const swList = context.getWorkers();
           const sw = swList.find(s => s.target === swTarget);
 

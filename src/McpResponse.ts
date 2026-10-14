@@ -796,7 +796,7 @@ export class McpResponse implements Response {
     ]);
 
     if (this.#includeExtensionServiceWorkers) {
-      context.createWorkersSnapshot();
+      await context.createWorkersSnapshot();
     }
 
     let extensions: Map<string, Extension> | undefined;

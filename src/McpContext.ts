@@ -145,7 +145,7 @@ export class McpContext implements Context {
 
   async #init(): Promise<void> {
     await this.createPagesSnapshot();
-    const workers = this.createWorkersSnapshot();
+    const workers = await this.createWorkersSnapshot();
 
     await this.#serviceWorkerConsoleCollector.init(workers);
     this.browser.on('targetcreated', this.#onTargetCreated);
@@ -512,12 +512,55 @@ export class McpContext implements Context {
     return this.#selectedPageFallback;
   }
 
+  async #pruneDestroyedServiceWorkers(): Promise<void> {
+    try {
+      // @ts-expect-error use internal Puppeteer connection
+      const connection = this.browser._connection;
+      if (!connection) {
+        return;
+      }
+      const response = await connection.send('Target.getTargets');
+      if (!response?.targetInfos) {
+        return;
+      }
+      const liveTargetIds = new Set(
+        response.targetInfos.map((t: {targetId: string}) => t.targetId),
+      );
+      const availableTargets = (
+        this.browser as unknown as {
+          _targetManager?: () => {
+            getAvailableTargets?: () => Map<string, Target>;
+          };
+        }
+      )
+        ._targetManager?.()
+        ?.getAvailableTargets?.();
+      for (const target of this.browser.targets()) {
+        // @ts-expect-error use internal targetId
+        const targetId = target._targetId;
+        if (
+          target.type() === 'service_worker' &&
+          targetId &&
+          !liveTargetIds.has(targetId)
+        ) {
+          availableTargets?.delete(targetId);
+          this.browser.emit('targetdestroyed', target);
+          this.#workers.delete(target);
+        }
+      }
+    } catch (err) {
+      this.logger?.('Error pruning destroyed service workers', err);
+    }
+  }
+
   /**
    * Creates a snapshot of the tracked workers. Today this is limited to
    * extension service workers; the McpWorker abstraction lets dedicated and
    * shared workers join the same snapshot later without changing consumers.
    */
-  createWorkersSnapshot(): McpWorker[] {
+  async createWorkersSnapshot(): Promise<McpWorker[]> {
+    await this.#pruneDestroyedServiceWorkers();
+
     const serviceWorkers = this.browser.targets().filter(target => {
       return (
         target.type() === 'service_worker' &&
@@ -748,6 +791,7 @@ export class McpContext implements Context {
         setTimeout(() => rej(new Error('Timeout installing extension')), 30000),
       ),
     ]);
+    await this.#pruneDestroyedServiceWorkers();
     return id;
   }
 
