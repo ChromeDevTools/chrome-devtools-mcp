@@ -109,7 +109,7 @@ export const mcpOptions = {
     type: 'boolean',
     default: false,
     describe:
-      'Use the legacy ffmpeg-based screencast implementation instead of the built-in Chrome recorder. Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
+      'Use the legacy ffmpeg-based screencast implementation instead of the built-in Chrome recorder. Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH. This option is deprecated and will be removed in favour of dependency-free screencast commands that are available by default.',
     reloadable: true,
   },
   experimentalFfmpegPath: {
