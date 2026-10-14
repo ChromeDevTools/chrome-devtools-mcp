@@ -395,6 +395,24 @@ describe('pages', () => {
         );
       });
     });
+    it('rejects devtools: URLs unless experimentalDevtools is enabled', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const tool = newPage(args);
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {params: {url: 'devtools://devtools/bundled/devtools_app.html'}},
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to devtools: URLs is not allowed without --experimentalDevtools.',
+          },
+        );
+      });
+    });
     it('allows chrome://newtab/', async () => {
       await withMcpContext(async (response, context, args) => {
         const tool = newPage(args);
@@ -1320,6 +1338,28 @@ describe('pages', () => {
           {
             message:
               'Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.',
+          },
+        );
+      });
+    });
+
+    it('rejects devtools: URLs unless experimentalDevtools is enabled', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const tool = navigatePage(args);
+        await assert.rejects(
+          async () => {
+            await tool.handler(
+              {
+                params: {url: 'devtools://devtools/bundled/devtools_app.html'},
+                page: context.getSelectedMcpPage(),
+              },
+              response,
+              context,
+            );
+          },
+          {
+            message:
+              'Navigating to devtools: URLs is not allowed without --experimentalDevtools.',
           },
         );
       });

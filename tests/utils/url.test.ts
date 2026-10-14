@@ -310,6 +310,32 @@ describe('validateUrl', () => {
     );
   });
 
+  it('should reject devtools: URLs unless experimentalDevtools is enabled', () => {
+    assert.throws(
+      () =>
+        validateUrl(
+          'devtools://devtools/bundled/devtools_app.html',
+          defaultOptions,
+        ),
+      /Navigating to devtools: URLs is not allowed without --experimentalDevtools\./,
+    );
+    assert.throws(
+      () =>
+        validateUrl('devtools://devtools/bundled/devtools_app.html', {
+          ...defaultOptions,
+          experimentalDevtools: false,
+        }),
+      /Navigating to devtools: URLs is not allowed without --experimentalDevtools\./,
+    );
+    assert.strictEqual(
+      validateUrl('devtools://devtools/bundled/devtools_app.html', {
+        ...defaultOptions,
+        experimentalDevtools: true,
+      }).href,
+      'devtools://devtools/bundled/devtools_app.html',
+    );
+  });
+
   it('should allow file URLs when fileNavigations is true or omitted', () => {
     assert.strictEqual(
       validateUrl('file:///tmp/example.txt', defaultOptions).protocol,
@@ -524,6 +550,29 @@ describe('isAllowedUrl', () => {
     );
     assert.strictEqual(
       isAllowedUrl('chrome-extension:abcdef', {categoryExtensions: true}),
+      true,
+    );
+  });
+
+  it('should disallow devtools: URLs unless experimentalDevtools is enabled', () => {
+    assert.strictEqual(
+      isAllowedUrl('devtools://devtools/bundled/devtools_app.html', {
+        categoryExtensions: undefined,
+      }),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('devtools://devtools/bundled/devtools_app.html', {
+        categoryExtensions: undefined,
+        experimentalDevtools: false,
+      }),
+      false,
+    );
+    assert.strictEqual(
+      isAllowedUrl('devtools://devtools/bundled/devtools_app.html', {
+        categoryExtensions: undefined,
+        experimentalDevtools: true,
+      }),
       true,
     );
   });
