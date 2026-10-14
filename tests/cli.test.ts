@@ -18,7 +18,6 @@ import {
   buildCommand,
   getCommandArgSpec,
   shieldLiteralArgs,
-  type OptionKind,
 } from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
@@ -1269,19 +1268,26 @@ describe('cli args parsing', () => {
 });
 
 describe('cli command strings', () => {
+  const required = {description: '', required: true, positional: true};
   const dummyArgsVariadic = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    arrArg: {name: 'arrArg', type: 'array', description: '', required: true},
+    arg1: {name: 'arg1', type: 'string', ...required},
+    arrArg: {name: 'arrArg', type: 'array', ...required},
   };
 
   const dummyArgsPlain = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    arg2: {name: 'arg2', type: 'string', description: '', required: true},
+    arg1: {name: 'arg1', type: 'string', ...required},
+    arg2: {name: 'arg2', type: 'string', ...required},
   };
 
   const dummyArgsOptional = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    optArg: {name: 'optArg', type: 'boolean', description: '', required: false},
+    arg1: {name: 'arg1', type: 'string', ...required},
+    optArg: {
+      name: 'optArg',
+      type: 'boolean',
+      description: '',
+      required: false,
+      positional: false,
+    },
   };
 
   it('renders a required array arg as a variadic positional', () => {
@@ -1342,15 +1348,8 @@ describe('cli command strings', () => {
 });
 
 describe('cli literal args', () => {
-  const globalOptions = new Map<string, OptionKind>([
-    ['sessionId', 'value'],
-    ['outputFormat', 'value'],
-    ['help', 'boolean'],
-  ]);
   const getSpec = (name: string) =>
-    name in commands
-      ? getCommandArgSpec(name, commands[name].args, globalOptions)
-      : undefined;
+    name in commands ? getCommandArgSpec(commands[name].args) : undefined;
 
   function shield(argv: string[]) {
     const {argv: shielded, restore} = shieldLiteralArgs(argv, getSpec);

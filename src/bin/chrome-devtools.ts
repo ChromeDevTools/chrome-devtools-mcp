@@ -31,9 +31,7 @@ import {VERSION} from '../version.js';
 import {
   buildCommand,
   getCommandArgSpec,
-  isOptionalPositionalArg,
   shieldLiteralArgs,
-  type OptionKind,
 } from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
@@ -71,19 +69,7 @@ const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
   hideBin(process.argv),
   commandName => {
     const commandDef = commands[commandName];
-    if (!commandDef) {
-      return undefined;
-    }
-    return getCommandArgSpec(
-      commandName,
-      commandDef.args,
-      new Map<string, OptionKind>([
-        ['sessionId', 'value'],
-        ['outputFormat', 'value'],
-        ['help', 'boolean'],
-        ['version', 'boolean'],
-      ]),
-    );
+    return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
   },
 );
 
@@ -238,7 +224,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required || isOptionalPositionalArg(commandName, argName)) {
+        if (opt.positional) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],

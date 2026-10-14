@@ -6,22 +6,13 @@
 
 import type {ArgDef} from './cli-options.js';
 
-const OPTIONAL_POSITIONAL_ARGS = new Set(['evaluate_script:function']);
-
-export function isOptionalPositionalArg(
-  commandName: string,
-  argName: string,
-): boolean {
-  return OPTIONAL_POSITIONAL_ARGS.has(`${commandName}:${argName}`);
-}
-
 /**
  * Builds the yargs command string and usage line for a CLI command.
  *
  * Optional flag args are rendered as `[--flag]` in the usage line only: as
  * part of the command string yargs parses each one as a trailing positional,
- * and a variadic positional has to be the last one. A small set of optional
- * args intentionally remain positional for backwards-compatible CLI syntax.
+ * and a variadic positional has to be the last one. Which args are positional
+ * is decided at build time by `scripts/generate-cli.ts`.
  */
 export function buildCommand(
   commandName: string,
@@ -30,12 +21,12 @@ export function buildCommand(
   let command = commandName;
   let flags = '';
   for (const [name, arg] of Object.entries(args)) {
-    if (arg.required) {
-      command += arg.type === 'array' ? ` <${name}..>` : ` <${name}>`;
-    } else if (isOptionalPositionalArg(commandName, name)) {
-      command += arg.type === 'array' ? ` [${name}..]` : ` [${name}]`;
-    } else {
+    if (!arg.positional) {
       flags += ` [--${name}]`;
+    } else if (arg.required) {
+      command += arg.type === 'array' ? ` <${name}..>` : ` <${name}>`;
+    } else {
+      command += arg.type === 'array' ? ` [${name}..]` : ` [${name}]`;
     }
   }
 
@@ -43,6 +34,17 @@ export function buildCommand(
 }
 
 export type OptionKind = 'boolean' | 'array' | 'value';
+
+/**
+ * Options that are available on every tool command and are consumed by yargs
+ * rather than forwarded to the tool.
+ */
+export const GLOBAL_CLI_OPTIONS: ReadonlyMap<string, OptionKind> = new Map([
+  ['sessionId', 'value'],
+  ['outputFormat', 'value'],
+  ['help', 'boolean'],
+  ['version', 'boolean'],
+]);
 
 /**
  * Describes what a CLI command accepts, as needed by `shieldLiteralArgs`.
@@ -57,19 +59,18 @@ export interface CommandArgSpec {
 }
 
 /**
- * Builds a `CommandArgSpec` for a tool command from its arg definitions and
- * the options available on every command.
+ * Builds a `CommandArgSpec` for a tool command from its generated arg
+ * definitions and the options available on every command.
  */
 export function getCommandArgSpec(
-  commandName: string,
   args: Record<string, ArgDef>,
-  globalOptions: Map<string, OptionKind>,
+  globalOptions: ReadonlyMap<string, OptionKind> = GLOBAL_CLI_OPTIONS,
 ): CommandArgSpec {
   const options = new Map(globalOptions);
   let positionalCount = 0;
   let variadic = false;
   for (const [name, arg] of Object.entries(args)) {
-    if (arg.required || isOptionalPositionalArg(commandName, name)) {
+    if (arg.positional) {
       positionalCount++;
       variadic = arg.type === 'array';
     } else {
