@@ -542,6 +542,9 @@ export const timeoutSchema = {
     ),
 };
 
+const DECIMAL = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/;
+const VALID_VIEWPORT_TAGS = new Set(['mobile', 'touch', 'landscape']);
+
 export function viewportTransform(arg: string | undefined):
   | {
       width: number;
@@ -556,33 +559,63 @@ export function viewportTransform(arg: string | undefined):
     return undefined;
   }
   const [dimensions, ...tags] = arg.split(',');
+  for (const tag of tags) {
+    if (!VALID_VIEWPORT_TAGS.has(tag)) {
+      throw new Error(
+        `Invalid viewport tag "${tag}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+      );
+    }
+  }
   const isMobile = tags.includes('mobile');
   const hasTouch = tags.includes('touch');
   const isLandscape = tags.includes('landscape');
-  const [width, height, dpr] = dimensions.split('x').map(Number) as [
-    number,
-    number,
-    number | undefined,
-  ];
+  const dimParts = dimensions.split('x');
+  if (dimParts.length !== 2 && dimParts.length !== 3) {
+    throw new Error(
+      `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+    );
+  }
+  if (!DECIMAL.test(dimParts[0])) {
+    throw new Error(
+      `Invalid viewport width "${dimParts[0]}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
+    );
+  }
+  const width = Number(dimParts[0]);
   if (!Number.isFinite(width) || width <= 0) {
     throw new Error(
       `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
     );
   }
+  if (!DECIMAL.test(dimParts[1])) {
+    throw new Error(
+      `Invalid viewport height "${dimParts[1]}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
+    );
+  }
+  const height = Number(dimParts[1]);
   if (!Number.isFinite(height) || height <= 0) {
     throw new Error(
       `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
     );
   }
-  if (dpr !== undefined && (!Number.isFinite(dpr) || dpr <= 0)) {
-    throw new Error(
-      `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
-    );
+  let deviceScaleFactor: number | undefined;
+  if (dimParts.length === 3) {
+    if (!DECIMAL.test(dimParts[2])) {
+      throw new Error(
+        `Invalid devicePixelRatio "${dimParts[2]}". Expected a positive number.`,
+      );
+    }
+    const dpr = Number(dimParts[2]);
+    if (!Number.isFinite(dpr) || dpr <= 0) {
+      throw new Error(
+        `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
+      );
+    }
+    deviceScaleFactor = dpr;
   }
   return {
     width,
     height,
-    deviceScaleFactor: dpr,
+    deviceScaleFactor,
     isMobile,
     isLandscape,
     hasTouch,
@@ -595,12 +628,29 @@ export function geolocationTransform(
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  const parts = arg.split(',');
+  if (parts.length !== 2) {
+    throw new Error(
+      `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
+    );
+  }
+  if (!DECIMAL.test(parts[0])) {
+    throw new Error(
+      `Invalid latitude "${parts[0]}". Latitude must be a number between -90 and 90.`,
+    );
+  }
+  const latitude = Number(parts[0]);
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error(
       `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
     );
   }
+  if (!DECIMAL.test(parts[1])) {
+    throw new Error(
+      `Invalid longitude "${parts[1]}". Longitude must be a number between -180 and 180.`,
+    );
+  }
+  const longitude = Number(parts[1]);
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error(
       `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
