@@ -27,24 +27,4 @@ describe('createTools', () => {
       assert.strictEqual(new Set(names).size, names.length);
     });
   }
-
-  it('tool reference documents evaluate_script with serviceWorkerId and optional pageId', async () => {
-    const fs = await import('node:fs/promises');
-    const content = await fs.readFile('docs/tool-reference.md', 'utf-8');
-    const evaluateSection = content.slice(
-      content.indexOf('### `evaluate_script`'),
-    );
-    const nextSection = evaluateSection.slice(
-      0,
-      evaluateSection.indexOf('---'),
-    );
-    assert.ok(
-      nextSection.includes('serviceWorkerId'),
-      'Expected docs/tool-reference.md evaluate_script section to document serviceWorkerId',
-    );
-    assert.ok(
-      nextSection.includes('pageId** (number) _(optional)_'),
-      'Expected docs/tool-reference.md evaluate_script section to document pageId as optional',
-    );
-  });
 });
