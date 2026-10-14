@@ -269,6 +269,61 @@ describe('NetworkFormatter', () => {
       assert.strictEqual(json.responseBody, undefined);
     });
 
+    it('preserves binary request body when saving to file and handles binary inline', async () => {
+      const binaryBytes = Buffer.from([0, 255, 128, 10, 200, 1]);
+      const base64Data = binaryBytes.toString('base64');
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com/upload',
+        headers: () => ({'content-type': 'application/octet-stream'}),
+        hasPostData: () => true,
+        postData: () => binaryBytes.toString('utf-8'),
+        response: () => null,
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => base64Data,
+        id: '123.1',
+        client: {
+          send: async (method: string) => {
+            if (method === 'Network.getRequestPostData') {
+              return {
+                postData: base64Data,
+                base64Encoded: true,
+              };
+            }
+            throw new Error(`Unexpected method: ${method}`);
+          },
+        },
+      } as unknown as HTTPRequest;
+
+      using tmpDir = createTempDir('network-formatter-binary-test-');
+      const reqPath = join(tmpDir.path, 'upload');
+
+      let savedData: Uint8Array | undefined;
+      await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        saveFile: async (data, filename) => {
+          savedData = data;
+          await writeFile(filename, data);
+          return {filename};
+        },
+        redactNetworkHeaders: false,
+      });
+
+      assert.deepStrictEqual(savedData, binaryBytes);
+      const fileContent = await readFile(reqPath);
+      assert.deepStrictEqual(fileContent, binaryBytes);
+
+      // Verify inline view displays <binary data> instead of corrupted text
+      const inlineFormatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        redactNetworkHeaders: false,
+      });
+      const inlineOutput = inlineFormatter.toStringDetailed();
+      assert.match(inlineOutput, /<binary data>/);
+    });
+
     it('should not truncate large bodies when saving to file', async () => {
       const largeBody = 'a'.repeat(10005);
       const request = {

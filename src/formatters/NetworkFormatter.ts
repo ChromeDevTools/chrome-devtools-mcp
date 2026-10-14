@@ -73,16 +73,60 @@ export class NetworkFormatter {
     return instance;
   }
 
+  async #getRequestPostData(): Promise<Uint8Array | undefined> {
+    const requestWithClient = this.#request as {
+      client?: {
+        send: (
+          method: string,
+          params: {requestId: string},
+        ) => Promise<{postData: string; base64Encoded?: boolean}>;
+      };
+      id?: string;
+    };
+    if (
+      requestWithClient.client &&
+      typeof requestWithClient.client.send === 'function' &&
+      requestWithClient.id
+    ) {
+      try {
+        const result = await requestWithClient.client.send(
+          'Network.getRequestPostData',
+          {requestId: requestWithClient.id},
+        );
+        if (result.base64Encoded) {
+          return Buffer.from(result.postData, 'base64');
+        }
+        return Buffer.from(result.postData);
+      } catch {
+        // Fall back to standard HTTPRequest methods
+      }
+    }
+
+    try {
+      const postData = this.#request.postData();
+      if (postData !== undefined) {
+        return Buffer.from(postData);
+      }
+    } catch {
+      // Ignore
+    }
+
+    try {
+      const fetched = await this.#request.fetchPostData();
+      if (fetched !== undefined) {
+        return Buffer.from(fetched);
+      }
+    } catch {
+      // Ignore
+    }
+
+    return undefined;
+  }
+
   async #loadDetailedData(): Promise<void> {
     // Load Request Body
     if (this.#request.hasPostData()) {
-      let data;
-      try {
-        data =
-          this.#request.postData() ?? (await this.#request.fetchPostData());
-      } catch {
-        // Ignore parsing errors
-      }
+      const data = await this.#getRequestPostData();
       const requestBodyNotAvailableMessage =
         '<Request body not available anymore>';
       if (this.#options.requestFilePath) {
@@ -93,7 +137,7 @@ export class NetworkFormatter {
         }
         if (data) {
           const result = await this.#options.saveFile(
-            Buffer.from(data),
+            data,
             this.#options.requestFilePath,
             '.network-request',
           );
@@ -102,7 +146,14 @@ export class NetworkFormatter {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
       } else if (data) {
-        this.#requestBody = getSizeLimitedString(data, BODY_CONTEXT_SIZE_LIMIT);
+        if (isUtf8(data)) {
+          this.#requestBody = getSizeLimitedString(
+            Buffer.from(data).toString('utf-8'),
+            BODY_CONTEXT_SIZE_LIMIT,
+          );
+        } else {
+          this.#requestBody = '<binary data>';
+        }
       } else {
         this.#requestBody = requestBodyNotAvailableMessage;
       }
