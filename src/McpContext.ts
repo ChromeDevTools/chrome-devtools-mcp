@@ -34,7 +34,6 @@ import {
   type Page,
   type Protocol,
   type PWAState,
-  type ScreenRecorder,
   type Target,
   type UninstallPWAOptions,
   type Extension,
@@ -45,6 +44,7 @@ import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
   DevToolsData,
+  ScreenRecorderData,
   SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
@@ -108,8 +108,7 @@ export class McpContext implements Context {
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
-  #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
-    null;
+  #screenRecorderData: ScreenRecorderData | null = null;
 
   #reconnectNotice = false;
 
@@ -404,13 +403,11 @@ export class McpContext implements Context {
     return this.#isRunningTrace;
   }
 
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
+  getScreenRecorder(): ScreenRecorderData | null {
     return this.#screenRecorderData;
   }
 
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void {
+  setScreenRecorder(data: ScreenRecorderData | null): void {
     this.#screenRecorderData = data;
   }
 

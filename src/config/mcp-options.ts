@@ -109,18 +109,20 @@ export const mcpOptions = {
     type: 'boolean',
     default: false,
     describe:
-      'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
+      'Use the legacy ffmpeg-based screencast implementation instead of the built-in Chrome recorder. Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
     reloadable: true,
   },
   experimentalFfmpegPath: {
     type: 'string',
-    describe: 'Path to ffmpeg executable for screencast recording.',
+    describe:
+      'Path to ffmpeg executable for legacy screencast recording (requires --experimentalScreencast).',
     reloadable: true,
   },
-  experimentalScreencastFps: {
+  screencastFps: {
     type: 'number',
+    alias: 'experimentalScreencastFps',
     describe:
-      'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
+      'Frames per second to use for screencast recording. Lower values reduce file size and encoding load.',
     reloadable: true,
     coerce: (value: number | undefined) => {
       if (value === undefined) {
@@ -128,7 +130,7 @@ export const mcpOptions = {
       }
       if (!Number.isInteger(value) || value <= 0) {
         throw new Error(
-          `Invalid experimentalScreencastFps ${value}. Expected a positive integer.`,
+          `Invalid screencastFps ${value}. Expected a positive integer.`,
         );
       }
       return value;
@@ -375,7 +377,6 @@ export const IMPLICATIONS: Array<
 > = [
   ['wsHeaders', 'wsEndpoint'],
   ['experimentalFfmpegPath', 'experimentalScreencast'],
-  ['experimentalScreencastFps', 'experimentalScreencast'],
 ];
 
 export function withoutDefaults(

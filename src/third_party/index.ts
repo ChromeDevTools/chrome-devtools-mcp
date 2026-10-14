@@ -71,6 +71,7 @@ export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
 export {CdpBrowser} from 'puppeteer-core/internal/cdp/Browser.js';
 export {CdpFrame} from 'puppeteer-core/internal/cdp/Frame.js';
 export {CdpPage} from 'puppeteer-core/internal/cdp/Page.js';
+export {CdpScreenRecording} from 'puppeteer-core/internal/cdp/ScreenRecording.js';
 export {CdpExtension} from 'puppeteer-core/internal/cdp/Extension.js';
 export type {CdpWebWorker} from 'puppeteer-core/internal/cdp/WebWorker.js';
 export type {Realm} from 'puppeteer-core/internal/api/Realm.js';

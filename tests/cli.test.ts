@@ -372,7 +372,7 @@ describe('cli args parsing', () => {
   });
 
   it('rejects invalid screencast fps values', async () => {
-    const coerce = mcpOptions.experimentalScreencastFps.coerce;
+    const coerce = mcpOptions.screencastFps.coerce;
     assert.ok(coerce);
 
     assert.strictEqual(coerce(undefined), undefined);
@@ -381,9 +381,27 @@ describe('cli args parsing', () => {
     for (const value of [0, -1, 10.5, Number.NaN]) {
       assert.throws(
         () => coerce(value),
-        /Invalid experimentalScreencastFps .* Expected a positive integer\./,
+        /Invalid screencastFps .* Expected a positive integer\./,
       );
     }
+  });
+
+  it('parses screencast fps without requiring experimental screencast', async () => {
+    const args = parseConfig(['--screencast-fps=5']);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      channel: 'stable',
+      screencastFps: 5,
+    });
+  });
+
+  it('accepts --experimental-screencast-fps as an alias for --screencast-fps', async () => {
+    const args = parseConfig(['--experimental-screencast-fps=5']);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      channel: 'stable',
+      screencastFps: 5,
+    });
   });
 
   it('parses usage statistics flag', async () => {

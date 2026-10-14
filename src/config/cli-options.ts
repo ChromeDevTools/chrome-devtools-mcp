@@ -1555,8 +1555,7 @@ export const commands: Commands = {
     },
   },
   screencast_start: {
-    description:
-      'Starts recording a screencast (video) of the target page in specified format. (requires flag: --experimentalScreencast=true)',
+    description: 'Starts recording a screencast (video) of the target page.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -1569,14 +1568,13 @@ export const commands: Commands = {
         name: 'filePath',
         type: 'string',
         description:
-          'Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.',
+          'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.',
         required: false,
       },
     },
   },
   screencast_stop: {
-    description:
-      'Stops the active screencast recording on the target page. (requires flag: --experimentalScreencast=true)',
+    description: 'Stops the active screencast recording on the target page.',
     category: 'Debugging',
     args: {
       pageId: {

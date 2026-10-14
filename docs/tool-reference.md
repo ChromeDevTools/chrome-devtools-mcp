@@ -36,10 +36,10 @@
   - [`get_css_styles`](#get_css_styles)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
-  - [`take_screenshot`](#take_screenshot)
-  - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
+  - [`take_screenshot`](#take_screenshot)
+  - [`take_snapshot`](#take_snapshot)
 - **[Memory](#memory)** (14 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`analyze_heapsnapshot_contexts`](#analyze_heapsnapshot_contexts)
@@ -453,6 +453,27 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ---
 
+### `screencast_start`
+
+**Description:** Starts recording a screencast (video) of the target page.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **filePath** (string) _(optional)_: Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.
+
+---
+
+### `screencast_stop`
+
+**Description:** Stops the active screencast recording on the target page.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+
+---
+
 ### `take_screenshot`
 
 **Description:** Take a screenshot of the page or element.
@@ -479,27 +500,6 @@ in the DevTools Elements panel (if any).
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
-
----
-
-### `screencast_start`
-
-**Description:** Starts recording a screencast (video) of the target page in specified format. (requires flag: --experimentalScreencast=true)
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-- **filePath** (string) _(optional)_: Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.
-
----
-
-### `screencast_stop`
-
-**Description:** Stops the active screencast recording on the target page. (requires flag: --experimentalScreencast=true)
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---
 
