@@ -629,6 +629,13 @@ export const commands: Commands = {
           'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
         required: false,
       },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+      },
       pageIdx: {
         name: 'pageIdx',
         type: 'number',

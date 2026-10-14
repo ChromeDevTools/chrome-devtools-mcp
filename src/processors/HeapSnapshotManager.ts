@@ -8,17 +8,18 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 
 import {DevTools} from '../third_party/index.js';
-import {
-  createIdGenerator,
-  stableIdSymbol,
-  type WithSymbolId,
-} from '../utils/id.js';
+import {createIdGenerator} from '../utils/id.js';
 
-export type AggregatedInfoWithId =
-  WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
+export interface HeapSnapshotAggregate {
+  id: number;
+  className: string;
+  count: number;
+  selfSize: number;
+  retainedSize: number;
+}
 
 export interface HeapSnapshotAggregateData {
-  aggregates: Record<string, AggregatedInfoWithId>;
+  aggregates: HeapSnapshotAggregate[];
   objectCount: number;
   totalSelfSize: number;
 }
@@ -141,17 +142,28 @@ export class HeapSnapshotManager {
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
     await this.#applyNodeFilter(snapshot.proxy, filter, filterName, objectId);
-    const aggregates: Record<string, AggregatedInfoWithId> =
-      await snapshot.proxy.aggregatesWithFilter(filter);
+    const rawAggregates = await snapshot.proxy.aggregatesWithFilter(filter);
     let objectCount = 0;
     let totalSelfSize = 0;
+    const aggregates: HeapSnapshotAggregate[] = [];
 
-    for (const [key, aggregate] of Object.entries(aggregates)) {
+    for (const [key, aggregate] of Object.entries(rawAggregates)) {
       const id = snapshot.resolveIdFromClassKey(key);
-      aggregate[stableIdSymbol] = id;
+      if (id === undefined) {
+        throw new Error(`No class ID found for class key ${key}`);
+      }
       objectCount += aggregate.count;
       totalSelfSize += aggregate.self;
+      aggregates.push({
+        id,
+        className: aggregate.name,
+        count: aggregate.count,
+        selfSize: aggregate.self,
+        retainedSize: aggregate.maxRet,
+      });
     }
+
+    aggregates.sort((a, b) => b.retainedSize - a.retainedSize);
 
     return {
       aggregates,

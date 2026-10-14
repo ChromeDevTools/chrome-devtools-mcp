@@ -124,6 +124,7 @@ export const getHeapSnapshotDetails = defineTool(() => ({
       .describe(
         'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
       ),
+    maxNameLength: maxNameLengthSchema,
     pageIdx: zod
       .number()
       .optional()
@@ -147,6 +148,7 @@ export const getHeapSnapshotDetails = defineTool(() => ({
     response.setHeapSnapshotAggregates(aggregates, {
       pageIdx: request.params.pageIdx,
       pageSize: request.params.pageSize,
+      maxNameLength: request.params.maxNameLength,
     });
   },
 }));

@@ -166,7 +166,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotAggregates,
         aggregates,
-        {pageIdx: undefined, pageSize: undefined},
+        {pageIdx: undefined, pageSize: undefined, maxNameLength: undefined},
       );
     });
 
@@ -183,6 +183,7 @@ describe('memory', () => {
             objectId: 123,
             pageIdx: 1,
             pageSize: 10,
+            maxNameLength: 500,
           },
         },
         response,
@@ -198,7 +199,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotAggregates,
         aggregates,
-        {pageIdx: 1, pageSize: 10},
+        {pageIdx: 1, pageSize: 10, maxNameLength: 500},
       );
     });
   });

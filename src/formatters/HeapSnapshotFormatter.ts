@@ -5,14 +5,13 @@
  */
 
 import type {
-  AggregatedInfoWithId,
+  HeapSnapshotAggregate,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
-import {stableIdSymbol} from '../utils/id.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -47,14 +46,6 @@ function truncateValue(value: string, maxLength = MAX_NAME_LENGTH): string {
     return value;
   }
   return value.slice(0, maxLength) + '...';
-}
-
-export interface FormattedSnapshotEntry {
-  className: string;
-  id?: number;
-  count: number;
-  selfSize: string;
-  retainedSize: string;
 }
 
 export interface ContextAnalysisReport {
@@ -133,12 +124,6 @@ export function isEdgeLike(
 }
 
 export class HeapSnapshotFormatter {
-  #aggregates: Record<string, AggregatedInfoWithId>;
-
-  constructor(aggregates: Record<string, AggregatedInfoWithId>) {
-    this.#aggregates = aggregates;
-  }
-
   static formatNodes(
     items: ReadonlyArray<
       | DevTools.HeapSnapshotModel.HeapSnapshotModel.Node
@@ -265,45 +250,20 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
-  #getSortedAggregates(): AggregatedInfoWithId[] {
-    return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
-  }
-
-  toString(): string {
-    const sorted = this.#getSortedAggregates();
+  static formatAggregates(
+    aggregates: readonly HeapSnapshotAggregate[],
+    options: HeapSnapshotFormatOptions,
+  ): string {
     const lines: string[] = [];
-    lines.push('id,name,count,selfSize,retainedSize');
+    lines.push('id,className,count,selfSize,retainedSize');
 
-    for (const info of sorted) {
-      const id = info[stableIdSymbol] ?? '';
+    for (const info of aggregates) {
       lines.push(
-        `${id},${info.name},${info.count},${formatBytesToKb(info.self)},${formatBytesToKb(info.maxRet)}`,
+        `${info.id},${formatName(info.className, options)},${info.count},${formatBytesToKb(info.selfSize)},${formatBytesToKb(info.retainedSize)}`,
       );
     }
 
     return lines.join('\n');
-  }
-
-  toJSON(): FormattedSnapshotEntry[] {
-    const sorted = this.#getSortedAggregates();
-    return sorted.map(info => ({
-      id: info[stableIdSymbol],
-      className: info.name,
-      count: info.count,
-      selfSize: formatBytesToKb(info.self),
-      retainedSize: formatBytesToKb(info.maxRet),
-    }));
-  }
-
-  static sort(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
-  ): Array<
-    [string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo]
-  > {
-    return Object.entries(aggregates).sort((a, b) => b[1].maxRet - a[1].maxRet);
   }
 
   static formatDiffSummary(

@@ -886,6 +886,10 @@
       {
         "name": "object_id",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },

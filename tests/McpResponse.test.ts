@@ -18,7 +18,6 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
   listPages,
@@ -36,7 +35,7 @@ import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   createHandlerMocks,
-  createMockAggregatedInfo,
+  createMockHeapSnapshotAggregate,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
@@ -1486,26 +1485,22 @@ describe('McpResponse heap snapshot formatting', () => {
   it('formats aggregate data with shallow size and pagination summaries', async () => {
     const response = new McpResponse(createMockParsedArguments());
     const aggregates = {
-      aggregates: {
-        ObjectA: createMockAggregatedInfo({
-          name: 'ObjectA',
+      aggregates: [
+        createMockHeapSnapshotAggregate({
+          id: 1,
+          className: 'ObjectA',
           count: 10,
-          self: 100,
-          maxRet: 1000,
-          distance: 1,
-          idxs: [],
-          [stableIdSymbol]: 1,
+          selfSize: 100,
+          retainedSize: 1000,
         }),
-        ObjectB: createMockAggregatedInfo({
-          name: 'ObjectB',
+        createMockHeapSnapshotAggregate({
+          id: 2,
+          className: 'ObjectB',
           count: 5,
-          self: 50,
-          maxRet: 500,
-          distance: 2,
-          idxs: [],
-          [stableIdSymbol]: 2,
+          selfSize: 50,
+          retainedSize: 500,
         }),
-      },
+      ],
       objectCount: 15,
       totalSelfSize: 150,
     };
@@ -1532,6 +1527,10 @@ describe('McpResponse heap snapshot formatting', () => {
       objectCount: 15,
       totalSelfSize: 150,
     });
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotAggregates'),
+      [aggregates.aggregates[0]],
+    );
   });
 
   it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
