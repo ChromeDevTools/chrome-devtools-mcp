@@ -573,18 +573,20 @@ describe('McpPage', () => {
       });
     });
 
-    it('calls setGeolocation with (0, 0) when geolocation is omitted', async () => {
+    it('clears the geolocation override when geolocation is omitted', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         geolocation: {latitude: 48.137154, longitude: 11.576124},
       });
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.geolocation, null);
-      sinon.assert.calledTwice(pptrPage.setGeolocation);
-      sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, {
-        latitude: 0,
-        longitude: 0,
-      });
+      sinon.assert.calledOnce(pptrPage.setGeolocation);
+      // @ts-expect-error internal API
+      const client = pptrPage._client();
+      sinon.assert.calledWithExactly(
+        client.send,
+        'Emulation.clearGeolocationOverride',
+      );
     });
 
     it('calls setUserAgent with the given user agent', async () => {
