@@ -514,11 +514,15 @@ export const queryHeapSnapshotObjects = defineTool(() => ({
     className: zod
       .string()
       .optional()
-      .describe('Optional regex or text matching object class name.'),
+      .describe(
+        'Optional case-insensitive regex matching object class name. Escape special characters to match them literally.',
+      ),
     propertyName: zod
       .string()
       .optional()
-      .describe('Optional property name filter for outgoing reference edges.'),
+      .describe(
+        'Optional case-insensitive regex matching property names of outgoing reference edges. Escape special characters to match them literally.',
+      ),
     nodeType: zod
       .string()
       .optional()

@@ -27,6 +27,57 @@ describe('HeapSnapshotManager', () => {
     );
   });
 
+  for (const parameter of ['className', 'propertyName']) {
+    it(`reports invalid ${parameter} regular expressions before loading a snapshot`, async () => {
+      const manager = new HeapSnapshotManager();
+      const getSnapshot = sinon.stub(manager, 'getSnapshot');
+      try {
+        for (const pattern of ['(', '[']) {
+          await assert.rejects(
+            manager.queryObjects('tests/fixtures/example.heapsnapshot', {
+              [parameter]: pattern,
+            }),
+            new RegExp(
+              `Invalid ${parameter} regular expression:.*Escape special characters to match them literally`,
+            ),
+          );
+        }
+        sinon.assert.notCalled(getSnapshot);
+      } finally {
+        manager.dispose();
+      }
+    });
+  }
+
+  it('still accepts valid and escaped className regular expressions', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const matchingObjects = await manager.queryObjects(filePath, {
+        className: 'Array|Object',
+      });
+      const matchingLiteral = await manager.queryObjects(filePath, {
+        className: '\\(',
+      });
+
+      assert.ok(matchingObjects.items.length > 0);
+      assert.ok(matchingLiteral.items.length > 0);
+      for (const node of matchingObjects.items) {
+        assert.match(node.name, /Array|Object/i);
+      }
+      for (const node of matchingLiteral.items) {
+        assert.ok(node.name.includes('('));
+      }
+
+      const matchingLowercase = await manager.queryObjects(filePath, {
+        className: 'array|object',
+      });
+      assert.deepStrictEqual(matchingLowercase, matchingObjects);
+    } finally {
+      manager.dispose();
+    }
+  });
+
   it('disposes the worker when snapshot loading fails', async () => {
     const disposeSpy = sinon.spy(
       DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotWorkerProxy
