@@ -19,6 +19,7 @@ import {
 } from '../../src/third_party/index.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {createHandlerMocks} from '../mocks.js';
+import {createTempDir, html, withMcpContext} from '../utils.js';
 
 function parseArgs(...argv: string[]) {
   return new ConfigParser('test', ['node', 'test', ...argv]).parse();
@@ -30,7 +31,7 @@ function createScreencastMocks() {
   const mockRecorder = sinon.createStubInstance(ScreenRecorder);
   page.pptrPage.record.resolves(mockRecording);
   page.pptrPage.screencast.resolves(mockRecorder);
-  context.getScreenRecorder.returns(null);
+  page.getScreenRecorder.returns(null);
   return {page, context, response, mockRecording, mockRecorder, args};
 }
 
@@ -66,7 +67,7 @@ describe('screencast', () => {
         fps: undefined,
       });
       sinon.assert.notCalled(page.pptrPage.screencast);
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
         recorder: mockRecording,
         filePath,
       });
@@ -98,7 +99,7 @@ describe('screencast', () => {
         path: expectedPath,
         fps: undefined,
       });
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
         recorder: mockRecording,
         filePath: expectedPath,
       });
@@ -107,7 +108,7 @@ describe('screencast', () => {
     it('errors if a recording is already active', async () => {
       const {page, context, response, mockRecording, args} =
         createScreencastMocks();
-      context.getScreenRecorder.returns({
+      page.getScreenRecorder.returns({
         recorder: mockRecording,
         filePath: `${path.join(os.tmpdir(), 'existing')}.mp4`,
       });
@@ -120,7 +121,7 @@ describe('screencast', () => {
 
       sinon.assert.notCalled(context.ensureExtension);
       sinon.assert.notCalled(page.pptrPage.record);
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.notCalled(page.setScreenRecorder);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
@@ -176,7 +177,7 @@ describe('screencast', () => {
       const tempPath = page.pptrPage.record.firstCall.args[0]?.path;
       assert.ok(tempPath);
       await assert.rejects(fs.access(path.dirname(tempPath)));
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.notCalled(page.setScreenRecorder);
     });
 
     describe('with --experimental-screencast', () => {
@@ -209,7 +210,7 @@ describe('screencast', () => {
           fps: undefined,
         });
         sinon.assert.notCalled(page.pptrPage.record);
-        sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
           recorder: mockRecorder,
           filePath,
         });
@@ -246,7 +247,7 @@ describe('screencast', () => {
           ffmpegPath: undefined,
           fps: undefined,
         });
-        sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
           recorder: mockRecorder,
           filePath: expectedPath,
         });
@@ -267,7 +268,7 @@ describe('screencast', () => {
 
         sinon.assert.notCalled(context.ensureExtension);
         sinon.assert.notCalled(page.pptrPage.screencast);
-        sinon.assert.notCalled(context.setScreenRecorder);
+        sinon.assert.notCalled(page.setScreenRecorder);
       });
 
       it('starts a screencast recording with temp file when no filePath', async () => {
@@ -293,7 +294,7 @@ describe('screencast', () => {
           ffmpegPath: undefined,
           fps: undefined,
         });
-        sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
           recorder: mockRecorder,
           filePath: expectedPath,
         });
@@ -319,7 +320,7 @@ describe('screencast', () => {
           filePath,
           '.mp4',
         );
-        sinon.assert.notCalled(context.setScreenRecorder);
+        sinon.assert.notCalled(page.setScreenRecorder);
       });
 
       it('cleans up the generated temp directory if recording fails to start', async () => {
@@ -339,7 +340,7 @@ describe('screencast', () => {
         const tempPath = page.pptrPage.screencast.firstCall.args[0]?.path;
         assert.ok(tempPath);
         await assert.rejects(fs.access(path.dirname(tempPath)));
-        sinon.assert.notCalled(context.setScreenRecorder);
+        sinon.assert.notCalled(page.setScreenRecorder);
       });
 
       it('passes ffmpegPath from args to puppeteer', async () => {
@@ -364,7 +365,7 @@ describe('screencast', () => {
           ffmpegPath: experimentalFfmpegPath,
           fps: undefined,
         });
-        sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
           recorder: mockRecorder,
           filePath,
         });
@@ -399,7 +400,7 @@ describe('screencast', () => {
     it('returns an error message if no recording is active', async () => {
       const {page, context, response, args} = createScreencastMocks();
       await stopScreencast(args).handler({params: {}, page}, response, context);
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.notCalled(page.setScreenRecorder);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Error: no active screencast recording to stop.',
@@ -410,7 +411,7 @@ describe('screencast', () => {
       const {page, context, response, mockRecording, args} =
         createScreencastMocks();
       const filePath = `${path.join(os.tmpdir(), 'test-recording')}.mp4`;
-      context.getScreenRecorder.returns({
+      page.getScreenRecorder.returns({
         recorder: mockRecording,
         filePath,
       });
@@ -418,7 +419,7 @@ describe('screencast', () => {
       await stopScreencast(args).handler({params: {}, page}, response, context);
 
       sinon.assert.calledOnce(mockRecording.stop);
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, null);
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, null);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         `The screencast recording has been stopped and saved to ${filePath}.`,
@@ -430,7 +431,7 @@ describe('screencast', () => {
         createScreencastMocks();
       mockRecording.stop.rejects(new Error('recording error'));
       const filePath = `${path.join(os.tmpdir(), 'test')}.mp4`;
-      context.getScreenRecorder.returns({
+      page.getScreenRecorder.returns({
         recorder: mockRecording,
         filePath,
       });
@@ -441,7 +442,56 @@ describe('screencast', () => {
       );
 
       sinon.assert.calledOnce(mockRecording.stop);
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, null);
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, null);
+    });
+  });
+
+  it('records two pages concurrently (e2e)', async () => {
+    using tmpDir = createTempDir();
+    await withMcpContext(async (response, context, args) => {
+      const page1 = context.getSelectedMcpPage();
+      const page2 = await context.newPage();
+      await page1.pptrPage.setContent(html`<h1>Page 1</h1>`);
+      await page2.pptrPage.setContent(html`<h1>Page 2</h1>`);
+
+      const filePath1 = path.join(tmpDir.path, 'page1.mp4');
+      const filePath2 = path.join(tmpDir.path, 'page2.mp4');
+
+      await startScreencast(args).handler(
+        {params: {filePath: filePath1}, page: page1},
+        response,
+        context,
+      );
+      await startScreencast(args).handler(
+        {params: {filePath: filePath2}, page: page2},
+        response,
+        context,
+      );
+
+      await page1.pptrPage.evaluate(() => {
+        document.body.style.background = 'red';
+      });
+      await page2.pptrPage.evaluate(() => {
+        document.body.style.background = 'blue';
+      });
+
+      await stopScreencast(args).handler(
+        {params: {}, page: page1},
+        response,
+        context,
+      );
+      await stopScreencast(args).handler(
+        {params: {}, page: page2},
+        response,
+        context,
+      );
+
+      for (const filePath of [filePath1, filePath2]) {
+        const content = await fs.readFile(filePath);
+        assert.ok(content.length > 0, `${filePath} should not be empty`);
+        // MP4 files start with a size-prefixed `ftyp` box.
+        assert.strictEqual(content.subarray(4, 8).toString(), 'ftyp');
+      }
     });
   });
 });

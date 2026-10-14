@@ -44,7 +44,6 @@ import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   Context,
   DevToolsData,
-  ScreenRecorderData,
   SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
@@ -108,7 +107,6 @@ export class McpContext implements Context {
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
-  #screenRecorderData: ScreenRecorderData | null = null;
 
   #reconnectNotice = false;
 
@@ -401,14 +399,6 @@ export class McpContext implements Context {
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
-  }
-
-  getScreenRecorder(): ScreenRecorderData | null {
-    return this.#screenRecorderData;
-  }
-
-  setScreenRecorder(data: ScreenRecorderData | null): void {
-    this.#screenRecorderData = data;
   }
 
   isCruxEnabled(): boolean {

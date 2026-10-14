@@ -74,7 +74,8 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
     filePath: true,
   },
   handler: async (request, response, context) => {
-    if (context.getScreenRecorder() !== null) {
+    const page = request.page;
+    if (page.getScreenRecorder() !== null) {
       response.appendResponseLine(
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
       );
@@ -89,8 +90,6 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
     const useLegacy = Boolean(args?.experimentalScreencast);
     const extension = useLegacy ? getLegacyExtension(filePath) : '.mp4';
     const resolvedPath = await context.ensureExtension(filePath, extension);
-
-    const page = request.page;
 
     let recorder: ScreenRecorder | ScreenRecording;
     try {
@@ -136,7 +135,7 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
       throw err;
     }
 
-    context.setScreenRecorder({recorder, filePath: resolvedPath});
+    page.setScreenRecorder({recorder, filePath: resolvedPath});
 
     response.appendResponseLine(
       `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast(args).name} to stop recording.`,
@@ -154,8 +153,9 @@ export const stopScreencast = definePageTool(() => ({
   schema: {},
   blockedByDialog: false,
   verifyFilesSchema: {},
-  handler: async (_request, response, context) => {
-    const data = context.getScreenRecorder();
+  handler: async (request, response) => {
+    const page = request.page;
+    const data = page.getScreenRecorder();
     if (!data) {
       response.appendResponseLine(
         'Error: no active screencast recording to stop.',
@@ -168,7 +168,7 @@ export const stopScreencast = definePageTool(() => ({
         `The screencast recording has been stopped and saved to ${data.filePath}.`,
       );
     } finally {
-      context.setScreenRecorder(null);
+      page.setScreenRecorder(null);
     }
   },
 }));

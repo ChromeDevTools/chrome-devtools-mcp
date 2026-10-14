@@ -335,8 +335,6 @@ export type Context = Readonly<{
   ): Promise<{filename: string}>;
   loadResource(path: string): Promise<string>;
 
-  getScreenRecorder(): ScreenRecorderData | null;
-  setScreenRecorder(data: ScreenRecorderData | null): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
@@ -441,6 +439,8 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  getScreenRecorder(): ScreenRecorderData | null;
+  setScreenRecorder(data: ScreenRecorderData | null): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
