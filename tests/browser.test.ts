@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
@@ -657,6 +658,99 @@ describe('browser', () => {
           0,
         ),
       );
+    });
+  });
+
+  describe('autoConnect and DevToolsActivePort errors', () => {
+    it('includes remote debugging hint when autoConnect fails without userDataDir', async () => {
+      const enoentError = Object.assign(
+        new Error(
+          "ENOENT: no such file or directory, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+        ),
+        {code: 'ENOENT'},
+      );
+      sinon
+        .stub(puppeteer, 'connect')
+        .rejects(
+          new Error(
+            'Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+            {cause: enoentError},
+          ),
+        );
+
+      const manager = new BrowserManager(
+        createMockParsedArguments({
+          autoConnect: true,
+          channel: 'stable',
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+        );
+        return true;
+      });
+    });
+
+    it('surfaces permission hint when autoConnect fails with EPERM reading DevToolsActivePort', async () => {
+      const epermError = Object.assign(
+        new Error(
+          "EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+        ),
+        {code: 'EPERM'},
+      );
+      const puppeteerError = new Error(
+        'Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+        {cause: epermError},
+      );
+      sinon.stub(puppeteer, 'connect').rejects(puppeteerError);
+
+      const manager = new BrowserManager(
+        createMockParsedArguments({
+          autoConnect: true,
+          channel: 'stable',
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.match(
+          err.message,
+          /blocked reading DevToolsActivePort|denied by file permissions/,
+        );
+        assert.strictEqual(err.cause, puppeteerError);
+        return true;
+      });
+    });
+
+    it('surfaces permission hint when reading DevToolsActivePort in userDataDir fails with EPERM', async () => {
+      const epermError = Object.assign(
+        new Error(
+          "EPERM: operation not permitted, open '/tmp/profile/DevToolsActivePort'",
+        ),
+        {code: 'EPERM'},
+      );
+      sinon.stub(fs.promises, 'readFile').rejects(epermError);
+
+      const manager = new BrowserManager(
+        createMockParsedArguments({
+          autoConnect: true,
+          userDataDir: '/tmp/profile',
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.match(
+          err.message,
+          /blocked reading DevToolsActivePort|denied by file permissions/,
+        );
+        assert.strictEqual(err.cause, epermError);
+        return true;
+      });
     });
   });
 

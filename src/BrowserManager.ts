@@ -116,6 +116,56 @@ export class BrowserManager {
     );
   }
 
+  /**
+   * On macOS 26+, TCC (`kTCCServiceSystemPolicyAppDataDetailed`) blocks
+   * processes without explicit "Google Chrome" folder access from reading
+   * `DevToolsActivePort` inside Chrome's user data directory, failing with
+   * `EPERM` or `EACCES` without showing a permission prompt. Puppeteer wraps
+   * any failure to read `DevToolsActivePort` as `Could not find
+   * DevToolsActivePort ...` with the filesystem error in `error.cause`.
+   *
+   * Detect permission failures reading `DevToolsActivePort` (both direct
+   * `fs.promises.readFile` errors when `userDataDir` is set and wrapped
+   * Puppeteer `connect()` errors when `channel` is set) and explain how to
+   * grant access.
+   */
+  static devToolsActivePortPermissionError(
+    error: unknown,
+    platform: NodeJS.Platform = os.platform(),
+  ): Error | undefined {
+    if (!(error instanceof Error)) {
+      return undefined;
+    }
+    const cause = error.cause;
+    const fsError =
+      'code' in error && typeof error.code === 'string'
+        ? error
+        : error.message.includes('DevToolsActivePort') &&
+            cause instanceof Error &&
+            'code' in cause &&
+            typeof cause.code === 'string'
+          ? cause
+          : undefined;
+    if (!fsError || (fsError.code !== 'EPERM' && fsError.code !== 'EACCES')) {
+      return undefined;
+    }
+    if (platform === 'darwin') {
+      return new Error(
+        'Could not connect to Chrome because macOS blocked reading DevToolsActivePort. ' +
+          'In System Settings > Privacy & Security > Files & Folders, grant your terminal or MCP client app access to "Google Chrome".',
+        {
+          cause: error,
+        },
+      );
+    }
+    return new Error(
+      'Could not connect to Chrome because reading DevToolsActivePort was denied by file permissions.',
+      {
+        cause: error,
+      },
+    );
+  }
+
   async ensureBrowser(): Promise<Browser> {
     if (this.#initPromise) {
       return await this.#initPromise;
@@ -359,8 +409,8 @@ export class BrowserManager {
     } else if (browserURL) {
       connectOptions.browserURL = browserURL;
     } else if (channel || userDataDir) {
+      autoConnect = true;
       if (userDataDir) {
-        autoConnect = true;
         // TODO: re-expose this logic via Puppeteer.
         const portPath = path.join(userDataDir, 'DevToolsActivePort');
         try {
@@ -385,6 +435,11 @@ export class BrowserManager {
           const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
           connectOptions.browserWSEndpoint = browserWSEndpoint;
         } catch (error) {
+          const permissionError =
+            BrowserManager.devToolsActivePortPermissionError(error);
+          if (permissionError) {
+            throw permissionError;
+          }
           throw new Error(
             `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
             {
@@ -414,6 +469,11 @@ export class BrowserManager {
       connected.once('disconnected', () => this.#evictIfCurrent(connected));
       return connected;
     } catch (err) {
+      const permissionError =
+        BrowserManager.devToolsActivePortPermissionError(err);
+      if (permissionError) {
+        throw permissionError;
+      }
       throw new Error(
         `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
         {

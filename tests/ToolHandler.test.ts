@@ -1541,4 +1541,62 @@ describe('ToolHandler', () => {
       clock.restore();
     }
   });
+
+  it('includes nested error causes in error output', async () => {
+    const tool: ToolDefinition = {
+      name: 'failing_connect_tool',
+      description: 'A tool whose getContext() fails with nested causes',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      verifyFilesSchema: {},
+      handler: async () => undefined,
+    };
+
+    const rootCause = Object.assign(
+      new Error(
+        "EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+      ),
+      {code: 'EPERM'},
+    );
+    const puppeteerError = new Error(
+      'Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+      {cause: rootCause},
+    );
+    const connectError = new Error(
+      'Could not connect to Chrome because macOS blocked reading DevToolsActivePort.',
+      {cause: puppeteerError},
+    );
+
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parse();
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => {
+        throw connectError;
+      },
+      new Mutex(),
+      sinon.spy(),
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({});
+    assert.strictEqual(result.isError, true);
+    const text =
+      result.content[0].type === 'text' ? result.content[0].text : '';
+    assert.strictEqual(
+      text,
+      [
+        'Could not connect to Chrome because macOS blocked reading DevToolsActivePort.',
+        'Cause: Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+        "Cause: EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+      ].join('\n'),
+    );
+  });
 });
