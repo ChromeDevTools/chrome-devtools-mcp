@@ -91,6 +91,34 @@ describe('emulation', () => {
       it('throws when height is missing', () => {
         assert.throws(() => viewportTransform('800'));
       });
+
+      it('parses decimal dimensions with leading whitespace', () => {
+        assert.deepStrictEqual(viewportTransform(' 800 x 600 '), {
+          width: 800,
+          height: 600,
+          deviceScaleFactor: undefined,
+          isMobile: false,
+          isLandscape: false,
+          hasTouch: false,
+        });
+      });
+
+      it('throws on an empty width part instead of treating it as zero', () => {
+        assert.throws(() => viewportTransform('x600'));
+        assert.throws(() => viewportTransform('800x'));
+      });
+
+      it('throws on hex dimensions', () => {
+        assert.throws(() => viewportTransform('0x10x0x20'));
+      });
+
+      it('throws when there are more than three dimension parts', () => {
+        assert.throws(() => viewportTransform('1280x720x2x9'));
+      });
+
+      it('throws on unknown viewport tags', () => {
+        assert.throws(() => viewportTransform('1280x720,mobile,bogus'));
+      });
     });
 
     describe('geolocationTransform', () => {
@@ -119,6 +147,22 @@ describe('emulation', () => {
 
       it('throws when longitude is missing', () => {
         assert.throws(() => geolocationTransform('48.1'));
+      });
+
+      it('throws on a trailing comma instead of treating longitude as zero', () => {
+        assert.throws(() => geolocationTransform('37.77,'));
+      });
+
+      it('throws on an empty latitude part instead of treating it as zero', () => {
+        assert.throws(() => geolocationTransform(',11.57'));
+      });
+
+      it('throws on hex coordinates', () => {
+        assert.throws(() => geolocationTransform('0x10,0x20'));
+      });
+
+      it('throws when there are extra parts', () => {
+        assert.throws(() => geolocationTransform('37.77,-122.42,9'));
       });
     });
   });

@@ -534,6 +534,19 @@ export const timeoutSchema = {
     ),
 };
 
+const DECIMAL_PATTERN = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/;
+
+function parseDecimal(
+  part: string | undefined,
+  name: string,
+  expectedFormat: string,
+): number {
+  if (part === undefined || !DECIMAL_PATTERN.test(part)) {
+    throw new Error(`Invalid ${name} "${part ?? ''}". ${expectedFormat}.`);
+  }
+  return Number(part);
+}
+
 export function viewportTransform(arg: string | undefined):
   | {
       width: number;
@@ -551,11 +564,34 @@ export function viewportTransform(arg: string | undefined):
   const isMobile = tags.includes('mobile');
   const hasTouch = tags.includes('touch');
   const isLandscape = tags.includes('landscape');
-  const [width, height, dpr] = dimensions.split('x').map(Number) as [
-    number,
-    number,
-    number | undefined,
-  ];
+  const knownTagCount =
+    (isMobile ? 1 : 0) + (hasTouch ? 1 : 0) + (isLandscape ? 1 : 0);
+  if (tags.length !== knownTagCount) {
+    throw new Error(
+      `Unknown viewport tag in "${arg}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+    );
+  }
+  const dimensionParts = dimensions.split('x');
+  if (dimensionParts.length !== 2 && dimensionParts.length !== 3) {
+    throw new Error(
+      `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+    );
+  }
+  const viewportFormat = `Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`;
+  const width = parseDecimal(
+    dimensionParts[0],
+    'viewport width',
+    viewportFormat,
+  );
+  const height = parseDecimal(
+    dimensionParts[1],
+    'viewport height',
+    viewportFormat,
+  );
+  const dpr =
+    dimensionParts.length === 3
+      ? parseDecimal(dimensionParts[2], 'devicePixelRatio', viewportFormat)
+      : undefined;
   if (!Number.isFinite(width) || width <= 0) {
     throw new Error(
       `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
@@ -587,7 +623,15 @@ export function geolocationTransform(
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  const parts = arg.split(',');
+  if (parts.length !== 2) {
+    throw new Error(
+      `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
+    );
+  }
+  const geolocationFormat = `Expected '<latitude>,<longitude>' with latitude between -90 and 90 and longitude between -180 and 180.`;
+  const latitude = parseDecimal(parts[0], 'latitude', geolocationFormat);
+  const longitude = parseDecimal(parts[1], 'longitude', geolocationFormat);
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error(
       `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
