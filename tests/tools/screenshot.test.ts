@@ -163,7 +163,50 @@ describe('screenshot', () => {
         quality: undefined,
         optimizeForSpeed: true,
       });
-      sinon.assert.notCalled(pptrPage.screenshot);
+    });
+
+    it('warns when fullPage screenshot exceeds 16384px without downscaling', async () => {
+      const {page, context, response, args} = createHandlerMocks({});
+      const pptrPage = page.pptrPage;
+      pptrPage.evaluate.resolves({
+        width: 1200,
+        height: 20000,
+        devicePixelRatio: 1,
+      });
+      pptrPage.screenshot.resolves(new Uint8Array());
+
+      await screenshot(args).handler(
+        {params: {format: 'png', fullPage: true}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledWithMatch(
+        response.appendResponseLine,
+        sinon.match(/exceed.*16384/i),
+      );
+    });
+
+    it('does not warn when fullPage screenshot is within 16384px', async () => {
+      const {page, context, response, args} = createHandlerMocks({});
+      const pptrPage = page.pptrPage;
+      pptrPage.evaluate.resolves({
+        width: 1200,
+        height: 5000,
+        devicePixelRatio: 1,
+      });
+      pptrPage.screenshot.resolves(new Uint8Array());
+
+      await screenshot(args).handler(
+        {params: {format: 'png', fullPage: true}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.neverCalledWithMatch(
+        response.appendResponseLine,
+        sinon.match(/exceed.*16384/i),
+      );
     });
   });
 
