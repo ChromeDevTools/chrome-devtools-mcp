@@ -86,7 +86,9 @@ describe('chrome-devtools', () => {
     const statusResult = await runCli(['status'], sessionId);
     assert.strictEqual(statusResult.status, 0);
     assert.ok(
-      statusResult.stdout.includes('--no-headless'),
+      statusResult.stdout.includes(
+        JSON.stringify(['--viaCli', '--headless=false']),
+      ),
       `headless=false was not forwarded: ${statusResult.stdout}`,
     );
   });
@@ -107,8 +109,9 @@ describe('chrome-devtools', () => {
     const statusResult = await runCli(['status'], sessionId);
     assert.strictEqual(statusResult.status, 0);
     assert.ok(
-      statusResult.stdout.includes('--filesystem-root=') &&
-        statusResult.stdout.includes(path.basename(workspace.path)),
+      statusResult.stdout.includes(
+        JSON.stringify(['--viaCli', '--workspace', workspace.path]),
+      ),
       `workspace was not forwarded: ${statusResult.stdout}`,
     );
   });
@@ -136,11 +139,13 @@ describe('chrome-devtools', () => {
 
     const statusResult = await runCli(['status'], sessionId);
     assert.strictEqual(statusResult.status, 0);
+    // `start` forwards the arguments to the daemon as typed; the daemon runs
+    // in the same cwd, so a relative config path resolves identically.
     assert.ok(
       statusResult.stdout.includes(
-        JSON.stringify(`--config=${configFile.path}`),
+        JSON.stringify(['--viaCli', '--config', relativeConfigPath]),
       ),
-      `resolved config path was not forwarded: ${statusResult.stdout}`,
+      `config path was not forwarded: ${statusResult.stdout}`,
     );
     assert.ok(
       !statusResult.stdout.includes('--headless'),

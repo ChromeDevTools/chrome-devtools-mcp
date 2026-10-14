@@ -9,7 +9,6 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import type {YargsOptions} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 
 export const DAEMON_SCRIPT_PATH = path.join(import.meta.dirname, 'daemon.js');
@@ -105,39 +104,4 @@ export function isDaemonRunning(sessionId: string): boolean {
     }
   }
   return false;
-}
-
-export function serializeArgs(
-  options: Record<string, YargsOptions>,
-  argv: Record<string, unknown>,
-): string[] {
-  const args: string[] = [];
-  for (const key of Object.keys(options)) {
-    if (argv[key] === undefined || argv[key] === null) {
-      continue;
-    }
-    const value = argv[key];
-    const option = options[key];
-    // Yargs reuses the option `default` object; skip it so the daemon parser
-    // still sees the original default (needed for filesystemRoot identity).
-    if (option !== undefined && value === option.default) {
-      continue;
-    }
-    const kebabKey = key.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`);
-
-    if (typeof value === 'boolean') {
-      if (value) {
-        args.push(`--${kebabKey}`);
-      } else {
-        args.push(`--no-${kebabKey}`);
-      }
-    } else if (Array.isArray(value)) {
-      for (const item of value) {
-        args.push(`--${kebabKey}=${String(item)}`);
-      }
-    } else {
-      args.push(`--${kebabKey}=${String(value)}`);
-    }
-  }
-  return args;
 }

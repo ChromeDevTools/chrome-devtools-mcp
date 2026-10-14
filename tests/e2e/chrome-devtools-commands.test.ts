@@ -227,22 +227,27 @@ describe('chrome-devtools', () => {
     );
 
     const initScriptResult = await runCli(
-      [
-        'navigate_page',
-        '1',
-        '--initScript',
-        'alert(1)',
-        '--timeout',
-        'invalid',
-      ],
+      ['navigate_page', '1', '--initScript', 'alert(1)'],
       sessionId,
     );
     assert.strictEqual(initScriptResult.status, 0);
     assert(
       initScriptResult.stdout.includes(
-        'Input validation error: Invalid arguments for tool navigate_page: timeout: Invalid input: expected number, received null, Unrecognized key: "initScript"',
+        'Input validation error: Invalid arguments for tool navigate_page: Unrecognized key: "initScript"',
       ),
       'error message is unexpected: ' + initScriptResult.stdout,
+    );
+
+    const invalidTimeoutResult = await runCli(
+      ['navigate_page', '1', '--timeout', 'invalid'],
+      sessionId,
+    );
+    assert.strictEqual(invalidTimeoutResult.status, 1);
+    assert(
+      invalidTimeoutResult.stderr.includes(
+        'Invalid value for timeout: expected a number, got "invalid"',
+      ),
+      'error message is unexpected: ' + invalidTimeoutResult.stderr,
     );
   });
 

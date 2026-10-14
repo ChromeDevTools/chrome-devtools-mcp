@@ -53,7 +53,11 @@ chrome-devtools <tool> [arguments] [flags]
 ```
 
 - **Required Arguments**: Passed as positional arguments. Page-scoped tools require `<pageId>` as their first positional argument.
-- **Optional Arguments**: Passed as flags (e.g., `--filePath`, `--fullPage`).
+- **Optional Arguments**: Passed as flags (e.g., `--filePath`, `--fullPage`). Use the camelCase names shown in `chrome-devtools <tool> --help`.
+  - Boolean flags accept `--fullPage`, `--fullPage true`, `--fullPage=false` and `--no-fullPage`.
+  - List flags are repeated for each value: `--types error --types info`.
+  - Values are validated against the tool schema (numbers, allowed choices).
+- **Values starting with `-`**: Put positional values that start with a dash after `--`, for example `chrome-devtools fill 1 "uid" -- "-5"`. Flag values work either way (`--value=-5`).
 
 ### Examples
 
@@ -125,5 +129,9 @@ chrome-devtools list_pages
 Implemented in `scripts/generate-cli.ts`. Some commands are excluded from CLI
 generation such as `wait_for` and `fill_form`.
 
-`chrome-devtools-mcp` args are also filtered in `src/bin/chrome-devtools.ts`
-because not all args make sense in a CLI interface.
+The CLI parses its own arguments with Node's built-in `util.parseArgs` (see
+`src/cli/`). `chrome-devtools start` forwards its arguments unchanged to the
+`chrome-devtools-mcp` daemon, which parses them like the MCP server does. The
+CLI validates them first, limited to the options returned by `getCliOptions()`
+in `src/config/mcp-options.ts`, because not all args make sense in a CLI
+interface.

@@ -14,8 +14,6 @@ import {
   mcpOptions,
   DEFAULT_FILESYSTEM_ROOT,
 } from '../src/config/mcp-options.js';
-import {buildCommand} from '../src/config/cli-commands.js';
-import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
 import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 
@@ -1242,79 +1240,6 @@ describe('cli args parsing', () => {
       assert.strictEqual(args.experimentalToonFormat, true);
       assert.strictEqual(args.experimentalDataFormat, undefined);
     });
-  });
-});
-
-describe('cli command strings', () => {
-  const dummyArgsVariadic = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    arrArg: {name: 'arrArg', type: 'array', description: '', required: true},
-  };
-
-  const dummyArgsPlain = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    arg2: {name: 'arg2', type: 'string', description: '', required: true},
-  };
-
-  const dummyArgsOptional = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    optArg: {name: 'optArg', type: 'boolean', description: '', required: false},
-  };
-
-  it('renders a required array arg as a variadic positional', () => {
-    const {command} = buildCommand('dummy_cmd', dummyArgsVariadic);
-    assert.strictEqual(command, 'dummy_cmd <arg1> <arrArg..>');
-  });
-
-  it('renders required non-array args as plain positionals', () => {
-    const {command} = buildCommand('dummy_cmd', dummyArgsPlain);
-    assert.strictEqual(command, 'dummy_cmd <arg1> <arg2>');
-  });
-
-  it('keeps evaluate_script function as an optional positional', () => {
-    const {command, usage} = buildCommand(
-      'evaluate_script',
-      commands['evaluate_script'].args,
-    );
-    assert.strictEqual(command, 'evaluate_script [function]');
-    assert.ok(!usage.includes('[--function]'));
-    assert.ok(usage.includes('[--sourcePath]'));
-  });
-
-  it('lists optional args in the usage line, not the command', () => {
-    const {command, usage} = buildCommand('dummy_cmd', dummyArgsOptional);
-    assert.ok(!command.includes('--'));
-    assert.ok(usage.startsWith(`$0 ${command} `));
-    assert.ok(usage.includes('[--optArg]'));
-  });
-
-  it('keeps every generated command parsable by yargs', () => {
-    for (const [name, {args}] of Object.entries(commands)) {
-      const {command} = buildCommand(name, args);
-
-      // A `[--flag]` token in the command string is parsed as a positional.
-      assert.ok(
-        !command.includes('--'),
-        `${name}: optional args must not be in the command string`,
-      );
-
-      // yargs only allows a variadic positional as the last one.
-      const variadic = command.indexOf('..>');
-      assert.ok(
-        variadic === -1 || variadic === command.length - 3,
-        `${name}: a variadic positional must be last`,
-      );
-
-      // A required array arg the daemon receives as a string fails validation.
-      for (const [argName, arg] of Object.entries(args)) {
-        if (arg.required && arg.type === 'array') {
-          assert.ok(
-            command.includes(`<${argName}..>`),
-            `${name}: required array arg ${argName} must be variadic`,
-          );
-        }
-      }
-    }
   });
 });
 
