@@ -7,6 +7,8 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
+import {Client} from '@modelcontextprotocol/client';
+import {InMemoryTransport} from '@modelcontextprotocol/server';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
@@ -106,6 +108,38 @@ describe('McpServer', () => {
       assert.deepStrictEqual(result.content, [
         {type: 'text', text: 'Tool list_pages not found'},
       ]);
+    });
+  });
+
+  describe('connect', () => {
+    it('closes the browser when an MCP client closes the transport', async () => {
+      const {server, browserManager} = await createTestServer();
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+
+      await server.connect(serverTransport);
+      const client = new Client(
+        {name: 'test-client', version: '1.0.0'},
+        {capabilities: {}},
+      );
+      await client.connect(clientTransport);
+
+      sinon.assert.notCalled(browserManager.close);
+      await client.close();
+
+      sinon.assert.calledOnce(browserManager.close);
+    });
+
+    it('closes the browser when the transport closes directly', async () => {
+      const {server, browserManager} = await createTestServer();
+      const [, serverTransport] = InMemoryTransport.createLinkedPair();
+
+      await server.connect(serverTransport);
+
+      sinon.assert.notCalled(browserManager.close);
+      await serverTransport.close();
+
+      sinon.assert.calledOnce(browserManager.close);
     });
   });
 });
