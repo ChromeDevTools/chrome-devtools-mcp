@@ -1155,7 +1155,9 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     if (data.traceSummary) {
-      const summary = getTraceSummary(data.traceSummary, this.#deviceScope);
+      const summary = getTraceSummary(data.traceSummary, this.#deviceScope, {
+        cruxEnabled: context.isCruxEnabled(),
+      });
       response.push(summary);
       structuredContent.traceSummary = summary;
       structuredContent.traceInsights = [];
