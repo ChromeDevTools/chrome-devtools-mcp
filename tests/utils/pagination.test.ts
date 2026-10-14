@@ -10,9 +10,9 @@ import {describe, it} from 'node:test';
 import {paginate} from '../../src/utils/pagination.js';
 
 describe('paginate', () => {
-  it('returns all items when pageSize is omitted with pageIdx: 0', () => {
+  it('returns all items when no pagination options are provided', () => {
     const items = Array.from({length: 25}, (_, i) => `item-${i}`);
-    const result = paginate(items, {pageIdx: 0});
+    const result = paginate(items);
     assert.strictEqual(result.items.length, 25);
     assert.strictEqual(result.currentPage, 0);
     assert.strictEqual(result.totalPages, 1);
@@ -21,13 +21,16 @@ describe('paginate', () => {
     assert.strictEqual(result.invalidPage, false);
   });
 
-  it('marks page invalid and returns all items on first page when pageIdx > 0 and pageSize is omitted', () => {
+  it('uses default page size of 20 when pageIdx is provided without pageSize', () => {
     const items = Array.from({length: 25}, (_, i) => `item-${i}`);
     const result = paginate(items, {pageIdx: 1});
-    assert.strictEqual(result.items.length, 25);
-    assert.strictEqual(result.currentPage, 0);
-    assert.strictEqual(result.totalPages, 1);
-    assert.strictEqual(result.invalidPage, true);
+    assert.strictEqual(result.items.length, 5);
+    assert.strictEqual(result.items[0], 'item-20');
+    assert.strictEqual(result.currentPage, 1);
+    assert.strictEqual(result.totalPages, 2);
+    assert.strictEqual(result.hasNextPage, false);
+    assert.strictEqual(result.hasPreviousPage, true);
+    assert.strictEqual(result.invalidPage, false);
   });
 
   it('paginates normally when pageSize is provided', () => {

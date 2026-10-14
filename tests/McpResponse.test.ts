@@ -15,7 +15,11 @@ import type {ParsedArguments} from '../src/config/ConfigParser.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools, type Extension} from '../src/third_party/index.js';
+import {
+  DevTools,
+  type ConsoleMessage,
+  type Extension,
+} from '../src/third_party/index.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
 import {stableIdSymbol} from '../src/utils/id.js';
@@ -747,6 +751,28 @@ describe('McpResponse network pagination', () => {
       );
       context.getSelectedMcpPage().getNetworkRequests = () => requests;
       response.setIncludeNetworkRequests(true, {pageIdx: 0});
+      const {content} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('Showing 1-30 of 30 (Page 1 of 1).'));
+      assert.ok(!text.includes('Next page:'));
+      assert.ok(!text.includes('Previous page:'));
+    });
+  });
+
+  it('returns all console messages when pageIdx is 0 without pageSize', async () => {
+    await withMcpContext(async (response, context) => {
+      const messages = Array.from(
+        {length: 30},
+        (_, idx) =>
+          ({
+            type: () => 'log',
+            text: () => `msg-${idx}`,
+            args: () => [],
+            location: () => ({}),
+          }) as unknown as ConsoleMessage,
+      );
+      context.getSelectedMcpPage().getConsoleData = () => messages;
+      response.setIncludeConsoleData(true, {pageIdx: 0});
       const {content} = await response.handle(context);
       const text = getTextContent(content[0]);
       assert.ok(text.includes('Showing 1-30 of 30 (Page 1 of 1).'));

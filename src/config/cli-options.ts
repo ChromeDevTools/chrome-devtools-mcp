@@ -1115,7 +1115,7 @@ export const commands: Commands = {
         name: 'pageIdx',
         type: 'integer',
         description:
-          'Page number to return (0-based). When omitted, returns the first page.',
+          'Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.',
         required: false,
       },
       types: {
@@ -1178,7 +1178,7 @@ export const commands: Commands = {
         name: 'pageIdx',
         type: 'integer',
         description:
-          'Page number to return (0-based). When omitted, returns the first page.',
+          'Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.',
         required: false,
       },
       resourceTypes: {

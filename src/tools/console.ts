@@ -64,7 +64,7 @@ export const listConsoleMessages = definePageTool(
           .min(0)
           .optional()
           .describe(
-            'Page number to return (0-based). When omitted, returns the first page.',
+            'Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.',
           ),
         types: zod
           .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
