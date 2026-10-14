@@ -708,6 +708,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
