@@ -100,11 +100,7 @@ export const evaluate = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    try {
-      const result = await page.pptrPage.evaluate(request.params.script);
-      response.appendResponseLine(JSON.stringify(result));
-    } catch (err) {
-      response.appendResponseLine(String(err.message));
-    }
+    const result = await page.pptrPage.evaluate(request.params.script);
+    response.appendResponseLine(JSON.stringify(result));
   },
 }));
