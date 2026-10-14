@@ -13,7 +13,7 @@ import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
 import type {
   HeapSnapshotManager,
   HeapSnapshotAggregateData,
-  HeapSnapshotClassDiff,
+  HeapSnapshotDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
@@ -993,7 +993,7 @@ export class McpContext implements Context {
   async getHeapSnapshotClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]> {
+  ): Promise<HeapSnapshotDiff> {
     return await this.#heapSnapshotManager.getClassDiffs(
       baseFilePath,
       currentFilePath,

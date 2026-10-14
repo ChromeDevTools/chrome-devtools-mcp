@@ -227,6 +227,20 @@ export const commands: Commands = {
         required: false,
         positional: false,
       },
+      pageIdx: {
+        name: 'pageIdx',
+        type: 'integer',
+        description: 'The page index for pagination.',
+        required: false,
+        positional: false,
+      },
+      pageSize: {
+        name: 'pageSize',
+        type: 'integer',
+        description: 'The page size for pagination.',
+        required: false,
+        positional: false,
+      },
     },
   },
   drag: {

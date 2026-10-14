@@ -46,6 +46,32 @@ describe('HeapSnapshotManager', () => {
     sinon.assert.calledOnce(disposeSpy);
   });
 
+  it('assigns class diff indices that resolve to the same detailed diff', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePathA = 'tests/fixtures/heap-1.heapsnapshot';
+      const filePathB = 'tests/fixtures/heap-2.heapsnapshot';
+
+      const {classDiffs} = await manager.getClassDiffs(filePathA, filePathB);
+      assert.deepStrictEqual(
+        classDiffs.map(diff => diff.index),
+        classDiffs.map((_, position) => position),
+      );
+
+      const lastDiff = classDiffs.at(-1);
+      assert.ok(lastDiff);
+      const detailedDiff = await manager.getDetailedClassDiff(
+        filePathA,
+        filePathB,
+        lastDiff.index,
+      );
+      assert.strictEqual(detailedDiff.index, lastDiff.index);
+      assert.strictEqual(detailedDiff.className, lastDiff.className);
+    } finally {
+      manager.dispose();
+    }
+  });
+
   // Verifies that the caching mechanism in HeapSnapshotManager correctly
   // distinguishes comparisons when the same "current" snapshot is compared
   // against different "base" snapshots. If the cache key (diffCacheKey) is
@@ -60,10 +86,10 @@ describe('HeapSnapshotManager', () => {
 
       const firstDiff = await manager.getClassDiffs(filePathA, filePathC);
       const secondDiff = await manager.getClassDiffs(filePathB, filePathC);
-      const firstNewObjectDiff = firstDiff.find(
+      const firstNewObjectDiff = firstDiff.classDiffs.find(
         entry => entry.className === 'NewObject',
       );
-      const secondNewObjectDiff = secondDiff.find(
+      const secondNewObjectDiff = secondDiff.classDiffs.find(
         entry => entry.className === 'NewObject',
       );
       assert.ok(firstNewObjectDiff);
