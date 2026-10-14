@@ -8,6 +8,7 @@ import {isUtf8} from 'node:buffer';
 
 import {
   DevTools,
+  type CDPSession,
   type HTTPRequest,
   type HTTPResponse,
 } from '../third_party/index.js';
@@ -76,13 +77,7 @@ export class NetworkFormatter {
   async #loadDetailedData(): Promise<void> {
     // Load Request Body
     if (this.#request.hasPostData()) {
-      let data;
-      try {
-        data =
-          this.#request.postData() ?? (await this.#request.fetchPostData());
-      } catch {
-        // Ignore parsing errors
-      }
+      const data = await this.#getRequestBodyBytes();
       const requestBodyNotAvailableMessage =
         '<Request body not available anymore>';
       if (this.#options.requestFilePath) {
@@ -91,9 +86,9 @@ export class NetworkFormatter {
             'Unable to save the request body to a file: no saveFile callback was configured.',
           );
         }
-        if (data) {
+        if (data?.length) {
           const result = await this.#options.saveFile(
-            Buffer.from(data),
+            data,
             this.#options.requestFilePath,
             '.network-request',
           );
@@ -101,10 +96,15 @@ export class NetworkFormatter {
         } else {
           this.#requestBody = requestBodyNotAvailableMessage;
         }
-      } else if (data) {
-        this.#requestBody = getSizeLimitedString(data, BODY_CONTEXT_SIZE_LIMIT);
-      } else {
+      } else if (!data?.length) {
         this.#requestBody = requestBodyNotAvailableMessage;
+      } else if (isUtf8(data)) {
+        this.#requestBody = getSizeLimitedString(
+          data.toString('utf-8'),
+          BODY_CONTEXT_SIZE_LIMIT,
+        );
+      } else {
+        this.#requestBody = '<binary data>';
       }
     }
 
@@ -209,6 +209,38 @@ export class NetworkFormatter {
         ? formattedRedirectChain
         : undefined,
     };
+  }
+
+  /**
+   * Returns the exact bytes of the request body. Puppeteer's `postData()` and
+   * `fetchPostData()` decode the body as UTF-8, which replaces every invalid
+   * byte with U+FFFD, so ask CDP for the body first: it reports binary bodies
+   * as base64. Fall back to Puppeteer's string when CDP cannot provide it.
+   */
+  async #getRequestBodyBytes(): Promise<Buffer | undefined> {
+    // `client` and `id` are Puppeteer internals of CdpHTTPRequest.
+    const {client, id} = this.#request as unknown as {
+      client?: CDPSession;
+      id?: string;
+    };
+    if (client && id) {
+      try {
+        const {postData, base64Encoded} = await client.send(
+          'Network.getRequestPostData',
+          {requestId: id},
+        );
+        return Buffer.from(postData, base64Encoded ? 'base64' : 'utf-8');
+      } catch {
+        // The body is no longer available from CDP; try Puppeteer's copy.
+      }
+    }
+    try {
+      const text =
+        this.#request.postData() ?? (await this.#request.fetchPostData());
+      return text === undefined ? undefined : Buffer.from(text, 'utf-8');
+    } catch {
+      return undefined;
+    }
   }
 
   #getStatusFromRequest(request: HTTPRequest): string {

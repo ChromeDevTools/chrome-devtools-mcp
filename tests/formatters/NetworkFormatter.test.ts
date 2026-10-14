@@ -11,7 +11,13 @@ import {describe, it} from 'node:test';
 
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
 import type {HTTPRequest} from '../../src/third_party/index.js';
-import {createTempDir, getMockRequest, getMockResponse} from '../utils.js';
+import {serverHooks} from '../server.js';
+import {
+  createTempDir,
+  getMockRequest,
+  getMockResponse,
+  withBrowser,
+} from '../utils.js';
 
 describe('NetworkFormatter', () => {
   describe('toString', () => {
@@ -606,6 +612,179 @@ describe('NetworkFormatter', () => {
       assert.strictEqual(result.responseBodyFilePath, resPath);
       assert.strictEqual(result.requestBody, undefined);
       assert.strictEqual(result.responseBody, undefined);
+    });
+  });
+
+  describe('request body bytes', () => {
+    const server = serverHooks();
+    const BINARY_BODY = [0x00, 0xff, 0x80, 0x0a, 0xc8, 0x01];
+
+    async function captureUpload(
+      body: string,
+      contentType: string,
+    ): Promise<{
+      received: Buffer;
+      saved?: Buffer;
+      savedTo?: string;
+      inlineBody?: string;
+    }> {
+      let received = Buffer.alloc(0);
+      let saved: Buffer | undefined;
+      let savedTo: string | undefined;
+      let inlineBody: string | undefined;
+      server.addHtmlRoute('/index.html', '<title>upload</title>');
+      server.addRoute('/upload', (req, res) => {
+        const chunks: Buffer[] = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => {
+          received = Buffer.concat(chunks);
+          res.writeHead(200, {'Content-Type': 'text/plain'});
+          res.end('ok');
+        });
+      });
+      let request: HTTPRequest | undefined;
+      await withBrowser(async (_browser, page) => {
+        page.on('request', r => {
+          if (r.url().endsWith('/upload')) {
+            request = r;
+          }
+        });
+        await page.goto(server.getRoute('/index.html'));
+        await page.evaluate(
+          async (url, bodyExpression, type) => {
+            const payload = new Function(`return ${bodyExpression}`)();
+            await fetch(url, {
+              method: 'POST',
+              headers: {'content-type': type},
+              body: payload,
+            });
+          },
+          server.getRoute('/upload'),
+          body,
+          contentType,
+        );
+        assert.ok(request, 'the upload request was not observed');
+        // Format while the page (and its CDP session) is still alive.
+        const captured = await NetworkFormatter.from(request, {
+          requestId: 1,
+          fetchData: true,
+          requestFilePath: '/upload',
+          saveFile: async data => {
+            saved = Buffer.from(data);
+            return {filename: '/upload.network-request'};
+          },
+          redactNetworkHeaders: false,
+        });
+        const inline = await NetworkFormatter.from(request, {
+          requestId: 1,
+          fetchData: true,
+          redactNetworkHeaders: false,
+        });
+        savedTo = captured.toJSONDetailed().requestBodyFilePath;
+        inlineBody = inline.toJSONDetailed().requestBody;
+      });
+      return {received, saved, savedTo, inlineBody};
+    }
+
+    it('saves a binary request body byte for byte', async () => {
+      const {received, saved, savedTo, inlineBody} = await captureUpload(
+        `new Uint8Array(${JSON.stringify(BINARY_BODY)})`,
+        'application/octet-stream',
+      );
+      assert.deepStrictEqual([...received], BINARY_BODY);
+      assert.ok(saved);
+      assert.deepStrictEqual([...saved], BINARY_BODY);
+      assert.strictEqual(savedTo, '/upload.network-request');
+      assert.strictEqual(inlineBody, '<binary data>');
+    });
+
+    it('still saves and shows a text request body unchanged', async () => {
+      const text = '{"user":"u","name":"é中"}';
+      const {received, saved, inlineBody} = await captureUpload(
+        JSON.stringify(text),
+        'application/json',
+      );
+      assert.strictEqual(received.toString('utf-8'), text);
+      assert.ok(saved);
+      assert.strictEqual(saved.toString('utf-8'), text);
+      assert.strictEqual(inlineBody, text);
+    });
+  });
+
+  describe('request body fallback', () => {
+    it('falls back to postData() when no CDP session is attached', async () => {
+      let saved: Buffer | undefined;
+      const request = getMockRequest({
+        method: 'POST',
+        hasPostData: true,
+        postData: '{"a":1}',
+      });
+      await NetworkFormatter.from(request, {
+        requestId: 1,
+        fetchData: true,
+        requestFilePath: '/req',
+        saveFile: async data => {
+          saved = Buffer.from(data);
+          return {filename: '/req.network-request'};
+        },
+        redactNetworkHeaders: false,
+      });
+      assert.strictEqual(saved?.toString('utf-8'), '{"a":1}');
+    });
+
+    it('decodes a base64 body returned by Network.getRequestPostData', async () => {
+      let saved: Buffer | undefined;
+      const sent: unknown[] = [];
+      const request = Object.assign(
+        getMockRequest({method: 'POST', hasPostData: true, postData: '\ufffd'}),
+        {
+          id: 'cdp-1',
+          client: {
+            send: async (method: string, params: unknown) => {
+              sent.push([method, params]);
+              return {postData: 'AP+ACsgB', base64Encoded: true};
+            },
+          },
+        },
+      );
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        fetchData: true,
+        requestFilePath: '/req',
+        saveFile: async data => {
+          saved = Buffer.from(data);
+          return {filename: '/req.network-request'};
+        },
+        redactNetworkHeaders: false,
+      });
+      assert.deepStrictEqual(sent, [
+        ['Network.getRequestPostData', {requestId: 'cdp-1'}],
+      ]);
+      assert.deepStrictEqual([...(saved ?? [])], [0, 255, 128, 10, 200, 1]);
+      assert.strictEqual(
+        formatter.toJSONDetailed().requestBodyFilePath,
+        '/req.network-request',
+      );
+    });
+
+    it('falls back to postData() when CDP no longer has the body', async () => {
+      const request = Object.assign(
+        getMockRequest({method: 'POST', hasPostData: true, postData: 'a=b'}),
+        {
+          id: 'cdp-2',
+          client: {
+            send: async () => {
+              throw new Error('No post data available for the request');
+            },
+          },
+        },
+      );
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        fetchData: true,
+        redactNetworkHeaders: false,
+      });
+      assert.strictEqual(formatter.toJSONDetailed().requestBody, 'a=b');
     });
   });
 });
