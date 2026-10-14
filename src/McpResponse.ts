@@ -283,8 +283,21 @@ export class McpResponse implements Response {
     };
   }
 
-  setError(error: Error): void {
-    this.#error = error;
+  setError(error: unknown): void {
+    if (error instanceof Error) {
+      this.#error = error;
+      return;
+    }
+    let message: string;
+    try {
+      message =
+        typeof error === 'object' && error !== null
+          ? JSON.stringify(error)
+          : String(error);
+    } catch {
+      message = String(error);
+    }
+    this.#error = new Error(message);
   }
 
   attachNetworkRequest(
