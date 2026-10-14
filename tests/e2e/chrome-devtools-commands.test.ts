@@ -161,43 +161,50 @@ describe('chrome-devtools', () => {
     }
   });
 
-  it('passes positional text values starting with a hyphen', async () => {
-    const startResult = await runCli(['start'], sessionId);
-    assert.strictEqual(
-      startResult.status,
-      0,
-      `start command failed: ${startResult.stderr}`,
-    );
+  describe('positional values starting with a hyphen', () => {
+    async function startDaemon(): Promise<void> {
+      const startResult = await runCli(['start'], sessionId);
+      assert.strictEqual(
+        startResult.status,
+        0,
+        `start command failed: ${startResult.stderr}`,
+      );
+    }
 
-    const navigateResult = await runCli(
-      [
-        'navigate_page',
-        '1',
-        '--url',
-        'data:text/html,<textarea id="t">x</textarea>',
-      ],
-      sessionId,
-    );
-    assert.strictEqual(
-      navigateResult.status,
-      0,
-      `navigate_page command failed: ${navigateResult.stderr}`,
-    );
+    /** Starts the daemon, opens a page with a textarea and returns its uid. */
+    async function startWithTextarea(): Promise<string> {
+      await startDaemon();
 
-    const snapshotResult = await runCli(['take_snapshot', '1'], sessionId);
-    assert.strictEqual(
-      snapshotResult.status,
-      0,
-      `take_snapshot command failed: ${snapshotResult.stderr}`,
-    );
-    const uidMatch = snapshotResult.stdout.match(/uid=(\S+) textbox/);
-    assert.ok(
-      uidMatch,
-      'textarea uid not found in snapshot: ' + snapshotResult.stdout,
-    );
-    const uid = uidMatch[1];
+      const navigateResult = await runCli(
+        [
+          'navigate_page',
+          '1',
+          '--url',
+          'data:text/html,<textarea id="t">x</textarea>',
+        ],
+        sessionId,
+      );
+      assert.strictEqual(
+        navigateResult.status,
+        0,
+        `navigate_page command failed: ${navigateResult.stderr}`,
+      );
 
-    async function readValue(): Promise<string> {
+      const snapshotResult = await runCli(['take_snapshot', '1'], sessionId);
+      assert.strictEqual(
+        snapshotResult.status,
+        0,
+        `take_snapshot command failed: ${snapshotResult.stderr}`,
+      );
+      const uidMatch = snapshotResult.stdout.match(/uid=(\S+) textbox/);
+      assert.ok(
+        uidMatch,
+        'textarea uid not found in snapshot: ' + snapshotResult.stdout,
+      );
+      return uidMatch[1];
+    }
+
+    async function readTextareaValue(): Promise<string> {
       const result = await runCli(
         [
           'evaluate_script',
@@ -217,51 +224,64 @@ describe('chrome-devtools', () => {
       return JSON.parse(`"${match[1]}"`);
     }
 
-    const cases: Array<{args: string[]; expected: string}> = [
-      {args: ['fill', '1', uid, '-'], expected: '-'},
-      {args: ['fill', '1', uid, '-5'], expected: '-5'},
-      {args: ['fill', '1', uid, 'a-b'], expected: 'a-b'},
-      {args: ['fill', '1', uid, '--weird'], expected: '--weird'},
-      {args: ['fill', '1', uid, '- item'], expected: '- item'},
-      {args: ['fill', '1', uid, '-abc'], expected: '-abc'},
-      {args: ['fill', '1', uid, '--', '--weird'], expected: '--weird'},
+    const fillCases: Array<{value: string[]; expected: string}> = [
+      {value: ['-'], expected: '-'},
+      {value: ['-5'], expected: '-5'},
+      {value: ['a-b'], expected: 'a-b'},
+      {value: ['--weird'], expected: '--weird'},
+      {value: ['- item'], expected: '- item'},
+      {value: ['-abc'], expected: '-abc'},
+      {value: ['--', '--weird'], expected: '--weird'},
     ];
-    for (const {args, expected} of cases) {
-      const result = await runCli(args, sessionId);
+    for (const {value, expected} of fillCases) {
+      it(`fill passes ${JSON.stringify(value.join(' '))} through`, async () => {
+        const uid = await startWithTextarea();
+
+        const args = ['fill', '1', uid, ...value];
+        const result = await runCli(args, sessionId);
+        assert.strictEqual(
+          result.status,
+          0,
+          `${args.join(' ')} failed: ${result.stderr}`,
+        );
+        assert.strictEqual(await readTextareaValue(), expected);
+      });
+    }
+
+    it('type_text passes a lone hyphen through', async () => {
+      await startDaemon();
+
+      const result = await runCli(['type_text', '1', '-'], sessionId);
       assert.strictEqual(
         result.status,
         0,
-        `${args.join(' ')} failed: ${result.stderr}`,
+        `type_text command failed: ${result.stderr}`,
       );
+      assert.match(result.stdout, /Typed text "-"/);
+    });
+
+    it('press_key passes a lone hyphen through', async () => {
+      await startDaemon();
+
+      const result = await runCli(['press_key', '1', '-'], sessionId);
       assert.strictEqual(
-        await readValue(),
-        expected,
-        `unexpected value after: ${args.join(' ')}`,
+        result.status,
+        0,
+        `press_key command failed: ${result.stderr}`,
       );
-    }
+      assert.match(result.stdout, /Successfully pressed key: -/);
+    });
 
-    const typeTextResult = await runCli(['type_text', '1', '-'], sessionId);
-    assert.strictEqual(
-      typeTextResult.status,
-      0,
-      `type_text command failed: ${typeTextResult.stderr}`,
-    );
-    assert.match(typeTextResult.stdout, /Typed text "-"/);
+    it('rejects unknown flags that are not preceded by --', async () => {
+      await startDaemon();
 
-    const pressKeyResult = await runCli(['press_key', '1', '-'], sessionId);
-    assert.strictEqual(
-      pressKeyResult.status,
-      0,
-      `press_key command failed: ${pressKeyResult.stderr}`,
-    );
-    assert.match(pressKeyResult.stdout, /Successfully pressed key: -/);
-
-    const unknownFlagResult = await runCli(
-      ['fill', '1', uid, 'x', '--pageid', '2'],
-      sessionId,
-    );
-    assert.strictEqual(unknownFlagResult.status, 1);
-    assert.match(unknownFlagResult.stderr, /Unknown arguments?: .*pageid/);
+      const result = await runCli(
+        ['fill', '1', 'x', 'x', '--pageid', '2'],
+        sessionId,
+      );
+      assert.strictEqual(result.status, 1);
+      assert.match(result.stderr, /Unknown arguments?: .*pageid/);
+    });
   });
 
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {
