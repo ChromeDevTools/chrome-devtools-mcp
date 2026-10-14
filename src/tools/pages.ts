@@ -352,6 +352,35 @@ export const resizePage = definePageTool(() => ({
       contentHeight: request.params.height,
     });
 
+    try {
+      const browser = page.pptrPage.browser();
+      const windowId = await page.pptrPage.windowId();
+      const newBounds = await browser.getWindowBounds(windowId);
+      if (
+        newBounds.width !== undefined &&
+        newBounds.width !== request.params.width
+      ) {
+        throw new Error(
+          `Could not resize page to ${request.params.width}x${request.params.height}. Resulting width is ${newBounds.width}.`,
+        );
+      }
+      if (
+        newBounds.height !== undefined &&
+        newBounds.height < request.params.height
+      ) {
+        throw new Error(
+          `Could not resize page to ${request.params.width}x${request.params.height}. Resulting height is ${newBounds.height}.`,
+        );
+      }
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.startsWith('Could not resize page')
+      ) {
+        throw err;
+      }
+    }
+
     response.setIncludePages(true);
   },
 }));

@@ -1403,6 +1403,22 @@ describe('pages', () => {
       });
     });
 
+    it('throws when Chrome clamps dimensions', async () => {
+      await withMcpContext(async (response, context, args) => {
+        await assert.rejects(
+          resizePage(args).handler(
+            {
+              params: {width: 100, height: 100},
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          /Could not resize page to 100x100/,
+        );
+      });
+    });
+
     it('resize when window state is normal', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
