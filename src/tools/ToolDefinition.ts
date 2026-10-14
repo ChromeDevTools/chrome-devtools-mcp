@@ -542,8 +542,17 @@ export const timeoutSchema = {
     ),
 };
 
-const DECIMAL = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)\s*$/;
+const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
 const VALID_VIEWPORT_TAGS = new Set(['mobile', 'touch', 'landscape']);
+
+function parseDecimal(part: string | undefined, name: string): number {
+  if (part === undefined || !DECIMAL.test(part)) {
+    throw new Error(
+      `Invalid ${name} "${part ?? ''}". Expected a decimal number.`,
+    );
+  }
+  return Number(part);
+}
 
 export function viewportTransform(arg: string | undefined):
   | {
@@ -575,23 +584,13 @@ export function viewportTransform(arg: string | undefined):
       `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
     );
   }
-  if (!DECIMAL.test(dimParts[0])) {
-    throw new Error(
-      `Invalid viewport width "${dimParts[0]}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
-    );
-  }
-  const width = Number(dimParts[0]);
+  const width = parseDecimal(dimParts[0], 'viewport width');
   if (!Number.isFinite(width) || width <= 0) {
     throw new Error(
       `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
     );
   }
-  if (!DECIMAL.test(dimParts[1])) {
-    throw new Error(
-      `Invalid viewport height "${dimParts[1]}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
-    );
-  }
-  const height = Number(dimParts[1]);
+  const height = parseDecimal(dimParts[1], 'viewport height');
   if (!Number.isFinite(height) || height <= 0) {
     throw new Error(
       `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
@@ -599,12 +598,7 @@ export function viewportTransform(arg: string | undefined):
   }
   let deviceScaleFactor: number | undefined;
   if (dimParts.length === 3) {
-    if (!DECIMAL.test(dimParts[2])) {
-      throw new Error(
-        `Invalid devicePixelRatio "${dimParts[2]}". Expected a positive number.`,
-      );
-    }
-    const dpr = Number(dimParts[2]);
+    const dpr = parseDecimal(dimParts[2], 'devicePixelRatio');
     if (!Number.isFinite(dpr) || dpr <= 0) {
       throw new Error(
         `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
@@ -634,23 +628,13 @@ export function geolocationTransform(
       `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
     );
   }
-  if (!DECIMAL.test(parts[0])) {
-    throw new Error(
-      `Invalid latitude "${parts[0]}". Latitude must be a number between -90 and 90.`,
-    );
-  }
-  const latitude = Number(parts[0]);
+  const latitude = parseDecimal(parts[0], 'latitude');
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error(
       `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
     );
   }
-  if (!DECIMAL.test(parts[1])) {
-    throw new Error(
-      `Invalid longitude "${parts[1]}". Longitude must be a number between -180 and 180.`,
-    );
-  }
-  const longitude = Number(parts[1]);
+  const longitude = parseDecimal(parts[1], 'longitude');
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error(
       `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,

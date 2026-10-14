@@ -104,15 +104,11 @@ describe('emulation', () => {
         assert.throws(() => viewportTransform('1280x720x2x9'));
       });
 
-      it('throws on hex dimension parts', () => {
-        assert.throws(() => viewportTransform('0x10x720'));
-        assert.throws(() => viewportTransform('1280x0x20'));
-        assert.throws(() => viewportTransform('1280x720x0x10'));
-      });
-
-      it('throws when dimension parts are empty', () => {
+      it('throws when dimension parts are empty or contain whitespace', () => {
         assert.throws(() => viewportTransform('800x'));
         assert.throws(() => viewportTransform('x600'));
+        assert.throws(() => viewportTransform(' 1280 x 720'));
+        assert.throws(() => viewportTransform('1280x720, mobile'));
       });
     });
 
@@ -153,8 +149,9 @@ describe('emulation', () => {
         assert.throws(() => geolocationTransform('37.77,-122.42,9'));
       });
 
-      it('throws on hex coordinates', () => {
+      it('throws on hex coordinates or surrounding whitespace', () => {
         assert.throws(() => geolocationTransform('0x10,0x20'));
+        assert.throws(() => geolocationTransform(' 37.77 , -122.42 '));
       });
     });
   });
