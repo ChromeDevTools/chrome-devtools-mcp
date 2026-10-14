@@ -152,7 +152,7 @@
 
 ### `press_key`
 
-**Description:** Press a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).
+**Description:** Press a key or key combination. Use this when other input methods like [`fill`](#fill)() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations). Note: On macOS, native &lt;select&gt; elements cannot be operated with ArrowDown/Enter via [`press_key`](#press_key); use [`fill`](#fill)() on the combobox or [`click`](#click)() on the option instead.
 
 **Parameters:**
 
