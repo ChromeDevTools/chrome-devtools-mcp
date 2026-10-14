@@ -474,12 +474,13 @@ export class McpResponse implements Response {
 
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
-    options?: HeapSnapshotFormatOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+      pagination: options,
       formatOptions: options,
     };
   }
@@ -1487,21 +1488,35 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       const detailedClassDiff = this.#heapSnapshotOptions.detailedClassDiff;
       if (detailedClassDiff) {
         response.push('### Heap Snapshot Detailed Diff');
+        const {classDiff, objects} = detailedClassDiff;
+        const paginationData = this.#dataWithPagination(
+          objects,
+          this.#heapSnapshotOptions.pagination,
+        );
+        structuredContent.pagination = paginationData.pagination;
         response.push(
           compactEncode
             ? compactEncode({
-                ...detailedClassDiff,
-                className: formatName(
-                  detailedClassDiff.className,
-                  formatOptions,
-                ),
+                ...classDiff,
+                className: formatName(classDiff.className, formatOptions),
               })
-            : HeapSnapshotFormatter.formatDiffDetails(
-                detailedClassDiff,
+            : HeapSnapshotFormatter.formatDetailedClassDiffHeader(
+                classDiff,
                 formatOptions,
               ),
         );
-        structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
+        response.push(...paginationData.info);
+        response.push(
+          compactEncode
+            ? compactEncode(paginationData.items)
+            : HeapSnapshotFormatter.formatDetailedClassDiffObjects(
+                paginationData.items,
+              ),
+        );
+        structuredContent.heapSnapshotDetailedClassDiff = {
+          classDiff,
+          objects: paginationData.items,
+        };
       }
       const duplicateStrings = this.#heapSnapshotOptions.duplicateStrings;
       if (duplicateStrings) {
@@ -1789,7 +1804,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
   }
 
   #dataWithPagination<T>(
-    data: T[],
+    data: readonly T[],
     pagination?: PaginationOptions,
   ): {
     info: string[];

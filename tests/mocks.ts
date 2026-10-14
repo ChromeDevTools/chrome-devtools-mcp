@@ -41,6 +41,7 @@ import type {
   HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
   HeapSnapshotDiff,
+  HeapSnapshotDiffObject,
 } from '../src/processors/HeapSnapshotManager.js';
 import {
   CdpBrowser,
@@ -1103,20 +1104,22 @@ export function createMockHeapSnapshotDiff(
   };
 }
 
-export function createMockDetailedClassDiff(): HeapSnapshotDetailedClassDiff {
+export function createMockDiffObject(
+  options: Partial<HeapSnapshotDiffObject> = {},
+): HeapSnapshotDiffObject {
   return {
-    index: 0,
-    className: 'TestClass',
-    addedCount: 1,
-    removedCount: 0,
-    countDelta: 1,
-    addedSize: 10,
-    removedSize: 0,
-    sizeDelta: 10,
-    addedIds: [1],
-    addedSelfSizes: [10],
-    deletedIds: [],
-    deletedSelfSizes: [],
+    id: options.id ?? 1,
+    selfSize: options.selfSize ?? 10,
+    change: options.change ?? 'added',
+  };
+}
+
+export function createMockDetailedClassDiff(
+  options: Partial<HeapSnapshotDetailedClassDiff> = {},
+): HeapSnapshotDetailedClassDiff {
+  return {
+    classDiff: options.classDiff ?? createMockClassDiff(),
+    objects: options.objects ?? [createMockDiffObject()],
   };
 }
 

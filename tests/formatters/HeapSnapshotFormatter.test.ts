@@ -18,6 +18,7 @@ import {
 import {
   HeapSnapshotManager,
   type HeapSnapshotAggregate,
+  type HeapSnapshotDiffObject,
 } from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
@@ -211,8 +212,8 @@ describe('HeapSnapshotFormatter', () => {
     });
   });
 
-  describe('formatDiffDetails', () => {
-    it('formats detailed diffs correctly', () => {
+  describe('formatDetailedClassDiffHeader and formatDetailedClassDiffObjects', () => {
+    it('formats the class header and its objects', () => {
       const details = {
         index: 0,
         className: 'MyClass',
@@ -222,25 +223,35 @@ describe('HeapSnapshotFormatter', () => {
         addedSize: 120,
         removedSize: 60,
         sizeDelta: 60,
-        addedIds: [101, 102],
-        addedSelfSizes: [60, 60],
-        deletedIds: [201],
-        deletedSelfSizes: [60],
       };
+      const objects: HeapSnapshotDiffObject[] = [
+        {id: 101, selfSize: 60, change: 'added'},
+        {id: 102, selfSize: 60, change: 'added'},
+        {id: 201, selfSize: 60, change: 'deleted'},
+      ];
 
-      const formatted = HeapSnapshotFormatter.formatDiffDetails(details, {});
+      const header = HeapSnapshotFormatter.formatDetailedClassDiffHeader(
+        details,
+        {},
+      );
+      const formattedObjects =
+        HeapSnapshotFormatter.formatDetailedClassDiffObjects(objects);
       const formatted120 = formatBytesToKb(120);
       const formatted60 = formatBytesToKb(60);
 
-      const expected = [
+      assert.strictEqual(
+        header,
         `MyClass: # new: 2, # deleted: 1, # delta: +1, alloc size: +${formatted120}, freed size: +${formatted60}, size delta: +${formatted60}`,
-        'Objects:',
-        `  + @101 (self_size: ${formatted60})`,
-        `  + @102 (self_size: ${formatted60})`,
-        `  - @201 (self_size: ${formatted60})`,
-      ].join('\n');
-
-      assert.strictEqual(formatted, expected);
+      );
+      assert.strictEqual(
+        formattedObjects,
+        [
+          'Objects:',
+          `  + @101 (self_size: ${formatted60})`,
+          `  + @102 (self_size: ${formatted60})`,
+          `  - @201 (self_size: ${formatted60})`,
+        ].join('\n'),
+      );
     });
 
     it('truncates className according to maxNameLength', () => {
@@ -253,24 +264,20 @@ describe('HeapSnapshotFormatter', () => {
         addedSize: 60,
         removedSize: 0,
         sizeDelta: 60,
-        addedIds: [101],
-        addedSelfSizes: [60],
-        deletedIds: [],
-        deletedSelfSizes: [],
       };
 
-      const formatted = HeapSnapshotFormatter.formatDiffDetails(details, {
-        maxNameLength: 4,
-      });
+      const header = HeapSnapshotFormatter.formatDetailedClassDiffHeader(
+        details,
+        {
+          maxNameLength: 4,
+        },
+      );
       const formatted60 = formatBytesToKb(60);
 
-      const expected = [
+      assert.strictEqual(
+        header,
         `Long...: # new: 1, # deleted: 0, # delta: +1, alloc size: +${formatted60}, freed size: 0.0\u00A0kB, size delta: +${formatted60}`,
-        'Objects:',
-        `  + @101 (self_size: ${formatted60})`,
-      ].join('\n');
-
-      assert.strictEqual(formatted, expected);
+      );
     });
   });
 
@@ -662,13 +669,16 @@ describe('HeapSnapshotFormatter', () => {
       });
 
       it('formats detailed diff comparing heap-1 to heap-2 with classIndex filter', async t => {
-        const detailedDiff = await manager.getDetailedClassDiff(
+        const {classDiff, objects} = await manager.getDetailedClassDiff(
           heap1Path,
           heap2Path,
           2,
         );
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatDiffDetails(detailedDiff, {}),
+          [
+            HeapSnapshotFormatter.formatDetailedClassDiffHeader(classDiff, {}),
+            HeapSnapshotFormatter.formatDetailedClassDiffObjects(objects),
+          ].join('\n'),
         );
       });
     });

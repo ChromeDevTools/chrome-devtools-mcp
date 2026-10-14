@@ -71,13 +71,12 @@ describe('HeapSnapshotManager', () => {
 
       const lastDiff = classDiffs.at(-1);
       assert.ok(lastDiff);
-      const detailedDiff = await manager.getDetailedClassDiff(
+      const {classDiff} = await manager.getDetailedClassDiff(
         filePathA,
         filePathB,
         lastDiff.index,
       );
-      assert.strictEqual(detailedDiff.index, lastDiff.index);
-      assert.strictEqual(detailedDiff.className, lastDiff.className);
+      assert.deepStrictEqual(classDiff, lastDiff);
     });
 
     // Verifies that the caching mechanism in HeapSnapshotManager correctly

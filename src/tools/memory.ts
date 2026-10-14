@@ -449,6 +449,8 @@ export const compareHeapSnapshots = defineBrowserlessTool(() => ({
         request.params.classIndex,
       );
       response.setHeapSnapshotDetailedClassDiff(classDiffResult, {
+        pageIdx: request.params.pageIdx,
+        pageSize: request.params.pageSize,
         maxNameLength: request.params.maxNameLength,
       });
     } else {

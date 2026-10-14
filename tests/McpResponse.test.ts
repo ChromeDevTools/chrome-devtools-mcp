@@ -44,6 +44,7 @@ import {
   createMockClassDiffTotals,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
+  createMockDiffObject,
   createMockHeapSnapshotDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
@@ -1722,6 +1723,34 @@ describe('McpResponse heap snapshot formatting', () => {
     const detailedText = getTextContent(detailedResult.content[0]);
     assert.ok(detailedText.includes('### Heap Snapshot Detailed Diff'));
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
+  });
+
+  it('paginates detailed class diff objects below the class header', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const objects = [
+      createMockDiffObject({id: 101, change: 'added'}),
+      createMockDiffObject({id: 102, change: 'added'}),
+      createMockDiffObject({id: 201, change: 'deleted'}),
+    ];
+    const classDiff = createMockClassDiff({className: 'Leaky'});
+    response.setHeapSnapshotDetailedClassDiff(
+      createMockDetailedClassDiff({classDiff, objects}),
+      {pageIdx: 1, pageSize: 2},
+    );
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('Leaky: # new: 1, # deleted: 0'));
+    assert.ok(text.includes('Showing 3-3 of 3 (Page 2 of 2).'));
+    assert.ok(text.includes('  - @201'));
+    assert.ok(!text.includes('@101'));
+    assert.ok(!text.includes('@102'));
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotDetailedClassDiff'),
+      {classDiff, objects: [objects[2]]},
+    );
   });
 
   it('paginates class diff summary and keeps global indices', async () => {

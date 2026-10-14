@@ -41,11 +41,15 @@ export interface HeapSnapshotClassDiff {
   sizeDelta: number;
 }
 
-export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
-  addedIds: number[];
-  addedSelfSizes: number[];
-  deletedIds: number[];
-  deletedSelfSizes: number[];
+export interface HeapSnapshotDetailedClassDiff {
+  classDiff: HeapSnapshotClassDiff;
+  objects: readonly HeapSnapshotDiffObject[];
+}
+
+export interface HeapSnapshotDiffObject {
+  id: number;
+  selfSize: number;
+  change: 'added' | 'deleted';
 }
 
 export interface HeapSnapshotClassDiffTotals {
@@ -65,6 +69,22 @@ export type HeapQueryOptions =
 
 export type HeapEdgesQueryOptions =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
+
+function toClassDiff(
+  index: number,
+  rawDiff: DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff,
+): HeapSnapshotClassDiff {
+  return {
+    index,
+    className: rawDiff.name,
+    addedCount: rawDiff.addedCount,
+    removedCount: rawDiff.removedCount,
+    countDelta: rawDiff.countDelta,
+    addedSize: rawDiff.addedSize,
+    removedSize: rawDiff.removedSize,
+    sizeDelta: rawDiff.sizeDelta,
+  };
+}
 
 export class HeapSnapshot {
   proxy: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
@@ -334,16 +354,7 @@ export class HeapSnapshotManager {
       sizeDelta: 0,
     };
     for (const [index, rawDiff] of rawDiffs.entries()) {
-      classDiffs.push({
-        index,
-        className: rawDiff.name,
-        addedCount: rawDiff.addedCount,
-        removedCount: rawDiff.removedCount,
-        countDelta: rawDiff.countDelta,
-        addedSize: rawDiff.addedSize,
-        removedSize: rawDiff.removedSize,
-        sizeDelta: rawDiff.sizeDelta,
-      });
+      classDiffs.push(toClassDiff(index, rawDiff));
       totals.addedCount += rawDiff.addedCount;
       totals.removedCount += rawDiff.removedCount;
       totals.countDelta += rawDiff.countDelta;
@@ -369,20 +380,18 @@ export class HeapSnapshotManager {
         `Invalid classIndex: ${classIndex}. Total classes with changes: ${classDiffs.length}`,
       );
     }
-    return {
-      index: classIndex,
-      className: rawDiff.name,
-      addedCount: rawDiff.addedCount,
-      removedCount: rawDiff.removedCount,
-      countDelta: rawDiff.countDelta,
-      addedSize: rawDiff.addedSize,
-      removedSize: rawDiff.removedSize,
-      sizeDelta: rawDiff.sizeDelta,
-      addedIds: rawDiff.addedIds ?? [],
-      addedSelfSizes: rawDiff.addedSelfSizes ?? [],
-      deletedIds: rawDiff.deletedIds ?? [],
-      deletedSelfSizes: rawDiff.deletedSelfSizes ?? [],
-    };
+    const objects: HeapSnapshotDiffObject[] = [];
+    const addedIds = rawDiff.addedIds ?? [];
+    const addedSelfSizes = rawDiff.addedSelfSizes ?? [];
+    for (const [i, id] of addedIds.entries()) {
+      objects.push({id, selfSize: addedSelfSizes[i], change: 'added'});
+    }
+    const deletedIds = rawDiff.deletedIds ?? [];
+    const deletedSelfSizes = rawDiff.deletedSelfSizes ?? [];
+    for (const [i, id] of deletedIds.entries()) {
+      objects.push({id, selfSize: deletedSelfSizes[i], change: 'deleted'});
+    }
+    return {classDiff: toClassDiff(classIndex, rawDiff), objects};
   }
 
   async #getSortedRawClassDiffs(

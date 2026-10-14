@@ -644,6 +644,8 @@ describe('memory', () => {
             currentFilePath: 'heap2.heapsnapshot',
             classIndex: 2,
             maxNameLength: 500,
+            pageIdx: 1,
+            pageSize: 5,
           },
         },
         response,
@@ -659,7 +661,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotDetailedClassDiff,
         detailedDiff,
-        {maxNameLength: 500},
+        {pageIdx: 1, pageSize: 5, maxNameLength: 500},
       );
     });
   });

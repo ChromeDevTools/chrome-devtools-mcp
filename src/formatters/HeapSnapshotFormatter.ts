@@ -8,7 +8,7 @@ import type {
   HeapSnapshotAggregate,
   HeapSnapshotClassDiff,
   HeapSnapshotClassDiffTotals,
-  HeapSnapshotDetailedClassDiff,
+  HeapSnapshotDiffObject,
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
@@ -286,36 +286,26 @@ export class HeapSnapshotFormatter {
   }
 
   static formatDiffTotals(totals: HeapSnapshotClassDiffTotals): string {
-    return `Total: # new: ${totals.addedCount}, # deleted: ${totals.removedCount}, # delta: ${formatSignedCount(totals.countDelta)}, alloc size: ${formatSignedSize(totals.addedSize)}, freed size: ${formatSignedSize(totals.removedSize)}, size delta: ${formatSignedSize(totals.sizeDelta)}`;
+    return `Total: ${formatDiffCounts(totals)}`;
   }
 
-  static formatDiffDetails(
-    diff: HeapSnapshotDetailedClassDiff,
+  static formatDetailedClassDiffHeader(
+    diff: HeapSnapshotClassDiff,
     options: HeapSnapshotFormatOptions,
   ): string {
-    const lines: string[] = [];
-    lines.push(
-      `${formatName(diff.className, options)}: # new: ${diff.addedCount}, # deleted: ${diff.removedCount}, # delta: ${formatSignedCount(diff.countDelta)}, alloc size: ${formatSignedSize(diff.addedSize)}, freed size: ${formatSignedSize(diff.removedSize)}, size delta: ${formatSignedSize(diff.sizeDelta)}`,
-    );
+    return `${formatName(diff.className, options)}: ${formatDiffCounts(diff)}`;
+  }
 
-    const addedIds = diff.addedIds;
-    const addedSelfSizes = diff.addedSelfSizes;
-    const deletedIds = diff.deletedIds;
-    const deletedSelfSizes = diff.deletedSelfSizes;
-
-    lines.push(`Objects:`);
-
-    for (let i = 0; i < addedIds.length; i++) {
+  static formatDetailedClassDiffObjects(
+    objects: readonly HeapSnapshotDiffObject[],
+  ): string {
+    const lines = ['Objects:'];
+    for (const object of objects) {
+      const sign = object.change === 'added' ? '+' : '-';
       lines.push(
-        `  + @${addedIds[i]} (self_size: ${formatBytesToKb(addedSelfSizes[i])})`,
+        `  ${sign} @${object.id} (self_size: ${formatBytesToKb(object.selfSize)})`,
       );
     }
-    for (let i = 0; i < deletedIds.length; i++) {
-      lines.push(
-        `  - @${deletedIds[i]} (self_size: ${formatBytesToKb(deletedSelfSizes[i])})`,
-      );
-    }
-
     return lines.join('\n');
   }
 
@@ -415,4 +405,8 @@ function formatSignedCount(n: number): string {
 function formatSignedSize(bytes: number): string {
   const formatted = formatBytesToKb(bytes);
   return bytes > 0 ? `+${formatted}` : formatted;
+}
+
+function formatDiffCounts(counts: HeapSnapshotClassDiffTotals): string {
+  return `# new: ${counts.addedCount}, # deleted: ${counts.removedCount}, # delta: ${formatSignedCount(counts.countDelta)}, alloc size: ${formatSignedSize(counts.addedSize)}, freed size: ${formatSignedSize(counts.removedSize)}, size delta: ${formatSignedSize(counts.sizeDelta)}`;
 }
