@@ -6,36 +6,27 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it, after, before} from 'node:test';
 
 import {assertDaemonIsNotRunning, runCli} from '../utils.js';
 
 describe('chrome-devtools positional values starting with a hyphen', () => {
   let sessionId: string;
+  let textareaUid: string;
 
-  beforeEach(async () => {
+  // Start one daemon for the whole suite. Starting a daemon and Chrome per
+  // test makes the file exceed the test timeout on slow machines.
+  before(async () => {
     sessionId = crypto.randomUUID();
     await runCli(['stop'], sessionId);
     await assertDaemonIsNotRunning(sessionId);
-  });
 
-  afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
-  });
-
-  async function startDaemon(): Promise<void> {
     const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
       startResult.status,
       0,
       `start command failed: ${startResult.stderr}`,
     );
-  }
-
-  /** Starts the daemon, opens a page with a textarea and returns its uid. */
-  async function startWithTextarea(): Promise<string> {
-    await startDaemon();
 
     const navigateResult = await runCli(
       [
@@ -63,8 +54,13 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
       uidMatch,
       'textarea uid not found in snapshot: ' + snapshotResult.stdout,
     );
-    return uidMatch[1];
-  }
+    textareaUid = uidMatch[1];
+  });
+
+  after(async () => {
+    await runCli(['stop'], sessionId);
+    await assertDaemonIsNotRunning(sessionId);
+  });
 
   async function readTextareaValue(): Promise<string> {
     const result = await runCli(
@@ -97,9 +93,7 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
   ];
   for (const {value, expected} of fillCases) {
     it(`fill passes ${JSON.stringify(value.join(' '))} through`, async () => {
-      const uid = await startWithTextarea();
-
-      const args = ['fill', '1', uid, ...value];
+      const args = ['fill', '1', textareaUid, ...value];
       const result = await runCli(args, sessionId);
       assert.strictEqual(
         result.status,
@@ -111,8 +105,6 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
   }
 
   it('type_text passes a lone hyphen through', async () => {
-    await startDaemon();
-
     const result = await runCli(['type_text', '1', '-'], sessionId);
     assert.strictEqual(
       result.status,
@@ -123,8 +115,6 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
   });
 
   it('press_key passes a lone hyphen through', async () => {
-    await startDaemon();
-
     const result = await runCli(['press_key', '1', '-'], sessionId);
     assert.strictEqual(
       result.status,
@@ -135,8 +125,6 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
   });
 
   it('rejects unknown flags that are not preceded by --', async () => {
-    await startDaemon();
-
     const result = await runCli(
       ['fill', '1', 'x', 'x', '--pageid', '2'],
       sessionId,
