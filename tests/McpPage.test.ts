@@ -728,6 +728,43 @@ describe('McpPage', () => {
       sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, null);
     });
 
+    it('does not store a viewport that setViewport rejects', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.setViewport.rejects(new Error('Invalid parameters'));
+
+      await assert.rejects(
+        () => mcpPage.emulate({viewport: {width: 800.5, height: 600}}),
+        /Invalid parameters/,
+      );
+
+      assert.strictEqual(mcpPage.viewport, null);
+    });
+
+    it('keeps the previous viewport when setViewport rejects a new one', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.emulate({viewport: {width: 400, height: 400}});
+      pptrPage.setViewport.rejects(new Error('Invalid parameters'));
+
+      await assert.rejects(
+        () =>
+          mcpPage.emulate({
+            viewport: {width: 20000000, height: 600},
+            cpuThrottlingRate: 4,
+          }),
+        /Invalid parameters/,
+      );
+
+      assert.deepStrictEqual(mcpPage.viewport, {
+        width: 400,
+        height: 400,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      });
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 4);
+    });
+
     it('calls setExtraHTTPHeaders with the given headers', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
