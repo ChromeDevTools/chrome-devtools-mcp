@@ -112,6 +112,13 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
+  /**
+   * When true, the handler runs without the server tool lock, so other tool
+   * calls proceed while this handler waits. Page lookup before the handler
+   * and response formatting after it still run under the lock. Only set
+   * this for tools that wait for external events.
+   */
+  yieldsToolLock?: boolean;
   verifyFilesSchema: Partial<
     Record<keyof MergeSchema<Schema>, FileVerificationOption>
   >;

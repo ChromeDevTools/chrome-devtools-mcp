@@ -32,6 +32,13 @@ import {logger} from './utils/logger.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isLocalhost} from './utils/url.js';
 
+type ToolLockGuard = Awaited<ReturnType<Mutex['acquire']>>;
+
+interface ToolLockControl {
+  releaseIfYielding: () => void;
+  reacquire: () => Promise<void>;
+}
+
 /**
  * Upper bound on how long a tool call may wait to acquire the browser
  * (connect/launch and McpContext initialization). A connect attempt on a
@@ -277,12 +284,16 @@ export class ToolHandler {
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
+    lock: ToolLockControl,
   ): ReturnType<McpResponse['handle']> {
     try {
       await validateToolFiles(tool, params, context, true);
+      lock.releaseIfYielding();
       await tool.handler({params}, response, context);
     } catch (err) {
       response.setError(err);
+    } finally {
+      await lock.reacquire();
     }
     return await response.handle(context, this.#dataFormat());
   }
@@ -292,6 +303,7 @@ export class ToolHandler {
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
+    lock: ToolLockControl,
     onTelemetryData: (
       devToolsData: DevToolsData | undefined,
       pageUrl: string | undefined,
@@ -327,6 +339,7 @@ export class ToolHandler {
         if (tool.blockedByDialog) {
           page.throwIfDialogOpen();
         }
+        lock.releaseIfYielding();
         await tool.handler(
           {
             params,
@@ -336,6 +349,7 @@ export class ToolHandler {
           context,
         );
       } else {
+        lock.releaseIfYielding();
         await tool.handler(
           {
             params,
@@ -346,6 +360,8 @@ export class ToolHandler {
       }
     } catch (err) {
       response.setError(err);
+    } finally {
+      await lock.reacquire();
     }
     onTelemetryData(
       await context.getDevToolsData(page),
@@ -355,9 +371,10 @@ export class ToolHandler {
   }
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
-    using guard = await this.toolMutex.acquire();
+    let guard: ToolLockGuard | undefined = await this.toolMutex.acquire();
 
     if (this.disabledReason) {
+      guard[Symbol.dispose]();
       return {
         content: [
           {
@@ -382,13 +399,34 @@ export class ToolHandler {
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
+      // When the tool yields the lock, the handler waits for external events.
+      // Release the lock so other tool calls proceed, and re-acquire it
+      // before the response is built.
+      const lock: ToolLockControl = {
+        releaseIfYielding: () => {
+          if (this.tool.yieldsToolLock && guard) {
+            guard[Symbol.dispose]();
+            guard = undefined;
+          }
+        },
+        reacquire: async () => {
+          guard ??= await this.toolMutex.acquire();
+        },
+      };
       const {content, structuredContent} = isBrowserlessTool(this.tool)
-        ? await this.#runBrowserlessTool(this.tool, params, response, context)
+        ? await this.#runBrowserlessTool(
+            this.tool,
+            params,
+            response,
+            context,
+            lock,
+          )
         : await this.#runBrowserTool(
             this.tool,
             params,
             response,
             context,
+            lock,
             (data, url) => {
               devToolsData = data;
               pageUrl = url;
@@ -423,6 +461,7 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
+      guard?.[Symbol.dispose]();
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: this.tool.name,
         params,

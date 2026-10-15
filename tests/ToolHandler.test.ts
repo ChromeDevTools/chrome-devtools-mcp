@@ -173,6 +173,185 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
   });
 
+  describe('yieldsToolLock', () => {
+    function createGlobalTool(
+      handler: ToolDefinition['handler'],
+      options: {name?: string; yieldsToolLock?: boolean} = {},
+    ): ToolDefinition {
+      return {
+        name: options.name ?? 'global_tool',
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        yieldsToolLock: options.yieldsToolLock,
+        verifyFilesSchema: {},
+        handler,
+      };
+    }
+
+    function createHandler(tool: ToolDefinition, toolMutex: Mutex) {
+      const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({process: mockProcess}),
+      );
+      const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      }).parse();
+      return new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        toolMutex,
+        sinon.spy(),
+      );
+    }
+
+    it('lets another tool run while a yielding tool waits', async () => {
+      const toolMutex = new Mutex();
+      const events: string[] = [];
+      const {promise: release, resolve: finishWait} =
+        Promise.withResolvers<void>();
+
+      const waitingTool = createGlobalTool(
+        async () => {
+          events.push('waiting:start');
+          await release;
+          events.push('waiting:end');
+        },
+        {name: 'waiting_tool', yieldsToolLock: true},
+      );
+      const otherTool = createGlobalTool(
+        async () => {
+          events.push('other:run');
+        },
+        {name: 'other_tool'},
+      );
+
+      const waitingHandler = createHandler(waitingTool, toolMutex);
+      const otherHandler = createHandler(otherTool, toolMutex);
+
+      const waitingResult = waitingHandler.handle({});
+      // Let the waiting tool enter its handler before the other tool is
+      // called.
+      await new Promise(resolve => setImmediate(resolve));
+      const otherResult = await otherHandler.handle({});
+      finishWait();
+      await waitingResult;
+
+      assert.deepStrictEqual(events, [
+        'waiting:start',
+        'other:run',
+        'waiting:end',
+      ]);
+      assert.strictEqual(otherResult.isError, undefined);
+    });
+
+    it('holds the lock for tools that do not yield', async () => {
+      const toolMutex = new Mutex();
+      const events: string[] = [];
+      const {promise: release, resolve: finishWait} =
+        Promise.withResolvers<void>();
+
+      const blockingTool = createGlobalTool(
+        async () => {
+          events.push('blocking:start');
+          await release;
+          events.push('blocking:end');
+        },
+        {name: 'blocking_tool'},
+      );
+      const otherTool = createGlobalTool(
+        async () => {
+          events.push('other:run');
+        },
+        {name: 'other_tool'},
+      );
+
+      const blockingHandler = createHandler(blockingTool, toolMutex);
+      const otherHandler = createHandler(otherTool, toolMutex);
+
+      const blockingResult = blockingHandler.handle({});
+      await new Promise(resolve => setImmediate(resolve));
+      const otherResult = otherHandler.handle({});
+      await new Promise(resolve => setImmediate(resolve));
+      finishWait();
+      await Promise.all([blockingResult, otherResult]);
+
+      assert.deepStrictEqual(events, [
+        'blocking:start',
+        'blocking:end',
+        'other:run',
+      ]);
+    });
+
+    it('builds the response only after a queued tool releases the lock', async () => {
+      const toolMutex = new Mutex();
+      const events: string[] = [];
+      const {promise: otherBlocked, resolve: unblockOther} =
+        Promise.withResolvers<void>();
+
+      const waitingTool = createGlobalTool(
+        async () => {
+          await new Promise(resolve => setImmediate(resolve));
+          events.push('waiting:handler-done');
+        },
+        {name: 'waiting_tool', yieldsToolLock: true},
+      );
+      const otherTool = createGlobalTool(
+        async () => {
+          events.push('other:start');
+          await otherBlocked;
+          events.push('other:end');
+        },
+        {name: 'other_tool'},
+      );
+
+      const waitingHandler = createHandler(waitingTool, toolMutex);
+      const otherHandler = createHandler(otherTool, toolMutex);
+
+      const waitingResult = waitingHandler.handle({}).then(result => {
+        events.push('waiting:result');
+        return result;
+      });
+      await new Promise(resolve => setImmediate(resolve));
+      const otherResult = otherHandler.handle({});
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+      unblockOther();
+      await Promise.all([waitingResult, otherResult]);
+
+      assert.deepStrictEqual(events, [
+        'other:start',
+        'waiting:handler-done',
+        'other:end',
+        'waiting:result',
+      ]);
+    });
+
+    it('re-acquires the lock when a yielding handler throws', async () => {
+      const toolMutex = new Mutex();
+      const tool = createGlobalTool(
+        async () => {
+          throw new Error('handler failed');
+        },
+        {yieldsToolLock: true},
+      );
+      const handler = createHandler(tool, toolMutex);
+
+      const result = await handler.handle({});
+
+      assert.strictEqual(result.isError, true);
+      // The lock is free again: a plain acquire must resolve.
+      const guard = await toolMutex.acquire();
+      guard[Symbol.dispose]();
+    });
+  });
+
   const dataFormatCases: Array<{argv: string[]; expected: DataFormat}> = [
     {argv: [], expected: 'default'},
     {argv: ['--experimentalToonFormat'], expected: 'toon'},
