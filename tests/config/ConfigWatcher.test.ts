@@ -39,15 +39,51 @@ function writeConfig(dir: string): string {
   return configPath;
 }
 
-function startWatcher(
+/**
+ * Resolves once fs events for `dir` are delivered.
+ *
+ * On macOS, libuv creates a single FSEvents stream per event loop on a
+ * background thread, and `fs.watch` returns before the stream exists. Changes
+ * made in that window are lost. The probe watcher shares the stream with the
+ * ConfigWatcher, so an event for the probe file proves the stream is active.
+ * The caller must keep the probe open: closing it recreates the stream.
+ */
+async function waitForWatchReady(dir: string): Promise<fs.FSWatcher> {
+  let ready = false;
+  const probe = fs.watch(dir, {persistent: false}, () => {
+    ready = true;
+  });
+  const probePath = path.join(dir, 'probe');
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  while (!ready) {
+    if (Date.now() >= deadline) {
+      probe.close();
+      throw new Error(`Timed out waiting for fs.watch on ${dir}`);
+    }
+    fs.writeFileSync(probePath, String(Date.now()));
+    await wait(POLL_INTERVAL_MS);
+  }
+  return probe;
+}
+
+async function startWatcher(
   watchedPath: string,
   onChange: () => Promise<void> = sinon.stub().resolves(),
-): ConfigWatcher {
+): Promise<{watcher: ConfigWatcher} & Disposable> {
   const watcher = new ConfigWatcher(watchedPath, onChange, {
     debounceMs: DEBOUNCE_MS,
   });
   watcher.start();
-  return watcher;
+  const probe = await waitForWatchReady(
+    path.dirname(fs.realpathSync(watchedPath)),
+  );
+  return {
+    watcher,
+    [Symbol.dispose]() {
+      watcher.dispose();
+      probe.close();
+    },
+  };
 }
 
 describe('ConfigWatcher', () => {
@@ -59,7 +95,7 @@ describe('ConfigWatcher', () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = await startWatcher(configPath, onChange);
 
     fs.writeFileSync(configPath, '{"headless": true}');
     fs.writeFileSync(configPath, '{"headless": false}');
@@ -72,7 +108,7 @@ describe('ConfigWatcher', () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = await startWatcher(configPath, onChange);
 
     const tempPath = path.join(dir.path, 'cd4a.config.json.tmp');
     fs.writeFileSync(tempPath, '{"headless": true}');
@@ -86,7 +122,7 @@ describe('ConfigWatcher', () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = await startWatcher(configPath, onChange);
 
     fs.writeFileSync(path.join(dir.path, 'other.json'), '{}');
     await wait(SETTLE_MS);
@@ -101,7 +137,7 @@ describe('ConfigWatcher', () => {
     const linkPath = path.join(linkDir.path, 'cd4a.config.json');
     fs.symlinkSync(configPath, linkPath);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(linkPath, onChange);
+    using watcher = await startWatcher(linkPath, onChange);
 
     fs.writeFileSync(configPath, '{"headless": true}');
     await waitForCall(onChange);
@@ -113,7 +149,7 @@ describe('ConfigWatcher', () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = await startWatcher(configPath, onChange);
 
     fs.writeFileSync(configPath, '{}');
     await wait(SETTLE_MS);
@@ -125,7 +161,7 @@ describe('ConfigWatcher', () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = await startWatcher(configPath, onChange);
 
     fs.unlinkSync(configPath);
     await wait(SETTLE_MS);
@@ -137,9 +173,9 @@ describe('ConfigWatcher', () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    const watcher = startWatcher(configPath, onChange);
+    using started = await startWatcher(configPath, onChange);
 
-    watcher.dispose();
+    started.watcher.dispose();
     fs.writeFileSync(configPath, '{"headless": true}');
     await wait(SETTLE_MS);
 
@@ -151,7 +187,7 @@ describe('ConfigWatcher', () => {
     const configPath = writeConfig(dir.path);
     const consoleError = sinon.stub(console, 'error');
     const error = new Error('apply failed');
-    using watcher = startWatcher(configPath, sinon.stub().rejects(error));
+    using watcher = await startWatcher(configPath, sinon.stub().rejects(error));
 
     fs.writeFileSync(configPath, '{"headless": true}');
     await waitForCall(consoleError);
@@ -173,7 +209,7 @@ describe('ConfigWatcher', () => {
     onChange.onSecondCall().callsFake(async () => {
       secondCall.resolve();
     });
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = await startWatcher(configPath, onChange);
 
     fs.writeFileSync(configPath, '{"headless": true}');
     await waitForCall(onChange);
