@@ -606,7 +606,9 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: {
         filePath: true,
-        fileList: true,
+        // allowUrl lets a remote URL pass through unchanged (file/plain paths
+        // are still validated); this is what source-map/PWA-style params use.
+        fileList: {local: true, remote: true, allowUrl: true},
       },
       handler: async request => {
         handlerCalled = true;
@@ -1001,6 +1003,7 @@ describe('ToolHandler', () => {
       verifyFilesSchema: {
         installUrlOrBundleUrl: {
           local: true,
+          allowUrl: true,
         },
       },
       handler: async () => {
@@ -1032,6 +1035,63 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(mockContext.validatePath.called, false);
+  });
+
+  it('validates an http/ws URL as a filesystem path when allowUrl is not set, even on a local browser', async () => {
+    // Regression test: a filesystem-path parameter (no allowUrl) must not let
+    // a value that merely parses as an http/ws URL bypass validatePath. Such a
+    // string is resolved to an absolute host path downstream (Puppeteer's
+    // uploadFile path.resolve()s a non-absolute "http://x/../../etc/passwd"
+    // into "/etc/passwd"), so it must go through the workspace-roots check.
+    let handlerCalled = false;
+    const tool: ToolDefinition = {
+      name: 'upload_tool',
+      description: 'A local-only file sink without allowUrl',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {
+        filePaths: zod.array(zod.string()),
+      },
+      blockedByDialog: false,
+      verifyFilesSchema: {
+        filePaths: {
+          local: true,
+          remote: false,
+        },
+      },
+      handler: async () => {
+        handlerCalled = true;
+      },
+    };
+
+    const mockContext = sinon.createStubInstance(McpContext);
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.validatePath.rejects(
+      new Error('Access denied: path is not within any workspace root.'),
+    );
+
+    const toolMutex = new Mutex();
+    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parse();
+
+    const toolHandler = new ToolHandler(
+      tool,
+      serverArgs,
+      async () => mockContext,
+      toolMutex,
+      sinon.spy(),
+    );
+
+    const traversalUrl = 'http://x/' + '../'.repeat(12) + 'etc/passwd';
+    const result = await toolHandler.handle({filePaths: [traversalUrl]});
+
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(handlerCalled, false);
+    sinon.assert.calledOnceWithExactly(mockContext.validatePath, traversalUrl);
   });
 
   it('validates verifyFilesSchema with true but skips local: true on remote browser', async () => {

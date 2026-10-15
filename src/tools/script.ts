@@ -103,7 +103,9 @@ Example with arguments: \`(el) => el.innerText\`
     blockedByDialog: true,
     verifyFilesSchema: {
       filePath: true,
-      sourcePath: true,
+      // sourcePath may be an http(s): URL the server fetches, so allow URLs
+      // through; a file: path or plain path is still validated.
+      sourcePath: {local: true, remote: true, allowUrl: true},
     },
     handler: async (request, response, context) => {
       const {

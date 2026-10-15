@@ -100,6 +100,7 @@ function isPageScopedTool(
 async function validateAndResolvePathOrUrl(
   filePathOrUrl: string,
   context: McpContext,
+  allowUrl: boolean,
 ): Promise<string | undefined> {
   if (filePathOrUrl.trim().length === 0) {
     return undefined;
@@ -109,7 +110,15 @@ async function validateAndResolvePathOrUrl(
     if (url.protocol === 'file:') {
       return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
     }
-    if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
+    // Only pass a remote URL through unchanged for parameters whose sink
+    // actually fetches the URL or hands it to the browser (allowUrl). For a
+    // filesystem-path parameter, a value that merely looks like an http/ws URL
+    // must still be validated: `new URL()` accepts `http://x/../../etc/passwd`,
+    // and the downstream filesystem API (e.g. Puppeteer's uploadFile)
+    // path.resolve()s that non-absolute string into an absolute host path,
+    // which would bypass validatePath (workspace roots and the temp-dir
+    // fallback) if it were returned here unchanged.
+    if (allowUrl && ['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
       return filePathOrUrl;
     }
   } catch {
@@ -153,14 +162,22 @@ async function validateToolFiles(
   const isLocal = isLocalBrowser(context);
   for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
     if (shouldValidateFile(option, isLocal)) {
+      const allowUrl =
+        typeof option === 'object' &&
+        option !== null &&
+        option.allowUrl === true;
       const val = params[key];
       if (typeof val === 'string') {
-        params[key] = await validateAndResolvePathOrUrl(val, context);
+        params[key] = await validateAndResolvePathOrUrl(val, context, allowUrl);
       } else if (Array.isArray(val)) {
         const updated: unknown[] = [];
         for (const item of val) {
           if (typeof item === 'string') {
-            const resolved = await validateAndResolvePathOrUrl(item, context);
+            const resolved = await validateAndResolvePathOrUrl(
+              item,
+              context,
+              allowUrl,
+            );
             if (resolved !== undefined) {
               updated.push(resolved);
             }

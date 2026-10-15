@@ -62,6 +62,17 @@ export type FileVerificationOption =
   | {
       local?: boolean;
       remote?: boolean;
+      /**
+       * When true, a value that parses as an `http(s):`/`ws(s):` URL is passed
+       * through unchanged instead of being resolved as a filesystem path. Only
+       * set this for parameters whose sink fetches the URL (for example a
+       * source map or script source the server downloads) or hands it to the
+       * browser (for example a PWA install URL). For filesystem-path
+       * parameters it MUST stay unset: otherwise a value such as
+       * `http://x/../../etc/passwd` skips `validatePath` and is resolved to an
+       * absolute host path by the downstream filesystem API.
+       */
+      allowUrl?: boolean;
     };
 
 type AllKeys<T> = T extends unknown ? keyof T : never;
