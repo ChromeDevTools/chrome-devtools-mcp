@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -17,6 +18,12 @@ import {
   triggerExtensionAction,
 } from '../../src/tools/extensions.js';
 import {createHandlerMocks, createMockExtension} from '../mocks.js';
+import {withMcpContext} from '../utils.js';
+
+const EXTENSION_SW_PATH = path.join(
+  import.meta.dirname,
+  '../../../tests/tools/fixtures/extension-sw',
+);
 
 describe('extensions', () => {
   afterEach(() => {
@@ -119,6 +126,41 @@ describe('extensions', () => {
       sinon.assert.calledOnceWithExactly(context.getExtension, 'non-existent');
       sinon.assert.notCalled(context.installExtension);
       sinon.assert.notCalled(response.appendResponseLine);
+    });
+
+    it('prunes destroyed extension service workers after reload_extension', async () => {
+      await withMcpContext(
+        async (response, context, args) => {
+          const extensionId = await context.installExtension(EXTENSION_SW_PATH);
+          assert.ok(extensionId);
+
+          await context.browser.waitForTarget(
+            target =>
+              target.type() === 'service_worker' &&
+              target.url().includes('chrome-extension://'),
+          );
+
+          const initialWorkers = await context.createWorkersSnapshot();
+          assert.strictEqual(initialWorkers.length, 1);
+          const oldWorkerId = initialWorkers[0].id;
+
+          await reloadExtension(args).handler(
+            {params: {id: extensionId}},
+            response,
+            context,
+          );
+
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          const workers = await context.createWorkersSnapshot();
+          assert.strictEqual(workers.length, 1);
+          assert.notStrictEqual(workers[0].id, oldWorkerId);
+          assert.strictEqual(context.getWorkerById(oldWorkerId), undefined);
+          await context.uninstallExtension(extensionId);
+        },
+        {},
+        {categoryExtensions: true},
+      );
     });
   });
 
