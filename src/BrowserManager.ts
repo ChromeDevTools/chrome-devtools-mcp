@@ -16,7 +16,11 @@ import type {
   LaunchOptions,
 } from './third_party/index.js';
 import {Mutex, puppeteer} from './third_party/index.js';
-import {logger, puppeteerLogger} from './utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactConnectOptionsForLogging,
+} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
 
 export interface BrowserManagerOptions {
@@ -56,20 +60,6 @@ export class BrowserManager {
         return true;
       }
       return isAllowedUrl(url, {categoryExtensions: enableExtensions});
-    };
-  }
-
-  static redactConnectOptionsForLogging(
-    options: Parameters<typeof puppeteer.connect>[0],
-  ): Parameters<typeof puppeteer.connect>[0] {
-    if (!options.headers) {
-      return {...options};
-    }
-    return {
-      ...options,
-      headers: Object.fromEntries(
-        Object.keys(options.headers).map(name => [name, '[REDACTED]']),
-      ),
     };
   }
 
@@ -426,7 +416,7 @@ export class BrowserManager {
 
     logger?.(
       'Connecting Puppeteer to ',
-      JSON.stringify(BrowserManager.redactConnectOptionsForLogging(connectOptions)),
+      JSON.stringify(redactConnectOptionsForLogging(connectOptions)),
     );
     try {
       const connected = await puppeteer.connect(connectOptions);

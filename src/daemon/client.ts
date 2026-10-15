@@ -12,7 +12,11 @@ import path from 'node:path';
 import type {CallToolResult} from '../third_party/index.js';
 import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
-import {logger, puppeteerLogger} from '../utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactDaemonArgsForLogging,
+} from '../utils/logger.js';
 
 import type {
   DaemonMessage,
@@ -133,7 +137,7 @@ export async function startDaemon(
     fs.unlinkSync(pidFilePath);
   }
 
-  logger?.('Starting daemon...', ...mcpArgs);
+  logger?.('Starting daemon...', ...redactDaemonArgsForLogging(mcpArgs));
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',
