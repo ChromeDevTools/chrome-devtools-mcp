@@ -8,18 +8,27 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import {describe, it, after, before} from 'node:test';
 
-import {assertDaemonIsNotRunning, runCli} from '../utils.js';
+import {runCli, stopDaemonForCleanup} from '../utils.js';
 
 describe('chrome-devtools positional values starting with a hyphen', () => {
+  const fillCases: Array<{value: string[]; expected: string}> = [
+    {value: ['-'], expected: '-'},
+    {value: ['-5'], expected: '-5'},
+    {value: ['a-b'], expected: 'a-b'},
+    {value: ['--weird'], expected: '--weird'},
+    {value: ['- item'], expected: '- item'},
+    {value: ['-abc'], expected: '-abc'},
+    {value: ['--', '--weird'], expected: '--weird'},
+  ];
+
   let sessionId: string;
-  let textareaUid: string;
+  let textareaUids: string[];
 
   // Start one daemon for the whole suite. Starting a daemon and Chrome per
-  // test makes the file exceed the test timeout on slow machines.
+  // test makes the file exceed the test timeout on slow machines. The page
+  // has one textarea per fill case, so the fill cases do not share state.
   before(async () => {
     sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
 
     const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
@@ -28,13 +37,11 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
       `start command failed: ${startResult.stderr}`,
     );
 
+    const textareas = fillCases
+      .map((_, index) => `<textarea id="t${index}">x</textarea>`)
+      .join('');
     const navigateResult = await runCli(
-      [
-        'navigate_page',
-        '1',
-        '--url',
-        'data:text/html,<textarea id="t">x</textarea>',
-      ],
+      ['navigate_page', '1', '--url', `data:text/html,${textareas}`],
       sessionId,
     );
     assert.strictEqual(
@@ -49,24 +56,26 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
       0,
       `take_snapshot command failed: ${snapshotResult.stderr}`,
     );
-    const uidMatch = snapshotResult.stdout.match(/uid=(\S+) textbox/);
-    assert.ok(
-      uidMatch,
-      'textarea uid not found in snapshot: ' + snapshotResult.stdout,
+    textareaUids = Array.from(
+      snapshotResult.stdout.matchAll(/uid=(\S+) textbox/g),
+      match => match[1],
     );
-    textareaUid = uidMatch[1];
+    assert.strictEqual(
+      textareaUids.length,
+      fillCases.length,
+      'textarea uids not found in snapshot: ' + snapshotResult.stdout,
+    );
   });
 
   after(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
+    await stopDaemonForCleanup(sessionId);
   });
 
-  async function readTextareaValue(): Promise<string> {
+  async function readTextareaValue(index: number): Promise<string> {
     const result = await runCli(
       [
         'evaluate_script',
-        '() => document.getElementById("t").value',
+        `() => document.getElementById("t${index}").value`,
         '--pageId',
         '1',
       ],
@@ -82,27 +91,22 @@ describe('chrome-devtools positional values starting with a hyphen', () => {
     return JSON.parse(`"${match[1]}"`);
   }
 
-  const fillCases: Array<{value: string[]; expected: string}> = [
-    {value: ['-'], expected: '-'},
-    {value: ['-5'], expected: '-5'},
-    {value: ['a-b'], expected: 'a-b'},
-    {value: ['--weird'], expected: '--weird'},
-    {value: ['- item'], expected: '- item'},
-    {value: ['-abc'], expected: '-abc'},
-    {value: ['--', '--weird'], expected: '--weird'},
-  ];
-  for (const {value, expected} of fillCases) {
-    it(`fill passes ${JSON.stringify(value.join(' '))} through`, async () => {
-      const args = ['fill', '1', textareaUid, ...value];
-      const result = await runCli(args, sessionId);
-      assert.strictEqual(
-        result.status,
-        0,
-        `${args.join(' ')} failed: ${result.stderr}`,
-      );
-      assert.strictEqual(await readTextareaValue(), expected);
-    });
-  }
+  // Each fill case uses its own textarea, so the cases run in parallel. The
+  // daemon still runs one tool call at a time.
+  describe('fill', {concurrency: true}, () => {
+    for (const [index, {value, expected}] of fillCases.entries()) {
+      it(`fill passes ${JSON.stringify(value.join(' '))} through`, async () => {
+        const args = ['fill', '1', textareaUids[index], ...value];
+        const result = await runCli(args, sessionId);
+        assert.strictEqual(
+          result.status,
+          0,
+          `${args.join(' ')} failed: ${result.stderr}`,
+        );
+        assert.strictEqual(await readTextareaValue(index), expected);
+      });
+    }
+  });
 
   it('type_text passes a lone hyphen through', async () => {
     const result = await runCli(['type_text', '1', '-'], sessionId);
