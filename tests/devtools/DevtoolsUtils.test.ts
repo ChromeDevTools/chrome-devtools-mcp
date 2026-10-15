@@ -232,6 +232,39 @@ describe('SymbolizedError', () => {
       assert.strictEqual(error.cause, undefined);
     });
 
+    it('includes the reason of an unhandled promise rejection', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          text: 'Uncaught (in promise)',
+          exception: {
+            type: 'object',
+            subtype: 'error',
+            className: 'Error',
+            description:
+              'Error: reason-A\n    at http://example.com/app.js:4:16',
+          },
+        }),
+        targetId: '',
+      });
+
+      assert.strictEqual(
+        error.message,
+        'Uncaught (in promise) Error: reason-A',
+      );
+    });
+
+    it('includes a primitive rejection reason', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          text: 'Uncaught (in promise)',
+          exception: {type: 'string', value: 'reason-B'},
+        }),
+        targetId: '',
+      });
+
+      assert.strictEqual(error.message, 'Uncaught (in promise) reason-B');
+    });
+
     it('keeps the full description when it has no stack frames', async () => {
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({

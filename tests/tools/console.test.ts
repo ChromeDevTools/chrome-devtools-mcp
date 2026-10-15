@@ -255,6 +255,58 @@ describe('console', () => {
       });
     });
 
+    it('lists the reason of each unhandled promise rejection', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        // Rejections are reported once the microtask queue drains, after
+        // setContent resolves, so wait for all three exceptions.
+        // @ts-expect-error internal API
+        const client = page.pptrPage._client();
+        const thrown = new Promise<void>(resolve => {
+          let count = 0;
+          const onThrown = () => {
+            if (++count === 3) {
+              client.off('Runtime.exceptionThrown', onThrown);
+              resolve();
+            }
+          };
+          client.on('Runtime.exceptionThrown', onThrown);
+        });
+        await page.pptrPage.setContent(`<script>
+          Promise.reject(new Error('reason-A'));
+          Promise.reject('reason-B');
+          (async () => { throw new TypeError('reason-C'); })();
+        </script>`);
+        await thrown;
+        await listConsoleMessages(args).handler(
+          {params: {}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.ok(
+          textContent.includes(
+            'msgid=1 [error] Uncaught (in promise) Error: reason-A (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(
+          textContent.includes(
+            'msgid=2 [error] Uncaught (in promise) reason-B (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(
+          textContent.includes(
+            'msgid=3 [error] Uncaught (in promise) TypeError: reason-C (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(!textContent.includes('times]'), textContent);
+      });
+    });
+
     describe('issues', () => {
       it('lists issues', async () => {
         await withMcpContext(async (response, context, args) => {
