@@ -1,0 +1,63 @@
+# Changes to the `orkon/js-repl` prototype (relative to the initial WIP commit 1e02124)
+
+## 1. Do not put tools on `window` (review feedback #2)
+
+- src/tools/repl.ts: removed `buildReplWrapperInitScript`, the
+  `evaluateOnNewDocument` install and the `globalThis[name] = ...` assignments.
+  The `mcp` namespace is now a frozen, null-prototype object created per
+  evaluation and passed to the user function as its first argument:
+  `async (mcp) => { await mcp.click({uid}) }`. Only the `__mcpCallTool`
+  binding remains on the global object (required by `exposeFunction`).
+- Tool description and `function` parameter description updated to the
+  `mcp.<tool>()` form.
+- tests/tools/repl.test.ts: tests use `mcp.*`; added assertions that no tool
+  names leak into `globalThis`; added a test that a page-defined
+  `window.click` is not overwritten.
+
+## 2. Forward images from inner tool calls (review feedback #3)
+
+- src/tools/repl.ts: the dispatcher now iterates `result.content` and calls
+  `outerResponse.attachImage()` for every `image` item, so inline
+  `mcp.take_screenshot()` results reach the MCP client via the outer
+  `evaluate_script` response. `ensureReplBindings` takes the outer `Response`.
+- tests/tools/repl.test.ts: added a test asserting `response.images` contains
+  one `image/png` after `await mcp.take_screenshot()`.
+
+## 3. Expose DevTools Console Utilities by name (CDP `includeCommandLineAPI`)
+
+- src/tools/repl.ts: evaluation no longer goes through `page.evaluate()`
+  (which uses `Runtime.callFunctionOn` and never installs the Console
+  Utilities). `evaluateReplFunction()` talks CDP directly on a dedicated
+  session:
+  1. One `Runtime.evaluate({includeCommandLineAPI: true})` runs
+     `buildReplEvaluationScript()`, which returns a `{fn, mcp}` holder.
+     The user function `fn` is created inside an IIFE whose parameters are
+     `getEventListeners`, `getAccessibleName`, `getAccessibleRole`,
+     `monitorEvents`, `unmonitorEvents`, `$x`, `$`, `$$`, `$0`,
+     bound to the values captured while the Command Line API is installed.
+     The utilities are therefore in scope by their usual DevTools names and
+     keep working after the first `await` (V8 removes them from the global
+     object once the synchronous part of the evaluation returns). No `cl`
+     argument and no host roundtrip for these calls.
+  2. One `Runtime.callFunctionOn` on the holder invokes `fn(mcp)` and returns
+     the JSON-serialized result. Exceptions surface via `exceptionDetails`.
+- tests/tools/repl.test.ts: added a test that uses `getEventListeners`,
+  `getAccessibleName/Role`, `$x`, `$$` by bare name after an
+  `await`, and asserts nothing leaks into `globalThis`.
+
+## 4. Typed signatures in the tool description
+
+- src/tools/repl.ts: replaced the "parameter names + first line" list with
+  generated TypeScript declarations in the description:
+  - `zodToTs()` renders each tool's zod schema (string/number/boolean,
+    literal, enum, optional/nullable/default, array, tuple, union, record,
+    nested object) with per-field JSDoc from `.describe()`.
+  - `interface McpTools { click(params: {uid: string; dblClick?: boolean; ...}): Promise<ToolResult>; ... }`
+    (`pageId` omitted because the REPL defaults it to the current page;
+    `params` is optional when every field is optional).
+  - `type ToolResult` documents the structuredContent keys tools can return.
+  - `declare function getEventListeners(...)` etc. document the in-scope
+    Console Utilities.
+  - `type ReplScript = (mcp: McpTools) => unknown | Promise<unknown>`.
+- tests/ToolHandler.test.ts: description assertions updated to check the
+  generated declarations.

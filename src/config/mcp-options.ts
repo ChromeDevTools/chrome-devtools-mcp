@@ -193,6 +193,12 @@ export const mcpOptions = {
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
     reloadable: true,
   },
+  repl: {
+    type: 'boolean',
+    alias: 'experimentalRepl',
+    describe:
+      'Exposes only evaluate_script to the MCP client and passes all enabled MCP tools to the evaluated function as the `mcp` argument.',
+  },
   viaCli: {
     type: 'boolean',
     default: false,

@@ -470,5 +470,13 @@
   {
     "name": "screencast_fps_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "repl_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "repl",
+    "flagType": "boolean"
   }
 ]

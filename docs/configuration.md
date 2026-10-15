@@ -224,6 +224,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--repl`, `--experimentalRepl`**
+  Exposes only evaluate_script to the MCP client and passes all enabled MCP tools to the evaluated function as the `mcp` argument.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--redactNetworkHeaders`/ `--redact-network-headers`**
   If true, redacts some of the network headers considered sensitive before returning to the client.
   - **Type:** boolean

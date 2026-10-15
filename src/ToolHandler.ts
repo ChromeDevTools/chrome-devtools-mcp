@@ -52,7 +52,7 @@ function buildDisabledMessage(
   return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
 
-function getToolStatusInfo(
+export function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ParsedArguments,
 ): {disabled: boolean; reason?: string; unavailableInMode?: boolean} {

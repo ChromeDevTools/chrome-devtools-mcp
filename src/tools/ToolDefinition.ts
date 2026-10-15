@@ -418,6 +418,7 @@ export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
  * Only add methods used by tools/*.
  */
 export type ContextPage = Readonly<{
+  readonly id: number;
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
