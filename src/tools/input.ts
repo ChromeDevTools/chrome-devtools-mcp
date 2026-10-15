@@ -7,7 +7,7 @@
 import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
-import {parseKey} from '../utils/keyboard.js';
+import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
@@ -442,16 +442,18 @@ export const typeText = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    // Validate before typing so an invalid key does not leave the text typed.
+    const submitKey = request.params.submitKey
+      ? throwIfInvalidKey(request.params.submitKey)
+      : undefined;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
-      if (request.params.submitKey) {
-        await page.pptrPage.keyboard.press(
-          request.params.submitKey as KeyInput,
-        );
+      if (submitKey) {
+        await page.pptrPage.keyboard.press(submitKey);
       }
     });
     response.appendResponseLine(
-      `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
+      `Typed text "${request.params.text}${submitKey ? ` + ${submitKey}` : ''}"`,
     );
     response.attachWaitForResult(result);
   },

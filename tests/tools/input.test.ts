@@ -883,30 +883,26 @@ describe('input', () => {
       });
     });
 
-    it('errors on invalid submit key', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(html`<textarea></textarea>`);
-        await page.click('textarea');
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        try {
-          await typeText(args).handler(
-            {
-              params: {
-                text: 'test',
-                submitKey: 'XXX',
-              },
-              page: context.getSelectedMcpPage(),
+    it('rejects an invalid submit key before typing', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+
+      await assert.rejects(
+        typeText(args).handler(
+          {
+            params: {
+              text: 'test',
+              submitKey: 'XXX',
             },
-            response,
-            context,
-          );
-        } catch (err) {
-          assert.strictEqual(err.message, 'Unknown key: "XXX"');
-        }
-      });
+            page,
+          },
+          response,
+          context,
+        ),
+        {message: /^XXX is invalid\. Valid keys are: /},
+      );
+
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
+      sinon.assert.notCalled(response.appendResponseLine);
     });
 
     it('reproduction: fill isolation', async () => {

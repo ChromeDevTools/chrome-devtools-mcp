@@ -265,7 +265,11 @@ const validKeys = new Set([
   'VolumeUp',
 ]);
 
-function throwIfInvalidKey(key: string): KeyInput {
+/**
+ * Validates a single key name (no `+` combinations) and returns it as a
+ * KeyInput.
+ */
+export function throwIfInvalidKey(key: string): KeyInput {
   if (validKeys.has(key)) {
     return key as KeyInput;
   }
