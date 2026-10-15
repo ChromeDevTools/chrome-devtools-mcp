@@ -34,7 +34,7 @@ import {
   shieldLiteralArgs,
 } from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
-import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
+import {getCliOptions} from '../config/mcp-options.js';
 
 import {ConfigParser} from '../config/ConfigParser.js';
 
@@ -261,7 +261,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
           : Promise.resolve(undefined);
 
         if (!isDaemonRunning(sessionId)) {
-          await start(serializeArgs(mcpOptions, argv), sessionId);
+          await start(serializeArgs(getCliOptions(), argv), sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
