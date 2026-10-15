@@ -60,6 +60,7 @@ export class McpServer {
   #serverArgs: ParsedArguments;
   #browserManager: BrowserManager;
   #context?: McpContext;
+  #closing?: Promise<void>;
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
@@ -131,6 +132,16 @@ export class McpServer {
   }
 
   async connect(transport: Transport): Promise<void> {
+    const originalOnClose = transport.onclose;
+    transport.onclose = () => {
+      originalOnClose?.();
+      void this.close();
+    };
+    const prevServerOnClose = this.server.server.onclose;
+    this.server.server.onclose = () => {
+      prevServerOnClose?.();
+      void this.close();
+    };
     return await this.server.connect(transport);
   }
 
@@ -175,17 +186,23 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
-    try {
-      this.#context?.dispose();
-    } catch (err) {
-      logger?.('Failed to dispose context', err);
-    } finally {
-      this.#context = undefined;
+    if (this.#closing) {
+      return await this.#closing;
     }
-    await Promise.allSettled([
-      this.#browserManager.close(),
-      this.server.close(),
-    ]);
+    this.#closing = (async () => {
+      try {
+        this.#context?.dispose();
+      } catch (err) {
+        logger?.('Failed to dispose context', err);
+      } finally {
+        this.#context = undefined;
+      }
+      await Promise.allSettled([
+        this.#browserManager.close(),
+        this.server.close(),
+      ]);
+    })();
+    return await this.#closing;
   }
 
   [Symbol.dispose](): void {
