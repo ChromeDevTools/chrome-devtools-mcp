@@ -157,7 +157,7 @@ export class McpContext implements Context {
 
   #allMcpPages(): Set<McpPage> {
     const pages = new Set(this.#mcpPages.values());
-    if (this.#selectedPage && !this.#selectedPage.isClosed()) {
+    if (this.#selectedPage) {
       pages.add(this.#selectedPage);
     }
     return pages;
@@ -508,6 +508,12 @@ export class McpContext implements Context {
   }
 
   selectPage(newPage: McpPage): void {
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
+    this.#selectPage(newPage);
+  }
+
+  #selectPage(newPage: McpPage): void {
     if (
       this.#selectedPage &&
       this.#selectedPage !== newPage &&
@@ -515,8 +521,6 @@ export class McpContext implements Context {
     ) {
       this.#selectedPage.dispose();
     }
-    this.#selectedPageFallback = undefined;
-    this.#selectedPageFallbackRead = false;
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -641,14 +645,12 @@ export class McpContext implements Context {
     if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
-      const fallback = this.#selectedPage
-        ? {wasClosed: this.#selectedPage.isClosed()}
-        : this.#selectedPageFallback;
-      this.selectPage(pages[0]);
-      if (fallback) {
-        this.#selectedPageFallback = fallback;
-        this.#selectedPageFallbackRead = false;
+      if (this.#selectedPage) {
+        this.#selectedPageFallback = {
+          wasClosed: this.#selectedPage.isClosed(),
+        };
       }
+      this.#selectPage(pages[0]);
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {

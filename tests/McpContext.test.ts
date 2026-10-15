@@ -365,6 +365,50 @@ describe('McpContext', () => {
     assert.strictEqual(context.getSelectedPageFallback(), undefined);
   });
 
+  it('overwrites an unread fallback when a second fallback occurs before it is read', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const {page: firstPptrPage, target: firstTarget} = createPageTarget();
+    const {target: secondTarget} = createPageTarget();
+    const {page: thirdPptrPage, target: thirdTarget} = createPageTarget();
+    const context = await createMockContext({
+      browser,
+      targets: [firstTarget, secondTarget, thirdTarget],
+    });
+    const [firstPage, secondPage, thirdPage] = context.getPages();
+    assert.ok(firstPage);
+    assert.ok(secondPage);
+    assert.ok(thirdPage);
+    context.selectPage(thirdPage);
+    await thirdPage.init();
+
+    // First snapshot: thirdPage triggers a fallback to firstPage (recording
+    // wasClosed: false on the third isClosed() call so it is distinguishable
+    // from the second fallback).
+    thirdPptrPage.isClosed
+      .onFirstCall()
+      .returns(true)
+      .onSecondCall()
+      .returns(true)
+      .returns(false);
+    browser.targets.returns([firstTarget, secondTarget]);
+    await context.createPagesSnapshot();
+    assert.ok(context.isPageSelected(firstPage));
+
+    // Second snapshot before getSelectedPageFallback() is read: the newly
+    // selected firstPage also closes and falls back to secondPage.
+    firstPptrPage.isClosed.returns(true);
+    browser.targets.returns([secondTarget]);
+    await context.createPagesSnapshot();
+    assert.ok(context.isPageSelected(secondPage));
+
+    assert.deepStrictEqual(context.getSelectedPageFallback(), {
+      wasClosed: true,
+    });
+
+    await context.createPagesSnapshot();
+    assert.strictEqual(context.getSelectedPageFallback(), undefined);
+  });
+
   it('clears the fallback when selectPage is called explicitly', async () => {
     const browser = createMockPuppeteerBrowser();
     const {target: firstTarget} = createPageTarget();
@@ -392,6 +436,28 @@ describe('McpContext', () => {
     const page = context.getSelectedMcpPage();
     const disposeSpy = sinon.spy(page, 'dispose');
 
+    context.dispose();
+
+    sinon.assert.calledOnceWithExactly(disposeSpy);
+  });
+
+  it('disposes a selected page that closed after being pruned from the snapshot', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const {page: pptrPage, target} = createPageTarget();
+    const context = await createMockContext({
+      browser,
+      targets: [target],
+    });
+    const page = context.getSelectedMcpPage();
+    const disposeSpy = sinon.spy(page, 'dispose');
+
+    // Prune the target from #mcpPages while the selected page is still open.
+    browser.targets.returns([]);
+    await context.createPagesSnapshot();
+    sinon.assert.notCalled(disposeSpy);
+
+    // The selected page closes before another snapshot runs.
+    pptrPage.isClosed.returns(true);
     context.dispose();
 
     sinon.assert.calledOnceWithExactly(disposeSpy);
