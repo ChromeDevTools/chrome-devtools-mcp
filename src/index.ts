@@ -10,6 +10,7 @@ import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
+import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
@@ -119,7 +120,8 @@ export class McpServer {
         );
       } else if (
         !this.#serverArgs.allowUnrestrictedPaths &&
-        (this.#serverArgs.filesystemRoot ?? []).length === 0
+        ((this.#serverArgs.filesystemRoot ?? []).length === 0 ||
+          this.#serverArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT)
       ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
