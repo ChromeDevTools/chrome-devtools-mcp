@@ -29,7 +29,7 @@ import sinon from 'sinon';
 import type {ParsedArguments} from '../src/config/ConfigParser.js';
 import {stopDaemon} from '../src/daemon/client.js';
 import {isDaemonRunning} from '../src/daemon/utils.js';
-import {McpContext} from '../src/McpContext.js';
+import {McpContext, type McpContextOptions} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -168,6 +168,23 @@ export async function withBrowser(
   }
 }
 
+/**
+ * Creates an McpContext that is already connected to `browser`.
+ */
+export async function createConnectedMcpContext(
+  browser: Browser,
+  options: Omit<McpContextOptions, 'getBrowser'>,
+  locatorClass?: typeof Locator,
+): Promise<McpContext> {
+  const context = McpContext.create(
+    undefined,
+    {...options, getBrowser: async () => browser},
+    locatorClass,
+  );
+  await context.ensureBrowser();
+  return context;
+}
+
 export async function withMcpContext(
   cb: (
     response: McpResponse,
@@ -198,9 +215,8 @@ export async function withMcpContext(
     if (context) {
       context.dispose();
     }
-    context = await McpContext.from(
+    context = await createConnectedMcpContext(
       browser,
-      undefined,
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: options.performanceCrux ?? true,

@@ -36,6 +36,7 @@ import {
 import {serverHooks, TestServer} from './server.js';
 import {
   assertNoServiceWorkerReported,
+  createConnectedMcpContext,
   createTempDir,
   createTempFile,
   getMockBrowser,
@@ -76,9 +77,8 @@ describe('McpContext', () => {
     const {target: defaultTarget} = createPageTarget();
     browser.targets.returns(options?.targets ?? [defaultTarget]);
     browser.browserContexts.returns([]);
-    return await McpContext.from(
+    return await createConnectedMcpContext(
       browser,
-      undefined,
       {
         experimentalDevToolsDebugging: false,
         performanceCrux: true,
@@ -524,19 +524,14 @@ describe('McpContext', () => {
         performanceCrux: false,
         heapSnapshotManager: new HeapSnapshotManager(),
       };
-      const first = await McpContext.from(browser, undefined, options, Locator);
+      const first = await createConnectedMcpContext(browser, options, Locator);
       const idBeforeReconnect = (await first.newPage()).id;
       first.dispose();
 
       // A new context (as created after a browser reconnect) continues the
       // shared id counter, so an id handed out before no longer resolves and
       // the next page keeps counting up rather than colliding with it.
-      const second = await McpContext.from(
-        browser,
-        undefined,
-        options,
-        Locator,
-      );
+      const second = await createConnectedMcpContext(browser, options, Locator);
       try {
         assert.throws(
           () => second.getPageById(idBeforeReconnect),
@@ -565,27 +560,182 @@ describe('McpContext', () => {
     });
   });
 
-  it('reports the reconnect notice once', async () => {
-    await withBrowser(async browser => {
-      const heapSnapshotManager = new HeapSnapshotManager();
-      const context = await McpContext.from(
-        browser,
+  describe('lazy browser connection', () => {
+    function createLazyContext(getBrowser: () => Promise<Browser>) {
+      return McpContext.create(
         undefined,
         {
           experimentalDevToolsDebugging: false,
           performanceCrux: false,
-          reconnected: true,
-          heapSnapshotManager,
+          heapSnapshotManager: new HeapSnapshotManager(),
+          getBrowser,
         },
         Locator,
       );
-      try {
-        assert.ok(context.consumeReconnectNotice(), 'notice available once');
-        assert.ok(!context.consumeReconnectNotice(), 'notice does not repeat');
-      } finally {
-        context.dispose();
-        heapSnapshotManager.dispose();
+    }
+
+    function createBrowser() {
+      const browser = createMockPuppeteerBrowser();
+      browser.targets.returns([]);
+      return browser;
+    }
+
+    it('does not connect until ensureBrowser() is called', async () => {
+      const browser = createBrowser();
+      const getBrowser = sinon.stub<[], Promise<Browser>>().resolves(browser);
+      const context = createLazyContext(getBrowser);
+
+      sinon.assert.notCalled(getBrowser);
+      assert.throws(() => context.browser, /Not connected to a browser/);
+
+      assert.strictEqual(await context.ensureBrowser(), browser);
+      assert.strictEqual(context.browser, browser);
+      sinon.assert.calledOnce(getBrowser);
+      context.dispose();
+    });
+
+    it('resets the browser state and reports a reconnect notice once when the browser changes', async () => {
+      const firstBrowser = createBrowser();
+      const secondBrowser = createBrowser();
+      const getBrowser = sinon.stub<[], Promise<Browser>>();
+      getBrowser.onFirstCall().resolves(firstBrowser);
+      getBrowser.onSecondCall().resolves(secondBrowser);
+      const context = createLazyContext(getBrowser);
+
+      await context.ensureBrowser();
+      assert.ok(!context.consumeReconnectNotice());
+      context.setIsRunningPerformanceTrace(true);
+
+      await context.ensureBrowser();
+
+      assert.strictEqual(context.browser, secondBrowser);
+      assert.ok(!context.isRunningPerformanceTrace());
+      sinon.assert.calledWith(
+        firstBrowser.off,
+        'targetcreated',
+        sinon.match.func,
+      );
+      assert.ok(context.consumeReconnectNotice(), 'notice available once');
+      assert.ok(!context.consumeReconnectNotice(), 'notice does not repeat');
+      context.dispose();
+    });
+
+    it('starts over if initializing the browser state fails', async () => {
+      const browser = createBrowser();
+      browser.targets.onFirstCall().throws(new Error('init failed'));
+      const context = createLazyContext(async () => browser);
+
+      await assert.rejects(context.ensureBrowser(), /init failed/);
+      assert.throws(() => context.browser, /Not connected to a browser/);
+
+      await context.ensureBrowser();
+      assert.strictEqual(context.browser, browser);
+      assert.ok(!context.consumeReconnectNotice());
+      context.dispose();
+    });
+
+    describe('when the browser is replaced during a hanging initialization', () => {
+      function setUpHangingInit() {
+        const firstBrowser = createBrowser();
+        const secondBrowser = createBrowser();
+        const getBrowser = sinon.stub<[], Promise<Browser>>();
+        getBrowser.onFirstCall().resolves(firstBrowser);
+        getBrowser.onSecondCall().resolves(secondBrowser);
+        const context = createLazyContext(getBrowser);
+        const hangingSnapshot = Promise.withResolvers<McpPage[]>();
+        sinon
+          .stub(context, 'createPagesSnapshot')
+          .callThrough()
+          .onFirstCall()
+          .returns(hangingSnapshot.promise);
+        return {context, firstBrowser, secondBrowser, hangingSnapshot};
       }
+
+      it('does not touch the new browser state once the stale call resumes', async () => {
+        const {context, firstBrowser, secondBrowser, hangingSnapshot} =
+          setUpHangingInit();
+
+        const staleCall = context.ensureBrowser();
+        await context.ensureBrowser();
+        for (const call of firstBrowser.on.getCalls()) {
+          sinon.assert.calledWithExactly(firstBrowser.off, ...call.args);
+        }
+        const firstBrowserOnCalls = firstBrowser.on.callCount;
+        const secondBrowserOnCalls = secondBrowser.on.callCount;
+
+        hangingSnapshot.resolve([]);
+        await assert.rejects(staleCall, /Browser was replaced/);
+
+        assert.strictEqual(context.browser, secondBrowser);
+        sinon.assert.callCount(firstBrowser.on, firstBrowserOnCalls);
+        sinon.assert.callCount(secondBrowser.on, secondBrowserOnCalls);
+        assert.ok(!context.consumeReconnectNotice());
+        context.dispose();
+      });
+
+      it('does not reset the new browser state when the stale call fails', async () => {
+        const {context, secondBrowser, hangingSnapshot} = setUpHangingInit();
+
+        const staleCall = context.ensureBrowser();
+        await context.ensureBrowser();
+
+        hangingSnapshot.reject(new Error('init failed'));
+        await assert.rejects(staleCall, /init failed/);
+
+        assert.strictEqual(context.browser, secondBrowser);
+        sinon.assert.notCalled(secondBrowser.off);
+        context.dispose();
+      });
+    });
+
+    describe('when the same browser is returned during a hanging initialization', () => {
+      function setUpHangingInit() {
+        const browser = createBrowser();
+        const context = createLazyContext(async () => browser);
+        const hangingSnapshot = Promise.withResolvers<McpPage[]>();
+        const createPagesSnapshot = sinon
+          .stub(context, 'createPagesSnapshot')
+          .callThrough()
+          .onFirstCall()
+          .returns(hangingSnapshot.promise);
+        return {context, browser, hangingSnapshot, createPagesSnapshot};
+      }
+
+      it('waits for the pending initialization', async () => {
+        const {context, browser, hangingSnapshot, createPagesSnapshot} =
+          setUpHangingInit();
+
+        const firstCall = context.ensureBrowser();
+        let joinedCallSettled = false;
+        const joinedCall = context.ensureBrowser().finally(() => {
+          joinedCallSettled = true;
+        });
+        await new Promise(resolve => setImmediate(resolve));
+        assert.ok(!joinedCallSettled);
+
+        hangingSnapshot.resolve([]);
+        assert.strictEqual(await firstCall, browser);
+        assert.strictEqual(await joinedCall, browser);
+        sinon.assert.calledOnce(createPagesSnapshot);
+        sinon.assert.notCalled(browser.off);
+        context.dispose();
+      });
+
+      it('fails the joined call too and starts over on the next call', async () => {
+        const {context, browser, hangingSnapshot, createPagesSnapshot} =
+          setUpHangingInit();
+
+        const firstCall = context.ensureBrowser();
+        const joinedCall = context.ensureBrowser();
+        hangingSnapshot.reject(new Error('init failed'));
+        await assert.rejects(firstCall, /init failed/);
+        await assert.rejects(joinedCall, /init failed/);
+        assert.throws(() => context.browser, /Not connected to a browser/);
+
+        assert.strictEqual(await context.ensureBrowser(), browser);
+        sinon.assert.calledTwice(createPagesSnapshot);
+        context.dispose();
+      });
     });
   });
 
@@ -933,9 +1083,8 @@ describe('McpContext', () => {
         const browser = getMockBrowser();
         browser.pages = async () => [];
         browser.targets = () => [];
-        return await McpContext.from(
+        return await createConnectedMcpContext(
           browser,
-          undefined,
           {
             experimentalDevToolsDebugging: false,
             performanceCrux: false,

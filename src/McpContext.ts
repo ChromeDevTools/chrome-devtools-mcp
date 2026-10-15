@@ -42,6 +42,7 @@ import {
 } from './third_party/index.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
+  BrowserlessContext,
   Context,
   DevToolsData,
   SupportedExtensions,
@@ -52,7 +53,7 @@ import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
-interface McpContextOptions {
+export interface McpContextOptions {
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
@@ -70,9 +71,6 @@ interface McpContextOptions {
   // restricted to the OS temp directory. When true, the previous permissive
   // behavior is restored.
   allowUnrestrictedPaths?: boolean;
-  // Whether this context replaces a previous one after a browser reconnect.
-  // Surfaces a one-time note in the next response.
-  reconnected?: boolean;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
   // Whether extension tools and targets are enabled.
@@ -81,6 +79,9 @@ interface McpContextOptions {
   onNotification?: (message: string) => void;
   // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
   heapSnapshotManager: HeapSnapshotManager;
+  // Returns the browser to use. Called by ensureBrowser(), so the browser
+  // connection is only established once a tool needs it.
+  getBrowser: () => Promise<Browser>;
 }
 
 // Page ids are handed out from a process-wide counter so they stay unique
@@ -89,9 +90,16 @@ interface McpContextOptions {
 // page of the reconnected browser.
 let nextPageId = 1;
 
-export class McpContext implements Context {
-  browser: Browser;
+export class McpContext implements Context, BrowserlessContext {
   logger: Logger;
+
+  #browser?: Browser;
+  // Initialization of #browser, settles once its browser-dependent state is
+  // ready.
+  #browserReady?: Promise<void>;
+  // Whether a browser connection was established before, so that switching to
+  // a new browser surfaces a reconnect notice.
+  #hasConnected = false;
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
@@ -107,7 +115,7 @@ export class McpContext implements Context {
   #selectedPageFallback?: {wasClosed: boolean};
   #selectedPageFallbackRead = false;
 
-  #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
+  #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
 
@@ -122,7 +130,6 @@ export class McpContext implements Context {
   #allowUnrestrictedPaths: boolean;
 
   private constructor(
-    browser: Browser,
     logger: Logger,
     options: McpContextOptions,
     locatorClass: typeof Locator,
@@ -133,26 +140,22 @@ export class McpContext implements Context {
       },
     });
 
-    this.browser = browser;
     this.logger = logger;
     this.#locatorClass = locatorClass;
     this.#options = options;
     this.#heapSnapshotManager = options.heapSnapshotManager;
     this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
-    this.#reconnectNotice = options.reconnected ?? false;
-
-    this.#serviceWorkerConsoleCollector = new ServiceWorkerConsoleCollector(
-      this.browser,
-    );
   }
 
-  async #init(): Promise<void> {
-    await this.createPagesSnapshot();
-    const workers = this.createWorkersSnapshot();
-
-    await this.#serviceWorkerConsoleCollector.init(workers);
-    this.browser.on('targetcreated', this.#onTargetCreated);
-    this.browser.on('targetdestroyed', this.#onTargetDestroyed);
+  /**
+   * The browser of the current connection. Throws if no browser connection was
+   * established yet, see {@link McpContext.ensureBrowser}.
+   */
+  get browser(): Browser {
+    if (!this.#browser) {
+      throw new Error('Not connected to a browser.');
+    }
+    return this.#browser;
   }
 
   #allMcpPages(): Set<McpPage> {
@@ -163,11 +166,66 @@ export class McpContext implements Context {
     return pages;
   }
 
-  dispose(): void {
-    this.browser.off('targetcreated', this.#onTargetCreated);
-    this.browser.off('targetdestroyed', this.#onTargetDestroyed);
+  /**
+   * Returns the browser, establishing the connection if needed. If the browser
+   * changed since the last call (e.g. after a reconnect), all
+   * browser-dependent state is rebuilt for the new browser.
+   */
+  async ensureBrowser(): Promise<Browser> {
+    const browser = await this.#options.getBrowser();
+    if (browser === this.#browser && this.#browserReady) {
+      // Joins a still pending initialization instead of handing out
+      // half-initialized state.
+      await this.#browserReady;
+      return browser;
+    }
 
-    this.#serviceWorkerConsoleCollector.dispose();
+    this.#resetBrowserState();
+    this.#browser = browser;
+    const ready = this.#initBrowserState(browser);
+    this.#browserReady = ready;
+    try {
+      await ready;
+      return browser;
+    } catch (err) {
+      // Leave no half-initialized state behind, the next call starts over. If
+      // a later call already installed another browser, its state is left
+      // intact.
+      if (this.#browserReady === ready) {
+        this.#resetBrowserState();
+      }
+      throw err;
+    }
+  }
+
+  async #initBrowserState(browser: Browser): Promise<void> {
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    this.#serviceWorkerConsoleCollector = collector;
+    // All listeners are registered synchronously, before the first await. If
+    // this call hangs and is abandoned by the tool-call timeout, a later call
+    // that installs a different browser removes them in #resetBrowserState().
+    browser.on('targetcreated', this.#onTargetCreated);
+    browser.on('targetdestroyed', this.#onTargetDestroyed);
+    await Promise.all([
+      collector.init(this.createWorkersSnapshot()),
+      this.createPagesSnapshot(),
+    ]);
+    // The state now belongs to the browser of a later call, leave it intact.
+    if (this.#browser !== browser) {
+      throw new Error('Browser was replaced while initializing.');
+    }
+
+    if (this.#hasConnected) {
+      this.#reconnectNotice = true;
+    }
+    this.#hasConnected = true;
+  }
+
+  #resetBrowserState(): void {
+    this.#browser?.off('targetcreated', this.#onTargetCreated);
+    this.#browser?.off('targetdestroyed', this.#onTargetDestroyed);
+
+    this.#serviceWorkerConsoleCollector?.dispose();
     for (const mcpPage of this.#allMcpPages()) {
       mcpPage.dispose();
     }
@@ -177,6 +235,19 @@ export class McpContext implements Context {
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
     this.#isolatedContexts.clear();
+    this.#nextIsolatedContextId = 1;
+    this.#selectedPage = undefined;
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
+    this.#isRunningTrace = false;
+    this.#traceResults = [];
+    this.#serviceWorkerConsoleCollector = undefined;
+    this.#browser = undefined;
+    this.#browserReady = undefined;
+  }
+
+  dispose(): void {
+    this.#resetBrowserState();
   }
 
   #onTargetCreated = (target: Target): void => {
@@ -203,16 +274,13 @@ export class McpContext implements Context {
     }
   };
 
-  static async from(
-    browser: Browser,
+  static create(
     logger: Logger,
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
-  ): Promise<McpContext> {
-    const context = new McpContext(browser, logger, opts, locatorClass);
-    await context.#init();
-    return context;
+  ): McpContext {
+    return new McpContext(logger, opts, locatorClass);
   }
 
   static resetPageIdsForTesting(): void {
@@ -485,9 +553,9 @@ export class McpContext implements Context {
   }
 
   /**
-   * Returns true once if this context was created by reconnecting after the
-   * previous browser connection was lost, so the next response can surface a
-   * note. Cleared on first call.
+   * Returns true once after the browser connection was re-established with a
+   * new browser, so the next response can surface a note. Cleared on first
+   * call.
    */
   consumeReconnectNotice(): boolean {
     const notice = this.#reconnectNotice;
@@ -572,7 +640,7 @@ export class McpContext implements Context {
   getServiceWorkerConsoleData(
     extensionId: string,
   ): Array<ConsoleMessage | UncaughtError> {
-    return this.#serviceWorkerConsoleCollector.getData(extensionId);
+    return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
   }
 
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {

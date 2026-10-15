@@ -343,6 +343,14 @@ export type Context = Readonly<{
   getSelectedMcpPage(): McpPage;
   getWorkers(): McpWorker[];
   getWorkerById(id: string): McpWorker | undefined;
+}>;
+
+/**
+ * The context available to tools that do not need a browser connection, see
+ * {@link defineBrowserlessTool}. Using it never triggers a browser launch or
+ * connection.
+ */
+export type BrowserlessContext = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
@@ -520,6 +528,49 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
       pageScoped: true,
     };
   };
+}
+
+export interface BrowserlessToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> extends BaseToolDefinition<Schema> {
+  browserless: true;
+  handler(
+    request: Request<Schema>,
+    response: Response,
+    context: BrowserlessContext,
+  ): Promise<void>;
+}
+
+/**
+ * Defines a tool that does not need a browser connection, e.g. a tool that only
+ * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ */
+export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
+  definition: (
+    args: ParsedArguments,
+  ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless'>,
+): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
+  return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
+    return {
+      ...definition(args),
+      browserless: true,
+    };
+  };
+}
+
+export type AnyToolDefinition =
+  ToolDefinition | DefinedPageTool | BrowserlessToolDefinition;
+
+export function isPageScopedTool(
+  tool: AnyToolDefinition,
+): tool is DefinedPageTool {
+  return 'pageScoped' in tool && tool.pageScoped === true;
+}
+
+export function isBrowserlessTool(
+  tool: AnyToolDefinition,
+): tool is BrowserlessToolDefinition {
+  return 'browserless' in tool && tool.browserless === true;
 }
 
 export const CLOSE_PAGE_ERROR =

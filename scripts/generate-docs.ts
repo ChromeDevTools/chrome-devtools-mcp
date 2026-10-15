@@ -17,10 +17,7 @@ import type {ParsedArguments} from '../build/src/config/ConfigParser.js';
 import {zod} from '../build/src/third_party/index.js';
 import {ToolCategory, labels} from '../build/src/tools/categories.js';
 import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
-import type {
-  DefinedPageTool,
-  ToolDefinition,
-} from '../src/tools/ToolDefinition.js';
+import type {AnyToolDefinition} from '../src/tools/ToolDefinition.js';
 import {createTools, requiresHiddenFlag} from '../build/src/tools/tools.js';
 
 const OUTPUT_PATH = './docs/tool-reference.md';
@@ -334,9 +331,7 @@ async function generateReference(
   );
 }
 
-function getToolsAndCategories(
-  tools: Array<ToolDefinition<zod.ZodRawShape> | DefinedPageTool>,
-) {
+function getToolsAndCategories(tools: AnyToolDefinition[]) {
   // Convert ToolDefinitions to ToolWithAnnotations
   const toolsWithAnnotations: ToolWithAnnotations[] = tools
     .filter(tool => {

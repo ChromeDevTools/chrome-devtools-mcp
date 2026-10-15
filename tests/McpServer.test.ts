@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -23,15 +24,20 @@ describe('McpServer', () => {
     ClearcutLogger.resetForTesting();
   });
 
-  async function createTestServer(extraArgs: string[] = []) {
+  async function createTestServer(
+    extraArgs: string[] = [],
+    {mockContext = true}: {mockContext?: boolean} = {},
+  ) {
     const browserManager = sinon.createStubInstance(BrowserManager);
     const browser = createMockPuppeteerBrowser();
     browserManager.ensureBrowser.resolves(browser);
 
     const context = createMockMcpContext();
-    context.browser = browser;
+    context.ensureBrowser.resolves(browser);
     context.getPages.returns([]);
-    sinon.stub(McpContext, 'from').resolves(context);
+    if (mockContext) {
+      sinon.stub(McpContext, 'create').returns(context);
+    }
 
     const serverArgs = new ConfigParser(
       '1.0.0',
@@ -77,13 +83,30 @@ describe('McpServer', () => {
     });
 
     it('executes the tool handler when arguments are valid', async () => {
-      const {server, browserManager, context} = await createTestServer();
+      const {server, context} = await createTestServer();
 
       const result = await server.callTool('list_pages', {});
 
       assert.strictEqual(result.isError, undefined);
-      sinon.assert.calledOnce(browserManager.ensureBrowser);
+      sinon.assert.calledOnce(context.ensureBrowser);
       sinon.assert.calledOnce(context.createPagesSnapshot);
+    });
+
+    it('does not launch or connect a browser for browserless tools', async () => {
+      const {server, browserManager} = await createTestServer(
+        ['--memoryDebugging', '--allowUnrestrictedPaths'],
+        {mockContext: false},
+      );
+
+      const result = await server.callTool('get_heapsnapshot_summary', {
+        filePath: path.resolve('tests/fixtures/heap-1.heapsnapshot'),
+      });
+
+      assert.strictEqual(result.isError, undefined);
+      assert.strictEqual(result.content[0].type, 'text');
+      assert.match(result.content[0].text, /## Heap Snapshot Data/);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
     });
   });
 
