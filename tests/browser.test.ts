@@ -150,6 +150,26 @@ describe('browser', () => {
       sinon.assert.notCalled(pptrBrowser.close);
     });
 
+    it('enables WebSocket keep-alive and passes wsHeaders when connecting', async () => {
+      const connectStub = sinon
+        .stub(puppeteer, 'connect')
+        .resolves(createMockPuppeteerBrowser());
+
+      const args = createMockParsedArguments({
+        wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc',
+        wsHeaders: {Authorization: 'Bearer token'},
+      });
+      await new BrowserManager(args).ensureBrowser();
+
+      sinon.assert.calledWithMatch(connectStub, {
+        browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser/abc',
+        wsOptions: {
+          keepAlive: true,
+          headers: {Authorization: 'Bearer token'},
+        },
+      });
+    });
+
     for (const categoryExtensions of [false, true]) {
       it(`${categoryExtensions ? 'keeps' : 'drops'} extension targets when connecting with categoryExtensions=${categoryExtensions}`, async () => {
         const connectStub = sinon

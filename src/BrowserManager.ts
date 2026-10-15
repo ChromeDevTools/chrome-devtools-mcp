@@ -348,14 +348,21 @@ export class BrowserManager {
       blocklist,
       allowlist,
       logger: puppeteerLogger,
+      // Detects a transport that died without a close frame (e.g. an adb
+      // port-forward torn down mid-call). Puppeteer pings the socket
+      // periodically and terminates it on a missed pong, which rejects the
+      // in-flight CDP calls and fires `disconnected` so #evictIfCurrent()
+      // drops the stale handle. Without this, such a call would hang until
+      // protocolTimeout while holding the tool mutex.
+      wsOptions: {
+        keepAlive: true,
+        headers: wsHeaders,
+      },
     };
 
     let autoConnect = false;
     if (wsEndpoint) {
       connectOptions.browserWSEndpoint = wsEndpoint;
-      if (wsHeaders) {
-        connectOptions.headers = wsHeaders;
-      }
     } else if (browserURL) {
       connectOptions.browserURL = browserURL;
     } else if (channel || userDataDir) {
