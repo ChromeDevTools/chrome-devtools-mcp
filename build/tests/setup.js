@@ -1,0 +1,26 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import '../src/utils/polyfill.js';
+import path from 'node:path';
+import { before, it } from 'node:test';
+import { overrideDevToolsGlobals } from '../src/devtools/DevtoolsUtils.js';
+before(() => {
+    overrideDevToolsGlobals({
+        loadResource: async () => '',
+    });
+});
+// This is run by Node when we execute the tests via the --import flag.
+it.snapshot.setResolveSnapshotPath(testPath => {
+    // By default the snapshots go into the build directory, but we want them
+    // in the tests/ directory.
+    const correctPath = testPath?.replace(path.join('build', 'tests'), 'tests');
+    return correctPath + '.snapshot';
+});
+// The default serializer is JSON.stringify which outputs a very hard to read
+// snapshot. So we override it to one that shows new lines literally rather
+// than via `\n`.
+it.snapshot.setDefaultSnapshotSerializers([String]);
+//# sourceMappingURL=setup.js.map

@@ -1,0 +1,526 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose, inner;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        var r, s = 0;
+        function next() {
+            while (r = env.stack.pop()) {
+                try {
+                    if (!r.async && s === 1) return s = 0, env.stack.push(r), Promise.resolve().then(next);
+                    if (r.dispose) {
+                        var result = r.dispose.call(r.value);
+                        if (r.async) return s |= 2, Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                    }
+                    else s |= 1;
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (s === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
+import assert from 'node:assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
+import { executablePath } from 'puppeteer';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { mcpOptions } from '../src/config/mcp-options.js';
+import { getOffByDefaultCategories } from '../src/config/category-options.js';
+import { createTempDir } from './utils.js';
+describe('e2e', () => {
+    async function withClient(cb, extraArgs = [], options = {}) {
+        let attempt = 1;
+        while (attempt <= 3) {
+            const transport = new StdioClientTransport({
+                command: 'node',
+                args: [
+                    'build/src/bin/chrome-devtools-mcp.js',
+                    '--headless',
+                    '--isolated',
+                    '--executable-path',
+                    await executablePath(),
+                    ...extraArgs,
+                ],
+                env: { ...process.env, CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true' },
+            });
+            const client = new Client({
+                name: 'e2e-test',
+                version: '1.0.0',
+            }, {
+                capabilities: options.capabilities ?? {},
+                ...(options.versionNegotiation
+                    ? { versionNegotiation: options.versionNegotiation }
+                    : {}),
+            });
+            try {
+                await client.connect(transport);
+                await cb(client);
+                return;
+            }
+            catch (error) {
+                if (attempt === 3 ||
+                    !(error instanceof Error) ||
+                    (!error.message.includes('timed out') &&
+                        !error.message.includes('timeout'))) {
+                    throw error;
+                }
+                attempt++;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            finally {
+                try {
+                    await client.close();
+                }
+                catch {
+                    // Ignore close errors
+                }
+            }
+        }
+    }
+    it('connects and negotiates 2026-07-28 era', async () => {
+        await withClient(async (client) => {
+            const result = await client.callTool({
+                name: 'list_pages',
+                arguments: {},
+            });
+            assert.ok(result.content);
+        }, [], { versionNegotiation: { mode: 'auto' } });
+    });
+    it('calls a tool', async (t) => {
+        await withClient(async (client) => {
+            const result = await client.callTool({
+                name: 'list_pages',
+                arguments: {},
+            });
+            t.assert.snapshot(JSON.stringify(result.content));
+        });
+    });
+    it('calls a tool multiple times', async (t) => {
+        await withClient(async (client) => {
+            let result = await client.callTool({
+                name: 'list_pages',
+                arguments: {},
+            });
+            result = await client.callTool({
+                name: 'list_pages',
+                arguments: {},
+            });
+            t.assert.snapshot(JSON.stringify(result.content));
+        });
+    });
+    it('has all tools with off by default categories', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const exposedNames = tools.map(t => t.name).sort();
+            const definedNames = await getToolsWithFilteredCategories();
+            definedNames.sort();
+            assert.deepStrictEqual(exposedNames, definedNames);
+        }, getOffByDefaultCategories().map(category => `--category-${category}`));
+    });
+    it('has all tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const exposedNames = tools.map(t => t.name).sort();
+            const definedNames = await getToolsWithFilteredCategories(getOffByDefaultCategories());
+            definedNames.sort();
+            assert.deepStrictEqual(exposedNames, definedNames);
+        });
+    });
+    it('has experimental third-party developer tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const listThirdPartyDeveloperTools = tools.find(t => t.name === 'list_3p_developer_tools');
+            assert.ok(listThirdPartyDeveloperTools);
+        }, ['--category-experimental-third-party']);
+    });
+    it('has experimental extensions tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const installExtension = tools.find(t => t.name === 'install_extension');
+            assert.ok(installExtension);
+        }, ['--category-extensions']);
+    });
+    it('has experimental vision tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const clickAt = tools.find(t => t.name === 'click_at');
+            assert.ok(clickAt);
+        }, ['--experimental-vision']);
+    });
+    it('has experimental interop tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const getTabId = tools.find(t => t.name === 'get_tab_id');
+            assert.ok(getTabId);
+        }, ['--experimental-interop-tools']);
+    });
+    it('has experimental webmcp', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const listWebMcpTools = tools.find(t => t.name === 'list_webmcp_tools');
+            const executeWebMcpTool = tools.find(t => t.name === 'execute_webmcp_tool');
+            assert.ok(listWebMcpTools);
+            assert.ok(executeWebMcpTool);
+        }, ['--categoryExperimentalWebmcp']);
+    });
+    it('has memory debugging tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const getHeapSnapshotSummary = tools.find(t => t.name === 'get_heapsnapshot_summary');
+            assert.ok(getHeapSnapshotSummary);
+        }, ['--memoryDebugging']);
+    });
+    it('can disable javascript evaluation tools', async () => {
+        await withClient(async (client) => {
+            const { tools } = await client.listTools();
+            const evaluateScript = tools.find(t => t.name === 'evaluate_script');
+            assert.strictEqual(evaluateScript, undefined);
+        }, ['--no-javascript-evaluation']);
+    });
+    it('updates roots when client notifies', async () => {
+        const roots = [{ uri: 'file:///test-root', name: 'test-root' }];
+        let resolvePromise;
+        const promise = new Promise(resolve => {
+            resolvePromise = resolve;
+        });
+        await withClient(async (client) => {
+            client.setRequestHandler('roots/list', () => {
+                resolvePromise();
+                return { roots };
+            });
+            await client.notification({
+                method: 'notifications/roots/list_changed',
+            });
+            // Wait for the server to process the notification and request roots
+            await promise;
+        }, [], {
+            capabilities: {
+                roots: { listChanged: true },
+            },
+        });
+    });
+    it('combines configured filesystem roots with client roots', async () => {
+        const env_1 = { stack: [], error: void 0, hasError: false };
+        try {
+            const configuredRoot = __addDisposableResource(env_1, createTempDir('.configured-root-', os.homedir()), false);
+            const clientRoot = __addDisposableResource(env_1, createTempDir('.client-root-', os.homedir()), false);
+            await withClient(async (client) => {
+                client.setRequestHandler('roots/list', () => {
+                    return {
+                        roots: [
+                            { uri: pathToFileURL(clientRoot.path).href, name: 'client-root' },
+                        ],
+                    };
+                });
+                for (const outputPath of [
+                    path.join(configuredRoot.path, 'configured.png'),
+                    path.join(clientRoot.path, 'client.png'),
+                ]) {
+                    const result = await client.callTool({
+                        name: 'take_screenshot',
+                        arguments: { pageId: 1, filePath: outputPath },
+                    });
+                    assert.strictEqual(result.isError, undefined);
+                    const content = result.content;
+                    assert.match(content[0].text, /Saved screenshot to/);
+                }
+            }, [`--filesystem-root=${configuredRoot.path}`], {
+                capabilities: {
+                    roots: { listChanged: true },
+                },
+            });
+        }
+        catch (e_1) {
+            env_1.error = e_1;
+            env_1.hasError = true;
+        }
+        finally {
+            __disposeResources(env_1);
+        }
+    });
+    it('denies file access if roots list is empty', async () => {
+        await withClient(async (client) => {
+            client.setRequestHandler('roots/list', () => {
+                return { roots: [] };
+            });
+            const result = await client.callTool({
+                name: 'take_screenshot',
+                arguments: {
+                    pageId: 1,
+                    filePath: path.resolve(os.homedir(), 'test.png'),
+                },
+            });
+            assert.strictEqual(result.isError, true);
+            const content = result.content;
+            assert.match(content[0].text, /Access denied/);
+        }, [], {
+            capabilities: {
+                roots: { listChanged: true },
+            },
+        });
+    });
+    it('allows file access if roots capability is missing', async () => {
+        const env_2 = { stack: [], error: void 0, hasError: false };
+        try {
+            const tempDir = __addDisposableResource(env_2, createTempDir(), false);
+            await withClient(async (client) => {
+                // Use os.tmpdir() rather than a hardcoded /tmp path.
+                // On macOS, os.tmpdir() returns /var/folders/... (not /tmp), so a
+                // hardcoded /tmp path is outside the allowed root after the
+                // validatePath fix and would be rejected with Access denied.
+                const result = await client.callTool({
+                    name: 'take_screenshot',
+                    arguments: {
+                        pageId: 1,
+                        filePath: path.join(tempDir.path, 'test.png'),
+                    },
+                });
+                assert.strictEqual(result.isError, undefined);
+                const content = result.content;
+                assert.match(content[0].text, /Saved screenshot to/);
+            }, [], {
+                capabilities: {},
+            });
+        }
+        catch (e_2) {
+            env_2.error = e_2;
+            env_2.hasError = true;
+        }
+        finally {
+            __disposeResources(env_2);
+        }
+    });
+    it('does not block tools if the client never answers roots/list', async () => {
+        await withClient(async (client) => {
+            // A client that negotiates roots but never responds. getContext()
+            // awaits updateRoots() while holding the tool mutex, so an unbounded
+            // request would stall this call for the SDK default of 60s.
+            client.setRequestHandler('roots/list', () => {
+                return new Promise(() => {
+                    // Intentionally never settles
+                });
+            });
+            const start = Date.now();
+            // Raise the client-side timeout above the SDK default so an unbounded
+            // roots request surfaces as the assertion below rather than a timeout
+            const result = await client.callTool({
+                name: 'list_pages',
+                arguments: {},
+            }, { timeout: 90_000 });
+            const elapsed = Date.now() - start;
+            assert.strictEqual(result.isError, undefined);
+            // Bounded roots request plus browser launch settles well under this,
+            // leaving room for a slow CI runner while still catching the 60s stall
+            assert.ok(elapsed < 45_000, `list_pages took ${elapsed}ms, expected the bounded roots request to settle well before the 60s SDK default`);
+        }, [], {
+            capabilities: {
+                roots: { listChanged: true },
+            },
+        });
+    });
+    it('still applies roots from a client slower than the bound', async () => {
+        const env_3 = { stack: [], error: void 0, hasError: false };
+        try {
+            const workspace = __addDisposableResource(env_3, createTempDir('.roots-slow-client-', os.homedir()), false);
+            await withClient(async (client) => {
+                // Answers after the bound the blocking call uses, so the roots only
+                // arrive via the background listing
+                client.setRequestHandler('roots/list', async () => {
+                    await new Promise(resolve => setTimeout(resolve, 8_000));
+                    return {
+                        roots: [
+                            { uri: pathToFileURL(workspace.path).href, name: 'workspace' },
+                        ],
+                    };
+                });
+                await client.callTool({ name: 'list_pages', arguments: {} });
+                await new Promise(resolve => setTimeout(resolve, 5_000));
+                const result = await client.callTool({
+                    name: 'take_screenshot',
+                    arguments: {
+                        pageId: 1,
+                        filePath: path.join(workspace.path, 'shot.png'),
+                    },
+                });
+                // Asserted before isError so a denial reports the path it rejected
+                const content = result.content;
+                assert.match(content[0].text, /Saved screenshot to/);
+                assert.strictEqual(result.isError, undefined);
+            }, [], {
+                capabilities: {
+                    roots: { listChanged: true },
+                },
+            });
+        }
+        catch (e_3) {
+            env_3.error = e_3;
+            env_3.hasError = true;
+        }
+        finally {
+            __disposeResources(env_3);
+        }
+    });
+    describe('Dialogs', () => {
+        function getFirstText(result) {
+            const first = Array.isArray(result.content)
+                ? result.content[0]
+                : undefined;
+            return first && 'text' in first && typeof first.text === 'string'
+                ? first.text
+                : '';
+        }
+        async function createNewPageAndTriggerDialog(client) {
+            // Navigate to a page with a button that triggers a dialog on click
+            const newPageResult = await client.callTool({
+                name: 'new_page',
+                arguments: {
+                    url: `data:text/html,<button id="test" onclick="alert('test dialog')">Click me</button>`,
+                },
+            });
+            if (newPageResult.isError) {
+                throw new Error(getFirstText(newPageResult));
+            }
+            const snapshotResult = await client.callTool({
+                name: 'take_snapshot',
+                arguments: {
+                    pageId: 2,
+                },
+            });
+            if (snapshotResult.isError) {
+                throw new Error(getFirstText(snapshotResult));
+            }
+            const snapshotText = getFirstText(snapshotResult);
+            const match = snapshotText.match(/uid=(\d+_\d+)\s+button "Click me"/);
+            const uid = match ? match[1] : '1_1';
+            // Trigger the dialog
+            const result = await client.callTool({
+                name: 'click',
+                arguments: {
+                    pageId: 2,
+                    uid,
+                },
+            });
+            if (result.isError) {
+                throw new Error(getFirstText(result));
+            }
+            return result;
+        }
+        it('returns blocked message when dialog is opened during tool execution', async (t) => {
+            await withClient(async (client) => {
+                const result = await createNewPageAndTriggerDialog(client);
+                t.assert.snapshot(JSON.stringify(result));
+            });
+        });
+        it('when dialog is open and tool is blocked, returns an error', async (t) => {
+            await withClient(async (client) => {
+                await createNewPageAndTriggerDialog(client);
+                const result = await client.callTool({
+                    name: 'take_screenshot',
+                    arguments: {
+                        pageId: 2,
+                        // Use os.tmpdir() so validatePath passes on macOS/Windows before
+                        // reaching the dialog-blocked check.
+                        filePath: path.join(os.tmpdir(), 'test.png'),
+                    },
+                });
+                t.assert.snapshot(JSON.stringify(result));
+            });
+        });
+        it('when dialog is open and tool is not blocked, executes tool', async (t) => {
+            await withClient(async (client) => {
+                await createNewPageAndTriggerDialog(client);
+                const result = await client.callTool({
+                    name: 'new_page',
+                    arguments: {
+                        url: `data:text/html,<h1>New</h1>`,
+                    },
+                });
+                t.assert.snapshot(JSON.stringify(result));
+            });
+        });
+    });
+});
+async function getToolsWithFilteredCategories(filterOutCategories = []) {
+    const files = fs.readdirSync('build/src/tools');
+    const definedNames = [];
+    for (const file of files) {
+        if (!file.endsWith('.js') ||
+            file === 'ToolDefinition.js' ||
+            file === 'tools.js' ||
+            file === 'slim') {
+            continue;
+        }
+        const fileTools = await import(`../src/tools/${file}`);
+        for (const maybeTool of Object.values(fileTools)) {
+            if (typeof maybeTool !== 'function') {
+                continue;
+            }
+            const tool = maybeTool({});
+            // Skipping all files that are not tool files
+            if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
+                continue;
+            }
+            if (toolShouldBeSkipped(tool, filterOutCategories)) {
+                continue;
+            }
+            definedNames.push(tool.name);
+        }
+    }
+    return definedNames;
+}
+function toolShouldBeSkipped(tool, filteredOutCategories) {
+    if (tool.annotations?.conditions) {
+        for (const condition of tool.annotations.conditions) {
+            const option = mcpOptions[condition];
+            if (!option || !('default' in option) || option.default !== true) {
+                return true;
+            }
+        }
+    }
+    if (tool.annotations?.category &&
+        filteredOutCategories.includes(tool.annotations?.category)) {
+        return true;
+    }
+    return false;
+}
+//# sourceMappingURL=index.test.js.map

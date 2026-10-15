@@ -1,0 +1,62 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import fs from 'node:fs';
+import util from 'node:util';
+const mcpDebugNamespace = 'mcp:log';
+let logFileStream;
+const debugLog = util.debuglog(mcpDebugNamespace);
+export function saveLogsToFile(fileName) {
+    const logFile = fs.createWriteStream(fileName, { flags: 'a+' });
+    logFile.on('error', function (error) {
+        console.error(`Error when opening/writing to log file: ${error.message}`);
+        logFile.end();
+        process.exit(1);
+    });
+    logFileStream = logFile;
+    return logFile;
+}
+export function flushLogs(logFile, timeoutMs = 2000) {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(reject, timeoutMs);
+        logFile.end(() => {
+            clearTimeout(timeout);
+            resolve();
+        });
+    });
+}
+/**
+ * Encodes a value for interpolation into a one-line log or error message. The
+ * result is a JSON string literal that also escapes DEL, C1 controls and
+ * U+2028/U+2029, which JSON.stringify leaves raw but terminals and line
+ * readers act on.
+ */
+export function escapeForLog(value) {
+    return JSON.stringify(value).replace(/[\u007f-\u009f\u2028\u2029]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+export const logger = (...args) => {
+    if (logFileStream) {
+        logFileStream.write(`${new Date().toISOString()} ${mcpDebugNamespace} ${util.format(...args)}\n`);
+    }
+    else if (debugLog.enabled) {
+        debugLog('%s %s', new Date().toISOString(), util.format(...args));
+    }
+};
+export const puppeteerLogger = (prefix) => {
+    const dbg = util.debuglog(prefix);
+    if (!dbg.enabled) {
+        return;
+    }
+    const stream = logFileStream;
+    if (stream) {
+        return (...args) => {
+            stream.write(`${new Date().toISOString()} ${prefix} ${util.format(...args)}\n`);
+        };
+    }
+    return (...args) => {
+        dbg('%s %s', new Date().toISOString(), util.format(...args));
+    };
+};
+//# sourceMappingURL=logger.js.map
