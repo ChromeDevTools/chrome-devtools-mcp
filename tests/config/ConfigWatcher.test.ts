@@ -4,168 +4,208 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import assert from 'node:assert';
+import type fs from 'node:fs';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {afterEach, beforeEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {ConfigWatcher} from '../../src/config/ConfigWatcher.js';
-import {createTempDir} from '../utils.js';
+import {
+  ConfigWatcher,
+  type DirectoryWatcher,
+} from '../../src/config/ConfigWatcher.js';
 
 const DEBOUNCE_MS = 50;
-// Long enough for fs events to be delivered and the debounce to fire.
-const SETTLE_MS = 500;
-const POLL_TIMEOUT_MS = 5000;
-const POLL_INTERVAL_MS = 20;
+const CONFIG_DIR = path.resolve('/config');
+const CONFIG_PATH = path.join(CONFIG_DIR, 'cd4a.config.json');
 
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+class TestConfigWatcher extends ConfigWatcher {
+  watchedDir?: string;
+  readonly #files = new Map<string, string>();
+  readonly #symlinks = new Map<string, string>();
+  #listener?: fs.WatchListener<string>;
 
-async function waitForCall(stub: sinon.SinonStub): Promise<void> {
-  const deadline = Date.now() + POLL_TIMEOUT_MS;
-  while (!stub.called) {
-    if (Date.now() >= deadline) {
-      throw new Error('Timed out waiting for stub to be called');
-    }
-    await wait(POLL_INTERVAL_MS);
+  constructor(
+    configPath: string,
+    onChange: () => Promise<void> = sinon.stub().resolves(),
+  ) {
+    super(configPath, onChange, {debounceMs: DEBOUNCE_MS});
+    this.#files.set(configPath, '{}');
   }
-}
 
-function writeConfig(dir: string): string {
-  const configPath = path.join(dir, 'cd4a.config.json');
-  fs.writeFileSync(configPath, '{}');
-  return configPath;
+  setSymlink(linkPath: string, targetPath: string): void {
+    this.#symlinks.set(linkPath, targetPath);
+  }
+
+  setFileContent(filePath: string, content: string): void {
+    this.#files.set(filePath, content);
+  }
+
+  writeFile(filePath: string, content: string): void {
+    this.#files.set(filePath, content);
+    this.emitFsEvent('change', path.basename(filePath));
+  }
+
+  replaceFile(filePath: string, content: string): void {
+    this.#files.set(filePath, content);
+    this.emitFsEvent('rename', path.basename(filePath));
+  }
+
+  deleteFile(filePath: string): void {
+    this.#files.delete(filePath);
+    this.emitFsEvent('rename', path.basename(filePath));
+  }
+
+  emitFsEvent(
+    eventType: fs.WatchEventType,
+    changedFileName: string | null,
+  ): void {
+    this.#listener?.(eventType, changedFileName);
+  }
+
+  protected override resolveRealPath(filePath: string): string {
+    const target = this.#symlinks.get(filePath) ?? filePath;
+    if (!this.#files.has(target)) {
+      throw new Error(
+        `ENOENT: no such file or directory, realpath '${filePath}'`,
+      );
+    }
+    return target;
+  }
+
+  protected override readContent(filePath: string): string | undefined {
+    return this.#files.get(filePath);
+  }
+
+  protected override watchDirectory(
+    dirPath: string,
+    listener: fs.WatchListener<string>,
+  ): DirectoryWatcher {
+    this.watchedDir = dirPath;
+    this.#listener = listener;
+    return {
+      on: () => {},
+      close: () => {
+        this.#listener = undefined;
+      },
+    };
+  }
 }
 
 function startWatcher(
   watchedPath: string,
   onChange: () => Promise<void> = sinon.stub().resolves(),
-): ConfigWatcher {
-  const watcher = new ConfigWatcher(watchedPath, onChange, {
-    debounceMs: DEBOUNCE_MS,
-  });
+): TestConfigWatcher {
+  const watcher = new TestConfigWatcher(watchedPath, onChange);
   watcher.start();
   return watcher;
 }
 
 describe('ConfigWatcher', () => {
+  let clock: sinon.SinonFakeTimers;
+
+  beforeEach(() => {
+    clock = sinon.useFakeTimers();
+  });
+
   afterEach(() => {
     sinon.restore();
   });
 
   it('calls onChange once for several quick writes', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = startWatcher(CONFIG_PATH, onChange);
 
-    fs.writeFileSync(configPath, '{"headless": true}');
-    fs.writeFileSync(configPath, '{"headless": false}');
-    await waitForCall(onChange);
+    watcher.writeFile(CONFIG_PATH, '{"headless": true}');
+    watcher.writeFile(CONFIG_PATH, '{"headless": false}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.calledOnceWithExactly(onChange);
   });
 
   it('detects atomic replacements', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = startWatcher(CONFIG_PATH, onChange);
 
-    const tempPath = path.join(dir.path, 'cd4a.config.json.tmp');
-    fs.writeFileSync(tempPath, '{"headless": true}');
-    fs.renameSync(tempPath, configPath);
-    await waitForCall(onChange);
+    watcher.replaceFile(CONFIG_PATH, '{"headless": true}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.calledOnceWithExactly(onChange);
   });
 
   it('ignores other files in the directory', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = startWatcher(CONFIG_PATH, onChange);
 
-    fs.writeFileSync(path.join(dir.path, 'other.json'), '{}');
-    await wait(SETTLE_MS);
+    watcher.writeFile(path.join(CONFIG_DIR, 'other.json'), '{}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.notCalled(onChange);
   });
 
   it('follows symlinks to the real config file', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    using linkDir = createTempDir('cd4a-link-');
-    const configPath = writeConfig(dir.path);
-    const linkPath = path.join(linkDir.path, 'cd4a.config.json');
-    fs.symlinkSync(configPath, linkPath);
+    const linkPath = path.resolve('/link/cd4a.config.json');
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(linkPath, onChange);
+    using watcher = new TestConfigWatcher(linkPath, onChange);
+    watcher.setSymlink(linkPath, CONFIG_PATH);
+    watcher.setFileContent(CONFIG_PATH, '{}');
+    watcher.start();
 
-    fs.writeFileSync(configPath, '{"headless": true}');
-    await waitForCall(onChange);
+    assert.strictEqual(watcher.watchedDir, CONFIG_DIR);
+    watcher.writeFile(CONFIG_PATH, '{"headless": true}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.calledOnceWithExactly(onChange);
   });
 
   it('does not call onChange if the content did not change', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = startWatcher(CONFIG_PATH, onChange);
 
-    fs.writeFileSync(configPath, '{}');
-    await wait(SETTLE_MS);
+    watcher.writeFile(CONFIG_PATH, '{}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.notCalled(onChange);
   });
 
   it('does not call onChange when the config file cannot be read', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = startWatcher(CONFIG_PATH, onChange);
 
-    fs.unlinkSync(configPath);
-    await wait(SETTLE_MS);
+    watcher.deleteFile(CONFIG_PATH);
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.notCalled(onChange);
   });
 
   it('stops calling onChange after dispose', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const onChange = sinon.stub().resolves();
-    const watcher = startWatcher(configPath, onChange);
+    const watcher = startWatcher(CONFIG_PATH, onChange);
 
     watcher.dispose();
-    fs.writeFileSync(configPath, '{"headless": true}');
-    await wait(SETTLE_MS);
+    watcher.writeFile(CONFIG_PATH, '{"headless": true}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.notCalled(onChange);
   });
 
   it('logs errors from onChange', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const consoleError = sinon.stub(console, 'error');
     const error = new Error('apply failed');
-    using watcher = startWatcher(configPath, sinon.stub().rejects(error));
+    using watcher = startWatcher(CONFIG_PATH, sinon.stub().rejects(error));
 
-    fs.writeFileSync(configPath, '{"headless": true}');
-    await waitForCall(consoleError);
+    watcher.writeFile(CONFIG_PATH, '{"headless": true}');
+    await clock.tickAsync(DEBOUNCE_MS);
 
     sinon.assert.calledOnceWithExactly(
       consoleError,
-      `Failed to apply ${configPath}:`,
+      `Failed to apply ${CONFIG_PATH}:`,
       error,
     );
   });
 
   it('serializes overlapping onChange calls', async () => {
-    using dir = createTempDir('cd4a-watcher-');
-    const configPath = writeConfig(dir.path);
     const firstCall = Promise.withResolvers<void>();
     const secondCall = Promise.withResolvers<void>();
     const onChange = sinon.stub();
@@ -173,14 +213,14 @@ describe('ConfigWatcher', () => {
     onChange.onSecondCall().callsFake(async () => {
       secondCall.resolve();
     });
-    using watcher = startWatcher(configPath, onChange);
+    using watcher = startWatcher(CONFIG_PATH, onChange);
 
-    fs.writeFileSync(configPath, '{"headless": true}');
-    await waitForCall(onChange);
+    watcher.writeFile(CONFIG_PATH, '{"headless": true}');
+    await clock.tickAsync(DEBOUNCE_MS);
     sinon.assert.calledOnce(onChange);
 
-    fs.writeFileSync(configPath, '{"headless": false}');
-    await wait(SETTLE_MS);
+    watcher.writeFile(CONFIG_PATH, '{"headless": false}');
+    await clock.tickAsync(DEBOUNCE_MS);
     sinon.assert.calledOnce(onChange);
 
     firstCall.resolve();

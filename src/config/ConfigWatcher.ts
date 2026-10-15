@@ -13,16 +13,9 @@ import {logger} from '../utils/logger.js';
 
 const DEFAULT_DEBOUNCE_MS = 200;
 
-/**
- * Returns undefined if the file cannot be read, for example while it is being
- * replaced.
- */
-function readContent(filePath: string): string | undefined {
-  try {
-    return fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return undefined;
-  }
+export interface DirectoryWatcher {
+  on(event: 'error', listener: (err: unknown) => void): void;
+  close(): void;
 }
 
 /**
@@ -41,7 +34,7 @@ export class ConfigWatcher implements Disposable {
   readonly #configPath: string;
   readonly #onChange: () => Promise<void>;
   readonly #debounceMs: number;
-  #watcher?: fs.FSWatcher;
+  #watcher?: DirectoryWatcher;
   #debounced?: ReturnType<typeof DevTools.Common.Debouncer.debounce>;
   #content?: string;
   #pending = Promise.resolve();
@@ -56,6 +49,29 @@ export class ConfigWatcher implements Disposable {
     this.#debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   }
 
+  protected resolveRealPath(filePath: string): string {
+    return fs.realpathSync(filePath);
+  }
+
+  /**
+   * Returns undefined if the file cannot be read, for example while it is being
+   * replaced.
+   */
+  protected readContent(filePath: string): string | undefined {
+    try {
+      return fs.readFileSync(filePath, 'utf8');
+    } catch {
+      return undefined;
+    }
+  }
+
+  protected watchDirectory(
+    dirPath: string,
+    listener: fs.WatchListener<string>,
+  ): DirectoryWatcher {
+    return fs.watch(dirPath, {persistent: false}, listener);
+  }
+
   /**
    * Starts watching the config file. Throws if `configPath` does not exist.
    */
@@ -63,11 +79,11 @@ export class ConfigWatcher implements Disposable {
     if (this.#watcher) {
       return;
     }
-    const realPath = fs.realpathSync(this.#configPath);
+    const realPath = this.resolveRealPath(this.#configPath);
     const fileName = path.basename(realPath);
-    this.#content = readContent(realPath);
+    this.#content = this.readContent(realPath);
     this.#debounced = DevTools.Common.Debouncer.debounce(() => {
-      const content = readContent(realPath);
+      const content = this.readContent(realPath);
       if (content === undefined || content === this.#content) {
         return;
       }
@@ -78,9 +94,8 @@ export class ConfigWatcher implements Disposable {
           console.error(`Failed to apply ${this.#configPath}:`, err);
         });
     }, this.#debounceMs);
-    this.#watcher = fs.watch(
+    this.#watcher = this.watchDirectory(
       path.dirname(realPath),
-      {persistent: false},
       (_eventType, changedFileName) => {
         if (changedFileName !== null && changedFileName !== fileName) {
           return;
