@@ -63,6 +63,24 @@ function setupServiceWorkerFixture(server: TestServer): {received: string[]} {
   return {received};
 }
 
+/**
+ * Serves `/allowed.html` and `/blocked.html` and records the request paths
+ * the server actually received, so a test can tell "blocked" apart from
+ * "reached the server but stalled".
+ */
+function setupBlockedPageFixture(server: TestServer): {received: string[]} {
+  const received: string[] = [];
+  const html =
+    (body: string) => (req: IncomingMessage, res: ServerResponse) => {
+      received.push(req.url ?? '');
+      res.writeHead(200, {'content-type': 'text/html; charset=utf-8'});
+      res.end(`<html><body>${body}</body></html>`);
+    };
+  server.addRoute('/allowed.html', html('Allowed'));
+  server.addRoute('/blocked.html', html('Blocked'));
+  return {received};
+}
+
 async function evaluate(
   fn: string,
   response: McpResponse,
@@ -78,6 +96,50 @@ async function evaluate(
   const line = response.responseLines.at(2);
   assert.ok(line, `unexpected response: ${response.responseLines.join('\n')}`);
   return line === 'undefined' ? undefined : JSON.parse(line);
+}
+
+/**
+ * Fetches `url` from the selected page and returns the outcome. The timeout
+ * is generous on purpose: a blocked request fails synchronously in the
+ * network service, so the budget only matters on an overloaded CI runner.
+ */
+async function fetchFromPage(
+  url: string,
+  response: McpResponse,
+  context: McpContext,
+  args: ParsedArguments,
+): Promise<unknown> {
+  return await evaluate(
+    `async () => {
+      try {
+        await fetch(${JSON.stringify(url)}, { signal: AbortSignal.timeout(30000) });
+        return 'SUCCESS';
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    }`,
+    response,
+    context,
+    args,
+  );
+}
+
+async function assertFetchIsBlocked(
+  url: string,
+  received: string[],
+  response: McpResponse,
+  context: McpContext,
+  args: ParsedArguments,
+  message = 'blocked request',
+): Promise<void> {
+  const result = await fetchFromPage(url, response, context, args);
+  const path = new URL(url).pathname;
+  assert.deepStrictEqual(
+    received.filter(p => p === path),
+    [],
+    `${message}: the request reached the server`,
+  );
+  assert.strictEqual(result, 'Failed to fetch', message);
 }
 
 async function assertServiceWorkerRequestsAreBlocked(
@@ -132,19 +194,7 @@ async function assertServiceWorkerRequestsAreBlocked(
     );
 
     assert.strictEqual(
-      await evaluate(
-        `async () => {
-          try {
-            await fetch('/blocked/data.json', { signal: AbortSignal.timeout(5000) });
-            return 'SUCCESS';
-          } catch (err) {
-            return err instanceof Error ? err.message : String(err);
-          }
-        }`,
-        response,
-        context,
-        args,
-      ),
+      await fetchFromPage('/blocked/data.json', response, context, args),
       'Failed to fetch',
       'fetch forwarded by the service worker should be blocked',
     );
@@ -212,8 +262,7 @@ describe('Network Blocking Integration', () => {
   });
 
   it('blocks URLs in blocklist', async () => {
-    server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
-    server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
+    const {received} = setupBlockedPageFixture(server);
 
     const blockedUrlPattern = [server.getRoute('/blocked.html')];
     await withMcpContext(
@@ -232,41 +281,22 @@ describe('Network Blocking Integration', () => {
           `Successfully navigated to ${allowedUrl}.`,
         );
 
-        response.resetResponseLineForTesting();
-        await evaluateScript(args).handler(
-          {
-            params: {function: String(() => document.body.textContent)},
-          },
-          response,
-          context,
-        );
         assert.strictEqual(
-          JSON.parse(response.responseLines.at(2)!),
+          await evaluate(
+            String(() => document.body.textContent),
+            response,
+            context,
+            args,
+          ),
           'Allowed',
         );
 
-        const blockedUrl = server.getRoute('/blocked.html');
-        response.resetResponseLineForTesting();
-        await evaluateScript(args).handler(
-          {
-            params: {
-              function: `async () => {
-                try {
-                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
-                  return 'SUCCESS';
-                } catch (err) {
-                  return err instanceof Error ? err.message : String(err);
-                }
-              }`,
-            },
-          },
+        await assertFetchIsBlocked(
+          server.getRoute('/blocked.html'),
+          received,
           response,
           context,
-        );
-
-        assert.strictEqual(
-          JSON.parse(response.responseLines.at(2)!),
-          'Failed to fetch',
+          args,
         );
       },
       {
@@ -276,8 +306,7 @@ describe('Network Blocking Integration', () => {
   });
 
   it('blocks URLs not in allowlist', async () => {
-    server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
-    server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
+    const {received} = setupBlockedPageFixture(server);
 
     const allowedUrlPattern = [server.getRoute('/allowed.html')];
 
@@ -297,41 +326,22 @@ describe('Network Blocking Integration', () => {
           `Successfully navigated to ${allowedUrl}.`,
         );
 
-        response.resetResponseLineForTesting();
-        await evaluateScript(args).handler(
-          {
-            params: {function: String(() => document.body.textContent)},
-          },
-          response,
-          context,
-        );
         assert.strictEqual(
-          JSON.parse(response.responseLines.at(2)!),
+          await evaluate(
+            String(() => document.body.textContent),
+            response,
+            context,
+            args,
+          ),
           'Allowed',
         );
 
-        const blockedUrl = server.getRoute('/blocked.html');
-        response.resetResponseLineForTesting();
-        await evaluateScript(args).handler(
-          {
-            params: {
-              function: `async () => {
-                try {
-                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
-                  return 'SUCCESS';
-                } catch (err) {
-                  return err instanceof Error ? err.message : String(err);
-                }
-              }`,
-            },
-          },
+        await assertFetchIsBlocked(
+          server.getRoute('/blocked.html'),
+          received,
           response,
           context,
-        );
-
-        assert.strictEqual(
-          JSON.parse(response.responseLines.at(2)!),
-          'Failed to fetch',
+          args,
         );
       },
       {
@@ -341,8 +351,7 @@ describe('Network Blocking Integration', () => {
   });
 
   it('respects blocklist after Lighthouse audits', async () => {
-    server.addHtmlRoute('/allowed.html', '<html><body>Allowed</body></html>');
-    server.addHtmlRoute('/blocked.html', '<html><body>Blocked</body></html>');
+    const {received} = setupBlockedPageFixture(server);
 
     const blockedUrlPattern = [server.getRoute('/blocked.html')];
     await withMcpContext(
@@ -363,27 +372,12 @@ describe('Network Blocking Integration', () => {
 
         const blockedUrl = server.getRoute('/blocked.html');
 
-        // Verifies fetch is blocked before Lighthouse audit
-        response.resetResponseLineForTesting();
-        await evaluateScript(args).handler(
-          {
-            params: {
-              function: `async () => {
-                try {
-                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
-                  return 'SUCCESS';
-                } catch (err) {
-                  return err instanceof Error ? err.message : String(err);
-                }
-              }`,
-            },
-          },
+        await assertFetchIsBlocked(
+          blockedUrl,
+          received,
           response,
           context,
-        );
-        assert.strictEqual(
-          JSON.parse(response.responseLines.at(2)!),
-          'Failed to fetch',
+          args,
           'Fetch should be blocked before audit',
         );
 
@@ -404,27 +398,12 @@ describe('Network Blocking Integration', () => {
           'navigation',
         );
 
-        // 2. Verify fetch remains blocked AFTER Lighthouse audit
-        response.resetResponseLineForTesting();
-        await evaluateScript(args).handler(
-          {
-            params: {
-              function: `async () => {
-                try {
-                  await fetch("${blockedUrl}", { signal: AbortSignal.timeout(5000) });
-                  return 'SUCCESS';
-                } catch (err) {
-                  return err instanceof Error ? err.message : String(err);
-                }
-              }`,
-            },
-          },
+        await assertFetchIsBlocked(
+          blockedUrl,
+          received,
           response,
           context,
-        );
-        assert.strictEqual(
-          JSON.parse(response.responseLines.at(2)!),
-          'Failed to fetch',
+          args,
           'Fetch should still be blocked after audit',
         );
       },
