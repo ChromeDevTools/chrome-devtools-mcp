@@ -13,20 +13,26 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {ConfigParser} from '../../src/config/ConfigParser.js';
-import {ScreenRecorder} from '../../src/third_party/index.js';
+import {
+  CdpScreenRecording,
+  ScreenRecorder,
+} from '../../src/third_party/index.js';
 import {startScreencast, stopScreencast} from '../../src/tools/screencast.js';
 import {createHandlerMocks} from '../mocks.js';
+import {createTempDir, html, withMcpContext} from '../utils.js';
 
-function createMockScreenRecorder(): sinon.SinonStubbedInstance<ScreenRecorder> {
-  return sinon.createStubInstance(ScreenRecorder);
+function parseArgs(...argv: string[]) {
+  return new ConfigParser('test', ['node', 'test', ...argv]).parse();
 }
 
 function createScreencastMocks() {
   const {page, context, response, args} = createHandlerMocks();
-  const mockRecorder = createMockScreenRecorder();
+  const mockRecording = sinon.createStubInstance(CdpScreenRecording);
+  const mockRecorder = sinon.createStubInstance(ScreenRecorder);
+  page.pptrPage.record.resolves(mockRecording);
   page.pptrPage.screencast.resolves(mockRecorder);
-  context.getScreenRecorder.returns(null);
-  return {page, context, response, mockRecorder, args};
+  page.getScreenRecorder.returns(null);
+  return {page, context, response, mockRecording, mockRecorder, args};
 }
 
 describe('screencast', () => {
@@ -35,8 +41,8 @@ describe('screencast', () => {
   });
 
   describe('screencast_start', () => {
-    it('starts a screencast recording with filePath', async () => {
-      const {page, context, response, mockRecorder, args} =
+    it('starts an mp4 recording with filePath', async () => {
+      const {page, context, response, mockRecording, args} =
         createScreencastMocks();
 
       const filePath: `${string}.mp4` = `${path.join(
@@ -46,10 +52,7 @@ describe('screencast', () => {
       context.ensureExtension.resolves(filePath);
 
       await startScreencast(args).handler(
-        {
-          params: {filePath},
-          page,
-        },
+        {params: {filePath}, page},
         response,
         context,
       );
@@ -59,14 +62,13 @@ describe('screencast', () => {
         filePath,
         '.mp4',
       );
-      sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+      sinon.assert.calledOnceWithExactly(page.pptrPage.record, {
         path: filePath,
-        format: 'mp4',
-        ffmpegPath: undefined,
         fps: undefined,
       });
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
-        recorder: mockRecorder,
+      sinon.assert.notCalled(page.pptrPage.screencast);
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
+        recorder: mockRecording,
         filePath,
       });
       sinon.assert.calledOnceWithExactly(
@@ -75,66 +77,8 @@ describe('screencast', () => {
       );
     });
 
-    it('records WebM for an uppercase extension (case-insensitive)', async () => {
-      const {page, context, response, mockRecorder, args} =
-        createScreencastMocks();
-
-      const requestedPath = `${path.join(os.tmpdir(), 'test-recording')}.WEBM`;
-      const expectedPath: `${string}.webm` = `${path.join(
-        os.tmpdir(),
-        'test-recording',
-      )}.webm`;
-      context.ensureExtension.resolves(expectedPath);
-
-      await startScreencast(args).handler(
-        {
-          params: {filePath: requestedPath},
-          page,
-        },
-        response,
-        context,
-      );
-
-      sinon.assert.calledOnceWithExactly(
-        context.ensureExtension,
-        requestedPath,
-        '.webm',
-      );
-      sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
-        path: expectedPath,
-        format: 'webm',
-        ffmpegPath: undefined,
-        fps: undefined,
-      });
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
-        recorder: mockRecorder,
-        filePath: expectedPath,
-      });
-    });
-
-    it('rejects an unsupported extension instead of silently using mp4', async () => {
-      const {page, context, response, args} = createScreencastMocks();
-      const filePath = `${path.join(os.tmpdir(), 'recording')}.avi`;
-
-      await assert.rejects(
-        startScreencast(args).handler(
-          {
-            params: {filePath},
-            page,
-          },
-          response,
-          context,
-        ),
-        /Unsupported screencast file extension/,
-      );
-
-      sinon.assert.notCalled(context.ensureExtension);
-      sinon.assert.notCalled(page.pptrPage.screencast);
-      sinon.assert.notCalled(context.setScreenRecorder);
-    });
-
-    it('starts a screencast recording with temp file when no filePath', async () => {
-      const {page, context, response, mockRecorder, args} =
+    it('starts a recording with temp file when no filePath', async () => {
+      const {page, context, response, mockRecording, args} =
         createScreencastMocks();
       const expectedPath: `${string}.mp4` = `${path.join(
         os.tmpdir(),
@@ -151,23 +95,21 @@ describe('screencast', () => {
       sinon.assert.calledOnce(context.ensureExtension);
       assert.ok(context.ensureExtension.firstCall.args[0].endsWith('.mp4'));
       assert.strictEqual(context.ensureExtension.firstCall.args[1], '.mp4');
-      sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+      sinon.assert.calledOnceWithExactly(page.pptrPage.record, {
         path: expectedPath,
-        format: 'mp4',
-        ffmpegPath: undefined,
         fps: undefined,
       });
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
-        recorder: mockRecorder,
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
+        recorder: mockRecording,
         filePath: expectedPath,
       });
     });
 
     it('errors if a recording is already active', async () => {
-      const {page, context, response, mockRecorder, args} =
+      const {page, context, response, mockRecording, args} =
         createScreencastMocks();
-      context.getScreenRecorder.returns({
-        recorder: mockRecorder,
+      page.getScreenRecorder.returns({
+        recorder: mockRecording,
         filePath: `${path.join(os.tmpdir(), 'existing')}.mp4`,
       });
 
@@ -178,122 +120,278 @@ describe('screencast', () => {
       );
 
       sinon.assert.notCalled(context.ensureExtension);
-      sinon.assert.notCalled(page.pptrPage.screencast);
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.notCalled(page.pptrPage.record);
+      sinon.assert.notCalled(page.setScreenRecorder);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
       );
     });
 
-    it('provides a clear error when ffmpeg is not found', async () => {
-      const {page, context, response, args} = createScreencastMocks();
+    it('passes screencast fps from --screencast-fps to puppeteer', async () => {
+      const {page, context, response} = createScreencastMocks();
       const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
       context.ensureExtension.resolves(filePath);
-      page.pptrPage.screencast.rejects(new Error('spawn ffmpeg ENOENT'));
 
-      await assert.rejects(
-        startScreencast(args).handler(
-          {
-            params: {filePath},
-            page,
-          },
-          response,
-          context,
-        ),
-        /ffmpeg is required for screencast recording/,
+      await startScreencast(parseArgs('--screencast-fps=10')).handler(
+        {params: {filePath}, page},
+        response,
+        context,
       );
 
-      sinon.assert.calledOnceWithExactly(
-        context.ensureExtension,
-        filePath,
-        '.mp4',
-      );
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.calledOnceWithExactly(page.pptrPage.record, {
+        path: filePath,
+        fps: 10,
+      });
     });
 
-    it('cleans up the generated temp directory if recording fails to start', async () => {
+    it('passes screencast fps from --experimental-screencast-fps to puppeteer', async () => {
+      const {page, context, response} = createScreencastMocks();
+      const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
+      context.ensureExtension.resolves(filePath);
+
+      await startScreencast(
+        parseArgs('--experimental-screencast-fps=10'),
+      ).handler({params: {filePath}, page}, response, context);
+
+      sinon.assert.calledOnceWithExactly(page.pptrPage.record, {
+        path: filePath,
+        fps: 10,
+      });
+    });
+
+    it('provides a clear error when Chrome does not support recording', async () => {
       const {page, context, response, args} = createScreencastMocks();
       context.ensureExtension.callsFake(async filePath => `${filePath}.mp4`);
-      page.pptrPage.screencast.rejects(new Error('spawn ffmpeg ENOENT'));
+      page.pptrPage.record.rejects(
+        new Error(
+          "Protocol error (Page.startScreenRecording): 'Page.startScreenRecording' wasn't found",
+        ),
+      );
 
       await assert.rejects(
         startScreencast(args).handler({params: {}, page}, response, context),
-        /ffmpeg is required for screencast recording/,
+        /The connected Chrome does not support screen recording/,
       );
 
-      const tempPath = page.pptrPage.screencast.firstCall.args[0]?.path;
+      const tempPath = page.pptrPage.record.firstCall.args[0]?.path;
       assert.ok(tempPath);
       await assert.rejects(fs.access(path.dirname(tempPath)));
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.notCalled(page.setScreenRecorder);
     });
 
-    it('passes ffmpegPath from args to puppeteer', async () => {
-      const {page, context, response, mockRecorder} = createScreencastMocks();
-      const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
-      context.ensureExtension.resolves(filePath);
+    describe('with --experimental-screencast', () => {
+      const legacyArgs = parseArgs('--experimental-screencast');
 
-      const experimentalFfmpegPath = '/custom/path/to/ffmpeg';
-      const args = new ConfigParser('test', [
-        'node',
-        'test',
-        '--experimental-screencast',
-        `--experimental-ffmpeg-path=${experimentalFfmpegPath}`,
-      ]).parse();
-      await startScreencast(args).handler(
-        {params: {filePath}, page},
-        response,
-        context,
-      );
+      it('starts a screencast recording with filePath', async () => {
+        const {page, context, response, mockRecorder} = createScreencastMocks();
 
-      sinon.assert.calledOnceWithExactly(
-        context.ensureExtension,
-        filePath,
-        '.mp4',
-      );
-      sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
-        path: filePath,
-        format: 'mp4',
-        ffmpegPath: experimentalFfmpegPath,
-        fps: undefined,
+        const filePath: `${string}.mp4` = `${path.join(
+          os.tmpdir(),
+          'test-recording',
+        )}.mp4`;
+        context.ensureExtension.resolves(filePath);
+
+        await startScreencast(legacyArgs).handler(
+          {params: {filePath}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(
+          context.ensureExtension,
+          filePath,
+          '.mp4',
+        );
+        sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+          path: filePath,
+          format: 'mp4',
+          ffmpegPath: undefined,
+          fps: undefined,
+        });
+        sinon.assert.notCalled(page.pptrPage.record);
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
+          recorder: mockRecorder,
+          filePath,
+        });
+        sinon.assert.calledOnceWithExactly(
+          response.appendResponseLine,
+          `Screencast recording started. The recording will be saved to ${filePath}. Use screencast_stop to stop recording.`,
+        );
       });
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
-        recorder: mockRecorder,
-        filePath,
+
+      it('records WebM for an uppercase extension (case-insensitive)', async () => {
+        const {page, context, response, mockRecorder} = createScreencastMocks();
+
+        const requestedPath = `${path.join(os.tmpdir(), 'test-recording')}.WEBM`;
+        const expectedPath: `${string}.webm` = `${path.join(
+          os.tmpdir(),
+          'test-recording',
+        )}.webm`;
+        context.ensureExtension.resolves(expectedPath);
+
+        await startScreencast(legacyArgs).handler(
+          {params: {filePath: requestedPath}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(
+          context.ensureExtension,
+          requestedPath,
+          '.webm',
+        );
+        sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+          path: expectedPath,
+          format: 'webm',
+          ffmpegPath: undefined,
+          fps: undefined,
+        });
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
+          recorder: mockRecorder,
+          filePath: expectedPath,
+        });
       });
-    });
 
-    it('passes screencast fps from args to puppeteer', async () => {
-      const {page, context, response, mockRecorder} = createScreencastMocks();
-      const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
-      context.ensureExtension.resolves(filePath);
+      it('rejects an unsupported extension instead of silently using mp4', async () => {
+        const {page, context, response} = createScreencastMocks();
+        const filePath = `${path.join(os.tmpdir(), 'recording')}.avi`;
 
-      const args = new ConfigParser('test', [
-        'node',
-        'test',
-        '--experimental-screencast',
-        '--experimental-screencast-fps=10',
-      ]).parse();
-      await startScreencast(args).handler(
-        {params: {filePath}, page},
-        response,
-        context,
-      );
+        await assert.rejects(
+          startScreencast(legacyArgs).handler(
+            {params: {filePath}, page},
+            response,
+            context,
+          ),
+          /Unsupported screencast file extension/,
+        );
 
-      sinon.assert.calledOnceWithExactly(
-        context.ensureExtension,
-        filePath,
-        '.mp4',
-      );
-      sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
-        path: filePath,
-        format: 'mp4',
-        ffmpegPath: undefined,
-        fps: 10,
+        sinon.assert.notCalled(context.ensureExtension);
+        sinon.assert.notCalled(page.pptrPage.screencast);
+        sinon.assert.notCalled(page.setScreenRecorder);
       });
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, {
-        recorder: mockRecorder,
-        filePath,
+
+      it('starts a screencast recording with temp file when no filePath', async () => {
+        const {page, context, response, mockRecorder} = createScreencastMocks();
+        const expectedPath: `${string}.mp4` = `${path.join(
+          os.tmpdir(),
+          'temp-screencast',
+        )}.mp4`;
+        context.ensureExtension.resolves(expectedPath);
+
+        await startScreencast(legacyArgs).handler(
+          {params: {}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnce(context.ensureExtension);
+        assert.ok(context.ensureExtension.firstCall.args[0].endsWith('.mp4'));
+        assert.strictEqual(context.ensureExtension.firstCall.args[1], '.mp4');
+        sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+          path: expectedPath,
+          format: 'mp4',
+          ffmpegPath: undefined,
+          fps: undefined,
+        });
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
+          recorder: mockRecorder,
+          filePath: expectedPath,
+        });
+      });
+
+      it('provides a clear error when ffmpeg is not found', async () => {
+        const {page, context, response} = createScreencastMocks();
+        const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
+        context.ensureExtension.resolves(filePath);
+        page.pptrPage.screencast.rejects(new Error('spawn ffmpeg ENOENT'));
+
+        await assert.rejects(
+          startScreencast(legacyArgs).handler(
+            {params: {filePath}, page},
+            response,
+            context,
+          ),
+          /ffmpeg is required for screencast recording/,
+        );
+
+        sinon.assert.calledOnceWithExactly(
+          context.ensureExtension,
+          filePath,
+          '.mp4',
+        );
+        sinon.assert.notCalled(page.setScreenRecorder);
+      });
+
+      it('cleans up the generated temp directory if recording fails to start', async () => {
+        const {page, context, response} = createScreencastMocks();
+        context.ensureExtension.callsFake(async filePath => `${filePath}.mp4`);
+        page.pptrPage.screencast.rejects(new Error('spawn ffmpeg ENOENT'));
+
+        await assert.rejects(
+          startScreencast(legacyArgs).handler(
+            {params: {}, page},
+            response,
+            context,
+          ),
+          /ffmpeg is required for screencast recording/,
+        );
+
+        const tempPath = page.pptrPage.screencast.firstCall.args[0]?.path;
+        assert.ok(tempPath);
+        await assert.rejects(fs.access(path.dirname(tempPath)));
+        sinon.assert.notCalled(page.setScreenRecorder);
+      });
+
+      it('passes ffmpegPath from args to puppeteer', async () => {
+        const {page, context, response, mockRecorder} = createScreencastMocks();
+        const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
+        context.ensureExtension.resolves(filePath);
+
+        const experimentalFfmpegPath = '/custom/path/to/ffmpeg';
+        const args = parseArgs(
+          '--experimental-screencast',
+          `--experimental-ffmpeg-path=${experimentalFfmpegPath}`,
+        );
+        await startScreencast(args).handler(
+          {params: {filePath}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+          path: filePath,
+          format: 'mp4',
+          ffmpegPath: experimentalFfmpegPath,
+          fps: undefined,
+        });
+        sinon.assert.calledOnceWithExactly(page.setScreenRecorder, {
+          recorder: mockRecorder,
+          filePath,
+        });
+      });
+
+      it('passes screencast fps from args to puppeteer', async () => {
+        const {page, context, response} = createScreencastMocks();
+        const filePath: `${string}.mp4` = `${path.join(os.tmpdir(), 'test')}.mp4`;
+        context.ensureExtension.resolves(filePath);
+
+        const args = parseArgs(
+          '--experimental-screencast',
+          '--screencast-fps=10',
+        );
+        await startScreencast(args).handler(
+          {params: {filePath}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(page.pptrPage.screencast, {
+          path: filePath,
+          format: 'mp4',
+          ffmpegPath: undefined,
+          fps: 10,
+        });
       });
     });
   });
@@ -302,7 +400,7 @@ describe('screencast', () => {
     it('returns an error message if no recording is active', async () => {
       const {page, context, response, args} = createScreencastMocks();
       await stopScreencast(args).handler({params: {}, page}, response, context);
-      sinon.assert.notCalled(context.setScreenRecorder);
+      sinon.assert.notCalled(page.setScreenRecorder);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Error: no active screencast recording to stop.',
@@ -310,18 +408,18 @@ describe('screencast', () => {
     });
 
     it('stops an active recording and reports the file path', async () => {
-      const {page, context, response, mockRecorder, args} =
+      const {page, context, response, mockRecording, args} =
         createScreencastMocks();
       const filePath = `${path.join(os.tmpdir(), 'test-recording')}.mp4`;
-      context.getScreenRecorder.returns({
-        recorder: mockRecorder,
+      page.getScreenRecorder.returns({
+        recorder: mockRecording,
         filePath,
       });
 
       await stopScreencast(args).handler({params: {}, page}, response, context);
 
-      sinon.assert.calledOnce(mockRecorder.stop);
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, null);
+      sinon.assert.calledOnce(mockRecording.stop);
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, null);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         `The screencast recording has been stopped and saved to ${filePath}.`,
@@ -329,22 +427,71 @@ describe('screencast', () => {
     });
 
     it('clears the recorder even if stop() throws', async () => {
-      const {page, context, response, mockRecorder, args} =
+      const {page, context, response, mockRecording, args} =
         createScreencastMocks();
-      mockRecorder.stop.rejects(new Error('ffmpeg process error'));
+      mockRecording.stop.rejects(new Error('recording error'));
       const filePath = `${path.join(os.tmpdir(), 'test')}.mp4`;
-      context.getScreenRecorder.returns({
-        recorder: mockRecorder,
+      page.getScreenRecorder.returns({
+        recorder: mockRecording,
         filePath,
       });
 
       await assert.rejects(
         stopScreencast(args).handler({params: {}, page}, response, context),
-        /ffmpeg process error/,
+        /recording error/,
       );
 
-      sinon.assert.calledOnce(mockRecorder.stop);
-      sinon.assert.calledOnceWithExactly(context.setScreenRecorder, null);
+      sinon.assert.calledOnce(mockRecording.stop);
+      sinon.assert.calledOnceWithExactly(page.setScreenRecorder, null);
+    });
+  });
+
+  it('records two pages concurrently (e2e)', async () => {
+    using tmpDir = createTempDir();
+    await withMcpContext(async (response, context, args) => {
+      const page1 = context.getSelectedMcpPage();
+      const page2 = await context.newPage();
+      await page1.pptrPage.setContent(html`<h1>Page 1</h1>`);
+      await page2.pptrPage.setContent(html`<h1>Page 2</h1>`);
+
+      const filePath1 = path.join(tmpDir.path, 'page1.mp4');
+      const filePath2 = path.join(tmpDir.path, 'page2.mp4');
+
+      await startScreencast(args).handler(
+        {params: {filePath: filePath1}, page: page1},
+        response,
+        context,
+      );
+      await startScreencast(args).handler(
+        {params: {filePath: filePath2}, page: page2},
+        response,
+        context,
+      );
+
+      await page1.pptrPage.evaluate(() => {
+        document.body.style.background = 'red';
+      });
+      await page2.pptrPage.evaluate(() => {
+        document.body.style.background = 'blue';
+      });
+
+      await stopScreencast(args).handler(
+        {params: {}, page: page1},
+        response,
+        context,
+      );
+      await stopScreencast(args).handler(
+        {params: {}, page: page2},
+        response,
+        context,
+      );
+
+      for (const filePath of [filePath1, filePath2]) {
+        const content = await fs.readFile(filePath);
+        assert.ok(content.length > 0, `${filePath} should not be empty`);
+        // MP4 files start with a size-prefixed `ftyp` box.
+        assert.strictEqual(content.subarray(4, 8).toString(), 'ftyp');
+      }
     });
   });
 });

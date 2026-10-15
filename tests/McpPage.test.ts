@@ -327,6 +327,11 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.page);
       sinon.assert.notCalled(target.asPage);
       assert.throws(() => mcpPage.pptrPage, /not initialized/);
+      assert.throws(
+        () => mcpPage.getThirdPartyDeveloperTools(),
+        /not initialized/,
+      );
+      assert.throws(() => mcpPage.getWebMcpTools(), /not initialized/);
       assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
       assert.strictEqual(mcpPage.getTitle(), 'Target Title');
 
@@ -388,6 +393,69 @@ describe('McpPage', () => {
         runBeforeUnload: false,
       });
       sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+    });
+  });
+
+  describe('getTitle()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    function createPage(url: string, title: string): McpPage {
+      const target = createMockPuppeteerTarget({url, title});
+      return new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+    }
+
+    function targetInfo(url: string, title: string) {
+      return {
+        targetId: '<mock-target-id>',
+        type: 'page',
+        title,
+        url,
+        attached: true,
+        canAccessOpener: false,
+      };
+    }
+
+    it('prefers fresh target info over cached target info', () => {
+      const mcpPage = createPage(
+        'http://127.0.0.1:8080/titled.html',
+        '127.0.0.1:8080/titled.html',
+      );
+      assert.strictEqual(
+        mcpPage.getTitle(
+          targetInfo('http://127.0.0.1:8080/titled.html', 'Real Title'),
+        ),
+        'Real Title',
+      );
+    });
+
+    it('ignores Chrome URL placeholder titles', () => {
+      assert.strictEqual(
+        createPage(
+          'http://127.0.0.1:8080/titled.html',
+          '127.0.0.1:8080/titled.html',
+        ).getTitle(),
+        '',
+      );
+      assert.strictEqual(
+        createPage('https://example.com/', 'example.com').getTitle(),
+        '',
+      );
+      assert.strictEqual(
+        createPage('about:blank', 'about:blank').getTitle(),
+        '',
+      );
+    });
+
+    it('exposes the target id', () => {
+      assert.strictEqual(
+        createPage('https://example.com', '').targetId,
+        '<mock-target-id>',
+      );
     });
   });
 
@@ -1566,6 +1634,34 @@ describe('McpPage', () => {
         () =>
           mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response),
         /Execution failed in page/,
+      );
+    });
+
+    it('throws the exception description when the WebMCP tool throws in executeThirdPartyDeveloperTool()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const mockTool = createMockWebMCPTool({
+        name: 'webmcp_tool',
+        annotations: {debugging: true},
+      });
+      mockTool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        errorText: '',
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          className: 'Error',
+          description: 'Error: boom\n    at foo (app.js:1:1)',
+          objectId: '1',
+        },
+      });
+      pptrPage.webmcp.tools.returns([mockTool]);
+      const response = createMockMcpResponse();
+
+      await assert.rejects(
+        () =>
+          mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response),
+        {message: 'Error: boom\n    at foo (app.js:1:1)'},
       );
     });
 

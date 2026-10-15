@@ -31,12 +31,12 @@ import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {
   createHandlerMocks,
-  createMockClassDiffs,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockDominatorChain,
   createMockDuplicateStrings,
   createMockHeapSnapshotAggregateData,
+  createMockHeapSnapshotDiff,
   createMockHeapSnapshotStats,
   createMockHeapSnapshotStaticData,
   createMockItemsRange,
@@ -166,7 +166,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotAggregates,
         aggregates,
-        {pageIdx: undefined, pageSize: undefined},
+        {pageIdx: undefined, pageSize: undefined, maxNameLength: undefined},
       );
     });
 
@@ -183,6 +183,7 @@ describe('memory', () => {
             objectId: 123,
             pageIdx: 1,
             pageSize: 10,
+            maxNameLength: 500,
           },
         },
         response,
@@ -198,7 +199,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotAggregates,
         aggregates,
-        {pageIdx: 1, pageSize: 10},
+        {pageIdx: 1, pageSize: 10, maxNameLength: 500},
       );
     });
   });
@@ -580,8 +581,8 @@ describe('memory', () => {
   describe('compare_heapsnapshots', () => {
     it('returns summary diff when classIndex is omitted', async () => {
       const {context, response, args} = createHandlerMocks();
-      const diffs = createMockClassDiffs();
-      context.getHeapSnapshotClassDiffs.resolves(diffs);
+      const diff = createMockHeapSnapshotDiff();
+      context.getHeapSnapshotClassDiffs.resolves(diff);
 
       await compareHeapSnapshots(args).handler(
         {
@@ -601,7 +602,33 @@ describe('memory', () => {
       );
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotClassDiffs,
-        diffs,
+        diff,
+        {pageIdx: undefined, pageSize: undefined, maxNameLength: undefined},
+      );
+    });
+
+    it('passes pagination options to the summary diff', async () => {
+      const {context, response, args} = createHandlerMocks();
+      const diff = createMockHeapSnapshotDiff();
+      context.getHeapSnapshotClassDiffs.resolves(diff);
+
+      await compareHeapSnapshots(args).handler(
+        {
+          params: {
+            baseFilePath: 'heap1.heapsnapshot',
+            currentFilePath: 'heap2.heapsnapshot',
+            pageIdx: 1,
+            pageSize: 10,
+          },
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotClassDiffs,
+        diff,
+        {pageIdx: 1, pageSize: 10, maxNameLength: undefined},
       );
     });
 
@@ -616,6 +643,7 @@ describe('memory', () => {
             baseFilePath: 'heap1.heapsnapshot',
             currentFilePath: 'heap2.heapsnapshot',
             classIndex: 2,
+            maxNameLength: 500,
           },
         },
         response,
@@ -631,6 +659,7 @@ describe('memory', () => {
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotDetailedClassDiff,
         detailedDiff,
+        {maxNameLength: 500},
       );
     });
   });

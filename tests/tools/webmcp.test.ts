@@ -144,7 +144,6 @@ describe('webmcp', () => {
         id: 'call-1',
         status: 'Completed',
         output: {ok: true},
-        errorText: undefined,
       });
       page.getWebMcpTools.returns([tool]);
 
@@ -162,7 +161,77 @@ describe('webmcp', () => {
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         JSON.stringify(
-          {status: 'Completed', output: {ok: true}, errorText: undefined},
+          {status: 'Completed', output: {ok: true}, error: undefined},
+          null,
+          2,
+        ),
+      );
+    });
+
+    it('reports the exception description as error when the tool throws', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const tool = createMockWebMCPTool({
+        name: 'my_tool',
+      });
+      tool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          className: 'Error',
+          description: 'Error: boom\n    at foo (app.js:1:1)',
+          objectId: '1',
+        },
+      });
+      page.getWebMcpTools.returns([tool]);
+
+      await executeWebMcpTool(args).handler(
+        {
+          params: {toolName: 'my_tool'},
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(tool.execute, {});
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        JSON.stringify(
+          {status: 'Error', error: 'Error: boom\n    at foo (app.js:1:1)'},
+          null,
+          2,
+        ),
+      );
+    });
+
+    it('reports errorText as error when there is no exception', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const tool = createMockWebMCPTool({
+        name: 'my_tool',
+      });
+      tool.execute.resolves({
+        id: 'call-1',
+        status: 'Error',
+        errorText: 'Invalid input arguments',
+      });
+      page.getWebMcpTools.returns([tool]);
+
+      await executeWebMcpTool(args).handler(
+        {
+          params: {toolName: 'my_tool'},
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(tool.execute, {});
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        JSON.stringify(
+          {status: 'Error', error: 'Invalid input arguments'},
           null,
           2,
         ),

@@ -1638,6 +1638,44 @@ describe('input', () => {
         assert.strictEqual(response.snapshotParams, undefined);
       });
     });
+
+    it('throws an error if multiple files are uploaded to an input without multiple attribute', async () => {
+      using firstFile = createTempFile('first file content', 'first.txt');
+      using secondFile = createTempFile('second file content', 'second.txt');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<form>
+            <input
+              type="file"
+              id="file-input"
+            />
+          </form>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await assert.rejects(
+          uploadFile(args).handler(
+            {
+              params: {
+                uid: '1_2',
+                filePaths: [firstFile.path, secondFile.path],
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          {
+            message:
+              'Multiple file uploads only work with <input type=file multiple>',
+          },
+        );
+      });
+    });
   });
 
   describe('press_key', () => {

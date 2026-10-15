@@ -7,7 +7,7 @@
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
-  HeapSnapshotClassDiff,
+  HeapSnapshotDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
@@ -30,6 +30,7 @@ import type {
   LaunchPWAOptions,
   PWAState,
   ScreenRecorder,
+  ScreenRecording,
   UninstallPWAOptions,
   Viewport,
   DevTools,
@@ -134,6 +135,34 @@ export interface SnapshotParams {
   filePath?: string;
 }
 
+export interface LighthouseAuditNode {
+  selector?: string;
+  snippet?: string;
+  nodeLabel?: string;
+  explanation?: string;
+}
+
+export interface LighthouseFailedAudit {
+  id: string;
+  title: string;
+  description?: string;
+  score: number;
+  displayValue?: string;
+  /**
+   * IDs of the categories that reference this audit.
+   */
+  categories: string[];
+  /**
+   * DOM nodes flagged by the audit, capped to a small number.
+   */
+  nodes: LighthouseAuditNode[];
+  /**
+   * Total number of distinct DOM nodes flagged by the audit, which may exceed
+   * the number of entries in `nodes`.
+   */
+  totalNodes: number;
+}
+
 export interface LighthouseData {
   summary: {
     mode: string;
@@ -152,6 +181,7 @@ export interface LighthouseData {
       total: number;
     };
   };
+  failedAudits: LighthouseFailedAudit[];
   reports: string[];
 }
 
@@ -164,7 +194,7 @@ export interface Response {
   appendResponseLine(value: string): void;
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
@@ -189,9 +219,13 @@ export interface Response {
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
     options?: HeapSnapshotFormatOptions,
   ): void;
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
+  setHeapSnapshotClassDiffs(
+    diff: HeapSnapshotDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+    options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
@@ -264,6 +298,11 @@ export type SupportedExtensions =
 /**
  * Only add methods used by tools/*.
  */
+export interface ScreenRecorderData {
+  recorder: ScreenRecorder | ScreenRecording;
+  filePath: string;
+}
+
 export type Context = Readonly<{
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
@@ -296,10 +335,6 @@ export type Context = Readonly<{
   ): Promise<{filename: string}>;
   loadResource(path: string): Promise<string>;
 
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
@@ -365,7 +400,7 @@ export type Context = Readonly<{
   getHeapSnapshotClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]>;
+  ): Promise<HeapSnapshotDiff>;
   getHeapSnapshotDetailedClassDiff(
     baseFilePath: string,
     currentFilePath: string,
@@ -404,6 +439,8 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  getScreenRecorder(): ScreenRecorderData | null;
+  setScreenRecorder(data: ScreenRecorderData | null): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {

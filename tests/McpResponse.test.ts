@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,7 +18,6 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
   listPages,
@@ -36,14 +35,16 @@ import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   createHandlerMocks,
-  createMockAggregatedInfo,
+  createMockHeapSnapshotAggregate,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
   createMockCSSStyleRule,
-  createMockClassDiffs,
+  createMockClassDiff,
+  createMockClassDiffTotals,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
+  createMockHeapSnapshotDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
   createMockHeapSnapshotStats,
@@ -53,6 +54,7 @@ import {
   createMockMcpWorker,
   createMockObjectInfo,
   createMockParsedArguments,
+  createMockPuppeteerTarget,
 } from './mocks.js';
 import {
   createTempDir,
@@ -68,6 +70,58 @@ import {
 } from './utils.js';
 
 describe('McpResponse', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('reports only pages opened by the attached action', async () => {
+    const openedTarget = createMockPuppeteerTarget({
+      url: 'https://example.com/opened',
+      title: 'Opened page',
+    });
+    const openedPage = createMockMcpPage({target: openedTarget});
+    const unrelatedPage = createMockMcpPage();
+    Object.defineProperty(openedPage, 'id', {value: 2});
+    openedPage.url.returns('https://example.com/opened');
+    openedPage.getTitle.returns('Opened page');
+    Object.defineProperty(unrelatedPage, 'id', {value: 3});
+    unrelatedPage.url.returns('https://example.com/unrelated');
+    unrelatedPage.getTitle.returns('Unrelated page');
+
+    const context = createMockMcpContext();
+    const targetInfo = openedTarget._getTargetInfo();
+    context.getTargetInfos.resolves(
+      new Map([[targetInfo.targetId, targetInfo]]),
+    );
+    context.getPages.returns([openedPage, unrelatedPage]);
+    context.isPageSelected.returns(false);
+    const response = new McpResponse(createMockParsedArguments());
+    response.attachWaitForResult({
+      openedPages: new Set([openedPage.target]),
+    });
+
+    const result = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(context.createPagesSnapshot);
+    sinon.assert.calledOnceWithExactly(context.getTargetInfos);
+    sinon.assert.calledOnceWithExactly(openedPage.getTitle, targetInfo);
+    assert.match(
+      getTextContent(result.content[0]),
+      /## Opened pages\n2: Opened page \(https:\/\/example\.com\/opened\)/,
+    );
+    assert.ok(!getTextContent(result.content[0]).includes('Unrelated page'));
+    assert.deepStrictEqual(result.structuredContent, {
+      openedPages: [
+        {
+          id: 2,
+          url: 'https://example.com/opened',
+          title: 'Opened page',
+          selected: false,
+        },
+      ],
+    });
+  });
+
   it('list pages', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);
@@ -261,6 +315,35 @@ describe('McpResponse', () => {
 
   describe('navigation', () => {
     const server = serverHooks();
+
+    it('lists current page titles', async () => {
+      await withMcpContext(async (response, context) => {
+        server.addHtmlRoute(
+          '/titled.html',
+          '<!doctype html><title>Real Title</title><h1>Titled</h1>',
+        );
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.goto(server.getRoute('/titled.html'));
+
+        response.setIncludePages(true);
+        const res1 = await response.handle(context);
+        assert.ok(
+          getTextContent(res1.content[0]).includes(
+            `Real Title (${server.getRoute('/titled.html')})`,
+          ),
+        );
+
+        await page.evaluate(() => {
+          document.title = 'Changed By Script';
+        });
+        const res2 = await response.handle(context);
+        assert.ok(
+          getTextContent(res2.content[0]).includes(
+            `Changed By Script (${server.getRoute('/titled.html')})`,
+          ),
+        );
+      });
+    });
 
     it('resets ids after navigation', async () => {
       await withMcpContext(async (response, context) => {
@@ -916,6 +999,39 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [
+          {
+            id: 'color-contrast',
+            title:
+              'Background and foreground colors do not have a sufficient contrast ratio.',
+            description: 'Low-contrast text is difficult to read.',
+            score: 0,
+            categories: ['accessibility'],
+            nodes: [
+              {
+                selector: 'body > p',
+                snippet: '<p class="faint">',
+                nodeLabel: 'Hello',
+                explanation:
+                  'Fix any of the following:\n  Element has insufficient color contrast',
+              },
+              {
+                selector: 'a[title="Say \\"hi\\""]',
+                snippet: '<a title="Say &quot;hi&quot;">',
+                nodeLabel: 'Say "hi"\nnow',
+              },
+            ],
+            totalNodes: 12,
+          },
+          {
+            id: 'document-title',
+            title: 'Document does not have a `<title>` element',
+            score: 0,
+            categories: ['accessibility', 'seo'],
+            nodes: [],
+            totalNodes: 0,
+          },
+        ],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 
@@ -923,6 +1039,7 @@ describe('lighthouse', () => {
       const {content, structuredContent} = await response.handle(context);
 
       const text = getTextContent(content[0]);
+      assert.ok(text.includes('### Failed audits'));
       assert.ok(text.includes('### Reports'));
       assert.ok(text.includes('- /tmp/report.json'));
       assert.ok(text.includes('- /tmp/report.html'));
@@ -964,6 +1081,7 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 
@@ -1369,26 +1487,22 @@ describe('McpResponse heap snapshot formatting', () => {
   it('formats aggregate data with shallow size and pagination summaries', async () => {
     const response = new McpResponse(createMockParsedArguments());
     const aggregates = {
-      aggregates: {
-        ObjectA: createMockAggregatedInfo({
-          name: 'ObjectA',
+      aggregates: [
+        createMockHeapSnapshotAggregate({
+          id: 1,
+          className: 'ObjectA',
           count: 10,
-          self: 100,
-          maxRet: 1000,
-          distance: 1,
-          idxs: [],
-          [stableIdSymbol]: 1,
+          selfSize: 100,
+          retainedSize: 1000,
         }),
-        ObjectB: createMockAggregatedInfo({
-          name: 'ObjectB',
+        createMockHeapSnapshotAggregate({
+          id: 2,
+          className: 'ObjectB',
           count: 5,
-          self: 50,
-          maxRet: 500,
-          distance: 2,
-          idxs: [],
-          [stableIdSymbol]: 2,
+          selfSize: 50,
+          retainedSize: 500,
         }),
-      },
+      ],
       objectCount: 15,
       totalSelfSize: 150,
     };
@@ -1415,6 +1529,10 @@ describe('McpResponse heap snapshot formatting', () => {
       objectCount: 15,
       totalSelfSize: 150,
     });
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotAggregates'),
+      [aggregates.aggregates[0]],
+    );
   });
 
   it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
@@ -1572,8 +1690,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
   it('formats class diff summary and detailed diff headers', async () => {
     const response = new McpResponse(createMockParsedArguments());
-    const diffs = createMockClassDiffs();
-    response.setHeapSnapshotClassDiffs(diffs);
+    response.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff());
 
     const context = createMockMcpContext();
     const {content} = await response.handle(context);
@@ -1590,6 +1707,61 @@ describe('McpResponse heap snapshot formatting', () => {
     const detailedText = getTextContent(detailedResult.content[0]);
     assert.ok(detailedText.includes('### Heap Snapshot Detailed Diff'));
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
+  });
+
+  it('paginates class diff summary and keeps global indices', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const classDiffs = [
+      createMockClassDiff({index: 0, className: 'ClassA'}),
+      createMockClassDiff({index: 1, className: 'ClassB'}),
+      createMockClassDiff({index: 2, className: 'ClassC'}),
+    ];
+    const totals = createMockClassDiffTotals({addedCount: 3, countDelta: 3});
+    response.setHeapSnapshotClassDiffs(
+      createMockHeapSnapshotDiff({classDiffs, totals}),
+      {pageIdx: 1, pageSize: 2},
+    );
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('Showing 3-3 of 3 (Page 2 of 2).'));
+    assert.ok(text.includes('Previous page: 0'));
+    assert.ok(text.includes('Total: # new: 3, # deleted: 0, # delta: +3'));
+    assert.ok(text.includes('\n2,ClassC,'));
+    assert.ok(!text.includes('ClassA'));
+    assert.ok(!text.includes('ClassB'));
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotClassDiffs'),
+      [classDiffs[2]],
+    );
+    const heapData: unknown = Reflect.get(structuredContent, 'heapSnapshot');
+    assert.ok(heapData && typeof heapData === 'object');
+    assert.deepStrictEqual(Reflect.get(heapData, 'classDiffStats'), totals);
+  });
+
+  it('truncates class diff names in compact format', async () => {
+    const context = createMockMcpContext();
+    const toonDiffResponse = new McpResponse(createMockParsedArguments());
+    toonDiffResponse.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff(), {
+      maxNameLength: 4,
+    });
+    const toonDiffResult = await toonDiffResponse.handle(context, 'toon');
+    const toonDiffText = getTextContent(toonDiffResult.content[0]);
+    assert.ok(toonDiffText.includes('Test...'));
+
+    const detailedDiff = createMockDetailedClassDiff();
+    const toonDetailedResponse = new McpResponse(createMockParsedArguments());
+    toonDetailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff, {
+      maxNameLength: 4,
+    });
+    const toonDetailedResult = await toonDetailedResponse.handle(
+      context,
+      'toon',
+    );
+    const toonDetailedText = getTextContent(toonDetailedResult.content[0]);
+    assert.ok(toonDetailedText.includes('Test...'));
   });
 
   it('formats duplicate strings with pagination and object details', async () => {

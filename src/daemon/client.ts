@@ -37,25 +37,10 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-/**
- * Waits for a file to be created and populated (removed = false) or removed (removed = true).
- */
-async function waitForFile(filePath: string, removed = false): Promise<void> {
-  const check = (): boolean => {
-    const exists = fs.existsSync(filePath);
-    if (removed) {
-      return !exists;
-    }
-    if (!exists) {
-      return false;
-    }
-    try {
-      return fs.statSync(filePath).size > 0;
-    } catch {
-      return false;
-    }
-  };
-
+async function waitFor(
+  check: () => boolean,
+  timeoutMessage: string,
+): Promise<void> {
   const deadline = Date.now() + FILE_TIMEOUT;
   while (Date.now() < deadline) {
     if (check()) {
@@ -71,9 +56,23 @@ async function waitForFile(filePath: string, removed = false): Promise<void> {
     return;
   }
 
-  throw new Error(
-    `Timeout: file ${filePath} ${removed ? 'not removed' : 'not found'} within ${FILE_TIMEOUT}ms`,
-  );
+  throw new Error(timeoutMessage);
+}
+
+/**
+ * Waits for a file to be created and populated.
+ */
+async function waitForFile(filePath: string): Promise<void> {
+  await waitFor(() => {
+    if (!fs.existsSync(filePath)) {
+      return false;
+    }
+    try {
+      return fs.statSync(filePath).size > 0;
+    } catch {
+      return false;
+    }
+  }, `Timeout: file ${filePath} not found within ${FILE_TIMEOUT}ms`);
 }
 
 async function waitForDaemonReady(sessionId: string): Promise<void> {
@@ -206,10 +205,25 @@ export async function stopDaemon(sessionId: string): Promise<void> {
   const pid = getDaemonPid(sessionId);
   const pidFilePath = getPidFilePath(sessionId);
 
-  await sendCommand({method: 'stop'}, sessionId);
+  try {
+    await sendCommand({method: 'stop'}, sessionId);
+  } catch (error) {
+    logger?.('Failed to stop daemon via socket, sending SIGTERM:', error);
+    if (pid) {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        // Ignore if process already exited.
+      }
+    }
+  }
 
   try {
-    await waitForFile(pidFilePath, /* removed=*/ true);
+    await waitFor(
+      () => !isDaemonRunning(sessionId),
+      `Timeout: daemon (pid ${pid}) did not exit within ${FILE_TIMEOUT}ms`,
+    );
+    fs.rmSync(pidFilePath, {force: true});
   } catch (error) {
     if (pid) {
       try {

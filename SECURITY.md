@@ -18,6 +18,32 @@ content or make sure your client takes precautions against prompt injections.
 
 We appreciate feedback and suggestions from developers on how this tool can make it easier for them to build a more secure user experience, but will treat these exclusively as feature requests, and not vulnerabilities in chrome-devtools-mcp itself.
 
+### Trusted host environment
+
+`chrome-devtools-mcp` is a local developer tool. It runs with the privileges of
+the user who starts it and trusts the environment it is started in, in the same
+way that `npm`, `npx`, `node`, or `git` do when run in that environment. In
+particular, we treat the following as trusted inputs:
+
+- The current working directory the server is started in and its contents.
+- Environment variables, including `PATH`, `npm_config_*`, and proxy settings.
+- The user's npm configuration at every scope (`.npmrc` files in the project,
+  user, and global locations) and the `npm` executable they resolve to. We
+  intentionally shell out to `npm` so that update checks respect the user's
+  registry, proxy, and authentication configuration.
+- The Node.js installation and the Chrome binary the server launches or
+  connects to.
+
+Reports that require an attacker to control any of these are not considered
+vulnerabilities in `chrome-devtools-mcp`. This includes placing executables or
+configuration files (for example `npm.cmd` or `.npmrc`) in a workspace
+directory that the server is later started from. Do not start the server, or
+any other developer tooling, in a workspace you do not trust. MCP clients
+typically use the opened workspace as the working directory for stdio servers;
+if you need to inspect untrusted repositories, run the server in an OS-level
+sandbox or a dedicated VM. The startup update check can be disabled with the
+`CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` environment variable.
+
 ### MCP roots
 
 `chrome-devtools-mcp` supports [MCP roots](https://modelcontextprotocol.io/specification/2025-06-18/client/roots). If the client specifies them, the MCP server will check the roots when accessing files.

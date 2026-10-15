@@ -152,6 +152,8 @@ chrome-devtools take_screenshot 1 --fullPage true --format "jpeg" --quality 80 #
 chrome-devtools take_screenshot 1 --uid "id" --filePath "s.png" # Take a screenshot of an element
 chrome-devtools take_snapshot 1 # Take a text snapshot of the page from the a11y tree
 chrome-devtools take_snapshot 1 --verbose true --filePath "s.txt" # Take a verbose snapshot and save to file
+chrome-devtools screencast_start 1 --filePath "screen.mp4" # Starts an mp4 screencast recording on page 1
+chrome-devtools screencast_stop 1 # Stops the active screencast on page 1
 ```
 
 ## Extensions
@@ -179,8 +181,6 @@ Experimental tools are disabled by default. Enable them with the corresponding f
 
 ```bash
 chrome-devtools click_at 1 100 200 # Clicks at the provided coordinates on page 1 (requires --experimentalVision=true)
-chrome-devtools screencast_start 1 --filePath "screen.mp4" # Starts a screencast recording on page 1 (requires --experimentalScreencast=true and ffmpeg)
-chrome-devtools screencast_stop 1 # Stops the active screencast on page 1
 chrome-devtools list_webmcp_tools 1 # List all WebMCP tools on page 1 (requires --categoryExperimentalWebmcp=true)
 chrome-devtools execute_webmcp_tool 1 "tool_name" --input '{"arg":"val"}' # Execute a WebMCP tool on page 1 (requires --categoryExperimentalWebmcp=true)
 chrome-devtools list_3p_developer_tools 1 # List third-party developer tools on page 1 (requires --categoryExperimentalThirdParty=true)

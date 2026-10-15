@@ -36,10 +36,10 @@
   - [`get_css_styles`](#get_css_styles)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
-  - [`take_screenshot`](#take_screenshot)
-  - [`take_snapshot`](#take_snapshot)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
+  - [`take_screenshot`](#take_screenshot)
+  - [`take_snapshot`](#take_snapshot)
 - **[Memory](#memory)** (14 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`analyze_heapsnapshot_contexts`](#analyze_heapsnapshot_contexts)
@@ -215,7 +215,7 @@
 
 ### `list_pages`
 
-**Description:** Get a list of pages open in the browser.
+**Description:** Get a list of pages including extension service workers open in the browser.
 
 **Parameters:** None
 
@@ -301,9 +301,9 @@
 
 **Parameters:**
 
-- **height** (number) **(required)**: Page height
+- **height** (integer) **(required)**: Page height
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **width** (number) **(required)**: Page width
+- **width** (integer) **(required)**: Page width
 
 ---
 
@@ -379,11 +379,10 @@
 
 ### `evaluate_script`
 
-**Description:** Evaluate JavaScript inside the target page. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.
+**Description:** Evaluate JavaScript inside the target page or service worker. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.
 
 **Parameters:**
 
-- **pageId** (number) **(required)**: Targets a specific page by ID.
 - **args** (array) _(optional)_: An optional list of arguments (element uids from the page content snapshot) to pass to the function.
 - **dialogAction** (string) _(optional)_: Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.
 - **filePath** (string) _(optional)_: The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.
@@ -392,6 +391,8 @@
   Example without arguments: `() => document.title` or `async () => await fetch("example.com")`.
   Example with arguments: `(el) => el.innerText`
 
+- **pageId** (number) _(optional)_: Targets a specific page by ID. Required when not evaluating in a service worker.
+- **serviceWorkerId** (string) _(optional)_: The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.
 - **sourcePath** (string) _(optional)_: The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.
 - **waitForStableDom** (boolean) _(optional)_: Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.
 
@@ -426,7 +427,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ### `lighthouse_audit`
 
-**Description:** Get Lighthouse score and reports for accessibility, SEO, best practices, and agentic browsing. This excludes performance. For performance audits, run [`performance_start_trace`](#performance_start_trace)
+**Description:** Get Lighthouse scores, failing audits, and the DOM nodes they flag for accessibility, SEO, best practices, and agentic browsing. Full reports are saved to disk. This excludes performance. For performance audits, run [`performance_start_trace`](#performance_start_trace)
 
 **Parameters:**
 
@@ -439,7 +440,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ### `list_console_messages`
 
-**Description:** List all console messages for the target page since the last navigation.
+**Description:** List all console messages for the target page since the last navigation. This includes console messages originating from extensions content scripts.
 
 **Parameters:**
 
@@ -450,6 +451,27 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
 - **serviceWorkerId** (string) _(optional)_: Filter messages to only return messages of the specified service worker.
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.
+
+---
+
+### `screencast_start`
+
+**Description:** Starts recording a screencast (video) of the target page.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **filePath** (string) _(optional)_: Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.
+
+---
+
+### `screencast_stop`
+
+**Description:** Stops the active screencast recording on the target page.
+
+**Parameters:**
+
+- **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---
 
@@ -479,27 +501,6 @@ in the DevTools Elements panel (if any).
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
-
----
-
-### `screencast_start`
-
-**Description:** Starts recording a screencast (video) of the target page in specified format. (requires flag: --experimentalScreencast=true)
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-- **filePath** (string) _(optional)_: Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.
-
----
-
-### `screencast_stop`
-
-**Description:** Stops the active screencast recording on the target page. (requires flag: --experimentalScreencast=true)
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---
 
@@ -550,6 +551,9 @@ in the DevTools Elements panel (if any).
 - **baseFilePath** (string) **(required)**: A path to the base .heapsnapshot file (earlier snapshot).
 - **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
 - **classIndex** (number) _(optional)_: Optional 0-based index of the class in the summary list to filter results, showing individual objects.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 
 ---
 
@@ -564,8 +568,8 @@ in the DevTools Elements panel (if any).
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the nodes.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 
 ---
 
@@ -577,9 +581,10 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the aggregates.
+- **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
-- **pageIdx** (number) _(optional)_: The page index for pagination of aggregates.
-- **pageSize** (number) _(optional)_: The page size for pagination of aggregates.
+- **pageIdx** (integer) _(optional)_: The page index for pagination of aggregates.
+- **pageSize** (integer) _(optional)_: The page size for pagination of aggregates.
 
 ---
 
@@ -603,8 +608,8 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 
 ---
 
@@ -618,8 +623,8 @@ in the DevTools Elements panel (if any).
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
 - **excludePrimitives** (boolean) _(optional)_: Whether to exclude primitive target nodes. Default is true.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.
 - **sortBy** (enum: "retainedSize", "selfSize", "name") _(optional)_: Sort order for edges. Default is retainedSize.
 
@@ -646,8 +651,8 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get retainers for.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 
 ---
 
@@ -688,8 +693,8 @@ in the DevTools Elements panel (if any).
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).
-- **pageIdx** (number) _(optional)_: The page index for pagination.
-- **pageSize** (number) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 - **propertyName** (string) _(optional)_: Optional property name filter for outgoing reference edges.
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **selfSize** (string) _(optional)_: Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.

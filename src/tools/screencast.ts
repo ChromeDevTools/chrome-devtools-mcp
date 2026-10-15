@@ -10,7 +10,11 @@ import path from 'node:path';
 
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
-import type {ScreenRecorder, VideoFormat} from '../third_party/index.js';
+import type {
+  ScreenRecorder,
+  ScreenRecording,
+  VideoFormat,
+} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
@@ -24,20 +28,45 @@ type SupportedVideoExtension = '.webm' | '.mp4';
 
 const supportedExtensions: SupportedVideoExtension[] = ['.webm', '.mp4'];
 
+/**
+ * Resolves the output extension for the legacy ffmpeg-based recorder.
+ *
+ * Matches the extension case-insensitively so e.g. `.WEBM` is recognized as
+ * WebM. An explicitly requested but unsupported extension is rejected rather
+ * than being silently rewritten to `.mp4` (which would change both the format
+ * and the output path from what was requested). A missing extension falls
+ * back to `.mp4`. The matched extension is normalized to lower case.
+ */
+function getLegacyExtension(filePath: string): SupportedVideoExtension {
+  const requestedExtension = path.extname(filePath);
+  const matchedExtension = supportedExtensions.find(
+    supportedExtension =>
+      supportedExtension === requestedExtension.toLowerCase(),
+  );
+  if (!matchedExtension && requestedExtension !== '') {
+    throw new Error(
+      `Unsupported screencast file extension "${requestedExtension}". ` +
+        `Supported formats: ${supportedExtensions.join(', ')} (case-insensitive).`,
+    );
+  }
+  return matchedExtension ?? '.mp4';
+}
+
 export const startScreencast = definePageTool((args: ParsedArguments) => ({
   name: 'screencast_start',
-  description: `Starts recording a screencast (video) of the target page in specified format.`,
+  description: `Starts recording a screencast (video) of the target page.`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
-    conditions: ['experimentalScreencast'],
   },
   schema: {
     filePath: zod
       .string()
       .optional()
       .describe(
-        `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`,
+        args?.experimentalScreencast
+          ? `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`
+          : 'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.',
       ),
   },
   blockedByDialog: false,
@@ -45,7 +74,8 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
     filePath: true,
   },
   handler: async (request, response, context) => {
-    if (context.getScreenRecorder() !== null) {
+    const page = request.page;
+    if (page.getScreenRecorder() !== null) {
       response.appendResponseLine(
         'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
       );
@@ -55,43 +85,28 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
     const requestedFilePath = request.params.filePath;
     const filePath = requestedFilePath ?? (await generateTempFilePath());
 
-    // Match the extension case-insensitively so e.g. `.WEBM` is recognized as
-    // WebM. An explicitly requested but unsupported extension is rejected
-    // rather than being silently rewritten to `.mp4` (which would change both
-    // the format and the output path from what was requested). A missing
-    // extension falls back to `.mp4`. The matched extension is normalized to
-    // lower case.
-    const requestedExtension = path.extname(filePath);
-    const matchedExtension = supportedExtensions.find(
-      supportedExtension =>
-        supportedExtension === requestedExtension.toLowerCase(),
-    );
-    if (!matchedExtension && requestedExtension !== '') {
-      throw new Error(
-        `Unsupported screencast file extension "${requestedExtension}". ` +
-          `Supported formats: ${supportedExtensions.join(', ')} (case-insensitive).`,
-      );
-    }
-    const enforcedExtension: SupportedVideoExtension =
-      matchedExtension ?? '.mp4';
-    const format: VideoFormat = (matchedExtension?.substring(1) ??
-      'mp4') as VideoFormat;
+    // The built-in Chrome recorder (page.record) always produces mp4. The
+    // legacy ffmpeg recorder (page.screencast) also supports WebM.
+    const useLegacy = Boolean(args?.experimentalScreencast);
+    const extension = useLegacy ? getLegacyExtension(filePath) : '.mp4';
+    const resolvedPath = await context.ensureExtension(filePath, extension);
 
-    const resolvedPath = await context.ensureExtension(
-      filePath,
-      enforcedExtension,
-    );
-
-    const page = request.page;
-
-    let recorder: ScreenRecorder;
+    let recorder: ScreenRecorder | ScreenRecording;
     try {
-      recorder = await page.pptrPage.screencast({
-        path: resolvedPath,
-        format,
-        ffmpegPath: args?.experimentalFfmpegPath,
-        fps: args?.experimentalScreencastFps,
-      });
+      if (useLegacy) {
+        const format: VideoFormat = extension === '.webm' ? 'webm' : 'mp4';
+        recorder = await page.pptrPage.screencast({
+          path: resolvedPath,
+          format,
+          ffmpegPath: args?.experimentalFfmpegPath,
+          fps: args?.screencastFps,
+        });
+      } else {
+        recorder = await page.pptrPage.record({
+          path: resolvedPath,
+          fps: args?.screencastFps,
+        });
+      }
     } catch (err) {
       // If we generated a temporary directory for this recording, remove it so
       // a failed start (e.g. ffmpeg missing) does not leak an empty directory.
@@ -112,10 +127,15 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
             'Install ffmpeg (https://ffmpeg.org/) and ensure it is available in your PATH.',
         );
       }
+      if (message.includes('Page.startScreenRecording')) {
+        throw new Error(
+          'The connected Chrome does not support screen recording. Update Chrome to a newer version.',
+        );
+      }
       throw err;
     }
 
-    context.setScreenRecorder({recorder, filePath: resolvedPath});
+    page.setScreenRecorder({recorder, filePath: resolvedPath});
 
     response.appendResponseLine(
       `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast(args).name} to stop recording.`,
@@ -129,13 +149,13 @@ export const stopScreencast = definePageTool(() => ({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
-    conditions: ['experimentalScreencast'],
   },
   schema: {},
   blockedByDialog: false,
   verifyFilesSchema: {},
-  handler: async (_request, response, context) => {
-    const data = context.getScreenRecorder();
+  handler: async (request, response) => {
+    const page = request.page;
+    const data = page.getScreenRecorder();
     if (!data) {
       response.appendResponseLine(
         'Error: no active screencast recording to stop.',
@@ -148,7 +168,7 @@ export const stopScreencast = definePageTool(() => ({
         `The screencast recording has been stopped and saved to ${data.filePath}.`,
       );
     } finally {
-      context.setScreenRecorder(null);
+      page.setScreenRecorder(null);
     }
   },
 }));

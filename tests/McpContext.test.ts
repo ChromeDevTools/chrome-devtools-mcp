@@ -17,16 +17,18 @@ import sinon from 'sinon';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
+import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
-import {serverHooks} from './server.js';
+import {serverHooks, TestServer} from './server.js';
 import {
   assertNoServiceWorkerReported,
   createTempDir,
   createTempFile,
+  getMockBrowser,
   getMockRequest,
   html,
   withBrowser,
@@ -354,6 +356,7 @@ describe('McpContext', () => {
       const options = {
         experimentalDevToolsDebugging: false,
         performanceCrux: false,
+        heapSnapshotManager: new HeapSnapshotManager(),
       };
       const first = await McpContext.from(browser, undefined, options, Locator);
       const idBeforeReconnect = (await first.newPage()).id;
@@ -379,12 +382,26 @@ describe('McpContext', () => {
         );
       } finally {
         second.dispose();
+        options.heapSnapshotManager.dispose();
       }
+    });
+  });
+
+  it('reports an unknown page id before the last-page guard on close', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await assert.rejects(context.closePage(99), /No page found/);
+      await assert.rejects(
+        context.closePage(page.id),
+        /The last open page cannot be closed/,
+      );
+      assert.ok(!page.pptrPage.isClosed());
     });
   });
 
   it('reports the reconnect notice once', async () => {
     await withBrowser(async browser => {
+      const heapSnapshotManager = new HeapSnapshotManager();
       const context = await McpContext.from(
         browser,
         undefined,
@@ -392,6 +409,7 @@ describe('McpContext', () => {
           experimentalDevToolsDebugging: false,
           performanceCrux: false,
           reconnected: true,
+          heapSnapshotManager,
         },
         Locator,
       );
@@ -400,25 +418,8 @@ describe('McpContext', () => {
         assert.ok(!context.consumeReconnectNotice(), 'notice does not repeat');
       } finally {
         context.dispose();
+        heapSnapshotManager.dispose();
       }
-    });
-  });
-
-  it('disposes loaded heap snapshots on teardown', async () => {
-    await withMcpContext(async (_response, context) => {
-      const filePath = path.join(
-        process.cwd(),
-        'tests/fixtures/example.heapsnapshot',
-      );
-      await context.getHeapSnapshotStats(filePath);
-      assert.ok(context.hasHeapSnapshots(), 'snapshot loaded before teardown');
-
-      context.dispose();
-
-      assert.ok(
-        !context.hasHeapSnapshots(),
-        'heap snapshots freed on teardown',
-      );
     });
   });
 
@@ -759,6 +760,41 @@ describe('McpContext', () => {
     });
 
     describe('https protocol', () => {
+      async function createNetworkPolicyContext(options: {
+        allowlist?: string[];
+        blocklist?: string[];
+      }) {
+        const browser = getMockBrowser();
+        browser.pages = async () => [];
+        browser.targets = () => [];
+        return await McpContext.from(
+          browser,
+          undefined,
+          {
+            experimentalDevToolsDebugging: false,
+            performanceCrux: false,
+            heapSnapshotManager: new HeapSnapshotManager(),
+            ...options,
+          },
+          Locator,
+        );
+      }
+
+      async function withServers<T>(
+        servers: TestServer[],
+        callback: () => Promise<T>,
+      ): Promise<T> {
+        for (const server of servers) {
+          await server.start();
+        }
+        try {
+          return await callback();
+        } finally {
+          for (const server of servers.reverse()) {
+            await server.stop();
+          }
+        }
+      }
       it('respects blocklist by throwing if blocked', async () => {
         await withMcpContext(
           async (_response, context) => {
@@ -821,6 +857,123 @@ describe('McpContext', () => {
             allowedUrlPattern: ['https://example.com/allowed*'],
           },
         );
+      });
+
+      it('rejects redirects outside the allowlist', async () => {
+        const allowedServer = new TestServer(TestServer.randomPort());
+        const forbiddenServer = new TestServer(TestServer.randomPort());
+        forbiddenServer.addRoute('/secret', (_req, res) => {
+          res.end('FORBIDDEN_BODY');
+        });
+        allowedServer.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: forbiddenServer.getRoute('/secret'),
+          });
+          res.end();
+        });
+        await withServers([allowedServer, forbiddenServer], async () => {
+          const context = await createNetworkPolicyContext({
+            allowlist: [allowedServer.getRoute('/redirect')],
+          });
+          try {
+            await assert.rejects(
+              () => context.loadResource(allowedServer.getRoute('/redirect')),
+              /Not allowed by allowlist/,
+            );
+          } finally {
+            context.dispose();
+          }
+        });
+      });
+
+      it('rejects redirects into the blocklist', async () => {
+        const allowedServer = new TestServer(TestServer.randomPort());
+        const forbiddenServer = new TestServer(TestServer.randomPort());
+        forbiddenServer.addRoute('/secret', (_req, res) => {
+          res.end('FORBIDDEN_BODY');
+        });
+        allowedServer.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: forbiddenServer.getRoute('/secret'),
+          });
+          res.end();
+        });
+        await withServers([allowedServer, forbiddenServer], async () => {
+          const context = await createNetworkPolicyContext({
+            blocklist: [forbiddenServer.getRoute('/secret')],
+          });
+          try {
+            await assert.rejects(
+              () => context.loadResource(allowedServer.getRoute('/redirect')),
+              /Blocked by blocklist/,
+            );
+          } finally {
+            context.dispose();
+          }
+        });
+      });
+
+      it('rejects a blocked intermediate redirect hop', async () => {
+        const startServer = new TestServer(TestServer.randomPort());
+        const blockedServer = new TestServer(TestServer.randomPort());
+        const finalServer = new TestServer(TestServer.randomPort());
+        finalServer.addRoute('/final', (_req, res) => {
+          res.end('FINAL_BODY');
+        });
+        blockedServer.addRoute('/bounce', (_req, res) => {
+          res.writeHead(302, {
+            Location: finalServer.getRoute('/final'),
+          });
+          res.end();
+        });
+        startServer.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: blockedServer.getRoute('/bounce'),
+          });
+          res.end();
+        });
+        await withServers(
+          [startServer, blockedServer, finalServer],
+          async () => {
+            const context = await createNetworkPolicyContext({
+              blocklist: [blockedServer.getRoute('/bounce')],
+            });
+            try {
+              await assert.rejects(
+                () => context.loadResource(startServer.getRoute('/redirect')),
+                /Blocked by blocklist/,
+              );
+            } finally {
+              context.dispose();
+            }
+          },
+        );
+      });
+
+      it('follows redirects when every hop is allowed', async () => {
+        const server = new TestServer(TestServer.randomPort());
+        server.addRoute('/final', (_req, res) => {
+          res.end('ALLOWED_BODY');
+        });
+        server.addRoute('/redirect', (_req, res) => {
+          res.writeHead(302, {
+            Location: server.getRoute('/final'),
+          });
+          res.end();
+        });
+        await withServers([server], async () => {
+          const context = await createNetworkPolicyContext({
+            allowlist: [server.baseUrl + '/*'],
+          });
+          try {
+            assert.strictEqual(
+              await context.loadResource(server.getRoute('/redirect')),
+              'ALLOWED_BODY',
+            );
+          } finally {
+            context.dispose();
+          }
+        });
       });
     });
 

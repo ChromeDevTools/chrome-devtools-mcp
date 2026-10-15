@@ -22,7 +22,8 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {createMockParsedArguments} from '../mocks.js';
+import {zod} from '../../src/third_party/index.js';
+import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -1376,6 +1377,29 @@ describe('pages', () => {
     });
   });
   describe('resize', () => {
+    it('rejects non-positive and fractional dimensions', () => {
+      const {args} = createHandlerMocks();
+      const {width, height} = resizePage(args).schema;
+      const schema = zod.object({width, height});
+      assert.strictEqual(
+        schema.safeParse({width: 800, height: 600}).success,
+        true,
+      );
+      for (const params of [
+        {width: 0, height: 600},
+        {width: 800, height: -1},
+        {width: Number.POSITIVE_INFINITY, height: 600},
+        {width: 800.5, height: 600},
+        {width: 800, height: Number.NaN},
+      ]) {
+        assert.strictEqual(
+          schema.safeParse(params).success,
+          false,
+          JSON.stringify(params),
+        );
+      }
+    });
+
     it('resize the page', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

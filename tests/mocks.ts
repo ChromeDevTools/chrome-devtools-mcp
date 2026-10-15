@@ -34,13 +34,14 @@ import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {McpWorker, type WorkerType} from '../src/McpWorker.js';
 import type {
-  AggregatedInfoWithId,
   DuplicateStringGroup,
+  HeapSnapshotAggregate,
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
+  HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
+  HeapSnapshotDiff,
 } from '../src/processors/HeapSnapshotManager.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
   CdpBrowser,
   CdpExtension,
@@ -133,6 +134,9 @@ export function mockListener() {
         listener(data);
       }
     },
+    listenerCount(eventName: string | symbol | number) {
+      return listeners[eventName]?.length ?? 0;
+    },
   };
 }
 
@@ -178,6 +182,7 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
     CdpPage,
   ) as unknown as sinon.SinonStubbedInstance<Page>;
   const pageListener = mockListener();
+  page.listenerCount.callsFake(pageListener.listenerCount);
   page.on.callsFake((eventName, handler) => {
     pageListener.on(eventName, handler);
     return page;
@@ -420,6 +425,7 @@ export function createMockMcpContext(
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
+  context.getTargetInfos.resolves(new Map());
 
   return context;
 }
@@ -985,7 +991,7 @@ export function createMockRetainedByContextSummary(): DevTools.HeapSnapshotModel
 
 export function createMockHeapSnapshotAggregateData(): HeapSnapshotAggregateData {
   return {
-    aggregates: {},
+    aggregates: [],
     objectCount: 0,
     totalSelfSize: 0,
   };
@@ -1015,22 +1021,46 @@ export function createMockDominatorChain(): DevTools.HeapSnapshotModel.HeapSnaps
   return [];
 }
 
-export function createMockClassDiffs(): HeapSnapshotClassDiff[] {
-  return [
-    {
-      className: 'TestClass',
-      addedCount: 1,
-      removedCount: 0,
-      countDelta: 1,
-      addedSize: 10,
-      removedSize: 0,
-      sizeDelta: 10,
-    },
-  ];
+export function createMockClassDiff(
+  options: Partial<HeapSnapshotClassDiff> = {},
+): HeapSnapshotClassDiff {
+  return {
+    index: options.index ?? 0,
+    className: options.className ?? 'TestClass',
+    addedCount: options.addedCount ?? 1,
+    removedCount: options.removedCount ?? 0,
+    countDelta: options.countDelta ?? 1,
+    addedSize: options.addedSize ?? 10,
+    removedSize: options.removedSize ?? 0,
+    sizeDelta: options.sizeDelta ?? 10,
+  };
+}
+
+export function createMockClassDiffTotals(
+  options: Partial<HeapSnapshotClassDiffTotals> = {},
+): HeapSnapshotClassDiffTotals {
+  return {
+    addedCount: options.addedCount ?? 1,
+    removedCount: options.removedCount ?? 0,
+    countDelta: options.countDelta ?? 1,
+    addedSize: options.addedSize ?? 10,
+    removedSize: options.removedSize ?? 0,
+    sizeDelta: options.sizeDelta ?? 10,
+  };
+}
+
+export function createMockHeapSnapshotDiff(
+  options: Partial<HeapSnapshotDiff> = {},
+): HeapSnapshotDiff {
+  return {
+    classDiffs: options.classDiffs ?? [createMockClassDiff()],
+    totals: options.totals ?? createMockClassDiffTotals(),
+  };
 }
 
 export function createMockDetailedClassDiff(): HeapSnapshotDetailedClassDiff {
   return {
+    index: 0,
     className: 'TestClass',
     addedCount: 1,
     removedCount: 0,
@@ -1199,16 +1229,14 @@ export function createMockHeapSnapshotEdge(
   };
 }
 
-export function createMockAggregatedInfo(
-  options: Partial<AggregatedInfoWithId> = {},
-): AggregatedInfoWithId {
+export function createMockHeapSnapshotAggregate(
+  options: Partial<HeapSnapshotAggregate> = {},
+): HeapSnapshotAggregate {
   return {
+    id: options.id ?? 1,
+    className: options.className ?? 'Object',
     count: options.count ?? 1,
-    distance: options.distance ?? 1,
-    self: options.self ?? 10,
-    maxRet: options.maxRet ?? 100,
-    name: options.name ?? 'Object',
-    idxs: options.idxs ?? [],
-    [stableIdSymbol]: options[stableIdSymbol] ?? 1,
+    selfSize: options.selfSize ?? 10,
+    retainedSize: options.retainedSize ?? 100,
   };
 }

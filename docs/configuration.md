@@ -182,16 +182,16 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--experimentalScreencast`/ `--experimental-screencast`**
-  Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.
+  Use the legacy ffmpeg-based screencast implementation instead of the built-in Chrome recorder. Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH. This option is deprecated and will be removed in favour of dependency-free screencast commands that are available by default.
   - **Type:** boolean
   - **Default:** `false`
 
 - **`--experimentalFfmpegPath`/ `--experimental-ffmpeg-path`**
-  Path to ffmpeg executable for screencast recording.
+  Path to ffmpeg executable for legacy screencast recording (requires --experimentalScreencast).
   - **Type:** string
 
-- **`--experimentalScreencastFps`/ `--experimental-screencast-fps`**
-  Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.
+- **`--screencastFps`/ `--screencast-fps`, `--experimentalScreencastFps`**
+  Frames per second to use for screencast recording. Lower values reduce file size and encoding load.
   - **Type:** number
 
 - **`--performanceCrux`/ `--performance-crux`**
