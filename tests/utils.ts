@@ -6,9 +6,11 @@
 
 import assert from 'node:assert';
 import {spawn, type ChildProcess} from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type {TestContext} from 'node:test';
 
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
@@ -481,6 +483,18 @@ export async function assertDaemonIsNotRunning(sessionId?: string) {
 export async function stopDaemonForCleanup(sessionId: string) {
   await stopDaemon(sessionId);
   assert.ok(!isDaemonRunning(sessionId), 'daemon is still running');
+}
+
+/**
+ * Creates a new CLI session ID for one test and stops its daemon after the
+ * test. Each test gets its own session, so tests can run concurrently.
+ */
+export function createCliSession(t: TestContext): string {
+  const sessionId = crypto.randomUUID();
+  t.after(async () => {
+    await stopDaemonForCleanup(sessionId);
+  });
+  return sessionId;
 }
 
 export async function assertDaemonIsRunning(sessionId?: string) {

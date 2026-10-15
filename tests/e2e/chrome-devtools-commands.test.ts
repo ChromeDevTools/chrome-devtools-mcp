@@ -5,31 +5,22 @@
  */
 
 import assert from 'node:assert';
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import {
   assertDaemonIsRunning,
+  createCliSession,
   createTempDir,
   runCli,
-  stopDaemonForCleanup,
 } from '../utils.js';
 
-describe('chrome-devtools', () => {
-  let sessionId: string;
-
-  beforeEach(() => {
-    sessionId = crypto.randomUUID();
-  });
-
-  afterEach(async () => {
-    await stopDaemonForCleanup(sessionId);
-  });
-
-  it('can invoke list_pages', async () => {
+// Each test uses its own daemon session, so the tests run in parallel.
+describe('chrome-devtools', {concurrency: true}, () => {
+  it('can invoke list_pages', async t => {
+    const sessionId = createCliSession(t);
     const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
       startResult.status,
@@ -51,7 +42,8 @@ describe('chrome-devtools', () => {
     await assertDaemonIsRunning(sessionId);
   });
 
-  it('can take screenshot', async () => {
+  it('can take screenshot', async t => {
+    const sessionId = createCliSession(t);
     const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
       startResult.status,
@@ -71,7 +63,8 @@ describe('chrome-devtools', () => {
     );
   });
 
-  it('can evaluate inline and local JavaScript', async () => {
+  it('can evaluate inline and local JavaScript', async t => {
+    const sessionId = createCliSession(t);
     using rootDirectory = createTempDir('evaluate-script-cli-');
     const daemonDirectory = path.join(rootDirectory.path, 'daemon');
     const clientDirectory = path.join(rootDirectory.path, 'client');

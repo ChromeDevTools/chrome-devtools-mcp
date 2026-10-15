@@ -5,23 +5,14 @@
  */
 
 import assert from 'node:assert';
-import crypto from 'node:crypto';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it} from 'node:test';
 
-import {runCli, stopDaemonForCleanup} from '../utils.js';
+import {createCliSession, runCli} from '../utils.js';
 
-describe('chrome-devtools', () => {
-  let sessionId: string;
-
-  beforeEach(() => {
-    sessionId = crypto.randomUUID();
-  });
-
-  afterEach(async () => {
-    await stopDaemonForCleanup(sessionId);
-  });
-
-  it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {
+// Each test uses its own daemon session, so the tests run in parallel.
+describe('chrome-devtools', {concurrency: true}, () => {
+  it('fails to invoke list_network_requests when categoryNetwork is disabled', async t => {
+    const sessionId = createCliSession(t);
     await runCli(['start', '--categoryNetwork=false'], sessionId);
 
     const result = await runCli(['list_network_requests', '1'], sessionId);
@@ -39,7 +30,8 @@ describe('chrome-devtools', () => {
     );
   });
 
-  it('fails to invoke click_at when experimentalVision is disabled (default)', async () => {
+  it('fails to invoke click_at when experimentalVision is disabled (default)', async t => {
+    const sessionId = createCliSession(t);
     await runCli(['start'], sessionId);
 
     const result = await runCli(['click_at', '1', '100', '100'], sessionId);
@@ -56,7 +48,8 @@ describe('chrome-devtools', () => {
     );
   });
 
-  it('fails to invoke evaluate_script when javascriptEvaluation is disabled', async () => {
+  it('fails to invoke evaluate_script when javascriptEvaluation is disabled', async t => {
+    const sessionId = createCliSession(t);
     await runCli(['start', '--no-javascript-evaluation'], sessionId);
 
     const result = await runCli(['evaluate_script', '() => 1'], sessionId);
