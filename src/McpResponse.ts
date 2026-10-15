@@ -378,13 +378,14 @@ export class McpResponse implements Response {
 
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       aggregateData,
       pagination: options,
+      formatOptions: options,
     };
   }
 
@@ -456,21 +457,27 @@ export class McpResponse implements Response {
     };
   }
 
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void {
+  setHeapSnapshotClassDiffs(
+    classDiffs: HeapSnapshotClassDiff[],
+    options?: HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       classDiffs,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+    options?: HeapSnapshotFormatOptions,
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+      formatOptions: options,
     };
   }
 
@@ -911,7 +918,7 @@ export class McpResponse implements Response {
           totalSelfSize: number;
         };
       };
-      heapSnapshotData?: object[];
+      heapSnapshotAggregates?: readonly object[];
       heapSnapshotNodes?: readonly object[];
       heapSnapshotRetainingPaths?: object;
       heapSnapshotDominators?: readonly object[];
@@ -1349,12 +1356,8 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {
-        const sortedEntries = HeapSnapshotFormatter.sort(
-          aggregateData.aggregates,
-        );
-
         const paginationData = this.#dataWithPagination(
-          sortedEntries,
+          aggregateData.aggregates,
           this.#heapSnapshotOptions.pagination,
         );
 
@@ -1370,14 +1373,19 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
 
-        const paginatedRecord = Object.fromEntries(paginationData.items);
-        const formatter = new HeapSnapshotFormatter(paginatedRecord);
-
-        structuredContent.heapSnapshotData = formatter.toJSON();
+        structuredContent.heapSnapshotAggregates = paginationData.items;
         response.push(
           compactEncode
-            ? compactEncode(structuredContent.heapSnapshotData)
-            : formatter.toString(),
+            ? compactEncode(
+                paginationData.items.map(aggregate => ({
+                  ...aggregate,
+                  className: formatName(aggregate.className, formatOptions),
+                })),
+              )
+            : HeapSnapshotFormatter.formatAggregates(
+                paginationData.items,
+                formatOptions,
+              ),
         );
       }
       const nodes = this.#heapSnapshotOptions.nodes;
@@ -1450,8 +1458,16 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         response.push('### Heap Snapshot Diff');
         response.push(
           compactEncode
-            ? compactEncode(classDiffs)
-            : HeapSnapshotFormatter.formatDiffSummary(classDiffs),
+            ? compactEncode(
+                classDiffs.map(diff => ({
+                  ...diff,
+                  className: formatName(diff.className, formatOptions),
+                })),
+              )
+            : HeapSnapshotFormatter.formatDiffSummary(
+                classDiffs,
+                formatOptions,
+              ),
         );
         structuredContent.heapSnapshotClassDiffs = classDiffs;
       }
@@ -1460,8 +1476,17 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         response.push('### Heap Snapshot Detailed Diff');
         response.push(
           compactEncode
-            ? compactEncode(detailedClassDiff)
-            : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
+            ? compactEncode({
+                ...detailedClassDiff,
+                className: formatName(
+                  detailedClassDiff.className,
+                  formatOptions,
+                ),
+              })
+            : HeapSnapshotFormatter.formatDiffDetails(
+                detailedClassDiff,
+                formatOptions,
+              ),
         );
         structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
       }

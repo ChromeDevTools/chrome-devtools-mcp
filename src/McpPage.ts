@@ -37,6 +37,7 @@ import type {
   DevToolsData,
   MatchedStyles,
   Response,
+  ScreenRecorderData,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -169,6 +170,9 @@ export class McpPage implements ContextPage {
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
+
+  // Screencast
+  #screenRecorder: ScreenRecorderData | null = null;
 
   eventBasedThirdPartyTools: ToolGroups = [];
 
@@ -369,6 +373,14 @@ export class McpPage implements ContextPage {
 
   clearDialog(): void {
     this.#dialog = undefined;
+  }
+
+  getScreenRecorder(): ScreenRecorderData | null {
+    return this.#screenRecorder;
+  }
+
+  setScreenRecorder(data: ScreenRecorderData | null): void {
+    this.#screenRecorder = data;
   }
 
   throwIfDialogOpen(): void {

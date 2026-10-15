@@ -34,13 +34,12 @@ import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {McpWorker, type WorkerType} from '../src/McpWorker.js';
 import type {
-  AggregatedInfoWithId,
   DuplicateStringGroup,
+  HeapSnapshotAggregate,
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
   HeapSnapshotDetailedClassDiff,
 } from '../src/processors/HeapSnapshotManager.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
   CdpBrowser,
   CdpExtension,
@@ -990,7 +989,7 @@ export function createMockRetainedByContextSummary(): DevTools.HeapSnapshotModel
 
 export function createMockHeapSnapshotAggregateData(): HeapSnapshotAggregateData {
   return {
-    aggregates: {},
+    aggregates: [],
     objectCount: 0,
     totalSelfSize: 0,
   };
@@ -1204,16 +1203,14 @@ export function createMockHeapSnapshotEdge(
   };
 }
 
-export function createMockAggregatedInfo(
-  options: Partial<AggregatedInfoWithId> = {},
-): AggregatedInfoWithId {
+export function createMockHeapSnapshotAggregate(
+  options: Partial<HeapSnapshotAggregate> = {},
+): HeapSnapshotAggregate {
   return {
+    id: options.id ?? 1,
+    className: options.className ?? 'Object',
     count: options.count ?? 1,
-    distance: options.distance ?? 1,
-    self: options.self ?? 10,
-    maxRet: options.maxRet ?? 100,
-    name: options.name ?? 'Object',
-    idxs: options.idxs ?? [],
-    [stableIdSymbol]: options[stableIdSymbol] ?? 1,
+    selfSize: options.selfSize ?? 10,
+    retainedSize: options.retainedSize ?? 100,
   };
 }

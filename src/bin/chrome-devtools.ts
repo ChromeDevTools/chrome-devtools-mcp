@@ -28,7 +28,11 @@ import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
+import {
+  buildCommand,
+  getCommandArgSpec,
+  shieldLiteralArgs,
+} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
 import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
 
@@ -61,7 +65,15 @@ async function start(
   logDisclaimers(parsedArgs);
 }
 
-const y = yargs(hideBin(process.argv))
+const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
+  hideBin(process.argv),
+  commandName => {
+    const commandDef = commands[commandName];
+    return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
+  },
+);
+
+const y = yargs(cliArgs)
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
@@ -212,7 +224,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required || isOptionalPositionalArg(commandName, argName)) {
+        if (opt.positional) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],
@@ -230,7 +242,9 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
             type: type as Options['type'],
           };
           if (opt.default !== undefined) {
-            options.default = opt.default;
+            // Document the default in --help without populating argv, so the
+            // daemon applies its current tool schema and config defaults.
+            options.defaultDescription = JSON.stringify(opt.default);
           }
           if (opt.enum) {
             options.choices = opt.enum as Array<string | number>;
@@ -253,7 +267,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
         const commandArgs: Record<string, unknown> = {};
         for (const argName of Object.keys(args)) {
           if (argName in argv) {
-            commandArgs[argName] = argv[argName];
+            commandArgs[argName] = restoreLiteralArg(argv[argName]);
           }
         }
 

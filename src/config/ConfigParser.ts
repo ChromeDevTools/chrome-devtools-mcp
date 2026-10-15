@@ -18,6 +18,7 @@ import {
   CONFLICTING_ARGS,
   IMPLICATIONS,
   DEFAULT_FILESYSTEM_ROOT,
+  isReloadableOption,
   withoutDefaults,
 } from './mcp-options.js';
 import {ConfigLocator} from './ConfigLocator.js';
@@ -41,21 +42,47 @@ function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
 
 export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
 
+function isMcpOptionKey(key: string): key is keyof ParsedArguments {
+  return key in mcpOptions;
+}
+
+function copyOption<K extends keyof ParsedArguments>(
+  target: Partial<ParsedArguments>,
+  source: Partial<ParsedArguments>,
+  key: K,
+): void {
+  if (key in source) {
+    target[key] = source[key];
+  } else {
+    delete target[key];
+  }
+}
+
+const explicitArgsByParsed = new WeakMap<
+  ParsedArguments,
+  {parser: ConfigParser; explicitArgs: Partial<ParsedArguments>}
+>();
+
 export class ConfigParser {
   #configPath?: string;
+  #usageStatisticsNoticeShown = false;
   readonly configLocator: ConfigLocator;
 
-  /**
-   * @param configLocator Finds the config file when `--config` is not passed.
-   * Config file discovery is off without it, for example in tests.
-   */
   constructor(
     private version: string,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
+    configLocator?: ConfigLocator,
   ) {
-    this.configLocator = new ConfigLocator();
+    this.configLocator = configLocator ?? new ConfigLocator();
+  }
+
+  /**
+   * The config file resolved by the last `parse()` call, if any.
+   */
+  get configPath(): string | undefined {
+    return this.#configPath;
   }
 
   buildCliParser(
@@ -131,7 +158,7 @@ export class ConfigParser {
    * Step 4: rejects mutually exclusive inputs. Only explicit inputs are checked,
    * so defaults never conflict.
    */
-  validateConflicts(explicitArgs: Partial<ParsedArguments>): void {
+  static validateConflicts(explicitArgs: Partial<ParsedArguments>): void {
     const activeArgs = new Set<string>();
     for (const [key, val] of Object.entries(explicitArgs)) {
       if (val !== undefined && val !== false) {
@@ -149,7 +176,7 @@ export class ConfigParser {
     }
   }
 
-  validateImplications(explicitArgs: Partial<ParsedArguments>): void {
+  static validateImplications(explicitArgs: Partial<ParsedArguments>): void {
     for (const [key, implied] of IMPLICATIONS) {
       const isKeySet =
         explicitArgs[key] !== undefined && explicitArgs[key] !== false;
@@ -219,9 +246,12 @@ export class ConfigParser {
     }
 
     if (this.env['CI'] || this.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-      console.error(
-        "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-      );
+      if (!this.#usageStatisticsNoticeShown) {
+        this.#usageStatisticsNoticeShown = true;
+        console.error(
+          "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
+        );
+      }
       resolvedArgs.usageStatistics = false;
     }
 
@@ -235,13 +265,18 @@ export class ConfigParser {
     // The merge and the default loop lose the static type that yargs infers from
     // `mcpOptions`. Every value was produced by the same option definitions (CLI
     // parser, strict config-file parser, option defaults), so the shape matches.
-    return resolvedArgs as unknown as ParsedArguments;
+    const parsed: ParsedArguments = resolvedArgs as unknown as ParsedArguments;
+    explicitArgsByParsed.set(parsed, {
+      parser: this,
+      explicitArgs: {...explicitArgs},
+    });
+    return parsed;
   }
 
   parse(): ParsedArguments {
     try {
       const cliArgs = this.parseCliArgs();
-      this.#configPath = cliArgs.config ?? this.configLocator?.locate(this.env);
+      this.#configPath = cliArgs.config ?? this.configLocator.locate(this.env);
       this.warnUnknownArgs(cliArgs);
       return this.#resolve(cliArgs);
     } catch (error) {
@@ -266,13 +301,40 @@ export class ConfigParser {
     const configPath = this.#configPath;
     const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
     // Step 3: merges the explicit inputs. The CLI wins over the config file.
-    const explicitArgs = {
+    const explicitArgs: Partial<ParsedArguments> = {
       ...configFileArgs,
       ...cliArgs,
       ...(configPath ? {config: configPath} : {}),
     };
-    this.validateConflicts(explicitArgs);
-    this.validateImplications(explicitArgs);
+    ConfigParser.validateConflicts(explicitArgs);
+    ConfigParser.validateImplications(explicitArgs);
     return this.applyDefaults(explicitArgs);
+  }
+  /**
+   * Merges explicit inputs so that a running server continues with `next` for
+   * reloadable options and `previous` for everything else, then validates and
+   * applies defaults.
+   */
+  static mergeReloadableOptions(
+    previous: ParsedArguments,
+    next: ParsedArguments,
+  ): ParsedArguments {
+    const previousEntry = explicitArgsByParsed.get(previous);
+    const nextEntry = explicitArgsByParsed.get(next);
+    const previousExplicit: Partial<ParsedArguments> =
+      previousEntry?.explicitArgs ?? previous;
+    const nextExplicit: Partial<ParsedArguments> =
+      nextEntry?.explicitArgs ?? next;
+    const merged: Partial<ParsedArguments> = {...previousExplicit};
+    for (const name of Object.keys(mcpOptions)) {
+      if (isMcpOptionKey(name) && isReloadableOption(name)) {
+        copyOption(merged, nextExplicit, name);
+      }
+    }
+    ConfigParser.validateConflicts(merged);
+    ConfigParser.validateImplications(merged);
+    const parser =
+      nextEntry?.parser ?? previousEntry?.parser ?? new ConfigParser('');
+    return parser.applyDefaults(merged);
   }
 }

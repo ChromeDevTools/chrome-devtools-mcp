@@ -583,21 +583,28 @@ export const uploadFile = definePageTool(() => ({
 
     try {
       await handle.uploadFile(...filePaths);
-    } catch {
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes('Multiple file uploads')
+      ) {
+        throw err;
+      }
       // Some sites use a proxy element to trigger file upload instead of
       // a type=file element. In this case, we want to default to
       // Page.waitForFileChooser() and upload the file this way.
+      let fileChooser;
       try {
-        const [fileChooser] = await Promise.all([
+        [fileChooser] = await Promise.all([
           request.page.pptrPage.waitForFileChooser({timeout: 3000}),
           handle.asLocator().click(),
         ]);
-        await fileChooser.accept(filePaths);
       } catch {
         throw new Error(
           `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
         );
       }
+      await fileChooser.accept(filePaths);
     }
     if (request.params.includeSnapshot) {
       response.includeSnapshot();

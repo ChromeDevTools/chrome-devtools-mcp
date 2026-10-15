@@ -18,7 +18,6 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
   listPages,
@@ -36,7 +35,7 @@ import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   createHandlerMocks,
-  createMockAggregatedInfo,
+  createMockHeapSnapshotAggregate,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
@@ -1486,26 +1485,22 @@ describe('McpResponse heap snapshot formatting', () => {
   it('formats aggregate data with shallow size and pagination summaries', async () => {
     const response = new McpResponse(createMockParsedArguments());
     const aggregates = {
-      aggregates: {
-        ObjectA: createMockAggregatedInfo({
-          name: 'ObjectA',
+      aggregates: [
+        createMockHeapSnapshotAggregate({
+          id: 1,
+          className: 'ObjectA',
           count: 10,
-          self: 100,
-          maxRet: 1000,
-          distance: 1,
-          idxs: [],
-          [stableIdSymbol]: 1,
+          selfSize: 100,
+          retainedSize: 1000,
         }),
-        ObjectB: createMockAggregatedInfo({
-          name: 'ObjectB',
+        createMockHeapSnapshotAggregate({
+          id: 2,
+          className: 'ObjectB',
           count: 5,
-          self: 50,
-          maxRet: 500,
-          distance: 2,
-          idxs: [],
-          [stableIdSymbol]: 2,
+          selfSize: 50,
+          retainedSize: 500,
         }),
-      },
+      ],
       objectCount: 15,
       totalSelfSize: 150,
     };
@@ -1532,6 +1527,10 @@ describe('McpResponse heap snapshot formatting', () => {
       objectCount: 15,
       totalSelfSize: 150,
     });
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotAggregates'),
+      [aggregates.aggregates[0]],
+    );
   });
 
   it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
@@ -1707,6 +1706,29 @@ describe('McpResponse heap snapshot formatting', () => {
     const detailedText = getTextContent(detailedResult.content[0]);
     assert.ok(detailedText.includes('### Heap Snapshot Detailed Diff'));
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
+  });
+
+  it('truncates class diff names in compact format', async () => {
+    const context = createMockMcpContext();
+    const diffs = createMockClassDiffs();
+
+    const toonDiffResponse = new McpResponse(createMockParsedArguments());
+    toonDiffResponse.setHeapSnapshotClassDiffs(diffs, {maxNameLength: 4});
+    const toonDiffResult = await toonDiffResponse.handle(context, 'toon');
+    const toonDiffText = getTextContent(toonDiffResult.content[0]);
+    assert.ok(toonDiffText.includes('Test...'));
+
+    const detailedDiff = createMockDetailedClassDiff();
+    const toonDetailedResponse = new McpResponse(createMockParsedArguments());
+    toonDetailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff, {
+      maxNameLength: 4,
+    });
+    const toonDetailedResult = await toonDetailedResponse.handle(
+      context,
+      'toon',
+    );
+    const toonDetailedText = getTextContent(toonDetailedResult.content[0]);
+    assert.ok(toonDetailedText.includes('Test...'));
   });
 
   it('formats duplicate strings with pagination and object details', async () => {

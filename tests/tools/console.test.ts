@@ -496,6 +496,68 @@ describe('console', () => {
       });
     });
 
+    it('uses document locations in stack traces of inline scripts', async () => {
+      server.addHtmlRoute(
+        '/inline.html',
+        `<!doctype html>
+<title>inline</title>
+<script>
+console.error('inline-line-4');
+</script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/inline.html'));
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.match(rawText, /inline-line-4/);
+        assert.match(rawText, /\(inline\.html:4:9\)/);
+        assert.doesNotMatch(rawText, /VM\d+/);
+      });
+    });
+
+    it('uses document locations in stack traces of inline scripts in iframes', async () => {
+      server.addHtmlRoute(
+        '/inline.html',
+        `<!doctype html>
+<title>inline</title>
+<script>
+console.error('inline-line-4');
+</script>`,
+      );
+      server.addHtmlRoute(
+        '/outer.html',
+        `<!doctype html>
+<title>outer</title>
+<iframe src="${server.getRoute('/inline.html')}"></iframe>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/outer.html'));
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.match(rawText, /inline-line-4/);
+        assert.match(rawText, /\(inline\.html:4:9\)/);
+        assert.doesNotMatch(rawText, /VM\d+/);
+      });
+    });
+
     it('applies source maps to stack traces of console messages', async t => {
       server.addRoute('/main.min.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');

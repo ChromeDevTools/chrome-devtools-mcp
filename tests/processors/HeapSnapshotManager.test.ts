@@ -11,7 +11,6 @@ import sinon from 'sinon';
 
 import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
-import {stableIdSymbol} from '../../src/utils/id.js';
 
 describe('HeapSnapshotManager', () => {
   afterEach(() => {
@@ -96,12 +95,11 @@ describe('HeapSnapshotManager', () => {
     try {
       const filePath = 'tests/fixtures/example.heapsnapshot';
       const {aggregates} = await manager1.getAggregates(filePath);
-      const functionAggregate = Object.values(aggregates).find(
-        a => a.name === 'Function',
+      const functionAggregate = aggregates.find(
+        a => a.className === 'Function',
       );
       assert.ok(functionAggregate);
-      const classId = functionAggregate[stableIdSymbol];
-      assert.ok(classId !== undefined);
+      const classId = functionAggregate.id;
 
       const expectedNodes = await manager1.getNodesById(filePath, classId);
       const nodesWithoutPriorAggregates = await manager2.getNodesById(
@@ -127,6 +125,9 @@ describe('HeapSnapshotManager', () => {
       const filePath = 'tests/fixtures/example.heapsnapshot';
       const unfilteredFirst =
         await unfilteredFirstManager.getAggregates(filePath);
+      const unfilteredById = new Map(
+        unfilteredFirst.aggregates.map(a => [a.id, a.className]),
+      );
 
       const filteredFirst = await filteredFirstManager.getAggregates(
         filePath,
@@ -135,21 +136,17 @@ describe('HeapSnapshotManager', () => {
       const unfilteredSecond =
         await filteredFirstManager.getAggregates(filePath);
 
-      for (const [key, aggregate] of Object.entries(filteredFirst.aggregates)) {
+      for (const aggregate of filteredFirst.aggregates) {
         assert.strictEqual(
-          aggregate[stableIdSymbol],
-          unfilteredFirst.aggregates[key]?.[stableIdSymbol],
+          aggregate.className,
+          unfilteredById.get(aggregate.id),
         );
       }
 
-      for (const [key, aggregate] of Object.entries(
+      assert.deepStrictEqual(
         unfilteredSecond.aggregates,
-      )) {
-        assert.strictEqual(
-          aggregate[stableIdSymbol],
-          unfilteredFirst.aggregates[key]?.[stableIdSymbol],
-        );
-      }
+        unfilteredFirst.aggregates,
+      );
     } finally {
       unfilteredFirstManager.dispose();
       filteredFirstManager.dispose();

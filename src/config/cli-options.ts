@@ -15,6 +15,8 @@ export interface ArgDef {
   type: string;
   description: string;
   required: boolean;
+  /** Whether the arg is a positional on the command line, otherwise a flag. */
+  positional: boolean;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }
@@ -37,6 +39,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       retainedSize: {
         name: 'retainedSize',
@@ -44,6 +47,7 @@ export const commands: Commands = {
         description:
           'Inclusive range for the dead-field score of a context (e.g. "10KB", "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
         required: false,
+        positional: false,
       },
       scopeInfoNodeId: {
         name: 'scopeInfoNodeId',
@@ -51,6 +55,7 @@ export const commands: Commands = {
         description:
           'Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.',
         required: false,
+        positional: false,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -58,12 +63,14 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
         description: 'The zero-based page index. Defaults to 0.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
@@ -71,6 +78,7 @@ export const commands: Commands = {
         description:
           'The number of contexts to return per page. Defaults to 20.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -83,6 +91,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       uid: {
         name: 'uid',
@@ -90,12 +99,14 @@ export const commands: Commands = {
         description:
           'The uid of an element on the page from the page content snapshot',
         required: true,
+        positional: true,
       },
       dblClick: {
         name: 'dblClick',
         type: 'boolean',
         description: 'Set to true for double clicks. Default is false.',
         required: false,
+        positional: false,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -103,6 +114,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -116,24 +128,28 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       x: {
         name: 'x',
         type: 'number',
         description: 'The x coordinate',
         required: true,
+        positional: true,
       },
       y: {
         name: 'y',
         type: 'number',
         description: 'The y coordinate',
         required: true,
+        positional: true,
       },
       dblClick: {
         name: 'dblClick',
         type: 'boolean',
         description: 'Set to true for double clicks. Default is false.',
         required: false,
+        positional: false,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -141,6 +157,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -154,6 +171,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to the .heapsnapshot file to close.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -168,6 +186,7 @@ export const commands: Commands = {
         description:
           'The ID of the page to close. Call list_pages to list pages.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -182,6 +201,7 @@ export const commands: Commands = {
         description:
           'A path to the base .heapsnapshot file (earlier snapshot).',
         required: true,
+        positional: true,
       },
       currentFilePath: {
         name: 'currentFilePath',
@@ -189,6 +209,7 @@ export const commands: Commands = {
         description:
           'A path to the current .heapsnapshot file (later snapshot).',
         required: true,
+        positional: true,
       },
       classIndex: {
         name: 'classIndex',
@@ -196,6 +217,15 @@ export const commands: Commands = {
         description:
           'Optional 0-based index of the class in the summary list to filter results, showing individual objects.',
         required: false,
+        positional: false,
+      },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+        positional: false,
       },
     },
   },
@@ -208,18 +238,21 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       from_uid: {
         name: 'from_uid',
         type: 'string',
         description: 'The uid of the element to drag',
         required: true,
+        positional: true,
       },
       to_uid: {
         name: 'to_uid',
         type: 'string',
         description: 'The uid of the element to drop into',
         required: true,
+        positional: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -227,6 +260,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -240,12 +274,14 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       networkConditions: {
         name: 'networkConditions',
         type: 'string',
         description: 'Throttle network. Omit to disable throttling.',
         required: false,
+        positional: false,
         enum: ['Offline', 'Slow 3G', 'Fast 3G', 'Slow 4G', 'Fast 4G'],
       },
       cpuThrottlingRate: {
@@ -254,6 +290,7 @@ export const commands: Commands = {
         description:
           'Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling',
         required: false,
+        positional: false,
       },
       geolocation: {
         name: 'geolocation',
@@ -261,6 +298,7 @@ export const commands: Commands = {
         description:
           'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
         required: false,
+        positional: false,
       },
       userAgent: {
         name: 'userAgent',
@@ -268,6 +306,7 @@ export const commands: Commands = {
         description:
           'User agent to emulate. Omit or set to empty string to clear the user agent override.',
         required: false,
+        positional: false,
       },
       colorScheme: {
         name: 'colorScheme',
@@ -275,6 +314,7 @@ export const commands: Commands = {
         description:
           'Emulate the dark or the light mode. Omit or set to "auto" to reset to the default.',
         required: false,
+        positional: false,
         enum: ['dark', 'light', 'auto'],
       },
       forcedColors: {
@@ -283,6 +323,7 @@ export const commands: Commands = {
         description:
           'Emulate the `forced-colors` CSS media feature. Omit or set to "auto" to reset to the default.',
         required: false,
+        positional: false,
         enum: ['active', 'none', 'auto'],
       },
       prefersContrast: {
@@ -291,6 +332,7 @@ export const commands: Commands = {
         description:
           'Emulate the `prefers-contrast` CSS media feature. Omit or set to "auto" to reset to the default.',
         required: false,
+        positional: false,
         enum: ['more', 'less', 'custom', 'no-preference', 'auto'],
       },
       prefersReducedMotion: {
@@ -299,6 +341,7 @@ export const commands: Commands = {
         description:
           'Emulate the `prefers-reduced-motion` CSS media feature. Omit or set to "auto" to reset to the default.',
         required: false,
+        positional: false,
         enum: ['reduce', 'no-preference', 'auto'],
       },
       viewport: {
@@ -307,6 +350,7 @@ export const commands: Commands = {
         description:
           "Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode. Omit to clear the viewport override.",
         required: false,
+        positional: false,
       },
       extraHttpHeaders: {
         name: 'extraHttpHeaders',
@@ -314,6 +358,7 @@ export const commands: Commands = {
         description:
           'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -328,6 +373,7 @@ export const commands: Commands = {
         description:
           'Targets a specific page by ID. Required when not evaluating in a service worker.',
         required: false,
+        positional: false,
       },
       function: {
         name: 'function',
@@ -335,6 +381,7 @@ export const commands: Commands = {
         description:
           'JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.\nExample without arguments: `() => document.title` or `async () => await fetch("example.com")`.\nExample with arguments: `(el) => el.innerText`\n',
         required: false,
+        positional: true,
       },
       sourcePath: {
         name: 'sourcePath',
@@ -342,6 +389,7 @@ export const commands: Commands = {
         description:
           "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
         required: false,
+        positional: false,
       },
       format: {
         name: 'format',
@@ -349,6 +397,7 @@ export const commands: Commands = {
         description:
           'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
         required: false,
+        positional: false,
         enum: ['function', 'script'],
       },
       args: {
@@ -357,6 +406,7 @@ export const commands: Commands = {
         description:
           'An optional list of arguments (element uids from the page content snapshot) to pass to the function.',
         required: false,
+        positional: false,
       },
       filePath: {
         name: 'filePath',
@@ -364,6 +414,7 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
         required: false,
+        positional: false,
       },
       dialogAction: {
         name: 'dialogAction',
@@ -371,6 +422,7 @@ export const commands: Commands = {
         description:
           'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
         required: false,
+        positional: false,
       },
       waitForStableDom: {
         name: 'waitForStableDom',
@@ -378,6 +430,7 @@ export const commands: Commands = {
         description:
           'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
         required: false,
+        positional: false,
       },
       serviceWorkerId: {
         name: 'serviceWorkerId',
@@ -385,6 +438,7 @@ export const commands: Commands = {
         description:
           "The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.",
         required: false,
+        positional: false,
       },
     },
   },
@@ -398,18 +452,21 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       toolName: {
         name: 'toolName',
         type: 'string',
         description: 'The name of the tool to execute',
         required: true,
+        positional: true,
       },
       params: {
         name: 'params',
         type: 'string',
         description: 'The JSON-stringified parameters to pass to the tool',
         required: false,
+        positional: false,
       },
     },
   },
@@ -423,12 +480,14 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       toolName: {
         name: 'toolName',
         type: 'string',
         description: 'The name of the WebMCP tool to execute',
         required: true,
+        positional: true,
       },
       input: {
         name: 'input',
@@ -436,6 +495,7 @@ export const commands: Commands = {
         description:
           'The JSON-stringified parameters to pass to the WebMCP tool',
         required: false,
+        positional: false,
       },
     },
   },
@@ -449,6 +509,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       uid: {
         name: 'uid',
@@ -456,6 +517,7 @@ export const commands: Commands = {
         description:
           'The uid of an element on the page from the page content snapshot',
         required: true,
+        positional: true,
       },
       value: {
         name: 'value',
@@ -463,6 +525,7 @@ export const commands: Commands = {
         description:
           'The value to fill in. "true" or "false" for checkboxes and toggles, "true" for radio buttons.',
         required: true,
+        positional: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -470,6 +533,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -483,6 +547,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       msgid: {
         name: 'msgid',
@@ -490,6 +555,7 @@ export const commands: Commands = {
         description:
           'The msgid of a console message on the page from the listed console messages',
         required: true,
+        positional: true,
       },
     },
   },
@@ -503,6 +569,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       uid: {
         name: 'uid',
@@ -510,6 +577,7 @@ export const commands: Commands = {
         description:
           'The uid of the element on the page from the page content snapshot to inspect CSS styles for',
         required: true,
+        positional: true,
       },
       pageSize: {
         name: 'pageSize',
@@ -517,6 +585,7 @@ export const commands: Commands = {
         description:
           'Maximum number of CSS rules to return per page. Defaults to 10.',
         required: false,
+        positional: false,
         default: 10,
       },
       pageIdx: {
@@ -525,6 +594,7 @@ export const commands: Commands = {
         description:
           'Page number to return (0-based). Defaults to 0 (the first page).',
         required: false,
+        positional: false,
         default: 0,
       },
     },
@@ -539,18 +609,21 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       id: {
         name: 'id',
         type: 'number',
         description: 'The ID for the class, obtained from details.',
         required: true,
+        positional: true,
       },
       filterName: {
         name: 'filterName',
         type: 'string',
         description: 'An optional filter to apply to the nodes.',
         required: false,
+        positional: false,
         enum: [
           'objectsRetainedByDetachedDomNodes',
           'objectsRetainedByConsole',
@@ -567,6 +640,7 @@ export const commands: Commands = {
         description:
           'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
         required: false,
+        positional: false,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -574,18 +648,21 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
+        type: 'integer',
         description: 'The page index for pagination.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
+        type: 'integer',
         description: 'The page size for pagination.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -599,12 +676,14 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       filterName: {
         name: 'filterName',
         type: 'string',
         description: 'An optional filter to apply to the aggregates.',
         required: false,
+        positional: false,
         enum: [
           'objectsRetainedByDetachedDomNodes',
           'objectsRetainedByConsole',
@@ -621,18 +700,29 @@ export const commands: Commands = {
         description:
           'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
         required: false,
+        positional: false,
+      },
+      maxNameLength: {
+        name: 'maxNameLength',
+        type: 'integer',
+        description:
+          'Maximum length of names before truncation. Defaults to 100.',
+        required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
+        type: 'integer',
         description: 'The page index for pagination of aggregates.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
+        type: 'integer',
         description: 'The page size for pagination of aggregates.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -646,12 +736,14 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       nodeId: {
         name: 'nodeId',
         type: 'number',
         description: 'The node ID to get the dominator chain for.',
         required: true,
+        positional: true,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -659,6 +751,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -672,18 +765,21 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
+        type: 'integer',
         description: 'The page index for pagination.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
+        type: 'integer',
         description: 'The page size for pagination.',
         required: false,
+        positional: false,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -691,6 +787,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -704,18 +801,21 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       nodeId: {
         name: 'nodeId',
         type: 'number',
         description: 'The node ID to get outgoing edges for.',
         required: true,
+        positional: true,
       },
       sortBy: {
         name: 'sortBy',
         type: 'string',
         description: 'Sort order for edges. Default is retainedSize.',
         required: false,
+        positional: false,
         enum: ['retainedSize', 'selfSize', 'name'],
       },
       retainedSize: {
@@ -724,6 +824,7 @@ export const commands: Commands = {
         description:
           'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.',
         required: false,
+        positional: false,
       },
       excludePrimitives: {
         name: 'excludePrimitives',
@@ -731,6 +832,7 @@ export const commands: Commands = {
         description:
           'Whether to exclude primitive target nodes. Default is true.',
         required: false,
+        positional: false,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -738,18 +840,21 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
+        type: 'integer',
         description: 'The page index for pagination.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
+        type: 'integer',
         description: 'The page size for pagination.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -763,12 +868,14 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       nodeId: {
         name: 'nodeId',
         type: 'number',
         description: 'The node ID to get object details for.',
         required: true,
+        positional: true,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -776,6 +883,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -789,12 +897,14 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       nodeId: {
         name: 'nodeId',
         type: 'number',
         description: 'The node ID to get retainers for.',
         required: true,
+        positional: true,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -802,18 +912,21 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
+        type: 'integer',
         description: 'The page index for pagination.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
+        type: 'integer',
         description: 'The page size for pagination.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -827,30 +940,35 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       nodeId: {
         name: 'nodeId',
         type: 'number',
         description: 'The node ID to get retaining paths for.',
         required: true,
+        positional: true,
       },
       maxDepth: {
         name: 'maxDepth',
         type: 'number',
         description: 'The maximum depth to search for retaining paths.',
         required: false,
+        positional: false,
       },
       maxNodes: {
         name: 'maxNodes',
         type: 'number',
         description: 'The maximum number of nodes to return.',
         required: false,
+        positional: false,
       },
       maxSiblings: {
         name: 'maxSiblings',
         type: 'number',
         description: 'The maximum number of siblings to return.',
         required: false,
+        positional: false,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -858,6 +976,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -871,6 +990,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -878,6 +998,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -891,6 +1012,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       reqid: {
         name: 'reqid',
@@ -898,6 +1020,7 @@ export const commands: Commands = {
         description:
           'The reqid of the network request. If omitted returns the currently selected request in the DevTools Network panel.',
         required: false,
+        positional: false,
       },
       requestFilePath: {
         name: 'requestFilePath',
@@ -905,6 +1028,7 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-request file to save the request body to. If omitted, the body is returned inline.',
         required: false,
+        positional: false,
       },
       responseFilePath: {
         name: 'responseFilePath',
@@ -912,6 +1036,7 @@ export const commands: Commands = {
         description:
           'The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -926,6 +1051,7 @@ export const commands: Commands = {
         description:
           'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -939,12 +1065,14 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       action: {
         name: 'action',
         type: 'string',
         description: 'Whether to dismiss or accept the dialog',
         required: true,
+        positional: true,
         enum: ['accept', 'dismiss'],
       },
       promptText: {
@@ -952,6 +1080,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'Optional prompt text to enter into the dialog.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -964,6 +1093,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       uid: {
         name: 'uid',
@@ -971,6 +1101,7 @@ export const commands: Commands = {
         description:
           'The uid of an element on the page from the page content snapshot',
         required: true,
+        positional: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -978,6 +1109,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -991,6 +1123,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'Absolute path to the unpacked extension folder.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1005,6 +1138,7 @@ export const commands: Commands = {
         description:
           'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
+        positional: true,
       },
       installUrlOrBundleUrl: {
         name: 'installUrlOrBundleUrl',
@@ -1012,6 +1146,7 @@ export const commands: Commands = {
         description:
           'The location of the app or bundle. For a normal site this is the page URL; for an Isolated Web App it can be a file:// or http(s):// signed web bundle.',
         required: true,
+        positional: true,
       },
       displayMode: {
         name: 'displayMode',
@@ -1019,6 +1154,7 @@ export const commands: Commands = {
         description:
           'Optional user display mode preference applied after install. "standalone" opens the app in its own window; "browser" opens it as a tab. Installs via the PWA CDP domain default to "browser" because they do not simulate the install dialog, so pass "standalone" to get an app-window experience.',
         required: false,
+        positional: false,
         enum: ['standalone', 'browser'],
       },
     },
@@ -1034,6 +1170,7 @@ export const commands: Commands = {
         description:
           'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
+        positional: true,
       },
       url: {
         name: 'url',
@@ -1041,6 +1178,7 @@ export const commands: Commands = {
         description:
           'Optional URL within the app to open instead of the default start URL.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1054,6 +1192,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       mode: {
         name: 'mode',
@@ -1061,6 +1200,7 @@ export const commands: Commands = {
         description:
           '"navigation" reloads & audits. "snapshot" analyzes current state.',
         required: false,
+        positional: false,
         default: 'navigation',
         enum: ['navigation', 'snapshot'],
       },
@@ -1069,6 +1209,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'Device to emulate.',
         required: false,
+        positional: false,
         default: 'desktop',
         enum: ['desktop', 'mobile'],
       },
@@ -1077,6 +1218,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'Directory for reports. If omitted, uses temporary files.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1090,6 +1232,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1103,6 +1246,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       pageSize: {
         name: 'pageSize',
@@ -1110,6 +1254,7 @@ export const commands: Commands = {
         description:
           'Maximum number of messages to return. When omitted, returns all messages.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -1117,6 +1262,7 @@ export const commands: Commands = {
         description:
           'Page number to return (0-based). When omitted, returns the first page.',
         required: false,
+        positional: false,
       },
       types: {
         name: 'types',
@@ -1124,6 +1270,7 @@ export const commands: Commands = {
         description:
           'Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.',
         required: false,
+        positional: false,
       },
       includePreservedMessages: {
         name: 'includePreservedMessages',
@@ -1131,6 +1278,7 @@ export const commands: Commands = {
         description:
           'Set to true to return the preserved messages over the last 3 navigations.',
         required: false,
+        positional: false,
         default: false,
       },
       includeStackTraces: {
@@ -1139,6 +1287,7 @@ export const commands: Commands = {
         description:
           'Set to true to include the stack trace for each message when available. Increases the response size.',
         required: false,
+        positional: false,
         default: false,
       },
       serviceWorkerId: {
@@ -1147,6 +1296,7 @@ export const commands: Commands = {
         description:
           'Filter messages to only return messages of the specified service worker.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1166,6 +1316,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       pageSize: {
         name: 'pageSize',
@@ -1173,6 +1324,7 @@ export const commands: Commands = {
         description:
           'Maximum number of requests to return. When omitted, returns all requests.',
         required: false,
+        positional: false,
       },
       pageIdx: {
         name: 'pageIdx',
@@ -1180,6 +1332,7 @@ export const commands: Commands = {
         description:
           'Page number to return (0-based). When omitted, returns the first page.',
         required: false,
+        positional: false,
       },
       resourceTypes: {
         name: 'resourceTypes',
@@ -1187,6 +1340,7 @@ export const commands: Commands = {
         description:
           'Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.',
         required: false,
+        positional: false,
       },
       includePreservedRequests: {
         name: 'includePreservedRequests',
@@ -1194,6 +1348,7 @@ export const commands: Commands = {
         description:
           'Set to true to return the preserved requests over the last 3 navigations.',
         required: false,
+        positional: false,
         default: false,
       },
     },
@@ -1214,6 +1369,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1227,6 +1383,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       type: {
         name: 'type',
@@ -1234,6 +1391,7 @@ export const commands: Commands = {
         description:
           'Navigate the page by URL, back or forward in history, or reload.',
         required: false,
+        positional: false,
         enum: ['url', 'back', 'forward', 'reload'],
       },
       url: {
@@ -1241,12 +1399,14 @@ export const commands: Commands = {
         type: 'string',
         description: 'Target URL (only type=url)',
         required: false,
+        positional: false,
       },
       ignoreCache: {
         name: 'ignoreCache',
         type: 'boolean',
         description: 'Whether to ignore cache on reload.',
         required: false,
+        positional: false,
       },
       handleBeforeUnload: {
         name: 'handleBeforeUnload',
@@ -1254,6 +1414,7 @@ export const commands: Commands = {
         description:
           'Whether to auto accept or beforeunload dialogs triggered by this navigation. Default is accept.',
         required: false,
+        positional: false,
         enum: ['accept', 'dismiss'],
       },
       initScript: {
@@ -1262,6 +1423,7 @@ export const commands: Commands = {
         description:
           'A JavaScript script to be executed on each new document before any other scripts for the next navigation.',
         required: false,
+        positional: false,
       },
       timeout: {
         name: 'timeout',
@@ -1269,6 +1431,7 @@ export const commands: Commands = {
         description:
           'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1282,6 +1445,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'URL to load in a new page.',
         required: true,
+        positional: true,
       },
       background: {
         name: 'background',
@@ -1289,6 +1453,7 @@ export const commands: Commands = {
         description:
           'Whether to open the page in the background without bringing it to the front. Default is false (foreground).',
         required: false,
+        positional: false,
       },
       isolatedContext: {
         name: 'isolatedContext',
@@ -1296,6 +1461,7 @@ export const commands: Commands = {
         description:
           'If specified, the page is created in an isolated browser context with the given name. Pages in the same browser context share cookies and storage. Pages in different browser contexts are fully isolated (useful for clean-slate testing of cookies and authentication).',
         required: false,
+        positional: false,
       },
       timeout: {
         name: 'timeout',
@@ -1303,6 +1469,7 @@ export const commands: Commands = {
         description:
           'Maximum wait time in milliseconds. If set to 0, the default timeout will be used.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1316,6 +1483,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       insightSetId: {
         name: 'insightSetId',
@@ -1323,6 +1491,7 @@ export const commands: Commands = {
         description:
           'The id for the specific insight set. Only use the ids given in the "Available insight sets" list.',
         required: true,
+        positional: true,
       },
       insightName: {
         name: 'insightName',
@@ -1330,6 +1499,7 @@ export const commands: Commands = {
         description:
           'The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1343,6 +1513,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       reload: {
         name: 'reload',
@@ -1350,6 +1521,7 @@ export const commands: Commands = {
         description:
           'Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.',
         required: false,
+        positional: false,
         default: true,
       },
       autoStop: {
@@ -1358,6 +1530,7 @@ export const commands: Commands = {
         description:
           'Determines if the trace recording should be automatically stopped.',
         required: false,
+        positional: false,
         default: true,
       },
       ignoreCache: {
@@ -1366,6 +1539,7 @@ export const commands: Commands = {
         description:
           'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
         required: false,
+        positional: false,
       },
       filePath: {
         name: 'filePath',
@@ -1373,6 +1547,7 @@ export const commands: Commands = {
         description:
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1386,6 +1561,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       filePath: {
         name: 'filePath',
@@ -1393,6 +1569,7 @@ export const commands: Commands = {
         description:
           'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1406,6 +1583,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       key: {
         name: 'key',
@@ -1413,6 +1591,7 @@ export const commands: Commands = {
         description:
           'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
         required: true,
+        positional: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -1420,6 +1599,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1433,12 +1613,14 @@ export const commands: Commands = {
         type: 'string',
         description: 'A path to a .heapsnapshot file to read.',
         required: true,
+        positional: true,
       },
       className: {
         name: 'className',
         type: 'string',
         description: 'Optional regex or text matching object class name.',
         required: false,
+        positional: false,
       },
       propertyName: {
         name: 'propertyName',
@@ -1446,6 +1628,7 @@ export const commands: Commands = {
         description:
           'Optional property name filter for outgoing reference edges.',
         required: false,
+        positional: false,
       },
       nodeType: {
         name: 'nodeType',
@@ -1453,6 +1636,7 @@ export const commands: Commands = {
         description:
           'Optional V8 node type filter (e.g. object, closure, string, array, code).',
         required: false,
+        positional: false,
       },
       retainedSize: {
         name: 'retainedSize',
@@ -1460,6 +1644,7 @@ export const commands: Commands = {
         description:
           'Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
         required: false,
+        positional: false,
       },
       selfSize: {
         name: 'selfSize',
@@ -1467,31 +1652,36 @@ export const commands: Commands = {
         description:
           'Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.',
         required: false,
+        positional: false,
       },
       isDetached: {
         name: 'isDetached',
         type: 'boolean',
         description: 'Whether to filter for detached DOM nodes.',
         required: false,
+        positional: false,
       },
       sortBy: {
         name: 'sortBy',
         type: 'string',
         description: 'Sort order for results. Default is retainedSize.',
         required: false,
+        positional: false,
         enum: ['retainedSize', 'selfSize', 'id'],
       },
       pageIdx: {
         name: 'pageIdx',
-        type: 'number',
+        type: 'integer',
         description: 'The page index for pagination.',
         required: false,
+        positional: false,
       },
       pageSize: {
         name: 'pageSize',
-        type: 'number',
+        type: 'integer',
         description: 'The page size for pagination.',
         required: false,
+        positional: false,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -1499,6 +1689,7 @@ export const commands: Commands = {
         description:
           'Maximum length of names before truncation. Defaults to 100.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1512,6 +1703,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'ID of the extension to reload.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1525,24 +1717,26 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       width: {
         name: 'width',
         type: 'integer',
         description: 'Page width',
         required: true,
+        positional: true,
       },
       height: {
         name: 'height',
         type: 'integer',
         description: 'Page height',
         required: true,
+        positional: true,
       },
     },
   },
   screencast_start: {
-    description:
-      'Starts recording a screencast (video) of the target page in specified format. (requires flag: --experimentalScreencast=true)',
+    description: 'Starts recording a screencast (video) of the target page.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -1550,19 +1744,20 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       filePath: {
         name: 'filePath',
         type: 'string',
         description:
-          'Output file path (.webm,.mp4 are supported). Uses mkdtemp to generate a unique path if not provided.',
+          'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.',
         required: false,
+        positional: false,
       },
     },
   },
   screencast_stop: {
-    description:
-      'Stops the active screencast recording on the target page. (requires flag: --experimentalScreencast=true)',
+    description: 'Stops the active screencast recording on the target page.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -1570,6 +1765,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1583,12 +1779,14 @@ export const commands: Commands = {
         description:
           'The ID of the page to select. Call list_pages to get available pages.',
         required: true,
+        positional: true,
       },
       bringToFront: {
         name: 'bringToFront',
         type: 'boolean',
         description: 'Whether to focus the page and bring it to the top.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1602,6 +1800,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       filePath: {
         name: 'filePath',
@@ -1609,6 +1808,7 @@ export const commands: Commands = {
         description:
           'A path to a .heapsnapshot file to save the heapsnapshot to.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1621,6 +1821,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       format: {
         name: 'format',
@@ -1628,6 +1829,7 @@ export const commands: Commands = {
         description:
           'Type of format to save the screenshot as. Default is "png"',
         required: false,
+        positional: false,
         default: 'png',
         enum: ['png', 'jpeg', 'webp'],
       },
@@ -1637,6 +1839,7 @@ export const commands: Commands = {
         description:
           'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
         required: false,
+        positional: false,
       },
       uid: {
         name: 'uid',
@@ -1644,6 +1847,7 @@ export const commands: Commands = {
         description:
           'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
         required: false,
+        positional: false,
       },
       fullPage: {
         name: 'fullPage',
@@ -1651,6 +1855,7 @@ export const commands: Commands = {
         description:
           'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
         required: false,
+        positional: false,
       },
       filePath: {
         name: 'filePath',
@@ -1658,6 +1863,7 @@ export const commands: Commands = {
         description:
           'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1671,6 +1877,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       verbose: {
         name: 'verbose',
@@ -1678,6 +1885,7 @@ export const commands: Commands = {
         description:
           'Whether to include all possible information available in the full a11y tree. Default is false.',
         required: false,
+        positional: false,
       },
       filePath: {
         name: 'filePath',
@@ -1685,6 +1893,7 @@ export const commands: Commands = {
         description:
           'The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1698,6 +1907,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'ID of the extension to trigger the action for.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1710,12 +1920,14 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       text: {
         name: 'text',
         type: 'string',
         description: 'The text to type',
         required: true,
+        positional: true,
       },
       submitKey: {
         name: 'submitKey',
@@ -1723,6 +1935,7 @@ export const commands: Commands = {
         description:
           'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
         required: false,
+        positional: false,
       },
     },
   },
@@ -1736,6 +1949,7 @@ export const commands: Commands = {
         type: 'string',
         description: 'ID of the extension to uninstall.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1750,6 +1964,7 @@ export const commands: Commands = {
         description:
           'The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.',
         required: true,
+        positional: true,
       },
     },
   },
@@ -1762,6 +1977,7 @@ export const commands: Commands = {
         type: 'number',
         description: 'Targets a specific page by ID.',
         required: true,
+        positional: true,
       },
       uid: {
         name: 'uid',
@@ -1769,6 +1985,7 @@ export const commands: Commands = {
         description:
           'The uid of the file input element or an element that will open file chooser on the page from the page content snapshot',
         required: true,
+        positional: true,
       },
       filePaths: {
         name: 'filePaths',
@@ -1776,6 +1993,7 @@ export const commands: Commands = {
         description:
           'One or more files paths to upload. File paths have to be local to the browser instance (not the MCP).',
         required: true,
+        positional: true,
       },
       includeSnapshot: {
         name: 'includeSnapshot',
@@ -1783,6 +2001,7 @@ export const commands: Commands = {
         description:
           'Whether to include a snapshot in the response. Default is false.',
         required: false,
+        positional: false,
       },
     },
   },

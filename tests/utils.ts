@@ -438,7 +438,8 @@ export async function runCli(
   return await new Promise((resolve, reject) => {
     const finalArgs = [...args];
     if (sessionId) {
-      finalArgs.push('--sessionId', sessionId);
+      // Prepend so that the flag is not swallowed by a trailing `--`.
+      finalArgs.unshift('--sessionId', sessionId);
     }
     const child = spawn('node', [CLI_PATH, ...finalArgs], {
       env: process.env,

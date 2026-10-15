@@ -15,10 +15,12 @@ import {
   HeapSnapshotFormatter,
   MAX_NAME_LENGTH,
 } from '../../src/formatters/HeapSnapshotFormatter.js';
-import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
+import {
+  HeapSnapshotManager,
+  type HeapSnapshotAggregate,
+} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
-import {stableIdSymbol} from '../../src/utils/id.js';
 import {createMockContextAnalysisResult} from '../mocks.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -33,29 +35,22 @@ describe('HeapSnapshotFormatter', () => {
     },
   });
   DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
-  const mockAggregates: Record<
-    string,
-    DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-  > = {
-    ObjectA: {
-      name: 'ObjectA',
+  const mockAggregates: HeapSnapshotAggregate[] = [
+    {
+      id: 1,
+      className: 'ObjectA',
       count: 10,
-      self: 100,
-      maxRet: 1000,
-      distance: 1,
-      idxs: [],
-      [stableIdSymbol]: 1,
-    } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
-    ObjectB: {
-      name: 'ObjectB',
+      selfSize: 100,
+      retainedSize: 1000,
+    },
+    {
+      id: 2,
+      className: 'ObjectB',
       count: 5,
-      self: 50,
-      maxRet: 500,
-      distance: 2,
-      idxs: [],
-      [stableIdSymbol]: 2,
-    } as unknown as DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo,
-  };
+      selfSize: 50,
+      retainedSize: 500,
+    },
+  ];
 
   describe('formatName', () => {
     it('returns short name unchanged', () => {
@@ -83,34 +78,29 @@ describe('HeapSnapshotFormatter', () => {
     });
   });
 
-  describe('toString', () => {
-    it('formats data as CSV and sorts by retained size', t => {
-      const formatter = new HeapSnapshotFormatter(mockAggregates);
-      const result = formatter.toString();
+  describe('formatAggregates', () => {
+    it('formats data as CSV', t => {
+      const result = HeapSnapshotFormatter.formatAggregates(mockAggregates, {});
       t.assert.snapshot(result);
     });
-  });
 
-  describe('toJSON', () => {
-    it('returns structured data sorted by retained size', () => {
-      const formatter = new HeapSnapshotFormatter(mockAggregates);
-      const result = formatter.toJSON();
-      assert.deepStrictEqual(result, [
-        {
-          id: 1,
-          className: 'ObjectA',
-          count: 10,
-          selfSize: formatBytesToKb(100),
-          retainedSize: formatBytesToKb(1000),
-        },
-        {
-          id: 2,
-          className: 'ObjectB',
-          count: 5,
-          selfSize: formatBytesToKb(50),
-          retainedSize: formatBytesToKb(500),
-        },
-      ]);
+    it('truncates class names to maxNameLength', () => {
+      const result = HeapSnapshotFormatter.formatAggregates(
+        [
+          {
+            id: 1,
+            className: 'abcdefghij',
+            count: 10,
+            selfSize: 100,
+            retainedSize: 1000,
+          },
+        ],
+        {maxNameLength: 5},
+      );
+      assert.strictEqual(
+        result.split('\n')[1],
+        `1,abcde...,10,${formatBytesToKb(100)},${formatBytesToKb(1000)}`,
+      );
     });
   });
 
@@ -181,7 +171,7 @@ describe('HeapSnapshotFormatter', () => {
           sizeDelta: 0,
         },
       ];
-      const result = HeapSnapshotFormatter.formatDiffSummary(summarized);
+      const result = HeapSnapshotFormatter.formatDiffSummary(summarized, {});
       const expected = [
         'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
         `0,Balanced,1,1,0,${formatBytesToKb(100)},${formatBytesToKb(100)},${formatBytesToKb(0)}`,
@@ -193,6 +183,29 @@ describe('HeapSnapshotFormatter', () => {
       assert.ok(summarizedJson);
       assert.equal(summarizedJson.includes('addedIndexes'), false);
       assert.equal(summarizedJson.includes('deletedIndexes'), false);
+    });
+
+    it('truncates className according to maxNameLength', () => {
+      const summarized = [
+        {
+          className: 'LongClassName',
+          addedCount: 1,
+          removedCount: 0,
+          countDelta: 1,
+          addedSize: 100,
+          removedSize: 0,
+          sizeDelta: 100,
+        },
+      ];
+      const result = HeapSnapshotFormatter.formatDiffSummary(summarized, {
+        maxNameLength: 4,
+      });
+      const expected = [
+        'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
+        `0,Long...,1,0,1,${formatBytesToKb(100)},${formatBytesToKb(0)},${formatBytesToKb(100)}`,
+      ].join('\n');
+
+      assert.strictEqual(result, expected);
     });
   });
 
@@ -212,7 +225,7 @@ describe('HeapSnapshotFormatter', () => {
         deletedSelfSizes: [60],
       };
 
-      const formatted = HeapSnapshotFormatter.formatDiffDetails(details);
+      const formatted = HeapSnapshotFormatter.formatDiffDetails(details, {});
       const formatted120 = formatBytesToKb(120);
       const formatted60 = formatBytesToKb(60);
 
@@ -226,33 +239,34 @@ describe('HeapSnapshotFormatter', () => {
 
       assert.strictEqual(formatted, expected);
     });
-  });
 
-  describe('sort', () => {
-    it('sorts aggregates by retained size descending', () => {
-      const unsortedAggregates: Record<
-        string,
-        DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-      > = {
-        ObjectB: {
-          name: 'ObjectB',
-          self: 50,
-          maxRet: 500,
-        },
-        ObjectA: {
-          name: 'ObjectA',
-          self: 100,
-          maxRet: 1000,
-        },
-      } as unknown as Record<
-        string,
-        DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-      >;
+    it('truncates className according to maxNameLength', () => {
+      const details = {
+        className: 'LongClassName',
+        addedCount: 1,
+        removedCount: 0,
+        countDelta: 1,
+        addedSize: 60,
+        removedSize: 0,
+        sizeDelta: 60,
+        addedIds: [101],
+        addedSelfSizes: [60],
+        deletedIds: [],
+        deletedSelfSizes: [],
+      };
 
-      const result = HeapSnapshotFormatter.sort(unsortedAggregates);
-      assert.strictEqual(result.length, 2);
-      assert.strictEqual(result[0][0], 'ObjectA');
-      assert.strictEqual(result[1][0], 'ObjectB');
+      const formatted = HeapSnapshotFormatter.formatDiffDetails(details, {
+        maxNameLength: 4,
+      });
+      const formatted60 = formatBytesToKb(60);
+
+      const expected = [
+        `Long...: # new: 1, # deleted: 0, # delta: +1, alloc size: +${formatted60}, freed size: 0.0\u00A0kB, size delta: +${formatted60}`,
+        'Objects:',
+        `  + @101 (self_size: ${formatted60})`,
+      ].join('\n');
+
+      assert.strictEqual(formatted, expected);
     });
   });
 
@@ -474,11 +488,12 @@ describe('HeapSnapshotFormatter', () => {
       manager.dispose();
     });
 
-    describe('toString with aggregates', () => {
+    describe('formatAggregates', () => {
       it('formats aggregates with default options', async t => {
         const data = await manager.getAggregates(examplePath);
-        const formatter = new HeapSnapshotFormatter(data.aggregates);
-        t.assert.snapshot(formatter.toString());
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatAggregates(data.aggregates, {}),
+        );
       });
 
       it('formats aggregates with objectsRetainedByContexts filterName', async t => {
@@ -486,8 +501,9 @@ describe('HeapSnapshotFormatter', () => {
           examplePath,
           'objectsRetainedByContexts',
         );
-        const formatter = new HeapSnapshotFormatter(data.aggregates);
-        t.assert.snapshot(formatter.toString());
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatAggregates(data.aggregates, {}),
+        );
       });
 
       it('formats aggregates with sharedNativeContext filterName', async t => {
@@ -495,8 +511,9 @@ describe('HeapSnapshotFormatter', () => {
           examplePath,
           'sharedNativeContext',
         );
-        const formatter = new HeapSnapshotFormatter(data.aggregates);
-        t.assert.snapshot(formatter.toString());
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatAggregates(data.aggregates, {}),
+        );
       });
 
       it('formats aggregates with attributedToSpecificNativeContext filterName and objectId', async t => {
@@ -505,8 +522,9 @@ describe('HeapSnapshotFormatter', () => {
           'attributedToSpecificNativeContext',
           7249,
         );
-        const formatter = new HeapSnapshotFormatter(data.aggregates);
-        t.assert.snapshot(formatter.toString());
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatAggregates(data.aggregates, {}),
+        );
       });
     });
 
@@ -540,17 +558,13 @@ describe('HeapSnapshotFormatter', () => {
           examplePath,
           'objectsRetainedByContexts',
         );
-        const aggregate = Object.values(aggregateData.aggregates).find(
-          a => a.name === 'Function',
+        const aggregate = aggregateData.aggregates.find(
+          a => a.className === 'Function',
         );
         assert.ok(aggregate);
-        const id = aggregate[stableIdSymbol];
-        if (id === undefined) {
-          assert.fail('Expected class ID to be defined');
-        }
         const nodes = await manager.getNodesById(
           examplePath,
-          id,
+          aggregate.id,
           'objectsRetainedByContexts',
         );
         t.assert.snapshot(HeapSnapshotFormatter.formatNodes(nodes.items, {}));
@@ -631,12 +645,12 @@ describe('HeapSnapshotFormatter', () => {
     describe('formatDiffSummary and formatDiffDetails', () => {
       it('formats diff summary comparing heap-1 to heap-2', async t => {
         const diffs = await manager.getClassDiffs(heap1Path, heap2Path);
-        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs));
+        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs, {}));
       });
 
       it('formats diff summary comparing heap-2 to heap-3', async t => {
         const diffs = await manager.getClassDiffs(heap2Path, heap3Path);
-        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs));
+        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs, {}));
       });
 
       it('formats detailed diff comparing heap-1 to heap-2 with classIndex filter', async t => {
@@ -646,7 +660,7 @@ describe('HeapSnapshotFormatter', () => {
           2,
         );
         t.assert.snapshot(
-          HeapSnapshotFormatter.formatDiffDetails(detailedDiff),
+          HeapSnapshotFormatter.formatDiffDetails(detailedDiff, {}),
         );
       });
     });

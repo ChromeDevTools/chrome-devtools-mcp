@@ -34,7 +34,6 @@ import {
   type Page,
   type Protocol,
   type PWAState,
-  type ScreenRecorder,
   type Target,
   type UninstallPWAOptions,
   type Extension,
@@ -108,8 +107,6 @@ export class McpContext implements Context {
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
-  #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
-    null;
 
   #reconnectNotice = false;
 
@@ -402,16 +399,6 @@ export class McpContext implements Context {
 
   isRunningPerformanceTrace(): boolean {
     return this.#isRunningTrace;
-  }
-
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
-    return this.#screenRecorderData;
-  }
-
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void {
-    this.#screenRecorderData = data;
   }
 
   isCruxEnabled(): boolean {
