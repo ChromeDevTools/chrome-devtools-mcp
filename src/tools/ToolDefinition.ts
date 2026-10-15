@@ -7,7 +7,7 @@
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
-  HeapSnapshotClassDiff,
+  HeapSnapshotDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
@@ -220,8 +220,8 @@ export interface Response {
     options?: HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotClassDiffs(
-    classDiffs: HeapSnapshotClassDiff[],
-    options?: HeapSnapshotFormatOptions,
+    diff: HeapSnapshotDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
@@ -400,7 +400,7 @@ export type Context = Readonly<{
   getHeapSnapshotClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]>;
+  ): Promise<HeapSnapshotDiff>;
   getHeapSnapshotDetailedClassDiff(
     baseFilePath: string,
     currentFilePath: string,

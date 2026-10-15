@@ -8,7 +8,20 @@ import assert from 'node:assert';
 import process from 'node:process';
 import {afterEach, beforeEach, describe, it, mock} from 'node:test';
 
-import {setupUnhandledRejectionHandler} from '../../src/utils/errorHandling.js';
+import {
+  getErrorMessage,
+  setupUnhandledRejectionHandler,
+} from '../../src/utils/errorHandling.js';
+
+describe('getErrorMessage', () => {
+  it('returns the message for Error instances', () => {
+    assert.strictEqual(getErrorMessage(new Error('boom')), 'boom');
+  });
+
+  it('converts non-Error values to strings', () => {
+    assert.strictEqual(getErrorMessage('string error'), 'string error');
+  });
+});
 
 describe('setupUnhandledRejectionHandler', () => {
   let originalEnvValue: string | undefined;

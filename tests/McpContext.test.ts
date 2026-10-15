@@ -17,6 +17,7 @@ import sinon from 'sinon';
 import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
+import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {type HTTPResponse} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
@@ -355,6 +356,7 @@ describe('McpContext', () => {
       const options = {
         experimentalDevToolsDebugging: false,
         performanceCrux: false,
+        heapSnapshotManager: new HeapSnapshotManager(),
       };
       const first = await McpContext.from(browser, undefined, options, Locator);
       const idBeforeReconnect = (await first.newPage()).id;
@@ -380,6 +382,7 @@ describe('McpContext', () => {
         );
       } finally {
         second.dispose();
+        options.heapSnapshotManager.dispose();
       }
     });
   });
@@ -398,6 +401,7 @@ describe('McpContext', () => {
 
   it('reports the reconnect notice once', async () => {
     await withBrowser(async browser => {
+      const heapSnapshotManager = new HeapSnapshotManager();
       const context = await McpContext.from(
         browser,
         undefined,
@@ -405,6 +409,7 @@ describe('McpContext', () => {
           experimentalDevToolsDebugging: false,
           performanceCrux: false,
           reconnected: true,
+          heapSnapshotManager,
         },
         Locator,
       );
@@ -413,25 +418,8 @@ describe('McpContext', () => {
         assert.ok(!context.consumeReconnectNotice(), 'notice does not repeat');
       } finally {
         context.dispose();
+        heapSnapshotManager.dispose();
       }
-    });
-  });
-
-  it('disposes loaded heap snapshots on teardown', async () => {
-    await withMcpContext(async (_response, context) => {
-      const filePath = path.join(
-        process.cwd(),
-        'tests/fixtures/example.heapsnapshot',
-      );
-      await context.getHeapSnapshotStats(filePath);
-      assert.ok(context.hasHeapSnapshots(), 'snapshot loaded before teardown');
-
-      context.dispose();
-
-      assert.ok(
-        !context.hasHeapSnapshots(),
-        'heap snapshots freed on teardown',
-      );
     });
   });
 
@@ -785,6 +773,7 @@ describe('McpContext', () => {
           {
             experimentalDevToolsDebugging: false,
             performanceCrux: false,
+            heapSnapshotManager: new HeapSnapshotManager(),
             ...options,
           },
           Locator,

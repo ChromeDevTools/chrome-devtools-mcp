@@ -7,6 +7,7 @@
 import type {
   HeapSnapshotAggregate,
   HeapSnapshotClassDiff,
+  HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
@@ -267,7 +268,7 @@ export class HeapSnapshotFormatter {
   }
 
   static formatDiffSummary(
-    diffs: HeapSnapshotClassDiff[],
+    diffs: readonly HeapSnapshotClassDiff[],
     options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
@@ -275,15 +276,17 @@ export class HeapSnapshotFormatter {
       'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
     );
 
-    let index = 0;
     for (const diff of diffs) {
       lines.push(
-        `${index},${formatName(diff.className, options)},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
+        `${diff.index},${formatName(diff.className, options)},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
       );
-      index++;
     }
 
     return lines.join('\n');
+  }
+
+  static formatDiffTotals(totals: HeapSnapshotClassDiffTotals): string {
+    return `Total: # new: ${totals.addedCount}, # deleted: ${totals.removedCount}, # delta: ${formatSignedCount(totals.countDelta)}, alloc size: ${formatSignedSize(totals.addedSize)}, freed size: ${formatSignedSize(totals.removedSize)}, size delta: ${formatSignedSize(totals.sizeDelta)}`;
   }
 
   static formatDiffDetails(

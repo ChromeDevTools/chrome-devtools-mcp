@@ -31,12 +31,12 @@ import {parseByteSizeRange} from '../../src/utils/bytes.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {
   createHandlerMocks,
-  createMockClassDiffs,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
   createMockDominatorChain,
   createMockDuplicateStrings,
   createMockHeapSnapshotAggregateData,
+  createMockHeapSnapshotDiff,
   createMockHeapSnapshotStats,
   createMockHeapSnapshotStaticData,
   createMockItemsRange,
@@ -581,8 +581,8 @@ describe('memory', () => {
   describe('compare_heapsnapshots', () => {
     it('returns summary diff when classIndex is omitted', async () => {
       const {context, response, args} = createHandlerMocks();
-      const diffs = createMockClassDiffs();
-      context.getHeapSnapshotClassDiffs.resolves(diffs);
+      const diff = createMockHeapSnapshotDiff();
+      context.getHeapSnapshotClassDiffs.resolves(diff);
 
       await compareHeapSnapshots(args).handler(
         {
@@ -602,8 +602,33 @@ describe('memory', () => {
       );
       sinon.assert.calledOnceWithExactly(
         response.setHeapSnapshotClassDiffs,
-        diffs,
-        {maxNameLength: undefined},
+        diff,
+        {pageIdx: undefined, pageSize: undefined, maxNameLength: undefined},
+      );
+    });
+
+    it('passes pagination options to the summary diff', async () => {
+      const {context, response, args} = createHandlerMocks();
+      const diff = createMockHeapSnapshotDiff();
+      context.getHeapSnapshotClassDiffs.resolves(diff);
+
+      await compareHeapSnapshots(args).handler(
+        {
+          params: {
+            baseFilePath: 'heap1.heapsnapshot',
+            currentFilePath: 'heap2.heapsnapshot',
+            pageIdx: 1,
+            pageSize: 10,
+          },
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.setHeapSnapshotClassDiffs,
+        diff,
+        {pageIdx: 1, pageSize: 10, maxNameLength: undefined},
       );
     });
 

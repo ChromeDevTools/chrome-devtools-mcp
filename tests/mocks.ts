@@ -38,7 +38,9 @@ import type {
   HeapSnapshotAggregate,
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
+  HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
+  HeapSnapshotDiff,
 } from '../src/processors/HeapSnapshotManager.js';
 import {
   CdpBrowser,
@@ -1019,22 +1021,46 @@ export function createMockDominatorChain(): DevTools.HeapSnapshotModel.HeapSnaps
   return [];
 }
 
-export function createMockClassDiffs(): HeapSnapshotClassDiff[] {
-  return [
-    {
-      className: 'TestClass',
-      addedCount: 1,
-      removedCount: 0,
-      countDelta: 1,
-      addedSize: 10,
-      removedSize: 0,
-      sizeDelta: 10,
-    },
-  ];
+export function createMockClassDiff(
+  options: Partial<HeapSnapshotClassDiff> = {},
+): HeapSnapshotClassDiff {
+  return {
+    index: options.index ?? 0,
+    className: options.className ?? 'TestClass',
+    addedCount: options.addedCount ?? 1,
+    removedCount: options.removedCount ?? 0,
+    countDelta: options.countDelta ?? 1,
+    addedSize: options.addedSize ?? 10,
+    removedSize: options.removedSize ?? 0,
+    sizeDelta: options.sizeDelta ?? 10,
+  };
+}
+
+export function createMockClassDiffTotals(
+  options: Partial<HeapSnapshotClassDiffTotals> = {},
+): HeapSnapshotClassDiffTotals {
+  return {
+    addedCount: options.addedCount ?? 1,
+    removedCount: options.removedCount ?? 0,
+    countDelta: options.countDelta ?? 1,
+    addedSize: options.addedSize ?? 10,
+    removedSize: options.removedSize ?? 0,
+    sizeDelta: options.sizeDelta ?? 10,
+  };
+}
+
+export function createMockHeapSnapshotDiff(
+  options: Partial<HeapSnapshotDiff> = {},
+): HeapSnapshotDiff {
+  return {
+    classDiffs: options.classDiffs ?? [createMockClassDiff()],
+    totals: options.totals ?? createMockClassDiffTotals(),
+  };
 }
 
 export function createMockDetailedClassDiff(): HeapSnapshotDetailedClassDiff {
   return {
+    index: 0,
     className: 'TestClass',
     addedCount: 1,
     removedCount: 0,
