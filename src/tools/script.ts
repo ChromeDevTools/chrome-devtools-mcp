@@ -162,6 +162,10 @@ Example with arguments: \`(el) => el.innerText\`
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
       await mcpPage.init();
+      // evaluate_script is not page-scoped, so ToolHandler does not apply the
+      // blockedByDialog check for it. Without this, an evaluation started
+      // while a dialog is open waits until the protocol timeout.
+      mcpPage.throwIfDialogOpen();
       const page: Page = mcpPage.pptrPage;
 
       const args: Array<JSHandle<unknown>> = [];
