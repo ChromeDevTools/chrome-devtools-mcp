@@ -17,10 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+        # Run Windows and macOS tests only on release PRs.
+        os: ${{ fromJSON(startsWith(github.head_ref, 'release-please') && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest"]') }}
         node:
           - 22
           - 24
