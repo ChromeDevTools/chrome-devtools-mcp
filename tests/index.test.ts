@@ -121,116 +121,123 @@ describe('e2e', () => {
     });
   });
 
-  it('has all tools with off by default categories', async () => {
-    await withClient(
-      async client => {
+  // These tests only list tools, so the server does not launch a browser.
+  // They run in parallel because each test spends most of its time on server
+  // start.
+  describe('tool list', {concurrency: true}, () => {
+    it('has all tools with off by default categories', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const exposedNames = tools.map(t => t.name).sort();
+          const definedNames = await getToolsWithFilteredCategories();
+          definedNames.sort();
+          assert.deepStrictEqual(exposedNames, definedNames);
+        },
+        getOffByDefaultCategories().map(category => `--category-${category}`),
+      );
+    });
+
+    it('has all tools', async () => {
+      await withClient(async client => {
         const {tools} = await client.listTools();
         const exposedNames = tools.map(t => t.name).sort();
-        const definedNames = await getToolsWithFilteredCategories();
+        const definedNames = await getToolsWithFilteredCategories(
+          getOffByDefaultCategories(),
+        );
         definedNames.sort();
         assert.deepStrictEqual(exposedNames, definedNames);
-      },
-      getOffByDefaultCategories().map(category => `--category-${category}`),
-    );
-  });
-
-  it('has all tools', async () => {
-    await withClient(async client => {
-      const {tools} = await client.listTools();
-      const exposedNames = tools.map(t => t.name).sort();
-      const definedNames = await getToolsWithFilteredCategories(
-        getOffByDefaultCategories(),
-      );
-      definedNames.sort();
-      assert.deepStrictEqual(exposedNames, definedNames);
+      });
     });
-  });
 
-  it('has experimental third-party developer tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const listThirdPartyDeveloperTools = tools.find(
-          t => t.name === 'list_3p_developer_tools',
-        );
-        assert.ok(listThirdPartyDeveloperTools);
-      },
-      ['--category-experimental-third-party'],
-    );
-  });
+    it('has experimental third-party developer tools', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const listThirdPartyDeveloperTools = tools.find(
+            t => t.name === 'list_3p_developer_tools',
+          );
+          assert.ok(listThirdPartyDeveloperTools);
+        },
+        ['--category-experimental-third-party'],
+      );
+    });
 
-  it('has experimental extensions tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const installExtension = tools.find(
-          t => t.name === 'install_extension',
-        );
-        assert.ok(installExtension);
-      },
-      ['--category-extensions'],
-    );
-  });
+    it('has experimental extensions tools', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const installExtension = tools.find(
+            t => t.name === 'install_extension',
+          );
+          assert.ok(installExtension);
+        },
+        ['--category-extensions'],
+      );
+    });
 
-  it('has experimental vision tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const clickAt = tools.find(t => t.name === 'click_at');
-        assert.ok(clickAt);
-      },
-      ['--experimental-vision'],
-    );
-  });
+    it('has experimental vision tools', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const clickAt = tools.find(t => t.name === 'click_at');
+          assert.ok(clickAt);
+        },
+        ['--experimental-vision'],
+      );
+    });
 
-  it('has experimental interop tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const getTabId = tools.find(t => t.name === 'get_tab_id');
-        assert.ok(getTabId);
-      },
-      ['--experimental-interop-tools'],
-    );
-  });
+    it('has experimental interop tools', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const getTabId = tools.find(t => t.name === 'get_tab_id');
+          assert.ok(getTabId);
+        },
+        ['--experimental-interop-tools'],
+      );
+    });
 
-  it('has experimental webmcp', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const listWebMcpTools = tools.find(t => t.name === 'list_webmcp_tools');
-        const executeWebMcpTool = tools.find(
-          t => t.name === 'execute_webmcp_tool',
-        );
-        assert.ok(listWebMcpTools);
-        assert.ok(executeWebMcpTool);
-      },
-      ['--categoryExperimentalWebmcp'],
-    );
-  });
+    it('has experimental webmcp', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const listWebMcpTools = tools.find(
+            t => t.name === 'list_webmcp_tools',
+          );
+          const executeWebMcpTool = tools.find(
+            t => t.name === 'execute_webmcp_tool',
+          );
+          assert.ok(listWebMcpTools);
+          assert.ok(executeWebMcpTool);
+        },
+        ['--categoryExperimentalWebmcp'],
+      );
+    });
 
-  it('has memory debugging tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const getHeapSnapshotSummary = tools.find(
-          t => t.name === 'get_heapsnapshot_summary',
-        );
-        assert.ok(getHeapSnapshotSummary);
-      },
-      ['--memoryDebugging'],
-    );
-  });
+    it('has memory debugging tools', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const getHeapSnapshotSummary = tools.find(
+            t => t.name === 'get_heapsnapshot_summary',
+          );
+          assert.ok(getHeapSnapshotSummary);
+        },
+        ['--memoryDebugging'],
+      );
+    });
 
-  it('can disable javascript evaluation tools', async () => {
-    await withClient(
-      async client => {
-        const {tools} = await client.listTools();
-        const evaluateScript = tools.find(t => t.name === 'evaluate_script');
-        assert.strictEqual(evaluateScript, undefined);
-      },
-      ['--no-javascript-evaluation'],
-    );
+    it('can disable javascript evaluation tools', async () => {
+      await withClient(
+        async client => {
+          const {tools} = await client.listTools();
+          const evaluateScript = tools.find(t => t.name === 'evaluate_script');
+          assert.strictEqual(evaluateScript, undefined);
+        },
+        ['--no-javascript-evaluation'],
+      );
+    });
   });
 
   it('updates roots when client notifies', async () => {
@@ -402,7 +409,7 @@ describe('e2e', () => {
         // Answers after the bound the blocking call uses, so the roots only
         // arrive via the background listing
         client.setRequestHandler('roots/list', async () => {
-          await new Promise(resolve => setTimeout(resolve, 8_000));
+          await new Promise(resolve => setTimeout(resolve, 6_000));
           return {
             roots: [
               {uri: pathToFileURL(workspace.path).href, name: 'workspace'},
@@ -411,15 +418,24 @@ describe('e2e', () => {
         });
 
         await client.callTool({name: 'list_pages', arguments: {}});
-        await new Promise(resolve => setTimeout(resolve, 5_000));
 
-        const result = await client.callTool({
-          name: 'take_screenshot',
-          arguments: {
-            pageId: 1,
-            filePath: path.join(workspace.path, 'shot.png'),
-          },
-        });
+        // Retries until the background listing delivers the roots, instead of
+        // a fixed wait.
+        const deadline = Date.now() + 10_000;
+        let result: Awaited<ReturnType<Client['callTool']>>;
+        do {
+          result = await client.callTool({
+            name: 'take_screenshot',
+            arguments: {
+              pageId: 1,
+              filePath: path.join(workspace.path, 'shot.png'),
+            },
+          });
+          if (!result.isError) {
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, 250));
+        } while (Date.now() < deadline);
 
         // Asserted before isError so a denial reports the path it rejected
         const content = result.content as TextContent[];
