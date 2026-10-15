@@ -182,7 +182,6 @@ export class McpPage implements ContextPage {
   #navigationTimeout: number;
   #sourceMaps: boolean;
   #commentBridge?: DevToolsCommentBridge;
-  #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
@@ -193,14 +192,12 @@ export class McpPage implements ContextPage {
       isolatedContextName?: string;
       navigationTimeout?: number;
       sourceMaps?: boolean;
-      onNotification?: (message: string) => void;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
-    this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -555,9 +552,7 @@ export class McpPage implements ContextPage {
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
-      this.#commentBridge = new DevToolsCommentBridge({
-        onNotification: this.#onNotification,
-      });
+      this.#commentBridge = new DevToolsCommentBridge();
     }
     const attached = await this.#commentBridge.attach(devtoolsPage);
     return attached ? this.#commentBridge : undefined;

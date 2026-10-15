@@ -114,16 +114,6 @@ export class McpServer {
       categoryExtensions: this.#serverArgs.categoryExtensions,
       heapSnapshotManager: this.#heapSnapshotManager,
       getBrowser: () => this.#browserManager.ensureBrowser(),
-      onNotification: (message: string) => {
-        void this.server
-          .sendLoggingMessage({
-            level: 'info',
-            data: message,
-          })
-          .catch(e => {
-            logger?.('Failed to send MCP notification', e);
-          });
-      },
     });
     this.#context.setRoots(this.#combinedRoots());
 
