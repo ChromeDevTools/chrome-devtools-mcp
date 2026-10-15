@@ -15,6 +15,7 @@ import {
   createCliSession,
   createTempDir,
   runCli,
+  stopDaemonForCleanup,
 } from '../utils.js';
 
 // Each test uses its own daemon session, so the tests run in parallel.
@@ -73,6 +74,11 @@ describe('chrome-devtools', {concurrency: true}, () => {
 
     const sourcePath = path.join(clientDirectory, 'script.js');
     const outputPath = path.join(clientDirectory, 'result.json');
+    await fs.writeFile(
+      sourcePath,
+      'document.title = "Local script"; document.title',
+      'utf8',
+    );
     try {
       const startResult = await runCli(['start'], sessionId, {
         cwd: daemonDirectory,
@@ -83,11 +89,42 @@ describe('chrome-devtools', {concurrency: true}, () => {
         `start command failed: ${startResult.stderr}`,
       );
 
-      const inlineResult = await runCli(
-        ['evaluate_script', '() => 6 * 7', '--pageId', '1'],
-        sessionId,
-        {cwd: clientDirectory},
-      );
+      // The three evaluations do not depend on each other, so they run in
+      // parallel.
+      const [inlineResult, fileResult, fileUrlResult] = await Promise.all([
+        runCli(['evaluate_script', '() => 6 * 7', '--pageId', '1'], sessionId, {
+          cwd: clientDirectory,
+        }),
+        runCli(
+          [
+            'evaluate_script',
+            '--pageId',
+            '1',
+            '--sourcePath',
+            sourcePath,
+            '--format',
+            'script',
+            '--filePath',
+            outputPath,
+          ],
+          sessionId,
+          {cwd: clientDirectory},
+        ),
+        runCli(
+          [
+            'evaluate_script',
+            '--pageId',
+            '1',
+            '--sourcePath',
+            pathToFileURL(sourcePath).href,
+            '--format',
+            'script',
+          ],
+          sessionId,
+          {cwd: clientDirectory},
+        ),
+      ]);
+
       assert.strictEqual(
         inlineResult.status,
         0,
@@ -95,26 +132,6 @@ describe('chrome-devtools', {concurrency: true}, () => {
       );
       assert.match(inlineResult.stdout, /\b42\b/);
 
-      await fs.writeFile(
-        sourcePath,
-        'document.title = "Local script"; document.title',
-        'utf8',
-      );
-      const fileResult = await runCli(
-        [
-          'evaluate_script',
-          '--pageId',
-          '1',
-          '--sourcePath',
-          sourcePath,
-          '--format',
-          'script',
-          '--filePath',
-          outputPath,
-        ],
-        sessionId,
-        {cwd: clientDirectory},
-      );
       assert.strictEqual(
         fileResult.status,
         0,
@@ -125,19 +142,6 @@ describe('chrome-devtools', {concurrency: true}, () => {
         'Local script',
       );
 
-      const fileUrlResult = await runCli(
-        [
-          'evaluate_script',
-          '--pageId',
-          '1',
-          '--sourcePath',
-          pathToFileURL(sourcePath).href,
-          '--format',
-          'script',
-        ],
-        sessionId,
-        {cwd: clientDirectory},
-      );
       assert.strictEqual(
         fileUrlResult.status,
         0,
@@ -145,7 +149,9 @@ describe('chrome-devtools', {concurrency: true}, () => {
       );
       assert.match(fileUrlResult.stdout, /Local script/);
     } finally {
-      await runCli(['stop'], sessionId, {cwd: clientDirectory});
+      // Stop the daemon before the temporary directory, its working
+      // directory, is removed.
+      await stopDaemonForCleanup(sessionId);
     }
   });
 });

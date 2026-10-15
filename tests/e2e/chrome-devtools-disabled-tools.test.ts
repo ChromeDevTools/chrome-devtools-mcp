@@ -52,7 +52,24 @@ describe('chrome-devtools', {concurrency: true}, () => {
     const sessionId = createCliSession(t);
     await runCli(['start', '--no-javascript-evaluation'], sessionId);
 
-    const result = await runCli(['evaluate_script', '() => 1'], sessionId);
+    // The three commands do not change daemon state, so they run in
+    // parallel.
+    const [result, navResult, initScriptResult] = await Promise.all([
+      runCli(['evaluate_script', '() => 1'], sessionId),
+      runCli(['navigate_page', '1', '--url', 'javascript:alert(1)'], sessionId),
+      runCli(
+        [
+          'navigate_page',
+          '1',
+          '--initScript',
+          'alert(1)',
+          '--timeout',
+          'invalid',
+        ],
+        sessionId,
+      ),
+    ]);
+
     assert.strictEqual(result.status, 0);
     assert(
       result.stdout.includes(
@@ -67,10 +84,6 @@ describe('chrome-devtools', {concurrency: true}, () => {
       'restart command suggestion is missing: ' + result.stdout,
     );
 
-    const navResult = await runCli(
-      ['navigate_page', '1', '--url', 'javascript:alert(1)'],
-      sessionId,
-    );
     assert.strictEqual(navResult.status, 0);
     assert(
       navResult.stdout.includes(
@@ -79,17 +92,6 @@ describe('chrome-devtools', {concurrency: true}, () => {
       'error message is unexpected: ' + navResult.stdout,
     );
 
-    const initScriptResult = await runCli(
-      [
-        'navigate_page',
-        '1',
-        '--initScript',
-        'alert(1)',
-        '--timeout',
-        'invalid',
-      ],
-      sessionId,
-    );
     assert.strictEqual(initScriptResult.status, 0);
     assert(
       initScriptResult.stdout.includes(
