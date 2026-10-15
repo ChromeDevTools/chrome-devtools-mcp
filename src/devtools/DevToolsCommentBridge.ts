@@ -24,6 +24,7 @@ export class DevToolsCommentBridge {
   readonly #debounceMs: number;
   #commentDebounceTimer?: NodeJS.Timeout;
   readonly #attachedPages = new Set<Page>();
+  readonly #commentWaiters = new Set<(changed: boolean) => void>();
 
   constructor(options?: DevToolsCommentBridgeOptions) {
     this.#onNotification = options?.onNotification;
@@ -116,13 +117,38 @@ export class DevToolsCommentBridge {
     });
   }
 
+  /**
+   * Resolves `true` on the next debounced comment event, or `false` when
+   * `timeoutMs` elapses or the bridge is disposed first.
+   */
+  waitForCommentEvent(timeoutMs: number): Promise<boolean> {
+    return new Promise<boolean>(resolve => {
+      const settle = (changed: boolean): void => {
+        clearTimeout(timer);
+        this.#commentWaiters.delete(settle);
+        resolve(changed);
+      };
+      const timer = setTimeout(() => {
+        settle(false);
+      }, timeoutMs);
+      this.#commentWaiters.add(settle);
+    });
+  }
+
   #handleCommentEvent(): void {
     if (this.#commentDebounceTimer) {
       clearTimeout(this.#commentDebounceTimer);
     }
     this.#commentDebounceTimer = setTimeout(() => {
       this.#onNotification?.('DevTools comment threads updated');
+      this.#notifyCommentWaiters(true);
     }, this.#debounceMs);
+  }
+
+  #notifyCommentWaiters(changed: boolean): void {
+    for (const waiter of [...this.#commentWaiters]) {
+      waiter(changed);
+    }
   }
 
   dispose(): void {
@@ -130,6 +156,7 @@ export class DevToolsCommentBridge {
       clearTimeout(this.#commentDebounceTimer);
       this.#commentDebounceTimer = undefined;
     }
+    this.#notifyCommentWaiters(false);
     for (const page of this.#attachedPages) {
       try {
         const result = page.evaluate(() => {

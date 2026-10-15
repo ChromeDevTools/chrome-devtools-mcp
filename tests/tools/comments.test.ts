@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -85,12 +86,141 @@ describe('comments tools', () => {
         devtoolsPage,
       );
       sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
+      sinon.assert.notCalled(bridge.waitForCommentEvent);
+      sinon.assert.notCalled(response.appendResponseLine);
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
         mockThread,
       ]);
     });
 
-    it('sets empty comments list when no comments are found', async () => {
+    it('yields the tool lock while waiting', () => {
+      const {args} = createHandlerMocks();
+      assert.strictEqual(getDevtoolsComments(args).yieldsToolLock, true);
+    });
+
+    it('waits for a comment event and fetches again', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      const mockThread: CommentThreadPayload = {
+        id: 'comment-2',
+        text: 'Align the header',
+      };
+      bridge.getComments.onFirstCall().resolves([]);
+      bridge.getComments.onSecondCall().resolves([mockThread]);
+      bridge.waitForCommentEvent.resolves(true);
+
+      await getDevtoolsComments(args).handler(
+        {params: {timeout: 5_000}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledTwice(bridge.getComments);
+      sinon.assert.calledOnceWithExactly(
+        bridge.waitForCommentEvent,
+        sinon.match((value: number) => value > 0 && value <= 5_000),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, [
+        mockThread,
+      ]);
+    });
+
+    it('keeps waiting when an event yields no new threads', async () => {
+      const clock = sinon.useFakeTimers();
+      const {page, context, response, args} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      bridge.getComments.resolves([]);
+      bridge.waitForCommentEvent.onFirstCall().callsFake(async () => {
+        clock.tick(2_000);
+        return true;
+      });
+      bridge.waitForCommentEvent.onSecondCall().callsFake(async () => {
+        clock.tick(3_000);
+        return false;
+      });
+
+      await getDevtoolsComments(args).handler(
+        {params: {timeout: 5_000}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledTwice(bridge.getComments);
+      sinon.assert.calledTwice(bridge.waitForCommentEvent);
+      sinon.assert.calledWithExactly(
+        bridge.waitForCommentEvent.secondCall,
+        3_000,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Waited 5000ms for new DevTools comments. Call get_devtools_comments again to keep waiting.',
+      );
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
+    });
+
+    it('returns an empty list after the wait times out', async () => {
+      const clock = sinon.useFakeTimers();
+      const {page, context, response, args} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      bridge.getComments.resolves([]);
+      bridge.waitForCommentEvent.callsFake(async () => {
+        clock.tick(10_000);
+        return false;
+      });
+
+      await getDevtoolsComments(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
+      sinon.assert.calledOnceWithExactly(bridge.waitForCommentEvent, 10_000);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Waited 10000ms for new DevTools comments. Call get_devtools_comments again to keep waiting.',
+      );
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
+    });
+
+    it('reports the elapsed time when the wait ends early', async () => {
+      const clock = sinon.useFakeTimers();
+      const {page, context, response, args} = createHandlerMocks();
+      const devtoolsPage = createMockPuppeteerPage();
+      const bridge = sinon.createStubInstance(DevToolsCommentBridge);
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(bridge);
+      bridge.getComments.resolves([]);
+      // The bridge was disposed before the deadline.
+      bridge.waitForCommentEvent.callsFake(async () => {
+        clock.tick(1_500);
+        return false;
+      });
+
+      await getDevtoolsComments(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Waited 1500ms for new DevTools comments. Call get_devtools_comments again to keep waiting.',
+      );
+      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
+    });
+
+    it('does not wait when timeout is 0', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       const bridge = sinon.createStubInstance(DevToolsCommentBridge);
@@ -99,17 +229,14 @@ describe('comments tools', () => {
       bridge.getComments.resolves([]);
 
       await getDevtoolsComments(args).handler(
-        {params: {}, page},
+        {params: {timeout: 0}, page},
         response,
         context,
       );
 
-      sinon.assert.calledOnce(page.getDevToolsPage);
-      sinon.assert.calledOnceWithExactly(
-        page.ensureDevToolsCommentBridge,
-        devtoolsPage,
-      );
       sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
+      sinon.assert.notCalled(bridge.waitForCommentEvent);
+      sinon.assert.notCalled(response.appendResponseLine);
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
     });
 
