@@ -19,10 +19,20 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {type HTTPResponse} from '../src/third_party/index.js';
+import {
+  type Browser,
+  type HTTPResponse,
+  type Target,
+  TargetType,
+} from '../src/third_party/index.js';
 import type {TraceResult} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 
+import {
+  createMockPuppeteerBrowser,
+  createMockPuppeteerPage,
+  createMockPuppeteerTarget,
+} from './mocks.js';
 import {serverHooks, TestServer} from './server.js';
 import {
   assertNoServiceWorkerReported,
@@ -49,6 +59,34 @@ describe('McpContext', () => {
   afterEach(() => {
     sinon.restore();
   });
+
+  function createPageTarget() {
+    const page = createMockPuppeteerPage();
+    page.emulateFocusedPage.resolves();
+    const target = createMockPuppeteerTarget({page});
+    target.type.returns(TargetType.PAGE);
+    return {page, target};
+  }
+
+  async function createMockContext(options?: {
+    browser?: sinon.SinonStubbedInstance<Browser>;
+    targets?: Target[];
+  }) {
+    const browser = options?.browser ?? createMockPuppeteerBrowser();
+    const {target: defaultTarget} = createPageTarget();
+    browser.targets.returns(options?.targets ?? [defaultTarget]);
+    browser.browserContexts.returns([]);
+    return await McpContext.from(
+      browser,
+      undefined,
+      {
+        experimentalDevToolsDebugging: false,
+        performanceCrux: true,
+        heapSnapshotManager: new HeapSnapshotManager(),
+      },
+      Locator,
+    );
+  }
 
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
@@ -295,6 +333,68 @@ describe('McpContext', () => {
       await context.createPagesSnapshot();
       assert.strictEqual(context.getSelectedPageFallback(), undefined);
     });
+  });
+
+  it('preserves an unread fallback across snapshots until read', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const {target: firstTarget} = createPageTarget();
+    const {page: secondPptrPage, target: secondTarget} = createPageTarget();
+    const context = await createMockContext({
+      browser,
+      targets: [firstTarget, secondTarget],
+    });
+    const [, secondPage] = context.getPages();
+    assert.ok(secondPage);
+    context.selectPage(secondPage);
+    await secondPage.init();
+
+    secondPptrPage.isClosed.returns(true);
+    browser.targets.returns([firstTarget]);
+
+    // First snapshot detects the fallback.
+    await context.createPagesSnapshot();
+    // Second snapshot runs before the fallback has been read by the response
+    // formatter.
+    await context.createPagesSnapshot();
+
+    assert.deepStrictEqual(context.getSelectedPageFallback(), {
+      wasClosed: true,
+    });
+
+    await context.createPagesSnapshot();
+    assert.strictEqual(context.getSelectedPageFallback(), undefined);
+  });
+
+  it('clears the fallback when selectPage is called explicitly', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const {target: firstTarget} = createPageTarget();
+    const {page: secondPptrPage, target: secondTarget} = createPageTarget();
+    const context = await createMockContext({
+      browser,
+      targets: [firstTarget, secondTarget],
+    });
+    const [firstPage, secondPage] = context.getPages();
+    assert.ok(firstPage);
+    assert.ok(secondPage);
+    context.selectPage(secondPage);
+    await secondPage.init();
+
+    secondPptrPage.isClosed.returns(true);
+    browser.targets.returns([firstTarget]);
+    await context.createPagesSnapshot();
+
+    context.selectPage(firstPage);
+    assert.strictEqual(context.getSelectedPageFallback(), undefined);
+  });
+
+  it('disposes the selected page only once when context is disposed', async () => {
+    const context = await createMockContext();
+    const page = context.getSelectedMcpPage();
+    const disposeSpy = sinon.spy(page, 'dispose');
+
+    context.dispose();
+
+    sinon.assert.calledOnceWithExactly(disposeSpy);
   });
 
   it('does not report a fallback for a regular selection', async () => {

@@ -105,6 +105,7 @@ export class McpContext implements Context {
   #mcpPages = new Map<Target, McpPage>();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
+  #selectedPageFallbackRead = false;
 
   #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
 
@@ -154,15 +155,22 @@ export class McpContext implements Context {
     this.browser.on('targetdestroyed', this.#onTargetDestroyed);
   }
 
+  #allMcpPages(): Set<McpPage> {
+    const pages = new Set(this.#mcpPages.values());
+    if (this.#selectedPage && !this.#selectedPage.isClosed()) {
+      pages.add(this.#selectedPage);
+    }
+    return pages;
+  }
+
   dispose(): void {
     this.browser.off('targetcreated', this.#onTargetCreated);
     this.browser.off('targetdestroyed', this.#onTargetDestroyed);
 
     this.#serviceWorkerConsoleCollector.dispose();
-    for (const mcpPage of this.#mcpPages.values()) {
+    for (const mcpPage of this.#allMcpPages()) {
       mcpPage.dispose();
     }
-    this.#selectedPage?.dispose();
     this.#mcpPages.clear();
     this.#workers.clear();
     // Isolated contexts are intentionally not closed here.
@@ -507,6 +515,8 @@ export class McpContext implements Context {
     ) {
       this.#selectedPage.dispose();
     }
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
   }
@@ -514,10 +524,12 @@ export class McpContext implements Context {
   /**
    * Returns details about the last page snapshot automatically replacing the
    * selection because the selected page disappeared from the page list, or
-   * `undefined` if the snapshot left the selection intact. Recomputed on every
-   * createPagesSnapshot() call.
+   * `undefined` if the snapshot left the selection intact. Cleared on the next
+   * createPagesSnapshot() call after it has been read, or when selectPage() is
+   * called explicitly.
    */
   getSelectedPageFallback(): {wasClosed: boolean} | undefined {
+    this.#selectedPageFallbackRead = true;
     return this.#selectedPageFallback;
   }
 
@@ -622,16 +634,21 @@ export class McpContext implements Context {
     // Only fall back when the selected page is actually gone. Gating on
     // `isClosed()` instead of `pages` membership avoids silently swapping a
     // live page that is momentarily missing from the snapshot.
-    this.#selectedPageFallback = undefined;
+    if (this.#selectedPageFallbackRead) {
+      this.#selectedPageFallback = undefined;
+      this.#selectedPageFallbackRead = false;
+    }
     if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
       // Record the automatic change so the response can surface it. Skipped on
       // first connect, when there was no prior selection to replace.
-      if (this.#selectedPage) {
-        this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.isClosed(),
-        };
-      }
+      const fallback = this.#selectedPage
+        ? {wasClosed: this.#selectedPage.isClosed()}
+        : this.#selectedPageFallback;
       this.selectPage(pages[0]);
+      if (fallback) {
+        this.#selectedPageFallback = fallback;
+        this.#selectedPageFallbackRead = false;
+      }
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {
@@ -642,7 +659,9 @@ export class McpContext implements Context {
   }
 
   #isPageTarget(target: Target): boolean {
-    const existingMcpPage = this.#mcpPages.get(target);
+    const existingMcpPage =
+      this.#mcpPages.get(target) ??
+      (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     const url = existingMcpPage ? existingMcpPage.url() : target.url();
     if (
       !this.#options.experimentalDevToolsDebugging &&
