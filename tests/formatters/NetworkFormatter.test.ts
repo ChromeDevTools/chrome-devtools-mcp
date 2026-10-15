@@ -455,6 +455,37 @@ describe('NetworkFormatter', () => {
       );
     });
 
+    it('throws error when responseFilePath saveFile fails rather than reporting body unavailable', async () => {
+      const request = {
+        method: () => 'GET',
+        url: () => 'http://example.com/data',
+        headers: () => ({}),
+        hasPostData: () => false,
+        postData: () => undefined,
+        response: () => ({
+          status: () => 200,
+          headers: () => ({}),
+          buffer: async () => Buffer.from('response body data'),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      await assert.rejects(async () => {
+        await NetworkFormatter.from(request, {
+          fetchData: true,
+          responseFilePath: '/unwritable/dir/blocked',
+          saveFile: async () => {
+            throw new Error(
+              'EACCES: permission denied, open /unwritable/dir/blocked.network-response',
+            );
+          },
+          redactNetworkHeaders: false,
+        });
+      }, /EACCES: permission denied/);
+    });
+
     it('handles missing response body when inline', async () => {
       const response = getMockResponse();
       response.buffer = () => Promise.reject(new Error('Evicted'));

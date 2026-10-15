@@ -33,18 +33,18 @@ describe('slim', () => {
     sinon.assert.calledOnceWithExactly(response.appendResponseLine, '10');
   });
 
-  it('handles errors', async () => {
+  it('propagates evaluation errors for response handling', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const script = "throw new Error('test error')";
     page.pptrPage.evaluate.rejects(new Error('test error'));
 
-    await evaluate(args).handler({params: {script}, page}, response, context);
+    await assert.rejects(
+      evaluate(args).handler({params: {script}, page}, response, context),
+      {message: 'test error'},
+    );
 
     sinon.assert.calledOnceWithExactly(page.pptrPage.evaluate, script);
-    sinon.assert.calledOnceWithExactly(
-      response.appendResponseLine,
-      'test error',
-    );
+    sinon.assert.notCalled(response.appendResponseLine);
   });
 
   it('navigates to correct page', async t => {
