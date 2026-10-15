@@ -118,10 +118,9 @@ describe('DevToolsCommentBridge', () => {
     sinon.assert.calledTwice(devtoolsPage.evaluate);
   });
 
-  it('debounces comment notifications', async () => {
+  it('debounces comment events', async () => {
     const devtoolsPage = createMockPuppeteerPage();
     devtoolsPage.evaluate.resolves(true);
-    const onNotification = sinon.stub();
     let exposedCallback: (() => void) | undefined;
 
     devtoolsPage.exposeFunction.callsFake((name: string, fn: unknown) => {
@@ -133,12 +132,15 @@ describe('DevToolsCommentBridge', () => {
       return Promise.resolve();
     });
 
-    const bridge = new DevToolsCommentBridge({
-      onNotification,
-      debounceMs: 150,
-    });
+    const bridge = new DevToolsCommentBridge({debounceMs: 150});
 
     await bridge.attach(devtoolsPage);
+
+    const waiting = bridge.waitForCommentEvent(10_000);
+    let settled = false;
+    void waiting.then(() => {
+      settled = true;
+    });
 
     assert.strictEqual(typeof exposedCallback, 'function');
     if (exposedCallback) {
@@ -148,20 +150,16 @@ describe('DevToolsCommentBridge', () => {
       exposedCallback();
     }
 
-    clock.tick(100);
-    sinon.assert.notCalled(onNotification);
+    await clock.tickAsync(100);
+    assert.strictEqual(settled, false);
 
-    clock.tick(60);
-    sinon.assert.calledOnceWithExactly(
-      onNotification,
-      'DevTools comment threads updated',
-    );
+    await clock.tickAsync(60);
+    assert.strictEqual(await waiting, true);
   });
 
   it('clears debounce timer on dispose', async () => {
     const devtoolsPage = createMockPuppeteerPage();
     devtoolsPage.evaluate.resolves(true);
-    const onNotification = sinon.stub();
     let exposedCallback: (() => void) | undefined;
 
     devtoolsPage.exposeFunction.callsFake((name: string, fn: unknown) => {
@@ -173,13 +171,11 @@ describe('DevToolsCommentBridge', () => {
       return Promise.resolve();
     });
 
-    const bridge = new DevToolsCommentBridge({
-      onNotification,
-      debounceMs: 150,
-    });
+    const bridge = new DevToolsCommentBridge({debounceMs: 150});
 
     await bridge.attach(devtoolsPage);
 
+    const waiting = bridge.waitForCommentEvent(10_000);
     assert.strictEqual(typeof exposedCallback, 'function');
     if (exposedCallback) {
       exposedCallback();
@@ -187,8 +183,8 @@ describe('DevToolsCommentBridge', () => {
 
     bridge.dispose();
 
-    clock.tick(200);
-    sinon.assert.notCalled(onNotification);
+    await clock.tickAsync(200);
+    assert.strictEqual(await waiting, false);
     sinon.assert.calledThrice(devtoolsPage.evaluate);
   });
 
