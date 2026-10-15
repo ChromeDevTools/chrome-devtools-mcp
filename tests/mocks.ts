@@ -47,6 +47,8 @@ import {
   CdpExtension,
   CdpFrame,
   CdpPage,
+  CDPSession,
+  Connection,
   DevTools,
   Dialog,
   ElementHandle,
@@ -61,7 +63,6 @@ import {
 import type {
   Browser,
   BrowserContext,
-  CDPSession,
   Extension,
   Page,
   Protocol,
@@ -148,6 +149,8 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   browser.close.resolves();
   browser.disconnect.resolves();
   browser.pages.resolves([]);
+  browser.targets.returns([]);
+  browser.browserContexts.returns([]);
   browser.process.returns(null);
 
   const browserListener = mockListener();
@@ -175,8 +178,47 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   return browser;
 }
 
+export class MockCDPSession extends CDPSession {
+  override connection(): Connection | undefined {
+    return undefined;
+  }
+  override get detached(): boolean {
+    return false;
+  }
+  override send(): Promise<never> {
+    throw new Error('Not implemented');
+  }
+  override detach(): Promise<void> {
+    throw new Error('Not implemented');
+  }
+  override id(): string {
+    return '';
+  }
+}
+
+export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSession> {
+  const session = sinon.createStubInstance(MockCDPSession);
+  const connection = sinon.createStubInstance(Connection);
+  connection.session.returns(session);
+  session.connection.returns(connection);
+  session.id.returns('<mock-session-id>');
+  session.send.resolves();
+  session.detach.resolves();
+  const listener = mockListener();
+  session.on.callsFake((eventName, handler) => {
+    listener.on(eventName, handler);
+    return session;
+  });
+  session.off.callsFake((eventName, handler) => {
+    listener.off(eventName, handler);
+    return session;
+  });
+  return session;
+}
+
 export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
   webmcp: sinon.SinonStubbedInstance<WebMCP>;
+  tracing: sinon.SinonStubbedInstance<Tracing>;
 } {
   const page = sinon.createStubInstance(
     CdpPage,
@@ -250,9 +292,10 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> & {
     configurable: true,
   });
 
+  page.emulateFocusedPage.resolves();
   page.evaluateHandle.resolves(createMockElementHandle().handle);
 
-  return Object.assign(page, {webmcp});
+  return Object.assign(page, {webmcp, tracing});
 }
 
 export function createMockWebMCPTool(options: {
@@ -301,6 +344,7 @@ export function createMockPuppeteerTarget(
     page?: sinon.SinonStubbedInstance<Page>;
     url?: string;
     title?: string;
+    type?: TargetType;
   } = {},
 ): sinon.SinonStubbedInstance<MockTarget> {
   const target = sinon.createStubInstance(MockTarget);
@@ -308,10 +352,11 @@ export function createMockPuppeteerTarget(
   page.target.returns(target);
   target.page.resolves(page);
   target.asPage.resolves(page);
+  target.type.returns(options.type ?? TargetType.PAGE);
   target.url.returns(options.url ?? 'https://example.com');
   target._getTargetInfo.returns({
     targetId: '<mock-target-id>',
-    type: 'page',
+    type: options.type ?? 'page',
     title: options.title ?? '',
     url: options.url ?? 'https://example.com',
     attached: true,
