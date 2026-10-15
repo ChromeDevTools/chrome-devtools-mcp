@@ -258,7 +258,7 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
 
     const encoder = new TextEncoder();
     const savePromises = formats.map(async format => {
-      const report = generateReport(lhr, format);
+      const report = await generateReport(lhr, format);
       const data = encoder.encode(report);
       if (outputDirPath) {
         const reportPath = path.join(outputDirPath, `report`);
