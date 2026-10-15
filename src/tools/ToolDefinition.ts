@@ -94,8 +94,8 @@ export interface BaseToolDefinition<
     readOnlyHint: boolean;
     /**
      * If `'slim'` is included, the tool is only available with `--slim`. Tools
-     * without `'slim'` are only available without `--slim`. Slim tools may
-     * reuse the names of other tools, see {@link isAvailableInMode}.
+     * without `'slim'` are only available without `--slim`, see
+     * {@link isAvailableInMode}.
      */
     conditions?: Array<keyof ParsedArguments>;
   };
@@ -619,10 +619,8 @@ export function isSlimTool(
 }
 
 /**
- * Slim mode replaces the regular tools with the slim tools. Only the tools of
- * the current mode are registered, so a slim tool may share its name with a
- * regular tool. `--slim` requires a restart, so the mode never changes while
- * the server is running.
+ * Slim mode replaces the regular tools with the slim tools. `--slim` requires
+ * a restart, so the mode never changes while the server is running.
  */
 export function isAvailableInMode(
   tool: Pick<BaseToolDefinition, 'annotations'>,

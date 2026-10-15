@@ -27,7 +27,6 @@ import {
 import {ToolHandler} from './ToolHandler.js';
 import {
   type DefinedPageTool,
-  isAvailableInMode,
   type ToolDefinition,
 } from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
@@ -212,10 +211,7 @@ export class McpServer {
 
   async #init(): Promise<void> {
     for (const tool of createTools(this.#serverArgs)) {
-      // Slim and regular tools may share names, only register the current mode.
-      if (isAvailableInMode(tool, this.#serverArgs)) {
-        this.#registerTool(tool);
-      }
+      this.#registerTool(tool);
     }
     await loadIssueDescriptions();
   }

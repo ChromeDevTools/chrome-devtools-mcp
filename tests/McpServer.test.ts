@@ -88,23 +88,28 @@ describe('McpServer', () => {
   });
 
   describe('slim mode', () => {
-    it('does not register slim tools without --slim', async () => {
+    it('disables slim tools without --slim', async () => {
       const {server} = await createTestServer();
 
       const result = await server.callTool('navigate', {url: 'about:blank'});
 
+      assert.strictEqual(result.isError, true);
       assert.deepStrictEqual(result.content, [
-        {type: 'text', text: 'Tool navigate not found'},
+        {type: 'text', text: 'Tool navigate is only available with --slim.'},
       ]);
     });
 
-    it('registers only slim tools with --slim', async () => {
+    it('disables non-slim tools with --slim', async () => {
       const {server} = await createTestServer(['--slim']);
 
       const result = await server.callTool('list_pages');
 
+      assert.strictEqual(result.isError, true);
       assert.deepStrictEqual(result.content, [
-        {type: 'text', text: 'Tool list_pages not found'},
+        {
+          type: 'text',
+          text: 'Tool list_pages is not available with --slim.',
+        },
       ]);
     });
   });
