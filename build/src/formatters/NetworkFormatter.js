@@ -1,0 +1,242 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ * */
+import { isUtf8 } from 'node:buffer';
+import { DevTools, } from '../third_party/index.js';
+const BODY_CONTEXT_SIZE_LIMIT = 10000;
+const URL_CONTEXT_SIZE_LIMIT = 255;
+export class NetworkFormatter {
+    #request;
+    #options;
+    #requestBody;
+    #responseBody;
+    #requestBodyFilePath;
+    #responseBodyFilePath;
+    constructor(request, options) {
+        this.#request = request;
+        this.#options = options;
+    }
+    static async from(request, options) {
+        const instance = new NetworkFormatter(request, options);
+        if (options.fetchData) {
+            await instance.#loadDetailedData();
+        }
+        return instance;
+    }
+    async #loadDetailedData() {
+        // Load Request Body
+        if (this.#request.hasPostData()) {
+            let data;
+            try {
+                data =
+                    this.#request.postData() ?? (await this.#request.fetchPostData());
+            }
+            catch {
+                // Ignore parsing errors
+            }
+            const requestBodyNotAvailableMessage = '<Request body not available anymore>';
+            if (this.#options.requestFilePath) {
+                if (!this.#options.saveFile) {
+                    throw new Error('Unable to save the request body to a file: no saveFile callback was configured.');
+                }
+                if (data) {
+                    const result = await this.#options.saveFile(Buffer.from(data), this.#options.requestFilePath, '.network-request');
+                    this.#requestBodyFilePath = result.filename;
+                }
+                else {
+                    this.#requestBody = requestBodyNotAvailableMessage;
+                }
+            }
+            else if (data) {
+                this.#requestBody = getSizeLimitedString(data, BODY_CONTEXT_SIZE_LIMIT);
+            }
+            else {
+                this.#requestBody = requestBodyNotAvailableMessage;
+            }
+        }
+        // Load Response Body
+        const response = this.#request.response();
+        if (response) {
+            const responseBodyNotAvailableMessage = '<Response body not available anymore>';
+            if (this.#options.responseFilePath) {
+                let buffer;
+                try {
+                    buffer = await response.buffer();
+                }
+                catch {
+                    // Response body is not available anymore
+                }
+                if (buffer) {
+                    if (!this.#options.saveFile) {
+                        throw new Error('Unable to save the response body to a file: no saveFile callback was configured.');
+                    }
+                    const result = await this.#options.saveFile(buffer, this.#options.responseFilePath, '.network-response');
+                    this.#responseBodyFilePath = result.filename;
+                }
+                else {
+                    this.#responseBody = responseBodyNotAvailableMessage;
+                }
+            }
+            else {
+                this.#responseBody = await this.#getFormattedResponseBody(response, BODY_CONTEXT_SIZE_LIMIT);
+            }
+        }
+    }
+    toString() {
+        return convertNetworkRequestConciseToString(this.toJSON());
+    }
+    toStringDetailed() {
+        return convertNetworkRequestDetailedToStringDetailed(this.toJSONDetailed());
+    }
+    toJSON() {
+        return {
+            requestId: this.#options.requestId,
+            method: this.#request.method(),
+            url: this.#request.url(),
+            status: this.#getStatusFromRequest(this.#request),
+            selectedInDevToolsUI: this.#options.selectedInDevToolsUI,
+        };
+    }
+    #redactNetworkHeaders(headers) {
+        const headersList = Object.entries(headers).map(item => {
+            return { name: item[0], value: item[1] };
+        });
+        const redacted = DevTools.NetworkRequestFormatter.sanitizeHeaders(headersList);
+        return redacted.reduce((acc, item) => {
+            acc[item.name] = item.value;
+            return acc;
+        }, {});
+    }
+    toJSONDetailed() {
+        const redirectChain = this.#request.redirectChain();
+        const formattedRedirectChain = redirectChain.reverse().map(request => {
+            const id = this.#options.requestIdResolver
+                ? this.#options.requestIdResolver(request)
+                : undefined;
+            const formatter = new NetworkFormatter(request, {
+                requestId: id,
+                saveFile: this.#options.saveFile,
+                redactNetworkHeaders: this.#options.redactNetworkHeaders,
+            });
+            return formatter.toJSON();
+        });
+        const responseHeaders = this.#request.response()?.headers();
+        return {
+            ...this.toJSON(),
+            requestHeaders: this.#options.redactNetworkHeaders
+                ? this.#redactNetworkHeaders(this.#request.headers())
+                : this.#request.headers(),
+            requestBody: this.#requestBody,
+            requestBodyFilePath: this.#requestBodyFilePath,
+            responseHeaders: this.#options.redactNetworkHeaders && responseHeaders
+                ? this.#redactNetworkHeaders(responseHeaders)
+                : this.#request.response()?.headers(),
+            responseBody: this.#responseBody,
+            responseBodyFilePath: this.#responseBodyFilePath,
+            failure: this.#request.failure()?.errorText,
+            redirectChain: formattedRedirectChain.length
+                ? formattedRedirectChain
+                : undefined,
+        };
+    }
+    #getStatusFromRequest(request) {
+        const httpResponse = request.response();
+        const failure = request.failure();
+        let status;
+        if (httpResponse) {
+            status = httpResponse.status().toString();
+        }
+        else if (failure) {
+            status = failure.errorText;
+        }
+        else {
+            status = 'pending';
+        }
+        return status;
+    }
+    async #getFormattedResponseBody(httpResponse, sizeLimit = BODY_CONTEXT_SIZE_LIMIT) {
+        try {
+            const responseBuffer = await httpResponse.buffer();
+            if (isUtf8(responseBuffer)) {
+                const responseAsTest = responseBuffer.toString('utf-8');
+                if (responseAsTest.length === 0) {
+                    return '<empty response>';
+                }
+                return getSizeLimitedString(responseAsTest, sizeLimit);
+            }
+            return '<binary data>';
+        }
+        catch {
+            return '<not available anymore>';
+        }
+    }
+}
+function getSizeLimitedString(text, sizeLimit) {
+    if (text.length > sizeLimit) {
+        return text.substring(0, sizeLimit) + '... <truncated>';
+    }
+    return text;
+}
+function convertNetworkRequestConciseToString(data) {
+    // Long URLs (e.g., data: URLs) bloat the concise list output. The full URL
+    // remains available via the detailed view and the structured content.
+    const url = getSizeLimitedString(data.url, URL_CONTEXT_SIZE_LIMIT);
+    return `reqid=${data.requestId} ${data.method} ${url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
+}
+function formatHeaders(headers) {
+    const response = [];
+    for (const [name, value] of Object.entries(headers)) {
+        response.push(`- ${name}:${value}`);
+    }
+    return response;
+}
+function convertNetworkRequestDetailedToStringDetailed(data) {
+    const response = [];
+    response.push(`## Request ${data.url}`);
+    response.push(`Status: ${data.status}`);
+    response.push(`### Request Headers`);
+    for (const line of formatHeaders(data.requestHeaders)) {
+        response.push(line);
+    }
+    if (data.requestBody) {
+        response.push(`### Request Body`);
+        response.push(data.requestBody);
+    }
+    else if (data.requestBodyFilePath) {
+        response.push(`### Request Body`);
+        response.push(`Saved to ${data.requestBodyFilePath}.`);
+    }
+    if (data.responseHeaders) {
+        response.push(`### Response Headers`);
+        for (const line of formatHeaders(data.responseHeaders)) {
+            response.push(line);
+        }
+    }
+    if (data.responseBody) {
+        response.push(`### Response Body`);
+        response.push(data.responseBody);
+    }
+    else if (data.responseBodyFilePath) {
+        response.push(`### Response Body`);
+        response.push(`Saved to ${data.responseBodyFilePath}.`);
+    }
+    if (data.failure) {
+        response.push(`### Request failed with`);
+        response.push(data.failure);
+    }
+    const redirectChain = data.redirectChain;
+    if (redirectChain?.length) {
+        response.push(`### Redirect chain`);
+        let indent = 0;
+        // `redirectChain` is already ordered by toJSONDetailed(); don't reverse it
+        // again here or the text output contradicts structuredContent (the JSON).
+        for (const request of redirectChain) {
+            response.push(`${'  '.repeat(indent)}${convertNetworkRequestConciseToString(request)}`);
+            indent++;
+        }
+    }
+    return response.join('\n');
+}
+//# sourceMappingURL=NetworkFormatter.js.map

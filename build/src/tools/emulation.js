@@ -1,0 +1,97 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ */
+import { zod, PredefinedNetworkConditions } from '../third_party/index.js';
+import { FORCED_COLORS_VALUES, PREFERS_CONTRAST_VALUES, PREFERS_REDUCED_MOTION_VALUES, } from '../types.js';
+import { ToolCategory } from './categories.js';
+import { definePageTool, geolocationTransform, viewportTransform, } from './ToolDefinition.js';
+function headerStringTransform(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (value === '') {
+        return {};
+    }
+    try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed !== 'object' ||
+            parsed === null ||
+            Array.isArray(parsed)) {
+            throw new Error('Headers must be a JSON object');
+        }
+        return parsed;
+    }
+    catch (error) {
+        throw new Error(`Invalid JSON for headers: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+const throttlingOptions = [
+    'Offline',
+    ...Object.keys(PredefinedNetworkConditions),
+];
+export const emulate = definePageTool(() => ({
+    name: 'emulate',
+    description: `Emulates various features on the target page. Each call replaces all emulation settings (except extraHttpHeaders), so pass all desired settings in a single call.`,
+    annotations: {
+        category: ToolCategory.EMULATION,
+        readOnlyHint: false,
+    },
+    schema: {
+        networkConditions: zod
+            .enum(throttlingOptions)
+            .optional()
+            .describe(`Throttle network. Omit to disable throttling.`),
+        cpuThrottlingRate: zod
+            .number()
+            .min(1)
+            .max(20)
+            .optional()
+            .describe('Represents the CPU slowdown factor. Omit or set the rate to 1 to disable throttling'),
+        geolocation: zod
+            .string()
+            .transform(geolocationTransform)
+            .optional()
+            .describe('Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.'),
+        userAgent: zod
+            .string()
+            .optional()
+            .describe('User agent to emulate. Omit or set to empty string to clear the user agent override.'),
+        colorScheme: zod
+            .enum(['dark', 'light', 'auto'])
+            .optional()
+            .describe('Emulate the dark or the light mode. Omit or set to "auto" to reset to the default.'),
+        forcedColors: zod
+            .enum([...FORCED_COLORS_VALUES, 'auto'])
+            .optional()
+            .describe('Emulate the `forced-colors` CSS media feature. Omit or set to "auto" to reset to the default.'),
+        prefersContrast: zod
+            .enum([...PREFERS_CONTRAST_VALUES, 'auto'])
+            .optional()
+            .describe('Emulate the `prefers-contrast` CSS media feature. Omit or set to "auto" to reset to the default.'),
+        prefersReducedMotion: zod
+            .enum([...PREFERS_REDUCED_MOTION_VALUES, 'auto'])
+            .optional()
+            .describe('Emulate the `prefers-reduced-motion` CSS media feature. Omit or set to "auto" to reset to the default.'),
+        viewport: zod
+            .string()
+            .transform(viewportTransform)
+            .optional()
+            .describe(`Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode. Omit to clear the viewport override.`),
+        extraHttpHeaders: zod
+            .string()
+            .transform(headerStringTransform)
+            .optional()
+            .describe('Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.'),
+    },
+    blockedByDialog: true,
+    verifyFilesSchema: {},
+    handler: async (request, response) => {
+        const page = request.page;
+        await page.emulate(request.params);
+        response.appendResponseLine('Emulation configured successfully');
+    },
+}));
+//# sourceMappingURL=emulation.js.map

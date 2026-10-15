@@ -1,0 +1,1249 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose, inner;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        var r, s = 0;
+        function next() {
+            while (r = env.stack.pop()) {
+                try {
+                    if (!r.async && s === 1) return s = 0, env.stack.push(r), Promise.resolve().then(next);
+                    if (r.dispose) {
+                        var result = r.dispose.call(r.value);
+                        if (r.async) return s |= 2, Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                    }
+                    else s |= 1;
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (s === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
+import assert from 'node:assert';
+import { afterEach, describe, it } from 'node:test';
+import sinon from 'sinon';
+import { McpResponse } from '../../src/McpResponse.js';
+import { TextSnapshot } from '../../src/TextSnapshot.js';
+import { click, hover, fill, drag, fillForm, uploadFile, pressKey, clickAt, typeText, } from '../../src/tools/input.js';
+import { createHandlerMocks, createMockDialog, createMockElementHandle, } from '../mocks.js';
+import { serverHooks } from '../server.js';
+import { createTempFile, html, withMcpContext, getTextContent, } from '../utils.js';
+describe('input', () => {
+    const server = serverHooks();
+    afterEach(() => {
+        sinon.restore();
+    });
+    describe('click', () => {
+        it('clicks', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<button onclick="this.innerText = 'clicked';">test</button>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await click(args).handler({
+                    params: {
+                        uid: '1_1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked on the element');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.$('text/clicked'));
+            });
+        });
+        it('double clicks', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<button ondblclick="this.innerText = 'dblclicked';"
+            >test</button
+          >`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await click(args).handler({
+                    params: {
+                        uid: '1_1',
+                        dblClick: true,
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully double clicked on the element');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.$('text/dblclicked'));
+            });
+        });
+        it('waits for navigation', async () => {
+            const resolveNavigation = Promise.withResolvers();
+            server.addHtmlRoute('/link', html `<a href="/navigated">Navigate page</a>`);
+            server.addRoute('/navigated', async (_req, res) => {
+                await resolveNavigation.promise;
+                res.write(html `<main>I was navigated</main>`);
+                res.end();
+            });
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.goto(server.getRoute('/link'));
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                const clickPromise = click(args).handler({
+                    params: {
+                        uid: '1_1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                const [t1, t2] = await Promise.all([
+                    clickPromise.then(() => Date.now()),
+                    new Promise(res => {
+                        setTimeout(() => {
+                            resolveNavigation.resolve();
+                            res(Date.now());
+                        }, 300);
+                    }),
+                ]);
+                assert(t1 > t2, 'Waited for navigation');
+            });
+        });
+        it('reports the new URL when click triggers a navigation', async () => {
+            server.addHtmlRoute('/start', html `<a href="/after-click">Navigate page</a>`);
+            server.addHtmlRoute('/after-click', html `<main>arrived</main>`);
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.goto(server.getRoute('/start'));
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await click(args).handler({
+                    params: {
+                        uid: '1_2',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                const result = await response.handle(context);
+                const textContent = getTextContent(result.content[0]);
+                const expectedUrl = server.getRoute('/after-click');
+                assert.ok(textContent.includes(`Page navigated to ${expectedUrl}.`), `Expected response to mention navigation to ${expectedUrl}, got: ${textContent}`);
+            });
+        });
+        it('does not report navigation when click does not navigate', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<button onclick="this.innerText = 'clicked';">test</button>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await click(args).handler({
+                    params: {
+                        uid: '1_1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                const result = await response.handle(context);
+                const textContent = getTextContent(result.content[0]);
+                assert.ok(!textContent.includes('Page navigated to '), `Did not expect a navigation line, got: ${textContent}`);
+            });
+        });
+        it('waits for stable DOM', async () => {
+            server.addHtmlRoute('/unstable', html `
+          <button>Click to change to see time</button>
+          <script>
+            const button = document.querySelector('button');
+            button.addEventListener('click', () => {
+              setTimeout(() => {
+                button.textContent = Date.now();
+              }, 50);
+            });
+          </script>
+        `);
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.goto(server.getRoute('/unstable'));
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                const handlerResolveTime = await click(args)
+                    .handler({
+                    params: {
+                        uid: '1_1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context)
+                    .then(() => Date.now());
+                const buttonChangeTime = await page.evaluate(() => {
+                    const button = document.querySelector('button');
+                    return Number(button?.textContent);
+                });
+                assert(handlerResolveTime > buttonChangeTime, 'Waited for navigation');
+            });
+        });
+        it('does not include snapshot by default', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<button onclick="this.innerText = 'clicked';">test</button>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await click(args).handler({
+                    params: {
+                        uid: '1_1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked on the element');
+                assert.strictEqual(response.snapshotParams, undefined);
+            });
+        });
+        it('includes snapshot if includeSnapshot is true', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<button onclick="this.innerText = 'clicked';">test</button>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await click(args).handler({
+                    params: {
+                        uid: '1_1',
+                        includeSnapshot: true,
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked on the element');
+                assert.notStrictEqual(response.snapshotParams, undefined);
+            });
+        });
+        it('selects a collapsed native select option by option uid', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<select onchange="document.body.dataset.selected = this.value">
+            <option value="v1">one</option>
+            <option value="v2">two</option>
+          </select>`);
+                const mcpPage = context.getSelectedMcpPage();
+                mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+                const optionNode = [...mcpPage.textSnapshot.idToNode.values()].find(node => node.role === 'option' && node.name === 'two');
+                assert.ok(optionNode);
+                await click(args).handler({
+                    params: {
+                        uid: optionNode.id,
+                    },
+                    page: mcpPage,
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked on the element');
+                assert.deepStrictEqual(await page.evaluate(() => {
+                    const select = document.querySelector('select');
+                    return {
+                        selectedValue: select?.value,
+                        changeEventValue: document.body.dataset.selected,
+                    };
+                }), {
+                    selectedValue: 'v2',
+                    changeEventValue: 'v2',
+                });
+            });
+        });
+        it('selects a collapsed native optgroup option by option uid', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<select onchange="document.body.dataset.selected = this.value">
+            <optgroup label="Numbers">
+              <option value="v1">one</option>
+              <option value="v2">two</option>
+            </optgroup>
+          </select>`);
+                const mcpPage = context.getSelectedMcpPage();
+                mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+                const optionNode = [...mcpPage.textSnapshot.idToNode.values()].find(node => node.role === 'option' && node.name === 'two');
+                assert.ok(optionNode);
+                await click(args).handler({
+                    params: {
+                        uid: optionNode.id,
+                    },
+                    page: mcpPage,
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked on the element');
+                assert.deepStrictEqual(await page.evaluate(() => {
+                    const select = document.querySelector('select');
+                    return {
+                        selectedValue: select?.value,
+                        changeEventValue: document.body.dataset.selected,
+                    };
+                }), {
+                    selectedValue: 'v2',
+                    changeEventValue: 'v2',
+                });
+            });
+        });
+        it('clicks custom ARIA option elements through the normal click path', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<div role="listbox">
+            <div
+              role="option"
+              tabindex="0"
+              onclick="document.body.dataset.clicked = this.textContent.trim()"
+            >
+              custom two
+            </div>
+          </div>`);
+                const mcpPage = context.getSelectedMcpPage();
+                mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+                const optionNode = [...mcpPage.textSnapshot.idToNode.values()].find(node => node.role === 'option' && node.name === 'custom two');
+                assert.ok(optionNode);
+                await click(args).handler({
+                    params: {
+                        uid: optionNode.id,
+                    },
+                    page: mcpPage,
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked on the element');
+                assert.strictEqual(await page.evaluate(() => document.body.dataset.clicked), 'custom two');
+            });
+        });
+        it('does not fail when the click opens a dialog', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            locator.click.rejects(new Error('Timed out'));
+            page.getDialog.returns(createMockDialog({ message: 'Are you sure?' }));
+            await click(args).handler({
+                params: {
+                    uid: '1_1',
+                    includeSnapshot: true,
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'The element was clicked and it opened a dialog.');
+            sinon.assert.notCalled(response.includeSnapshot);
+        });
+        it('does not fail when the double click opens a dialog', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            locator.click.rejects(new Error('Timed out'));
+            page.getDialog.returns(createMockDialog({ message: 'Are you sure?' }));
+            await click(args).handler({
+                params: {
+                    uid: '1_1',
+                    dblClick: true,
+                    includeSnapshot: true,
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'The element was double clicked and it opened a dialog.');
+            sinon.assert.notCalled(response.includeSnapshot);
+        });
+    });
+    describe('hover', () => {
+        it('hovers', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<button onmouseover="this.innerText = 'hovered';">test</button>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await hover(args).handler({
+                    params: {
+                        uid: '1_1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully hovered over the element');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.$('text/hovered'));
+            });
+        });
+        it('does not fail when the hover opens a dialog', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            locator.hover.rejects(new Error('Timed out'));
+            page.getDialog.returns(createMockDialog({ message: 'Hovered!' }));
+            await hover(args).handler({
+                params: {
+                    uid: '1_1',
+                    includeSnapshot: true,
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'The element was hovered and it opened a dialog.');
+            sinon.assert.notCalled(response.includeSnapshot);
+        });
+    });
+    describe('click_at', () => {
+        it('clicks at coordinates', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<div
+            style="width: 100px; height: 100px; background: red;"
+            onclick="this.innerText = 'clicked'"
+          ></div>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await clickAt(args).handler({
+                    params: {
+                        x: 50,
+                        y: 50,
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully clicked at the coordinates');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.$('text/clicked'));
+            });
+        });
+        it('double clicks at coordinates', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<div
+            style="width: 100px; height: 100px; background: red;"
+            ondblclick="this.innerText = 'dblclicked'"
+          ></div>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await clickAt(args).handler({
+                    params: {
+                        x: 50,
+                        y: 50,
+                        dblClick: true,
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully double clicked at the coordinates');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.$('text/dblclicked'));
+            });
+        });
+    });
+    describe('fill', () => {
+        it('fills out an input', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<input />`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'test',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the element');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.$('text/test'));
+            });
+        });
+        it('fills out a select by text', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<select
+            ><option value="v1">one</option
+            ><option value="v2">two</option></select
+          >`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'two',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the element');
+                assert.ok(response.includeSnapshot);
+                const selectedValue = await page.evaluate(() => document.querySelector('select').value);
+                assert.strictEqual(selectedValue, 'v2');
+            });
+        });
+        it('reports why filling out a select failed', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<select
+            ><option value="v1">one</option
+            ><option value="v2">two</option></select
+          >`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await assert.rejects(() => fill(args).handler({
+                    params: {
+                        // Options are matched by their text, not their value.
+                        uid: '1_1',
+                        value: 'v2',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context), {
+                    message: 'Failed to interact with the element with uid 1_1. Could not find option with text "v2"',
+                });
+            });
+        });
+        it('fills out a select option with an empty value by text', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<select
+            ><option value="">none</option
+            ><option
+              value="v2"
+              selected
+              >two</option
+            ></select
+          >`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'none',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the element');
+                const selectedValue = await page.evaluate(() => document.querySelector('select').value);
+                assert.strictEqual(selectedValue, '');
+            });
+        });
+        it('fills out a textarea marked as combobox', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<textarea role="combobox"></textarea>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: '1',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the element');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.evaluate(() => {
+                    return document.body.querySelector('textarea')?.value === '1';
+                }));
+            });
+        });
+        it('fills out a textarea with long text', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<textarea></textarea>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                page.setDefaultTimeout(1000);
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: '1'.repeat(3000),
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the element');
+                assert.ok(response.includeSnapshot);
+                assert.ok(await page.evaluate(() => {
+                    return (document.body.querySelector('textarea')?.value.length === 3_000);
+                }));
+            });
+        });
+        it('types text', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<textarea></textarea>`);
+                await page.click('textarea');
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await typeText(args).handler({
+                    params: {
+                        text: 'test',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Typed text "test"');
+                assert.strictEqual(await page.evaluate(() => {
+                    return document.body.querySelector('textarea')?.value;
+                }), 'test');
+            });
+        });
+        it('types text with submit key', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<textarea></textarea>`);
+                await page.click('textarea');
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await typeText(args).handler({
+                    params: {
+                        text: 'test',
+                        submitKey: 'Tab',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Typed text "test + Tab"');
+                assert.strictEqual(await page.evaluate(() => {
+                    return document.body.querySelector('textarea')?.value;
+                }), 'test');
+                assert.ok(await page.evaluate(() => {
+                    return (document.body.querySelector('textarea') !== document.activeElement);
+                }));
+            });
+        });
+        it('errors on invalid submit key', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<textarea></textarea>`);
+                await page.click('textarea');
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                try {
+                    await typeText(args).handler({
+                        params: {
+                            text: 'test',
+                            submitKey: 'XXX',
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context);
+                }
+                catch (err) {
+                    assert.strictEqual(err.message, 'Unknown key: "XXX"');
+                }
+            });
+        });
+        it('reproduction: fill isolation', async () => {
+            await withMcpContext(async (_response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<form>
+            <input
+              id="email"
+              value="user@test.com"
+            />
+            <input
+              id="password"
+              type="password"
+            />
+          </form>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                // Fill email
+                const response1 = new McpResponse(args);
+                await fill(args).handler({
+                    params: {
+                        uid: '1_2', // email input
+                        value: 'new@test.com',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response1, context);
+                assert.strictEqual(response1.responseLines[0], 'Successfully filled out the element');
+                // Fill password
+                const response2 = new McpResponse(args);
+                await fill(args).handler({
+                    params: {
+                        uid: '1_3', // password input
+                        value: 'secret',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response2, context);
+                assert.strictEqual(response2.responseLines[0], 'Successfully filled out the element');
+                // Verify values
+                const values = await page.evaluate(() => {
+                    return {
+                        email: document.getElementById('email').value,
+                        password: document.getElementById('password')
+                            .value,
+                    };
+                });
+                assert.strictEqual(values.email, 'new@test.com', 'Email should be updated correctly');
+                assert.strictEqual(values.password, 'secret', 'Password should be updated correctly');
+            });
+        });
+        it('toggles checkboxes', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<input
+            type="checkbox"
+            id="cb"
+          />`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                // Check it
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'true',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the element');
+                assert.ok(response.includeSnapshot);
+                let isChecked = await page.$eval('#cb', el => el.checked);
+                assert.strictEqual(isChecked, true);
+                // Uncheck it
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'false',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, new McpResponse(args), context);
+                isChecked = await page.$eval('#cb', el => el.checked);
+                assert.strictEqual(isChecked, false);
+            });
+        });
+        it('toggles switches', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `
+          <div
+            role="switch"
+            aria-checked="false"
+            id="sw"
+            style="width: 20px; height: 20px; background: blue;"
+            onclick="this.setAttribute('aria-checked', this.getAttribute('aria-checked') === 'true' ? 'false' : 'true')"
+          >
+            switch
+          </div>
+        `);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                // Turn it on
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'true',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                let swChecked = await page.$eval('#sw', el => el.getAttribute('aria-checked') === 'true');
+                assert.strictEqual(swChecked, true);
+                // Turn it off
+                await fill(args).handler({
+                    params: {
+                        uid: '1_1',
+                        value: 'false',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, new McpResponse(args), context);
+                swChecked = await page.$eval('#sw', el => el.getAttribute('aria-checked') === 'true');
+                assert.strictEqual(swChecked, false);
+            });
+        });
+        it('selects radio buttons', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `
+          <input
+            type="radio"
+            name="group1"
+            id="r1"
+            checked
+          />
+          <input
+            type="radio"
+            name="group1"
+            id="r2"
+          />
+        `);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                // Initial state
+                let r1Checked = await page.$eval('#r1', el => el.checked);
+                let r2Checked = await page.$eval('#r2', el => el.checked);
+                assert.strictEqual(r1Checked, true);
+                assert.strictEqual(r2Checked, false);
+                // Fill second radio with true
+                await fill(args).handler({
+                    params: {
+                        uid: '1_2',
+                        value: 'true',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                r1Checked = await page.$eval('#r1', el => el.checked);
+                r2Checked = await page.$eval('#r2', el => el.checked);
+                assert.strictEqual(r1Checked, false);
+                assert.strictEqual(r2Checked, true);
+            });
+        });
+        it('does not fail when filling opens a dialog', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            page.pptrPage.getDefaultTimeout.returns(5000);
+            locator.fill.rejects(new Error('Timed out'));
+            page.getDialog.returns(createMockDialog({ message: 'Invalid input' }));
+            await fill(args).handler({
+                params: {
+                    uid: '1_1',
+                    value: 'test',
+                    includeSnapshot: true,
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'The element was filled out and it opened a dialog.');
+            sinon.assert.notCalled(response.includeSnapshot);
+        });
+    });
+    describe('drags', () => {
+        it('drags one element onto another', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<div
+              role="button"
+              id="drag"
+              draggable="true"
+              >drag me</div
+            >
+            <div
+              id="drop"
+              aria-label="drop"
+              style="width: 100px; height: 100px; border: 1px solid black;"
+              ondrop="this.innerText = 'dropped';"
+            >
+            </div>
+            <script>
+              drag.addEventListener('dragstart', event => {
+                event.dataTransfer.setData('text/plain', event.target.id);
+              });
+              drop.addEventListener('dragover', event => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              });
+              drop.addEventListener('drop', event => {
+                event.preventDefault();
+                const data = event.dataTransfer.getData('text/plain');
+                event.target.appendChild(document.getElementById(data));
+              });
+            </script>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await drag(args).handler({
+                    params: {
+                        from_uid: '1_1',
+                        to_uid: '1_2',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.ok(response.includeSnapshot);
+                assert.strictEqual(response.responseLines[0], 'Successfully dragged an element');
+                assert.ok(await page.$('text/dropped'));
+            });
+        });
+    });
+    describe('fill form', () => {
+        it('successfully fills out the form', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<form>
+            <label
+              >username<input
+                name="username"
+                type="text"
+            /></label>
+            <label
+              >email<input
+                name="email"
+                type="text"
+            /></label>
+            <input
+              type="submit"
+              value="Submit"
+            />
+          </form>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await fillForm(args).handler({
+                    params: {
+                        elements: [
+                            {
+                                uid: '1_3',
+                                value: 'test',
+                            },
+                            {
+                                uid: '1_5',
+                                value: 'test2',
+                            },
+                        ],
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.ok(response.includeSnapshot);
+                assert.strictEqual(response.responseLines[0], 'Successfully filled out the form');
+                assert.deepStrictEqual(await page.evaluate(() => {
+                    return [
+                        // @ts-expect-error missing types
+                        document.querySelector('input[name=username]').value,
+                        // @ts-expect-error missing types
+                        document.querySelector('input[name=email]').value,
+                    ];
+                }), ['test', 'test2']);
+            });
+        });
+        it('fill_form handles checkboxes', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<input
+              name="username"
+              type="text"
+            /><input
+              name="cb"
+              type="checkbox"
+            />`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await fillForm(args).handler({
+                    params: {
+                        elements: [
+                            {
+                                uid: '1_1',
+                                value: 'test',
+                            },
+                            {
+                                uid: '1_2',
+                                value: 'true',
+                            },
+                        ],
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.strictEqual(await page.evaluate(() => {
+                    // @ts-expect-error missing types
+                    return document.querySelector('input[name=username]').value;
+                }), 'test');
+                assert.strictEqual(await page.evaluate(() => {
+                    // @ts-expect-error missing types
+                    return document.querySelector('input[name=cb]').checked;
+                }), true);
+            });
+        });
+        it('stops filling remaining elements when an element opens a dialog', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            page.pptrPage.getDefaultTimeout.returns(5000);
+            locator.fill.rejects(new Error('Timed out'));
+            page.getDialog.returns(createMockDialog({ message: 'Confirm input' }));
+            await fillForm(args).handler({
+                params: {
+                    elements: [
+                        {
+                            uid: '1_1',
+                            value: 'first',
+                        },
+                        {
+                            uid: '1_2',
+                            value: 'second',
+                        },
+                    ],
+                    includeSnapshot: true,
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnce(page.waitForEventsAfterAction);
+            sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.');
+            sinon.assert.notCalled(response.attachWaitForResult);
+            sinon.assert.notCalled(response.includeSnapshot);
+        });
+        it('does not mention remaining elements when the last element opens a dialog', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            page.pptrPage.getDefaultTimeout.returns(5000);
+            locator.fill.onFirstCall().resolves();
+            locator.fill.onSecondCall().rejects(new Error('Timed out'));
+            page.getDialog.returns(createMockDialog({ message: 'Confirm input' }));
+            await fillForm(args).handler({
+                params: {
+                    elements: [
+                        {
+                            uid: '1_1',
+                            value: 'first',
+                        },
+                        {
+                            uid: '1_2',
+                            value: 'second',
+                        },
+                    ],
+                    includeSnapshot: true,
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnce(page.waitForEventsAfterAction);
+            sinon.assert.calledTwice(page.getElementByUid);
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'Filling out the element with uid 1_2 opened a dialog.');
+            sinon.assert.notCalled(response.attachWaitForResult);
+            sinon.assert.notCalled(response.includeSnapshot);
+        });
+        it('stops before advancing to the next element when signal aborts as locator.fill resolves', async () => {
+            const { page, context, response, args } = createHandlerMocks();
+            const { handle, locator } = createMockElementHandle();
+            page.getElementByUid.resolves(handle);
+            page.pptrPage.getDefaultTimeout.returns(5000);
+            page.getDialog.returns(createMockDialog({ message: 'Confirm input' }));
+            page.waitForEventsAfterAction.callsFake(async (action) => {
+                const abortController = new AbortController();
+                locator.fill.callsFake(async () => {
+                    abortController.abort(new Error('Action interrupted by a dialog'));
+                });
+                await action(abortController.signal);
+                return {};
+            });
+            await fillForm(args).handler({
+                params: {
+                    elements: [
+                        {
+                            uid: '1_1',
+                            value: 'first',
+                        },
+                        {
+                            uid: '1_2',
+                            value: 'second',
+                        },
+                    ],
+                },
+                page,
+            }, response, context);
+            sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'Filling out the element with uid 1_1 opened a dialog. The remaining elements were not filled out.');
+        });
+    });
+    describe('uploadFile', () => {
+        it('uploads a file to a file input', async () => {
+            const env_1 = { stack: [], error: void 0, hasError: false };
+            try {
+                const testFile = __addDisposableResource(env_1, createTempFile('test file content', 'test.txt'), false);
+                await withMcpContext(async (response, context, args) => {
+                    const page = context.getSelectedMcpPage().pptrPage;
+                    await page.setContent(html `<form>
+            <input
+              type="file"
+              id="file-input"
+            />
+          </form>`);
+                    context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                    await uploadFile(args).handler({
+                        params: {
+                            uid: '1_2',
+                            filePaths: [testFile.path],
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context);
+                    assert.ok(response.includeSnapshot);
+                    assert.strictEqual(response.responseLines[0], `File uploaded from ${testFile.path}.`);
+                });
+            }
+            catch (e_1) {
+                env_1.error = e_1;
+                env_1.hasError = true;
+            }
+            finally {
+                __disposeResources(env_1);
+            }
+        });
+        it('uploads multiple files to a file input', async () => {
+            const env_2 = { stack: [], error: void 0, hasError: false };
+            try {
+                const firstFile = __addDisposableResource(env_2, createTempFile('first file content', 'first.txt'), false);
+                const secondFile = __addDisposableResource(env_2, createTempFile('second file content', 'second.txt'), false);
+                await withMcpContext(async (response, context, args) => {
+                    const page = context.getSelectedMcpPage().pptrPage;
+                    await page.setContent(html `<form>
+            <input
+              type="file"
+              id="file-input"
+              multiple
+            />
+          </form>`);
+                    context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                    await uploadFile(args).handler({
+                        params: {
+                            uid: '1_2',
+                            filePaths: [firstFile.path, secondFile.path],
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context);
+                    assert.strictEqual(response.responseLines[0], `File uploaded from ${firstFile.path}, ${secondFile.path}.`);
+                    const uploadedFileNames = await page.$eval('#file-input', el => {
+                        const input = el;
+                        return Array.from(input.files ?? []).map(file => file.name);
+                    });
+                    assert.deepStrictEqual(uploadedFileNames, ['first.txt', 'second.txt']);
+                });
+            }
+            catch (e_2) {
+                env_2.error = e_2;
+                env_2.hasError = true;
+            }
+            finally {
+                __disposeResources(env_2);
+            }
+        });
+        it('uploads a file when clicking an element opens a file uploader', async () => {
+            const env_3 = { stack: [], error: void 0, hasError: false };
+            try {
+                const testFile = __addDisposableResource(env_3, createTempFile('test file content', 'test.txt'), false);
+                await withMcpContext(async (response, context, args) => {
+                    const page = context.getSelectedMcpPage().pptrPage;
+                    await page.setContent(html `<button id="file-chooser-button">Upload file</button>
+            <input
+              type="file"
+              id="file-input"
+              style="display: none;"
+            />
+            <script>
+              document
+                .getElementById('file-chooser-button')
+                .addEventListener('click', () => {
+                  document.getElementById('file-input').click();
+                });
+            </script>`);
+                    context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                    await uploadFile(args).handler({
+                        params: {
+                            uid: '1_1',
+                            filePaths: [testFile.path],
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context);
+                    assert.ok(response.includeSnapshot);
+                    assert.strictEqual(response.responseLines[0], `File uploaded from ${testFile.path}.`);
+                    const uploadedFileName = await page.$eval('#file-input', el => {
+                        const input = el;
+                        return input.files?.[0]?.name;
+                    });
+                    assert.strictEqual(uploadedFileName, 'test.txt');
+                });
+            }
+            catch (e_3) {
+                env_3.error = e_3;
+                env_3.hasError = true;
+            }
+            finally {
+                __disposeResources(env_3);
+            }
+        });
+        it('throws an error if the element is not a file input and does not open a file chooser', async () => {
+            const env_4 = { stack: [], error: void 0, hasError: false };
+            try {
+                const testFile = __addDisposableResource(env_4, createTempFile('test file content', 'test.txt'), false);
+                await withMcpContext(async (response, context, args) => {
+                    const page = context.getSelectedMcpPage().pptrPage;
+                    await page.setContent(html `<div>Not a file input</div>`);
+                    context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                    await assert.rejects(uploadFile(args).handler({
+                        params: {
+                            uid: '1_1',
+                            filePaths: [testFile.path],
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context), {
+                        message: 'Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.',
+                    });
+                    assert.strictEqual(response.responseLines.length, 0);
+                    assert.strictEqual(response.snapshotParams, undefined);
+                });
+            }
+            catch (e_4) {
+                env_4.error = e_4;
+                env_4.hasError = true;
+            }
+            finally {
+                __disposeResources(env_4);
+            }
+        });
+        it('throws an error if multiple files are uploaded to an input without multiple attribute', async () => {
+            const env_5 = { stack: [], error: void 0, hasError: false };
+            try {
+                const firstFile = __addDisposableResource(env_5, createTempFile('first file content', 'first.txt'), false);
+                const secondFile = __addDisposableResource(env_5, createTempFile('second file content', 'second.txt'), false);
+                await withMcpContext(async (response, context, args) => {
+                    const page = context.getSelectedMcpPage().pptrPage;
+                    await page.setContent(html `<form>
+            <input
+              type="file"
+              id="file-input"
+            />
+          </form>`);
+                    context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                    await assert.rejects(uploadFile(args).handler({
+                        params: {
+                            uid: '1_2',
+                            filePaths: [firstFile.path, secondFile.path],
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context), {
+                        message: 'Multiple file uploads only work with <input type=file multiple>',
+                    });
+                });
+            }
+            catch (e_5) {
+                env_5.error = e_5;
+                env_5.hasError = true;
+            }
+            finally {
+                __disposeResources(env_5);
+            }
+        });
+    });
+    describe('press_key', () => {
+        it('processes press_key', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<script>
+            logs = [];
+            document.addEventListener('keydown', e => logs.push('d' + e.key));
+            document.addEventListener('keyup', e => logs.push('u' + e.key));
+          </script>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                await pressKey(args).handler({
+                    params: {
+                        key: 'Control+Shift+C',
+                    },
+                    page: context.getSelectedMcpPage(),
+                }, response, context);
+                assert.deepStrictEqual(await page.evaluate('logs'), [
+                    'dControl',
+                    'dShift',
+                    'dC',
+                    'uC',
+                    'uShift',
+                    'uControl',
+                ]);
+            });
+        });
+        it('releases held modifiers when the main key press fails', async () => {
+            await withMcpContext(async (response, context, args) => {
+                const page = context.getSelectedMcpPage().pptrPage;
+                await page.setContent(html `<script>
+            logs = [];
+            document.addEventListener('keydown', e => logs.push('d' + e.key));
+            document.addEventListener('keyup', e => logs.push('u' + e.key));
+          </script>`);
+                context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(context.getSelectedMcpPage());
+                // Simulate the main key press failing mid-sequence (e.g. a CDP
+                // hiccup) after the modifiers have already been pressed down.
+                sinon
+                    .stub(page.keyboard, 'press')
+                    .throws(new Error('injected press failure'));
+                try {
+                    await assert.rejects(pressKey(args).handler({
+                        params: {
+                            key: 'Control+Shift+C',
+                        },
+                        page: context.getSelectedMcpPage(),
+                    }, response, context));
+                }
+                finally {
+                    sinon.restore();
+                }
+                // The modifiers were pressed down; both must be released even though
+                // the main key press threw, otherwise the browser is left with the
+                // modifiers logically stuck down.
+                assert.deepStrictEqual(await page.evaluate('logs'), [
+                    'dControl',
+                    'dShift',
+                    'uShift',
+                    'uControl',
+                ]);
+            });
+        });
+    });
+});
+//# sourceMappingURL=input.test.js.map

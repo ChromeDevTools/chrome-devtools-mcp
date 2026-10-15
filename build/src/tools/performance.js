@@ -1,0 +1,230 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import zlib from 'node:zlib';
+import { zod, DevTools } from '../third_party/index.js';
+import { parseRawTraceBuffer, traceResultIsSuccess, } from '../processors/PerformanceTrace.js';
+import { logger } from '../utils/logger.js';
+import { ToolCategory } from './categories.js';
+import { definePageTool } from './ToolDefinition.js';
+const filePathSchema = zod
+    .string()
+    .optional()
+    .describe('The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).');
+export const startTrace = definePageTool(() => ({
+    name: 'performance_start_trace',
+    description: `Start a performance trace on the target webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.`,
+    annotations: {
+        category: ToolCategory.PERFORMANCE,
+        readOnlyHint: false,
+    },
+    schema: {
+        reload: zod
+            .boolean()
+            .default(true)
+            .describe('Determines if, once tracing has started, the target page should be automatically reloaded. Navigate the page to the right URL using the navigate_page tool BEFORE starting the trace if reload or autoStop is set to true.'),
+        autoStop: zod
+            .boolean()
+            .default(true)
+            .describe('Determines if the trace recording should be automatically stopped.'),
+        ignoreCache: zod
+            .boolean()
+            .optional()
+            .describe('Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.'),
+        filePath: filePathSchema,
+    },
+    blockedByDialog: true,
+    verifyFilesSchema: {
+        filePath: true,
+    },
+    handler: async (request, response, context) => {
+        if (context.isRunningPerformanceTrace()) {
+            response.appendResponseLine('Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.');
+            return;
+        }
+        context.setIsRunningPerformanceTrace(true);
+        const page = request.page;
+        const pageUrlForTracing = page.pptrPage.url();
+        try {
+            if (request.params.reload) {
+                // Before starting the recording, navigate to about:blank to clear out any state.
+                // We use `load` because `networkidle0` is known to be flaky for about:blank in Puppeteer.
+                await page.pptrPage.goto('about:blank', {
+                    waitUntil: 'load',
+                });
+            }
+            const categories = [
+                '-*',
+                ...DevTools.TracingDefaultCategories,
+                // These categories are optional in DevTools, but enabled by default in the DevTools UI, so we enable them here too.
+                ...DevTools.TracingOptionalCategories.JsSampling,
+                ...DevTools.TracingOptionalCategories.Screenshot,
+            ];
+            await page.pptrPage.tracing.start({
+                categories,
+                bufferSize: 1200 * 1000,
+            });
+            if (request.params.reload) {
+                const ignoreCache = request.params.ignoreCache ?? false;
+                if (ignoreCache) {
+                    // Disable the HTTP cache so that the main document and all
+                    // subresources are fetched from the network, like a hard reload.
+                    await page.pptrPage.setCacheEnabled(false);
+                }
+                try {
+                    await page.pptrPage.goto(pageUrlForTracing, {
+                        waitUntil: ['load'],
+                    });
+                }
+                finally {
+                    if (ignoreCache) {
+                        await page.pptrPage.setCacheEnabled(true);
+                    }
+                }
+            }
+            if (request.params.autoStop) {
+                await new Promise(resolve => setTimeout(resolve, 5_000));
+                await stopTracingAndAppendOutput(page, response, context, request.params.filePath);
+            }
+            else {
+                response.appendResponseLine(`The performance trace is being recorded. Use performance_stop_trace to stop it.`);
+            }
+        }
+        catch (error) {
+            // If a setup step (navigation, tracing.start) throws before
+            // stopTracingAndAppendOutput runs, the running flag would otherwise stay
+            // stuck `true` for the rest of the session, blocking all future traces.
+            // Unwind here: stop tracing if it was started and clear the flag. When
+            // autoStop already ran stopTracingAndAppendOutput the flag is already
+            // false and this is a no-op.
+            if (context.isRunningPerformanceTrace()) {
+                try {
+                    await page.pptrPage.tracing.stop();
+                }
+                catch {
+                    // Tracing may not have started yet; ignore.
+                }
+                context.setIsRunningPerformanceTrace(false);
+            }
+            throw error;
+        }
+    },
+}));
+export const stopTrace = definePageTool(() => ({
+    name: 'performance_stop_trace',
+    description: 'Stop the active performance trace recording on the target webpage.',
+    annotations: {
+        category: ToolCategory.PERFORMANCE,
+        readOnlyHint: false,
+    },
+    schema: {
+        filePath: filePathSchema,
+    },
+    blockedByDialog: true,
+    verifyFilesSchema: {
+        filePath: true,
+    },
+    handler: async (request, response, context) => {
+        if (!context.isRunningPerformanceTrace()) {
+            response.appendResponseLine('Error: no active performance trace recording to stop.');
+            return;
+        }
+        const page = request.page;
+        await stopTracingAndAppendOutput(page, response, context, request.params.filePath);
+    },
+}));
+export const analyzeInsight = definePageTool(() => ({
+    name: 'performance_analyze_insight',
+    description: 'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
+    annotations: {
+        category: ToolCategory.PERFORMANCE,
+        readOnlyHint: true,
+    },
+    schema: {
+        insightSetId: zod
+            .string()
+            .describe('The id for the specific insight set. Only use the ids given in the "Available insight sets" list.'),
+        insightName: zod
+            .string()
+            .describe('The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"'),
+    },
+    blockedByDialog: false,
+    verifyFilesSchema: {},
+    handler: async (request, response, context) => {
+        const lastRecording = context.recordedTraces().at(-1);
+        if (!lastRecording) {
+            response.appendResponseLine('No recorded traces found. Record a performance trace so you have Insights to analyze.');
+            return;
+        }
+        response.attachTraceInsight(lastRecording, request.params.insightSetId, request.params.insightName);
+    },
+}));
+async function stopTracingAndAppendOutput(page, response, context, filePath) {
+    try {
+        const traceEventsBuffer = await page.pptrPage.tracing.stop();
+        if (filePath && traceEventsBuffer) {
+            let dataToWrite = traceEventsBuffer;
+            if (filePath.endsWith('.gz')) {
+                dataToWrite = await new Promise((resolve, reject) => {
+                    zlib.gzip(traceEventsBuffer, (error, result) => {
+                        if (error) {
+                            reject(error);
+                        }
+                        else {
+                            resolve(result);
+                        }
+                    });
+                });
+            }
+            const file = await context.saveFile(dataToWrite, filePath, filePath.endsWith('.gz') ? '.gz' : '.json');
+            response.appendResponseLine(`The raw trace data was saved to ${file.filename}.`);
+        }
+        const result = await parseRawTraceBuffer(traceEventsBuffer, {
+            cpuThrottling: page.cpuThrottlingRate,
+            networkThrottling: page.networkConditions ?? undefined,
+        });
+        response.appendResponseLine('The performance trace has been stopped.');
+        if (traceResultIsSuccess(result)) {
+            if (context.isCruxEnabled()) {
+                await populateCruxData(result);
+            }
+            context.storeTraceRecording(result);
+            response.attachTraceSummary(result);
+        }
+        else {
+            throw new Error(`There was an unexpected error parsing the trace: ${result.error}`);
+        }
+    }
+    finally {
+        context.setIsRunningPerformanceTrace(false);
+    }
+}
+/** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */
+async function populateCruxData(result) {
+    logger?.('populateCruxData called');
+    const cruxManager = DevTools.CrUXManager.CrUXManager.instance();
+    // go/jtfbx. Yes, we're aware this API key is public. ;)
+    cruxManager.setEndpointForTesting('https://chromeuxreport.googleapis.com/v1/records:queryRecord?key=AIzaSyBn5gimNjhiEyA_euicSKko6IlD3HdgUfk');
+    const cruxSetting = DevTools.Common.Settings.Settings.instance().createSetting('field-data', {
+        enabled: true,
+    });
+    cruxSetting.set({ enabled: true });
+    // Gather URLs to fetch CrUX data for
+    const urls = [...(result.parsedTrace.insights?.values() ?? [])].map(c => c.url.toString());
+    urls.push(result.parsedTrace.data.Meta.mainFrameURL);
+    const urlSet = new Set(urls);
+    if (urlSet.size === 0) {
+        logger?.('No URLs found for CrUX data');
+        return;
+    }
+    logger?.(`Fetching CrUX data for ${urlSet.size} URLs: ${Array.from(urlSet).join(', ')}`);
+    const cruxData = await Promise.all(Array.from(urlSet).map(async (url) => {
+        const data = await cruxManager.getFieldDataForPage(url);
+        logger?.(`CrUX data for ${url}: ${data ? 'found' : 'not found'}`);
+        return data;
+    }));
+    result.parsedTrace.metadata.cruxFieldData = cruxData;
+}
+//# sourceMappingURL=performance.js.map

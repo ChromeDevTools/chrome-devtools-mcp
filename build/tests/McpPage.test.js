@@ -1,0 +1,1367 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import assert from 'node:assert';
+import { afterEach, describe, it } from 'node:test';
+import sinon from 'sinon';
+import { McpPage, replaceHtmlElementsWithUids } from '../src/McpPage.js';
+import { DevTools, Locator } from '../src/third_party/index.js';
+import { TextSnapshot } from '../src/TextSnapshot.js';
+import { createMockMcpResponse, createMockPuppeteerPage, createMockPuppeteerTarget, createMockWebMCPTool, } from './mocks.js';
+import { serverHooks } from './server.js';
+import { getMockRequest, html, withMcpContext } from './utils.js';
+describe('replaceHtmlElementsWithUids', () => {
+    it('does nothing for boolean schemas', () => {
+        const schemaTrue = true;
+        const schemaFalse = false;
+        replaceHtmlElementsWithUids(schemaTrue);
+        replaceHtmlElementsWithUids(schemaFalse);
+        assert.strictEqual(schemaTrue, true);
+        assert.strictEqual(schemaFalse, false);
+    });
+    it('replaces HTMLElement type with uid string', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                foo: { type: 'string' },
+                bar: { type: 'number' },
+            },
+            required: ['foo'],
+        };
+        Object.assign(schema, { 'x-mcp-type': 'HTMLElement' });
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object') {
+            assert.deepStrictEqual(schema.properties, {
+                uid: { type: 'string' },
+            });
+            assert.deepStrictEqual(schema.required, ['uid']);
+        }
+        else {
+            assert.fail('Schema should be an object');
+        }
+    });
+    it('does not replace if x-mcp-type is not HTMLElement', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                foo: { type: 'string' },
+            },
+        };
+        Object.assign(schema, { 'x-mcp-type': 'OtherType' });
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object') {
+            assert.deepStrictEqual(schema.properties, {
+                foo: { type: 'string' },
+            });
+            assert.strictEqual(schema.required, undefined);
+        }
+        else {
+            assert.fail('Schema should be an object');
+        }
+    });
+    it('recurses into nested properties', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                element: {
+                    type: 'object',
+                    properties: {
+                        foo: { type: 'string' },
+                    },
+                },
+                other: {
+                    type: 'string',
+                },
+            },
+        };
+        if (typeof schema === 'object' && schema.properties) {
+            Object.assign(schema.properties.element, { 'x-mcp-type': 'HTMLElement' });
+        }
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object' &&
+            schema.properties &&
+            typeof schema.properties.element === 'object') {
+            const elementSchema = schema.properties.element;
+            assert.deepStrictEqual(elementSchema.properties, {
+                uid: { type: 'string' },
+            });
+            assert.deepStrictEqual(elementSchema.required, ['uid']);
+        }
+        else {
+            assert.fail('Unexpected schema structure');
+        }
+    });
+    it('recurses into array items (single schema object)', () => {
+        const schema = {
+            type: 'array',
+            items: {
+                type: 'object',
+            },
+        };
+        if (typeof schema === 'object' && typeof schema.items === 'object') {
+            Object.assign(schema.items, { 'x-mcp-type': 'HTMLElement' });
+        }
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object' && typeof schema.items === 'object') {
+            const itemsSchema = schema.items;
+            if (!Array.isArray(itemsSchema)) {
+                assert.deepStrictEqual(itemsSchema.properties, {
+                    uid: { type: 'string' },
+                });
+                assert.deepStrictEqual(itemsSchema.required, ['uid']);
+            }
+            else {
+                assert.fail('items should not be an array in this test case');
+            }
+        }
+        else {
+            assert.fail('Unexpected schema structure');
+        }
+    });
+    it('recurses into array items (array of schemas)', () => {
+        const schema = {
+            type: 'array',
+            items: [
+                {
+                    type: 'object',
+                },
+                {
+                    type: 'string',
+                },
+            ],
+        };
+        if (typeof schema === 'object' && Array.isArray(schema.items)) {
+            Object.assign(schema.items[0], { 'x-mcp-type': 'HTMLElement' });
+        }
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object' && Array.isArray(schema.items)) {
+            const firstItem = schema.items[0];
+            if (typeof firstItem === 'object') {
+                assert.deepStrictEqual(firstItem.properties, {
+                    uid: { type: 'string' },
+                });
+                assert.deepStrictEqual(firstItem.required, ['uid']);
+            }
+            else {
+                assert.fail('First item should be an object');
+            }
+            const secondItem = schema.items[1];
+            if (typeof secondItem === 'object') {
+                assert.strictEqual(secondItem.properties, undefined);
+            }
+            else {
+                assert.fail('Second item should be an object');
+            }
+        }
+        else {
+            assert.fail('Unexpected schema structure');
+        }
+    });
+    it('recurses into anyOf', () => {
+        const schema = {
+            anyOf: [
+                {
+                    type: 'object',
+                },
+                {
+                    type: 'string',
+                },
+            ],
+        };
+        if (typeof schema === 'object' && Array.isArray(schema.anyOf)) {
+            Object.assign(schema.anyOf[0], { 'x-mcp-type': 'HTMLElement' });
+        }
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object' && Array.isArray(schema.anyOf)) {
+            const firstItem = schema.anyOf[0];
+            if (typeof firstItem === 'object') {
+                assert.deepStrictEqual(firstItem.properties, {
+                    uid: { type: 'string' },
+                });
+            }
+            else {
+                assert.fail('First item should be an object');
+            }
+        }
+        else {
+            assert.fail('Unexpected schema structure');
+        }
+    });
+    it('recurses into allOf', () => {
+        const schema = {
+            allOf: [
+                {
+                    type: 'object',
+                },
+            ],
+        };
+        if (typeof schema === 'object' && Array.isArray(schema.allOf)) {
+            Object.assign(schema.allOf[0], { 'x-mcp-type': 'HTMLElement' });
+        }
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object' && Array.isArray(schema.allOf)) {
+            const firstItem = schema.allOf[0];
+            if (typeof firstItem === 'object') {
+                assert.deepStrictEqual(firstItem.properties, {
+                    uid: { type: 'string' },
+                });
+            }
+            else {
+                assert.fail('First item should be an object');
+            }
+        }
+        else {
+            assert.fail('Unexpected schema structure');
+        }
+    });
+    it('recurses into oneOf', () => {
+        const schema = {
+            oneOf: [
+                {
+                    type: 'object',
+                },
+            ],
+        };
+        if (typeof schema === 'object' && Array.isArray(schema.oneOf)) {
+            Object.assign(schema.oneOf[0], { 'x-mcp-type': 'HTMLElement' });
+        }
+        replaceHtmlElementsWithUids(schema);
+        if (typeof schema === 'object' && Array.isArray(schema.oneOf)) {
+            const firstItem = schema.oneOf[0];
+            if (typeof firstItem === 'object') {
+                assert.deepStrictEqual(firstItem.properties, {
+                    uid: { type: 'string' },
+                });
+            }
+            else {
+                assert.fail('First item should be an object');
+            }
+        }
+        else {
+            assert.fail('Unexpected schema structure');
+        }
+    });
+});
+describe('McpPage', () => {
+    async function createMcpPage(options = {}) {
+        const pptrPage = createMockPuppeteerPage();
+        pptrPage.emulateFocusedPage.resolves();
+        const target = createMockPuppeteerTarget({ page: pptrPage });
+        const mcpPage = new McpPage(target, 1, {
+            hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
+            locatorClass: Locator,
+        });
+        const mockSession = {
+            send: sinon.stub().resolves(),
+        };
+        sinon
+            .stub(mcpPage, 'devtoolsUniverse')
+            .get(() => ({ session: mockSession }));
+        await mcpPage.init();
+        return { mcpPage, pptrPage, target, mockSession };
+    }
+    function getUidForNode(mcpPage, matcher) {
+        const textSnapshot = mcpPage.textSnapshot;
+        if (!textSnapshot) {
+            throw new Error('No textSnapshot on mcpPage');
+        }
+        for (const [uid, node] of textSnapshot.idToNode) {
+            if (node.name?.includes(matcher)) {
+                return uid;
+            }
+        }
+        throw new Error(`Target element "${matcher}" not found in snapshot`);
+    }
+    describe('lazy initialization', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('does not initialize Puppeteer Page in constructor and throws if pptrPage is accessed before init()', async () => {
+            const pptrPage = createMockPuppeteerPage();
+            pptrPage.emulateFocusedPage.resolves();
+            const target = createMockPuppeteerTarget({
+                page: pptrPage,
+                url: 'https://target-only.example.com',
+                title: 'Target Title',
+            });
+            const mcpPage = new McpPage(target, 1, {
+                hasNetworkBlockOrAllowlist: false,
+                locatorClass: Locator,
+            });
+            sinon.assert.notCalled(target.page);
+            sinon.assert.notCalled(target.asPage);
+            assert.throws(() => mcpPage.pptrPage, /not initialized/);
+            assert.throws(() => mcpPage.getThirdPartyDeveloperTools(), /not initialized/);
+            assert.throws(() => mcpPage.getWebMcpTools(), /not initialized/);
+            assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
+            assert.strictEqual(mcpPage.getTitle(), 'Target Title');
+            await mcpPage.init();
+            sinon.assert.calledOnce(target.page);
+            assert.strictEqual(mcpPage.pptrPage, pptrPage);
+            assert.strictEqual(mcpPage.getTitle(), 'Target Title');
+            sinon.assert.notCalled(pptrPage.title);
+        });
+        it('falls back to target.asPage() when target.page() returns null', async () => {
+            const pptrPage = createMockPuppeteerPage();
+            pptrPage.emulateFocusedPage.resolves();
+            const target = createMockPuppeteerTarget({ page: pptrPage });
+            target.page.resolves(null);
+            const mcpPage = new McpPage(target, 1, {
+                hasNetworkBlockOrAllowlist: false,
+                locatorClass: Locator,
+            });
+            await mcpPage.init();
+            sinon.assert.calledOnce(target.page);
+            sinon.assert.calledOnce(target.asPage);
+            assert.strictEqual(mcpPage.pptrPage, pptrPage);
+        });
+        it('disposes safely before init() is called and rejects subsequent init()', async () => {
+            const target = createMockPuppeteerTarget();
+            const mcpPage = new McpPage(target, 1, {
+                hasNetworkBlockOrAllowlist: false,
+                locatorClass: Locator,
+            });
+            assert.strictEqual(mcpPage.isClosed(), false);
+            mcpPage.dispose();
+            assert.strictEqual(mcpPage.isClosed(), true);
+            await assert.rejects(() => mcpPage.init(), /McpPage \(id=1\) has already been disposed/);
+            sinon.assert.notCalled(target.page);
+        });
+        it('closes the underlying page without running init()', async () => {
+            const pptrPage = createMockPuppeteerPage();
+            const target = createMockPuppeteerTarget({ page: pptrPage });
+            const mcpPage = new McpPage(target, 1, {
+                hasNetworkBlockOrAllowlist: false,
+                locatorClass: Locator,
+            });
+            await mcpPage.close();
+            assert.strictEqual(mcpPage.isClosed(), true);
+            sinon.assert.calledOnceWithExactly(pptrPage.close, {
+                runBeforeUnload: false,
+            });
+            sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+        });
+    });
+    describe('getTitle()', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        function createPage(url, title) {
+            const target = createMockPuppeteerTarget({ url, title });
+            return new McpPage(target, 1, {
+                hasNetworkBlockOrAllowlist: false,
+                locatorClass: Locator,
+            });
+        }
+        function targetInfo(url, title) {
+            return {
+                targetId: '<mock-target-id>',
+                type: 'page',
+                title,
+                url,
+                attached: true,
+                canAccessOpener: false,
+            };
+        }
+        it('prefers fresh target info over cached target info', () => {
+            const mcpPage = createPage('http://127.0.0.1:8080/titled.html', '127.0.0.1:8080/titled.html');
+            assert.strictEqual(mcpPage.getTitle(targetInfo('http://127.0.0.1:8080/titled.html', 'Real Title')), 'Real Title');
+        });
+        it('ignores Chrome URL placeholder titles', () => {
+            assert.strictEqual(createPage('http://127.0.0.1:8080/titled.html', '127.0.0.1:8080/titled.html').getTitle(), '');
+            assert.strictEqual(createPage('https://example.com/', 'example.com').getTitle(), '');
+            assert.strictEqual(createPage('about:blank', 'about:blank').getTitle(), '');
+        });
+        it('exposes the target id', () => {
+            assert.strictEqual(createPage('https://example.com', '').targetId, '<mock-target-id>');
+        });
+    });
+    describe('emulate()', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('calls emulateNetworkConditions with offline settings', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ networkConditions: 'Offline' });
+            assert.strictEqual(mcpPage.networkConditions, 'Offline');
+            sinon.assert.calledOnceWithExactly(pptrPage.emulateNetworkConditions, {
+                offline: true,
+                download: 0,
+                upload: 0,
+                latency: 0,
+            });
+        });
+        it('calls emulateNetworkConditions with the predefined condition', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ networkConditions: 'Slow 3G' });
+            assert.strictEqual(mcpPage.networkConditions, 'Slow 3G');
+            sinon.assert.calledOnceWithExactly(pptrPage.emulateNetworkConditions, {
+                download: 50000,
+                upload: 50000,
+                latency: 2000,
+            });
+        });
+        it('calls emulateNetworkConditions(null) when networkConditions is omitted', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ networkConditions: 'Slow 3G' });
+            await mcpPage.emulate({});
+            assert.strictEqual(mcpPage.networkConditions, null);
+            sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
+            sinon.assert.calledWithExactly(pptrPage.emulateNetworkConditions.secondCall, null);
+        });
+        it('does not call emulateNetworkConditions for unknown values', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ networkConditions: 'Slow 11G' });
+            assert.strictEqual(mcpPage.networkConditions, null);
+            sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
+        });
+        it('throws when networkConditions is set with network blocking enabled', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage({
+                hasNetworkBlockOrAllowlist: true,
+            });
+            await assert.rejects(() => mcpPage.emulate({ networkConditions: 'Slow 3G' }), /Network throttling is not supported when network blocking/);
+            sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
+        });
+        it('calls emulateCPUThrottling with the given rate', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ cpuThrottlingRate: 4 });
+            assert.strictEqual(mcpPage.cpuThrottlingRate, 4);
+            sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
+        });
+        it('calls emulateCPUThrottling(1) to reset throttling', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ cpuThrottlingRate: 4 });
+            await mcpPage.emulate({ cpuThrottlingRate: 1 });
+            assert.strictEqual(mcpPage.cpuThrottlingRate, 1);
+            sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
+            sinon.assert.calledWithExactly(pptrPage.emulateCPUThrottling.secondCall, 1);
+        });
+        it('sends Emulation.setCPUThrottlingRate to secondary session if present', async () => {
+            const { mcpPage, pptrPage, mockSession } = await createMcpPage();
+            await mcpPage.emulate({ cpuThrottlingRate: 4 });
+            sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 4);
+            sinon.assert.calledOnceWithExactly(mockSession.send, 'Emulation.setCPUThrottlingRate', { rate: 4 });
+        });
+        it('sends Emulation.setCPUThrottlingRate with rate 1 to secondary session when cpuThrottlingRate is omitted', async () => {
+            const { mcpPage, pptrPage, mockSession } = await createMcpPage();
+            await mcpPage.emulate({});
+            sinon.assert.calledOnceWithExactly(pptrPage.emulateCPUThrottling, 1);
+            sinon.assert.calledOnceWithExactly(mockSession.send, 'Emulation.setCPUThrottlingRate', { rate: 1 });
+        });
+        it('calls setGeolocation with the given coordinates', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                geolocation: { latitude: 48.137154, longitude: 11.576124 },
+            });
+            assert.deepStrictEqual(mcpPage.geolocation, {
+                latitude: 48.137154,
+                longitude: 11.576124,
+            });
+            sinon.assert.calledOnceWithExactly(pptrPage.setGeolocation, {
+                latitude: 48.137154,
+                longitude: 11.576124,
+            });
+        });
+        it('calls setGeolocation with (0, 0) when geolocation is omitted', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                geolocation: { latitude: 48.137154, longitude: 11.576124 },
+            });
+            await mcpPage.emulate({});
+            assert.strictEqual(mcpPage.geolocation, null);
+            sinon.assert.calledTwice(pptrPage.setGeolocation);
+            sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, {
+                latitude: 0,
+                longitude: 0,
+            });
+        });
+        it('calls setUserAgent with the given user agent', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ userAgent: 'TestUA/1.0' });
+            assert.strictEqual(mcpPage.userAgent, 'TestUA/1.0');
+            sinon.assert.calledOnceWithExactly(pptrPage.setUserAgent, {
+                userAgent: 'TestUA/1.0',
+            });
+        });
+        it('calls setUserAgent with undefined to clear the user agent', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ userAgent: 'TestUA/1.0' });
+            await mcpPage.emulate({ userAgent: '' });
+            assert.strictEqual(mcpPage.userAgent, null);
+            sinon.assert.calledTwice(pptrPage.setUserAgent);
+            sinon.assert.calledWithExactly(pptrPage.setUserAgent.secondCall, {
+                userAgent: undefined,
+            });
+        });
+        describe('media features', () => {
+            it('emulates all media features in a single call', async () => {
+                const { mcpPage, pptrPage } = await createMcpPage();
+                await mcpPage.emulate({
+                    colorScheme: 'dark',
+                    forcedColors: 'active',
+                    prefersContrast: 'more',
+                    prefersReducedMotion: 'reduce',
+                });
+                assert.strictEqual(mcpPage.colorScheme, 'dark');
+                assert.strictEqual(mcpPage.forcedColors, 'active');
+                assert.strictEqual(mcpPage.prefersContrast, 'more');
+                assert.strictEqual(mcpPage.prefersReducedMotion, 'reduce');
+                sinon.assert.calledOnceWithExactly(pptrPage.emulateMediaFeatures, [
+                    { name: 'prefers-color-scheme', value: 'dark' },
+                    { name: 'forced-colors', value: 'active' },
+                    { name: 'prefers-contrast', value: 'more' },
+                    { name: 'prefers-reduced-motion', value: 'reduce' },
+                ]);
+            });
+            it('resets media features set to auto', async () => {
+                const { mcpPage, pptrPage } = await createMcpPage();
+                await mcpPage.emulate({
+                    colorScheme: 'dark',
+                    forcedColors: 'active',
+                    prefersContrast: 'more',
+                    prefersReducedMotion: 'reduce',
+                });
+                await mcpPage.emulate({
+                    colorScheme: 'auto',
+                    forcedColors: 'auto',
+                    prefersContrast: 'auto',
+                    prefersReducedMotion: 'auto',
+                });
+                assert.strictEqual(mcpPage.colorScheme, null);
+                assert.strictEqual(mcpPage.forcedColors, null);
+                assert.strictEqual(mcpPage.prefersContrast, null);
+                assert.strictEqual(mcpPage.prefersReducedMotion, null);
+                sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
+                sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
+                    { name: 'prefers-color-scheme', value: '' },
+                    { name: 'forced-colors', value: '' },
+                    { name: 'prefers-contrast', value: '' },
+                    { name: 'prefers-reduced-motion', value: '' },
+                ]);
+            });
+            it('resets omitted media features', async () => {
+                const { mcpPage, pptrPage } = await createMcpPage();
+                await mcpPage.emulate({ forcedColors: 'active' });
+                await mcpPage.emulate({ prefersContrast: 'less' });
+                assert.strictEqual(mcpPage.forcedColors, null);
+                assert.strictEqual(mcpPage.prefersContrast, 'less');
+                sinon.assert.calledTwice(pptrPage.emulateMediaFeatures);
+                sinon.assert.calledWithExactly(pptrPage.emulateMediaFeatures.secondCall, [
+                    { name: 'prefers-color-scheme', value: '' },
+                    { name: 'forced-colors', value: '' },
+                    { name: 'prefers-contrast', value: 'less' },
+                    { name: 'prefers-reduced-motion', value: '' },
+                ]);
+            });
+        });
+        it('calls setViewport with the given dimensions merged with defaults', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                viewport: {
+                    width: 400,
+                    height: 400,
+                },
+            });
+            assert.deepStrictEqual(mcpPage.viewport, {
+                width: 400,
+                height: 400,
+                deviceScaleFactor: 1,
+                isMobile: false,
+                hasTouch: false,
+                isLandscape: false,
+            });
+            sinon.assert.calledOnceWithExactly(pptrPage.setViewport, {
+                width: 400,
+                height: 400,
+                deviceScaleFactor: 1,
+                isMobile: false,
+                hasTouch: false,
+                isLandscape: false,
+            });
+        });
+        it('calls setViewport(null) when viewport is omitted', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({ viewport: { width: 400, height: 400 } });
+            await mcpPage.emulate({});
+            assert.strictEqual(mcpPage.viewport, null);
+            sinon.assert.calledTwice(pptrPage.setViewport);
+            sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, null);
+        });
+        it('calls setExtraHTTPHeaders with the given headers', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                extraHttpHeaders: { 'X-Custom-Header': 'test-value' },
+            });
+            assert.deepStrictEqual(mcpPage.emulationSettings.extraHttpHeaders, {
+                'X-Custom-Header': 'test-value',
+            });
+            sinon.assert.calledOnceWithExactly(pptrPage.setExtraHTTPHeaders, {
+                'X-Custom-Header': 'test-value',
+            });
+        });
+        it('clears extraHttpHeaders when empty object is passed', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                extraHttpHeaders: { 'X-Custom-Header': 'test-value' },
+            });
+            await mcpPage.emulate({ extraHttpHeaders: {} });
+            assert.strictEqual(mcpPage.emulationSettings.extraHttpHeaders, undefined);
+            sinon.assert.calledTwice(pptrPage.setExtraHTTPHeaders);
+            sinon.assert.calledWithExactly(pptrPage.setExtraHTTPHeaders.secondCall, {});
+        });
+    });
+    describe('restoreEmulation()', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('re-applies previously configured viewport emulation', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                viewport: {
+                    width: 400,
+                    height: 400,
+                    deviceScaleFactor: 1,
+                    isMobile: false,
+                    hasTouch: false,
+                    isLandscape: false,
+                },
+            });
+            sinon.assert.calledOnce(pptrPage.setViewport);
+            await mcpPage.restoreEmulation();
+            sinon.assert.calledTwice(pptrPage.setViewport);
+            sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, {
+                width: 400,
+                height: 400,
+                deviceScaleFactor: 1,
+                isMobile: false,
+                hasTouch: false,
+                isLandscape: false,
+            });
+        });
+        it('re-applies previously configured network and cpu throttling emulation', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            await mcpPage.emulate({
+                networkConditions: 'Slow 3G',
+                cpuThrottlingRate: 4,
+            });
+            sinon.assert.calledOnce(pptrPage.emulateNetworkConditions);
+            sinon.assert.calledOnce(pptrPage.emulateCPUThrottling);
+            await mcpPage.restoreEmulation();
+            sinon.assert.calledTwice(pptrPage.emulateNetworkConditions);
+            sinon.assert.calledTwice(pptrPage.emulateCPUThrottling);
+        });
+    });
+    describe('getNetworkRequests', () => {
+        it('delegates to networkCollector.getData with includePreservedRequests', async () => {
+            const { mcpPage } = await createMcpPage();
+            const stub = sinon.stub(mcpPage.networkCollector, 'getData').returns([]);
+            mcpPage.getNetworkRequests(true);
+            sinon.assert.calledOnceWithExactly(stub, true);
+            mcpPage.getNetworkRequests(false);
+            sinon.assert.calledWithExactly(stub.secondCall, false);
+            mcpPage.getNetworkRequests();
+            sinon.assert.calledWithExactly(stub.thirdCall, undefined);
+        });
+    });
+    describe('getNetworkRequestById', () => {
+        it('delegates to networkCollector.getById', async () => {
+            const { mcpPage } = await createMcpPage();
+            const mockRequest = getMockRequest();
+            const stub = sinon
+                .stub(mcpPage.networkCollector, 'getById')
+                .returns(mockRequest);
+            const result = mcpPage.getNetworkRequestById(42);
+            sinon.assert.calledOnceWithExactly(stub, 42);
+            assert.strictEqual(result, mockRequest);
+        });
+    });
+    describe('network collection with redirects', () => {
+        const server = serverHooks();
+        it('collects real browser requests across server-side and client-side redirects', async () => {
+            server.addRoute('/redirect', async (_req, res) => {
+                res.writeHead(302, {
+                    Location: server.getRoute('/redirected'),
+                });
+                res.end();
+            });
+            server.addHtmlRoute('/redirected', html `<script>
+          document.location.href = '/redirected-page';
+        </script>`);
+            server.addHtmlRoute('/redirected-page', html `<main>Redirected</main>`);
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                await mcpPage.setUpNetworkCollectorForTesting();
+                const page = mcpPage.pptrPage;
+                await page.goto(server.getRoute('/redirect'), {
+                    waitUntil: 'networkidle0',
+                });
+                const requests = mcpPage.getNetworkRequests(true);
+                const urls = requests.map(req => req.url());
+                assert.ok(urls.some(url => url.includes('/redirect')));
+                assert.ok(urls.some(url => url.includes('/redirected')));
+                assert.ok(urls.some(url => url.includes('/redirected-page')));
+            });
+        });
+    });
+    describe('waitForTextOnPage()', () => {
+        it('finds text on the page', async () => {
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                const page = mcpPage.pptrPage;
+                await page.setContent(html `<main><span>Hello</span><span> </span><div>World</div></main>`);
+                const element = await mcpPage.waitForTextOnPage(['Hello']);
+                assert.ok(element);
+            });
+        });
+        it('works with any-match array', async () => {
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                const page = mcpPage.pptrPage;
+                await page.setContent(html `<main><span>Status</span><div>Error</div></main>`);
+                const element = await mcpPage.waitForTextOnPage(['Complete', 'Error']);
+                assert.ok(element);
+            });
+        });
+        it('works with any-match array when element shows up later', async () => {
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                const page = mcpPage.pptrPage;
+                const waitPromise = mcpPage.waitForTextOnPage(['Complete', 'Error']);
+                await page.setContent(html `<main
+            ><span>Hello</span><span> </span><div>Complete</div></main
+          >`);
+                const element = await waitPromise;
+                assert.ok(element);
+            });
+        });
+        it('works with element that shows up later', async () => {
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                const page = mcpPage.pptrPage;
+                const waitPromise = mcpPage.waitForTextOnPage(['Hello World']);
+                await page.setContent(html `<main><span>Hello</span><span> </span><div>World</div></main>`);
+                const element = await waitPromise;
+                assert.ok(element);
+            });
+        });
+        it('works with aria elements', async () => {
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                const page = mcpPage.pptrPage;
+                await page.setContent(html `<main><h1>Header</h1><div>Text</div></main>`);
+                const element = await mcpPage.waitForTextOnPage(['Header']);
+                assert.ok(element);
+            });
+        });
+        it('works with iframe content', async () => {
+            await withMcpContext(async (_response, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                const page = mcpPage.pptrPage;
+                await page.setContent(html `<h1>Top level</h1>
+            <iframe srcdoc="<p>Hello iframe</p>"></iframe>`);
+                const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
+                assert.ok(element);
+            });
+        });
+    });
+    describe('DevToolsCommentBridge lifecycle', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('does not create commentBridge on construction or getDevToolsPage', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            pptrPage.hasDevTools.resolves(true);
+            const devtoolsPage = createMockPuppeteerPage();
+            pptrPage.openDevTools.resolves(devtoolsPage);
+            assert.strictEqual(mcpPage.commentBridge, undefined);
+            const retrieved = await mcpPage.getDevToolsPage();
+            assert.strictEqual(retrieved, devtoolsPage);
+            assert.strictEqual(mcpPage.commentBridge, undefined);
+        });
+        it('creates and attaches commentBridge when openDevTools is called', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const devtoolsPage = createMockPuppeteerPage();
+            devtoolsPage.evaluate.resolves(true);
+            pptrPage.openDevTools.resolves(devtoolsPage);
+            assert.strictEqual(mcpPage.commentBridge, undefined);
+            const result = await mcpPage.openDevTools();
+            assert.strictEqual(result, devtoolsPage);
+            assert.notStrictEqual(mcpPage.commentBridge, undefined);
+            sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+        });
+        it('returns the commentBridge when the DevTools page has a CD4A bridge', async () => {
+            const { mcpPage } = await createMcpPage();
+            const devtoolsPage = createMockPuppeteerPage();
+            devtoolsPage.evaluate.resolves(true);
+            const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+            assert.notStrictEqual(bridge, undefined);
+            assert.strictEqual(bridge, mcpPage.commentBridge);
+        });
+        it('returns undefined when the DevTools page has no CD4A bridge', async () => {
+            const { mcpPage } = await createMcpPage();
+            const devtoolsPage = createMockPuppeteerPage();
+            devtoolsPage.evaluate.resolves(false);
+            const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+            assert.strictEqual(bridge, undefined);
+            sinon.assert.notCalled(devtoolsPage.exposeFunction);
+        });
+        it('disposes commentBridge on mcpPage.dispose()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const devtoolsPage = createMockPuppeteerPage();
+            pptrPage.openDevTools.resolves(devtoolsPage);
+            await mcpPage.openDevTools();
+            const bridge = mcpPage.commentBridge;
+            assert.notStrictEqual(bridge, undefined);
+            if (bridge) {
+                const disposeSpy = sinon.spy(bridge, 'dispose');
+                mcpPage.dispose();
+                sinon.assert.calledOnce(disposeSpy);
+                assert.strictEqual(mcpPage.commentBridge, undefined);
+            }
+        });
+        it('creates and attaches commentBridge when getDevToolsData is called', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            pptrPage.hasDevTools.resolves(true);
+            const devtoolsPage = createMockPuppeteerPage();
+            devtoolsPage.evaluate.resolves(true);
+            devtoolsPage.evaluate.onThirdCall().resolves({
+                cdpRequestId: 'req-1',
+                cdpBackendNodeId: 10,
+            });
+            pptrPage.openDevTools.resolves(devtoolsPage);
+            assert.strictEqual(mcpPage.commentBridge, undefined);
+            const data = await mcpPage.getDevToolsData();
+            assert.deepStrictEqual(data, {
+                cdpRequestId: 'req-1',
+                cdpBackendNodeId: 10,
+            });
+            assert.notStrictEqual(mcpPage.commentBridge, undefined);
+            sinon.assert.calledOnce(devtoolsPage.exposeFunction);
+            sinon.assert.calledThrice(devtoolsPage.evaluate);
+        });
+    });
+    describe('resolveBackendNodeId()', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        function createSnapshotWithNodes(nodes, verbose = false) {
+            const idToNode = new Map();
+            const children = [];
+            for (const n of nodes) {
+                const node = {
+                    id: n.id,
+                    role: 'generic',
+                    backendNodeId: n.backendNodeId,
+                    children: [],
+                    elementHandle: async () => null,
+                };
+                idToNode.set(n.id, node);
+                children.push(node);
+            }
+            const rootNode = {
+                id: '1_0',
+                role: 'root',
+                children,
+                elementHandle: async () => null,
+            };
+            return new TextSnapshot({
+                root: rootNode,
+                idToNode,
+                snapshotId: '1',
+                hasSelectedElement: false,
+                verbose,
+            });
+        }
+        it('returns uid from existing textSnapshot without regenerating', async () => {
+            const { mcpPage } = await createMcpPage();
+            mcpPage.textSnapshot = createSnapshotWithNodes([
+                { id: '1_1', backendNodeId: 42 },
+            ]);
+            const createStub = sinon.stub(TextSnapshot, 'create');
+            const uid = await mcpPage.resolveBackendNodeId(42);
+            assert.strictEqual(uid, '1_1');
+            sinon.assert.notCalled(createStub);
+        });
+        it('creates textSnapshot when textSnapshot is null', async () => {
+            const { mcpPage } = await createMcpPage();
+            const snapshot = createSnapshotWithNodes([
+                { id: '1_1', backendNodeId: 42 },
+            ]);
+            const createStub = sinon.stub(TextSnapshot, 'create').resolves(snapshot);
+            const uid = await mcpPage.resolveBackendNodeId(42);
+            assert.strictEqual(uid, '1_1');
+            sinon.assert.calledOnceWithExactly(createStub, mcpPage, { verbose: false });
+            assert.strictEqual(mcpPage.textSnapshot, snapshot);
+        });
+        it('regenerates textSnapshot when backendNodeId is not in existing snapshot', async () => {
+            const { mcpPage } = await createMcpPage();
+            mcpPage.textSnapshot = createSnapshotWithNodes([
+                { id: '1_1', backendNodeId: 10 },
+            ]);
+            const updatedSnapshot = createSnapshotWithNodes([
+                { id: '2_1', backendNodeId: 42 },
+            ]);
+            const createStub = sinon
+                .stub(TextSnapshot, 'create')
+                .resolves(updatedSnapshot);
+            const uid = await mcpPage.resolveBackendNodeId(42);
+            assert.strictEqual(uid, '2_1');
+            sinon.assert.calledOnceWithExactly(createStub, mcpPage, { verbose: false });
+            assert.strictEqual(mcpPage.textSnapshot, updatedSnapshot);
+        });
+        it('falls back to verbose textSnapshot when backendNodeId is not in non-verbose snapshot', async () => {
+            const { mcpPage } = await createMcpPage();
+            const nonVerboseSnapshot = createSnapshotWithNodes([{ id: '1_1', backendNodeId: 10 }], false);
+            const verboseSnapshot = createSnapshotWithNodes([{ id: '2_5', backendNodeId: 30 }], true);
+            const createStub = sinon.stub(TextSnapshot, 'create');
+            createStub.onFirstCall().resolves(nonVerboseSnapshot);
+            createStub.onSecondCall().resolves(verboseSnapshot);
+            const uid = await mcpPage.resolveBackendNodeId(30);
+            assert.strictEqual(uid, '2_5');
+            sinon.assert.calledTwice(createStub);
+            sinon.assert.calledWithExactly(createStub.firstCall, mcpPage, {
+                verbose: false,
+            });
+            sinon.assert.calledWithExactly(createStub.secondCall, mcpPage, {
+                verbose: true,
+            });
+            assert.strictEqual(mcpPage.textSnapshot, verboseSnapshot);
+        });
+    });
+    describe('getMatchedStylesForUid()', () => {
+        const server = serverHooks();
+        function getSelectors(matchedStyles) {
+            const styles = matchedStyles.nodeStyles();
+            assert.ok(styles.length > 0);
+            const selectors = [];
+            for (const s of styles) {
+                if (s.parentRule instanceof DevTools.CSSRule.CSSStyleRule) {
+                    selectors.push(s.parentRule.selectorText());
+                }
+            }
+            return selectors;
+        }
+        async function getSelectorsForUid(uid, mcpPage) {
+            const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+            assert.ok(matchedStyles);
+            return getSelectors(matchedStyles);
+        }
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('throws when snapshot has not been captured', async () => {
+            const { mcpPage } = await createMcpPage();
+            await assert.rejects(() => mcpPage.getMatchedStylesForUid('node_1'), /No snapshot found for page/);
+        });
+        it('throws when element uid is not found in snapshot', async () => {
+            const { mcpPage } = await createMcpPage();
+            const rootNode = {
+                id: '1_0',
+                role: 'root',
+                children: [],
+                elementHandle: async () => null,
+            };
+            mcpPage.textSnapshot = new TextSnapshot({
+                root: rootNode,
+                idToNode: new Map(),
+                snapshotId: '1',
+                hasSelectedElement: false,
+                verbose: false,
+            });
+            await assert.rejects(() => mcpPage.getMatchedStylesForUid('node_1'), /Element uid "node_1" not found on page/);
+        });
+        it('throws when element has no backendNodeId', async () => {
+            const { mcpPage } = await createMcpPage();
+            const node = {
+                id: '1_1',
+                role: 'button',
+                children: [],
+                elementHandle: async () => null,
+            };
+            const idToNode = new Map([['node_1', node]]);
+            mcpPage.textSnapshot = new TextSnapshot({
+                root: node,
+                idToNode,
+                snapshotId: '1',
+                hasSelectedElement: false,
+                verbose: false,
+            });
+            await assert.rejects(() => mcpPage.getMatchedStylesForUid('node_1'), /Failed to resolve backend node ID for element with uid "node_1"/);
+        });
+        it('retrieves matched styles across elements, shadow roots, and iframes', async () => {
+            server.addHtmlRoute('/iframe_content.html', html `
+          <style>
+            .frame-btn {
+              background-color: purple;
+              color: white;
+            }
+          </style>
+          <button
+            id="iframe-btn"
+            class="frame-btn"
+            >Iframe Button</button
+          >
+        `);
+            server.addHtmlRoute('/styles_combined_test.html', html `
+          <style>
+            .btn-primary {
+              color: blue;
+              font-size: 14px;
+            }
+            #my-button {
+              color: green;
+            }
+          </style>
+          <button
+            id="my-button"
+            class="btn-primary"
+            style="font-size: 16px; padding: 8px;"
+          >
+            Click Me
+          </button>
+          <div id="open-host"></div>
+          <div id="closed-host"></div>
+          <iframe
+            id="child-frame"
+            src="/iframe_content.html"
+          ></iframe>
+          <script>
+            const openHost = document.getElementById('open-host');
+            const openRoot = openHost.attachShadow({mode: 'open'});
+            openRoot.innerHTML = \`
+              <style>
+                .shadow-btn-open {
+                  color: rgb(100, 200, 50);
+                }
+              </style>
+              <button class="shadow-btn-open">Open Shadow Button</button>
+            \`;
+
+            const closedHost = document.getElementById('closed-host');
+            const closedRoot = closedHost.attachShadow({mode: 'closed'});
+            closedRoot.innerHTML = \`
+              <style>
+                .shadow-btn-closed {
+                  color: rgb(200, 50, 100);
+                }
+              </style>
+              <button class="shadow-btn-closed">Closed Shadow Button</button>
+            \`;
+          </script>
+        `);
+            await withMcpContext(async (_, context) => {
+                const mcpPage = context.getSelectedMcpPage();
+                await mcpPage.pptrPage.goto(server.getRoute('/styles_combined_test.html'));
+                const frame = await mcpPage.pptrPage.waitForFrame(f => f.url() === server.getRoute('/iframe_content.html'));
+                if (!frame) {
+                    throw new Error('Child frame not found');
+                }
+                await frame.waitForSelector('#iframe-btn');
+                mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
+                // 1. Regular element
+                {
+                    const uid = getUidForNode(mcpPage, 'Click Me');
+                    const matchedStyles = await mcpPage.getMatchedStylesForUid(uid);
+                    const inlineStyle = matchedStyles
+                        .nodeStyles()
+                        .find(s => s.type === DevTools.CSSStyleDeclaration.Type.Inline);
+                    assert.ok(inlineStyle);
+                    const selectors = getSelectors(matchedStyles);
+                    assert.ok(selectors.includes('#my-button'));
+                    assert.ok(selectors.includes('.btn-primary'));
+                }
+                // 2. Open shadow root
+                {
+                    const uid = getUidForNode(mcpPage, 'Open Shadow Button');
+                    const selectors = await getSelectorsForUid(uid, mcpPage);
+                    assert.ok(selectors.includes('.shadow-btn-open'));
+                }
+                // 3. Closed shadow root
+                {
+                    const uid = getUidForNode(mcpPage, 'Closed Shadow Button');
+                    const selectors = await getSelectorsForUid(uid, mcpPage);
+                    assert.ok(selectors.includes('.shadow-btn-closed'));
+                }
+                // 4. Iframe
+                {
+                    const uid = getUidForNode(mcpPage, 'Iframe Button');
+                    const selectors = await getSelectorsForUid(uid, mcpPage);
+                    assert.ok(selectors.includes('.frame-btn'));
+                }
+            });
+        });
+    });
+    describe('executeThirdPartyDeveloperTool()', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('appends "Tool returned no result." and skips cleanup evaluate when the tool returns undefined and stashed is 0', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const response = createMockMcpResponse();
+            pptrPage.evaluate.resolves({ result: undefined, stashed: 0 });
+            await mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response);
+            sinon.assert.calledOnce(pptrPage.evaluate);
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'Tool returned no result.');
+        });
+        it('preserves the original evaluateHandle error when stashedElements cleanup fails', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const response = createMockMcpResponse();
+            pptrPage.evaluate
+                .onFirstCall()
+                .resolves({ result: '{"stashedId":"stashed-0"}', stashed: 1 });
+            pptrPage.evaluateHandle.rejects(new Error('Execution context was destroyed'));
+            pptrPage.evaluate.onSecondCall().rejects(new Error('Target closed'));
+            await assert.rejects(() => mcpPage.executeThirdPartyDeveloperTool('my-tool', {}, response), /Execution context was destroyed/);
+            sinon.assert.calledTwice(pptrPage.evaluate);
+            sinon.assert.notCalled(response.appendResponseLine);
+        });
+    });
+    describe('WebMCP third-party developer tools', () => {
+        afterEach(() => {
+            sinon.restore();
+        });
+        it('filters WebMCP tools by annotations.debugging in getToolGroups()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const debuggingTool = createMockWebMCPTool({
+                name: 'debug_tool',
+                description: 'A debugging WebMCP tool',
+                inputSchema: { type: 'object' },
+                annotations: { debugging: true },
+            });
+            const nonDebuggingTool = createMockWebMCPTool({
+                name: 'user_tool',
+                description: 'A non-debugging WebMCP tool',
+                inputSchema: { type: 'object' },
+                annotations: { debugging: false },
+            });
+            const unannotatedTool = createMockWebMCPTool({
+                name: 'legacy_webmcp_tool',
+                description: 'A WebMCP tool without debugging annotation',
+                inputSchema: { type: 'object' },
+            });
+            pptrPage.webmcp.tools.returns([
+                debuggingTool,
+                nonDebuggingTool,
+                unannotatedTool,
+            ]);
+            const groups = await mcpPage.getToolGroups();
+            assert.deepStrictEqual(groups, [
+                {
+                    name: 'WebMCP Tools',
+                    description: 'Tools exposed via WebMCP',
+                    tools: [
+                        {
+                            name: 'debug_tool',
+                            description: 'A debugging WebMCP tool',
+                            inputSchema: { type: 'object' },
+                        },
+                    ],
+                },
+            ]);
+            assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), groups);
+        });
+        it('combines WebMCP debugging tools and devtoolstooldiscovery tools in getThirdPartyDeveloperTools()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const debuggingTool = createMockWebMCPTool({
+                name: 'debug_tool',
+                description: 'A debugging WebMCP tool',
+                annotations: { debugging: true },
+            });
+            pptrPage.webmcp.tools.returns([debuggingTool]);
+            mcpPage.eventBasedThirdPartyTools = [
+                {
+                    name: 'Custom Tools',
+                    description: 'Tools exposed via event',
+                    tools: [
+                        {
+                            name: 'custom_tool',
+                            description: 'A custom tool',
+                            inputSchema: {
+                                type: 'object',
+                                properties: {
+                                    el: {
+                                        properties: { uid: { type: 'string' } },
+                                        required: ['uid'],
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            ];
+            const groups = mcpPage.getThirdPartyDeveloperTools();
+            assert.deepStrictEqual(groups, [
+                {
+                    name: 'WebMCP Tools',
+                    description: 'Tools exposed via WebMCP',
+                    tools: [
+                        {
+                            name: 'debug_tool',
+                            description: 'A debugging WebMCP tool',
+                            inputSchema: {},
+                        },
+                    ],
+                },
+                {
+                    name: 'Custom Tools',
+                    description: 'Tools exposed via event',
+                    tools: [
+                        {
+                            name: 'custom_tool',
+                            description: 'A custom tool',
+                            inputSchema: {
+                                type: 'object',
+                                properties: {
+                                    el: {
+                                        properties: { uid: { type: 'string' } },
+                                        required: ['uid'],
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+            ]);
+        });
+        it('reflects dynamically added and removed WebMCP debugging tools in getThirdPartyDeveloperTools()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), []);
+            const debuggingTool = createMockWebMCPTool({
+                name: 'dynamic_debug_tool',
+                description: 'Added dynamically',
+                inputSchema: { type: 'object' },
+                annotations: { debugging: true },
+            });
+            pptrPage.webmcp.tools.returns([debuggingTool]);
+            assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), [
+                {
+                    name: 'WebMCP Tools',
+                    description: 'Tools exposed via WebMCP',
+                    tools: [
+                        {
+                            name: 'dynamic_debug_tool',
+                            description: 'Added dynamically',
+                            inputSchema: { type: 'object' },
+                        },
+                    ],
+                },
+            ]);
+            pptrPage.webmcp.tools.returns([]);
+            assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), []);
+        });
+        it('executes a WebMCP tool in executeThirdPartyDeveloperTool()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const mockTool = createMockWebMCPTool({
+                name: 'webmcp_tool',
+                description: 'A WebMCP tool',
+                annotations: { debugging: true },
+            });
+            mockTool.execute.resolves({
+                id: 'call-1',
+                status: 'Completed',
+                output: { result: 42 },
+            });
+            pptrPage.webmcp.tools.returns([mockTool]);
+            const response = createMockMcpResponse();
+            await mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', { x: 21 }, response);
+            sinon.assert.calledOnceWithExactly(mockTool.execute, { x: 21 });
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, JSON.stringify({ result: 42 }, null, 2));
+            sinon.assert.notCalled(pptrPage.evaluate);
+        });
+        it('appends "Tool returned no result." when WebMCP tool output is undefined in executeThirdPartyDeveloperTool()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const mockTool = createMockWebMCPTool({
+                name: 'webmcp_void_tool',
+                annotations: { debugging: true },
+            });
+            mockTool.execute.resolves({
+                id: 'call-1',
+                status: 'Completed',
+                output: undefined,
+            });
+            pptrPage.webmcp.tools.returns([mockTool]);
+            const response = createMockMcpResponse();
+            await mcpPage.executeThirdPartyDeveloperTool('webmcp_void_tool', {}, response);
+            sinon.assert.calledOnceWithExactly(mockTool.execute, {});
+            sinon.assert.calledOnceWithExactly(response.appendResponseLine, 'Tool returned no result.');
+        });
+        it('does not execute non-debugging WebMCP tools in executeThirdPartyDeveloperTool()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const nonDebuggingTool = createMockWebMCPTool({
+                name: 'user_tool',
+                annotations: { debugging: false },
+            });
+            pptrPage.webmcp.tools.returns([nonDebuggingTool]);
+            pptrPage.evaluate.rejects(new Error('No tools found on the page'));
+            const response = createMockMcpResponse();
+            await assert.rejects(() => mcpPage.executeThirdPartyDeveloperTool('user_tool', {}, response), /No tools found on the page/);
+            sinon.assert.notCalled(nonDebuggingTool.execute);
+        });
+        it('throws when WebMCP tool execution fails in executeThirdPartyDeveloperTool()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const mockTool = createMockWebMCPTool({
+                name: 'webmcp_tool',
+                annotations: { debugging: true },
+            });
+            mockTool.execute.resolves({
+                id: 'call-1',
+                status: 'Error',
+                errorText: 'Execution failed in page',
+            });
+            pptrPage.webmcp.tools.returns([mockTool]);
+            const response = createMockMcpResponse();
+            await assert.rejects(() => mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response), /Execution failed in page/);
+        });
+        it('throws the exception description when the WebMCP tool throws in executeThirdPartyDeveloperTool()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const mockTool = createMockWebMCPTool({
+                name: 'webmcp_tool',
+                annotations: { debugging: true },
+            });
+            mockTool.execute.resolves({
+                id: 'call-1',
+                status: 'Error',
+                errorText: '',
+                exception: {
+                    type: 'object',
+                    subtype: 'error',
+                    className: 'Error',
+                    description: 'Error: boom\n    at foo (app.js:1:1)',
+                    objectId: '1',
+                },
+            });
+            pptrPage.webmcp.tools.returns([mockTool]);
+            const response = createMockMcpResponse();
+            await assert.rejects(() => mcpPage.executeThirdPartyDeveloperTool('webmcp_tool', {}, response), { message: 'Error: boom\n    at foo (app.js:1:1)' });
+        });
+        it('excludes debugging WebMCP tools from getWebMcpTools()', async () => {
+            const { mcpPage, pptrPage } = await createMcpPage();
+            const debuggingTool = createMockWebMCPTool({
+                name: 'debug_tool',
+                description: 'A debugging WebMCP tool',
+                annotations: { debugging: true },
+            });
+            const nonDebuggingTool = createMockWebMCPTool({
+                name: 'user_tool',
+                description: 'A non-debugging WebMCP tool',
+                annotations: { debugging: false },
+            });
+            const unannotatedTool = createMockWebMCPTool({
+                name: 'legacy_webmcp_tool',
+                description: 'A WebMCP tool without debugging annotation',
+            });
+            pptrPage.webmcp.tools.returns([
+                debuggingTool,
+                nonDebuggingTool,
+                unannotatedTool,
+            ]);
+            assert.deepStrictEqual(mcpPage.getWebMcpTools(), [
+                nonDebuggingTool,
+                unannotatedTool,
+            ]);
+        });
+    });
+});
+//# sourceMappingURL=McpPage.test.js.map

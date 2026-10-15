@@ -1,0 +1,90 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import { DevTools } from '../third_party/index.js';
+import { stripUnderscoreBeforeNumber } from './transformation.js';
+const { StringUtilities } = DevTools.Platform;
+/**
+ * For enums, log the value as uppercase.
+ * We're going to have an enum for such flags with choices represented
+ * as an `enum` where the keys of the enum will map to the uppercase `choice`.
+ */
+function formatEnumChoice(snakeCaseName, choice) {
+    return stripUnderscoreBeforeNumber(`${snakeCaseName}_${choice}`).toUpperCase();
+}
+/**
+ * Computes telemetry flag usage from parsed arguments and CLI options.
+ *
+ * Iterates over the defined CLI options to construct a payload:
+ * - Flag names are converted to snake_case (e.g. `browserUrl` -> `browser_url`).
+ * - A flag is logged as `{flag_name}_present` if:
+ *    - It has no default value, OR
+ *    - The provided value differs from the default value.
+ * - Boolean flags are logged with their literal value.
+ * - String flags with defined `choices` (Enums) are logged as their uppercase value.
+ *
+ * IMPORTANT: keep getPossibleFlagMetrics() in sync with this function.
+ */
+export function computeFlagUsage(args, options) {
+    const usage = {};
+    for (const [flagName, config] of Object.entries(options)) {
+        const value = args[flagName];
+        const snakeCaseName = stripUnderscoreBeforeNumber(StringUtilities.toSnakeCase(flagName));
+        // If there isn't a default value provided for the flag,
+        // we're going to log whether it's present on the args user
+        // provided or not. If there is a default value, we only log presence
+        // if the value differs from the default, implying explicit user intent.
+        if (!('default' in config) || value !== config.default) {
+            usage[`${snakeCaseName}_present`] = value !== undefined && value !== null;
+        }
+        if (config.type === 'boolean' && typeof value === 'boolean') {
+            // For boolean options, we're going to log the value directly.
+            usage[snakeCaseName] = value;
+        }
+        else if (config.type === 'string' &&
+            typeof value === 'string' &&
+            'choices' in config &&
+            config.choices) {
+            usage[snakeCaseName] = formatEnumChoice(snakeCaseName, value);
+        }
+    }
+    return usage;
+}
+/**
+ * Computes the list of possible flag metrics based on the CLI options.
+ *
+ * IMPORTANT: keep this function in sync with computeFlagUsage().
+ */
+export function getPossibleFlagMetrics(options) {
+    const metrics = [];
+    for (const [flagName, config] of Object.entries(options)) {
+        const snakeCaseName = stripUnderscoreBeforeNumber(StringUtilities.toSnakeCase(flagName));
+        // _present is always a possible metric
+        metrics.push({
+            name: `${snakeCaseName}_present`,
+            flagType: 'boolean',
+        });
+        if (config.type === 'boolean') {
+            metrics.push({
+                name: snakeCaseName,
+                flagType: 'boolean',
+            });
+        }
+        else if (config.type === 'string' &&
+            'choices' in config &&
+            config.choices) {
+            metrics.push({
+                name: snakeCaseName,
+                flagType: 'enum',
+                choices: [
+                    `${snakeCaseName.toUpperCase()}_UNSPECIFIED`,
+                    ...config.choices.map(choice => formatEnumChoice(snakeCaseName, choice)),
+                ],
+            });
+        }
+    }
+    return metrics;
+}
+//# sourceMappingURL=flagUtils.js.map

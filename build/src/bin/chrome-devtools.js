@@ -1,0 +1,211 @@
+#!/usr/bin/env node
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import process from 'node:process';
+import { startDaemon, stopDaemon, sendCommand, handleResponse, verifyDaemonVersion, } from '../daemon/client.js';
+import { isDaemonRunning, serializeArgs, assertValidSessionId, } from '../daemon/utils.js';
+import { logDisclaimers } from '../index.js';
+import { hideBin, yargs } from '../third_party/index.js';
+import { checkForUpdates } from '../utils/check-for-updates.js';
+import { VERSION } from '../version.js';
+import { buildCommand, getCommandArgSpec, shieldLiteralArgs, } from '../config/cli-commands.js';
+import { commands } from '../config/cli-options.js';
+import { mcpOptions, getCliOptions } from '../config/mcp-options.js';
+import { ConfigParser } from '../config/ConfigParser.js';
+process.title = 'chrome-devtools';
+await checkForUpdates('Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.');
+const DEFAULT_CLI_ARGS = ['--viaCli'];
+async function start(args, sessionId, stopExisting = false) {
+    const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
+    // Validates the arguments and the config file before starting the daemon.
+    const parsedArgs = new ConfigParser(VERSION, [
+        process.execPath,
+        process.argv[1],
+        ...combinedArgs,
+    ]).parse();
+    if (stopExisting && isDaemonRunning(sessionId)) {
+        await stopDaemon(sessionId);
+    }
+    await startDaemon(combinedArgs, sessionId);
+    logDisclaimers(parsedArgs);
+}
+const { argv: cliArgs, restore: restoreLiteralArg } = shieldLiteralArgs(hideBin(process.argv), commandName => {
+    const commandDef = commands[commandName];
+    return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
+});
+const y = yargs(cliArgs)
+    .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
+    .scriptName('chrome-devtools')
+    .showHelpOnFail(true)
+    .usage('chrome-devtools <command> [...args] --flags')
+    .usage(`Run 'chrome-devtools <command> --help' for help on the specific command.`)
+    .option('sessionId', {
+    type: 'string',
+    description: 'Session ID for daemon scoping',
+    default: process.env.CD4A_INTERNAL_DAEMON_SESSION_ID || '',
+    hidden: true,
+    coerce: (sessionId) => {
+        assertValidSessionId(sessionId);
+        return sessionId;
+    },
+})
+    .demandCommand()
+    .version(VERSION)
+    .strict()
+    .help(true)
+    .wrap(120)
+    .fail((msg, err) => {
+    if (msg) {
+        console.error('Error:', msg);
+        if (msg.includes('Not enough non-option arguments') ||
+            msg.includes('Unknown argument') ||
+            msg.includes('Unknown arguments')) {
+            console.error('\n=========================================');
+            console.error('💡 TIP FOR AI AGENT / DEVELOPER:');
+            console.error('In the `chrome-devtools` CLI:');
+            console.error('1. Required parameters MUST be passed as positional arguments (without flags).');
+            console.error('   - INCORRECT: chrome-devtools click --pageId 1 --uid "1_2"');
+            console.error('   - CORRECT:   chrome-devtools click 1 "1_2"');
+            console.error('   - CORRECT:   chrome-devtools evaluate_script "() => document.title" --pageId 1');
+            console.error('2. Optional parameters are passed as double-dash options/flags (e.g. --dblClick true), except optional positional parameters shown in command help.');
+            console.error('3. Make sure to escape quotes properly for your shell environment.');
+            console.error('Run `chrome-devtools <command> --help` to see exact positional and optional parameters.');
+            console.error('=========================================');
+        }
+    }
+    else if (err) {
+        console.error(err);
+    }
+    process.exit(1);
+});
+y.command('start', 'Start or restart chrome-devtools-mcp', y => y
+    .options(getCliOptions())
+    .example('$0 start --browserUrl http://localhost:9222', 'Start the server connecting to an existing browser')
+    .strict(), async (argv) => {
+    const args = serializeArgs(getCliOptions(), argv);
+    await start(args, argv.sessionId, /* stopExisting= */ true);
+    process.exit(0);
+}).strict(); // Re-enable strict validation for other commands; this is applied to the yargs instance itself
+y.command('status', 'Checks if chrome-devtools-mcp is running', y => y, async (argv) => {
+    if (isDaemonRunning(argv.sessionId)) {
+        console.log('chrome-devtools-mcp daemon is running.');
+        const response = await sendCommand({
+            method: 'status',
+        }, argv.sessionId);
+        if (response.success) {
+            const data = JSON.parse(response.result);
+            console.log(`pid=${data.pid} socket=${data.socketPath} start-date=${data.startDate} version=${data.version}`);
+            console.log(`args=${JSON.stringify(data.args)}`);
+            if (data.version !== VERSION) {
+                console.warn(`Warning: Daemon server version (${data.version}) does not match CLI version (${VERSION}). Run 'chrome-devtools start' to update and restart the daemon.`);
+            }
+        }
+        else {
+            console.error('Error:', response.error);
+            process.exit(1);
+        }
+    }
+    else {
+        console.log('chrome-devtools-mcp daemon is not running.');
+    }
+    process.exit(0);
+});
+y.command('stop', 'Stop chrome-devtools-mcp if any', y => y, async (argv) => {
+    const sessionId = argv.sessionId;
+    if (!isDaemonRunning(sessionId)) {
+        process.exit(0);
+    }
+    await stopDaemon(sessionId);
+    process.exit(0);
+});
+for (const [commandName, commandDef] of Object.entries(commands)) {
+    const args = commandDef.args;
+    const { command, usage } = buildCommand(commandName, args);
+    y.command(command, commandDef.description, y => {
+        y.usage(usage);
+        y.option('output-format', {
+            choices: ['md', 'json'],
+            default: 'md',
+        });
+        for (const [argName, opt] of Object.entries(args)) {
+            const type = opt.type === 'integer' || opt.type === 'number'
+                ? 'number'
+                : opt.type === 'boolean'
+                    ? 'boolean'
+                    : opt.type === 'array'
+                        ? 'array'
+                        : 'string';
+            if (opt.positional) {
+                const options = {
+                    describe: opt.description,
+                    type: type,
+                };
+                if (opt.default !== undefined) {
+                    options.default = opt.default;
+                }
+                if (opt.enum) {
+                    options.choices = opt.enum;
+                }
+                y.positional(argName, options);
+            }
+            else {
+                const options = {
+                    describe: opt.description,
+                    type: type,
+                };
+                if (opt.default !== undefined) {
+                    // Document the default in --help without populating argv, so the
+                    // daemon applies its current tool schema and config defaults.
+                    options.defaultDescription = JSON.stringify(opt.default);
+                }
+                if (opt.enum) {
+                    options.choices = opt.enum;
+                }
+                y.option(argName, options);
+            }
+        }
+    }, async (argv) => {
+        const sessionId = argv.sessionId;
+        try {
+            const versionWarningPromise = isDaemonRunning(sessionId)
+                ? verifyDaemonVersion(sessionId, VERSION)
+                : Promise.resolve(undefined);
+            if (!isDaemonRunning(sessionId)) {
+                await start(serializeArgs(mcpOptions, argv), sessionId);
+            }
+            const commandArgs = {};
+            for (const argName of Object.keys(args)) {
+                if (argName in argv) {
+                    commandArgs[argName] = restoreLiteralArg(argv[argName]);
+                }
+            }
+            const response = await sendCommand({
+                method: 'invoke_tool',
+                tool: commandName,
+                args: commandArgs,
+            }, sessionId);
+            if (response.success) {
+                console.log(await handleResponse(JSON.parse(response.result), argv['output-format']));
+            }
+            else {
+                console.error('Error:', response.error);
+            }
+            const versionWarning = await versionWarningPromise;
+            if (versionWarning) {
+                console.warn(versionWarning);
+            }
+            if (!response.success) {
+                process.exit(1);
+            }
+        }
+        catch (error) {
+            console.error('Failed to execute command:', error);
+            process.exit(1);
+        }
+    });
+}
+await y.parse();
+//# sourceMappingURL=chrome-devtools.js.map

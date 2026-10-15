@@ -1,0 +1,166 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import assert from 'node:assert';
+import { spawn } from 'node:child_process';
+import { describe, it } from 'node:test';
+import { executablePath } from 'puppeteer';
+// Once shutdown is signalled, the server should be fully gone within this
+// budget. The actual fast path is well under 500ms; the budget is set to be
+// generous against CI noise without being so loose that it would hide a hang.
+const SHUTDOWN_BUDGET_MS = 10000;
+// Outer test timeout. If exit doesn't happen within this, treat as a hang
+// (the bug we're guarding against) and SIGKILL the subprocess.
+const EXIT_TIMEOUT_MS = 15000;
+async function spawnServer() {
+    const child = spawn('node', [
+        'build/src/bin/chrome-devtools-mcp.js',
+        '--headless',
+        '--isolated',
+        '--executable-path',
+        await executablePath(),
+    ], {
+        env: {
+            ...process.env,
+            CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    // Drain stderr to avoid pipe-buffer backpressure stalling the server.
+    child.stderr.on('data', () => {
+        // discard
+    });
+    // Drain stdout to avoid pipe-buffer backpressure stalling the server during shutdown.
+    child.stdout.on('data', () => {
+        // discard
+    });
+    return child;
+}
+async function waitForExit(child, timeoutMs) {
+    const start = Date.now();
+    return await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            child.kill('SIGKILL');
+            reject(new Error(`server did not exit within ${timeoutMs}ms`));
+        }, timeoutMs);
+        child.once('exit', (code, signal) => {
+            clearTimeout(timer);
+            resolve({ code, signal, elapsedMs: Date.now() - start });
+        });
+    });
+}
+async function rpc(child, msg) {
+    const id = Math.floor(Math.random() * 1e9);
+    const payload = JSON.stringify({ jsonrpc: '2.0', id, ...msg }) + '\n';
+    return await new Promise((resolve, reject) => {
+        let buf = '';
+        const onData = (chunk) => {
+            buf += chunk.toString();
+            const lines = buf.split('\n');
+            buf = lines.pop() ?? '';
+            for (const line of lines) {
+                if (!line.trim()) {
+                    continue;
+                }
+                try {
+                    const parsed = JSON.parse(line);
+                    if (parsed.id === id) {
+                        clearTimeout(timer);
+                        child.stdout.off('data', onData);
+                        child.off('exit', onExit);
+                        resolve(parsed);
+                        return;
+                    }
+                }
+                catch {
+                    // Not a JSON message; ignore.
+                }
+            }
+        };
+        const timer = setTimeout(() => {
+            child.stdout.off('data', onData);
+            child.off('exit', onExit);
+            reject(new Error(`RPC timeout: no response for method ${msg.method} within 60000ms`));
+        }, 60000);
+        child.stdout.on('data', onData);
+        const onExit = () => {
+            clearTimeout(timer);
+            child.stdout.off('data', onData);
+            reject(new Error('server exited before RPC response'));
+        };
+        child.once('exit', onExit);
+        child.stdin.write(payload);
+    });
+}
+function notify(child, msg) {
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...msg }) + '\n');
+}
+async function initializeAndLaunchBrowser(child) {
+    await rpc(child, {
+        method: 'initialize',
+        params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'shutdown-test', version: '0.0.1' },
+        },
+    });
+    notify(child, { method: 'notifications/initialized' });
+    // list_pages forces a real Chrome launch — this is what reproduces
+    // the hang in #2116. Without an active Chrome subprocess, stdin EOF
+    // would close the event loop on its own and shutdown would look fine
+    // even with broken handlers.
+    await rpc(child, {
+        method: 'tools/call',
+        params: {
+            name: 'list_pages',
+            arguments: {},
+        },
+    });
+}
+async function setupServerWithRetry() {
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        const child = await spawnServer();
+        try {
+            await initializeAndLaunchBrowser(child);
+            return child;
+        }
+        catch (e) {
+            lastError = e;
+            // If setup failed (e.g., Chrome hung on launch), kill the child and try again.
+            child.kill('SIGKILL');
+            // Wait briefly for OS cleanup.
+            await new Promise(r => setTimeout(r, 500));
+        }
+    }
+    throw lastError ?? new Error('Failed without an error');
+}
+describe('shutdown', () => {
+    it('exits within budget on stdin EOF after Chrome launch', async () => {
+        const child = await setupServerWithRetry();
+        child.stdin.end();
+        const { elapsedMs } = await waitForExit(child, EXIT_TIMEOUT_MS);
+        assert.ok(elapsedMs < SHUTDOWN_BUDGET_MS, `stdin-EOF shutdown took ${elapsedMs}ms (budget ${SHUTDOWN_BUDGET_MS}ms)`);
+    });
+    it('exits within budget on SIGTERM after Chrome launch', async () => {
+        const child = await setupServerWithRetry();
+        child.kill('SIGTERM');
+        const { elapsedMs } = await waitForExit(child, EXIT_TIMEOUT_MS);
+        assert.ok(elapsedMs < SHUTDOWN_BUDGET_MS, `SIGTERM shutdown took ${elapsedMs}ms (budget ${SHUTDOWN_BUDGET_MS}ms)`);
+    });
+    it('exits within budget on SIGINT after Chrome launch', async () => {
+        const child = await setupServerWithRetry();
+        child.kill('SIGINT');
+        const { elapsedMs } = await waitForExit(child, EXIT_TIMEOUT_MS);
+        assert.ok(elapsedMs < SHUTDOWN_BUDGET_MS, `SIGINT shutdown took ${elapsedMs}ms (budget ${SHUTDOWN_BUDGET_MS}ms)`);
+    });
+    it('exits within budget on SIGHUP after Chrome launch', async () => {
+        const child = await setupServerWithRetry();
+        child.kill('SIGHUP');
+        const { elapsedMs } = await waitForExit(child, EXIT_TIMEOUT_MS);
+        assert.ok(elapsedMs < SHUTDOWN_BUDGET_MS, `SIGHUP shutdown took ${elapsedMs}ms (budget ${SHUTDOWN_BUDGET_MS}ms)`);
+    });
+});
+//# sourceMappingURL=shutdown.test.js.map
