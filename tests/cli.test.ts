@@ -578,7 +578,7 @@ describe('cli args parsing', () => {
         parseConfig([
           String.raw`--blockedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
     );
 
     assert.throws(
@@ -586,27 +586,27 @@ describe('cli args parsing', () => {
         parseConfig([
           String.raw`--allowedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
     );
 
     assert.throws(
       () => parseConfig(['--blockedUrlPattern=*://127.0.0.1::port/secret']),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a ":name" named group is not enforced/,
     );
 
     assert.throws(
       () => parseConfig(['--allowedUrlPattern=*://127.0.0.1::port/secret']),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a ":name" named group is not enforced/,
     );
 
     assert.throws(
       () => parseConfig(['--blockedUrlPattern=*://127.0.0.*/*']),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a partial IPv4 wildcard is not enforced/,
     );
 
     assert.throws(
       () => parseConfig(['--allowedUrlPattern=*://127.0.0.*/*']),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a partial IPv4 wildcard is not enforced/,
     );
   });
 
@@ -617,7 +617,7 @@ describe('cli args parsing', () => {
           '--blocked-url-pattern=https://a.com/*',
           String.raw`--blocked-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
     );
     assert.throws(
       () =>
@@ -625,7 +625,7 @@ describe('cli args parsing', () => {
           '--allowed-url-pattern=https://a.com/*',
           String.raw`--allowed-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
     );
   });
 

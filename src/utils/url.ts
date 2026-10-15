@@ -132,25 +132,30 @@ function hasPartialIpv4Hostname(pattern: string): boolean {
 }
 
 /**
- * Finds the first pattern that Chrome can't enforce on redirects or subresources:
- * - Any pattern containing a regexp group (for example `(foo|bar)`).
- * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/path`).
- * - Any pattern with a partial IPv4 wildcard in the hostname (for example `127.0.0.*`).
+ * Validates that every pattern can be enforced by Chrome on redirects and subresources:
+ * - Rejects patterns with a partial IPv4 wildcard in the hostname (for example `127.0.0.*`).
+ * - Rejects patterns containing a regexp group (for example `(foo|bar)`).
+ * - Rejects patterns containing a named group (`:name`, for example `*://127.0.0.1::port/path`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
- * @returns The first unenforceable pattern, or undefined if all are valid.
- * @throws Error if a pattern's syntax is invalid (via `new URLPattern`).
+ * @param flagName The CLI flag name used in error messages.
+ * @throws Error if a pattern's syntax is invalid (via `new URLPattern`) or uses an unenforceable construct.
  */
-export function findUnenforceablePattern(
+export function validateUrlPatterns(
   patterns: string[],
-): string | undefined {
+  flagName: string,
+): void {
   for (const raw of patterns) {
     if (hasPartialIpv4Hostname(raw)) {
-      return raw;
+      throw new Error(
+        `Invalid ${flagName} "${raw}": a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact IPv4 address or a "*" wildcard instead.`,
+      );
     }
     const parsed = new URLPattern(raw);
     if (parsed.hasRegExpGroups) {
-      return raw;
+      throw new Error(
+        `Invalid ${flagName} "${raw}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+      );
     }
     const components = [
       parsed.protocol,
@@ -163,10 +168,11 @@ export function findUnenforceablePattern(
       parsed.hash,
     ];
     if (components.some(hasNamedGroup)) {
-      return raw;
+      throw new Error(
+        `Invalid ${flagName} "${raw}": a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+      );
     }
   }
-  return undefined;
 }
 
 /**

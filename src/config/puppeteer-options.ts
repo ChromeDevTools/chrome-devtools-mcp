@@ -5,7 +5,7 @@
  */
 
 import type {YargsOptions} from '../third_party/index.js';
-import {findUnenforceablePattern} from '../utils/url.js';
+import {validateUrlPatterns} from '../utils/url.js';
 
 /**
  * Options that are applied through Puppeteer when launching or connecting to
@@ -51,12 +51,7 @@ export const puppeteerOptions = {
       if (arg === undefined || arg.length === 0) {
         return undefined;
       }
-      const pattern = findUnenforceablePattern(arg);
-      if (pattern) {
-        throw new Error(
-          `Invalid --blockedUrlPattern "${pattern}": a regexp group, a ":name" named group, or a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
-        );
-      }
+      validateUrlPatterns(arg, '--blockedUrlPattern');
       return arg;
     },
   },
@@ -74,12 +69,7 @@ export const puppeteerOptions = {
           'Invalid --allowedUrlPattern: at least one pattern is required.',
         );
       }
-      const pattern = findUnenforceablePattern(arg);
-      if (pattern) {
-        throw new Error(
-          `Invalid --allowedUrlPattern "${pattern}": a regexp group, a ":name" named group, or a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
-        );
-      }
+      validateUrlPatterns(arg, '--allowedUrlPattern');
       return arg;
     },
   },
