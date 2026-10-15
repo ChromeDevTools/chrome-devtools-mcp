@@ -278,16 +278,6 @@ export class McpServer {
         reconnected: this.#context !== undefined,
         categoryExtensions: this.#serverArgs.categoryExtensions,
         heapSnapshotManager: this.#heapSnapshotManager,
-        onNotification: (message: string) => {
-          void this.server
-            .sendLoggingMessage({
-              level: 'info',
-              data: message,
-            })
-            .catch(e => {
-              logger?.('Failed to send MCP notification', e);
-            });
-        },
       });
       this.#context.setRoots(this.#combinedRoots());
       if (this.#lastClientRoots === undefined) {

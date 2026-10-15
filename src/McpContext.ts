@@ -77,8 +77,6 @@ interface McpContextOptions {
   navigationTimeout?: number;
   // Whether extension tools and targets are enabled.
   categoryExtensions?: boolean;
-  // Callback when a notification should be emitted to MCP client.
-  onNotification?: (message: string) => void;
   // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
   heapSnapshotManager: HeapSnapshotManager;
 }
@@ -592,7 +590,6 @@ export class McpContext implements Context {
         ),
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
-        onNotification: this.#options.onNotification,
       });
     }
     this.#mcpPages.set(target, mcpPage);
