@@ -24,7 +24,14 @@ export interface HeapSnapshotAggregateData {
   totalSelfSize: number;
 }
 
+export interface HeapSnapshotDiff {
+  classDiffs: HeapSnapshotClassDiff[];
+  totals: HeapSnapshotClassDiffTotals;
+}
+
 export interface HeapSnapshotClassDiff {
+  /** Position in the full sorted diff list. Use as `classIndex`. */
+  index: number;
   className: string;
   addedCount: number;
   removedCount: number;
@@ -39,6 +46,15 @@ export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
   addedSelfSizes: number[];
   deletedIds: number[];
   deletedSelfSizes: number[];
+}
+
+export interface HeapSnapshotClassDiffTotals {
+  addedCount: number;
+  removedCount: number;
+  countDelta: number;
+  addedSize: number;
+  removedSize: number;
+  sizeDelta: number;
 }
 
 export type DuplicateStringGroup =
@@ -303,20 +319,39 @@ export class HeapSnapshotManager {
   async getClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]> {
+  ): Promise<HeapSnapshotDiff> {
     const rawDiffs = await this.#getSortedRawClassDiffs(
       baseFilePath,
       currentFilePath,
     );
-    return rawDiffs.map(rawDiff => ({
-      className: rawDiff.name,
-      addedCount: rawDiff.addedCount,
-      removedCount: rawDiff.removedCount,
-      countDelta: rawDiff.countDelta,
-      addedSize: rawDiff.addedSize,
-      removedSize: rawDiff.removedSize,
-      sizeDelta: rawDiff.sizeDelta,
-    }));
+    const classDiffs: HeapSnapshotClassDiff[] = [];
+    const totals: HeapSnapshotClassDiffTotals = {
+      addedCount: 0,
+      removedCount: 0,
+      countDelta: 0,
+      addedSize: 0,
+      removedSize: 0,
+      sizeDelta: 0,
+    };
+    for (const [index, rawDiff] of rawDiffs.entries()) {
+      classDiffs.push({
+        index,
+        className: rawDiff.name,
+        addedCount: rawDiff.addedCount,
+        removedCount: rawDiff.removedCount,
+        countDelta: rawDiff.countDelta,
+        addedSize: rawDiff.addedSize,
+        removedSize: rawDiff.removedSize,
+        sizeDelta: rawDiff.sizeDelta,
+      });
+      totals.addedCount += rawDiff.addedCount;
+      totals.removedCount += rawDiff.removedCount;
+      totals.countDelta += rawDiff.countDelta;
+      totals.addedSize += rawDiff.addedSize;
+      totals.removedSize += rawDiff.removedSize;
+      totals.sizeDelta += rawDiff.sizeDelta;
+    }
+    return {classDiffs, totals};
   }
 
   async getDetailedClassDiff(
@@ -335,6 +370,7 @@ export class HeapSnapshotManager {
       );
     }
     return {
+      index: classIndex,
       className: rawDiff.name,
       addedCount: rawDiff.addedCount,
       removedCount: rawDiff.removedCount,

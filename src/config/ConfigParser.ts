@@ -21,14 +21,11 @@ import {
   isReloadableOption,
   withoutDefaults,
 } from './mcp-options.js';
+import {getErrorMessage} from '../utils/errorHandling.js';
 import {ConfigLocator} from './ConfigLocator.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function getErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(

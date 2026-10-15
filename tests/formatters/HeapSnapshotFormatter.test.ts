@@ -162,6 +162,7 @@ describe('HeapSnapshotFormatter', () => {
     it('includes classes with balanced added and removed objects', () => {
       const summarized = [
         {
+          index: 0,
           className: 'Balanced',
           addedCount: 1,
           removedCount: 1,
@@ -188,6 +189,7 @@ describe('HeapSnapshotFormatter', () => {
     it('truncates className according to maxNameLength', () => {
       const summarized = [
         {
+          index: 0,
           className: 'LongClassName',
           addedCount: 1,
           removedCount: 0,
@@ -212,6 +214,7 @@ describe('HeapSnapshotFormatter', () => {
   describe('formatDiffDetails', () => {
     it('formats detailed diffs correctly', () => {
       const details = {
+        index: 0,
         className: 'MyClass',
         addedCount: 2,
         removedCount: 1,
@@ -242,6 +245,7 @@ describe('HeapSnapshotFormatter', () => {
 
     it('truncates className according to maxNameLength', () => {
       const details = {
+        index: 0,
         className: 'LongClassName',
         addedCount: 1,
         removedCount: 0,
@@ -644,13 +648,17 @@ describe('HeapSnapshotFormatter', () => {
 
     describe('formatDiffSummary and formatDiffDetails', () => {
       it('formats diff summary comparing heap-1 to heap-2', async t => {
-        const diffs = await manager.getClassDiffs(heap1Path, heap2Path);
-        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs, {}));
+        const {classDiffs} = await manager.getClassDiffs(heap1Path, heap2Path);
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatDiffSummary(classDiffs, {}),
+        );
       });
 
       it('formats diff summary comparing heap-2 to heap-3', async t => {
-        const diffs = await manager.getClassDiffs(heap2Path, heap3Path);
-        t.assert.snapshot(HeapSnapshotFormatter.formatDiffSummary(diffs, {}));
+        const {classDiffs} = await manager.getClassDiffs(heap2Path, heap3Path);
+        t.assert.snapshot(
+          HeapSnapshotFormatter.formatDiffSummary(classDiffs, {}),
+        );
       });
 
       it('formats detailed diff comparing heap-1 to heap-2 with classIndex filter', async t => {

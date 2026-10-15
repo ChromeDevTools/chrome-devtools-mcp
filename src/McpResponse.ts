@@ -34,7 +34,9 @@ import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
+  HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
+  HeapSnapshotDiff,
   DuplicateStringGroup,
 } from './processors/HeapSnapshotManager.js';
 import type {McpContext} from './McpContext.js';
@@ -113,7 +115,7 @@ export class McpResponse implements Response {
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
-    classDiffs?: HeapSnapshotClassDiff[];
+    diff?: HeapSnapshotDiff;
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
     objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
@@ -458,13 +460,14 @@ export class McpResponse implements Response {
   }
 
   setHeapSnapshotClassDiffs(
-    classDiffs: HeapSnapshotClassDiff[],
-    options?: HeapSnapshotFormatOptions,
+    diff: HeapSnapshotDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
-      classDiffs,
+      diff,
+      pagination: options,
       formatOptions: options,
     };
   }
@@ -917,12 +920,13 @@ export class McpResponse implements Response {
           objectCount: number;
           totalSelfSize: number;
         };
+        classDiffStats?: HeapSnapshotClassDiffTotals;
       };
       heapSnapshotAggregates?: readonly object[];
       heapSnapshotNodes?: readonly object[];
       heapSnapshotRetainingPaths?: object;
       heapSnapshotDominators?: readonly object[];
-      heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
+      heapSnapshotClassDiffs?: readonly HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
       heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
@@ -1453,23 +1457,32 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         }
         structuredContent.heapSnapshotDominators = dominators;
       }
-      const classDiffs = this.#heapSnapshotOptions.classDiffs;
-      if (classDiffs) {
+      const diff = this.#heapSnapshotOptions.diff;
+      if (diff) {
         response.push('### Heap Snapshot Diff');
+        response.push(HeapSnapshotFormatter.formatDiffTotals(diff.totals));
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.classDiffStats = diff.totals;
+        const paginationData = this.#dataWithPagination(
+          diff.classDiffs,
+          this.#heapSnapshotOptions.pagination,
+        );
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
         response.push(
           compactEncode
             ? compactEncode(
-                classDiffs.map(diff => ({
+                paginationData.items.map(diff => ({
                   ...diff,
                   className: formatName(diff.className, formatOptions),
                 })),
               )
             : HeapSnapshotFormatter.formatDiffSummary(
-                classDiffs,
+                paginationData.items,
                 formatOptions,
               ),
         );
-        structuredContent.heapSnapshotClassDiffs = classDiffs;
+        structuredContent.heapSnapshotClassDiffs = paginationData.items;
       }
       const detailedClassDiff = this.#heapSnapshotOptions.detailedClassDiff;
       if (detailedClassDiff) {
