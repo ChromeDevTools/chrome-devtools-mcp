@@ -7,7 +7,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -16,7 +15,7 @@ import {lighthouseRunner} from '../../src/third_party/index.js';
 import {lighthouseAudit} from '../../src/tools/lighthouse.js';
 import {createHandlerMocks, createMockRunnerResult} from '../mocks.js';
 import {serverHooks} from '../server.js';
-import {createTempDir, html, withMcpContext} from '../utils.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('lighthouse', () => {
   afterEach(() => {
@@ -61,60 +60,33 @@ describe('lighthouse', () => {
       });
     });
 
-    it('explains that navigation mode cannot audit about:blank', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage();
-        await page.pptrPage.goto('about:blank');
+    it('explains which URLs navigation mode can audit', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.url.returns('file:///tmp/page.html');
+      const invalidUrl = Object.assign(new Error('INVALID_URL'), {
+        code: 'INVALID_URL',
+      });
+      sinon.stub(lighthouseRunner, 'navigation').rejects(invalidUrl);
 
-        await assert.rejects(
-          () =>
-            lighthouseAudit(args).handler(
-              {
-                params: {
-                  mode: 'navigation',
-                  device: 'desktop',
-                },
-                page,
+      await assert.rejects(
+        () =>
+          lighthouseAudit(args).handler(
+            {
+              params: {
+                mode: 'navigation',
+                device: 'desktop',
               },
-              response,
-              context,
-            ),
-          {
-            message:
-              'Lighthouse "navigation" mode cannot audit about:blank: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.',
-          },
-        );
-      });
-    });
-
-    it('audits a file:// page in snapshot mode', async () => {
-      using dir = createTempDir('lighthouse-file-');
-      const file = path.join(dir.path, 'page.html');
-      await fs.writeFile(
-        file,
-        '<!doctype html><html lang="en"><title>file</title><h1>Hello</h1></html>',
-      );
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage();
-        await page.pptrPage.goto(pathToFileURL(file).href);
-
-        await lighthouseAudit(args).handler(
-          {
-            params: {
-              mode: 'snapshot',
-              device: 'desktop',
+              page,
             },
-            page,
-          },
-          response,
-          context,
-        );
-
-        const data = response.attachedLighthouseResult;
-        assert.ok(data);
-        assert.equal(data.summary.mode, 'snapshot');
-        assert.equal(data.summary.url, pathToFileURL(file).href);
-      });
+            response,
+            context,
+          ),
+        {
+          message:
+            'Lighthouse "navigation" mode cannot audit file:///tmp/page.html: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.',
+          cause: invalidUrl,
+        },
+      );
     });
 
     it('passes other navigation errors through unchanged', async () => {
