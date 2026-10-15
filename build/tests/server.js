@@ -1,0 +1,121 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import http from 'node:http';
+import { before, after, afterEach } from 'node:test';
+import { html } from './utils.js';
+export class TestServer {
+    #port;
+    #server;
+    static randomPort() {
+        /**
+         * Some ports are restricted by Chromium and will fail to connect
+         * to prevent we start after the
+         *
+         * https://source.chromium.org/chromium/chromium/src/+/main:net/base/port_util.cc;l=107?q=kRestrictedPorts&ss=chromium
+         */
+        const min = 10101;
+        const max = 20202;
+        return Math.floor(Math.random() * (max - min + 1) + min);
+    }
+    #routes = {};
+    constructor(port) {
+        this.#port = port;
+        this.#server = http.createServer((req, res) => this.#handle(req, res));
+    }
+    get baseUrl() {
+        return `http://127.0.0.1:${this.#port}`;
+    }
+    getRoute(path) {
+        if (!this.#routes[path]) {
+            throw new Error(`Route ${path} was not setup.`);
+        }
+        return `${this.baseUrl}${path}`;
+    }
+    addHtmlRoute(path, htmlContent) {
+        if (this.#routes[path]) {
+            throw new Error(`Route ${path} was already setup.`);
+        }
+        this.#routes[path] = (_req, res) => {
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.statusCode = 200;
+            res.end(htmlContent);
+        };
+    }
+    addRoute(path, handler) {
+        if (this.#routes[path]) {
+            throw new Error(`Route ${path} was already setup.`);
+        }
+        this.#routes[path] = handler;
+    }
+    #handle(req, res) {
+        const url = req.url ?? '';
+        const routeHandler = this.#routes[url];
+        if (routeHandler) {
+            routeHandler(req, res);
+        }
+        else {
+            res.writeHead(404, { 'Content-Type': 'text/html' });
+            res.end(html `<h1>404 - Not Found</h1><p>The requested page does not exist.</p>`);
+        }
+    }
+    restore() {
+        this.#routes = {};
+    }
+    async start() {
+        let retries = 5;
+        while (retries > 0) {
+            try {
+                await new Promise((res, rej) => {
+                    this.#server.once('error', rej);
+                    this.#server.listen(this.#port, () => {
+                        this.#server.off('error', rej);
+                        res();
+                    });
+                });
+                return;
+            }
+            catch (err) {
+                if (err instanceof Error &&
+                    'code' in err &&
+                    err.code === 'EADDRINUSE') {
+                    retries--;
+                    this.#port = TestServer.randomPort();
+                }
+                else {
+                    throw err;
+                }
+            }
+        }
+        throw new Error('Failed to bind to a port after 5 retries');
+    }
+    stop() {
+        return new Promise((res, rej) => {
+            this.#server.closeAllConnections();
+            this.#server.close(err => {
+                if (err) {
+                    rej(err);
+                }
+                else {
+                    res();
+                }
+            });
+        });
+    }
+}
+export function serverHooks() {
+    const server = new TestServer(TestServer.randomPort());
+    before(async () => {
+        await server.start();
+    });
+    after(async () => {
+        await server.stop();
+    });
+    afterEach(() => {
+        server.restore();
+    });
+    return server;
+}
+//# sourceMappingURL=server.js.map
