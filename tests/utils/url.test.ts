@@ -643,7 +643,13 @@ describe('validateUrlPatterns', () => {
       '*://127.*.0.1/*',
       '*://127.0.0*/*',
       '*://127.0.0.{*}/*',
+      '*://{127.0.0.*}/*',
+      '*://{*.0.0.1}/*',
+      '*://*1*/*',
       '*://0x7f.0.0.*/*',
+      '*://0x7f.*/*',
+      '*://user:pw@127.0.0.*/*',
+      '*://user:pw@127.0.0.*:8080/*',
     ]) {
       assert.throws(
         () => validateUrlPatterns([pattern], '--blockedUrlPattern'),
@@ -679,11 +685,13 @@ describe('validateUrlPatterns', () => {
   });
 
   it('throws for a pattern that fails to construct', () => {
-    assert.throws(() =>
-      validateUrlPatterns(
-        ['*://example.com/(unterminated'],
-        '--blockedUrlPattern',
-      ),
+    assert.throws(
+      () =>
+        validateUrlPatterns(
+          ['*://example.com/(unterminated'],
+          '--blockedUrlPattern',
+        ),
+      /Invalid --blockedUrlPattern "\*:\/\/example\.com\/\(unterminated":/,
     );
   });
 

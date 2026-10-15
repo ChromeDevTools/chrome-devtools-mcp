@@ -123,12 +123,22 @@ function hasNamedGroup(component: string): boolean {
 
 /**
  * Checks whether a URLPattern string has a partial IPv4 wildcard in the
- * hostname (for example `127.0.0.*` or `*.0.0.1`), which Chrome cannot
- * enforce on redirects or subresources.
+ * hostname (for example `127.0.0.*`, `*.0.0.1`, `*1*`, or `{127.0.0.*}`),
+ * which Chrome cannot enforce on redirects or subresources.
  */
 function hasPartialIpv4Hostname(pattern: string): boolean {
-  const hostname = /:\/\/([^/:?#]+)/.exec(pattern)?.[1] ?? '';
-  return hostname.includes('*') && /^\d|\d$/.test(hostname);
+  const authority = /:\/\/([^/?#]+)/.exec(pattern)?.[1] ?? '';
+  const hostPort = authority.slice(authority.lastIndexOf('@') + 1);
+  if (hostPort.startsWith('[')) {
+    return false;
+  }
+  const hostname = hostPort.replace(/:.*$/, '');
+  if (!hostname.includes('*')) {
+    return false;
+  }
+  const stripped = hostname.replaceAll(/[{}*]/g, '').replace(/\.+$/, '');
+  const lastLabel = stripped.split('.').at(-1) ?? '';
+  return /^(?:\d+|0[xX][0-9a-fA-F]*)$/.test(lastLabel);
 }
 
 /**
@@ -151,7 +161,15 @@ export function validateUrlPatterns(
         `Invalid ${flagName} "${raw}": a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact IPv4 address or a "*" wildcard instead.`,
       );
     }
-    const parsed = new URLPattern(raw);
+    let parsed: URLPattern;
+    try {
+      parsed = new URLPattern(raw);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid ${flagName} "${raw}": ${message}`, {
+        cause: error,
+      });
+    }
     if (parsed.hasRegExpGroups) {
       throw new Error(
         `Invalid ${flagName} "${raw}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
