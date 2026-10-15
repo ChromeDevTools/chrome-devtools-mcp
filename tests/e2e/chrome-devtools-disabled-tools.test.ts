@@ -8,20 +8,17 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
-import {assertDaemonIsNotRunning, runCli} from '../utils.js';
+import {runCli, stopDaemonForCleanup} from '../utils.js';
 
 describe('chrome-devtools', () => {
   let sessionId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
+    await stopDaemonForCleanup(sessionId);
   });
 
   it('fails to invoke list_network_requests when categoryNetwork is disabled', async () => {

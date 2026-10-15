@@ -15,20 +15,18 @@ import {
   createTempDir,
   createTempFile,
   runCli,
+  stopDaemonForCleanup,
 } from '../utils.js';
 
 describe('chrome-devtools', () => {
   let sessionId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
+    await stopDaemonForCleanup(sessionId);
   });
 
   it('can start and stop the daemon', async () => {

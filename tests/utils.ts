@@ -25,6 +25,8 @@ import type {
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/ConfigParser.js';
+import {stopDaemon} from '../src/daemon/client.js';
+import {isDaemonRunning} from '../src/daemon/utils.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
@@ -470,6 +472,15 @@ export async function assertDaemonIsNotRunning(sessionId?: string) {
     result.stdout,
     'chrome-devtools-mcp daemon is not running.\n',
   );
+}
+
+/**
+ * Stops the daemon in-process. Use it for test cleanup: it does not spawn
+ * a CLI process, which takes about a second per call.
+ */
+export async function stopDaemonForCleanup(sessionId: string) {
+  await stopDaemon(sessionId);
+  assert.ok(!isDaemonRunning(sessionId), 'daemon is still running');
 }
 
 export async function assertDaemonIsRunning(sessionId?: string) {

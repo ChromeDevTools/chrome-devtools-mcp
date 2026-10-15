@@ -12,29 +12,24 @@ import {describe, it, afterEach, beforeEach} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import {
-  assertDaemonIsNotRunning,
   assertDaemonIsRunning,
   createTempDir,
   runCli,
+  stopDaemonForCleanup,
 } from '../utils.js';
 
 describe('chrome-devtools', () => {
   let sessionId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
+    await stopDaemonForCleanup(sessionId);
   });
 
   it('can invoke list_pages', async () => {
-    await assertDaemonIsNotRunning(sessionId);
-
     const startResult = await runCli(['start'], sessionId);
     assert.strictEqual(
       startResult.status,
