@@ -17,9 +17,8 @@ import {
   executeThirdPartyDeveloperTool,
   listThirdPartyDeveloperTools,
 } from '../../src/tools/thirdPartyDeveloper.js';
-import type {ToolGroups} from '../../src/tools/thirdPartyDeveloper.js';
 import {createHandlerMocks} from '../mocks.js';
-import {withMcpContext} from '../utils.js';
+import {getTextContent, withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
   afterEach(() => {
@@ -108,13 +107,14 @@ describe('thirdPartyDeveloperTools', () => {
 
           const result = await response.handle(context);
           assert.ok(result.structuredContent);
-          assert.deepStrictEqual(
-            (
-              result.structuredContent as {
-                thirdPartyDeveloperTools?: ToolGroups;
-              }
-            ).thirdPartyDeveloperTools,
-            undefined,
+          assert.deepStrictEqual(result.structuredContent, {
+            thirdPartyDeveloperTools: [],
+          });
+          const firstContent = result.content[0];
+          assert.ok(firstContent);
+          assert.strictEqual(
+            getTextContent(firstContent),
+            '## Third-party developer tools\nNo third-party developer tools available.',
           );
         },
         undefined,
@@ -141,13 +141,14 @@ describe('thirdPartyDeveloperTools', () => {
 
           const result = await response.handle(context);
           assert.ok(result.structuredContent);
-          assert.deepStrictEqual(
-            (
-              result.structuredContent as {
-                thirdPartyDeveloperTools?: ToolGroups;
-              }
-            ).thirdPartyDeveloperTools,
-            undefined,
+          assert.deepStrictEqual(result.structuredContent, {
+            thirdPartyDeveloperTools: [],
+          });
+          const firstContent = result.content[0];
+          assert.ok(firstContent);
+          assert.strictEqual(
+            getTextContent(firstContent),
+            '## Third-party developer tools\nNo third-party developer tools available.',
           );
         },
         undefined,
@@ -168,13 +169,14 @@ describe('thirdPartyDeveloperTools', () => {
 
           const result = await response.handle(context);
           assert.ok(result.structuredContent);
-          assert.deepStrictEqual(
-            (
-              result.structuredContent as {
-                thirdPartyDeveloperTools?: ToolGroups;
-              }
-            ).thirdPartyDeveloperTools,
-            undefined,
+          assert.deepStrictEqual(result.structuredContent, {
+            thirdPartyDeveloperTools: [],
+          });
+          const firstContent = result.content[0];
+          assert.ok(firstContent);
+          assert.strictEqual(
+            getTextContent(firstContent),
+            '## Third-party developer tools\nNo third-party developer tools available.',
           );
         },
         undefined,

@@ -1163,6 +1163,22 @@ describe('third-party developer tools', () => {
     );
   });
 
+  it('list no third-party developer tools if there are none', async t => {
+    await withMcpContext(
+      async (response, context) => {
+        response.setListThirdPartyDeveloperTools();
+        const {content, structuredContent} = await response.handle(context);
+        const firstContent = content[0];
+        assert.ok(firstContent);
+        assert.ok(getTextContent(firstContent));
+        t.assert.snapshot(getTextContent(firstContent));
+        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+      },
+      undefined,
+      {categoryExperimentalThirdParty: true},
+    );
+  });
+
   async function testIncludesThirdPartyDeveloperTools(
     handlerAction: (
       response: McpResponse,
