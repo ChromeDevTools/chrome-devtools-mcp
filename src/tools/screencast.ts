@@ -11,6 +11,7 @@ import path from 'node:path';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {
+  Page,
   ScreenRecorder,
   ScreenRecording,
   VideoFormat,
@@ -50,6 +51,23 @@ function getLegacyExtension(filePath: string): SupportedVideoExtension {
     );
   }
   return matchedExtension ?? '.mp4';
+}
+
+/**
+ * Returns the size of the page viewport in device pixels.
+ */
+async function getPagePixelSize(
+  pptrPage: Page,
+): Promise<{maxWidth: number; maxHeight: number}> {
+  const {width, height, dpr} = await pptrPage.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    dpr: window.devicePixelRatio,
+  }));
+  return {
+    maxWidth: Math.max(1, Math.round(width * dpr)),
+    maxHeight: Math.max(1, Math.round(height * dpr)),
+  };
 }
 
 export const startScreencast = definePageTool((args: ParsedArguments) => ({
@@ -102,9 +120,14 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
           fps: args?.screencastFps,
         });
       } else {
+        // Without explicit limits Chrome downscales frames to a small default
+        // size. Record at the actual device pixel size of the page instead.
+        const {maxWidth, maxHeight} = await getPagePixelSize(page.pptrPage);
         recorder = await page.pptrPage.record({
           path: resolvedPath,
           fps: args?.screencastFps,
+          maxWidth,
+          maxHeight,
         });
       }
     } catch (err) {
