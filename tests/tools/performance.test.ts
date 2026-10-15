@@ -302,6 +302,7 @@ describe('performance', () => {
           .stub(context, 'saveFile')
           .resolves({filename: filePath});
 
+        const clock = sinon.useFakeTimers({toFake: ['setTimeout']});
         const handlerPromise = startTrace(args).handler(
           {
             params: {reload: true, autoStop: true, filePath},
@@ -311,10 +312,10 @@ describe('performance', () => {
           context,
         );
         // In the handler we wait 5 seconds after the page load event (which is
-        // what DevTools does), hence we now fake-progress time to allow
-        // the handler to complete. We allow extra time because the Trace
-        // Engine also uses some timers to yield updates and we need those to
-        // execute.
+        // what DevTools does). Fake only this wait, then return to real timers:
+        // gzip runs on the thread pool, and trace parsing after it uses timers.
+        await clock.tickAsync(5_000);
+        clock.restore();
         await handlerPromise;
 
         assert.ok(
