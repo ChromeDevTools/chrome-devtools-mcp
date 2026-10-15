@@ -25,6 +25,8 @@ import {logger} from './utils/logger.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isLocalhost} from './utils/url.js';
 
+type ToolLockGuard = Awaited<ReturnType<Mutex['acquire']>>;
+
 /**
  * Upper bound on how long a tool call may wait to acquire the browser
  * (connect/launch and McpContext initialization). A connect attempt on a
@@ -235,9 +237,10 @@ export class ToolHandler {
   }
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
-    using guard = await this.toolMutex.acquire();
+    let guard: ToolLockGuard | undefined = await this.toolMutex.acquire();
 
     if (this.disabledReason) {
+      guard[Symbol.dispose]();
       return {
         content: [
           {
@@ -276,6 +279,15 @@ export class ToolHandler {
         response.setReconnectNotice();
       }
       let page: McpPage | undefined;
+      // When the tool yields the lock, the handler waits for external events.
+      // Release the lock so other tool calls proceed, and re-acquire it
+      // before the response is built.
+      const releaseLockIfYielding = (): void => {
+        if (this.tool.yieldsToolLock && guard) {
+          guard[Symbol.dispose]();
+          guard = undefined;
+        }
+      };
       try {
         await validateToolFiles(this.tool, params, context);
         if (isPageScopedTool(this.tool)) {
@@ -292,6 +304,7 @@ export class ToolHandler {
           if (this.tool.blockedByDialog) {
             page.throwIfDialogOpen();
           }
+          releaseLockIfYielding();
           await this.tool.handler(
             {
               params,
@@ -301,6 +314,7 @@ export class ToolHandler {
             context,
           );
         } else {
+          releaseLockIfYielding();
           await this.tool.handler(
             {
               params,
@@ -311,6 +325,8 @@ export class ToolHandler {
         }
       } catch (err) {
         response.setError(err);
+      } finally {
+        guard ??= await this.toolMutex.acquire();
       }
       devToolsData = await context.getDevToolsData(page);
       pageUrl = context.getSelectedMcpPageUrl(page);
@@ -352,6 +368,7 @@ export class ToolHandler {
         isError: true,
       };
     } finally {
+      guard?.[Symbol.dispose]();
       void ClearcutLogger.get()?.logToolInvocation({
         toolName: this.tool.name,
         params,

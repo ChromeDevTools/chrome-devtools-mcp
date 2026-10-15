@@ -1309,6 +1309,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "timeout",
+        "argType": "number"
       }
     ]
   },

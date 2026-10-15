@@ -208,4 +208,78 @@ describe('DevToolsCommentBridge', () => {
     sinon.assert.calledOnce(devtoolsPage.evaluate);
     assert.deepStrictEqual(threads, mockThreads);
   });
+
+  describe('waitForCommentEvent', () => {
+    async function attachWithCallback(bridge: DevToolsCommentBridge) {
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
+      let exposedCallback: (() => void) | undefined;
+      devtoolsPage.exposeFunction.callsFake((name: string, fn: unknown) => {
+        if (name === '__onDevToolsCommentEvent' && typeof fn === 'function') {
+          exposedCallback = () => {
+            fn();
+          };
+        }
+        return Promise.resolve();
+      });
+      await bridge.attach(devtoolsPage);
+      assert.ok(exposedCallback);
+      return exposedCallback;
+    }
+
+    it('resolves true after the debounced comment event', async () => {
+      const bridge = new DevToolsCommentBridge({debounceMs: 150});
+      const fireEvent = await attachWithCallback(bridge);
+
+      const waiting = bridge.waitForCommentEvent(10_000);
+      fireEvent();
+      await clock.tickAsync(150);
+
+      assert.strictEqual(await waiting, true);
+    });
+
+    it('resolves false at timeout when no event fires', async () => {
+      const bridge = new DevToolsCommentBridge({debounceMs: 150});
+      await attachWithCallback(bridge);
+
+      const waiting = bridge.waitForCommentEvent(1_000);
+      await clock.tickAsync(1_000);
+
+      assert.strictEqual(await waiting, false);
+    });
+
+    it('resolves false when the bridge is disposed during the wait', async () => {
+      const bridge = new DevToolsCommentBridge({debounceMs: 150});
+      await attachWithCallback(bridge);
+
+      const waiting = bridge.waitForCommentEvent(10_000);
+      bridge.dispose();
+
+      assert.strictEqual(await waiting, false);
+    });
+
+    it('resolves all concurrent waiters on one event', async () => {
+      const bridge = new DevToolsCommentBridge({debounceMs: 150});
+      const fireEvent = await attachWithCallback(bridge);
+
+      const first = bridge.waitForCommentEvent(10_000);
+      const second = bridge.waitForCommentEvent(10_000);
+      fireEvent();
+      await clock.tickAsync(150);
+
+      assert.deepStrictEqual(await Promise.all([first, second]), [true, true]);
+    });
+
+    it('does not resolve a later waiter with an earlier event', async () => {
+      const bridge = new DevToolsCommentBridge({debounceMs: 150});
+      const fireEvent = await attachWithCallback(bridge);
+
+      fireEvent();
+      await clock.tickAsync(150);
+      const waiting = bridge.waitForCommentEvent(1_000);
+      await clock.tickAsync(1_000);
+
+      assert.strictEqual(await waiting, false);
+    });
+  });
 });
