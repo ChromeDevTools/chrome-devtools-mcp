@@ -676,6 +676,13 @@ export class McpPage implements ContextPage {
     this.#disposed = true;
     this.#commentBridge?.dispose();
     this.#commentBridge = undefined;
+    if (this.#screenRecorder) {
+      const {recorder} = this.#screenRecorder;
+      this.#screenRecorder = null;
+      void recorder.stop().catch(e => {
+        logger?.('Failed to stop screencast recording on dispose', e);
+      });
+    }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
@@ -1083,7 +1090,6 @@ export class McpPage implements ContextPage {
       await this.ensureDevToolsCommentBridge(devtoolsPage);
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
-          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types

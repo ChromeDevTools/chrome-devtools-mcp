@@ -11,7 +11,7 @@ import sinon from 'sinon';
 
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {DevTools, Locator} from '../src/third_party/index.js';
+import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
@@ -393,6 +393,22 @@ describe('McpPage', () => {
         runBeforeUnload: false,
       });
       sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+    });
+
+    it('stops and clears an active screenRecorder on dispose()', async () => {
+      const target = createMockPuppeteerTarget();
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+      const recorder = sinon.createStubInstance(ScreenRecorder);
+      recorder.stop.resolves();
+      mcpPage.setScreenRecorder({recorder, filePath: '/tmp/video.mp4'});
+
+      mcpPage.dispose();
+
+      sinon.assert.calledOnceWithExactly(recorder.stop);
+      assert.strictEqual(mcpPage.getScreenRecorder(), null);
     });
   });
 
