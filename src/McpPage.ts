@@ -1083,7 +1083,6 @@ export class McpPage implements ContextPage {
       await this.ensureDevToolsCommentBridge(devtoolsPage);
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
-          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
