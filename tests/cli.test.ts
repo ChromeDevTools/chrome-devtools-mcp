@@ -631,11 +631,13 @@ describe('cli args parsing', () => {
 
   it('rejects url-pattern with invalid syntax', async () => {
     assert.throws(
-      () => parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
+      () =>
+        parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
       /Invalid --blockedUrlPattern "\*:\/\/example\.com\/\(unterminated":/,
     );
     assert.throws(
-      () => parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']),
+      () =>
+        parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']),
       /Invalid --allowedUrlPattern "\*:\/\/example\.com\/\(unterminated":/,
     );
   });
