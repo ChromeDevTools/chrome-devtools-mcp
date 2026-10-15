@@ -1091,6 +1091,14 @@
       {
         "name": "max_name_length",
         "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
       }
     ]
   },

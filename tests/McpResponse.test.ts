@@ -40,9 +40,11 @@ import {
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
   createMockCSSStyleRule,
-  createMockClassDiffs,
+  createMockClassDiff,
+  createMockClassDiffTotals,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
+  createMockHeapSnapshotDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
   createMockHeapSnapshotStats,
@@ -1688,8 +1690,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
   it('formats class diff summary and detailed diff headers', async () => {
     const response = new McpResponse(createMockParsedArguments());
-    const diffs = createMockClassDiffs();
-    response.setHeapSnapshotClassDiffs(diffs);
+    response.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff());
 
     const context = createMockMcpContext();
     const {content} = await response.handle(context);
@@ -1708,12 +1709,44 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
   });
 
+  it('paginates class diff summary and keeps global indices', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const classDiffs = [
+      createMockClassDiff({index: 0, className: 'ClassA'}),
+      createMockClassDiff({index: 1, className: 'ClassB'}),
+      createMockClassDiff({index: 2, className: 'ClassC'}),
+    ];
+    const totals = createMockClassDiffTotals({addedCount: 3, countDelta: 3});
+    response.setHeapSnapshotClassDiffs(
+      createMockHeapSnapshotDiff({classDiffs, totals}),
+      {pageIdx: 1, pageSize: 2},
+    );
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('Showing 3-3 of 3 (Page 2 of 2).'));
+    assert.ok(text.includes('Previous page: 0'));
+    assert.ok(text.includes('Total: # new: 3, # deleted: 0, # delta: +3'));
+    assert.ok(text.includes('\n2,ClassC,'));
+    assert.ok(!text.includes('ClassA'));
+    assert.ok(!text.includes('ClassB'));
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotClassDiffs'),
+      [classDiffs[2]],
+    );
+    const heapData: unknown = Reflect.get(structuredContent, 'heapSnapshot');
+    assert.ok(heapData && typeof heapData === 'object');
+    assert.deepStrictEqual(Reflect.get(heapData, 'classDiffStats'), totals);
+  });
+
   it('truncates class diff names in compact format', async () => {
     const context = createMockMcpContext();
-    const diffs = createMockClassDiffs();
-
     const toonDiffResponse = new McpResponse(createMockParsedArguments());
-    toonDiffResponse.setHeapSnapshotClassDiffs(diffs, {maxNameLength: 4});
+    toonDiffResponse.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff(), {
+      maxNameLength: 4,
+    });
     const toonDiffResult = await toonDiffResponse.handle(context, 'toon');
     const toonDiffText = getTextContent(toonDiffResult.content[0]);
     assert.ok(toonDiffText.includes('Test...'));

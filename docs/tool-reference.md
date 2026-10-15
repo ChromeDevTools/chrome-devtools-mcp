@@ -552,6 +552,8 @@ in the DevTools Elements panel (if any).
 - **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
 - **classIndex** (number) _(optional)_: Optional 0-based index of the class in the summary list to filter results, showing individual objects.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
+- **pageIdx** (integer) _(optional)_: The page index for pagination.
+- **pageSize** (integer) _(optional)_: The page size for pagination.
 
 ---
 
