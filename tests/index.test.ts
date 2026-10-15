@@ -23,7 +23,9 @@ import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 import {createTempDir} from './utils.js';
 
-describe('e2e', () => {
+// Each test starts its own server process, so the tests run in parallel. Most
+// of the test time is server start and waits, not CPU work.
+describe('e2e', {concurrency: true}, () => {
   async function withClient(
     cb: (client: Client) => Promise<void>,
     extraArgs: string[] = [],
@@ -122,8 +124,6 @@ describe('e2e', () => {
   });
 
   // These tests only list tools, so the server does not launch a browser.
-  // They run in parallel because each test spends most of its time on server
-  // start.
   describe('tool list', {concurrency: true}, () => {
     it('has all tools with off by default categories', async () => {
       await withClient(
@@ -451,7 +451,7 @@ describe('e2e', () => {
     );
   });
 
-  describe('Dialogs', () => {
+  describe('Dialogs', {concurrency: true}, () => {
     function getFirstText(
       result: Awaited<ReturnType<Client['callTool']>>,
     ): string {
