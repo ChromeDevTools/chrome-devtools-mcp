@@ -9,6 +9,13 @@ on:
     branches:
       - main
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      # Re-run when the `full-ci` label changes.
+      - labeled
+      - unlabeled
 
 jobs:
   run-tests:
@@ -17,8 +24,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Run Windows and macOS tests only on release PRs.
-        os: ${{ fromJSON(startsWith(github.head_ref, 'release-please') && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest"]') }}
+        # Run Windows and macOS tests only on release PRs or on PRs with the
+        # `full-ci` label.
+        os: ${{ fromJSON((startsWith(github.head_ref, 'release-please') || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest"]') }}
         node:
           - 22
           - 24
