@@ -136,7 +136,7 @@ function hasPartialIpv4Hostname(pattern: string): boolean {
   if (!hostname.includes('*')) {
     return false;
   }
-  const stripped = hostname.replaceAll(/[{}*]/g, '').replace(/\.+$/, '');
+  const stripped = hostname.replaceAll(/[{}*\\]/g, '').replace(/\.+$/, '');
   const lastLabel = stripped.split('.').at(-1) ?? '';
   return /^(?:\d+|0[xX][0-9a-fA-F]*)$/.test(lastLabel);
 }

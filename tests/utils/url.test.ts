@@ -650,6 +650,8 @@ describe('validateUrlPatterns', () => {
       '*://0x7f.*/*',
       '*://user:pw@127.0.0.*/*',
       '*://user:pw@127.0.0.*:8080/*',
+      String.raw`*://127.0.0.*\:8080/*`,
+      String.raw`*://127.0.\0.*/*`,
     ]) {
       assert.throws(
         () => validateUrlPatterns([pattern], '--blockedUrlPattern'),
