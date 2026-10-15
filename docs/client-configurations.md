@@ -93,6 +93,9 @@ Then, install the plugin:
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
 
+> [!NOTE]
+> The plugin was previously named `chrome-devtools-mcp`. Claude Code migrates existing installs to `chrome-devtools`. If Claude Code reports `Plugin "chrome-devtools" not cached`, run `/plugin install chrome-devtools@chrome-devtools-plugins` once.
+
 > [!TIP]
 > If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
 
