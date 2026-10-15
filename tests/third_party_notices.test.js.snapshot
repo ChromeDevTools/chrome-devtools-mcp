@@ -353,7 +353,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 Name: @modelcontextprotocol/server
 URL: https://modelcontextprotocol.io
 Version: <VERSION>
-License: MIT
+License: Apache-2.0
 
 The MCP project is undergoing a licensing transition from the MIT License to the Apache License, Version 2.0 ("Apache-2.0"). All new code and specification contributions to the project are licensed under Apache-2.0. Documentation contributions (excluding specifications) are licensed under CC-BY-4.0.
 
@@ -578,7 +578,7 @@ the full license text.
 Name: @modelcontextprotocol/core
 URL: https://modelcontextprotocol.io
 Version: <VERSION>
-License: MIT
+License: Apache-2.0
 
 The MCP project is undergoing a licensing transition from the MIT License to the Apache License, Version 2.0 ("Apache-2.0"). All new code and specification contributions to the project are licensed under Apache-2.0. Documentation contributions (excluding specifications) are licensed under CC-BY-4.0.
 
