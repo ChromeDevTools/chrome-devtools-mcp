@@ -260,17 +260,21 @@ describe('console', () => {
         const page = context.getSelectedMcpPage();
         // Rejections are reported once the microtask queue drains, after
         // setContent resolves, so wait for all three exceptions.
-        // @ts-expect-error internal API
-        const client = page.pptrPage._client();
-        const thrown = new Promise<void>(resolve => {
+        const session = await page.pptrPage.createCDPSession();
+        await session.send('Runtime.enable');
+        const thrown = new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Timeout waiting for 3 unhandled rejections'));
+          }, 5000);
           let count = 0;
           const onThrown = () => {
             if (++count === 3) {
-              client.off('Runtime.exceptionThrown', onThrown);
+              clearTimeout(timeout);
+              session.off('Runtime.exceptionThrown', onThrown);
               resolve();
             }
           };
-          client.on('Runtime.exceptionThrown', onThrown);
+          session.on('Runtime.exceptionThrown', onThrown);
         });
         await page.pptrPage.setContent(`<script>
           Promise.reject(new Error('reason-A'));
@@ -278,6 +282,7 @@ describe('console', () => {
           (async () => { throw new TypeError('reason-C'); })();
         </script>`);
         await thrown;
+        await session.detach();
         await listConsoleMessages(args).handler(
           {params: {}, page: context.getSelectedMcpPage()},
           response,

@@ -301,7 +301,7 @@ describe('SymbolizedError', () => {
       );
     });
 
-    it('uses an empty exception message when the exception only has a value', async () => {
+    it('uses the value of a thrown primitive as the exception message', async () => {
       // A thrown primitive (e.g. `throw 'oops'`) has no description.
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({
@@ -313,7 +313,7 @@ describe('SymbolizedError', () => {
         targetId: '',
       });
 
-      assert.strictEqual(error.message, 'Uncaught ');
+      assert.strictEqual(error.message, 'Uncaught oops');
     });
 
     it('uses the details text verbatim when there is no exception object', async () => {
@@ -435,7 +435,7 @@ describe('SymbolizedError', () => {
       assert.strictEqual(error.message, 'TypeError: nope');
     });
 
-    it('falls back to an empty message without a description', async () => {
+    it('uses the value of a primitive error without a description', async () => {
       const error = await SymbolizedError.fromError({
         error: {
           type: 'string',
@@ -444,7 +444,7 @@ describe('SymbolizedError', () => {
         targetId: '',
       });
 
-      assert.strictEqual(error.message, '');
+      assert.strictEqual(error.message, 'oops');
     });
   });
 });
