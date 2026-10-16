@@ -107,6 +107,40 @@ describe('lighthouse', () => {
       sinon.assert.calledOnceWithExactly(page.restoreEmulation);
     });
 
+    it('fails when Lighthouse reports a runtime error', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      sinon.stub(lighthouseRunner, 'navigation').resolves(
+        createMockRunnerResult({
+          runtimeError: {
+            code: 'ERRORED_DOCUMENT_REQUEST',
+            message: 'Lighthouse was unable to reliably load the page.',
+          },
+        }),
+      );
+
+      await assert.rejects(
+        () =>
+          lighthouseAudit(args).handler(
+            {
+              params: {
+                mode: 'navigation',
+                device: 'desktop',
+              },
+              page,
+            },
+            response,
+            context,
+          ),
+        {
+          message:
+            'Lighthouse could not audit the page (ERRORED_DOCUMENT_REQUEST): Lighthouse was unable to reliably load the page.',
+        },
+      );
+
+      sinon.assert.notCalled(response.attachLighthouseResult);
+      sinon.assert.calledOnceWithExactly(page.restoreEmulation);
+    });
+
     it('emulates a desktop user agent for desktop audits', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
