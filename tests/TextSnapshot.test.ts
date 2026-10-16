@@ -7,17 +7,101 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
+import {
+  Accessibility,
+  type ElementHandle,
+  type SerializedAXNode,
+} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 
+import {createMockMcpPage} from './mocks.js';
 import {html, withMcpContext} from './utils.js';
+
+interface ProtocolAXNode extends SerializedAXNode {
+  loaderId?: string;
+  backendNodeId?: number;
+  children?: ProtocolAXNode[];
+  elementHandle: () => Promise<ElementHandle<Element> | null>;
+}
+
+const createAXNode = (
+  role: string,
+  options: {
+    name?: string;
+    loaderId?: string;
+    backendNodeId?: number;
+    children?: ProtocolAXNode[];
+  } = {},
+): ProtocolAXNode => ({
+  role,
+  name: options.name,
+  loaderId: options.loaderId,
+  backendNodeId: options.backendNodeId,
+  children: options.children,
+  elementHandle: async () => null,
+});
 
 describe('TextSnapshot', () => {
   afterEach(() => {
     sinon.restore();
     TextSnapshot.resetCounter();
+  });
+
+  it('assigns unique uids to nodes without backendNodeId', async () => {
+    const page = createMockMcpPage();
+    page.uniqueBackendNodeIdToMcpId = new Map();
+    page.extraHandles = [];
+    const mockRoot = createAXNode('RootWebArea', {
+      loaderId: '1',
+      backendNodeId: 1,
+      children: [
+        createAXNode('paragraph', {
+          loaderId: '1',
+          backendNodeId: 2,
+          children: [
+            createAXNode('InlineTextBox', {
+              name: 'alpha',
+              loaderId: '1',
+            }),
+          ],
+        }),
+        createAXNode('paragraph', {
+          loaderId: '1',
+          backendNodeId: 3,
+          children: [
+            createAXNode('InlineTextBox', {
+              name: 'beta',
+              loaderId: '1',
+            }),
+          ],
+        }),
+      ],
+    });
+    const accessibility = sinon.createStubInstance(Accessibility);
+    accessibility.snapshot.resolves(mockRoot);
+    Object.defineProperty(page.pptrPage, 'accessibility', {
+      value: accessibility,
+      configurable: true,
+    });
+
+    const snapshot = await TextSnapshot.create(page, {verbose: true});
+    const inlineNodes = [...snapshot.idToNode.values()].filter(
+      node => node.role === 'InlineTextBox',
+    );
+
+    assert.strictEqual(inlineNodes.length, 2);
+    assert.notStrictEqual(inlineNodes[0]?.id, inlineNodes[1]?.id);
+    assert.strictEqual(
+      page.uniqueBackendNodeIdToMcpId.has('1_undefined'),
+      false,
+    );
+    assert.strictEqual(
+      page.uniqueBackendNodeIdToMcpId.has('undefined_undefined'),
+      false,
+    );
   });
 
   it('creates a snapshot', async () => {
