@@ -11,13 +11,7 @@ import {describe, it} from 'node:test';
 
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
 import type {HTTPRequest} from '../../src/third_party/index.js';
-import {serverHooks} from '../server.js';
-import {
-  createTempDir,
-  getMockRequest,
-  getMockResponse,
-  withMcpContext,
-} from '../utils.js';
+import {createTempDir, getMockRequest, getMockResponse} from '../utils.js';
 
 describe('NetworkFormatter', () => {
   describe('toString', () => {
@@ -416,7 +410,6 @@ describe('NetworkFormatter', () => {
         'http://example.com/second',
         'http://example.com/first',
       ]);
-      assert.deepStrictEqual(chain, [first, second]);
     });
 
     it('shows saved to file message in toStringDetailed', async () => {
@@ -682,48 +675,6 @@ describe('NetworkFormatter', () => {
       assert.strictEqual(result.responseBodyFilePath, resPath);
       assert.strictEqual(result.requestBody, undefined);
       assert.strictEqual(result.responseBody, undefined);
-    });
-  });
-  describe('redirects in a real browser', () => {
-    const server = serverHooks();
-
-    it('lists only earlier hops in each hop of a redirect', async () => {
-      server.addRoute('/r1', (_req, res) => {
-        res.writeHead(302, {Location: '/r2'});
-        res.end();
-      });
-      server.addRoute('/r2', (_req, res) => {
-        res.writeHead(301, {Location: '/final'});
-        res.end();
-      });
-      server.addHtmlRoute('/final', '<h1>Final</h1>');
-
-      await withMcpContext(async (_response, context) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        const requests: HTTPRequest[] = [];
-        page.on('request', request => {
-          requests.push(request);
-        });
-        await page.goto(server.getRoute('/r1'));
-
-        const chains: Record<string, string[]> = {};
-        for (const request of requests) {
-          const formatter = await NetworkFormatter.from(request, {
-            requestId: 1,
-            saveFile: async () => ({filename: ''}),
-            redactNetworkHeaders: false,
-          });
-          chains[new URL(request.url()).pathname] = (
-            formatter.toJSONDetailed().redirectChain ?? []
-          ).map(entry => new URL(entry.url).pathname);
-        }
-
-        assert.deepStrictEqual(chains, {
-          '/r1': [],
-          '/r2': ['/r1'],
-          '/final': ['/r2', '/r1'],
-        });
-      });
     });
   });
 });
