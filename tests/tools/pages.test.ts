@@ -907,7 +907,10 @@ describe('pages', () => {
         async () => {
           await navigatePage(args).handler(
             {
-              params: {url: 'file:///etc/passwd'},
+              params: {
+                url: 'file:///etc/passwd',
+                initScript: 'window.initScript = "completed"',
+              },
               page,
             },
             response,
@@ -920,7 +923,8 @@ describe('pages', () => {
         },
       );
 
-      sinon.assert.notCalled(page.pptrPage.goto);
+      sinon.assert.notCalled(page.pptrPage.evaluateOnNewDocument);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
     });
 
     it('throws an error if the page was closed not by the MCP server', async () => {
@@ -1235,7 +1239,7 @@ describe('pages', () => {
         },
       );
 
-      sinon.assert.notCalled(page.pptrPage.goto);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
     });
 
     it('throws when URL does not parse with new URL', async () => {
@@ -1260,7 +1264,7 @@ describe('pages', () => {
         },
       );
 
-      sinon.assert.notCalled(page.pptrPage.goto);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
     });
 
     it('rejects chrome: and chrome-untrusted: URLs', async () => {
@@ -1297,7 +1301,7 @@ describe('pages', () => {
         },
       );
 
-      sinon.assert.notCalled(page.pptrPage.goto);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
     });
 
     it('rejects chrome-extension: URLs unless categoryExtensions is enabled', async () => {
@@ -1320,7 +1324,7 @@ describe('pages', () => {
         },
       );
 
-      sinon.assert.notCalled(page.pptrPage.goto);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
     });
 
     it('allows chrome://newtab/', async () => {
