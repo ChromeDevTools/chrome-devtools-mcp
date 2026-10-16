@@ -405,7 +405,6 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          InlineTextBox "test"
 
 `;
 
@@ -432,13 +431,7 @@ exports[`McpResponse > returns verbose snapshot and structured content 2`] = `
                   {
                     "id": "1_4",
                     "role": "StaticText",
-                    "name": "test",
-                    "children": [
-                      {
-                        "role": "InlineTextBox",
-                        "name": "test"
-                      }
-                    ]
+                    "name": "test"
                   }
                 ]
               }
@@ -467,7 +460,6 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          InlineTextBox "test"
 
 `;
 
