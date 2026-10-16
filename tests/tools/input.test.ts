@@ -262,7 +262,13 @@ describe('input', () => {
       );
 
       sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
-      sinon.assert.calledOnce(locator.click);
+      sinon.assert.calledOnceWithMatch(
+        locator.click,
+        sinon.match({
+          count: 1,
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Successfully clicked on the element',
@@ -288,7 +294,13 @@ describe('input', () => {
       );
 
       sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
-      sinon.assert.calledOnce(locator.click);
+      sinon.assert.calledOnceWithMatch(
+        locator.click,
+        sinon.match({
+          count: 1,
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Successfully clicked on the element',
@@ -1186,36 +1198,58 @@ describe('input', () => {
 
   describe('drags', () => {
     it('drags one element onto another', async () => {
-      const {page, context, response, args} = createHandlerMocks();
-      const fromHandle = createMockElementHandle().handle;
-      const toHandle = createMockElementHandle().handle;
-      page.getElementByUid.withArgs('1_1').resolves(fromHandle);
-      page.getElementByUid.withArgs('1_2').resolves(toHandle);
-
-      await drag(args).handler(
-        {
-          params: {
-            from_uid: '1_1',
-            to_uid: '1_2',
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<div
+              role="button"
+              id="drag"
+              draggable="true"
+              >drag me</div
+            >
+            <div
+              id="drop"
+              aria-label="drop"
+              style="width: 100px; height: 100px; border: 1px solid black;"
+              ondrop="this.innerText = 'dropped';"
+            >
+            </div>
+            <script>
+              drag.addEventListener('dragstart', event => {
+                event.dataTransfer.setData('text/plain', event.target.id);
+              });
+              drop.addEventListener('dragover', event => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              });
+              drop.addEventListener('drop', event => {
+                event.preventDefault();
+                const data = event.dataTransfer.getData('text/plain');
+                event.target.appendChild(document.getElementById(data));
+              });
+            </script>`,
+        );
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+        await drag(args).handler(
+          {
+            params: {
+              from_uid: '1_1',
+              to_uid: '1_2',
+            },
+            page: context.getSelectedMcpPage(),
           },
-          page,
-        },
-        response,
-        context,
-      );
-
-      sinon.assert.calledWith(page.getElementByUid, '1_1');
-      sinon.assert.calledWith(page.getElementByUid, '1_2');
-      sinon.assert.calledOnceWithExactly(fromHandle.drag, toHandle);
-      sinon.assert.calledOnceWithMatch(
-        toHandle.drop,
-        sinon.match.same(fromHandle),
-      );
-      sinon.assert.calledOnceWithExactly(
-        response.appendResponseLine,
-        'Successfully dragged an element',
-      );
-      sinon.assert.notCalled(response.includeSnapshot);
+          response,
+          context,
+        );
+        assert.ok(response.includeSnapshot);
+        assert.strictEqual(
+          response.responseLines[0],
+          'Successfully dragged an element',
+        );
+        assert.ok(await page.$('text/dropped'));
+      });
     });
 
     it('includes snapshot if includeSnapshot is true', async () => {
@@ -1238,6 +1272,18 @@ describe('input', () => {
         context,
       );
 
+      sinon.assert.calledTwice(page.getElementByUid);
+      sinon.assert.calledWithExactly(page.getElementByUid.firstCall, '1_1');
+      sinon.assert.calledWithExactly(page.getElementByUid.secondCall, '1_2');
+      sinon.assert.calledOnceWithExactly(fromHandle.drag, toHandle);
+      sinon.assert.calledOnceWithMatch(
+        toHandle.drop,
+        sinon.match.same(fromHandle),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully dragged an element',
+      );
       sinon.assert.calledOnce(response.includeSnapshot);
     });
   });
