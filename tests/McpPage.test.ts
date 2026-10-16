@@ -9,6 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
@@ -16,9 +17,11 @@ import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
+  createMockCDPSession,
   createMockMcpResponse,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
+  createMockServerConfig,
   createMockWebMCPTool,
 } from './mocks.js';
 import {serverHooks} from './server.js';
@@ -273,14 +276,12 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
-  async function createMcpPage(
-    options: {hasNetworkBlockOrAllowlist?: boolean} = {},
-  ) {
+  async function createMcpPage(options: {config?: ReadonlyServerConfig} = {}) {
     const pptrPage = createMockPuppeteerPage();
     pptrPage.emulateFocusedPage.resolves();
     const target = createMockPuppeteerTarget({page: pptrPage});
     const mcpPage = new McpPage(target, 1, {
-      hasNetworkBlockOrAllowlist: options.hasNetworkBlockOrAllowlist ?? false,
+      config: options.config ?? createMockServerConfig(),
       locatorClass: Locator,
     });
     const mockSession = {
@@ -320,7 +321,7 @@ describe('McpPage', () => {
         title: 'Target Title',
       });
       const mcpPage = new McpPage(target, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        config: createMockServerConfig(),
         locatorClass: Locator,
       });
 
@@ -350,7 +351,7 @@ describe('McpPage', () => {
       target.page.resolves(null);
 
       const mcpPage = new McpPage(target, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        config: createMockServerConfig(),
         locatorClass: Locator,
       });
 
@@ -364,7 +365,7 @@ describe('McpPage', () => {
     it('disposes safely before init() is called and rejects subsequent init()', async () => {
       const target = createMockPuppeteerTarget();
       const mcpPage = new McpPage(target, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        config: createMockServerConfig(),
         locatorClass: Locator,
       });
 
@@ -382,7 +383,7 @@ describe('McpPage', () => {
       const pptrPage = createMockPuppeteerPage();
       const target = createMockPuppeteerTarget({page: pptrPage});
       const mcpPage = new McpPage(target, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        config: createMockServerConfig(),
         locatorClass: Locator,
       });
 
@@ -398,7 +399,7 @@ describe('McpPage', () => {
     it('stops and clears an active screenRecorder on dispose()', async () => {
       const target = createMockPuppeteerTarget();
       const mcpPage = new McpPage(target, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        config: createMockServerConfig(),
         locatorClass: Locator,
       });
       const recorder = sinon.createStubInstance(ScreenRecorder);
@@ -420,7 +421,7 @@ describe('McpPage', () => {
     function createPage(url: string, title: string): McpPage {
       const target = createMockPuppeteerTarget({url, title});
       return new McpPage(target, 1, {
-        hasNetworkBlockOrAllowlist: false,
+        config: createMockServerConfig(),
         locatorClass: Locator,
       });
     }
@@ -524,7 +525,9 @@ describe('McpPage', () => {
 
     it('throws when networkConditions is set with network blocking enabled', async () => {
       const {mcpPage, pptrPage} = await createMcpPage({
-        hasNetworkBlockOrAllowlist: true,
+        config: createMockServerConfig({
+          blockedUrlPattern: ['*://blocked.example.com/*'],
+        }),
       });
       await assert.rejects(
         () => mcpPage.emulate({networkConditions: 'Slow 3G'}),
@@ -1116,6 +1119,136 @@ describe('McpPage', () => {
       assert.notStrictEqual(mcpPage.commentBridge, undefined);
       sinon.assert.calledOnce(devtoolsPage.exposeFunction);
       sinon.assert.calledThrice(devtoolsPage.evaluate);
+    });
+
+    it('disposes and clears commentBridge on mcpPage.disposeCommentBridge()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      await mcpPage.openDevTools();
+      const bridge = mcpPage.commentBridge;
+      assert.notStrictEqual(bridge, undefined);
+
+      if (bridge) {
+        const disposeSpy = sinon.spy(bridge, 'dispose');
+        mcpPage.disposeCommentBridge();
+
+        sinon.assert.calledOnceWithExactly(disposeSpy);
+        assert.strictEqual(mcpPage.commentBridge, undefined);
+      }
+    });
+
+    it('does not re-attach commentBridge in getDevToolsData() after disposeCommentBridge()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.hasDevTools.resolves(true);
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      await mcpPage.openDevTools();
+      assert.notStrictEqual(mcpPage.commentBridge, undefined);
+
+      mcpPage.disposeCommentBridge();
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+      devtoolsPage.exposeFunction.resetHistory();
+      devtoolsPage.evaluate.reset();
+      devtoolsPage.evaluate.resolves({
+        cdpRequestId: 'req-2',
+        cdpBackendNodeId: 20,
+      });
+
+      const data = await mcpPage.getDevToolsData();
+
+      assert.deepStrictEqual(data, {
+        cdpRequestId: 'req-2',
+        cdpBackendNodeId: 20,
+      });
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+      sinon.assert.notCalled(devtoolsPage.exposeFunction);
+      sinon.assert.calledOnce(devtoolsPage.evaluate);
+    });
+
+    it('re-attaches commentBridge when ensureDevToolsCommentBridge() is called after disposeCommentBridge()', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const devtoolsPage = createMockPuppeteerPage();
+      devtoolsPage.evaluate.resolves(true);
+      pptrPage.openDevTools.resolves(devtoolsPage);
+
+      await mcpPage.openDevTools();
+      mcpPage.disposeCommentBridge();
+      assert.strictEqual(mcpPage.commentBridge, undefined);
+
+      const bridge = await mcpPage.ensureDevToolsCommentBridge(devtoolsPage);
+
+      assert.notStrictEqual(bridge, undefined);
+      assert.strictEqual(bridge, mcpPage.commentBridge);
+    });
+  });
+
+  describe('syncSourceMaps()', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('updates JS and CSS source map settings on an initialized DevTools universe', async () => {
+      const config = createMockServerConfig({sourceMaps: true});
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.createCDPSession.resolves(createMockCDPSession());
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const mcpPage = new McpPage(target, 1, {
+        config,
+        locatorClass: Locator,
+      });
+      await mcpPage.init();
+
+      config.commit(createMockServerConfig({sourceMaps: false}));
+      mcpPage.syncSourceMaps();
+
+      const settings = mcpPage.devtoolsUniverse?.universe.settings;
+      assert.ok(settings);
+      assert.strictEqual(
+        settings
+          .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+          .get(),
+        false,
+      );
+      assert.strictEqual(
+        settings
+          .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+          .get(),
+        false,
+      );
+    });
+
+    it('reads updated sourceMaps from config when initialized later', async () => {
+      const config = createMockServerConfig({sourceMaps: true});
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.createCDPSession.resolves(createMockCDPSession());
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const mcpPage = new McpPage(target, 1, {
+        config,
+        locatorClass: Locator,
+      });
+
+      config.commit(createMockServerConfig({sourceMaps: false}));
+      mcpPage.syncSourceMaps();
+      await mcpPage.init();
+
+      const settings = mcpPage.devtoolsUniverse?.universe.settings;
+      assert.ok(settings);
+      assert.strictEqual(
+        settings
+          .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+          .get(),
+        false,
+      );
+      assert.strictEqual(
+        settings
+          .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+          .get(),
+        false,
+      );
     });
   });
 

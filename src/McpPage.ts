@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
@@ -179,29 +180,27 @@ export class McpPage implements ContextPage {
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
-  #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
-  #sourceMaps: boolean;
+  #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
+  #commentBridgeDisposed = false;
   #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
     id: number,
     options: {
-      hasNetworkBlockOrAllowlist: boolean;
+      config: ReadonlyServerConfig;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
       navigationTimeout?: number;
-      sourceMaps?: boolean;
       onNotification?: (message: string) => void;
     },
   ) {
-    this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
+    this.#config = options.config;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
-    this.#sourceMaps = options.sourceMaps ?? true;
     this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
@@ -209,6 +208,13 @@ export class McpPage implements ContextPage {
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+  }
+
+  get #hasNetworkBlockOrAllowlist(): boolean {
+    return Boolean(
+      this.#config.resolved.allowedUrlPattern ||
+      this.#config.resolved.blockedUrlPattern,
+    );
   }
 
   get pptrPage(): Page {
@@ -275,6 +281,10 @@ export class McpPage implements ContextPage {
     if (this.#pptrPage) {
       return this.#pptrPage.isClosed();
     }
+    return this.#disposed;
+  }
+
+  isDisposed(): boolean {
     return this.#disposed;
   }
 
@@ -356,11 +366,24 @@ export class McpPage implements ContextPage {
     try {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session, {
-        sourceMaps: this.#sourceMaps,
+        sourceMaps: this.#config.resolved.sourceMaps,
       });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
+  }
+
+  syncSourceMaps(): void {
+    if (!this.#devtoolsUniverse) {
+      return;
+    }
+    const sourceMaps = this.#config.resolved.sourceMaps;
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
   }
 
   get devtoolsUniverse(): TargetUniverse | undefined {
@@ -559,6 +582,12 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  disposeCommentBridge(): void {
+    this.#commentBridgeDisposed = true;
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
+  }
+
   /**
    * Returns the comment bridge attached to the DevTools page, or undefined if
    * the DevTools page does not support DevTools comments.
@@ -566,6 +595,7 @@ export class McpPage implements ContextPage {
   async ensureDevToolsCommentBridge(
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined> {
+    this.#commentBridgeDisposed = false;
     if (!this.#commentBridge) {
       this.#commentBridge = new DevToolsCommentBridge({
         onNotification: this.#onNotification,
@@ -674,8 +704,7 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.#disposed = true;
-    this.#commentBridge?.dispose();
-    this.#commentBridge = undefined;
+    this.disposeCommentBridge();
     if (this.#screenRecorder) {
       const {recorder} = this.#screenRecorder;
       this.#screenRecorder = null;
@@ -1087,7 +1116,9 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+      if (!this.#commentBridgeDisposed) {
+        await this.ensureDevToolsCommentBridge(devtoolsPage);
+      }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
           // @ts-expect-error no types

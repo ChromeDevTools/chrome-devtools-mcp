@@ -30,6 +30,12 @@ describe('McpServer', () => {
     ClearcutLogger.resetForTesting();
   });
 
+  function parseConfig(argv: string[] = []) {
+    return new ConfigParser('1.0.0', ['node', 'script.js', ...argv], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parseConfig();
+  }
+
   async function createTestServer(
     extraArgs: string[] = [],
     {mockContext = true}: {mockContext?: boolean} = {},
@@ -45,15 +51,9 @@ describe('McpServer', () => {
       sinon.stub(McpContext, 'create').returns(context);
     }
 
-    const serverArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', ...extraArgs],
-      {
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-      },
-    ).parse();
-    const server = await McpServer.from(serverArgs, {browserManager});
-    return {server, browserManager, context};
+    const config = parseConfig(extraArgs);
+    const server = await McpServer.from(config, {browserManager});
+    return {server, browserManager, context, config};
   }
 
   describe('callTool', () => {
