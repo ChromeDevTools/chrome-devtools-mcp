@@ -21,6 +21,14 @@ describe('network', () => {
   });
 
   describe('list_network_requests', () => {
+    it('describes the default preserved navigation history', () => {
+      const tool = listNetworkRequests(createMockParsedArguments());
+      assert.strictEqual(
+        tool.schema.includePreservedRequests.description,
+        'Set to true to return the preserved requests over the last 3 navigations.',
+      );
+    });
+
     it('describes preserved requests using maxNavigationSaved', () => {
       const tool = listNetworkRequests(
         createMockParsedArguments({maxNavigationSaved: 5}),

@@ -143,6 +143,14 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    it('describes the default preserved navigation history', () => {
+      const tool = listConsoleMessages(createMockParsedArguments());
+      assert.strictEqual(
+        tool.schema.includePreservedMessages.description,
+        'Set to true to return the preserved messages over the last 3 navigations.',
+      );
+    });
+
     it('describes preserved messages using maxNavigationSaved', () => {
       const tool = listConsoleMessages(
         createMockParsedArguments({maxNavigationSaved: 5}),

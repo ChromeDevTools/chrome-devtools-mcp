@@ -273,12 +273,9 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(
-        page,
-        undefined,
-        undefined,
-        this.#maxNavigationSaved,
-      );
+      this.#networkCollector = new NetworkCollector(page, {
+        maxNavigationSaved: this.#maxNavigationSaved,
+      });
       this.#consoleCollector = new ConsoleCollector(
         page,
         collect => {
@@ -294,8 +291,7 @@ export class McpPage implements ContextPage {
             },
           };
         },
-        undefined,
-        this.#maxNavigationSaved,
+        {maxNavigationSaved: this.#maxNavigationSaved},
       );
     }
     this.updateTimeouts();
@@ -1168,7 +1164,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      undefined,
+      {maxNavigationSaved: this.#maxNavigationSaved},
       collect => {
         return {
           request: req => {
@@ -1179,7 +1175,6 @@ export class McpPage implements ContextPage {
           },
         } as ListenerMap;
       },
-      this.#maxNavigationSaved,
     );
   }
 }

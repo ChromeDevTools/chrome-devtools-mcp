@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PageCollector} from '../collectors/PageCollector.js';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {ConsoleMessageType} from '../third_party/index.js';
@@ -45,7 +44,7 @@ export const listConsoleMessages = definePageTool(
   (cliArgs: ParsedArguments) => {
     return {
       name: LIST_CONSOLE_MESSAGES_TOOL_NAME,
-      description: `List all console messages for the target page since the last navigation.${cliArgs?.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
+      description: `List all console messages for the target page since the last navigation.${cliArgs.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
       annotations: {
         category: ToolCategory.DEBUGGING,
         readOnlyHint: true,
@@ -78,7 +77,7 @@ export const listConsoleMessages = definePageTool(
           .default(false)
           .optional()
           .describe(
-            `Set to true to return the preserved messages over the last ${cliArgs?.maxNavigationSaved ?? PageCollector.MAX_NAVIGATION_SAVED} navigations.`,
+            `Set to true to return the preserved messages over the last ${cliArgs.maxNavigationSaved} navigations.`,
           ),
         includeStackTraces: zod
           .boolean()

@@ -9,6 +9,7 @@ import path from 'node:path';
 import {describe, it} from 'node:test';
 
 import {ConfigParser} from '../src/config/ConfigParser.js';
+import {PageCollector} from '../src/collectors/PageCollector.js';
 import {getCliOptions, mcpOptions} from '../src/config/mcp-options.js';
 import {buildCommand} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
@@ -614,6 +615,10 @@ describe('cli args parsing', () => {
   it('parses maxNavigationSaved flag', async () => {
     const defaultParsed = parseConfig(['main.js']);
     assert.strictEqual(defaultParsed.maxNavigationSaved, 3);
+    assert.strictEqual(
+      defaultParsed.maxNavigationSaved,
+      PageCollector.MAX_NAVIGATION_SAVED,
+    );
 
     const camelCaseArgs = parseConfig(['--maxNavigationSaved', '5']);
     assert.strictEqual(camelCaseArgs.maxNavigationSaved, 5);

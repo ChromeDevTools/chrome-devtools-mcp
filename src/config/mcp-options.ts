@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DEFAULT_MAX_NAVIGATION_SAVED} from '../collectors/constants.js';
 import type {YargsOptions} from '../third_party/index.js';
 import os from 'node:os';
 import path from 'node:path';
@@ -148,7 +149,7 @@ export const mcpOptions = {
   },
   maxNavigationSaved: {
     type: 'number',
-    default: 3,
+    default: DEFAULT_MAX_NAVIGATION_SAVED,
     describe: `Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.`,
     coerce: (value: number | undefined) => {
       if (value === undefined) {

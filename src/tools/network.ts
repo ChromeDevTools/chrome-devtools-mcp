@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {PageCollector} from '../collectors/PageCollector.js';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {ResourceType} from '../third_party/index.js';
@@ -69,7 +68,7 @@ export const listNetworkRequests = definePageTool((args: ParsedArguments) => ({
       .default(false)
       .optional()
       .describe(
-        `Set to true to return the preserved requests over the last ${args?.maxNavigationSaved ?? PageCollector.MAX_NAVIGATION_SAVED} navigations.`,
+        `Set to true to return the preserved requests over the last ${args.maxNavigationSaved} navigations.`,
       ),
   },
   blockedByDialog: false,
