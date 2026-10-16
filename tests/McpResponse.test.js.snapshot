@@ -1470,12 +1470,12 @@ exports[`lighthouse > rounds category scores and shows unscored categories as n/
 }
 `;
 
-exports[`third-party developer tools > list no third-party developer tools if there are none 1`] = `
+exports[`third-party developer tools > lists no third-party developer tools if there are none 1`] = `
 ## Third-party developer tools
 No third-party developer tools available.
 `;
 
-exports[`third-party developer tools > list no third-party developer tools if there are none 2`] = `
+exports[`third-party developer tools > lists no third-party developer tools if there are none 2`] = `
 {
   "thirdPartyDeveloperTools": []
 }

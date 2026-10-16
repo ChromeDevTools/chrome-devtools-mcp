@@ -610,7 +610,7 @@ export class McpResponse implements Response {
     return undefined;
   }
 
-  async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
+  async #handleThirdPartyDeveloperTools(): Promise<ToolGroups | undefined> {
     if (
       this.#args.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
@@ -793,7 +793,7 @@ export class McpResponse implements Response {
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
       this.#handleAttachedConsoleMessage(),
-      this.#handleThirdPartyDevelopeTools(),
+      this.#handleThirdPartyDeveloperTools(),
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),

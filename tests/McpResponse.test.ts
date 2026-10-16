@@ -1163,20 +1163,21 @@ describe('third-party developer tools', () => {
     );
   });
 
-  it('list no third-party developer tools if there are none', async t => {
-    await withMcpContext(
-      async (response, context) => {
-        response.setListThirdPartyDeveloperTools();
-        const {content, structuredContent} = await response.handle(context);
-        const firstContent = content[0];
-        assert.ok(firstContent);
-        assert.ok(getTextContent(firstContent));
-        t.assert.snapshot(getTextContent(firstContent));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
-      },
-      undefined,
-      {categoryExperimentalThirdParty: true},
+  it('lists no third-party developer tools if there are none', async t => {
+    const response = new McpResponse(
+      createMockParsedArguments({categoryExperimentalThirdParty: true}),
     );
+    const page = createMockMcpPage();
+    page.getToolGroups.resolves([]);
+    response.setPage(page);
+    response.setListThirdPartyDeveloperTools();
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const firstContent = content[0];
+    assert.ok(firstContent);
+    t.assert.snapshot(getTextContent(firstContent));
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
   });
 
   async function testIncludesThirdPartyDeveloperTools(
