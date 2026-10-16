@@ -45,8 +45,7 @@ chrome-devtools stop
 
 ## Command Usage
 
-The CLI only supports tools available in the MCP server without additional arguments (see [Tool reference](./tool-reference.md)).
-Thus, `--categoryExtensions` tools are currently not available in the CLI.
+The CLI supports all tools available in the MCP server even if they require a flag to activate in the MCP server (see [Tool reference](./tool-reference.md)).
 
 ```sh
 chrome-devtools <tool> [arguments] [flags]
