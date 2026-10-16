@@ -24,13 +24,19 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {
   type Browser,
   type HTTPResponse,
+  ScreenRecorder,
   type Target,
   TargetType,
 } from '../src/third_party/index.js';
-import type {TraceResult} from '../src/processors/PerformanceTrace.js';
+import {
+  parseRawTraceBuffer,
+  type TraceResult,
+  traceResultIsSuccess,
+} from '../src/processors/PerformanceTrace.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
+import type {ServerConfig} from '../src/config/ServerConfig.js';
 import {
   createMockMcpWorker,
   createMockPuppeteerBrowser,
@@ -39,6 +45,7 @@ import {
   createMockServerConfig,
 } from './mocks.js';
 import {serverHooks, TestServer} from './server.js';
+import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   assertNoServiceWorkerReported,
   createConnectedMcpContext,
@@ -72,17 +79,19 @@ describe('McpContext', () => {
 
   async function createMockContext(options?: {
     browser?: sinon.SinonStubbedInstance<Browser>;
+    config?: ServerConfig;
+    heapSnapshotManager?: HeapSnapshotManager;
     targets?: Target[];
   }) {
     const browser = options?.browser ?? createMockPuppeteerBrowser();
-    const {target: defaultTarget} = createPageTarget();
+    const defaultTarget = createMockPuppeteerTarget();
     browser.targets.returns(options?.targets ?? [defaultTarget]);
-    browser.browserContexts.returns([]);
     return await createConnectedMcpContext(
       browser,
       {
-        config: createMockServerConfig(),
-        heapSnapshotManager: new HeapSnapshotManager(),
+        config: options?.config ?? createMockServerConfig(),
+        heapSnapshotManager:
+          options?.heapSnapshotManager ?? new HeapSnapshotManager(),
       },
       Locator,
     );
@@ -172,7 +181,6 @@ describe('McpContext', () => {
       });
     }
   });
-
   it('list pages', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();
@@ -548,6 +556,131 @@ describe('McpContext', () => {
     sinon.assert.calledOnceWithExactly(disposeSpy);
   });
 
+  async function updateConfig(
+    config: ServerConfig,
+    context: McpContext,
+    next: Partial<ServerConfig['resolved']>,
+  ): Promise<void> {
+    const previousArgs = config.resolved;
+    config.commit(createMockServerConfig({...previousArgs, ...next}));
+    await context.onConfigChanged(previousArgs);
+  }
+
+  it('falls back when the selected page is no longer a valid page target', async () => {
+    const regularTarget = createMockPuppeteerTarget();
+    const bgTarget = createMockPuppeteerTarget({
+      type: TargetType.BACKGROUND_PAGE,
+    });
+    const config = createMockServerConfig({
+      experimentalIncludeAllPages: true,
+    });
+    const context = await createMockContext({
+      config,
+      targets: [regularTarget, bgTarget],
+    });
+    const [regularPage, bgPage] = context.getPages();
+    assert.ok(regularPage);
+    assert.ok(bgPage);
+    context.selectPage(bgPage);
+    const disposeSpy = sinon.spy(bgPage, 'dispose');
+
+    await updateConfig(config, context, {
+      experimentalIncludeAllPages: false,
+    });
+
+    assert.ok(context.isPageSelected(regularPage));
+    sinon.assert.calledOnceWithExactly(disposeSpy);
+    assert.deepStrictEqual(context.getSelectedPageFallback(), {
+      wasClosed: false,
+    });
+  });
+
+  it('clears the selection when the selected page is no longer a valid page target and no other pages exist', async () => {
+    const bgTarget = createMockPuppeteerTarget({
+      type: TargetType.BACKGROUND_PAGE,
+    });
+    const config = createMockServerConfig({
+      experimentalIncludeAllPages: true,
+    });
+    const context = await createMockContext({
+      config,
+      targets: [bgTarget],
+    });
+    const bgPage = context.getSelectedMcpPage();
+    const disposeSpy = sinon.spy(bgPage, 'dispose');
+
+    await updateConfig(config, context, {
+      experimentalIncludeAllPages: false,
+    });
+
+    sinon.assert.calledOnceWithExactly(disposeSpy);
+    assert.throws(() => context.getSelectedMcpPage(), /No page selected/);
+    assert.deepStrictEqual(context.getSelectedPageFallback(), {
+      wasClosed: false,
+    });
+  });
+
+  it('preserves an unread fallback when the selection is cleared and a later snapshot selects a new page', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const bgTarget = createMockPuppeteerTarget({
+      type: TargetType.BACKGROUND_PAGE,
+    });
+    const config = createMockServerConfig({
+      experimentalIncludeAllPages: true,
+    });
+    const context = await createMockContext({
+      browser,
+      config,
+      targets: [bgTarget],
+    });
+
+    await updateConfig(config, context, {
+      experimentalIncludeAllPages: false,
+    });
+    assert.throws(() => context.getSelectedMcpPage(), /No page selected/);
+
+    const regularTarget = createMockPuppeteerTarget();
+    browser.targets.returns([regularTarget, bgTarget]);
+    await context.createPagesSnapshot();
+
+    const [regularPage] = context.getPages();
+    assert.ok(regularPage);
+    assert.ok(context.isPageSelected(regularPage));
+    assert.deepStrictEqual(context.getSelectedPageFallback(), {
+      wasClosed: false,
+    });
+  });
+
+  it('does not operate on a closed and already-disposed selected page in onConfigChanged or release methods', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const pptrPage = createMockPuppeteerPage();
+    const target = createMockPuppeteerTarget({page: pptrPage});
+    const config = createMockServerConfig();
+    const context = await createMockContext({
+      browser,
+      config,
+      targets: [target],
+    });
+    const page = context.getSelectedMcpPage();
+    pptrPage.isClosed.returns(true);
+    browser.targets.returns([]);
+
+    await context.createPagesSnapshot();
+
+    const syncSourceMapsSpy = sinon.spy(page, 'syncSourceMaps');
+    const disposeCommentBridgeSpy = sinon.spy(page, 'disposeCommentBridge');
+    const disposeSpy = sinon.spy(page, 'dispose');
+
+    await updateConfig(config, context, {sourceMaps: false});
+    await context.releaseScreencasts();
+    context.releaseDevToolsComments();
+    context.dispose();
+
+    sinon.assert.notCalled(syncSourceMapsSpy);
+    sinon.assert.notCalled(disposeCommentBridgeSpy);
+    sinon.assert.notCalled(disposeSpy);
+  });
+
   it('does not report a fallback for a regular selection', async () => {
     await withMcpContext(async (_response, context) => {
       await context.newPage();
@@ -683,6 +816,7 @@ describe('McpContext', () => {
 
     it('resets the browser state and reports a reconnect notice once when the browser changes', async () => {
       const firstBrowser = createBrowser();
+      firstBrowser.targets.returns([createMockPuppeteerTarget()]);
       const secondBrowser = createBrowser();
       const getBrowser = sinon.stub<[], Promise<Browser>>();
       getBrowser.onFirstCall().resolves(firstBrowser);
@@ -691,7 +825,7 @@ describe('McpContext', () => {
 
       await context.ensureBrowser();
       assert.ok(!context.consumeReconnectNotice());
-      context.setIsRunningPerformanceTrace(true);
+      context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
 
       await context.ensureBrowser();
 
@@ -1457,6 +1591,239 @@ describe('McpContext', () => {
           assert.strictEqual(result, undefined);
         });
       });
+    });
+  });
+
+  describe('onConfigChanged', () => {
+    it('reads the updated CrUX setting from the shared config', async () => {
+      const config = createMockServerConfig({
+        performanceCrux: true,
+      });
+      const context = await createMockContext({config});
+
+      await updateConfig(config, context, {performanceCrux: false});
+
+      assert.strictEqual(context.isCruxEnabled(), false);
+    });
+
+    it('reads the updated allowUnrestrictedPaths setting from the shared config', async () => {
+      const config = createMockServerConfig({
+        allowUnrestrictedPaths: false,
+      });
+      const context = await createMockContext({config});
+      const outsidePath = path.resolve(os.homedir(), 'anywhere.txt');
+      await assert.rejects(context.validatePath(outsidePath), /Access denied/);
+
+      await updateConfig(config, context, {allowUnrestrictedPaths: true});
+
+      assert.strictEqual(
+        await context.validatePath(outsidePath),
+        await resolveCanonicalPath(outsidePath),
+      );
+    });
+
+    it('updates sourceMaps on existing pages only when changed', async () => {
+      const config = createMockServerConfig({
+        sourceMaps: true,
+      });
+      const context = await createMockContext({config});
+      const mcpPage = context.getSelectedMcpPage();
+      const syncSourceMapsSpy = sinon.spy(mcpPage, 'syncSourceMaps');
+
+      await updateConfig(config, context, {sourceMaps: true});
+      sinon.assert.notCalled(syncSourceMapsSpy);
+
+      await updateConfig(config, context, {sourceMaps: false});
+      sinon.assert.calledOnceWithExactly(syncSourceMapsSpy);
+
+      syncSourceMapsSpy.resetHistory();
+      await updateConfig(config, context, {
+        performanceCrux: false,
+        sourceMaps: false,
+      });
+      sinon.assert.notCalled(syncSourceMapsSpy);
+
+      await updateConfig(config, context, {sourceMaps: true});
+      sinon.assert.calledOnceWithExactly(syncSourceMapsSpy);
+    });
+
+    it('refreshes the pages when experimentalIncludeAllPages changes', async () => {
+      const config = createMockServerConfig({
+        experimentalIncludeAllPages: false,
+      });
+      const context = await createMockContext({config});
+      const snapshotSpy = sinon.spy(context, 'createPagesSnapshot');
+
+      await updateConfig(config, context, {experimentalIncludeAllPages: true});
+
+      sinon.assert.calledOnceWithExactly(snapshotSpy);
+    });
+
+    it('releases feature state when capabilities transition from enabled to disabled', async () => {
+      const config = createMockServerConfig({
+        memoryDebugging: true,
+        devtoolsComments: true,
+      });
+      const context = await createMockContext({config});
+      const releaseScreencasts = sinon
+        .stub(context, 'releaseScreencasts')
+        .resolves();
+      const releaseHeapSnapshots = sinon.stub(context, 'releaseHeapSnapshots');
+      const releasePerformanceTrace = sinon
+        .stub(context, 'releasePerformanceTrace')
+        .resolves();
+      const releaseDevToolsComments = sinon.stub(
+        context,
+        'releaseDevToolsComments',
+      );
+
+      await updateConfig(config, context, {
+        categoryDebugging: false,
+        categoryPerformance: false,
+        memoryDebugging: false,
+      });
+
+      sinon.assert.calledOnceWithExactly(releaseScreencasts);
+      sinon.assert.calledOnceWithExactly(releaseHeapSnapshots);
+      sinon.assert.calledOnceWithExactly(releasePerformanceTrace);
+      sinon.assert.calledOnceWithExactly(releaseDevToolsComments);
+    });
+
+    it('releases feature state when switching to slim mode', async () => {
+      const config = createMockServerConfig({
+        memoryDebugging: true,
+        devtoolsComments: true,
+      });
+      const context = await createMockContext({config});
+      const releaseScreencasts = sinon
+        .stub(context, 'releaseScreencasts')
+        .resolves();
+      const releaseHeapSnapshots = sinon.stub(context, 'releaseHeapSnapshots');
+      const releasePerformanceTrace = sinon
+        .stub(context, 'releasePerformanceTrace')
+        .resolves();
+      const releaseDevToolsComments = sinon.stub(
+        context,
+        'releaseDevToolsComments',
+      );
+
+      await updateConfig(config, context, {slim: true});
+
+      sinon.assert.calledOnceWithExactly(releaseScreencasts);
+      sinon.assert.calledOnceWithExactly(releaseHeapSnapshots);
+      sinon.assert.calledOnceWithExactly(releasePerformanceTrace);
+      sinon.assert.calledOnceWithExactly(releaseDevToolsComments);
+    });
+
+    it('does not release state of capabilities that stay enabled or stay disabled', async () => {
+      const config = createMockServerConfig({
+        memoryDebugging: false,
+        devtoolsComments: true,
+      });
+      const context = await createMockContext({config});
+      const releaseScreencasts = sinon
+        .stub(context, 'releaseScreencasts')
+        .resolves();
+      const releaseHeapSnapshots = sinon.stub(context, 'releaseHeapSnapshots');
+      const releasePerformanceTrace = sinon
+        .stub(context, 'releasePerformanceTrace')
+        .resolves();
+      const releaseDevToolsComments = sinon.stub(
+        context,
+        'releaseDevToolsComments',
+      );
+
+      await updateConfig(config, context, {
+        memoryDebugging: false,
+        devtoolsComments: true,
+      });
+
+      sinon.assert.notCalled(releaseScreencasts);
+      sinon.assert.notCalled(releaseHeapSnapshots);
+      sinon.assert.notCalled(releasePerformanceTrace);
+      sinon.assert.notCalled(releaseDevToolsComments);
+    });
+  });
+
+  describe('releaseState', () => {
+    it('stops and clears the screencast recording', async () => {
+      const context = await createMockContext();
+      const page = context.getSelectedMcpPage();
+      const recorder = sinon.createStubInstance(ScreenRecorder);
+      recorder.stop.resolves();
+      page.setScreenRecorder({recorder, filePath: '/tmp/video.mp4'});
+
+      await context.releaseScreencasts();
+
+      sinon.assert.calledOnceWithExactly(recorder.stop);
+      assert.strictEqual(page.getScreenRecorder(), null);
+    });
+
+    it('clears the screencast recording when stopping fails', async () => {
+      const context = await createMockContext();
+      const page = context.getSelectedMcpPage();
+      const recorder = sinon.createStubInstance(ScreenRecorder);
+      recorder.stop.rejects(new Error('ffmpeg error'));
+      page.setScreenRecorder({recorder, filePath: '/tmp/video.mp4'});
+
+      await context.releaseScreencasts();
+
+      sinon.assert.calledOnceWithExactly(recorder.stop);
+      assert.strictEqual(page.getScreenRecorder(), null);
+    });
+
+    it('disposes loaded heap snapshots', async () => {
+      const heapSnapshotManager = new HeapSnapshotManager();
+      const context = await createMockContext({
+        heapSnapshotManager,
+      });
+      await context.getHeapSnapshotStats(
+        path.join(process.cwd(), 'tests/fixtures/example.heapsnapshot'),
+      );
+
+      context.releaseHeapSnapshots();
+
+      assert.strictEqual(heapSnapshotManager.hasSnapshots(), false);
+    });
+
+    it('does not dispose heapSnapshotManager when no snapshots are loaded', async () => {
+      const heapSnapshotManager = new HeapSnapshotManager();
+      const disposeSpy = sinon.spy(heapSnapshotManager, 'dispose');
+      const context = await createMockContext({heapSnapshotManager});
+
+      context.releaseHeapSnapshots();
+
+      sinon.assert.notCalled(disposeSpy);
+    });
+
+    it('stops the running performance trace and clears recorded traces', async () => {
+      const {page: pptrPage, target} = createPageTarget();
+      const context = await createMockContext({targets: [target]});
+      context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
+      const traceResult = await parseRawTraceBuffer(
+        loadTraceAsBuffer('basic-trace.json.gz'),
+      );
+      assert.ok(traceResultIsSuccess(traceResult));
+      context.storeTraceRecording(traceResult);
+
+      await context.releasePerformanceTrace();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.tracing.stop);
+      assert.strictEqual(context.isRunningPerformanceTrace(), false);
+      assert.deepStrictEqual(context.recordedTraces(), []);
+    });
+
+    it('disposes comment bridges once per page when devtoolsComments is released', async () => {
+      const context = await createMockContext();
+      const mcpPage = context.getSelectedMcpPage();
+      const disposeCommentBridgeSpy = sinon.spy(
+        mcpPage,
+        'disposeCommentBridge',
+      );
+
+      context.releaseDevToolsComments();
+
+      sinon.assert.calledOnceWithExactly(disposeCommentBridgeSpy);
     });
   });
 

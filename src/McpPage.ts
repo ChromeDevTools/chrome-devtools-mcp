@@ -175,6 +175,9 @@ export class McpPage implements ContextPage {
   // Screencast
   #screenRecorder: ScreenRecorderData | null = null;
 
+  // Performance trace
+  #isRunningPerformanceTrace = false;
+
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
@@ -397,6 +400,14 @@ export class McpPage implements ContextPage {
 
   setScreenRecorder(data: ScreenRecorderData | null): void {
     this.#screenRecorder = data;
+  }
+
+  isRunningPerformanceTrace(): boolean {
+    return this.#isRunningPerformanceTrace;
+  }
+
+  setIsRunningPerformanceTrace(x: boolean): void {
+    this.#isRunningPerformanceTrace = x;
   }
 
   throwIfDialogOpen(): void {
@@ -686,6 +697,7 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.#disposed = true;
+    this.#isRunningPerformanceTrace = false;
     this.disposeCommentBridge();
     if (this.#screenRecorder) {
       const {recorder} = this.#screenRecorder;
