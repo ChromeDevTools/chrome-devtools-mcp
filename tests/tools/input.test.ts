@@ -1286,7 +1286,10 @@ describe('input', () => {
       sinon.assert.calledWithExactly(page.getElementByUid.firstCall, '1_1');
       sinon.assert.calledWithExactly(page.getElementByUid.secondCall, '1_2');
       sinon.assert.calledOnceWithExactly(fromHandle.drag, toHandle);
-      sinon.assert.calledOnceWithExactly(toHandle.drop, fromHandle);
+      sinon.assert.calledOnceWithMatch(
+        toHandle.drop,
+        sinon.match.same(fromHandle),
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Successfully dragged an element',

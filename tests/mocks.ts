@@ -460,14 +460,8 @@ export function createMockDialog(
   return dialog;
 }
 
-export type MockElementHandle = sinon.SinonStubbedInstance<
-  ElementHandle<Element>
-> & {
-  drop: sinon.SinonStub<[element: ElementHandle<Element>], Promise<void>>;
-};
-
 export function createMockElementHandle(): {
-  handle: MockElementHandle;
+  handle: sinon.SinonStubbedInstance<ElementHandle<Element>>;
   locator: sinon.SinonStubbedInstance<Locator<Element>>;
 } {
   const handle =
@@ -477,7 +471,7 @@ export function createMockElementHandle(): {
   const locator = sinon.createStubInstance<Locator<Element>>(Locator);
   locator.setTimeout.returns(locator);
   handle.asLocator.returns(locator);
-  return {handle: handle as unknown as MockElementHandle, locator};
+  return {handle, locator};
 }
 
 export function createMockTarget(): sinon.SinonStubbedInstance<MockTarget> {
