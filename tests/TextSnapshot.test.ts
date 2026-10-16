@@ -104,6 +104,28 @@ describe('TextSnapshot', () => {
     });
   });
 
+  it('drops InlineTextBox nodes from verbose snapshots', async () => {
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.setContent(
+        html`<p style="width: 40px">Some wrapped text content</p>`,
+      );
+
+      const snapshot = await TextSnapshot.create(page, {verbose: true});
+
+      let staticTextNode: TextSnapshotNode | undefined;
+      for (const node of snapshot.idToNode.values()) {
+        assert.notStrictEqual(node.role, 'InlineTextBox');
+        if (node.role === 'StaticText') {
+          staticTextNode = node;
+        }
+      }
+      assert.ok(staticTextNode, 'StaticText node should be in the snapshot');
+      assert.strictEqual(staticTextNode.name, 'Some wrapped text content');
+      assert.deepStrictEqual(staticTextNode.children, []);
+    });
+  });
+
   it('inserts extraHandles into the snapshot correctly', async () => {
     await withMcpContext(async (_response, context) => {
       const page = context.getSelectedMcpPage();

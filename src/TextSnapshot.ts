@@ -14,6 +14,15 @@ import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';
 
+/**
+ * InlineTextBox nodes are layout line fragments of a StaticText node. They
+ * repeat the parent text, have no backendNodeId and cannot be targeted by
+ * tools. Puppeteer only serializes them for non-interesting-only snapshots.
+ */
+function isLayoutOnlyNode(node: SerializedAXNode): boolean {
+  return node.role === 'InlineTextBox';
+}
+
 export class TextSnapshot {
   static nextSnapshotId = 1;
 
@@ -94,7 +103,9 @@ export class TextSnapshot {
         ...node,
         id,
         children: node.children
-          ? node.children.map(child => assignIds(child))
+          ? node.children
+              .filter(child => !isLayoutOnlyNode(child))
+              .map(child => assignIds(child))
           : [],
       };
 
