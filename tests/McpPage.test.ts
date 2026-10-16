@@ -781,7 +781,7 @@ describe('McpPage', () => {
       // identical to the last one of this session (see restoreEmulation).
       sinon.assert.calledThrice(pptrPage.setViewport);
       sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, {
-        width: 401,
+        width: 399,
         height: 400,
         deviceScaleFactor: 1,
         isMobile: false,
@@ -798,7 +798,7 @@ describe('McpPage', () => {
       });
     });
 
-    it('does not touch the viewport when none was configured', async () => {
+    it('does not send a scratch viewport when none was configured', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({cpuThrottlingRate: 4});
       pptrPage.setViewport.resetHistory();

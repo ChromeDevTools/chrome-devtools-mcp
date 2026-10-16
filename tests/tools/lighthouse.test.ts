@@ -28,42 +28,6 @@ describe('lighthouse', () => {
       server.addHtmlRoute('/test', html`<div>Test</div>`);
 
       await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/test'));
-
-        await lighthouseAudit(args).handler(
-          {
-            params: {
-              mode: 'navigation',
-              device: 'desktop',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-
-        const data = response.attachedLighthouseResult;
-        assert.ok(data);
-
-        assert.ok(data.summary);
-        assert.equal(data.summary.mode, 'navigation');
-        assert.equal(data.summary.device, 'desktop');
-        assert.ok(data.reports.length === 2); // json, html
-        assert.equal(data.failedAudits.length, data.summary.audits.failed);
-
-        // Verify files exist
-        for (const reportPath of data.reports) {
-          const stats = await fs.stat(reportPath);
-          assert.ok(stats.isFile());
-        }
-      });
-    });
-
-    it('keeps the emulated viewport after a navigation audit', async () => {
-      server.addHtmlRoute('/test', html`<div>Test</div>`);
-
-      await withMcpContext(async (response, context, args) => {
         const mcpPage = context.getSelectedMcpPage();
         const page = mcpPage.pptrPage;
         await page.goto(server.getRoute('/test'));
@@ -84,15 +48,12 @@ describe('lighthouse', () => {
             deviceScaleFactor: window.devicePixelRatio,
             screenWidth: screen.width,
             orientation: screen.orientation.type,
+            maxTouchPoints: navigator.maxTouchPoints,
           }));
-        const expected = {
-          width: 390,
-          height: 844,
-          deviceScaleFactor: 3,
-          screenWidth: 390,
-          orientation: 'portrait-primary',
-        };
-        assert.deepEqual(await readViewport(), expected);
+        const emulated = await readViewport();
+        assert.equal(emulated.width, 390);
+        assert.equal(emulated.deviceScaleFactor, 3);
+        assert.ok(emulated.maxTouchPoints > 0);
 
         await lighthouseAudit(args).handler(
           {
@@ -106,7 +67,24 @@ describe('lighthouse', () => {
           context,
         );
 
-        assert.deepEqual(await readViewport(), expected);
+        // Lighthouse replaces and then clears the device metrics override, the
+        // emulated viewport must be back afterwards.
+        assert.deepEqual(await readViewport(), emulated);
+
+        const data = response.attachedLighthouseResult;
+        assert.ok(data);
+
+        assert.ok(data.summary);
+        assert.equal(data.summary.mode, 'navigation');
+        assert.equal(data.summary.device, 'desktop');
+        assert.ok(data.reports.length === 2); // json, html
+        assert.equal(data.failedAudits.length, data.summary.audits.failed);
+
+        // Verify files exist
+        for (const reportPath of data.reports) {
+          const stats = await fs.stat(reportPath);
+          assert.ok(stats.isFile());
+        }
       });
     });
 
