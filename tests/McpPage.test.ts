@@ -1021,6 +1021,49 @@ describe('McpPage', () => {
         assert.ok(element);
       });
     });
+
+    it('finds text in an iframe attached while waiting', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>Waiting for the frame</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        const waitPromise = mcpPage.waitForTextOnPage(
+          ['Arrived in a late iframe'],
+          1500,
+        );
+        await page.evaluate(() => {
+          const frame = document.createElement('iframe');
+          frame.srcdoc = '<p>Arrived in a late iframe</p>';
+          document.body.appendChild(frame);
+        });
+
+        const element = await waitPromise;
+        assert.ok(element);
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('cleans the frame listener after a timed out wait', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>No matching text</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Text that never appears'], 250),
+        );
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
   });
 
   describe('DevToolsCommentBridge lifecycle', () => {
