@@ -21,7 +21,9 @@ import {zod, Mutex} from '../src/third_party/index.js';
 import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import {
+  defineBrowserlessTool,
   definePageTool,
+  type BrowserlessToolDefinition,
   type DefinedPageTool,
   type DevToolsData,
   type ToolDefinition,
@@ -59,7 +61,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getPageById.returns(mockPage);
 
@@ -105,7 +107,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getSelectedMcpPage.returns(mockPage);
 
@@ -146,7 +148,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -199,9 +201,11 @@ describe('ToolHandler', () => {
         handler: async () => undefined,
       };
       const mockContext = sinon.createStubInstance(McpContext);
-      mockContext.browser = getMockBrowser({
-        process: sinon.createStubInstance(ChildProcess),
-      });
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({
+          process: sinon.createStubInstance(ChildProcess),
+        }),
+      );
       const handleStub = sinon
         .stub(McpResponse.prototype, 'handle')
         .resolves({content: [], structuredContent: {}});
@@ -274,7 +278,9 @@ describe('ToolHandler', () => {
 
       const mockContext = sinon.createStubInstance(McpContext);
       const mockProcess = sinon.createStubInstance(ChildProcess);
-      mockContext.browser = getMockBrowser({process: mockProcess});
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({process: mockProcess}),
+      );
       mockContext.getDevToolsData.resolves(testCase.devToolsData);
       if (testCase.pageUrl) {
         mockContext.getSelectedMcpPageUrl.returns(testCase.pageUrl);
@@ -618,7 +624,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.callsFake(async p => {
       if (!p) {
         return undefined;
@@ -701,7 +707,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.rejects(
       new Error('Access denied: path is outside roots'),
     );
@@ -738,7 +744,7 @@ describe('ToolHandler', () => {
     const tool = evaluateScript(serverArgs);
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.rejects(
       new Error('Access denied: path is outside roots'),
     );
@@ -791,7 +797,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     const canonicalPath = path.resolve('/canonical/workspace/upload.png');
     mockContext.validatePath.resolves(canonicalPath);
 
@@ -847,9 +853,11 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.browser = getMockBrowser({
-      wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/test',
-    });
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/test',
+      }),
+    );
     const canonicalBundlePath = path.resolve('/canonical/workspace/app.swbn');
     mockContext.validatePath.resolves(canonicalBundlePath);
 
@@ -910,9 +918,11 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.browser = getMockBrowser({
-      wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
-    });
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
+      }),
+    );
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -963,7 +973,7 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.browser = getMockBrowser();
+    mockContext.ensureBrowser.resolves(getMockBrowser());
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -1013,7 +1023,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -1064,7 +1074,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -1120,9 +1130,11 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    mockContext.browser = getMockBrowser({
-      wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
-    });
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
+      }),
+    );
     const canonicalOutputPath = path.resolve('/canonical/output.json');
     mockContext.validatePath.resolves(canonicalOutputPath);
 
@@ -1183,7 +1195,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.rejects(
       new Error('Path is outside configured roots'),
     );
@@ -1243,9 +1255,11 @@ describe('ToolHandler', () => {
 
     // Remote browser: should validate
     const mockRemoteContext = sinon.createStubInstance(McpContext);
-    mockRemoteContext.browser = getMockBrowser({
-      wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
-    });
+    mockRemoteContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
+      }),
+    );
     mockRemoteContext.validatePath.resolves();
 
     const remoteToolHandler = new ToolHandler(
@@ -1266,7 +1280,9 @@ describe('ToolHandler', () => {
     // Local browser: should skip
     const mockLocalContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockLocalContext.browser = getMockBrowser({process: mockProcess});
+    mockLocalContext.ensureBrowser.resolves(
+      getMockBrowser({process: mockProcess}),
+    );
 
     const localToolHandler = new ToolHandler(
       tool,
@@ -1306,7 +1322,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.getDevToolsData.resolves({});
     const mockPage = sinon.createStubInstance(McpPage);
     mockPage.getDialog.returns(undefined);
@@ -1372,7 +1388,7 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = createMockMcpContext();
-    mockContext.browser = getMockBrowser();
+    mockContext.ensureBrowser.resolves(getMockBrowser());
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1421,7 +1437,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
-    mockContext.browser = getMockBrowser({process: mockProcess});
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -1452,10 +1468,10 @@ describe('ToolHandler', () => {
     }
   });
 
-  it('times out when getContext() hangs, and abandons the pending connect', async () => {
+  it('times out when ensureBrowser() hangs, and abandons the pending connect', async () => {
     const tool: ToolDefinition = {
       name: 'hanging_context_tool',
-      description: 'A tool whose getContext() call never resolves',
+      description: 'A tool whose browser connection never resolves',
       annotations: {
         category: ToolCategory.NAVIGATION,
         readOnlyHint: true,
@@ -1464,10 +1480,17 @@ describe('ToolHandler', () => {
       blockedByDialog: false,
       verifyFilesSchema: {},
       handler: async () => {
-        // Never reached: the timeout fires while still awaiting getContext().
+        // Never reached: the timeout fires while still awaiting ensureBrowser().
       },
     };
 
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.returns(
+      new Promise(() => {
+        // Simulates BrowserManager#ensureBrowser() hanging on a half-open
+        // socket: it never resolves or rejects on its own.
+      }),
+    );
     const abandonPendingBrowserAttemptSpy = sinon.spy();
 
     const toolMutex = new Mutex();
@@ -1478,11 +1501,7 @@ describe('ToolHandler', () => {
     const toolHandler = new ToolHandler(
       tool,
       serverArgs,
-      () =>
-        new Promise(() => {
-          // Simulates BrowserManager#ensureBrowser() hanging on a half-open
-          // socket: it never resolves or rejects on its own.
-        }),
+      async () => mockContext,
       toolMutex,
       abandonPendingBrowserAttemptSpy,
     );
@@ -1502,5 +1521,65 @@ describe('ToolHandler', () => {
     } finally {
       clock.restore();
     }
+  });
+
+  describe('browserless tools', () => {
+    function createBrowserlessTool(
+      handler: BrowserlessToolDefinition['handler'],
+    ) {
+      return defineBrowserlessTool(() => ({
+        name: 'browserless_tool',
+        description: 'A tool that does not need a browser',
+        annotations: {
+          category: ToolCategory.MEMORY,
+          readOnlyHint: true,
+        },
+        schema: {
+          filePath: zod.string(),
+        },
+        blockedByDialog: false,
+        verifyFilesSchema: {filePath: true},
+        handler,
+      }))(createServerArgs());
+    }
+
+    function createServerArgs() {
+      return new ConfigParser('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      }).parse();
+    }
+
+    it('runs without establishing a browser connection', async () => {
+      const handler = sinon.stub().resolves();
+      const mockContext = createMockMcpContext();
+      mockContext.validatePath.resolves('/canonical/file.heapsnapshot');
+      const handleStub = sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+
+      const result = await new ToolHandler(
+        createBrowserlessTool(handler),
+        createServerArgs(),
+        async () => mockContext,
+        new Mutex(),
+        sinon.spy(),
+      ).handle({filePath: 'file.heapsnapshot'});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.notCalled(mockContext.ensureBrowser);
+      sinon.assert.notCalled(mockContext.consumeReconnectNotice);
+      sinon.assert.notCalled(mockContext.getDevToolsData);
+      sinon.assert.calledOnceWithExactly(
+        mockContext.validatePath,
+        'file.heapsnapshot',
+      );
+      sinon.assert.calledOnceWithExactly(
+        handler,
+        {params: {filePath: '/canonical/file.heapsnapshot'}},
+        sinon.match.instanceOf(McpResponse),
+        mockContext,
+      );
+      sinon.assert.calledOnceWithExactly(handleStub, mockContext, 'default');
+    });
   });
 });

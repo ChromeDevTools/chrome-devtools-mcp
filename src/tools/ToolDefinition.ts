@@ -354,6 +354,14 @@ export type Context = Readonly<{
   getSelectedMcpPage(): McpPage;
   getWorkers(): McpWorker[];
   getWorkerById(id: string): McpWorker | undefined;
+}>;
+
+/**
+ * The context available to tools that do not need a browser connection, see
+ * {@link defineBrowserlessTool}. Using it never triggers a browser launch or
+ * connection.
+ */
+export type BrowserlessContext = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
@@ -533,6 +541,49 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
   };
 }
 
+export interface BrowserlessToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> extends BaseToolDefinition<Schema> {
+  browserless: true;
+  handler(
+    request: Request<Schema>,
+    response: Response,
+    context: BrowserlessContext,
+  ): Promise<void>;
+}
+
+/**
+ * Defines a tool that does not need a browser connection, e.g. a tool that only
+ * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ */
+export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
+  definition: (
+    args: ParsedArguments,
+  ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless'>,
+): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
+  return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
+    return {
+      ...definition(args),
+      browserless: true,
+    };
+  };
+}
+
+export type AnyToolDefinition =
+  ToolDefinition | DefinedPageTool | BrowserlessToolDefinition;
+
+export function isPageScopedTool(
+  tool: AnyToolDefinition,
+): tool is DefinedPageTool {
+  return 'pageScoped' in tool && tool.pageScoped === true;
+}
+
+export function isBrowserlessTool(
+  tool: AnyToolDefinition,
+): tool is BrowserlessToolDefinition {
+  return 'browserless' in tool && tool.browserless === true;
+}
+
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
@@ -553,6 +604,18 @@ export const timeoutSchema = {
     ),
 };
 
+const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+const VALID_VIEWPORT_TAGS = new Set(['mobile', 'touch', 'landscape']);
+
+function parseDecimal(part: string | undefined, name: string): number {
+  if (part === undefined || !DECIMAL.test(part)) {
+    throw new Error(
+      `Invalid ${name} "${part ?? ''}". Expected a decimal number.`,
+    );
+  }
+  return Number(part);
+}
+
 export function viewportTransform(arg: string | undefined):
   | {
       width: number;
@@ -567,33 +630,48 @@ export function viewportTransform(arg: string | undefined):
     return undefined;
   }
   const [dimensions, ...tags] = arg.split(',');
+  for (const tag of tags) {
+    if (!VALID_VIEWPORT_TAGS.has(tag)) {
+      throw new Error(
+        `Invalid viewport tag "${tag}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+      );
+    }
+  }
   const isMobile = tags.includes('mobile');
   const hasTouch = tags.includes('touch');
   const isLandscape = tags.includes('landscape');
-  const [width, height, dpr] = dimensions.split('x').map(Number) as [
-    number,
-    number,
-    number | undefined,
-  ];
+  const dimParts = dimensions.split('x');
+  if (dimParts.length !== 2 && dimParts.length !== 3) {
+    throw new Error(
+      `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+    );
+  }
+  const width = parseDecimal(dimParts[0], 'viewport width');
   if (!Number.isFinite(width) || width <= 0) {
     throw new Error(
       `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
     );
   }
+  const height = parseDecimal(dimParts[1], 'viewport height');
   if (!Number.isFinite(height) || height <= 0) {
     throw new Error(
       `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
     );
   }
-  if (dpr !== undefined && (!Number.isFinite(dpr) || dpr <= 0)) {
-    throw new Error(
-      `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
-    );
+  let deviceScaleFactor: number | undefined;
+  if (dimParts.length === 3) {
+    const dpr = parseDecimal(dimParts[2], 'devicePixelRatio');
+    if (!Number.isFinite(dpr) || dpr <= 0) {
+      throw new Error(
+        `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
+      );
+    }
+    deviceScaleFactor = dpr;
   }
   return {
     width,
     height,
-    deviceScaleFactor: dpr,
+    deviceScaleFactor,
     isMobile,
     isLandscape,
     hasTouch,
@@ -606,12 +684,19 @@ export function geolocationTransform(
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  const parts = arg.split(',');
+  if (parts.length !== 2) {
+    throw new Error(
+      `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
+    );
+  }
+  const latitude = parseDecimal(parts[0], 'latitude');
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error(
       `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
     );
   }
+  const longitude = parseDecimal(parts[1], 'longitude');
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error(
       `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
