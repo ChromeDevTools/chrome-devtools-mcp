@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
+import {Breakpoints, DevTools, Workspace} from '../third_party/index.js';
 import type {
   CDPSession,
   ConsoleMessage,
@@ -135,6 +135,26 @@ export interface TargetUniverse {
   universe: DevTools.Foundation.Universe.Universe;
   /** The secondary session created for this page */
   session: CDPSession;
+  /** The breakpoint manager of this universe, used for logpoints */
+  breakpointManager: Breakpoints.BreakpointManager.BreakpointManager;
+}
+
+let uiLocationRevealerRegistered = false;
+
+/**
+ * The breakpoint manager reveals a breakpoint location in the Sources panel
+ * when it had to be moved. There is no UI here, so a no-op revealer is
+ * registered once to keep that from failing.
+ */
+function registerUILocationRevealer(): void {
+  if (uiLocationRevealerRegistered) {
+    return;
+  }
+  uiLocationRevealerRegistered = true;
+  DevTools.Common.Revealer.registerRevealer({
+    contextTypes: () => [Workspace.UISourceCode.UILocation],
+    loadRevealer: () => Promise.resolve({reveal: () => Promise.resolve()}),
+  });
 }
 
 export interface CreateTargetUniverseOptions {
@@ -202,7 +222,23 @@ export async function createTargetUniverse(
     connection,
   );
 
-  return {target, universe, session};
+  registerUILocationRevealer();
+  // DevTools keeps a single global breakpoint manager, while there is one
+  // universe per page here. `forceNew` creates a manager bound to this
+  // universe; nothing in the bundled DevTools code relies on the global
+  // instance.
+  const breakpointManager =
+    Breakpoints.BreakpointManager.BreakpointManager.instance({
+      forceNew: true,
+      targetManager,
+      workspace: universe.context.get(Workspace.Workspace.WorkspaceImpl),
+      debuggerWorkspaceBinding: universe.context.get(
+        DevTools.DebuggerWorkspaceBinding,
+      ),
+      settings: universe.settings,
+    });
+
+  return {target, universe, session, breakpointManager};
 }
 
 // Not recording network requests in the DevTools universe.

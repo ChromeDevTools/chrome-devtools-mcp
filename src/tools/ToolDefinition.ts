@@ -15,6 +15,11 @@ import type {
   HeapQueryOptions,
 } from '../processors/HeapSnapshotManager.js';
 import type {McpPage} from '../McpPage.js';
+import type {
+  Logpoint,
+  LogpointOptions,
+  ScriptInfo,
+} from '../LogpointManager.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import type {
@@ -475,6 +480,10 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  setLogpoint(options: LogpointOptions): Promise<Logpoint>;
+  removeLogpoint(id?: number): Promise<Logpoint[]>;
+  getLogpoints(): Logpoint[];
+  listScripts(filter?: string): Promise<ScriptInfo[]>;
   getScreenRecorder(): ScreenRecorderData | null;
   setScreenRecorder(data: ScreenRecorderData | null): void;
   setIsRunningPerformanceTrace(x: boolean): void;
