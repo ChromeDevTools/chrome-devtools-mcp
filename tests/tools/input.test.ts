@@ -519,7 +519,12 @@ describe('input', () => {
       );
 
       sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
-      sinon.assert.calledOnce(locator.hover);
+      sinon.assert.calledOnceWithMatch(
+        locator.hover,
+        sinon.match({
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Successfully hovered over the element',
@@ -545,7 +550,12 @@ describe('input', () => {
       );
 
       sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
-      sinon.assert.calledOnce(locator.hover);
+      sinon.assert.calledOnceWithMatch(
+        locator.hover,
+        sinon.match({
+          signal: sinon.match.instanceOf(AbortSignal),
+        }),
+      );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Successfully hovered over the element',
@@ -1252,7 +1262,7 @@ describe('input', () => {
       });
     });
 
-    it('includes snapshot if includeSnapshot is true', async () => {
+    it('calls drag and drop on the element handles and includes snapshot', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const fromHandle = createMockElementHandle().handle;
       const toHandle = createMockElementHandle().handle;
@@ -1276,10 +1286,7 @@ describe('input', () => {
       sinon.assert.calledWithExactly(page.getElementByUid.firstCall, '1_1');
       sinon.assert.calledWithExactly(page.getElementByUid.secondCall, '1_2');
       sinon.assert.calledOnceWithExactly(fromHandle.drag, toHandle);
-      sinon.assert.calledOnceWithMatch(
-        toHandle.drop,
-        sinon.match.same(fromHandle),
-      );
+      sinon.assert.calledOnceWithExactly(toHandle.drop, fromHandle);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Successfully dragged an element',
