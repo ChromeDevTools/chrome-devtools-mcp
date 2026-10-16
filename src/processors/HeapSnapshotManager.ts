@@ -391,6 +391,9 @@ export class HeapSnapshotManager {
     for (const [i, id] of deletedIds.entries()) {
       objects.push({id, selfSize: deletedSelfSizes[i], change: 'deleted'});
     }
+    // Largest objects first so that the first page of paginated output shows
+    // the most significant changes.
+    objects.sort((a, b) => b.selfSize - a.selfSize);
     return {classDiff: toClassDiff(classIndex, rawDiff), objects};
   }
 
