@@ -169,6 +169,11 @@ describe('performance', () => {
         context,
       );
 
+      sinon.assert.calledOnceWithExactly(
+        context.setIsRunningPerformanceTrace,
+        true,
+        page.pptrPage,
+      );
       sinon.assert.notCalled(page.pptrPage.setCacheEnabled);
     });
 
