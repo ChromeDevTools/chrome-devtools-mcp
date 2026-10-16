@@ -21,6 +21,7 @@ import {
   PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
+  type Frame,
   type Viewport,
   type WebMCPTool,
   type Protocol,
@@ -1302,22 +1303,64 @@ export class McpPage implements ContextPage {
   }
 
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
-    const frames = this.pptrPage.frames();
+    const page = this.pptrPage;
+    const initialFrames = page.frames();
+    const observedFrames = new Set(initialFrames);
+    const controller = new AbortController();
 
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => [
-          frame.locator(`aria/${value}`),
-          frame.locator(`text/${value}`),
-        ]),
-      ),
-    );
+    const locatorForFrames = (frames: Frame[]): Locator<Element> => {
+      let locator = this.#locatorClass.race(
+        frames.flatMap(frame =>
+          text.flatMap(value => [
+            frame.locator(`aria/${value}`),
+            frame.locator(`text/${value}`),
+          ]),
+        ),
+      );
+      if (timeout) {
+        locator = locator.setTimeout(timeout);
+      }
+      return locator;
+    };
 
-    if (timeout) {
-      locator = locator.setTimeout(timeout);
-    }
+    return new Promise<Element>((resolve, reject) => {
+      let settled = false;
+      const settle = (result: {element: Element} | {error: unknown}): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        page.off('frameattached', onFrameAttached);
+        controller.abort();
+        if ('error' in result) {
+          reject(result.error);
+        } else {
+          resolve(result.element);
+        }
+      };
+      const onFrameAttached = (frame: Frame): void => {
+        if (observedFrames.has(frame)) {
+          return;
+        }
+        observedFrames.add(frame);
+        // The initial locator race does not include frames added later.
+        // Watch each new frame until the initial race resolves or times out.
+        void locatorForFrames([frame])
+          .wait({signal: controller.signal})
+          .then(
+            element => settle({element}),
+            () => {},
+          );
+      };
 
-    return locator.wait();
+      page.on('frameattached', onFrameAttached);
+      void locatorForFrames(initialFrames)
+        .wait({signal: controller.signal})
+        .then(
+          element => settle({element}),
+          error => settle({error}),
+        );
+    });
   }
 
   /**
