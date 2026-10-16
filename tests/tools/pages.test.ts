@@ -232,6 +232,29 @@ describe('pages', () => {
     });
   });
   describe('new_page', () => {
+    it('sets the selected page and response flags', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.newPage.resolves(page);
+
+      await newPage(args).handler(
+        {params: {url: 'https://example.com'}},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(context.newPage, undefined, undefined);
+      sinon.assert.calledOnceWithExactly(
+        page.pptrPage.goto,
+        'https://example.com',
+        {
+          timeout: undefined,
+        },
+      );
+      sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+      sinon.assert.calledOnceWithExactly(
+        response.setListThirdPartyDeveloperTools,
+      );
+    });
     it('create a page', async () => {
       await withMcpContext(async (response, context, args) => {
         assert.strictEqual(
@@ -746,6 +769,20 @@ describe('pages', () => {
     });
   });
   describe('select_page', () => {
+    it('sets the selected page and response flags', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      context.getPageById.withArgs(1).returns(page);
+
+      await selectPage(args).handler({params: {pageId: 1}}, response, context);
+
+      sinon.assert.calledOnceWithExactly(page.init);
+      sinon.assert.calledOnceWithExactly(context.selectPage, page);
+      sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+      sinon.assert.calledOnceWithExactly(
+        response.setListThirdPartyDeveloperTools,
+      );
+      sinon.assert.calledOnceWithExactly(response.setListWebMcpTools);
+    });
     it('selects a page', async () => {
       await withMcpContext(async (response, context, args) => {
         await context.newPage();

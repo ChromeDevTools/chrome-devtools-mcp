@@ -533,9 +533,6 @@ export class McpResponse implements Response {
   async #handleSnapshot(
     context: McpContext,
   ): Promise<SnapshotFormatter | string | undefined> {
-    if (this.#includePages) {
-      await context.createPagesSnapshot();
-    }
     if (!this.#snapshotParams) {
       return undefined;
     }
@@ -787,8 +784,15 @@ export class McpResponse implements Response {
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
   }> {
-    if (this.#attachedWaitForResult?.openedPages && !this.#includePages) {
+    if (this.#includePages || this.#attachedWaitForResult?.openedPages) {
       await context.createPagesSnapshot();
+    }
+    if (this.#includePages && (!this.#page || this.#page.isClosed())) {
+      try {
+        this.#page = context.getSelectedMcpPage();
+      } catch {
+        this.#page = undefined;
+      }
     }
 
     const [
