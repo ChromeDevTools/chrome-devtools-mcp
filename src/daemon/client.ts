@@ -9,8 +9,8 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
+import {PipeTransport} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
-import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
 import {logger, puppeteerLogger} from '../utils/logger.js';
 

@@ -101,7 +101,7 @@ export default {
     schema: [],
     messages: {
       noDirectImport:
-        'Do not import "{{source}}" directly. Use the re-export from "src/third_party/index.js" instead so the import survives bundling. (Type-only imports are fine.)',
+        'Do not import "{{source}}" directly. Use the re-export from "src/third_party/index.js" (or "src/third_party/cli.js" on the CLI path) instead so the import survives bundling. (Type-only imports are fine.)',
     },
   },
   defaultOptions: [],

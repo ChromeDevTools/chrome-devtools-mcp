@@ -5,9 +5,9 @@
  */
 
 import type {Argv} from 'yargs';
-import type {YargsOptions, InferredOptionTypes} from '../third_party/index.js';
+import type {YargsOptions, InferredOptionTypes} from '../third_party/cli.js';
 
-import {yargs, hideBin} from '../third_party/index.js';
+import {yargs, hideBin} from '../third_party/cli.js';
 
 import {readFileSync} from 'node:fs';
 

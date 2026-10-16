@@ -23,8 +23,9 @@ import {
   serializeArgs,
   assertValidSessionId,
 } from '../daemon/utils.js';
-import {logDisclaimers} from '../index.js';
-import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
+import {logDisclaimers} from '../utils/disclaimers.js';
+import {hideBin, yargs} from '../third_party/cli.js';
+import type {CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 

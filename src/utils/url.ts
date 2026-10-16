@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Node 22 has no global URLPattern. Loading the third-party bundle installs
-// the URLPattern polyfill that Puppeteer ships.
-import '../third_party/index.js';
+// Node 22 has no global URLPattern. The CLI bundle exports Puppeteer's
+// polyfill, so this module does not need the full third-party bundle.
+import {URLPattern} from '../third_party/cli.js';
 
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'ws:', 'wss:']);
 const IPV4_LOOPBACK_REGEX = /^127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/;
