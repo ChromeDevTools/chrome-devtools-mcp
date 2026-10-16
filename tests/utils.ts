@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import './setupDevTools.js';
+
 import assert from 'node:assert';
 import {spawn, type ChildProcess} from 'node:child_process';
 import crypto from 'node:crypto';

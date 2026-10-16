@@ -4,18 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import '../src/utils/polyfill.js';
-
 import path from 'node:path';
-import {before, it} from 'node:test';
+import {it} from 'node:test';
 
-import {overrideDevToolsGlobals} from '../src/devtools/DevtoolsUtils.js';
-
-before(() => {
-  overrideDevToolsGlobals({
-    loadResource: async () => '',
-  });
-});
+// This module runs for every test file, so it must not import src code. Test
+// files that use DevTools import tests/setupDevTools.ts.
 
 // This is run by Node when we execute the tests via the --import flag.
 it.snapshot.setResolveSnapshotPath(testPath => {
