@@ -249,16 +249,6 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
       if (!result) {
         throw new Error('Lighthouse audit failed.');
       }
-
-      // Lighthouse reports a page it could not load (for example an HTTP 404
-      // document) in `runtimeError` and leaves every category unscored. Without
-      // this check the response would look like a completed audit.
-      const {runtimeError} = result.lhr;
-      if (runtimeError) {
-        throw new Error(
-          `Lighthouse could not audit the page (${runtimeError.code}): ${runtimeError.message}`,
-        );
-      }
     } finally {
       await page.restoreEmulation();
     }
@@ -292,6 +282,13 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
         throw res.reason;
       }
       reportPaths.push(res.value);
+    }
+
+    // Lighthouse sets runtimeError when it could not load the page; the categories are unscored.
+    if (lhr.runtimeError) {
+      throw new Error(
+        `Lighthouse could not audit the page (${lhr.runtimeError.code}): ${lhr.runtimeError.message} Reports: ${reportPaths.join(', ')}`,
+      );
     }
 
     const categoryScores = Object.values(lhr.categories).map(c => ({

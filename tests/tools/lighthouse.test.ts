@@ -109,6 +109,7 @@ describe('lighthouse', () => {
 
     it('fails when Lighthouse reports a runtime error', async () => {
       const {page, context, response, args} = createHandlerMocks();
+      context.saveTemporaryFile.resolves({filepath: 'report.json'});
       sinon.stub(lighthouseRunner, 'navigation').resolves(
         createMockRunnerResult({
           runtimeError: {
@@ -133,10 +134,11 @@ describe('lighthouse', () => {
           ),
         {
           message:
-            'Lighthouse could not audit the page (ERRORED_DOCUMENT_REQUEST): Lighthouse was unable to reliably load the page.',
+            'Lighthouse could not audit the page (ERRORED_DOCUMENT_REQUEST): Lighthouse was unable to reliably load the page. Reports: report.json, report.json',
         },
       );
 
+      sinon.assert.calledTwice(context.saveTemporaryFile);
       sinon.assert.notCalled(response.attachLighthouseResult);
       sinon.assert.calledOnceWithExactly(page.restoreEmulation);
     });
