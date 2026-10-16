@@ -551,68 +551,70 @@ describe('input', () => {
 
   describe('click_at', () => {
     it('clicks at coordinates', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<div
-            style="width: 100px; height: 100px; background: red;"
-            onclick="this.innerText = 'clicked'"
-          ></div>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await clickAt(args).handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      await clickAt(args).handler(
+        {
+          params: {
+            x: 50,
+            y: 50,
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully clicked at the coordinates',
-        );
-        assert.ok(response.includeSnapshot);
-        assert.ok(await page.$('text/clicked'));
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.pptrPage.mouse.click, 50, 50, {
+        count: 1,
       });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully clicked at the coordinates',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
     });
 
     it('double clicks at coordinates', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<div
-            style="width: 100px; height: 100px; background: red;"
-            ondblclick="this.innerText = 'dblclicked'"
-          ></div>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await clickAt(args).handler(
-          {
-            params: {
-              x: 50,
-              y: 50,
-              dblClick: true,
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      await clickAt(args).handler(
+        {
+          params: {
+            x: 50,
+            y: 50,
+            dblClick: true,
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully double clicked at the coordinates',
-        );
-        assert.ok(response.includeSnapshot);
-        assert.ok(await page.$('text/dblclicked'));
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.pptrPage.mouse.click, 50, 50, {
+        count: 2,
       });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully double clicked at the coordinates',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('includes snapshot if includeSnapshot is true', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await clickAt(args).handler(
+        {
+          params: {
+            x: 50,
+            y: 50,
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.pptrPage.mouse.click, 50, 50, {
+        count: 1,
+      });
+      sinon.assert.calledOnce(response.includeSnapshot);
     });
   });
 
