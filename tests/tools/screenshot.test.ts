@@ -217,6 +217,31 @@ describe('screenshot', () => {
       page.pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
 
       await screenshot(args).handler(
+        {params: {format: 'jpeg'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.pptrPage.screenshot, {
+        type: 'jpeg',
+        fullPage: false,
+        quality: undefined,
+        optimizeForSpeed: true,
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        "Took a screenshot of the current page's viewport.",
+      );
+      sinon.assert.calledOnceWithExactly(response.attachImage, {
+        mimeType: 'image/jpeg',
+        data: 'AQID',
+      });
+    });
+    it('forwards the requested quality for jpeg', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
+
+      await screenshot(args).handler(
         {params: {format: 'jpeg', quality: 50}, page},
         response,
         context,
@@ -227,14 +252,6 @@ describe('screenshot', () => {
         fullPage: false,
         quality: 50,
         optimizeForSpeed: true,
-      });
-      sinon.assert.calledOnceWithExactly(
-        response.appendResponseLine,
-        "Took a screenshot of the current page's viewport.",
-      );
-      sinon.assert.calledOnceWithExactly(response.attachImage, {
-        mimeType: 'image/jpeg',
-        data: 'AQID',
       });
     });
     it('with webp', async () => {
@@ -372,6 +389,7 @@ describe('screenshot', () => {
         quality: undefined,
         optimizeForSpeed: true,
       });
+      sinon.assert.notCalled(page.pptrPage.screenshot);
       sinon.assert.calledOnceWithExactly(handle.dispose);
     });
 
@@ -390,6 +408,7 @@ describe('screenshot', () => {
         /Capture failed/,
       );
 
+      sinon.assert.notCalled(page.pptrPage.screenshot);
       sinon.assert.calledOnceWithExactly(handle.dispose);
       sinon.assert.notCalled(response.attachImage);
     });
