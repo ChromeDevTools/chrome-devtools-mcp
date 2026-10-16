@@ -4,10 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
-import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
+import {
+  ConsoleFormatter,
+  describeValue,
+} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
 import type {
   ConsoleMessage,
@@ -21,6 +25,7 @@ interface MockConsoleMessage {
   args: () => Array<{
     jsonValue: () => Promise<unknown>;
     remoteObject: () => Protocol.Runtime.RemoteObject;
+    evaluate?: (fn: (value: unknown) => string) => Promise<string>;
   }>;
   stackTrace?: DevTools.StackTrace.StackTrace.StackTrace;
 }
@@ -848,5 +853,73 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+  });
+});
+
+describe('describeValue', () => {
+  it('describes values that JSON cannot represent', () => {
+    function foo() {
+      return 1;
+    }
+    assert.strictEqual(
+      describeValue(new Map([[1, {a: 2}]])),
+      'Map(1) {1 => {"a": 2}}',
+    );
+    assert.strictEqual(describeValue(new Set([3, 'x'])), 'Set(2) {3, "x"}');
+    assert.strictEqual(describeValue(new Date(0)), '1970-01-01T00:00:00.000Z');
+    assert.ok(describeValue(foo).startsWith('ƒ foo() {'));
+    assert.strictEqual(describeValue(Symbol('s')), 'Symbol(s)');
+    assert.strictEqual(describeValue(5n), '5n');
+    assert.strictEqual(describeValue('top-level string'), 'top-level string');
+  });
+
+  it('marks cycles and limits depth and length', () => {
+    const cyclic: Record<string, unknown> = {name: 'cyc'};
+    cyclic['self'] = cyclic;
+    assert.strictEqual(
+      describeValue(cyclic),
+      '{"name": "cyc", "self": [Circular]}',
+    );
+    assert.strictEqual(describeValue([[[[1]]]]), '[[[[…]]]]');
+    const many = Array.from({length: 102}, (_, i) => i);
+    assert.ok(describeValue(many).endsWith(', 99, …2 more]'));
+  });
+});
+
+describe('ConsoleFormatter arguments', () => {
+  it('describes non-JSON arguments in the page and keeps JSON for plain values', async () => {
+    const cyclic: Record<string, unknown> = {name: 'cyc'};
+    cyclic['self'] = cyclic;
+    const message = createMockMessage({
+      type: () => 'log',
+      text: () => 'values',
+      args: () => [
+        {
+          jsonValue: async () => ({}),
+          remoteObject: () => ({type: 'object', subtype: 'map'}),
+          evaluate: async fn => fn(new Map([[1, 2]])),
+        },
+        {
+          jsonValue: async () => {
+            throw new Error('Object reference chain is too long');
+          },
+          remoteObject: () => ({type: 'object'}),
+          evaluate: async fn => fn(cyclic),
+        },
+        {
+          jsonValue: async () => ({a: 1}),
+          remoteObject: () => ({type: 'object'}),
+        },
+      ],
+    });
+    const formatter = await ConsoleFormatter.from(message, {
+      id: 1,
+      fetchDetailedData: true,
+    });
+    assert.deepStrictEqual(formatter.toJSONDetailed().args, [
+      'Map(1) {1 => 2}',
+      '{"name": "cyc", "self": [Circular]}',
+      '{"a":1}',
+    ]);
   });
 });
