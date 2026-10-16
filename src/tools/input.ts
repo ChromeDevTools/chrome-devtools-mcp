@@ -7,7 +7,7 @@
 import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
-import {parseKey} from '../utils/keyboard.js';
+import {invalidKeyMessage, isValidKey, parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
@@ -27,6 +27,10 @@ const includeSnapshotSchema = zod
 
 const submitKeySchema = zod
   .string()
+  // An empty string means no submit key, as before.
+  .refine((key): boolean => key === '' || isValidKey(key), {
+    error: issue => invalidKeyMessage(String(issue.input)),
+  })
   .optional()
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
@@ -442,16 +446,16 @@ export const typeText = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const submitKey = request.params.submitKey;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
-      if (request.params.submitKey) {
-        await page.pptrPage.keyboard.press(
-          request.params.submitKey as KeyInput,
-        );
+      // submitKeySchema has already validated the key; isValidKey narrows the type.
+      if (submitKey && isValidKey(submitKey)) {
+        await page.pptrPage.keyboard.press(submitKey);
       }
     });
     response.appendResponseLine(
-      `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
+      `Typed text "${request.params.text}${submitKey ? ` + ${submitKey}` : ''}"`,
     );
     response.attachWaitForResult(result);
   },

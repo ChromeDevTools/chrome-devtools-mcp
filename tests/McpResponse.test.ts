@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {after, afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -68,6 +68,24 @@ import {
   stabilizeStructuredContent,
   withMcpContext,
 } from './utils.js';
+
+let webDevTrace: ReturnType<typeof parseRawTraceBuffer> | undefined;
+
+/**
+ * Parses the web.dev trace fixture one time for this file. A parse takes
+ * about 0.8 s of CPU time, and the tests only read the result.
+ */
+function parseWebDevTrace(): ReturnType<typeof parseRawTraceBuffer> {
+  webDevTrace ??= parseRawTraceBuffer(
+    loadTraceAsBuffer('web-dev-with-commit.json.gz'),
+  );
+  return webDevTrace;
+}
+
+// Releases the shared trace after all tests in this file.
+after(() => {
+  webDevTrace = undefined;
+});
 
 describe('McpResponse', () => {
   afterEach(() => {
@@ -860,8 +878,7 @@ describe('McpResponse network pagination', () => {
 
   describe('trace summaries', () => {
     it('includes the trace summary text and structured data', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      const result = await parseRawTraceBuffer(rawData);
+      const result = await parseWebDevTrace();
       if (!traceResultIsSuccess(result)) {
         throw new Error(result.error);
       }
@@ -887,8 +904,7 @@ describe('McpResponse network pagination', () => {
 
   describe('trace insights', () => {
     it('includes the trace insight output', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      const result = await parseRawTraceBuffer(rawData);
+      const result = await parseWebDevTrace();
       if (!traceResultIsSuccess(result)) {
         throw new Error(result.error);
       }
@@ -907,8 +923,7 @@ describe('McpResponse network pagination', () => {
     });
 
     it('includes error if insight not found', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      const result = await parseRawTraceBuffer(rawData);
+      const result = await parseWebDevTrace();
       if (!traceResultIsSuccess(result)) {
         throw new Error(result.error);
       }

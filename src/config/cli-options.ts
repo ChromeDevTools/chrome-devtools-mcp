@@ -1308,7 +1308,7 @@ export const commands: Commands = {
         name: 'serviceWorkerId',
         type: 'string',
         description:
-          'Filter messages to only return messages of the specified service worker.',
+          'Filter messages by the service worker ID shown by list_pages (sw-N).',
         required: false,
         positional: false,
       },

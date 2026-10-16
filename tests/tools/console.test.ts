@@ -100,7 +100,7 @@ describe('console', () => {
 
         await listConsoleMessages(args).handler(
           {
-            params: {serviceWorkerId: extensionId},
+            params: {serviceWorkerId: sw.id},
             page: context.getSelectedMcpPage(),
           },
           response2,
@@ -252,6 +252,51 @@ describe('console', () => {
         const formattedResponse = await response.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] Uncaught  (0 args)'));
+      });
+    });
+
+    it('lists the reason of each unhandled promise rejection', async () => {
+      await withMcpContext(async (_response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(`<script>
+          Promise.reject(new Error('reason-A'));
+          Promise.reject('reason-B');
+          (async () => { throw new TypeError('reason-C'); })();
+        </script>`);
+        // Rejections are reported once the microtask queue drains, after
+        // setContent resolves, so poll until the collector has all three.
+        let textContent = '';
+        await waitExecutionFor(async () => {
+          const pollResponse = new McpResponse(args);
+          pollResponse.setPage(page);
+          await listConsoleMessages(args).handler(
+            {params: {}, page},
+            pollResponse,
+            context,
+          );
+          const formattedResponse = await pollResponse.handle(context);
+          textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('msgid=3 '), textContent);
+        }, 5000);
+        assert.ok(
+          textContent.includes(
+            'msgid=1 [error] Uncaught (in promise) Error: reason-A (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(
+          textContent.includes(
+            'msgid=2 [error] Uncaught (in promise) reason-B (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(
+          textContent.includes(
+            'msgid=3 [error] Uncaught (in promise) TypeError: reason-C (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(!textContent.includes('times]'), textContent);
       });
     });
 

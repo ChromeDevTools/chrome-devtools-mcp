@@ -22,6 +22,8 @@
  *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
+import './setupDevTools.js';
+
 import type {Frame} from 'puppeteer-core';
 import sinon from 'sinon';
 

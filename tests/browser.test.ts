@@ -576,7 +576,7 @@ describe('browser', () => {
         assert.strictEqual(first, firstBrowser);
 
         // Simulates a getContext()-level timeout firing after ensureBrowser()
-        // had already resolved — e.g. McpContext.from()'s own CDP
+        // had already resolved — e.g. McpContext.ensureBrowser()'s own CDP
         // initialization hanging on a transport that died silently. Token
         // rotation alone wouldn't help here: there's no in-flight
         // connect()/launch() left to discard, #browser is already cached.

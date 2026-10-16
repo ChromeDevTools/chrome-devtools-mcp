@@ -883,32 +883,6 @@ describe('input', () => {
       });
     });
 
-    it('errors on invalid submit key', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(html`<textarea></textarea>`);
-        await page.click('textarea');
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        try {
-          await typeText(args).handler(
-            {
-              params: {
-                text: 'test',
-                submitKey: 'XXX',
-              },
-              page: context.getSelectedMcpPage(),
-            },
-            response,
-            context,
-          );
-        } catch (err) {
-          assert.strictEqual(err.message, 'Unknown key: "XXX"');
-        }
-      });
-    });
-
     it('reproduction: fill isolation', async () => {
       await withMcpContext(async (_response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

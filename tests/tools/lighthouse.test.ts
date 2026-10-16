@@ -60,6 +60,58 @@ describe('lighthouse', () => {
       });
     });
 
+    it('explains which URLs navigation mode can audit', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.url.returns('file:///tmp/page.html');
+      const invalidUrl = Object.assign(new Error('INVALID_URL'), {
+        code: 'INVALID_URL',
+      });
+      sinon.stub(lighthouseRunner, 'navigation').rejects(invalidUrl);
+
+      await assert.rejects(
+        () =>
+          lighthouseAudit(args).handler(
+            {
+              params: {
+                mode: 'navigation',
+                device: 'desktop',
+              },
+              page,
+            },
+            response,
+            context,
+          ),
+        {
+          message:
+            'Lighthouse "navigation" mode cannot audit file:///tmp/page.html: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.',
+          cause: invalidUrl,
+        },
+      );
+    });
+
+    it('passes other navigation errors through unchanged', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      sinon
+        .stub(lighthouseRunner, 'navigation')
+        .rejects(new Error('PROTOCOL_TIMEOUT'));
+
+      await assert.rejects(
+        () =>
+          lighthouseAudit(args).handler(
+            {
+              params: {
+                mode: 'navigation',
+                device: 'desktop',
+              },
+              page,
+            },
+            response,
+            context,
+          ),
+        {message: 'PROTOCOL_TIMEOUT'},
+      );
+    });
+
     it('restores emulation', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
