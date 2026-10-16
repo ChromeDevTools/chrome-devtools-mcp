@@ -5,16 +5,22 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
 
+import {Client, InMemoryTransport} from '@modelcontextprotocol/client';
 import sinon from 'sinon';
 
 import {BrowserManager} from '../src/BrowserManager.js';
+import {getOffByDefaultCategories} from '../src/config/category-options.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
+import {mcpOptions} from '../src/config/mcp-options.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import type {ToolCategory} from '../src/tools/categories.js';
+import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
 
@@ -136,4 +142,134 @@ describe('McpServer', () => {
       ]);
     });
   });
+
+  describe('tool list', () => {
+    async function listToolNames(extraArgs: string[] = []): Promise<string[]> {
+      const {server} = await createTestServer(extraArgs);
+      const [clientTransport, serverTransport] =
+        InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      const client = new Client({name: 'test', version: '1.0.0'});
+      await client.connect(clientTransport);
+      try {
+        const {tools} = await client.listTools();
+        return tools.map(tool => tool.name).sort();
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    }
+
+    it('has all tools with off by default categories', async () => {
+      const exposedNames = await listToolNames(
+        getOffByDefaultCategories().map(category => `--category-${category}`),
+      );
+      const definedNames = await getToolsWithFilteredCategories();
+      assert.deepStrictEqual(exposedNames, definedNames.sort());
+    });
+
+    it('has all tools', async () => {
+      const exposedNames = await listToolNames();
+      const definedNames = await getToolsWithFilteredCategories(
+        getOffByDefaultCategories(),
+      );
+      assert.deepStrictEqual(exposedNames, definedNames.sort());
+    });
+
+    it('has experimental third-party developer tools', async () => {
+      const names = await listToolNames([
+        '--category-experimental-third-party',
+      ]);
+      assert.ok(names.includes('list_3p_developer_tools'));
+    });
+
+    it('has experimental extensions tools', async () => {
+      const names = await listToolNames(['--category-extensions']);
+      assert.ok(names.includes('install_extension'));
+    });
+
+    it('has experimental vision tools', async () => {
+      const names = await listToolNames(['--experimental-vision']);
+      assert.ok(names.includes('click_at'));
+    });
+
+    it('has experimental interop tools', async () => {
+      const names = await listToolNames(['--experimental-interop-tools']);
+      assert.ok(names.includes('get_tab_id'));
+    });
+
+    it('has experimental webmcp', async () => {
+      const names = await listToolNames(['--categoryExperimentalWebmcp']);
+      assert.ok(names.includes('list_webmcp_tools'));
+      assert.ok(names.includes('execute_webmcp_tool'));
+    });
+
+    it('has memory debugging tools', async () => {
+      const names = await listToolNames(['--memoryDebugging']);
+      assert.ok(names.includes('get_heapsnapshot_summary'));
+    });
+
+    it('can disable javascript evaluation tools', async () => {
+      const names = await listToolNames(['--no-javascript-evaluation']);
+      assert.ok(!names.includes('evaluate_script'));
+    });
+  });
 });
+
+async function getToolsWithFilteredCategories(
+  filterOutCategories: ToolCategory[] = [],
+): Promise<string[]> {
+  const files = fs.readdirSync('build/src/tools');
+  const definedNames = [];
+  for (const file of files) {
+    if (
+      !file.endsWith('.js') ||
+      file === 'ToolDefinition.js' ||
+      file === 'tools.js' ||
+      file === 'slim'
+    ) {
+      continue;
+    }
+    const fileTools = await import(`../src/tools/${file}`);
+
+    for (const maybeTool of Object.values(fileTools)) {
+      if (typeof maybeTool !== 'function') {
+        continue;
+      }
+      const tool = maybeTool({});
+
+      // Skipping all files that are not tool files
+      if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
+        continue;
+      }
+
+      if (toolShouldBeSkipped(tool, filterOutCategories)) {
+        continue;
+      }
+      definedNames.push(tool.name);
+    }
+  }
+  return definedNames;
+}
+
+function toolShouldBeSkipped(
+  tool: ToolDefinition,
+  filteredOutCategories: ToolCategory[],
+) {
+  if (tool.annotations?.conditions) {
+    for (const condition of tool.annotations.conditions) {
+      const option = mcpOptions[condition as keyof typeof mcpOptions];
+      if (!option || !('default' in option) || option.default !== true) {
+        return true;
+      }
+    }
+  }
+  if (
+    tool.annotations?.category &&
+    filteredOutCategories.includes(tool.annotations?.category)
+  ) {
+    return true;
+  }
+
+  return false;
+}

@@ -5,7 +5,6 @@
  */
 
 import assert from 'node:assert';
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
@@ -15,11 +14,7 @@ import {executablePath} from 'puppeteer';
 
 import {Client, type ClientCapabilities} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
-import {mcpOptions} from '../src/config/mcp-options.js';
-import {getOffByDefaultCategories} from '../src/config/category-options.js';
 import type {TextContent} from '../src/third_party/index.js';
-import type {ToolCategory} from '../src/tools/categories.js';
-import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 import {createTempDir} from './utils.js';
 
@@ -120,123 +115,6 @@ describe('e2e', {concurrency: true}, () => {
         arguments: {},
       });
       t.assert.snapshot(JSON.stringify(result.content));
-    });
-  });
-
-  // These tests only list tools, so the server does not launch a browser.
-  describe('tool list', {concurrency: true}, () => {
-    it('has all tools with off by default categories', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const exposedNames = tools.map(t => t.name).sort();
-          const definedNames = await getToolsWithFilteredCategories();
-          definedNames.sort();
-          assert.deepStrictEqual(exposedNames, definedNames);
-        },
-        getOffByDefaultCategories().map(category => `--category-${category}`),
-      );
-    });
-
-    it('has all tools', async () => {
-      await withClient(async client => {
-        const {tools} = await client.listTools();
-        const exposedNames = tools.map(t => t.name).sort();
-        const definedNames = await getToolsWithFilteredCategories(
-          getOffByDefaultCategories(),
-        );
-        definedNames.sort();
-        assert.deepStrictEqual(exposedNames, definedNames);
-      });
-    });
-
-    it('has experimental third-party developer tools', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const listThirdPartyDeveloperTools = tools.find(
-            t => t.name === 'list_3p_developer_tools',
-          );
-          assert.ok(listThirdPartyDeveloperTools);
-        },
-        ['--category-experimental-third-party'],
-      );
-    });
-
-    it('has experimental extensions tools', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const installExtension = tools.find(
-            t => t.name === 'install_extension',
-          );
-          assert.ok(installExtension);
-        },
-        ['--category-extensions'],
-      );
-    });
-
-    it('has experimental vision tools', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const clickAt = tools.find(t => t.name === 'click_at');
-          assert.ok(clickAt);
-        },
-        ['--experimental-vision'],
-      );
-    });
-
-    it('has experimental interop tools', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const getTabId = tools.find(t => t.name === 'get_tab_id');
-          assert.ok(getTabId);
-        },
-        ['--experimental-interop-tools'],
-      );
-    });
-
-    it('has experimental webmcp', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const listWebMcpTools = tools.find(
-            t => t.name === 'list_webmcp_tools',
-          );
-          const executeWebMcpTool = tools.find(
-            t => t.name === 'execute_webmcp_tool',
-          );
-          assert.ok(listWebMcpTools);
-          assert.ok(executeWebMcpTool);
-        },
-        ['--categoryExperimentalWebmcp'],
-      );
-    });
-
-    it('has memory debugging tools', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const getHeapSnapshotSummary = tools.find(
-            t => t.name === 'get_heapsnapshot_summary',
-          );
-          assert.ok(getHeapSnapshotSummary);
-        },
-        ['--memoryDebugging'],
-      );
-    });
-
-    it('can disable javascript evaluation tools', async () => {
-      await withClient(
-        async client => {
-          const {tools} = await client.listTools();
-          const evaluateScript = tools.find(t => t.name === 'evaluate_script');
-          assert.strictEqual(evaluateScript, undefined);
-        },
-        ['--no-javascript-evaluation'],
-      );
     });
   });
 
@@ -543,61 +421,3 @@ describe('e2e', {concurrency: true}, () => {
     });
   });
 });
-
-async function getToolsWithFilteredCategories(
-  filterOutCategories: ToolCategory[] = [],
-): Promise<string[]> {
-  const files = fs.readdirSync('build/src/tools');
-  const definedNames = [];
-  for (const file of files) {
-    if (
-      !file.endsWith('.js') ||
-      file === 'ToolDefinition.js' ||
-      file === 'tools.js' ||
-      file === 'slim'
-    ) {
-      continue;
-    }
-    const fileTools = await import(`../src/tools/${file}`);
-
-    for (const maybeTool of Object.values(fileTools)) {
-      if (typeof maybeTool !== 'function') {
-        continue;
-      }
-      const tool = maybeTool({});
-
-      // Skipping all files that are not tool files
-      if (tool === null || typeof tool !== 'object' || !('name' in tool)) {
-        continue;
-      }
-
-      if (toolShouldBeSkipped(tool, filterOutCategories)) {
-        continue;
-      }
-      definedNames.push(tool.name);
-    }
-  }
-  return definedNames;
-}
-
-function toolShouldBeSkipped(
-  tool: ToolDefinition,
-  filteredOutCategories: ToolCategory[],
-) {
-  if (tool.annotations?.conditions) {
-    for (const condition of tool.annotations.conditions) {
-      const option = mcpOptions[condition as keyof typeof mcpOptions];
-      if (!option || !('default' in option) || option.default !== true) {
-        return true;
-      }
-    }
-  }
-  if (
-    tool.annotations?.category &&
-    filteredOutCategories.includes(tool.annotations?.category)
-  ) {
-    return true;
-  }
-
-  return false;
-}
