@@ -40,13 +40,17 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
+import type {ParsedArguments} from './config/ConfigParser.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
-import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {
-  BrowserlessContext,
-  Context,
-  DevToolsData,
-  SupportedExtensions,
+import {ToolCategory} from './tools/categories.js';
+import {
+  CLOSE_PAGE_ERROR,
+  isCapabilityEnabled,
+  type BrowserlessContext,
+  type CapabilityGate,
+  type Context,
+  type DevToolsData,
+  type SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
@@ -67,6 +71,30 @@ export interface McpContextOptions {
   // connection is only established once a tool needs it.
   getBrowser: () => Promise<Browser>;
 }
+
+interface FeatureController {
+  gate: CapabilityGate;
+  onDisable(context: McpContext): Promise<void> | void;
+}
+
+const FEATURE_CONTROLLERS: readonly FeatureController[] = [
+  {
+    gate: {category: ToolCategory.DEBUGGING},
+    onDisable: context => context.releaseScreencasts(),
+  },
+  {
+    gate: {category: ToolCategory.MEMORY, conditions: ['memoryDebugging']},
+    onDisable: context => context.releaseHeapSnapshots(),
+  },
+  {
+    gate: {category: ToolCategory.PERFORMANCE},
+    onDisable: context => context.releasePerformanceTrace(),
+  },
+  {
+    gate: {category: ToolCategory.DEBUGGING, conditions: ['devtoolsComments']},
+    onDisable: context => context.releaseDevToolsComments(),
+  },
+];
 
 // Page ids are handed out from a process-wide counter so they stay unique
 // across all contexts, in particular across browser reconnects. An id issued
@@ -102,6 +130,7 @@ export class McpContext implements Context, BrowserlessContext {
   #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
+  #tracingPage?: Page;
 
   #reconnectNotice = false;
 
@@ -144,10 +173,107 @@ export class McpContext implements Context, BrowserlessContext {
 
   #allMcpPages(): Set<McpPage> {
     const pages = new Set(this.#mcpPages.values());
-    if (this.#selectedPage) {
+    if (this.#selectedPage && !this.#selectedPage.isDisposed()) {
       pages.add(this.#selectedPage);
     }
     return pages;
+  }
+
+  /**
+   * Synchronizes browser/page state and releases state of capabilities that
+   * transitioned from enabled to disabled after a config reload.
+   */
+  async onConfigChanged(previousArgs: ParsedArguments): Promise<void> {
+    const nextArgs = this.#config.resolved;
+    if (nextArgs.sourceMaps !== previousArgs.sourceMaps) {
+      for (const mcpPage of this.#allMcpPages()) {
+        mcpPage.syncSourceMaps();
+      }
+    }
+    if (
+      nextArgs.experimentalIncludeAllPages !==
+      previousArgs.experimentalIncludeAllPages
+    ) {
+      await this.createPagesSnapshot();
+    }
+    for (const controller of FEATURE_CONTROLLERS) {
+      if (
+        isCapabilityEnabled(controller.gate, previousArgs) &&
+        !isCapabilityEnabled(controller.gate, nextArgs)
+      ) {
+        await controller.onDisable(this);
+      }
+    }
+  }
+
+  /**
+   * Stops and saves active screencast recordings across all pages when
+   * screencast tools are disabled.
+   */
+  async releaseScreencasts(): Promise<void> {
+    for (const mcpPage of this.#allMcpPages()) {
+      const screenRecorderData = mcpPage.getScreenRecorder();
+      if (!screenRecorderData) {
+        continue;
+      }
+      const {recorder, filePath} = screenRecorderData;
+      mcpPage.setScreenRecorder(null);
+      try {
+        await recorder.stop();
+        this.#notify(
+          `The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`,
+        );
+      } catch (err) {
+        this.logger?.('Failed to stop the screencast recording', err);
+      }
+    }
+  }
+
+  /**
+   * Closes all loaded heap snapshots when memory tools are disabled.
+   */
+  releaseHeapSnapshots(): void {
+    if (this.#heapSnapshotManager.hasSnapshots()) {
+      this.#heapSnapshotManager.dispose();
+      this.#notify(
+        'Loaded heap snapshots were closed because memory tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Discards recorded performance traces and stops any running trace when
+   * performance tools are disabled.
+   */
+  async releasePerformanceTrace(): Promise<void> {
+    this.#traceResults = [];
+    if (this.#isRunningTrace) {
+      const page = this.#tracingPage;
+      this.setIsRunningPerformanceTrace(false);
+      try {
+        await page?.tracing.stop();
+      } catch (err) {
+        this.logger?.('Failed to stop the performance trace', err);
+      }
+      this.#notify(
+        'The running performance trace was discarded because performance tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Disposes DevTools comment bridges across all pages when DevTools comment
+   * tools are disabled.
+   */
+  releaseDevToolsComments(): void {
+    for (const mcpPage of this.#allMcpPages()) {
+      mcpPage.disposeCommentBridge();
+    }
+  }
+
+  #notify(message: string): void {
+    this.logger?.(message);
+    this.#options.onNotification?.(message);
   }
 
   /**
@@ -224,6 +350,7 @@ export class McpContext implements Context, BrowserlessContext {
     this.#selectedPageFallback = undefined;
     this.#selectedPageFallbackRead = false;
     this.#isRunningTrace = false;
+    this.#tracingPage = undefined;
     this.#traceResults = [];
     this.#serviceWorkerConsoleCollector = undefined;
     this.#browser = undefined;
@@ -454,8 +581,13 @@ export class McpContext implements Context, BrowserlessContext {
     return this.browser.getPWAState(options);
   }
 
-  setIsRunningPerformanceTrace(x: boolean): void {
+  /**
+   * @param page The page that is being traced, so the trace can be stopped if
+   * performance tools are disabled while it is running.
+   */
+  setIsRunningPerformanceTrace(x: boolean, page?: Page): void {
     this.#isRunningTrace = x;
+    this.#tracingPage = x ? page : undefined;
   }
 
   isRunningPerformanceTrace(): boolean {
@@ -671,6 +803,9 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   async createPagesSnapshot(): Promise<McpPage[]> {
+    if (!this.#browser) {
+      return [];
+    }
     const allTargets = this.#fetchPageTargets();
 
     for (const target of allTargets) {
@@ -690,22 +825,37 @@ export class McpContext implements Context, BrowserlessContext {
 
     const pages = Array.from(this.#mcpPages.values());
 
-    // Only fall back when the selected page is actually gone. Gating on
-    // `isClosed()` instead of `pages` membership avoids silently swapping a
-    // live page that is momentarily missing from the snapshot.
+    // Only fall back when the selected page is actually gone or no longer
+    // counts as a page, e.g. a background page after
+    // experimentalIncludeAllPages was turned off. Gating on `isClosed()`
+    // instead of `pages` membership avoids silently swapping a live page that
+    // is momentarily missing from the snapshot.
     if (this.#selectedPageFallbackRead) {
       this.#selectedPageFallback = undefined;
       this.#selectedPageFallbackRead = false;
     }
-    if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
-      // Record the automatic change so the response can surface it. Skipped on
-      // first connect, when there was no prior selection to replace.
-      if (this.#selectedPage) {
-        this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.isClosed(),
-        };
+    if (
+      !this.#selectedPage ||
+      this.#selectedPage.isClosed() ||
+      !this.#isPageTarget(this.#selectedPage.target)
+    ) {
+      if (pages[0]) {
+        // Record the automatic change so the response can surface it. Skipped on
+        // first connect, when there was no prior selection to replace.
+        if (this.#selectedPage) {
+          this.#selectedPageFallback = {
+            wasClosed: this.#selectedPage.isClosed(),
+          };
+        }
+        this.#selectPage(pages[0]);
+      } else if (
+        this.#selectedPage &&
+        !this.#isPageTarget(this.#selectedPage.target)
+      ) {
+        this.#selectedPage.dispose();
+        this.#selectedPage = undefined;
+        this.#selectedPageFallback = {wasClosed: false};
       }
-      this.#selectPage(pages[0]);
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {
