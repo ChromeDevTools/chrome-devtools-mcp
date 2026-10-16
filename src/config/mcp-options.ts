@@ -240,53 +240,39 @@ export const mcpOptions = {
   },
 } satisfies Record<string, McpOption>;
 
-export function getMcpOptionsForViaCli(): Record<
-  keyof typeof mcpOptions,
-  YargsOptions
-> {
-  if (!('default' in mcpOptions.headless)) {
-    throw new Error('headless cli option unexpectedly does not have a default');
-  }
-  if (!('default' in mcpOptions.experimentalStructuredContent)) {
-    throw new Error(
-      'experimentalStructuredContent cli option unexpectedly does not have a default',
-    );
-  }
-
-  return {
-    ...mcpOptions,
-    headless: {
-      ...mcpOptions.headless,
-      default: true,
-    },
-    memoryDebugging: {
-      ...mcpOptions.memoryDebugging,
-      default: true,
-    },
-    categoryExtensions: {
-      ...mcpOptions.categoryExtensions,
-      defaultDescription:
-        'true unless autoConnect, browserUrl or wsEndpoint is set',
-    },
-    experimentalStructuredContent: {
-      ...mcpOptions.experimentalStructuredContent,
-      default: true,
-    },
-    isolated: {
-      ...mcpOptions.isolated,
-      description:
-        'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.',
-      defaultDescription:
-        'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
-    },
-  };
-}
+export const mcpOptionsForViaCli = {
+  ...mcpOptions,
+  headless: {
+    ...mcpOptions.headless,
+    default: true,
+  },
+  memoryDebugging: {
+    ...mcpOptions.memoryDebugging,
+    default: true,
+  },
+  categoryExtensions: {
+    ...mcpOptions.categoryExtensions,
+    defaultDescription:
+      'true unless autoConnect, browserUrl or wsEndpoint is set',
+  },
+  experimentalStructuredContent: {
+    ...mcpOptions.experimentalStructuredContent,
+    default: true,
+  },
+  isolated: {
+    ...mcpOptions.isolated,
+    description:
+      'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.',
+    defaultDescription:
+      'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
+  },
+} satisfies Record<keyof typeof mcpOptions, YargsOptions>;
 
 export function getCliOptions(): Partial<
   Record<keyof typeof mcpOptions, YargsOptions>
 > {
   const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> =
-    withoutDefaults(getMcpOptionsForViaCli());
+    withoutDefaults(mcpOptionsForViaCli);
 
   // Missing CLI serialization.
   delete options.viewport;
@@ -395,6 +381,19 @@ export function withoutDefaults(
     result[key] = copy;
   }
   return result;
+}
+
+export function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
+  parsed: T,
+): {
+  [
+    K in keyof T as string extends K ? never : K extends '_' | '$0' ? never : K
+  ]: T[K];
+} {
+  const copy = {...parsed};
+  delete copy._;
+  delete copy.$0;
+  return copy;
 }
 
 export function isReloadableOption(name: keyof typeof mcpOptions): boolean {
