@@ -20,6 +20,8 @@ import {FilePersistence} from './telemetry/persistence.js';
 import {
   type CallToolResult,
   McpServer as SdkMcpServer,
+  ProtocolError,
+  ProtocolErrorCode,
   type RegisteredTool,
   type Root,
   type Transport,
@@ -163,25 +165,7 @@ export class McpServer {
         isError: true,
       };
     }
-    const parseResult =
-      await toolHandler.registeredInputSchema.safeParseAsync(args);
-    if (!parseResult.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Input validation error: Invalid arguments for tool ${name}: ${parseResult.error.issues
-              .map(
-                issue =>
-                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
-              )
-              .join(', ')}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    return await toolHandler.handle(parseResult.data);
+    return await toolHandler.handle(args);
   }
 
   /**
@@ -224,6 +208,7 @@ export class McpServer {
     for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
+    this.#setToolCallRequestHandler();
     await loadIssueDescriptions();
   }
 
@@ -277,15 +262,33 @@ export class McpServer {
   }
 
   #createToolHandler(tool: AnyToolDefinition): ToolHandler {
-    // No production code calls ServerConfig.commit() yet; a follow-up PR passes
-    // ReadonlyServerConfig to ToolHandler.
     return new ToolHandler(
       tool,
-      this.#config.resolved,
+      this.#config,
       () => this.#getContext(),
       this.#toolMutex,
       () => this.#browserManager.abandonPendingAttempt(),
     );
+  }
+
+  /**
+   * Overrides the SDK's `tools/call` handler so enabled and input-schema
+   * checks run inside `ToolHandler.handle()` after acquiring `#toolMutex`.
+   */
+  #setToolCallRequestHandler(): void {
+    this.server.server.setRequestHandler('tools/call', async request => {
+      const entry = this.#tools.get(request.params.name);
+      if (!entry) {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          `Tool ${request.params.name} not found`,
+        );
+      }
+      const result = await entry.handler.handle(request.params.arguments, {
+        viaMcp: true,
+      });
+      return this.server.server.projectCallToolResult(result, undefined);
+    });
   }
 
   #registerTool(tool: AnyToolDefinition): void {
@@ -298,7 +301,7 @@ export class McpServer {
         inputSchema: handler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      handler.handle,
+      args => handler.handle(args),
     );
 
     if (handler.disabled) {

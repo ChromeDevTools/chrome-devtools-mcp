@@ -5,13 +5,14 @@
  */
 
 import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {McpResponse, type DataFormat} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import type {Browser, CallToolResult, Mutex} from './third_party/index.js';
-import {zod} from './third_party/index.js';
+import {ProtocolError, ProtocolErrorCode, zod} from './third_party/index.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
 import type {
@@ -30,6 +31,7 @@ import {
 } from './tools/ToolDefinition.js';
 import {logger} from './utils/logger.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 import {isLocalhost} from './utils/url.js';
 
 type ToolLockGuard = Awaited<ReturnType<Mutex['acquire']>>;
@@ -68,41 +70,31 @@ function buildDisabledMessage(
   return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
 
-function getToolStatusInfo(
+function getDisabledReason(
   tool: AnyToolDefinition,
   serverArgs: ParsedArguments,
-): {disabled: boolean; reason?: string; unavailableInMode?: boolean} {
+): string | undefined {
   if (!isAvailableInMode(tool, serverArgs)) {
-    return {
-      disabled: true,
-      unavailableInMode: true,
-      reason: isSlimTool(tool)
-        ? `Tool ${tool.name} is only available with --slim.`
-        : `Tool ${tool.name} is not available with --slim.`,
-    };
+    return isSlimTool(tool)
+      ? `Tool ${tool.name} is only available with --slim.`
+      : `Tool ${tool.name} is not available with --slim.`;
   }
 
   const category = tool.annotations.category;
   if (category) {
     const flag = categoryToFlagName(category);
     if (!serverArgs[flag]) {
-      return {
-        disabled: true,
-        reason: buildDisabledMessage(tool.name, `--${flag}`, labels[category]),
-      };
+      return buildDisabledMessage(tool.name, `--${flag}`, labels[category]);
     }
   }
 
   for (const condition of tool.annotations.conditions || []) {
     if (!serverArgs[condition]) {
-      return {
-        disabled: true,
-        reason: buildDisabledMessage(tool.name, `--${condition}`),
-      };
+      return buildDisabledMessage(tool.name, `--${condition}`);
     }
   }
 
-  return {disabled: false};
+  return undefined;
 }
 
 async function validateAndResolvePathOrUrl(
@@ -208,32 +200,93 @@ async function validateToolFiles(
   }
 }
 
+function toInputJsonSchema(schema: zod.ZodType): unknown {
+  return zod.toJSONSchema(schema, {io: 'input', unrepresentable: 'any'});
+}
+
+function formatValidationError(toolName: string, error: zod.ZodError): string {
+  const details = error.issues
+    .map(
+      issue =>
+        `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
+    )
+    .join(', ');
+  return `Input validation error: Invalid arguments for tool ${toolName}: ${details}`;
+}
+
 export class ToolHandler {
-  readonly inputSchema: zod.ZodRawShape;
-  readonly registeredInputSchema: zod.ZodObject<
-    zod.ZodRawShape,
-    zod.core.$strict
-  >;
-  readonly disabled: boolean;
-  private readonly disabledReason?: string;
+  #tool: AnyToolDefinition;
+  #config: ReadonlyServerConfig;
+  #registeredInputSchema: zod.ZodObject<zod.ZodRawShape, zod.core.$strict>;
+  #disabled = false;
+  #disabledReason?: string;
 
   constructor(
-    private readonly tool: AnyToolDefinition,
-    private readonly serverArgs: ParsedArguments,
+    tool: AnyToolDefinition,
+    config: ReadonlyServerConfig,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
   ) {
-    const {disabled, reason, unavailableInMode} = getToolStatusInfo(
-      tool,
-      serverArgs,
-    );
-    this.disabledReason = reason;
-    this.disabled =
-      disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
+    this.#tool = tool;
+    this.#config = config;
+    this.#registeredInputSchema = zod.object(tool.schema).strict();
+    this.#updateStatus(tool);
+  }
 
-    this.inputSchema = tool.schema;
-    this.registeredInputSchema = zod.object(this.inputSchema).strict();
+  get registeredInputSchema(): zod.ZodObject<
+    zod.ZodRawShape,
+    zod.core.$strict
+  > {
+    return this.#registeredInputSchema;
+  }
+
+  /**
+   * Whether the tool is hidden from the client.
+   */
+  get disabled(): boolean {
+    return this.#disabled;
+  }
+
+  #updateStatus(tool: AnyToolDefinition): void {
+    const serverArgs = this.#config.resolved;
+    this.#disabledReason = getDisabledReason(tool, serverArgs);
+    this.#disabled =
+      Boolean(this.#disabledReason) &&
+      (!isAvailableInMode(tool, serverArgs) || !serverArgs.viaCli);
+  }
+
+  /**
+   * Replaces the tool definition and re-evaluates its status against the
+   * current server config. Callers must hold the tool mutex, so calls that
+   * are already waiting for it run with the new state. Returns true if the
+   * tool listing visible to the client changed.
+   */
+  update(tool: AnyToolDefinition): boolean {
+    const previousTool = this.#tool;
+    const previousDisabled = this.#disabled;
+    const previousInputSchema = this.#registeredInputSchema;
+    const nextInputSchema = zod.object(tool.schema).strict();
+
+    this.#tool = tool;
+    this.#registeredInputSchema = nextInputSchema;
+    this.#updateStatus(tool);
+
+    if (previousDisabled !== this.#disabled) {
+      return true;
+    }
+    if (this.#disabled) {
+      return false;
+    }
+
+    return (
+      previousTool.description !== tool.description ||
+      !isDeepStrictEqual(previousTool.annotations, tool.annotations) ||
+      !isDeepStrictEqual(
+        toInputJsonSchema(previousInputSchema),
+        toInputJsonSchema(nextInputSchema),
+      )
+    );
   }
 
   /**
@@ -247,7 +300,7 @@ export class ToolHandler {
     onTimeout: () => void,
   ): Promise<T> {
     const timeoutError = new ToolCallTimeoutError(
-      `Tool "${this.tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting for the browser connection to be established. The connection attempt will be retried automatically on the next tool call.`,
+      `Tool "${this.#tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting for the browser connection to be established. The connection attempt will be retried automatically on the next tool call.`,
     );
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
@@ -266,12 +319,12 @@ export class ToolHandler {
     }
   }
 
-  #dataFormat(): DataFormat {
+  #dataFormat(serverArgs: ParsedArguments): DataFormat {
     // --experimentalDataFormat takes precedence over the legacy
     // --experimentalToonFormat.
     return (
-      this.serverArgs.experimentalDataFormat ??
-      (this.serverArgs.experimentalToonFormat ? 'toon' : 'default')
+      serverArgs.experimentalDataFormat ??
+      (serverArgs.experimentalToonFormat ? 'toon' : 'default')
     );
   }
 
@@ -281,6 +334,7 @@ export class ToolHandler {
    */
   async #runBrowserlessTool(
     tool: BrowserlessToolDefinition,
+    serverArgs: ParsedArguments,
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
@@ -295,11 +349,12 @@ export class ToolHandler {
     } finally {
       await lock.reacquire();
     }
-    return await response.handle(context, this.#dataFormat());
+    return await response.handle(context, this.#dataFormat(serverArgs));
   }
 
   async #runBrowserTool(
     tool: ToolDefinition | DefinedPageTool,
+    serverArgs: ParsedArguments,
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
@@ -329,9 +384,7 @@ export class ToolHandler {
         const pageId =
           typeof params.pageId === 'number' ? params.pageId : undefined;
         page =
-          this.serverArgs.pageIdRouting &&
-          pageId !== undefined &&
-          !isSlimTool(tool)
+          serverArgs.pageIdRouting && pageId !== undefined && !isSlimTool(tool)
             ? context.getPageById(pageId)
             : context.getSelectedMcpPage();
         await page?.init();
@@ -367,110 +420,140 @@ export class ToolHandler {
       await context.getDevToolsData(page),
       context.getSelectedMcpPageUrl(page),
     );
-    return await response.handle(context, this.#dataFormat());
+    return await response.handle(context, this.#dataFormat(serverArgs));
   }
 
-  handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
+  handle = async (
+    rawArgs: Record<string, unknown> = {},
+    options?: {viaMcp?: boolean},
+  ): Promise<CallToolResult> => {
     let guard: ToolLockGuard | undefined = await this.toolMutex.acquire();
-
-    if (this.disabledReason) {
-      guard[Symbol.dispose]();
-      return {
-        content: [
-          {
-            type: 'text',
-            text: this.disabledReason,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    const startTime = Date.now();
-    let success = false;
-    let devToolsData: DevToolsData | undefined;
-    let pageUrl: string | undefined;
     try {
-      logger?.(
-        `${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`,
-      );
-      const context = await this.getContext();
-      const response = this.serverArgs.slim
-        ? new SlimMcpResponse(this.serverArgs)
-        : new McpResponse(this.serverArgs);
-      response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
-      // When the tool yields the lock, the handler waits for external events.
-      // Release the lock so other tool calls proceed, and re-acquire it
-      // before the response is built.
-      const lock: ToolLockControl = {
-        releaseIfYielding: () => {
-          if (this.tool.yieldsToolLock && guard) {
-            guard[Symbol.dispose]();
-            guard = undefined;
-          }
-        },
-        reacquire: async () => {
-          guard ??= await this.toolMutex.acquire();
-        },
-      };
-      const {content, structuredContent} = isBrowserlessTool(this.tool)
-        ? await this.#runBrowserlessTool(
-            this.tool,
-            params,
-            response,
-            context,
-            lock,
-          )
-        : await this.#runBrowserTool(
-            this.tool,
-            params,
-            response,
-            context,
-            lock,
-            (data, url) => {
-              devToolsData = data;
-              pageUrl = url;
+      if (options?.viaMcp && this.#disabled) {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          `Tool ${this.#tool.name} disabled`,
+        );
+      }
+
+      if (this.#disabledReason) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: this.#disabledReason,
             },
-          );
-      const result: CallToolResult & {
-        structuredContent?: Record<string, unknown>;
-      } = {
-        content,
-      };
-      if (response.error) {
-        result.isError = true;
+          ],
+          isError: true,
+        };
       }
-      success = true;
-      if (this.serverArgs.experimentalStructuredContent) {
-        result.structuredContent = structuredContent as Record<string, unknown>;
+
+      const tool = this.#tool;
+      const serverArgs = this.#config.resolved;
+      const parseResult = this.#registeredInputSchema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: formatValidationError(tool.name, parseResult.error),
+            },
+          ],
+          isError: true,
+        };
       }
-      return result;
-    } catch (err) {
-      logger?.(`${this.tool.name} error:`, err, err?.stack);
-      let errorText = err && 'message' in err ? err.message : String(err);
-      if ('cause' in err && err.cause) {
-        errorText += `\nCause: ${err.cause.message}`;
-      }
-      return {
-        content: [
-          {
-            type: 'text',
-            text: errorText,
+      const params = parseResult.data;
+
+      const startTime = Date.now();
+      let success = false;
+      let devToolsData: DevToolsData | undefined;
+      let pageUrl: string | undefined;
+      try {
+        logger?.(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
+        const context = await this.getContext();
+        const response = isSlimTool(tool)
+          ? new SlimMcpResponse(serverArgs)
+          : new McpResponse(serverArgs);
+        response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
+        // When the tool yields the lock, the handler waits for external events.
+        // Release the lock so other tool calls proceed, and re-acquire it
+        // before the response is built.
+        const lock: ToolLockControl = {
+          releaseIfYielding: () => {
+            if (tool.yieldsToolLock && guard) {
+              guard[Symbol.dispose]();
+              guard = undefined;
+            }
           },
-        ],
-        isError: true,
-      };
+          reacquire: async () => {
+            guard ??= await this.toolMutex.acquire();
+          },
+        };
+        const {content, structuredContent} = isBrowserlessTool(tool)
+          ? await this.#runBrowserlessTool(
+              tool,
+              serverArgs,
+              params,
+              response,
+              context,
+              lock,
+            )
+          : await this.#runBrowserTool(
+              tool,
+              serverArgs,
+              params,
+              response,
+              context,
+              lock,
+              (data, url) => {
+                devToolsData = data;
+                pageUrl = url;
+              },
+            );
+        const result: CallToolResult & {
+          structuredContent?: Record<string, unknown>;
+        } = {
+          content,
+        };
+        if (response.error) {
+          result.isError = true;
+        }
+        success = true;
+        if (serverArgs.experimentalStructuredContent) {
+          result.structuredContent = structuredContent as Record<
+            string,
+            unknown
+          >;
+        }
+        return result;
+      } catch (err) {
+        logger?.(`${tool.name} error:`, err, err?.stack);
+        let errorText = err && 'message' in err ? err.message : String(err);
+        if ('cause' in err && err.cause) {
+          errorText += `\nCause: ${err.cause.message}`;
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: errorText,
+            },
+          ],
+          isError: true,
+        };
+      } finally {
+        void ClearcutLogger.get()?.logToolInvocation({
+          toolName: tool.name,
+          params,
+          schema: tool.schema,
+          success,
+          latencyMs: Date.now() - startTime,
+          devToolsData,
+          pageUrl,
+        });
+      }
     } finally {
       guard?.[Symbol.dispose]();
-      void ClearcutLogger.get()?.logToolInvocation({
-        toolName: this.tool.name,
-        params,
-        schema: this.inputSchema,
-        success,
-        latencyMs: Date.now() - startTime,
-        devToolsData,
-        pageUrl,
-      });
     }
   };
 }

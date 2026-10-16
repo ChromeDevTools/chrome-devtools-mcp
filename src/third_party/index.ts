@@ -18,7 +18,12 @@ export type {Flags, Result, RunnerResult, OutputMode};
 
 export type {YargsOptions, InferredOptionTypes} from './cli.js';
 export {yargs, hideBin, semver, PipeTransport} from './cli.js';
-export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
+export {
+  McpServer,
+  ProtocolError,
+  ProtocolErrorCode,
+  type RegisteredTool,
+} from '@modelcontextprotocol/server';
 export {
   StdioServerTransport,
   serveStdio,
