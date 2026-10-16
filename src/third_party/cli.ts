@@ -16,8 +16,10 @@
  * keep one import path.
  */
 
-// Node 22 has no global URLPattern. The import installs Puppeteer's polyfill
-// when the global is missing.
+// Node 20 and 22 have no global URLPattern. Puppeteer's polyfill module sets
+// `globalThis.URLPattern` when the global is missing. ES modules evaluate
+// their imports before their own body, so the global is always defined by
+// the time the export below runs.
 import 'puppeteer-core/lib/third_party/urlpattern-polyfill/urlpattern-polyfill.js';
 
 export type {Options as YargsOptions, InferredOptionTypes} from 'yargs';
@@ -25,4 +27,10 @@ export {default as yargs} from 'yargs';
 export {hideBin} from 'yargs/helpers';
 export {default as semver} from 'semver';
 export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
+
+/**
+ * The native `URLPattern` on Node 23+, or Puppeteer's polyfill on older
+ * Node versions. Import this instead of using the global so the import
+ * also installs the polyfill.
+ */
 export const URLPattern = globalThis.URLPattern;

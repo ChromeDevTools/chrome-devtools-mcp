@@ -344,5 +344,3 @@ export async function createMcpServer(
   });
   return {server: server.server};
 }
-
-export {logDisclaimers} from './utils/disclaimers.js';
