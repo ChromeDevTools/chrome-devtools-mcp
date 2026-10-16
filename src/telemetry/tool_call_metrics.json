@@ -1350,5 +1350,73 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "list_logpoints",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "list_scripts",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "filter_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "remove_logpoint",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "id",
+        "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "set_logpoint",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "url_length",
+        "argType": "number"
+      },
+      {
+        "name": "line_number",
+        "argType": "number"
+      },
+      {
+        "name": "column_number",
+        "argType": "number"
+      },
+      {
+        "name": "expression_length",
+        "argType": "number"
+      }
+    ]
   }
 ]
