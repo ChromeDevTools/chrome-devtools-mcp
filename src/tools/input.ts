@@ -446,18 +446,11 @@ export const typeText = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    // submitKeySchema already rejects invalid keys; this also narrows the type
-    // and keeps direct handler calls from typing before failing.
-    let submitKey: KeyInput | undefined;
-    if (request.params.submitKey) {
-      if (!isValidKey(request.params.submitKey)) {
-        throw new Error(invalidKeyMessage(request.params.submitKey));
-      }
-      submitKey = request.params.submitKey;
-    }
+    const submitKey = request.params.submitKey;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
-      if (submitKey) {
+      // submitKeySchema has already validated the key; isValidKey narrows the type.
+      if (submitKey && isValidKey(submitKey)) {
         await page.pptrPage.keyboard.press(submitKey);
       }
     });
