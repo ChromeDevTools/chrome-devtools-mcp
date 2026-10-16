@@ -26,12 +26,10 @@ const includeSnapshotSchema = zod
   .describe('Whether to include a snapshot in the response. Default is false.');
 
 const submitKeySchema = zod
+  .string()
   // An empty string means no submit key, as before.
-  .stringFormat('key', key => key === '' || isValidKey(key), {
-    error: issue =>
-      issue.code === 'invalid_format'
-        ? invalidKeyMessage(String(issue.input))
-        : undefined,
+  .refine((key): boolean => key === '' || isValidKey(key), {
+    error: issue => invalidKeyMessage(String(issue.input)),
   })
   .optional()
   .describe(
