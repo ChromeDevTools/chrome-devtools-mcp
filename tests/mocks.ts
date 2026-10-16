@@ -1304,6 +1304,16 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
   };
 }
 
+export function stripUndefined<T extends object>(options: T): T {
+  const result = {...options};
+  for (const [key, value] of Object.entries(result)) {
+    if (value === undefined) {
+      Reflect.deleteProperty(result, key);
+    }
+  }
+  return result;
+}
+
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
@@ -1311,7 +1321,19 @@ export function createMockParsedArguments(
     {},
     {suppressUsageStatisticsNotice: true},
   );
-  return {...defaultArgs, ...options};
+  return {...defaultArgs, ...stripUndefined(options)};
+}
+
+export function createMockServerConfig(
+  options: Partial<ParsedArguments> = {},
+): ServerConfig {
+  const definedOptions = stripUndefined(options);
+  return new ServerConfig({
+    cliArgs: definedOptions,
+    fileArgs: {},
+    configPath: definedOptions.config,
+    resolved: createMockParsedArguments(definedOptions),
+  });
 }
 
 export function createMockHeapSnapshotNode(

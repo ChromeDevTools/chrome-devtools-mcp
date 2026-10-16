@@ -36,6 +36,7 @@ import {
   createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
+  createMockServerConfig,
 } from './mocks.js';
 import {serverHooks, TestServer} from './server.js';
 import {
@@ -80,8 +81,7 @@ describe('McpContext', () => {
     return await createConnectedMcpContext(
       browser,
       {
-        experimentalDevToolsDebugging: false,
-        performanceCrux: true,
+        config: createMockServerConfig(),
         heapSnapshotManager: new HeapSnapshotManager(),
       },
       Locator,
@@ -95,8 +95,9 @@ describe('McpContext', () => {
       const context = await createConnectedMcpContext(
         browser,
         {
-          experimentalDevToolsDebugging: false,
-          performanceCrux: false,
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
           heapSnapshotManager: new HeapSnapshotManager(),
         },
         Locator,
@@ -141,8 +142,9 @@ describe('McpContext', () => {
         const context = await createConnectedMcpContext(
           browser,
           {
-            experimentalDevToolsDebugging: false,
-            performanceCrux: false,
+            config: createMockServerConfig({
+              performanceCrux: false,
+            }),
             heapSnapshotManager: new HeapSnapshotManager(),
           },
           Locator,
@@ -603,8 +605,9 @@ describe('McpContext', () => {
   it('continues page ids across contexts so stale ids do not resolve', async () => {
     await withBrowser(async browser => {
       const options = {
-        experimentalDevToolsDebugging: false,
-        performanceCrux: false,
+        config: createMockServerConfig({
+          performanceCrux: false,
+        }),
         heapSnapshotManager: new HeapSnapshotManager(),
       };
       const first = await createConnectedMcpContext(browser, options, Locator);
@@ -648,8 +651,9 @@ describe('McpContext', () => {
       return McpContext.create(
         undefined,
         {
-          experimentalDevToolsDebugging: false,
-          performanceCrux: false,
+          config: createMockServerConfig({
+            performanceCrux: false,
+          }),
           heapSnapshotManager: new HeapSnapshotManager(),
           getBrowser,
         },
@@ -1169,10 +1173,12 @@ describe('McpContext', () => {
         return await createConnectedMcpContext(
           browser,
           {
-            experimentalDevToolsDebugging: false,
-            performanceCrux: false,
+            config: createMockServerConfig({
+              performanceCrux: false,
+              allowedUrlPattern: options.allowlist,
+              blockedUrlPattern: options.blocklist,
+            }),
             heapSnapshotManager: new HeapSnapshotManager(),
-            ...options,
           },
           Locator,
         );

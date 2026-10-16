@@ -40,6 +40,7 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
 import type {
   BrowserlessContext,
@@ -53,28 +54,11 @@ import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
+
 export interface McpContextOptions {
-  // Whether the DevTools windows are exposed as pages for debugging of DevTools.
-  experimentalDevToolsDebugging: boolean;
-  // Whether all page-like targets are exposed as pages.
-  experimentalIncludeAllPages?: boolean;
-  // Whether CrUX data should be fetched.
-  performanceCrux: boolean;
-  // Whether source maps are enabled in DevTools.
-  sourceMaps?: boolean;
-  // The allow list of URL patterns to allow loading resources.
-  allowlist?: string[];
-  // The block list of URL patterns to block loading resources.
-  blocklist?: string[];
-  // Whether to skip path validation when the client did not negotiate the roots
-  // capability. When false (default), tools that read or write local files are
-  // restricted to the OS temp directory. When true, the previous permissive
-  // behavior is restored.
-  allowUnrestrictedPaths?: boolean;
+  config: ReadonlyServerConfig;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
-  // Whether extension tools and targets are enabled.
-  categoryExtensions?: boolean;
   // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
   heapSnapshotManager: HeapSnapshotManager;
   // Returns the browser to use. Called by ensureBrowser(), so the browser
@@ -122,10 +106,10 @@ export class McpContext implements Context, BrowserlessContext {
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
+  #config: ReadonlyServerConfig;
   #options: McpContextOptions;
   #heapSnapshotManager: HeapSnapshotManager;
   #roots: Root[] | undefined = undefined;
-  #allowUnrestrictedPaths: boolean;
 
   private constructor(
     logger: Logger,
@@ -140,9 +124,9 @@ export class McpContext implements Context, BrowserlessContext {
 
     this.logger = logger;
     this.#locatorClass = locatorClass;
+    this.#config = options.config;
     this.#options = options;
     this.#heapSnapshotManager = options.heapSnapshotManager;
-    this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
   }
 
   /**
@@ -333,7 +317,10 @@ export class McpContext implements Context, BrowserlessContext {
     // If the client never negotiated roots and the operator has explicitly
     // opted into unrestricted access via --allow-unrestricted-paths, restore
     // the previous permissive behavior and skip validation.
-    if (this.#roots === undefined && this.#allowUnrestrictedPaths) {
+    if (
+      this.#roots === undefined &&
+      this.#config.resolved.allowUnrestrictedPaths
+    ) {
       // Canonical path might not exist yet so we fallback to
       // path.resolve(filePath). Consumers should not follow symlinks.
       return canonicalPath || path.resolve(filePath);
@@ -429,10 +416,6 @@ export class McpContext implements Context, BrowserlessContext {
     await page.close();
   }
 
-  get #hasNetworkBlockOrAllowlist(): boolean {
-    return !!(this.#options.allowlist || this.#options.blocklist);
-  }
-
   async installPWA(options: InstallPWAOptions): Promise<string> {
     try {
       return await this.browser.installPWA(options);
@@ -478,7 +461,7 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   isCruxEnabled(): boolean {
-    return this.#options.performanceCrux;
+    return this.#config.resolved.performanceCrux;
   }
 
   getPages(): McpPage[] {
@@ -672,13 +655,12 @@ export class McpContext implements Context, BrowserlessContext {
       (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     if (!mcpPage) {
       mcpPage = new McpPage(target, nextPageId++, {
+        config: this.#config,
         locatorClass: this.#locatorClass,
-        hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           target.browserContext(),
         ),
         navigationTimeout: this.#options.navigationTimeout,
-        sourceMaps: this.#options.sourceMaps,
       });
     }
     this.#mcpPages.set(target, mcpPage);
@@ -736,14 +718,14 @@ export class McpContext implements Context, BrowserlessContext {
       (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     const url = existingMcpPage ? existingMcpPage.url() : target.url();
     if (
-      !this.#options.experimentalDevToolsDebugging &&
+      !this.#config.resolved.experimentalDevtools &&
       url.startsWith('devtools://')
     ) {
       return false;
     }
     if (
       !isAllowedUrl(url, {
-        categoryExtensions: this.#options.categoryExtensions,
+        categoryExtensions: this.#config.resolved.categoryExtensions,
       })
     ) {
       return false;
@@ -753,13 +735,13 @@ export class McpContext implements Context, BrowserlessContext {
       return true;
     }
     if (
-      this.#options.experimentalIncludeAllPages &&
+      this.#config.resolved.experimentalIncludeAllPages &&
       (type === 'background_page' || type === 'webview')
     ) {
       return true;
     }
     if (
-      this.#options.experimentalDevToolsDebugging &&
+      this.#config.resolved.experimentalDevtools &&
       type === 'other' &&
       url.startsWith('devtools://')
     ) {
@@ -995,10 +977,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   #validateUrlNotBlocked(url: URL): void {
-    if (!this.#options.blocklist) {
+    const blocklist = this.#config.resolved.blockedUrlPattern;
+    if (!blocklist) {
       return;
     }
-    for (const block of this.#options.blocklist) {
+    for (const block of blocklist) {
       const pattern = new URLPattern(block);
       if (pattern.test(url)) {
         throw new Error(`Blocked by blocklist: ${url}`);
@@ -1007,10 +990,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   #validateUrlAllowed(url: URL): void {
-    if (!this.#options.allowlist) {
+    const allowlist = this.#config.resolved.allowedUrlPattern;
+    if (!allowlist) {
       return;
     }
-    for (const allow of this.#options.allowlist) {
+    for (const allow of allowlist) {
       const pattern = new URLPattern(allow);
       if (pattern.test(url)) {
         return;

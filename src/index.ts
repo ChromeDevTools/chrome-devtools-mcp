@@ -11,6 +11,7 @@ import {pathToFileURL} from 'node:url';
 import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
 import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
+import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
@@ -55,7 +56,7 @@ interface ToolEntry {
 
 export class McpServer {
   readonly server: SdkMcpServer;
-  #serverArgs: ParsedArguments;
+  #config: ServerConfig;
   #browserManager: BrowserManager;
   #context: McpContext;
   #heapSnapshotManager = new HeapSnapshotManager();
@@ -63,7 +64,7 @@ export class McpServer {
   /**
    * Client roots stay valid across browser reconnects and only the client can
    * invalidate them through a `roots/list_changed` notification. CLI-configured
-   * roots are read from `#serverArgs` when combining roots.
+   * roots are read from `#config` when combining roots.
    */
   #lastClientRoots?: Root[];
   /**
@@ -74,19 +75,19 @@ export class McpServer {
   #toolMutex = new Mutex();
   #tools = new Map<string, ToolEntry>();
 
-  private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
-    this.#serverArgs = serverArgs;
+  private constructor(config: ServerConfig, options: McpServerOptions) {
+    this.#config = config;
     this.#browserManager = options.browserManager;
+    const serverArgs = this.#config.resolved;
 
-    if (this.#serverArgs.usageStatistics) {
+    if (serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
         persistence: new FilePersistence(),
-        logFile: this.#serverArgs.logFile,
+        logFile: serverArgs.logFile,
         appVersion: VERSION,
-        clearcutEndpoint: this.#serverArgs.clearcutEndpoint,
-        clearcutForceFlushIntervalMs:
-          this.#serverArgs.clearcutForceFlushIntervalMs,
-        clearcutIncludePidHeader: this.#serverArgs.clearcutIncludePidHeader,
+        clearcutEndpoint: serverArgs.clearcutEndpoint,
+        clearcutForceFlushIntervalMs: serverArgs.clearcutForceFlushIntervalMs,
+        clearcutIncludePidHeader: serverArgs.clearcutIncludePidHeader,
       });
     }
 
@@ -104,15 +105,7 @@ export class McpServer {
     );
 
     this.#context = McpContext.create(logger, {
-      experimentalDevToolsDebugging:
-        this.#serverArgs.experimentalDevtools ?? false,
-      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
-      performanceCrux: this.#serverArgs.performanceCrux,
-      sourceMaps: this.#serverArgs.sourceMaps,
-      allowlist: this.#serverArgs.allowedUrlPattern,
-      blocklist: this.#serverArgs.blockedUrlPattern,
-      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
-      categoryExtensions: this.#serverArgs.categoryExtensions,
+      config: this.#config,
       heapSnapshotManager: this.#heapSnapshotManager,
       getBrowser: () => this.#browserManager.ensureBrowser(),
     });
@@ -136,9 +129,9 @@ export class McpServer {
           },
         );
       } else if (
-        !this.#serverArgs.allowUnrestrictedPaths &&
-        ((this.#serverArgs.filesystemRoot ?? []).length === 0 ||
-          this.#serverArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT)
+        !this.#config.resolved.allowUnrestrictedPaths &&
+        ((this.#config.resolved.filesystemRoot ?? []).length === 0 ||
+          this.#config.resolved.filesystemRoot === DEFAULT_FILESYSTEM_ROOT)
       ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
@@ -218,26 +211,26 @@ export class McpServer {
   }
 
   static async from(
-    serverArgs: ParsedArguments,
+    config: ServerConfig,
     options: McpServerOptions,
   ): Promise<McpServer> {
-    const server = new McpServer(serverArgs, options);
+    const server = new McpServer(config, options);
     await server.#init();
     return server;
   }
 
   async #init(): Promise<void> {
-    for (const tool of createTools(this.#serverArgs)) {
+    // Tool definitions take a ParsedArguments snapshot; reload recreates them.
+    for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
     await loadIssueDescriptions();
   }
 
   #combinedRoots(): Root[] | undefined {
+    const serverArgs = this.#config.resolved;
     const configuredRoots = (
-      this.#serverArgs.allowUnrestrictedPaths
-        ? []
-        : (this.#serverArgs.filesystemRoot ?? [])
+      serverArgs.allowUnrestrictedPaths ? [] : (serverArgs.filesystemRoot ?? [])
     ).map(root => {
       const rootPath = path.resolve(root);
       return {
@@ -284,9 +277,11 @@ export class McpServer {
   }
 
   #createToolHandler(tool: AnyToolDefinition): ToolHandler {
+    // No production code calls ServerConfig.commit() yet; a follow-up PR passes
+    // ReadonlyServerConfig to ToolHandler.
     return new ToolHandler(
       tool,
-      this.#serverArgs,
+      this.#config.resolved,
       () => this.#getContext(),
       this.#toolMutex,
       () => this.#browserManager.abandonPendingAttempt(),
@@ -319,7 +314,7 @@ export class McpServer {
  *
  * Maintained as a public API for backwards compatibility because external
  * consumers and integrations rely on `createMcpServer()`. For new code,
- * prefer using `McpServer.from(serverArgs, options)`.
+ * prefer using `McpServer.from(config, options)`.
  */
 export async function createMcpServer(
   serverArgs: ParsedArguments,
@@ -327,12 +322,24 @@ export async function createMcpServer(
     logFile?: fs.WriteStream;
   },
 ): Promise<{server: SdkMcpServer}> {
+  // BrowserManager only reads non-reloadable browser launch and connection
+  // options.
   const browserManager = new BrowserManager(serverArgs, {
     logFile: options.logFile,
   });
-  const server = await McpServer.from(serverArgs, {
-    browserManager,
-    ...options,
-  });
+  // createMcpServer takes a flat ParsedArguments snapshot and only returns
+  // SdkMcpServer, so instances created here are never reloaded.
+  const server = await McpServer.from(
+    new ServerConfig({
+      cliArgs: {},
+      fileArgs: {},
+      configPath: undefined,
+      resolved: serverArgs,
+    }),
+    {
+      browserManager,
+      ...options,
+    },
+  );
   return {server: server.server};
 }
