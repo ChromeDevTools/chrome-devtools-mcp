@@ -105,24 +105,30 @@ async function validateAndResolvePathOrUrl(
   if (filePathOrUrl.trim().length === 0) {
     return undefined;
   }
+  let url: URL | undefined;
   try {
-    const url = new URL(filePathOrUrl);
+    url = new URL(filePathOrUrl);
+  } catch {
+    // Not a URL; fall through and validate it as a regular file path.
+  }
+  if (url) {
     if (url.protocol === 'file:') {
       return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
     }
-    // Only pass a remote URL through unchanged for parameters whose sink
-    // actually fetches the URL or hands it to the browser (allowUrl). For a
-    // filesystem-path parameter, a value that merely looks like an http/ws URL
-    // must still be validated: `new URL()` accepts `http://x/../../etc/passwd`,
-    // and the downstream filesystem API (e.g. Puppeteer's uploadFile)
-    // path.resolve()s that non-absolute string into an absolute host path,
-    // which would bypass validatePath (workspace roots and the temp-dir
-    // fallback) if it were returned here unchanged.
-    if (allowUrl && ['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
-      return filePathOrUrl;
+    if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
+      // Only pass a remote URL through unchanged for parameters whose sink
+      // actually fetches the URL or hands it to the browser (allowUrl). For a
+      // filesystem-path parameter, a value that merely looks like an http/ws
+      // URL must still be rejected outright: `new URL()` accepts
+      // `http://x/../../etc/passwd`, and the downstream filesystem API (e.g.
+      // Puppeteer's uploadFile) path.resolve()s that non-absolute string into
+      // an absolute host path, which would bypass validatePath (workspace
+      // roots and the temp-dir fallback) if it fell through to it unchanged.
+      if (allowUrl) {
+        return filePathOrUrl;
+      }
+      throw new Error('This parameter expects a file path, not a URL.');
     }
-  } catch {
-    // Suppress parsing errors for regular file paths.
   }
   return await context.validatePath(filePathOrUrl);
 }
@@ -141,7 +147,7 @@ function isLocalBrowser(context: McpContext): boolean {
 function shouldValidateFile(
   option: FileVerificationOption | undefined,
   isLocal: boolean,
-): boolean {
+): option is FileVerificationOption {
   if (option === true) {
     return true;
   }
@@ -162,10 +168,7 @@ async function validateToolFiles(
   const isLocal = isLocalBrowser(context);
   for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
     if (shouldValidateFile(option, isLocal)) {
-      const allowUrl =
-        typeof option === 'object' &&
-        option !== null &&
-        option.allowUrl === true;
+      const allowUrl = option !== true && option.allowUrl === true;
       const val = params[key];
       if (typeof val === 'string') {
         params[key] = await validateAndResolvePathOrUrl(val, context, allowUrl);

@@ -1037,12 +1037,8 @@ describe('ToolHandler', () => {
     assert.strictEqual(mockContext.validatePath.called, false);
   });
 
-  it('validates an http/ws URL as a filesystem path when allowUrl is not set, even on a local browser', async () => {
-    // Regression test: a filesystem-path parameter (no allowUrl) must not let
-    // a value that merely parses as an http/ws URL bypass validatePath. Such a
-    // string is resolved to an absolute host path downstream (Puppeteer's
-    // uploadFile path.resolve()s a non-absolute "http://x/../../etc/passwd"
-    // into "/etc/passwd"), so it must go through the workspace-roots check.
+  it('rejects an http/ws URL for a filesystem-path parameter when allowUrl is not set, even on a local browser', async () => {
+    // Regression test for the allowUrl TSDoc in ToolDefinition.ts: a filesystem-path parameter must reject a value that merely parses as an http/ws URL instead of passing it through.
     let handlerCalled = false;
     const tool: ToolDefinition = {
       name: 'upload_tool',
@@ -1069,9 +1065,6 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.browser = getMockBrowser({process: mockProcess});
-    mockContext.validatePath.rejects(
-      new Error('Access denied: path is not within any workspace root.'),
-    );
 
     const toolMutex = new Mutex();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
@@ -1091,7 +1084,11 @@ describe('ToolHandler', () => {
 
     assert.strictEqual(result.isError, true);
     assert.strictEqual(handlerCalled, false);
-    sinon.assert.calledOnceWithExactly(mockContext.validatePath, traversalUrl);
+    sinon.assert.notCalled(mockContext.validatePath);
+    assert.strictEqual(
+      result.content[0].type === 'text' ? result.content[0].text : '',
+      'Error: This parameter expects a file path, not a URL.',
+    );
   });
 
   it('validates verifyFilesSchema with true but skips local: true on remote browser', async () => {
