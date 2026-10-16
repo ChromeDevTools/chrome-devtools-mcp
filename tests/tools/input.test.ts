@@ -905,6 +905,20 @@ describe('input', () => {
       sinon.assert.notCalled(response.appendResponseLine);
     });
 
+    it('validates submitKey in the input schema', () => {
+      const {args} = createHandlerMocks();
+      const submitKey = typeText(args).schema.submitKey;
+      assert.strictEqual(submitKey.safeParse(undefined).success, true);
+      assert.strictEqual(submitKey.safeParse('Enter').success, true);
+      assert.strictEqual(submitKey.safeParse('').success, true);
+      const result = submitKey.safeParse('XXX');
+      assert.strictEqual(result.success, false);
+      assert.match(
+        result.error?.issues[0]?.message ?? '',
+        /^XXX is invalid\. Valid keys are: /,
+      );
+    });
+
     it('reproduction: fill isolation', async () => {
       await withMcpContext(async (_response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

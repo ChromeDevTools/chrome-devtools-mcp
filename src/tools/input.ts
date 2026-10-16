@@ -7,7 +7,7 @@
 import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
-import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
+import {invalidKeyMessage, isValidKey, parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
@@ -26,7 +26,13 @@ const includeSnapshotSchema = zod
   .describe('Whether to include a snapshot in the response. Default is false.');
 
 const submitKeySchema = zod
-  .string()
+  // An empty string means no submit key, as before.
+  .stringFormat('key', key => key === '' || isValidKey(key), {
+    error: issue =>
+      issue.code === 'invalid_format'
+        ? invalidKeyMessage(String(issue.input))
+        : undefined,
+  })
   .optional()
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
@@ -442,10 +448,15 @@ export const typeText = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    // Validate before typing so an invalid key does not leave the text typed.
-    const submitKey = request.params.submitKey
-      ? throwIfInvalidKey(request.params.submitKey)
-      : undefined;
+    // submitKeySchema already rejects invalid keys; this also narrows the type
+    // and keeps direct handler calls from typing before failing.
+    let submitKey: KeyInput | undefined;
+    if (request.params.submitKey) {
+      if (!isValidKey(request.params.submitKey)) {
+        throw new Error(invalidKeyMessage(request.params.submitKey));
+      }
+      submitKey = request.params.submitKey;
+    }
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
       if (submitKey) {

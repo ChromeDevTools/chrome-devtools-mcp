@@ -266,16 +266,24 @@ const validKeys = new Set([
 ]);
 
 /**
- * Validates a single key name (no `+` combinations) and returns it as a
- * KeyInput.
+ * Whether the string is a single valid key name (no `+` combinations).
  */
-export function throwIfInvalidKey(key: string): KeyInput {
-  if (validKeys.has(key)) {
-    return key as KeyInput;
+export function isValidKey(key: string): key is KeyInput {
+  return validKeys.has(key);
+}
+
+/**
+ * Error message for a string that is not a valid key name.
+ */
+export function invalidKeyMessage(key: string): string {
+  return `${key} is invalid. Valid keys are: ${Array.from(validKeys.values()).join(',')}.`;
+}
+
+function throwIfInvalidKey(key: string): KeyInput {
+  if (isValidKey(key)) {
+    return key;
   }
-  throw new Error(
-    `${key} is invalid. Valid keys are: ${Array.from(validKeys.values()).join(',')}.`,
-  );
+  throw new Error(invalidKeyMessage(key));
 }
 
 /**
