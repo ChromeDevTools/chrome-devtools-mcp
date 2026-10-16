@@ -68,17 +68,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The zero-based page index. Defaults to 0.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
         description:
-          'The number of contexts to return per page. Defaults to 20.',
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
     },
   },
@@ -230,16 +233,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
     },
   },
@@ -667,16 +674,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
     },
   },
@@ -727,16 +738,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination of aggregates.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination of aggregates.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
     },
   },
@@ -784,16 +799,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
       maxNameLength: {
         name: 'maxNameLength',
@@ -859,16 +878,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
     },
   },
@@ -931,16 +954,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
     },
   },
@@ -1686,16 +1713,20 @@ export const commands: Commands = {
       pageIdx: {
         name: 'pageIdx',
         type: 'integer',
-        description: 'The page index for pagination.',
+        description:
+          'The zero-based page index. Defaults to 0 (the first page).',
         required: false,
         positional: false,
+        default: 0,
       },
       pageSize: {
         name: 'pageSize',
         type: 'integer',
-        description: 'The page size for pagination.',
+        description:
+          'The maximum number of items to return per page. Defaults to 50.',
         required: false,
         positional: false,
+        default: 50,
       },
       maxNameLength: {
         name: 'maxNameLength',

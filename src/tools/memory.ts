@@ -30,19 +30,23 @@ const maxNameLengthSchema = zod
     `Maximum length of names before truncation. Defaults to ${MAX_NAME_LENGTH}.`,
   );
 
+const DEFAULT_HEAP_SNAPSHOT_PAGE_SIZE = 50;
+
 const pageIdxSchema = zod
   .number()
   .int()
   .nonnegative()
-  .optional()
-  .describe('The page index for pagination.');
+  .default(0)
+  .describe('The zero-based page index. Defaults to 0 (the first page).');
 
 const pageSizeSchema = zod
   .number()
   .int()
   .positive()
-  .optional()
-  .describe('The page size for pagination.');
+  .default(DEFAULT_HEAP_SNAPSHOT_PAGE_SIZE)
+  .describe(
+    `The maximum number of items to return per page. Defaults to ${DEFAULT_HEAP_SNAPSHOT_PAGE_SIZE}.`,
+  );
 
 export const takeHeapSnapshot = definePageTool(() => ({
   name: 'take_heapsnapshot',
@@ -139,18 +143,8 @@ export const getHeapSnapshotDetails = defineBrowserlessTool(() => ({
         'The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.',
       ),
     maxNameLength: maxNameLengthSchema,
-    pageIdx: zod
-      .number()
-      .int()
-      .nonnegative()
-      .optional()
-      .describe('The page index for pagination of aggregates.'),
-    pageSize: zod
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('The page size for pagination of aggregates.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
   },
   blockedByDialog: false,
   verifyFilesSchema: {
@@ -624,18 +618,8 @@ export const analyzeHeapSnapshotContexts = defineBrowserlessTool(() => ({
         'Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.',
       ),
     maxNameLength: maxNameLengthSchema,
-    pageIdx: zod
-      .number()
-      .int()
-      .nonnegative()
-      .optional()
-      .describe('The zero-based page index. Defaults to 0.'),
-    pageSize: zod
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe('The number of contexts to return per page. Defaults to 20.'),
+    pageIdx: pageIdxSchema,
+    pageSize: pageSizeSchema,
   },
   handler: async (request, response, context) => {
     const analysis = await context.analyzeHeapSnapshotContexts(

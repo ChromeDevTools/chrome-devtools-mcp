@@ -525,8 +525,8 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0.
-- **pageSize** (integer) _(optional)_: The number of contexts to return per page. Defaults to 20.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 - **retainedSize** (string) _(optional)_: Inclusive range for the dead-field score of a context (e.g. "10KB", "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **scopeInfoNodeId** (integer) _(optional)_: Only return contexts declared by the scope with this ScopeInfo node id, as reported in the scope header of a previous call.
 
@@ -552,8 +552,8 @@ in the DevTools Elements panel (if any).
 - **currentFilePath** (string) **(required)**: A path to the current .heapsnapshot file (later snapshot).
 - **classIndex** (number) _(optional)_: Optional 0-based index of the class in the summary list to filter results, showing individual objects.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (integer) _(optional)_: The page index for pagination.
-- **pageSize** (integer) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 
 ---
 
@@ -568,8 +568,8 @@ in the DevTools Elements panel (if any).
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the nodes.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
-- **pageIdx** (integer) _(optional)_: The page index for pagination.
-- **pageSize** (integer) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 
 ---
 
@@ -583,8 +583,8 @@ in the DevTools Elements panel (if any).
 - **filterName** (enum: "objectsRetainedByDetachedDomNodes", "objectsRetainedByConsole", "objectsRetainedByEventHandlers", "objectsRetainedByContexts", "sharedNativeContext", "noNativeContext", "attributedToSpecificNativeContext") _(optional)_: An optional filter to apply to the aggregates.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **objectId** (number) _(optional)_: The object ID (nodeId) of the specific native context to filter by when filterName is attributedToSpecificNativeContext.
-- **pageIdx** (integer) _(optional)_: The page index for pagination of aggregates.
-- **pageSize** (integer) _(optional)_: The page size for pagination of aggregates.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 
 ---
 
@@ -608,8 +608,8 @@ in the DevTools Elements panel (if any).
 
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (integer) _(optional)_: The page index for pagination.
-- **pageSize** (integer) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 
 ---
 
@@ -623,8 +623,8 @@ in the DevTools Elements panel (if any).
 - **nodeId** (number) **(required)**: The node ID to get outgoing edges for.
 - **excludePrimitives** (boolean) _(optional)_: Whether to exclude primitive target nodes. Default is true.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (integer) _(optional)_: The page index for pagination.
-- **pageSize** (integer) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-") for target nodes. A single value is treated as a minimum. Currently, only the lower bound is applied.
 - **sortBy** (enum: "retainedSize", "selfSize", "name") _(optional)_: Sort order for edges. Default is retainedSize.
 
@@ -651,8 +651,8 @@ in the DevTools Elements panel (if any).
 - **filePath** (string) **(required)**: A path to a .heapsnapshot file to read.
 - **nodeId** (number) **(required)**: The node ID to get retainers for.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
-- **pageIdx** (integer) _(optional)_: The page index for pagination.
-- **pageSize** (integer) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 
 ---
 
@@ -693,8 +693,8 @@ in the DevTools Elements panel (if any).
 - **isDetached** (boolean) _(optional)_: Whether to filter for detached DOM nodes.
 - **maxNameLength** (integer) _(optional)_: Maximum length of names before truncation. Defaults to 100.
 - **nodeType** (string) _(optional)_: Optional V8 node type filter (e.g. object, closure, string, array, code).
-- **pageIdx** (integer) _(optional)_: The page index for pagination.
-- **pageSize** (integer) _(optional)_: The page size for pagination.
+- **pageIdx** (integer) _(optional)_: The zero-based page index. Defaults to 0 (the first page).
+- **pageSize** (integer) _(optional)_: The maximum number of items to return per page. Defaults to 50.
 - **propertyName** (string) _(optional)_: Optional property name filter for outgoing reference edges.
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **selfSize** (string) _(optional)_: Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
