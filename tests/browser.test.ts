@@ -86,9 +86,12 @@ describe('browser', () => {
 
       sinon.assert.calledOnceWithMatch(connectStub, {
         browserWSEndpoint: endpoint,
-        headers,
+        wsOptions: {headers},
       });
-      assert.deepStrictEqual(connectStub.firstCall.args[0].headers, headers);
+      assert.deepStrictEqual(
+        connectStub.firstCall.args[0].wsOptions?.headers,
+        headers,
+      );
       await manager.close();
     });
 
