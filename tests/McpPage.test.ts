@@ -777,8 +777,18 @@ describe('McpPage', () => {
 
       await mcpPage.restoreEmulation();
 
-      sinon.assert.calledTwice(pptrPage.setViewport);
+      // A different width first, because Chrome ignores an override that is
+      // identical to the last one of this session (see restoreEmulation).
+      sinon.assert.calledThrice(pptrPage.setViewport);
       sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, {
+        width: 401,
+        height: 400,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      });
+      sinon.assert.calledWithExactly(pptrPage.setViewport.thirdCall, {
         width: 400,
         height: 400,
         deviceScaleFactor: 1,
@@ -786,6 +796,16 @@ describe('McpPage', () => {
         hasTouch: false,
         isLandscape: false,
       });
+    });
+
+    it('does not touch the viewport when none was configured', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      pptrPage.setViewport.resetHistory();
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.setViewport, null);
     });
 
     it('re-applies previously configured network and cpu throttling emulation', async () => {

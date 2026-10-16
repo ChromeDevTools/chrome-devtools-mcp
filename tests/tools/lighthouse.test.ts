@@ -60,6 +60,56 @@ describe('lighthouse', () => {
       });
     });
 
+    it('keeps the emulated viewport after a navigation audit', async () => {
+      server.addHtmlRoute('/test', html`<div>Test</div>`);
+
+      await withMcpContext(async (response, context, args) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.goto(server.getRoute('/test'));
+        await mcpPage.emulate({
+          viewport: {
+            width: 390,
+            height: 844,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+          },
+        });
+        const readViewport = () =>
+          page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+            deviceScaleFactor: window.devicePixelRatio,
+            screenWidth: screen.width,
+            orientation: screen.orientation.type,
+          }));
+        const expected = {
+          width: 390,
+          height: 844,
+          deviceScaleFactor: 3,
+          screenWidth: 390,
+          orientation: 'portrait-primary',
+        };
+        assert.deepEqual(await readViewport(), expected);
+
+        await lighthouseAudit(args).handler(
+          {
+            params: {
+              mode: 'navigation',
+              device: 'desktop',
+            },
+            page: mcpPage,
+          },
+          response,
+          context,
+        );
+
+        assert.deepEqual(await readViewport(), expected);
+      });
+    });
+
     it('restores emulation', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
