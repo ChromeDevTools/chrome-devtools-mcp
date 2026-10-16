@@ -21,7 +21,7 @@ describe('TextSnapshot', () => {
     TextSnapshot.resetCounter();
   });
 
-  it('assigns unique uids to nodes without backendNodeId', async () => {
+  it('does not assign uids to nodes without backendNodeId', async () => {
     const page = createMockMcpPage();
     page.uniqueBackendNodeIdToMcpId = new Map();
     page.extraHandles = [];
@@ -58,25 +58,19 @@ describe('TextSnapshot', () => {
       node => node.role === 'InlineTextBox',
     );
 
-    assert.strictEqual(inlineNodes.length, 2);
-    assert.strictEqual(inlineNodes[0]?.id, '1_2');
-    assert.strictEqual(inlineNodes[1]?.id, '1_4');
-    assert.strictEqual(snapshot.idToNode.get('1_2')?.name, 'alpha');
-    assert.strictEqual(snapshot.idToNode.get('1_4')?.name, 'beta');
-    assert.strictEqual(snapshot.idToNode.get('1_2')?.role, 'InlineTextBox');
-    assert.strictEqual(snapshot.idToNode.get('1_4')?.role, 'InlineTextBox');
+    assert.strictEqual(inlineNodes.length, 0);
 
-    const paragraphNodes = [...snapshot.idToNode.values()].filter(
-      node => node.role === 'paragraph',
-    );
-    assert.strictEqual(
-      paragraphNodes.some(p => p.id === inlineNodes[0]?.id),
-      false,
-    );
-    assert.strictEqual(
-      paragraphNodes.some(p => p.id === inlineNodes[1]?.id),
-      false,
-    );
+    const paragraph1 = snapshot.idToNode.get('1_1');
+    assert.strictEqual(paragraph1?.role, 'paragraph');
+    assert.strictEqual(paragraph1?.children[0]?.role, 'InlineTextBox');
+    assert.strictEqual(paragraph1?.children[0]?.id, '');
+    assert.strictEqual(paragraph1?.children[0]?.name, 'alpha');
+
+    const paragraph2 = snapshot.idToNode.get('1_2');
+    assert.strictEqual(paragraph2?.role, 'paragraph');
+    assert.strictEqual(paragraph2?.children[0]?.role, 'InlineTextBox');
+    assert.strictEqual(paragraph2?.children[0]?.id, '');
+    assert.strictEqual(paragraph2?.children[0]?.name, 'beta');
 
     assert.strictEqual(
       page.uniqueBackendNodeIdToMcpId.has('1_undefined'),

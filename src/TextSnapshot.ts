@@ -88,8 +88,6 @@ export class TextSnapshot {
         }
         seenUniqueIds.add(uniqueBackendId);
         seenBackendNodeIds.add(backendNodeId);
-      } else {
-        id = `${snapshotId}_${idCounter++}`;
       }
 
       const nodeWithId: TextSnapshotNode = {
@@ -109,7 +107,9 @@ export class TextSnapshot {
         }
       }
 
-      idToNode.set(nodeWithId.id, nodeWithId);
+      if (id) {
+        idToNode.set(nodeWithId.id, nodeWithId);
+      }
       return nodeWithId;
     };
 
