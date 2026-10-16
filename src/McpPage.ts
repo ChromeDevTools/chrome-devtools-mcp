@@ -15,6 +15,8 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
+import type {Logpoint, LogpointOptions, ScriptInfo} from './LogpointManager.js';
+import {listParsedScripts, LogpointManager} from './LogpointManager.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
   type Locator,
@@ -166,6 +168,9 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   #devtoolsUniverse?: TargetUniverse;
+
+  // Logpoints, created on first use.
+  #logpointManager?: LogpointManager;
 
   // Dialog
   #dialog?: Dialog;
@@ -363,6 +368,53 @@ export class McpPage implements ContextPage {
 
   get devtoolsUniverse(): TargetUniverse | undefined {
     return this.#devtoolsUniverse;
+  }
+
+  #requireDevToolsUniverse(): TargetUniverse {
+    if (!this.#devtoolsUniverse) {
+      throw new Error(
+        `DevTools universe is not available for page ${this.id ?? '?'}.`,
+      );
+    }
+    return this.#devtoolsUniverse;
+  }
+
+  get #logpoints(): LogpointManager {
+    if (!this.#logpointManager) {
+      this.#logpointManager = new LogpointManager(
+        this.#requireDevToolsUniverse(),
+      );
+    }
+    return this.#logpointManager;
+  }
+
+  setLogpoint(options: LogpointOptions): Promise<Logpoint> {
+    return this.#logpoints.setLogpoint(options);
+  }
+
+  removeLogpoint(id?: number): Promise<Logpoint[]> {
+    if (!this.#logpointManager) {
+      if (id === undefined) {
+        return Promise.resolve([]);
+      }
+      throw new Error(`No logpoint found with id ${id}.`);
+    }
+    return this.#logpointManager.removeLogpoint(id);
+  }
+
+  getLogpoints(): Logpoint[] {
+    return this.#logpointManager?.getLogpoints() ?? [];
+  }
+
+  async listScripts(filter?: string): Promise<ScriptInfo[]> {
+    const devTools = this.#requireDevToolsUniverse();
+    const model = devTools.target.model(DevTools.DebuggerModel);
+    if (!model) {
+      throw new Error(
+        `Script information is not available for page ${this.id ?? '?'}.`,
+      );
+    }
+    return await listParsedScripts(model, filter);
   }
 
   getDialog(): Dialog | undefined {
@@ -674,6 +726,8 @@ export class McpPage implements ContextPage {
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
+    this.#logpointManager?.dispose();
+    this.#logpointManager = undefined;
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     devtoolsUniverse?.universe.dispose();
