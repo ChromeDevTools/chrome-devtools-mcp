@@ -246,58 +246,54 @@ describe('input', () => {
     });
 
     it('does not include snapshot by default', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<button onclick="this.innerText = 'clicked';">test</button>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await click(args).handler(
-          {
-            params: {
-              uid: '1_1',
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully clicked on the element',
-        );
-        assert.strictEqual(response.snapshotParams, undefined);
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnce(locator.click);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully clicked on the element',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
     });
 
     it('includes snapshot if includeSnapshot is true', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<button onclick="this.innerText = 'clicked';">test</button>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await click(args).handler(
-          {
-            params: {
-              uid: '1_1',
-              includeSnapshot: true,
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await click(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully clicked on the element',
-        );
-        assert.notStrictEqual(response.snapshotParams, undefined);
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnce(locator.click);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully clicked on the element',
+      );
+      sinon.assert.calledOnce(response.includeSnapshot);
     });
 
     it('selects a collapsed native select option by option uid', async () => {
@@ -495,31 +491,54 @@ describe('input', () => {
 
   describe('hover', () => {
     it('hovers', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<button onmouseover="this.innerText = 'hovered';">test</button>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await hover(args).handler(
-          {
-            params: {
-              uid: '1_1',
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await hover(args).handler(
+        {
+          params: {
+            uid: '1_1',
           },
-          response,
-          context,
-        );
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully hovered over the element',
-        );
-        assert.ok(response.includeSnapshot);
-        assert.ok(await page.$('text/hovered'));
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnce(locator.hover);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully hovered over the element',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('includes snapshot if includeSnapshot is true', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+
+      await hover(args).handler(
+        {
+          params: {
+            uid: '1_1',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnce(locator.hover);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully hovered over the element',
+      );
+      sinon.assert.calledOnce(response.includeSnapshot);
     });
 
     it('does not fail when the hover opens a dialog', async () => {
@@ -1167,58 +1186,59 @@ describe('input', () => {
 
   describe('drags', () => {
     it('drags one element onto another', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(
-          html`<div
-              role="button"
-              id="drag"
-              draggable="true"
-              >drag me</div
-            >
-            <div
-              id="drop"
-              aria-label="drop"
-              style="width: 100px; height: 100px; border: 1px solid black;"
-              ondrop="this.innerText = 'dropped';"
-            >
-            </div>
-            <script>
-              drag.addEventListener('dragstart', event => {
-                event.dataTransfer.setData('text/plain', event.target.id);
-              });
-              drop.addEventListener('dragover', event => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'move';
-              });
-              drop.addEventListener('drop', event => {
-                event.preventDefault();
-                const data = event.dataTransfer.getData('text/plain');
-                event.target.appendChild(document.getElementById(data));
-              });
-            </script>`,
-        );
-        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
-          context.getSelectedMcpPage(),
-        );
-        await drag(args).handler(
-          {
-            params: {
-              from_uid: '1_1',
-              to_uid: '1_2',
-            },
-            page: context.getSelectedMcpPage(),
+      const {page, context, response, args} = createHandlerMocks();
+      const fromHandle = createMockElementHandle().handle;
+      const toHandle = createMockElementHandle().handle;
+      page.getElementByUid.withArgs('1_1').resolves(fromHandle);
+      page.getElementByUid.withArgs('1_2').resolves(toHandle);
+
+      await drag(args).handler(
+        {
+          params: {
+            from_uid: '1_1',
+            to_uid: '1_2',
           },
-          response,
-          context,
-        );
-        assert.ok(response.includeSnapshot);
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully dragged an element',
-        );
-        assert.ok(await page.$('text/dropped'));
-      });
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledWith(page.getElementByUid, '1_1');
+      sinon.assert.calledWith(page.getElementByUid, '1_2');
+      sinon.assert.calledOnceWithExactly(fromHandle.drag, toHandle);
+      sinon.assert.calledOnceWithMatch(
+        toHandle.drop,
+        sinon.match.same(fromHandle),
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Successfully dragged an element',
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('includes snapshot if includeSnapshot is true', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const fromHandle = createMockElementHandle().handle;
+      const toHandle = createMockElementHandle().handle;
+      page.getElementByUid.withArgs('1_1').resolves(fromHandle);
+      page.getElementByUid.withArgs('1_2').resolves(toHandle);
+
+      await drag(args).handler(
+        {
+          params: {
+            from_uid: '1_1',
+            to_uid: '1_2',
+            includeSnapshot: true,
+          },
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnce(response.includeSnapshot);
     });
   });
 
