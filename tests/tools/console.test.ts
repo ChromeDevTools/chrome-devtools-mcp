@@ -256,40 +256,28 @@ describe('console', () => {
     });
 
     it('lists the reason of each unhandled promise rejection', async () => {
-      await withMcpContext(async (response, context, args) => {
+      await withMcpContext(async (_response, context, args) => {
         const page = context.getSelectedMcpPage();
-        // Rejections are reported once the microtask queue drains, after
-        // setContent resolves, so wait for all three exceptions.
-        const session = await page.pptrPage.createCDPSession();
-        await session.send('Runtime.enable');
-        const thrown = new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Timeout waiting for 3 unhandled rejections'));
-          }, 5000);
-          let count = 0;
-          const onThrown = () => {
-            if (++count === 3) {
-              clearTimeout(timeout);
-              session.off('Runtime.exceptionThrown', onThrown);
-              resolve();
-            }
-          };
-          session.on('Runtime.exceptionThrown', onThrown);
-        });
         await page.pptrPage.setContent(`<script>
           Promise.reject(new Error('reason-A'));
           Promise.reject('reason-B');
           (async () => { throw new TypeError('reason-C'); })();
         </script>`);
-        await thrown;
-        await session.detach();
-        await listConsoleMessages(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        const formattedResponse = await response.handle(context);
-        const textContent = getTextContent(formattedResponse.content[0]);
+        // Rejections are reported once the microtask queue drains, after
+        // setContent resolves, so poll until the collector has all three.
+        let textContent = '';
+        await waitExecutionFor(async () => {
+          const pollResponse = new McpResponse(args);
+          pollResponse.setPage(page);
+          await listConsoleMessages(args).handler(
+            {params: {}, page},
+            pollResponse,
+            context,
+          );
+          const formattedResponse = await pollResponse.handle(context);
+          textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('msgid=3 '), textContent);
+        }, 5000);
         assert.ok(
           textContent.includes(
             'msgid=1 [error] Uncaught (in promise) Error: reason-A (0 args)',
