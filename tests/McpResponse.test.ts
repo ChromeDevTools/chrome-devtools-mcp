@@ -1127,7 +1127,7 @@ describe('third-party developer tools', () => {
       categoryExperimentalThirdParty: true,
     });
     const page = createMockMcpPage();
-    page.getToolGroups.resolves([
+    page.discoverThirdPartyDeveloperTools.resolves([
       {
         name: 'My Tool Group',
         description: 'A group of tools',
@@ -1165,7 +1165,7 @@ describe('third-party developer tools', () => {
       createMockParsedArguments({categoryExperimentalThirdParty: true}),
     );
     const page = createMockMcpPage();
-    page.getToolGroups.resolves([]);
+    page.discoverThirdPartyDeveloperTools.resolves([]);
     response.setPage(page);
     response.setListThirdPartyDeveloperTools();
 
@@ -1192,7 +1192,7 @@ describe('third-party developer tools', () => {
     const page = createMockMcpPage();
     Object.defineProperty(page, 'id', {value: 1});
     page.url.returns('about:blank');
-    page.getToolGroups.resolves([
+    page.discoverThirdPartyDeveloperTools.resolves([
       {
         name: 'Tool group name',
         description: 'Test tools',

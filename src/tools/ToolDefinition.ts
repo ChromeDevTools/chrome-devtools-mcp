@@ -475,7 +475,7 @@ export type ContextPage = Readonly<{
     },
   ): Promise<WaitForEventsResult>;
   getWebMcpTools(): WebMCPTool[];
-  getThirdPartyDeveloperTools(): ToolGroups;
+  discoverThirdPartyDeveloperTools(): Promise<ToolGroups>;
 
   executeThirdPartyDeveloperTool(
     toolName: string,

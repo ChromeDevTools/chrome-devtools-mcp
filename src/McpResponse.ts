@@ -624,7 +624,7 @@ export class McpResponse implements Response {
       this.#listThirdPartyDeveloperTools &&
       this.#page
     ) {
-      return await this.#page.getToolGroups();
+      return await this.#page.discoverThirdPartyDeveloperTools();
     }
     return undefined;
   }

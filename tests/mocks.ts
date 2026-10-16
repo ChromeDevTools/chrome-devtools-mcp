@@ -81,6 +81,13 @@ export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
   tracing: sinon.SinonStubbedInstance<Tracing>;
   mouse: sinon.SinonStubbedInstance<Mouse>;
   accessibility: sinon.SinonStubbedInstance<Accessibility>;
+  cdpSession: {
+    on: sinon.SinonStub;
+    off: sinon.SinonStub;
+    send: sinon.SinonStub;
+    target: sinon.SinonStub;
+    emit: (eventName: string | symbol | number, data?: unknown) => void;
+  };
 };
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -346,7 +353,13 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   page.emulateFocusedPage.resolves();
   page.evaluateHandle.resolves(createMockElementHandle().handle);
 
-  return Object.assign(page, {webmcp, tracing, mouse, accessibility});
+  return Object.assign(page, {
+    webmcp,
+    tracing,
+    mouse,
+    accessibility,
+    cdpSession,
+  });
 }
 
 export function createMockWebMCPTool(options: {
@@ -438,6 +451,7 @@ export function createMockMcpPage(
     return {};
   });
   page.getWebMcpTools.returns([]);
+  page.discoverThirdPartyDeveloperTools.resolves([]);
   Object.defineProperty(page, 'pptrPage', {
     value: pptrPage,
     writable: true,

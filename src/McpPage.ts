@@ -174,8 +174,6 @@ export class McpPage implements ContextPage {
   // Screencast
   #screenRecorder: ScreenRecorderData | null = null;
 
-  eventBasedThirdPartyTools: ToolGroups = [];
-
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
@@ -411,14 +409,7 @@ export class McpPage implements ContextPage {
     ];
   }
 
-  getThirdPartyDeveloperTools(): ToolGroups {
-    return [
-      ...this.#getDebuggingWebMcpToolGroups(),
-      ...this.eventBasedThirdPartyTools,
-    ];
-  }
-
-  async getToolGroups(): Promise<ToolGroups> {
+  async discoverThirdPartyDeveloperTools(): Promise<ToolGroups> {
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
@@ -428,8 +419,7 @@ export class McpPage implements ContextPage {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      this.eventBasedThirdPartyTools = [];
-      return this.getThirdPartyDeveloperTools();
+      return this.#getDebuggingWebMcpToolGroups();
     }
 
     const eventToolGroups = await this.pptrPage.evaluate(() => {
@@ -515,9 +505,7 @@ export class McpPage implements ContextPage {
       }
     }
 
-    this.eventBasedThirdPartyTools = eventToolGroups;
-
-    return this.getThirdPartyDeveloperTools();
+    return [...this.#getDebuggingWebMcpToolGroups(), ...eventToolGroups];
   }
 
   getWebMcpTools(): WebMCPTool[] {
