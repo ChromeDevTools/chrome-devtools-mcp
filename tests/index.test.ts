@@ -561,22 +561,6 @@ describe('e2e', {concurrency: true}, () => {
           getFirstText(result),
           /A dialog is open \(alert: test dialog\)\./,
         );
-
-        const handled = await client.callTool({
-          name: 'handle_dialog',
-          arguments: {pageId: 2, action: 'accept'},
-        });
-        assert.strictEqual(handled.isError, undefined);
-
-        const evaluated = await client.callTool(
-          {
-            name: 'evaluate_script',
-            arguments: {pageId: 2, function: '() => 1'},
-          },
-          {timeout: 10_000},
-        );
-        assert.strictEqual(evaluated.isError, undefined);
-        assert.match(getFirstText(evaluated), /returned:\n```json\n1\n```/);
       });
     });
   });

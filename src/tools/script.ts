@@ -100,7 +100,7 @@ Example with arguments: \`(el) => el.innerText\`
           }
         : {}),
     },
-    blockedByDialog: true,
+    blockedByDialog: false,
     verifyFilesSchema: {
       filePath: true,
       sourcePath: true,
@@ -162,9 +162,11 @@ Example with arguments: \`(el) => el.innerText\`
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
       await mcpPage.init();
-      // evaluate_script is not page-scoped, so ToolHandler does not apply the
+      // evaluate_script is not page-scoped, so ToolHandler does not run the
       // blockedByDialog check for it. Without this, an evaluation started
       // while a dialog is open waits until the protocol timeout.
+      // TODO: include the "# Open dialog ... Call handle_dialog" hint once
+      // Response can attach the page for non-page-scoped tools.
       mcpPage.throwIfDialogOpen();
       const page: Page = mcpPage.pptrPage;
 
