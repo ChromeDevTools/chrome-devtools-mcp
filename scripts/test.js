@@ -9,6 +9,7 @@
 
 import {spawn} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -51,6 +52,16 @@ if (userArgs.length > 0) {
   }
 } else if (files.length === 0) {
   files.push('build/tests/**/*.test.js');
+}
+
+// Node runs `availableParallelism() - 1` test files at a time by default, so
+// a 2-core CI runner runs one file at a time. Most test files wait on Chrome
+// and child processes, so a second file uses the idle CPU. On 2 cores, 2
+// files at a time cut the suite from 304 s to 222 s.
+if (!flags.some(flag => flag.startsWith('--test-concurrency'))) {
+  flags.push(
+    `--test-concurrency=${Math.max(2, os.availableParallelism() - 1)}`,
+  );
 }
 
 const nodeArgs = [
