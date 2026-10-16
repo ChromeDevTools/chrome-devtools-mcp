@@ -24,7 +24,7 @@
 
 import './setupDevTools.js';
 
-import type {Frame, Mouse} from 'puppeteer-core';
+import type {Frame, Mouse, SerializedAXNode} from 'puppeteer-core';
 import sinon from 'sinon';
 
 import {
@@ -46,6 +46,7 @@ import type {
   HeapSnapshotDiffObject,
 } from '../src/processors/HeapSnapshotManager.js';
 import {
+  Accessibility,
   CdpBrowser,
   CdpExtension,
   CdpFrame,
@@ -79,6 +80,7 @@ export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
   webmcp: sinon.SinonStubbedInstance<WebMCP>;
   tracing: sinon.SinonStubbedInstance<Tracing>;
   mouse: sinon.SinonStubbedInstance<Mouse>;
+  accessibility: sinon.SinonStubbedInstance<Accessibility>;
 };
 
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
@@ -87,6 +89,32 @@ export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
+
+export interface ProtocolAXNode extends SerializedAXNode {
+  loaderId?: string;
+  backendNodeId?: number;
+  children?: ProtocolAXNode[];
+  elementHandle: () => Promise<ElementHandle<Element> | null>;
+}
+
+export function createMockAXNode(
+  role: string,
+  options: {
+    name?: string;
+    loaderId?: string;
+    backendNodeId?: number;
+    children?: ProtocolAXNode[];
+  } = {},
+): ProtocolAXNode {
+  return {
+    role,
+    name: options.name,
+    loaderId: options.loaderId,
+    backendNodeId: options.backendNodeId,
+    children: options.children,
+    elementHandle: async () => null,
+  };
+}
 export type MockDOMNode = sinon.SinonStubbedInstance<DevTools.DOMModel.DOMNode>;
 export type MockCSSProperty =
   sinon.SinonStubbedInstance<DevTools.CSSProperty.CSSProperty>;
@@ -308,10 +336,17 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
     configurable: true,
   });
 
+  const accessibility = sinon.createStubInstance(Accessibility);
+  Object.defineProperty(page, 'accessibility', {
+    value: accessibility,
+    writable: true,
+    configurable: true,
+  });
+
   page.emulateFocusedPage.resolves();
   page.evaluateHandle.resolves(createMockElementHandle().handle);
 
-  return Object.assign(page, {webmcp, tracing, mouse});
+  return Object.assign(page, {webmcp, tracing, mouse, accessibility});
 }
 
 export function createMockWebMCPTool(options: {
