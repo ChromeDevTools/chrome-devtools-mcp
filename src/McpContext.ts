@@ -118,6 +118,7 @@ export class McpContext implements Context, BrowserlessContext {
   #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
 
   #isRunningTrace = false;
+  #tracedPageId?: number;
 
   #reconnectNotice = false;
 
@@ -471,8 +472,13 @@ export class McpContext implements Context, BrowserlessContext {
     return this.browser.getPWAState(options);
   }
 
-  setIsRunningPerformanceTrace(x: boolean): void {
+  setIsRunningPerformanceTrace(x: boolean, pageId?: number): void {
     this.#isRunningTrace = x;
+    this.#tracedPageId = x ? pageId : undefined;
+  }
+
+  getPerformanceTracedPageId(): number | undefined {
+    return this.#tracedPageId;
   }
 
   isRunningPerformanceTrace(): boolean {

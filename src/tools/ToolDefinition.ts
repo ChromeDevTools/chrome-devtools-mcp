@@ -329,7 +329,8 @@ export type Context = Readonly<{
     extension: Extension,
   ): Promise<`${string}${Extension}`>;
   isRunningPerformanceTrace(): boolean;
-  setIsRunningPerformanceTrace(x: boolean): void;
+  setIsRunningPerformanceTrace(x: boolean, pageId?: number): void;
+  getPerformanceTracedPageId(): number | undefined;
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
@@ -442,10 +443,12 @@ export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
  * Only add methods used by tools/*.
  */
 export type ContextPage = Readonly<{
+  readonly id: number;
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
   init(): Promise<void>;
+  isClosed(): boolean;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
