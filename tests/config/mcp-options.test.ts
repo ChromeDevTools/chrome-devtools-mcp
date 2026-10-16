@@ -13,6 +13,7 @@ import sinon from 'sinon';
 import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {DEFAULT_FILESYSTEM_ROOT} from '../../src/config/mcp-options.js';
+import {ServerConfig} from '../../src/config/ServerConfig.js';
 import {createTempFile} from '../utils.js';
 
 describe('mcp-options steps', () => {
@@ -74,11 +75,11 @@ describe('mcp-options steps', () => {
 
   describe('validateConflicts', () => {
     it('accepts a single argument from a conflict group', () => {
-      ConfigParser.validateConflicts({browserUrl: 'http://localhost:9222'});
+      ServerConfig.validateConflicts({browserUrl: 'http://localhost:9222'});
     });
 
     it('ignores false and undefined values', () => {
-      ConfigParser.validateConflicts({
+      ServerConfig.validateConflicts({
         browserUrl: 'http://localhost:9222',
         wsEndpoint: undefined,
         categoryExtensions: false,
@@ -88,7 +89,7 @@ describe('mcp-options steps', () => {
     it('rejects two arguments from the same group', () => {
       assert.throws(
         () =>
-          ConfigParser.validateConflicts({
+          ServerConfig.validateConflicts({
             browserUrl: 'http://localhost:9222',
             channel: 'canary',
           }),
@@ -98,11 +99,11 @@ describe('mcp-options steps', () => {
 
     describe('validateImplications', () => {
       it('accepts when implying key is not set', () => {
-        ConfigParser.validateImplications({wsEndpoint: 'ws://localhost:9222'});
+        ServerConfig.validateImplications({wsEndpoint: 'ws://localhost:9222'});
       });
 
       it('accepts when both implying and implied keys are set', () => {
-        ConfigParser.validateImplications({
+        ServerConfig.validateImplications({
           wsHeaders: {Auth: 'token'},
           wsEndpoint: 'ws://localhost:9222',
         });
@@ -110,7 +111,7 @@ describe('mcp-options steps', () => {
 
       it('rejects when implying key is set but implied key is missing', () => {
         assert.throws(
-          () => ConfigParser.validateImplications({wsHeaders: {Auth: 'token'}}),
+          () => ServerConfig.validateImplications({wsHeaders: {Auth: 'token'}}),
           /Implications failed:\n {2}wsHeaders -> wsEndpoint/,
         );
       });
@@ -118,7 +119,7 @@ describe('mcp-options steps', () => {
       it('rejects when implying key is set but implied key is negated', () => {
         assert.throws(
           () =>
-            ConfigParser.validateImplications({
+            ServerConfig.validateImplications({
               experimentalFfmpegPath: '/bin/ffmpeg',
               experimentalScreencast: false,
             }),
@@ -127,11 +128,10 @@ describe('mcp-options steps', () => {
       });
     });
   });
+
   describe('applyDefaults', () => {
     it('keeps explicit values and fills in defaults', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        headless: true,
-      });
+      const args = ServerConfig.applyDefaults({headless: true}, {env: {}});
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.isolated, false);
       assert.strictEqual(args.channel, 'stable');
@@ -145,17 +145,20 @@ describe('mcp-options steps', () => {
     ]) {
       it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
         assert.strictEqual(
-          new ConfigParser('0.0.0', [], {}).applyDefaults(explicitArgs).channel,
+          ServerConfig.applyDefaults(explicitArgs, {env: {}}).channel,
           undefined,
         );
       });
     }
 
     it('applies viaCli defaults when launching a browser', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        viaCli: true,
-        filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
-      });
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
+        },
+        {env: {}},
+      );
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.isolated, true);
       assert.strictEqual(args.categoryExtensions, true);
@@ -164,41 +167,54 @@ describe('mcp-options steps', () => {
     });
 
     it('keeps the default filesystem root for viaCli with explicit allowUnrestrictedPaths=false', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        viaCli: true,
-        allowUnrestrictedPaths: false,
-      });
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          allowUnrestrictedPaths: false,
+        },
+        {env: {}},
+      );
       assert.strictEqual(args.allowUnrestrictedPaths, false);
       assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
 
     it('does not enable isolated or extensions for viaCli with browserUrl', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        viaCli: true,
-        browserUrl: 'http://localhost:9222',
-      });
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          browserUrl: 'http://localhost:9222',
+        },
+        {env: {}},
+      );
       assert.strictEqual(args.isolated, false);
       assert.strictEqual(args.categoryExtensions, undefined);
     });
 
     it('turns off usage statistics in CI', () => {
       sinon.stub(console, 'error');
-      const args = new ConfigParser('0.0.0', [], {
-        CI: 'true',
-      }).applyDefaults({
-        usageStatistics: true,
-      });
+      const args = ServerConfig.applyDefaults(
+        {usageStatistics: true},
+        {env: {CI: 'true'}},
+      );
       assert.strictEqual(args.usageStatistics, false);
     });
 
-    it('prints the usage statistics notice once', () => {
+    it('prints the usage statistics notice once across parse and reload', () => {
       const consoleError = sinon.stub(console, 'error');
-      const parser = new ConfigParser('0.0.0', [], {CI: 'true'});
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      const ciParser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js'],
+        {CI: 'true'},
+        false,
+        locator,
+      );
 
-      parser.applyDefaults({});
-      const args = parser.applyDefaults({});
+      ciParser.parseConfig();
+      const reloaded = ciParser.reloadConfig();
 
-      assert.strictEqual(args.usageStatistics, false);
+      assert.strictEqual(reloaded.resolved.usageStatistics, false);
       sinon.assert.calledOnce(consoleError);
     });
   });
@@ -311,8 +327,8 @@ describe('mcp-options steps', () => {
     });
   });
 
-  describe('mergeReloadableOptions', () => {
-    function parseArgs(argv: string[] = []) {
+  describe('mergeReloadable', () => {
+    function parseConfig(argv: string[] = []) {
       const locator = new ConfigLocator();
       sinon.stub(locator, 'locate').returns(undefined);
       return new ConfigParser(
@@ -321,19 +337,18 @@ describe('mcp-options steps', () => {
         {},
         false,
         locator,
-      ).parse();
+      ).parseConfig();
     }
 
     it('applies reloadable options', () => {
-      const merged = ConfigParser.mergeReloadableOptions(
-        parseArgs(),
-        parseArgs([
+      const merged = parseConfig().mergeReloadable(
+        parseConfig([
           '--memoryDebugging',
           '--no-category-network',
           '--no-file-navigations',
           '--slim',
         ]),
-      );
+      ).resolved;
 
       assert.strictEqual(merged.memoryDebugging, true);
       assert.strictEqual(merged.categoryNetwork, false);
@@ -342,14 +357,13 @@ describe('mcp-options steps', () => {
     });
 
     it('keeps restart-required options', () => {
-      const merged = ConfigParser.mergeReloadableOptions(
-        parseArgs(),
-        parseArgs([
+      const merged = parseConfig().mergeReloadable(
+        parseConfig([
           '--categoryExtensions',
           '--blockedUrlPattern=https://example.com/*',
           '--experimentalDevtools',
         ]),
-      );
+      ).resolved;
 
       assert.strictEqual(merged.categoryExtensions, undefined);
       assert.strictEqual(merged.blockedUrlPattern, undefined);
@@ -357,33 +371,59 @@ describe('mcp-options steps', () => {
     });
 
     it('keeps options derived from restart-required options', () => {
-      const previous = parseArgs(['--viaCli']);
-      const next = parseArgs([
+      const previous = parseConfig(['--viaCli']);
+      const next = parseConfig([
         '--viaCli',
         '--browserUrl=http://127.0.0.1:9222',
       ]);
 
-      const merged = ConfigParser.mergeReloadableOptions(previous, next);
+      const merged = previous.mergeReloadable(next).resolved;
 
       assert.strictEqual(merged.categoryExtensions, true);
       assert.strictEqual(merged.browserUrl, undefined);
     });
 
+    it('preserves CLI precedence over reloaded config file values', () => {
+      using configFile = createTempFile(
+        JSON.stringify({memoryDebugging: false, performanceCrux: true}),
+        'cd4a.config.json',
+      );
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(configFile.path);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js', '--memoryDebugging'],
+        {},
+        false,
+        locator,
+      );
+      const initial = parser.parseConfig();
+
+      fs.writeFileSync(
+        configFile.path,
+        JSON.stringify({memoryDebugging: false, performanceCrux: false}),
+      );
+      const reloaded = parser.reloadConfig();
+      const merged = initial.mergeReloadable(reloaded).resolved;
+
+      assert.strictEqual(merged.memoryDebugging, true);
+      assert.strictEqual(merged.performanceCrux, false);
+    });
+
     it('rejects reloadable options that conflict with startup restart-required options', () => {
-      const previous = parseArgs(['--browserUrl=http://127.0.0.1:9222']);
-      const next = parseArgs(['--categoryPwa']);
+      const previous = parseConfig(['--browserUrl=http://127.0.0.1:9222']);
+      const next = parseConfig(['--categoryPwa']);
 
       assert.throws(
-        () => ConfigParser.mergeReloadableOptions(previous, next),
+        () => previous.mergeReloadable(next),
         /Arguments categoryPwa and browserUrl are mutually exclusive/,
       );
     });
 
     it('does not conflict with default options', () => {
-      const merged = ConfigParser.mergeReloadableOptions(
-        parseArgs(),
-        parseArgs(['--allow-unrestricted-paths']),
-      );
+      const merged = parseConfig().mergeReloadable(
+        parseConfig(['--allow-unrestricted-paths']),
+      ).resolved;
 
       assert.strictEqual(merged.allowUnrestrictedPaths, true);
       assert.strictEqual(merged.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
