@@ -9,7 +9,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
-import {type ParsedArguments} from './config/ConfigParser.js';
+import type {ParsedArguments} from './config/ConfigParser.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
@@ -30,6 +30,7 @@ import {
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
+import {logCruxDisclaimer} from './utils/disclaimers.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
 
@@ -174,6 +175,55 @@ export class McpServer {
       };
     }
     return await toolHandler.handle(args);
+  }
+
+  /**
+   * Applies a new config to the running server. Only reloadable options are
+   * applied, all other options keep the value the server was started with.
+   * Tools are updated in place and only tools whose listing changed notify
+   * the client, which results in at most one `tools/list_changed`
+   * notification.
+   */
+  async applyConfig(config: ServerConfig): Promise<void> {
+    using guard = await this.#toolMutex.acquire();
+    const previousArgs = this.#config.resolved;
+    const nextConfig = this.#config.mergeReloadable(config);
+    const nextArgs = nextConfig.resolved;
+    // Build everything before committing so that a throwing tool factory
+    // leaves the server untouched.
+    const updates: Array<{
+      entry: ToolEntry;
+      tool: AnyToolDefinition;
+    }> = [];
+    for (const tool of createTools(nextArgs)) {
+      const entry = this.#tools.get(tool.name);
+      if (entry) {
+        updates.push({entry, tool});
+      }
+    }
+
+    this.#config.commit(nextConfig);
+    for (const {entry, tool} of updates) {
+      if (entry.handler.update(tool)) {
+        entry.registeredTool.update({
+          description: tool.description,
+          paramsSchema: entry.handler.registeredInputSchema,
+          annotations: tool.annotations,
+          enabled: !entry.handler.disabled,
+        });
+      }
+    }
+
+    if (
+      (!previousArgs.performanceCrux || previousArgs.slim) &&
+      !nextArgs.slim &&
+      nextArgs.performanceCrux
+    ) {
+      logCruxDisclaimer(nextArgs);
+    }
+
+    this.#context.setRoots(this.#combinedRoots());
+    await this.#context.onConfigChanged(previousArgs);
   }
 
   /**
