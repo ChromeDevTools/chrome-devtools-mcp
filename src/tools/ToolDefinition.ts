@@ -550,6 +550,11 @@ export interface BrowserlessToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   browserless: true;
+  /**
+   * Browserless tools have no page, so ToolHandler never checks them for open
+   * dialogs.
+   */
+  blockedByDialog: false;
   handler(
     request: Request<Schema>,
     response: Response,
