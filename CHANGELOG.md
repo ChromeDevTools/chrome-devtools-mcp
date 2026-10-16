@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.12.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.11.0...chrome-devtools-mcp-v1.12.0) (2026-10-16)
+
+
+### 🎉 Features
+
+* Analyze heap snapshots without a browser connection ([#3156](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3156)) ([78c8320](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/78c8320c505a7725980a10cb420b72fa59a7322e))
+* Paginate by default in heap snapshot tools ([#3201](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3201)) ([fb8375b](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/fb8375bd2d0c5d47bd46e2276b05054112c12888))
+* Paginate detailed diff in compare_heapsnapshots ([#3195](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3195)) ([4a9dd53](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4a9dd53fe639d5bbd9612965c3da2d7a5df3dd4a))
+* Sort objects for class by self size in compare_heapsnapshots ([#3205](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3205)) ([f8a18c6](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f8a18c68d4b65f6af01a6d4ba190f61f4b8a755e))
+
+
+### 🛠️ Fixes
+
+* block evaluate_script while a dialog is open ([#3196](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3196)) ([545bcbb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/545bcbb8c66bdce75b0249eba79f988d3bb73cc2))
+* **browser:** redact WebSocket headers from connection logs ([#2901](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2901)) ([3a2f91e](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3a2f91ed2296046754dcda44543dbf1876d25b97))
+* **cli:** serialize object daemon arguments ([#2797](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2797)) ([f73a440](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f73a440b49ea868185f90e3b9251c49f76f89264))
+* **console:** include the reason of unhandled promise rejections ([#3148](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3148)) ([f7cdf73](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/f7cdf732e3c58bba2720f3116ca8d0a118fb78cc))
+* discover third-party developer tools before tool lookup ([#3208](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3208)) ([2777fa0](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/2777fa05b296cdb51507e6fd33ae05c06fe0b9e7)), closes [#2973](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2973)
+* discover third-party developer tools in page tools ([#3207](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3207)) ([cf33529](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/cf33529b969cba62ca638f5806ebd5e00fc22ac0)), closes [#2980](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2980)
+* **emulate:** keep previous viewport when setViewport fails ([#3150](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3150)) ([19d883c](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/19d883c4d2ba59a8a9280e8af5ca014c7cafe5f1))
+* **lighthouse:** explain unsupported URL schemes in navigation mode ([#3144](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3144)) ([c6ad84a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c6ad84a23b4dfde7b88fa4cf26262b494820c131))
+* **lighthouse:** fail the audit when Lighthouse reports a runtime error ([#3188](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3188)) ([53ea78d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/53ea78db7eabe48d77f249e87b24e766e7888390))
+* **lighthouse:** restore the emulated viewport after a navigation audit ([#3189](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3189)) ([c777ece](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c777ece9a8becd04c86c4803a8a641aca357fa46))
+* **network:** list only earlier hops in a request's redirect chain ([#3198](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3198)) ([4675940](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/4675940e04d67102f7b640d03c87053be9370040))
+* preserve unread page fallback across snapshots and deduplicate page disposal ([#3161](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3161)) ([8604365](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/8604365faa28d862a1d1ecdd4b7acce1a14a95ce))
+* reject empty, extra, and unknown parts in geolocation and viewport transforms ([#3097](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3097)) ([#3120](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3120)) ([3ea31fb](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3ea31fbab1ac1c4b4155cdacaff07b0f3f9880a5))
+* resolve service worker IDs for console messages ([#2881](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/2881)) ([3804a9a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/3804a9ad5299bad87e3771683ad4da6d8cae280d))
+* return message when page exposes no 3p developer tools ([#3197](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3197)) ([663f3c3](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/663f3c3ffc9f192942bfb11ff995cfe525d4e9a2)), closes [#3004](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3004)
+* **security:** validate filesystem paths that parse as http/ws URLs ([#3186](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3186)) ([91e112d](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/91e112d3dd4a56e8ae940d8f34591afb360feb77))
+* **snapshot:** omit uid for accessibility nodes without backendNodeId ([#3187](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3187)) ([9054351](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/9054351be25b98a45bb87e687070a5f4adacb7b7))
+* stop active screencast on McpPage.dispose() ([#3160](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3160)) ([558af81](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/558af8196fc2ec1ddfcef4f1f726a9502b84b0fc))
+* validate type_text submitKey before typing ([#3185](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3185)) ([c8615d7](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/c8615d705dbddf9c75fdd4cae26a651d4cd99582))
+
+
+### ⚡ Performance
+
+* **cli:** load a small third-party bundle in the chrome-devtools CLI ([#3200](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3200)) ([552e1f8](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/552e1f8d251957b99ecf8e2870c9f92b63c4a892))
+* load the Lighthouse bundle on first use ([#3169](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3169)) ([798f03a](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/798f03ae885657788d483bb1997b435f0546878b))
+
+
+### 🏗️ Refactor
+
+* register all tools upfront across modes ([#3163](https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/3163)) ([58f8d1f](https://github.com/ChromeDevTools/chrome-devtools-mcp/commit/58f8d1f5c8b0cfaafbf471bbabb19b6718cdb45d))
+
 ## [1.11.0](https://github.com/ChromeDevTools/chrome-devtools-mcp/compare/chrome-devtools-mcp-v1.10.1...chrome-devtools-mcp-v1.11.0) (2026-10-15)
 
 
