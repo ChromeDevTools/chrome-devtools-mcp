@@ -14,6 +14,7 @@ import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
+import {formatRemoteObject} from './RemoteObjectFormatter.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
@@ -46,6 +47,27 @@ interface ConsoleMessageDetailed extends ConsoleMessageConcise {
   args: string[];
   // pre-formatted stacktrace.
   stackTrace?: string;
+}
+
+type RemoteObject = ReturnType<
+  Awaited<ReturnType<ConsoleMessage['args']>>[number]['remoteObject']
+>;
+
+// JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
+// on symbols and cyclic objects. Those are formatted from their preview.
+function isJsonLike(remoteObject: RemoteObject): boolean {
+  if (remoteObject.type === 'object') {
+    return (
+      remoteObject.subtype === undefined ||
+      remoteObject.subtype === 'array' ||
+      remoteObject.subtype === 'null'
+    );
+  }
+  return (
+    remoteObject.type !== 'function' &&
+    remoteObject.type !== 'symbol' &&
+    remoteObject.type !== 'bigint'
+  );
 }
 
 export class ConsoleFormatter {
@@ -152,7 +174,19 @@ export class ConsoleFormatter {
                 targetId: msg._targetId(),
               });
             }
-            return await arg.jsonValue();
+            if (!isJsonLike(remoteObject)) {
+              return formatRemoteObject(remoteObject);
+            }
+            try {
+              return await arg.jsonValue();
+            } catch (error) {
+              // JSON can't represent the value (for example, a cyclic object)
+              // or the page is gone; the preview still describes it.
+              if (remoteObject.preview) {
+                return formatRemoteObject(remoteObject);
+              }
+              throw error;
+            }
           } catch {
             return `<error: Argument ${i} is no longer available>`;
           }

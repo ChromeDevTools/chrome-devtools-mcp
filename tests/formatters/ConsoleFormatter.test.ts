@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
@@ -848,5 +849,78 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+  });
+});
+
+describe('ConsoleFormatter arguments', () => {
+  it('formats non-JSON arguments from their preview and keeps JSON for plain values', async () => {
+    const message = createMockMessage({
+      type: () => 'log',
+      text: () => 'values',
+      args: () => [
+        {
+          jsonValue: async () => ({}),
+          remoteObject: () => ({
+            type: 'object',
+            subtype: 'map',
+            description: 'Map(1)',
+            preview: {
+              type: 'object',
+              subtype: 'map',
+              description: 'Map(1)',
+              overflow: false,
+              properties: [{name: 'size', type: 'number', value: '1'}],
+              entries: [
+                {
+                  key: {
+                    type: 'number',
+                    description: '1',
+                    overflow: false,
+                    properties: [],
+                  },
+                  value: {
+                    type: 'number',
+                    description: '2',
+                    overflow: false,
+                    properties: [],
+                  },
+                },
+              ],
+            },
+          }),
+        },
+        {
+          jsonValue: async () => {
+            throw new Error('Object reference chain is too long');
+          },
+          remoteObject: () => ({
+            type: 'object',
+            description: 'Object',
+            preview: {
+              type: 'object',
+              description: 'Object',
+              overflow: false,
+              properties: [
+                {name: 'name', type: 'string', value: 'cyc'},
+                {name: 'self', type: 'object', value: 'Object'},
+              ],
+            },
+          }),
+        },
+        {
+          jsonValue: async () => ({a: 1}),
+          remoteObject: () => ({type: 'object'}),
+        },
+      ],
+    });
+    const formatter = await ConsoleFormatter.from(message, {
+      id: 1,
+      fetchDetailedData: true,
+    });
+    assert.deepStrictEqual(formatter.toJSONDetailed().args, [
+      'Map(1) {1 => 2}',
+      "{name: 'cyc', self: {…}}",
+      '{"a":1}',
+    ]);
   });
 });
