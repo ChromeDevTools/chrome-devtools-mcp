@@ -697,6 +697,58 @@ describe('McpResponse', () => {
 });
 
 describe('McpResponse network request filtering', () => {
+  const server = serverHooks();
+
+  it('filters CORS preflights and prefetches by their own types', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addRoute('/data?prefetch', (_req, res) => {
+        res.writeHead(200, {'Content-Type': 'text/plain'});
+        res.end('prefetched');
+      });
+      server.addRoute('/data?cors', (_req, res) => {
+        res.writeHead(200, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'PUT',
+          'Access-Control-Allow-Headers': 'x-custom',
+          'Content-Type': 'text/plain',
+        });
+        res.end('cors');
+      });
+      // localhost vs 127.0.0.1 makes the PUT cross-origin, so it is preflighted.
+      const crossOrigin = server
+        .getRoute('/data?cors')
+        .replace('127.0.0.1', 'localhost');
+      server.addHtmlRoute(
+        '/types.html',
+        `<!doctype html><link rel="prefetch" href="/data?prefetch"><script>fetch(${JSON.stringify(crossOrigin)}, {method: 'PUT', headers: {'x-custom': '1'}});</script>`,
+      );
+      const page = context.getSelectedMcpPage().pptrPage;
+      const done = Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/data?prefetch')),
+        page.waitForResponse(
+          r => r.url() === crossOrigin && r.request().method() === 'PUT',
+        ),
+      ]);
+      await page.goto(server.getRoute('/types.html'));
+      await done;
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['preflight']});
+      let text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /OPTIONS \S+\/data\?cors/, text);
+      assert.doesNotMatch(text, /PUT|prefetch/, text);
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['prefetch']});
+      text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /GET \S+\/data\?prefetch/, text);
+      assert.doesNotMatch(text, /OPTIONS|PUT/, text);
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['fetch']});
+      text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /PUT \S+\/data\?cors/, text);
+      assert.doesNotMatch(text, /OPTIONS|prefetch/, text);
+    });
+  });
+
   it('filters network requests by resource type', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {

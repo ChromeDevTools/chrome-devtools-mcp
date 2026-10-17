@@ -73,6 +73,7 @@ import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
+import {getFilterableResourceType} from './utils/resourceType.js';
 import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -726,8 +727,7 @@ export class McpResponse implements Response {
         this.#networkRequestsOptions.resourceTypes,
       );
       requests = requests.filter(request => {
-        const type = request.resourceType();
-        return normalizedTypes.has(type);
+        return normalizedTypes.has(getFilterableResourceType(request));
       });
     }
 
