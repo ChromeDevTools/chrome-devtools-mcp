@@ -23,7 +23,7 @@ import {
 import {DevTools} from '../../src/third_party/index.js';
 import {createHandlerMocks} from '../mocks.js';
 import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
-import {withMcpContext} from '../utils.js';
+import {getTextContent, withMcpContext} from '../utils.js';
 
 describe('performance', () => {
   afterEach(() => {
@@ -482,7 +482,7 @@ describe('performance', () => {
     });
 
     it('does not fetch CrUX data if performanceCrux is false', async () => {
-      const rawData = loadTraceAsBuffer('basic-trace.json.gz');
+      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
       await withMcpContext(
         async (response, context, args) => {
           context.setIsRunningPerformanceTrace(true);
@@ -504,6 +504,19 @@ describe('performance', () => {
             cruxCall,
             undefined,
             'CrUX fetch should not have been called',
+          );
+
+          const {content} = await response.handle(context);
+          const text = getTextContent(content[0]);
+          assert.ok(
+            text.includes(
+              'Metrics (field / real users): n/a – field data was not requested',
+            ),
+            `Expected field data was not requested, got:\n${text}`,
+          );
+          assert.ok(
+            !text.includes('no data for this page in CrUX'),
+            `Expected not to include "no data for this page in CrUX", got:\n${text}`,
           );
         },
         {performanceCrux: false},

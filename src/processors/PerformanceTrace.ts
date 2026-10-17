@@ -126,10 +126,19 @@ ${DevTools.PerformanceTraceFormatter.networkDataFormatDescription}`;
 export function getTraceSummary(
   result: TraceResult,
   deviceScope?: DevTools.CrUXManager.DeviceScope | null,
+  options?: {
+    cruxEnabled?: boolean;
+  },
 ): string {
   const focus = DevTools.AgentFocus.fromParsedTrace(result.parsedTrace);
   const formatter = new DevTools.PerformanceTraceFormatter(focus, deviceScope);
-  const summaryText = formatter.formatTraceSummary();
+  let summaryText = formatter.formatTraceSummary();
+  if (options?.cruxEnabled === false) {
+    summaryText = summaryText.replaceAll(
+      'Metrics (field / real users): n/a – no data for this page in CrUX',
+      'Metrics (field / real users): n/a – field data was not requested',
+    );
+  }
   return `## Summary of Performance trace findings:
 ${summaryText}
 
