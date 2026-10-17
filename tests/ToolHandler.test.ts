@@ -737,6 +737,49 @@ describe('ToolHandler', () => {
     assert.strictEqual(handlerCalled, false);
   });
 
+  for (const thrown of ['str-thrown', 0]) {
+    it(`reports non-Error values thrown by a handler: ${thrown}`, async () => {
+      const tool: ToolDefinition = {
+        name: 'throwing_tool',
+        description: 'A tool that throws a non-Error value',
+        annotations: {
+          category: ToolCategory.INPUT,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: async () => {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw thrown;
+        },
+      };
+      const mockContext = sinon.createStubInstance(McpContext);
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({
+          process: sinon.createStubInstance(ChildProcess),
+        }),
+      );
+      const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      }).parse();
+      const toolHandler = new ToolHandler(
+        tool,
+        serverArgs,
+        async () => mockContext,
+        new Mutex(),
+        sinon.spy(),
+      );
+
+      const result = await toolHandler.handle({});
+
+      assert.strictEqual(result.isError, true);
+      assert.deepStrictEqual(result.content, [
+        {type: 'text', text: `Error: ${thrown}`},
+      ]);
+    });
+  }
+
   it('validates evaluate_script sourcePath before reading the file', async () => {
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',

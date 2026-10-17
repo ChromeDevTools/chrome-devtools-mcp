@@ -245,7 +245,29 @@ const performEvaluation = async (
     >(`(\n${functionSource}\n)`);
     result = await evaluatable.evaluate(
       async (fn, ...args) => {
-        return JSON.stringify(await fn(...args));
+        try {
+          return JSON.stringify(await fn(...args));
+        } catch (error) {
+          // Puppeteer reduces a thrown plain object to its description
+          // ("Object") and passes primitives through as non-Error values, so
+          // wrap those in an Error that carries the value. Anything with its
+          // own prototype (Errors from any realm, DOM nodes, arrays, class
+          // instances) keeps Puppeteer's own reporting.
+          const proto =
+            typeof error === 'object' && error !== null
+              ? Object.getPrototypeOf(error)
+              : null;
+          if (proto !== null && proto !== Object.prototype) {
+            throw error;
+          }
+          let message: string | undefined;
+          try {
+            message = typeof error === 'string' ? error : JSON.stringify(error);
+          } catch {
+            // Not serializable (e.g. circular); fall back to String().
+          }
+          throw new Error(message ?? String(error));
+        }
       },
       fn,
       ...args,

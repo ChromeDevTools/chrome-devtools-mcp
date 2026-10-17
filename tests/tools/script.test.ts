@@ -52,6 +52,62 @@ describe('script', () => {
         assert.strictEqual(JSON.parse(lineEvaluation), 10);
       });
     });
+    for (const [thrown, message] of [
+      ["() => { throw 'str-thrown'; }", 'str-thrown'],
+      ["async () => { throw 'async-str'; }", 'async-str'],
+      ['() => Promise.reject(42)', '42'],
+      ['() => { throw 0; }', '0'],
+      ['() => { throw {code: 42}; }', '{"code":42}'],
+    ]) {
+      it(`reports non-Error thrown values: ${thrown}`, async () => {
+        await withMcpContext(async (response, context, args) => {
+          await assert.rejects(
+            evaluateScript(args).handler(
+              {params: {function: thrown}},
+              response,
+              context,
+            ),
+            {name: 'Error', message},
+          );
+        });
+      });
+    }
+    for (const [thrown, expected] of [
+      [
+        "() => { throw new TypeError('err-thrown'); }",
+        {name: 'TypeError', message: 'err-thrown'},
+      ],
+      [
+        // An Error from another realm is not `instanceof Error` in the page.
+        `() => {
+          const iframe = document.body.appendChild(document.createElement('iframe'));
+          throw iframe.contentWindow.eval('new TypeError("x")');
+        }`,
+        // Puppeteer may keep a stack line in the message for this case.
+        {name: 'TypeError', message: /^x(\n|$)/},
+      ],
+      [
+        '() => { class Cancelled {} throw new Cancelled(); }',
+        {message: 'Cancelled'},
+      ],
+      [
+        '() => { throw document.body; }',
+        {name: 'HTMLBodyElement', message: 'body'},
+      ],
+    ] as const) {
+      it(`does not wrap thrown non-plain objects: ${thrown}`, async () => {
+        await withMcpContext(async (response, context, args) => {
+          await assert.rejects(
+            evaluateScript(args).handler(
+              {params: {function: thrown}},
+              response,
+              context,
+            ),
+            expected,
+          );
+        });
+      });
+    }
     it('evaluates an inline classic script', async () => {
       await withMcpContext(async (response, context, args) => {
         await evaluateScript(args).handler(
