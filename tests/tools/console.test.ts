@@ -719,6 +719,37 @@ console.error('inline-line-4');
       });
     });
 
+    it('resolves the cause of an uncaught exception thrown after load', async () => {
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html><script>
+          window.addEventListener('load', () => {
+            setTimeout(() => {
+              window.thrown = true;
+              throw new Error('outer', {cause: new Error('inner')});
+            }, 100);
+          });
+        </script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+        await page.pptrPage.waitForFunction(() => 'thrown' in window);
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(rawText.includes('Uncaught Error: outer'), rawText);
+        assert.ok(rawText.includes('Caused by: Error: inner'), rawText);
+      });
+    });
+
     it('applies source maps to stack traces of Error object (with cause) console.log arguments', async t => {
       server.addRoute('/main.min.js', (_req, res) => {
         res.setHeader('Content-Type', 'text/javascript');

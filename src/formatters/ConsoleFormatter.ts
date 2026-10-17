@@ -117,6 +117,7 @@ export class ConsoleFormatter {
         devTools: options?.devTools,
         details: msg.details,
         targetId: msg.targetId,
+        session: msg.session,
         includeStackAndCause:
           options?.fetchDetailedData || options?.fetchStackTrace,
         resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,

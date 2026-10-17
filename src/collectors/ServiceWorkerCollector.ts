@@ -61,7 +61,9 @@ export class ServiceWorkerSubscriber {
     const extensionId = extractExtensionId(url);
 
     if (extensionId) {
-      this.#callback(new UncaughtError(event.exceptionDetails, extensionId));
+      this.#callback(
+        new UncaughtError(event.exceptionDetails, extensionId, this.#session),
+      );
     }
   };
 }
