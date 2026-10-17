@@ -13,6 +13,7 @@ import type {
 } from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
+import {sliceWithoutSplittingSurrogates} from '../utils/text.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
@@ -46,7 +47,7 @@ function truncateValue(value: string, maxLength = MAX_NAME_LENGTH): string {
   if (value.length <= maxLength) {
     return value;
   }
-  return value.slice(0, maxLength) + '...';
+  return sliceWithoutSplittingSurrogates(value, maxLength) + '...';
 }
 
 export interface ContextAnalysisReport {
