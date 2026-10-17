@@ -249,6 +249,25 @@ describe('mcp-options steps', () => {
       assert.strictEqual(parser.parse().headless, true);
       sinon.assert.notCalled(locateStub);
     });
+
+    it('falls back to a discovered config file when --config= is empty', () => {
+      using configFile = createTempFile(
+        JSON.stringify({headless: true}),
+        'cd4a.discovered.config.json',
+      );
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js', '--config='],
+        {},
+        false,
+      );
+      sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
+
+      const args = parser.parse();
+
+      assert.strictEqual(args.headless, true);
+      assert.strictEqual(args.config, configFile.path);
+    });
   });
 
   describe('reload', () => {
