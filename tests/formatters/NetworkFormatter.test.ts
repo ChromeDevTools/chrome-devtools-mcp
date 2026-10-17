@@ -449,6 +449,72 @@ describe('NetworkFormatter', () => {
       assert.ok(result.includes(`Saved to ${resPath}.`));
     });
 
+    it('stops waiting for a response body that never finishes loading', async () => {
+      const request = {
+        method: () => 'GET',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => false,
+        response: () => ({
+          status: () => 500,
+          headers: () => ({}),
+          buffer: () => new Promise<Buffer>(() => {}),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+      } as unknown as HTTPRequest;
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        responseBodyTimeout: 10,
+        redactNetworkHeaders: false,
+      });
+
+      assert.strictEqual(
+        (formatter.toJSONDetailed() as {responseBody: string}).responseBody,
+        '<Response body not available: the response did not finish loading within 10 ms>',
+      );
+    });
+
+    it('does not save a response body that never finishes loading', async () => {
+      const request = {
+        method: () => 'GET',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => false,
+        response: () => ({
+          status: () => 500,
+          headers: () => ({}),
+          buffer: () => new Promise<Buffer>(() => {}),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+      } as unknown as HTTPRequest;
+      let saved = false;
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        responseFilePath: '/tmp/never-written',
+        responseBodyTimeout: 10,
+        saveFile: async filename => {
+          saved = true;
+          return {filename: String(filename)};
+        },
+        redactNetworkHeaders: false,
+      });
+
+      const json = formatter.toJSONDetailed() as {
+        responseBody?: string;
+        responseBodyFilePath?: string;
+      };
+      assert.strictEqual(saved, false);
+      assert.strictEqual(json.responseBodyFilePath, undefined);
+      assert.match(
+        json.responseBody ?? '',
+        /did not finish loading within 10 ms/,
+      );
+    });
+
     it('handles missing bodies with filepath', async () => {
       const request = {
         method: () => 'POST',
