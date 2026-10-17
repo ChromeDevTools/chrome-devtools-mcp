@@ -747,6 +747,7 @@ export class McpContext implements Context, BrowserlessContext {
     if (
       !isAllowedUrl(url, {
         categoryExtensions: this.#options.categoryExtensions,
+        experimentalDevtools: this.#options.experimentalDevToolsDebugging,
       })
     ) {
       return false;

@@ -57,10 +57,12 @@ export interface ValidateUrlOptions {
   javascriptEvaluation: boolean | undefined;
   categoryExtensions: boolean | undefined;
   fileNavigations: boolean | undefined;
+  experimentalDevtools?: boolean | undefined;
 }
 
 export interface IsAllowedUrlOptions {
   categoryExtensions: boolean | undefined;
+  experimentalDevtools?: boolean | undefined;
 }
 
 /**
@@ -69,6 +71,7 @@ export interface IsAllowedUrlOptions {
  * Disallowed schemes:
  * - chrome: (except chrome://newtab/ and chrome://inspect*)
  * - chrome-untrusted:
+ * - devtools: (unless experimentalDevtools is true)
  * - chrome-extension: (unless categoryExtensions is true)
  *
  * @param url The URL string to test.
@@ -106,6 +109,9 @@ export function isAllowedUrl(
     parsed.protocol === 'chrome:' ||
     parsed.protocol === 'chrome-untrusted:'
   ) {
+    return false;
+  }
+  if (!options.experimentalDevtools && parsed.protocol === 'devtools:') {
     return false;
   }
   if (!options.categoryExtensions && parsed.protocol === 'chrome-extension:') {
@@ -231,7 +237,12 @@ function targetsFileScheme(url: URL): boolean {
  * or if file navigations are disabled and a `file:` URL is passed, or if navigating to a restricted scheme.
  */
 export function validateUrl(url: string, options: ValidateUrlOptions): URL {
-  const {javascriptEvaluation, categoryExtensions, fileNavigations} = options;
+  const {
+    javascriptEvaluation,
+    categoryExtensions,
+    fileNavigations,
+    experimentalDevtools,
+  } = options;
 
   let parsed: URL;
   try {
@@ -257,10 +268,15 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
     );
   }
 
-  if (!isAllowedUrl(url, {categoryExtensions})) {
+  if (!isAllowedUrl(url, {categoryExtensions, experimentalDevtools})) {
     if (parsed.protocol === 'chrome-extension:') {
       throw new Error(
         `Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.`,
+      );
+    }
+    if (parsed.protocol === 'devtools:') {
+      throw new Error(
+        `Navigating to devtools: URLs is not allowed without --experimentalDevtools.`,
       );
     }
     throw new Error(`Navigating to ${parsed.protocol} URLs is not allowed.`);
