@@ -1867,10 +1867,20 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
   }
 }
 function truncateTitle(title: string, maxLength = 50): string {
-  if (title.length <= maxLength) {
+  const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+  const segments = Array.from(segmenter.segment(title));
+
+  if (segments.length <= maxLength) {
     return title;
   }
-  return title.slice(0, maxLength - 3) + '...';
+
+  // Slice grapheme clusters without breaking emoji sequences
+  const truncated = segments
+    .slice(0, maxLength - 3)
+    .map(s => s.segment)
+    .join('');
+
+  return truncated + '...';
 }
 
 const collapseWhitespace = (value: string): string => {

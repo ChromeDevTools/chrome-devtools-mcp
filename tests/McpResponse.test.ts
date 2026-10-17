@@ -366,6 +366,30 @@ describe('McpResponse', () => {
       });
     });
 
+    it('truncates a long page title on grapheme boundaries', async () => {
+      await withMcpContext(async (response, context) => {
+        // 46 letters + 1 emoji grapheme + more: truncate keeps whole graphemes.
+        const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
+        server.addHtmlRoute(
+          '/emoji-title.html',
+          `<!doctype html><title>${title}</title><h1>Emoji</h1>`,
+        );
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.goto(server.getRoute('/emoji-title.html'));
+
+        response.setIncludePages(true);
+        const res = await response.handle(context);
+        const text = getTextContent(res.content[0]);
+        assert.ok(
+          text.includes(
+            `${'A'.repeat(46)}\u{1F600}... (${server.getRoute('/emoji-title.html')})`,
+          ),
+          text,
+        );
+        assert.doesNotMatch(JSON.stringify(res), /\\ud83d/i);
+      });
+    });
+
     it('resets ids after navigation', async () => {
       await withMcpContext(async (response, context) => {
         server.addHtmlRoute(
