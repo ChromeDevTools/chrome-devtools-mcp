@@ -366,6 +366,45 @@ describe('McpResponse', () => {
       });
     });
 
+    it('returns an attached no-store response the page did not read', async () => {
+      await withMcpContext(async (response, context) => {
+        // Chrome never finishes loading a no-store body nobody reads, and
+        // Puppeteer's buffer() waits for that with no timeout.
+        server.addRoute('/no-store', (_req, res) => {
+          res.writeHead(500, {
+            'Cache-Control': 'no-store',
+            'Content-Type': 'text/plain',
+          });
+          res.end('server error details');
+        });
+        server.addHtmlRoute(
+          '/unread.html',
+          `<!doctype html><script>fetch('/no-store', {method: 'POST'}).then(r => { if (!r.ok) throw new Error('failed'); });</script>`,
+        );
+        const mcpPage = context.getSelectedMcpPage();
+        const responsePromise = mcpPage.pptrPage.waitForResponse(r =>
+          r.url().endsWith('/no-store'),
+        );
+        await mcpPage.pptrPage.goto(server.getRoute('/unread.html'));
+        await responsePromise;
+        const request = mcpPage
+          .getNetworkRequests()
+          .find(r => r.url().endsWith('/no-store'));
+        assert.ok(request);
+
+        response.attachNetworkRequest(
+          response.getNetworkRequestStableId(request),
+        );
+        const {content} = await response.handle(context);
+        const text = getTextContent(content[0]);
+        assert.match(text, /Status:\s+500/);
+        assert.ok(
+          text.includes('the response did not finish loading within 5000 ms'),
+          text,
+        );
+      });
+    });
+
     it('resets ids after navigation', async () => {
       await withMcpContext(async (response, context) => {
         server.addHtmlRoute(

@@ -14,6 +14,21 @@ import {
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 const URL_CONTEXT_SIZE_LIMIT = 255;
+/**
+ * How long to wait for a response body. Puppeteer reads a body only after the
+ * response finished loading, with no timeout of its own, and a response that
+ * never finishes (e.g. a `Cache-Control: no-store` response the page did not
+ * read) would otherwise hold the tool mutex forever.
+ */
+export const RESPONSE_BODY_TIMEOUT_MS = 5000;
+
+class ResponseBodyTimeoutError extends Error {
+  constructor(timeout: number) {
+    super(
+      `<Response body not available: the response did not finish loading within ${timeout} ms>`,
+    );
+  }
+}
 
 export interface NetworkFormatterOptions {
   requestId?: number | string;
@@ -28,6 +43,8 @@ export interface NetworkFormatterOptions {
     extension: '.network-request' | '.network-response',
   ) => Promise<{filename: string}>;
   redactNetworkHeaders: boolean;
+  /** Defaults to `RESPONSE_BODY_TIMEOUT_MS`. */
+  responseBodyTimeout?: number;
 }
 
 interface NetworkRequestConcise {
@@ -116,8 +133,12 @@ export class NetworkFormatter {
       if (this.#options.responseFilePath) {
         let buffer: Uint8Array | undefined;
         try {
-          buffer = await response.buffer();
-        } catch {
+          buffer = await this.#readResponseBody(response);
+        } catch (error) {
+          if (error instanceof ResponseBodyTimeoutError) {
+            this.#responseBody = error.message;
+            return;
+          }
           // Response body is not available anymore
         }
 
@@ -238,7 +259,7 @@ export class NetworkFormatter {
     sizeLimit = BODY_CONTEXT_SIZE_LIMIT,
   ): Promise<string | undefined> {
     try {
-      const responseBuffer = await httpResponse.buffer();
+      const responseBuffer = await this.#readResponseBody(httpResponse);
 
       if (isUtf8(responseBuffer)) {
         const responseAsTest = responseBuffer.toString('utf-8');
@@ -251,8 +272,29 @@ export class NetworkFormatter {
       }
 
       return '<binary data>';
-    } catch {
+    } catch (error) {
+      if (error instanceof ResponseBodyTimeoutError) {
+        return error.message;
+      }
       return '<not available anymore>';
+    }
+  }
+
+  async #readResponseBody(httpResponse: HTTPResponse): Promise<Buffer> {
+    const timeout =
+      this.#options.responseBodyTimeout ?? RESPONSE_BODY_TIMEOUT_MS;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        httpResponse.buffer(),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new ResponseBodyTimeoutError(timeout));
+          }, timeout);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
