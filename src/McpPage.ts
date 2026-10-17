@@ -1196,7 +1196,10 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
+      // Puppeteer has no API to remove the override, and setting (0, 0) would
+      // pin the page to "null island" instead of restoring its real position.
+      // @ts-expect-error internal API
+      await page._client().send('Emulation.clearGeolocationOverride');
       delete newSettings.geolocation;
     } else {
       await page.setGeolocation(options.geolocation);

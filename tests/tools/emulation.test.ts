@@ -16,6 +16,8 @@ import {
   viewportTransform,
 } from '../../src/tools/ToolDefinition.js';
 import {createHandlerMocks} from '../mocks.js';
+import {serverHooks} from '../server.js';
+import {html, withMcpContext} from '../utils.js';
 
 describe('emulation', () => {
   afterEach(() => {
@@ -241,6 +243,8 @@ describe('emulation', () => {
   });
 
   describe('geolocation', () => {
+    const server = serverHooks();
+
     it('emulates geolocation with latitude and longitude', async () => {
       const {page, context, response, args} = createHandlerMocks();
       await emulate(args).handler(
@@ -279,6 +283,36 @@ describe('emulation', () => {
         context,
       );
       sinon.assert.calledOnceWithExactly(page.emulate, {});
+    });
+
+    it('restores the real position instead of (0, 0) after clearing', async () => {
+      server.addHtmlRoute('/geo', html`<h1>Geo</h1>`);
+      await withMcpContext(async (_response, context) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/geo'));
+        await page.pptrPage
+          .browserContext()
+          .overridePermissions(server.baseUrl, ['geolocation']);
+        const readPosition = () =>
+          page.pptrPage.evaluate(
+            () =>
+              new Promise<string>(resolve => {
+                navigator.geolocation.getCurrentPosition(
+                  p => resolve(`${p.coords.latitude},${p.coords.longitude}`),
+                  () => resolve('unavailable'),
+                  {timeout: 2000},
+                );
+              }),
+          );
+
+        await page.emulate({
+          geolocation: {latitude: 48.137154, longitude: 11.576124},
+        });
+        assert.strictEqual(await readPosition(), '48.137154,11.576124');
+
+        await page.emulate({});
+        assert.notStrictEqual(await readPosition(), '0,0');
+      });
     });
 
     it('reports correctly for the currently selected page', async () => {
