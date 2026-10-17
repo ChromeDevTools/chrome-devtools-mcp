@@ -1,0 +1,381 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import assert from 'node:assert';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import puppeteer, { Locator } from 'puppeteer';
+import sinon from 'sinon';
+import { McpContext } from '../src/McpContext.js';
+import { McpResponse } from '../src/McpResponse.js';
+import { HeapSnapshotManager } from '../src/processors/HeapSnapshotManager.js';
+import { TextSnapshot } from '../src/TextSnapshot.js';
+import { DevTools } from '../src/third_party/index.js';
+import { stableIdSymbol } from '../src/utils/id.js';
+import { createMockParsedArguments, createMockPuppeteerPage, mockListener, } from './mocks.js';
+export function assertNoServiceWorkerReported(targets, id) {
+    const target = targets.find(target => {
+        return target.url().includes(id) && target.type() === 'service_worker';
+    });
+    assert(target === undefined);
+}
+export function getTextContent(content) {
+    if (content.type === 'text') {
+        return content.text;
+    }
+    throw new Error(`Expected text content but got ${content.type}`);
+}
+export function getImageContent(content) {
+    if (content.type === 'image') {
+        return { data: content.data, mimeType: content.mimeType };
+    }
+    throw new Error(`Expected image content but got ${content.type}`);
+}
+export function extractExtensionId(response) {
+    const responseLine = response.responseLines[0];
+    assert.ok(responseLine, 'Response should not be empty');
+    const match = responseLine.match(/Extension installed\. Id: (.+)/);
+    const extensionId = match ? match[1] : null;
+    assert.ok(extensionId, 'Response should contain a valid key');
+    return extensionId;
+}
+const browsers = new Map();
+let context;
+export async function withBrowser(cb, options = {}) {
+    let attempt = 1;
+    while (attempt <= 3) {
+        const launchOptions = {
+            executablePath: options.executablePath ?? process.env.PUPPETEER_EXECUTABLE_PATH,
+            headless: !options.debug,
+            defaultViewport: null,
+            devtools: options.autoOpenDevTools ?? false,
+            pipe: true,
+            handleDevToolsAsPage: true,
+            args: [...(options.args || []), '--screen-info={3840x2160}'],
+            enableExtensions: true,
+            blocklist: options.blockedUrlPattern,
+            allowlist: options.allowedUrlPattern,
+        };
+        const key = JSON.stringify(launchOptions);
+        let browser = browsers.get(key);
+        if (!browser) {
+            browser = await puppeteer.launch(launchOptions);
+            browsers.set(key, browser);
+        }
+        try {
+            await Promise.race([
+                (async () => {
+                    const newPage = await browser.newPage();
+                    // Close other pages.
+                    await Promise.all((await browser.pages()).map(async (page) => {
+                        if (page !== newPage) {
+                            await page.close();
+                        }
+                    }));
+                    await cb(browser, newPage);
+                })(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('withBrowser timeout exceeded')), 60000)),
+            ]);
+            return;
+        }
+        catch (error) {
+            browsers.delete(key);
+            try {
+                await Promise.race([
+                    browser.close(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('browser.close timeout')), 2000)),
+                ]);
+            }
+            catch {
+                browser.process()?.kill('SIGKILL');
+            }
+            const isRetryable = error instanceof Error &&
+                (error.message === 'withBrowser timeout exceeded' ||
+                    error.message.includes('Navigation timeout') ||
+                    error.message.includes("Couldn't fetch install info") ||
+                    error.message.includes('closed') ||
+                    error.message.includes('crash') ||
+                    error.message.includes('hang'));
+            if (attempt === 3 || !isRetryable) {
+                throw error;
+            }
+            attempt++;
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    }
+}
+export async function withMcpContext(cb, options = {}, args = {}) {
+    await withBrowser(async (browser) => {
+        TextSnapshot.resetCounter();
+        McpContext.resetPageIdsForTesting();
+        McpContext.resetWorkerIdsForTesting();
+        const parsedArgs = createMockParsedArguments(args);
+        const response = new McpResponse(parsedArgs);
+        const heapSnapshotManager = new HeapSnapshotManager();
+        if (context) {
+            context.dispose();
+        }
+        context = await McpContext.from(browser, undefined, {
+            experimentalDevToolsDebugging: false,
+            performanceCrux: options.performanceCrux ?? true,
+            sourceMaps: options.sourceMaps ?? true,
+            allowlist: options.allowedUrlPattern,
+            blocklist: options.blockedUrlPattern,
+            allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
+            navigationTimeout: options.navigationTimeout ??
+                (process.platform === 'win32' ? 20000 : undefined),
+            categoryExtensions: parsedArgs.categoryExtensions,
+            heapSnapshotManager,
+        }, Locator);
+        response.setPage(context.getSelectedMcpPage());
+        try {
+            await cb(response, context, parsedArgs);
+        }
+        finally {
+            context.dispose();
+            heapSnapshotManager.dispose();
+            context = undefined;
+        }
+    }, options);
+}
+export function getMockRequest(options = {}) {
+    return {
+        url() {
+            return options.url ?? 'http://example.com';
+        },
+        method() {
+            return options.method ?? 'GET';
+        },
+        fetchPostData() {
+            return options.fetchPostData ?? Promise.reject();
+        },
+        hasPostData() {
+            return options.hasPostData ?? false;
+        },
+        postData() {
+            return options.postData;
+        },
+        response() {
+            return options.response ?? null;
+        },
+        failure() {
+            return options.failure?.() ?? null;
+        },
+        resourceType() {
+            return options.resourceType ?? 'document';
+        },
+        headers() {
+            return (options.headers ?? {
+                'content-size': '10',
+            });
+        },
+        redirectChain() {
+            // Puppeteer returns a fresh copy on every call (HTTPRequest returns
+            // `this._redirectChain.slice()`); mirror that so formatters can't share
+            // and accidentally mutate the same array across calls.
+            return [...(options.redirectChain ?? [])];
+        },
+        isNavigationRequest() {
+            return options.navigationRequest ?? false;
+        },
+        frame() {
+            return options.frame ?? {};
+        },
+        [stableIdSymbol]: options.stableId ?? 1,
+    };
+}
+export function getMockResponse(options = {}) {
+    return {
+        status() {
+            return options.status ?? 200;
+        },
+        headers() {
+            return options.headers ?? {};
+        },
+    };
+}
+export function html(strings, ...values) {
+    const bodyContent = strings.reduce((acc, str, i) => {
+        return acc + str + (values[i] || '');
+    }, '');
+    return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My test page</title>
+  </head>
+  <body>
+    ${bodyContent}
+  </body>
+</html>`;
+}
+export function stabilizeStructuredContent(content) {
+    if (typeof content === 'string') {
+        return stabilizeResponseOutput(content);
+    }
+    const stabilize = (c) => {
+        if (typeof c === 'string') {
+            return stabilizeResponseOutput(c);
+        }
+        if (Array.isArray(c)) {
+            return c.map(item => stabilize(item));
+        }
+        if (typeof c === 'object' && c !== null) {
+            const result = {};
+            for (const [key, value] of Object.entries(c)) {
+                if (key === 'snapshotFilePath' && typeof value === 'string') {
+                    result[key] = '<file>';
+                }
+                else {
+                    result[key] = stabilize(value);
+                }
+            }
+            return result;
+        }
+        return c;
+    };
+    return JSON.stringify(stabilize(content), null, 2);
+}
+export function stabilizeResponseOutput(text) {
+    if (typeof text !== 'string') {
+        throw new Error('Input must be string');
+    }
+    let output = text;
+    const dateRegEx = /.{3}, \d{2} .{3} \d{4} \d{2}:\d{2}:\d{2} [A-Z]{3}/g;
+    output = output.replaceAll(dateRegEx, '<long date>');
+    const localhostRegEx = /localhost:\d{5}/g;
+    output = output.replaceAll(localhostRegEx, 'localhost:<port>');
+    const loopbackAddress = /127.0.0.1:\d{5}/g;
+    output = output.replaceAll(loopbackAddress, '127.0.0.1:<port>');
+    const userAgentRegEx = /user-agent:.*\n/g;
+    output = output.replaceAll(userAgentRegEx, 'user-agent:<user-agent>\n');
+    const chUaRegEx = /sec-ch-ua:"Chromium";v="\d{3}"/g;
+    output = output.replaceAll(chUaRegEx, 'sec-ch-ua:"Chromium";v="<version>"');
+    // sec-ch-ua-platform:"Linux"
+    const chUaPlatformRegEx = /sec-ch-ua-platform:"[a-zA-Z]*"/g;
+    output = output.replaceAll(chUaPlatformRegEx, 'sec-ch-ua-platform:"<os>"');
+    const savedSnapshot = /Saved snapshot to (.*)/g;
+    output = output.replaceAll(savedSnapshot, 'Saved snapshot to <file>');
+    const acceptLanguageRegEx = /accept-language:.*\n/g;
+    output = output.replaceAll(acceptLanguageRegEx, 'accept-language:<lang>\n');
+    // Stabilize URL-encoded file paths
+    const fileUriRegEx = /file%3A%2F%2F%2F[^)\n]+/g;
+    output = output.replaceAll(fileUriRegEx, '<file-path>');
+    return output;
+}
+export function getMockAggregatedIssue() {
+    const mockAggregatedIssue = sinon.createStubInstance(DevTools.AggregatedIssue);
+    mockAggregatedIssue.getAllIssues.returns([]);
+    return mockAggregatedIssue;
+}
+export function getMockBrowser(options) {
+    const page = createMockPuppeteerPage();
+    const listener = mockListener();
+    page.on.callsFake((eventName, handler) => {
+        listener.on(eventName, handler);
+        return page;
+    });
+    page.off.callsFake((eventName, handler) => {
+        if (handler) {
+            listener.off(eventName, handler);
+        }
+        return page;
+    });
+    page.emit = listener.emit;
+    const pages = [page];
+    return {
+        process() {
+            return options?.process ?? null;
+        },
+        wsEndpoint() {
+            return options?.wsEndpoint ?? '';
+        },
+        pages() {
+            return Promise.resolve(pages);
+        },
+        ...mockListener(),
+    };
+}
+export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
+export async function runCli(args, sessionId, options) {
+    return await new Promise((resolve, reject) => {
+        const finalArgs = [...args];
+        if (sessionId) {
+            // Prepend so that the flag is not swallowed by a trailing `--`.
+            finalArgs.unshift('--sessionId', sessionId);
+        }
+        const child = spawn('node', [CLI_PATH, ...finalArgs], {
+            env: process.env,
+            cwd: options?.cwd,
+        });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', chunk => {
+            stdout += chunk;
+            process.stdout.write(chunk);
+        });
+        child.stderr.on('data', chunk => {
+            stderr += chunk;
+            process.stderr.write(chunk);
+        });
+        child.on('close', status => resolve({ status, stdout, stderr }));
+        child.on('error', reject);
+    });
+}
+export async function assertDaemonIsNotRunning(sessionId) {
+    const result = await runCli(['status'], sessionId);
+    assert.strictEqual(result.stdout, 'chrome-devtools-mcp daemon is not running.\n');
+}
+export async function assertDaemonIsRunning(sessionId) {
+    const result = await runCli(['status'], sessionId);
+    assert.ok(result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'), 'chrome-devtools-mcp daemon is not running');
+}
+export async function waitExecutionFor(func, timeout) {
+    const start = Date.now();
+    while (Date.now() - start < 10000) {
+        try {
+            await func();
+            return;
+        }
+        catch {
+            await new Promise(resolve => setTimeout(resolve, 100)); // wait and retry
+        }
+    }
+    throw new Error(`Timeout of ${timeout} reached.`);
+}
+export function createTempDir(prefix = 'chrome-devtools-test-', baseDir = os.tmpdir()) {
+    const dirPath = fs.mkdtempSync(path.join(baseDir, prefix));
+    return {
+        path: dirPath,
+        [Symbol.dispose]() {
+            try {
+                fs.rmSync(dirPath, { recursive: true, force: true });
+            }
+            catch {
+                // ignore
+            }
+        },
+    };
+}
+export function createTempFile(content, fileName, baseDir = os.tmpdir()) {
+    const dirPath = fs.mkdtempSync(path.join(baseDir, 'chrome-devtools-test-file-'));
+    const filePath = path.join(dirPath, fileName);
+    fs.writeFileSync(filePath, content);
+    return {
+        path: filePath,
+        [Symbol.dispose]() {
+            try {
+                fs.rmSync(dirPath, { recursive: true, force: true });
+            }
+            catch {
+                // ignore
+            }
+        },
+    };
+}
+//# sourceMappingURL=utils.js.map

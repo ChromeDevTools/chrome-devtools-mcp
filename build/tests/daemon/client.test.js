@@ -1,0 +1,183 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import assert from 'node:assert';
+import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { describe, it, afterEach, beforeEach } from 'node:test';
+import { handleResponse, startDaemon, stopDaemon, verifyDaemonVersion, } from '../../src/daemon/client.js';
+import { getDaemonPid, getPidFilePath, isDaemonRunning, } from '../../src/daemon/utils.js';
+import { VERSION } from '../../src/version.js';
+describe('daemon client', () => {
+    let sessionId;
+    beforeEach(async () => {
+        sessionId = crypto.randomUUID();
+        await stopDaemon(sessionId);
+    });
+    afterEach(async () => {
+        await stopDaemon(sessionId);
+    });
+    describe('start/stop', () => {
+        it('should start and stop daemon', async () => {
+            assert.ok(!isDaemonRunning(sessionId), 'Daemon should not be running initially');
+            await startDaemon([], sessionId);
+            assert.ok(isDaemonRunning(sessionId), 'Daemon should be running after start');
+            await stopDaemon(sessionId);
+            assert.ok(!isDaemonRunning(sessionId), 'Daemon should not be running after stop');
+        });
+        it('should handle starting daemon when already running', async () => {
+            await startDaemon([], sessionId);
+            assert.ok(isDaemonRunning(sessionId), 'Daemon should be running');
+            // Starting again should be a no-op
+            await startDaemon([], sessionId);
+            assert.ok(isDaemonRunning(sessionId), 'Daemon should still be running');
+        });
+        it('should handle stopping daemon when not running', async () => {
+            assert.ok(!isDaemonRunning(sessionId), 'Daemon should not be running initially');
+            // Stopping when not running should be a no-op
+            await stopDaemon(sessionId);
+            assert.ok(!isDaemonRunning(sessionId), 'Daemon should still not be running');
+        });
+        it('should stop and allow restarting a daemon when its socket is unreachable', async () => {
+            const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+                stdio: 'ignore',
+            });
+            child.unref();
+            assert.ok(child.pid, 'Child process should have a PID');
+            try {
+                const pidFilePath = getPidFilePath(sessionId);
+                mkdirSync(dirname(pidFilePath), { recursive: true, mode: 0o700 });
+                writeFileSync(pidFilePath, String(child.pid), 'utf-8');
+                assert.ok(isDaemonRunning(sessionId), 'Daemon should be detected as running via PID file');
+                await stopDaemon(sessionId);
+                assert.ok(!isDaemonRunning(sessionId), 'Unreachable daemon should be stopped via signal fallback');
+                await startDaemon([], sessionId);
+                assert.ok(isDaemonRunning(sessionId), 'New daemon should start after stopping unreachable daemon');
+                assert.notStrictEqual(getDaemonPid(sessionId), child.pid);
+            }
+            finally {
+                child.kill();
+            }
+        });
+    });
+    describe('verifyDaemonVersion', () => {
+        it('warns when daemon version does not match CLI version', async () => {
+            await startDaemon([], sessionId);
+            const warning = await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+            assert.ok(warning &&
+                warning.includes('does not match CLI version (0.0.0-mismatch)'), `Expected warning message about version mismatch, got: ${warning}`);
+        });
+        it('does not warn when daemon version matches CLI version', async () => {
+            await startDaemon([], sessionId);
+            const warning = await verifyDaemonVersion(sessionId, VERSION);
+            assert.strictEqual(warning, undefined, 'Should not return warning when version matches');
+        });
+        it('does nothing when daemon is not running', async () => {
+            const warning = await verifyDaemonVersion(sessionId, '0.0.0-mismatch');
+            assert.strictEqual(warning, undefined, 'Should not return warning when daemon is stopped');
+        });
+    });
+    describe('parsing', () => {
+        it('handles MCP response with text format', async () => {
+            const textResponse = { content: [{ type: 'text', text: 'test' }] };
+            assert.strictEqual(await handleResponse(textResponse, 'md'), 'test');
+        });
+        it('handles JSON response', async () => {
+            const jsonResponse = {
+                content: [],
+                structuredContent: {
+                    test: 'data',
+                    number: 123,
+                },
+            };
+            assert.strictEqual(await handleResponse(jsonResponse, 'json'), JSON.stringify(jsonResponse.structuredContent));
+        });
+        it('handles error response when isError is true with md format', async () => {
+            const errorResponse = {
+                isError: true,
+                content: [{ type: 'text', text: 'Something went wrong' }],
+            };
+            assert.strictEqual(await handleResponse(errorResponse, 'md'), 'Something went wrong');
+        });
+        it('handles error response when isError is true with json format', async () => {
+            const errorResponse = {
+                isError: true,
+                content: [{ type: 'text', text: 'Something went wrong' }],
+            };
+            assert.strictEqual(await handleResponse(errorResponse, 'json'), JSON.stringify(errorResponse.content));
+        });
+        it('handles text response when json format is requested but no structured content', async () => {
+            const textResponse = {
+                content: [{ type: 'text', text: 'Fall through text' }],
+            };
+            assert.deepStrictEqual(await handleResponse(textResponse, 'json'), JSON.stringify(['Fall through text']));
+        });
+        it('supports images', async () => {
+            const unsupportedContentResponse = {
+                content: [
+                    {
+                        type: 'image',
+                        data: 'base64data',
+                        mimeType: 'image/png',
+                    },
+                ],
+                structuredContent: {},
+            };
+            const response = await handleResponse(unsupportedContentResponse, 'md');
+            assert.ok(response.includes('.png'));
+        });
+        it('includes saved image file paths in structured JSON responses', async () => {
+            const imageContentResponse = {
+                content: [
+                    {
+                        type: 'text',
+                        text: 'Took a screenshot.',
+                    },
+                    {
+                        type: 'image',
+                        data: Buffer.from('image data').toString('base64'),
+                        mimeType: 'image/png',
+                    },
+                ],
+                structuredContent: {
+                    message: 'Took a screenshot.',
+                },
+            };
+            let filePath;
+            try {
+                const response = await handleResponse(imageContentResponse, 'json');
+                const parsed = JSON.parse(response);
+                assert.strictEqual(parsed.message, 'Took a screenshot.');
+                assert.strictEqual(parsed.images.length, 1);
+                assert.strictEqual(parsed.images[0].mimeType, 'image/png');
+                filePath = parsed.images[0].filePath;
+                assert.ok(filePath.endsWith('.png'));
+                assert.ok(existsSync(filePath));
+            }
+            finally {
+                if (filePath) {
+                    rmSync(dirname(filePath), { recursive: true, force: true });
+                }
+            }
+        });
+        it('uses the webp extension for WebP images', async () => {
+            const webpContentResponse = {
+                content: [
+                    {
+                        type: 'image',
+                        data: 'base64data',
+                        mimeType: 'image/webp',
+                    },
+                ],
+                structuredContent: {},
+            };
+            const response = await handleResponse(webpContentResponse, 'md');
+            assert.ok(response.includes('.webp'));
+        });
+    });
+});
+//# sourceMappingURL=client.test.js.map
