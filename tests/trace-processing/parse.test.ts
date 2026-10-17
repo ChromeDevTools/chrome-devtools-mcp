@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import '../setupDevTools.js';
+
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 

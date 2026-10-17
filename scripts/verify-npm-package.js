@@ -19,6 +19,7 @@ function verifyPackageContents() {
     const requiredPaths = [
       'build/src/index.js',
       'build/src/third_party/index.js',
+      'build/src/third_party/cli.js',
     ];
     for (const requiredPath of requiredPaths) {
       const hasBuildFolder = files.some(path => path.startsWith(requiredPath));

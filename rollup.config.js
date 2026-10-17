@@ -16,7 +16,7 @@
  */
 
 /**
- * @fileoverview taken from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
+ * @file taken from {@link https://github.com/GoogleChromeLabs/chromium-bidi/blob/main/rollup.config.mjs | chromium-bidi}
  * and modified to specific requirement.
  */
 
@@ -195,7 +195,7 @@ const bundleDependency = (
             const stringifiedDependencies = Array.from(
               seenDependencies.values(),
             ).map(dependency => {
-              let arr = [];
+              const arr = [];
               arr.push(`Name: ${dependency.name ?? 'N/A'}`);
               let url = dependency.homepage ?? dependency.repository;
               if (url !== null && typeof url !== 'string') {
@@ -351,6 +351,8 @@ export default [
         './bidi.js',
         '../bidi/bidi.js',
         './lighthouse-devtools-mcp-bundle.js',
+        // The CLI client loads only this small bundle. See src/third_party/cli.ts.
+        './cli.js',
       ];
 
       if (existingExternals.includes(source)) {
@@ -358,6 +360,13 @@ export default [
       }
       return false;
     },
+  ),
+  bundleDependency(
+    'cli.js',
+    {
+      inlineDynamicImports: true,
+    },
+    (_source, _importer, _isResolved) => false,
   ),
   bundleDependency(
     'devtools-formatter-worker.js',

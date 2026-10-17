@@ -105,6 +105,18 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "forced_colors",
+        "argType": "string"
+      },
+      {
+        "name": "prefers_contrast",
+        "argType": "string"
+      },
+      {
+        "name": "prefers_reduced_motion",
+        "argType": "string"
       }
     ]
   },
@@ -466,6 +478,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "ignore_cache",
+        "argType": "boolean"
       }
     ]
   },
@@ -870,6 +886,10 @@
       {
         "name": "object_id",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -1066,6 +1086,18 @@
       },
       {
         "name": "class_index",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
         "argType": "number"
       }
     ]

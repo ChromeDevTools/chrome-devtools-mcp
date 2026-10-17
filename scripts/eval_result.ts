@@ -13,10 +13,10 @@ export interface CapturedFunctionCall {
 
 export class Result {
   private nextCallIndex = 0;
-  public readonly calls: CapturedFunctionCall[];
-  public readonly serverArgs: string[];
+  readonly calls: CapturedFunctionCall[];
+  readonly serverArgs: string[];
   /** The model's final response text. */
-  public readonly text: string;
+  readonly text: string;
 
   constructor(calls: CapturedFunctionCall[], serverArgs: string[], text = '') {
     this.calls = calls;

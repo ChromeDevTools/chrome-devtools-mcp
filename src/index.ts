@@ -12,6 +12,7 @@ import {BrowserManager} from './BrowserManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
+import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {FilePersistence} from './telemetry/persistence.js';
 import {
@@ -24,11 +25,7 @@ import {
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
-import {
-  type DefinedPageTool,
-  isAvailableInMode,
-  type ToolDefinition,
-} from './tools/ToolDefinition.js';
+import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
@@ -59,7 +56,8 @@ export class McpServer {
   readonly server: SdkMcpServer;
   #serverArgs: ParsedArguments;
   #browserManager: BrowserManager;
-  #context?: McpContext;
+  #context: McpContext;
+  #heapSnapshotManager = new HeapSnapshotManager();
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
@@ -67,6 +65,11 @@ export class McpServer {
    * roots are read from `#serverArgs` when combining roots.
    */
   #lastClientRoots?: Root[];
+  /**
+   * Whether a tool call already waited for the initial `roots/list`, so a
+   * client that negotiates roots but never answers only delays the first call.
+   */
+  #awaitedInitialRoots = false;
   #toolMutex = new Mutex();
   #tools = new Map<string, ToolEntry>();
 
@@ -99,6 +102,32 @@ export class McpServer {
       },
     );
 
+    this.#context = McpContext.create(logger, {
+      experimentalDevToolsDebugging:
+        this.#serverArgs.experimentalDevtools ?? false,
+      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
+      performanceCrux: this.#serverArgs.performanceCrux,
+      sourceMaps: this.#serverArgs.sourceMaps,
+      maxNavigationSaved: this.#serverArgs.maxNavigationSaved,
+      allowlist: this.#serverArgs.allowedUrlPattern,
+      blocklist: this.#serverArgs.blockedUrlPattern,
+      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
+      categoryExtensions: this.#serverArgs.categoryExtensions,
+      heapSnapshotManager: this.#heapSnapshotManager,
+      getBrowser: () => this.#browserManager.ensureBrowser(),
+      onNotification: (message: string) => {
+        void this.server
+          .sendLoggingMessage({
+            level: 'info',
+            data: message,
+          })
+          .catch(e => {
+            logger?.('Failed to send MCP notification', e);
+          });
+      },
+    });
+    this.#context.setRoots(this.#combinedRoots());
+
     this.server.server.setRequestHandler('logging/setLevel', () => {
       return {};
     });
@@ -122,7 +151,7 @@ export class McpServer {
       ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
-            'capability. File-writing tools will be restricted to the OS temp directory. ' +
+            'capability. Tools that read or write local files will be restricted to the OS temp directory. ' +
             'To restore the previous unrestricted behavior, start the server with ' +
             '--allow-unrestricted-paths.',
         );
@@ -176,12 +205,11 @@ export class McpServer {
    */
   async close(): Promise<void> {
     try {
-      this.#context?.dispose();
+      this.#context.dispose();
     } catch (err) {
       logger?.('Failed to dispose context', err);
-    } finally {
-      this.#context = undefined;
     }
+    this.#heapSnapshotManager.dispose();
     await Promise.allSettled([
       this.#browserManager.close(),
       this.server.close(),
@@ -209,10 +237,7 @@ export class McpServer {
 
   async #init(): Promise<void> {
     for (const tool of createTools(this.#serverArgs)) {
-      // Slim and regular tools may share names, only register the current mode.
-      if (isAvailableInMode(tool, this.#serverArgs)) {
-        this.#registerTool(tool);
-      }
+      this.#registerTool(tool);
     }
     await loadIssueDescriptions();
   }
@@ -237,8 +262,9 @@ export class McpServer {
 
   /**
    * `timeout` is only passed where a tool call is waiting on the result – the
-   * background refreshes below block nobody, so bounding them would just discard
-   * roots a slow client was about to send
+   * background refreshes (on initialization and `roots/list_changed`) block
+   * nobody, so bounding them would just discard roots a slow client was about
+   * to send
    */
   async #updateRoots(timeout?: number): Promise<void> {
     if (!this.server.server.getClientCapabilities()?.roots) {
@@ -250,68 +276,33 @@ export class McpServer {
         timeout === undefined ? undefined : {timeout},
       );
       this.#lastClientRoots = result.roots;
-      this.#context?.setRoots(this.#combinedRoots());
+      this.#context.setRoots(this.#combinedRoots());
     } catch (e) {
       logger?.('Failed to list roots', e);
     }
   }
 
   async #getContext(): Promise<McpContext> {
-    const browser = await this.#browserManager.ensureBrowser();
-
-    if (this.#context?.browser !== browser) {
-      this.#context?.dispose();
-      this.#context = await McpContext.from(browser, logger, {
-        experimentalDevToolsDebugging:
-          this.#serverArgs.experimentalDevtools ?? false,
-        experimentalIncludeAllPages:
-          this.#serverArgs.experimentalIncludeAllPages,
-        performanceCrux: this.#serverArgs.performanceCrux,
-        sourceMaps: this.#serverArgs.sourceMaps,
-        maxNavigationSaved: this.#serverArgs.maxNavigationSaved,
-        allowlist: this.#serverArgs.allowedUrlPattern,
-        blocklist: this.#serverArgs.blockedUrlPattern,
-        allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
-        // Surfaces a one-time note in the next response after a reconnect.
-        reconnected: this.#context !== undefined,
-        categoryExtensions: this.#serverArgs.categoryExtensions,
-        onNotification: (message: string) => {
-          void this.server
-            .sendLoggingMessage({
-              level: 'info',
-              data: message,
-            })
-            .catch(e => {
-              logger?.('Failed to send MCP notification', e);
-            });
-        },
-      });
-      this.#context.setRoots(this.#combinedRoots());
-      if (this.#lastClientRoots === undefined) {
-        // Nothing listed yet, so this call has to wait – bounded, since it is
-        // holding the tool mutex, and a later background refresh still lands
-        await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
-      } else {
-        // Carry the known roots over and refresh out of band, so a reconnect
-        // never pays for a client round-trip
-        void this.#updateRoots();
-      }
+    if (this.#lastClientRoots === undefined && !this.#awaitedInitialRoots) {
+      this.#awaitedInitialRoots = true;
+      // Nothing listed yet, so this call has to wait – bounded, since it is
+      // holding the tool mutex, and a later background refresh still lands
+      await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
     }
     return this.#context;
   }
 
-  #createToolHandler(tool: ToolDefinition | DefinedPageTool): ToolHandler {
+  #createToolHandler(tool: AnyToolDefinition): ToolHandler {
     return new ToolHandler(
       tool,
       this.#serverArgs,
       () => this.#getContext(),
       this.#toolMutex,
-      browser => this.#browserManager.forget(browser),
       () => this.#browserManager.abandonPendingAttempt(),
     );
   }
 
-  #registerTool(tool: ToolDefinition | DefinedPageTool): void {
+  #registerTool(tool: AnyToolDefinition): void {
     const handler = this.#createToolHandler(tool);
 
     const registeredTool = this.server.registerTool(
@@ -354,25 +345,3 @@ export async function createMcpServer(
   });
   return {server: server.server};
 }
-
-export const logDisclaimers = (args: ParsedArguments) => {
-  console.error(
-    `chrome-devtools-mcp exposes content of the browser instance to the MCP clients allowing them to inspect,
-debug, and modify any data in the browser or DevTools.
-Avoid sharing sensitive or personal information that you do not want to share with MCP clients.`,
-  );
-
-  if (!args.slim && args.performanceCrux) {
-    console.error(
-      `Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.`,
-    );
-  }
-
-  if (!args.slim && args.usageStatistics) {
-    console.error(
-      `
-Google collects usage statistics to improve Chrome DevTools MCP. To opt-out, run with --no-usage-statistics.
-For more details, visit: https://github.com/ChromeDevTools/chrome-devtools-mcp#usage-statistics`,
-    );
-  }
-};

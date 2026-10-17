@@ -64,7 +64,7 @@ export const navigate = definePageTool((args: ParsedArguments) => {
         timeout: 30_000,
       };
 
-      const dialogHandler = (dialog: Dialog) => {
+      const dialogHandler = (dialog: Dialog): void => {
         if (dialog.type() === 'beforeunload') {
           response.appendResponseLine(`Accepted a beforeunload dialog.`);
           void dialog.accept();
@@ -100,11 +100,7 @@ export const evaluate = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    try {
-      const result = await page.pptrPage.evaluate(request.params.script);
-      response.appendResponseLine(JSON.stringify(result));
-    } catch (err) {
-      response.appendResponseLine(String(err.message));
-    }
+    const result = await page.pptrPage.evaluate(request.params.script);
+    response.appendResponseLine(JSON.stringify(result));
   },
 }));

@@ -10,15 +10,13 @@ import type {
   ConsoleMessage,
   Protocol,
   Issue,
+  Frame,
+  Handler,
+  HTTPRequest,
+  Page,
+  PageEvents as PuppeteerPageEvents,
 } from '../third_party/index.js';
 import {DevTools, FrameEvent} from '../third_party/index.js';
-import {
-  type Frame,
-  type Handler,
-  type HTTPRequest,
-  type Page,
-  type PageEvents as PuppeteerPageEvents,
-} from '../third_party/index.js';
 import {
   createIdGenerator,
   stableIdSymbol,
@@ -131,7 +129,7 @@ export class PageCollector<T> {
     this.#listeners = listenerMap;
   }
 
-  dispose() {
+  dispose(): void {
     this.#detachFrameNavigatedWithinDocumentListener();
     if (this.#listeners) {
       for (const [name, listener] of Object.entries(this.#listeners)) {
@@ -143,11 +141,11 @@ export class PageCollector<T> {
   // Puppeteer emits this right before the page-level navigation event for
   // same-document (SPA) navigations, which lets `framenavigated` skip the
   // history rotation for those navigations.
-  #onFrameNavigatedWithinDocument = () => {
+  #onFrameNavigatedWithinDocument = (): void => {
     this.#pendingSameDocumentNavigation = true;
   };
 
-  #attachFrameNavigatedWithinDocumentListener() {
+  #attachFrameNavigatedWithinDocumentListener(): void {
     this.#detachFrameNavigatedWithinDocumentListener();
     this.#frameNavigatedWithinDocumentTarget = this.pptrPage.mainFrame();
     this.#frameNavigatedWithinDocumentTarget.on(
@@ -156,7 +154,7 @@ export class PageCollector<T> {
     );
   }
 
-  #detachFrameNavigatedWithinDocumentListener() {
+  #detachFrameNavigatedWithinDocumentListener(): void {
     if (this.#frameNavigatedWithinDocumentTarget) {
       this.#frameNavigatedWithinDocumentTarget.off(
         FrameEvent.FrameNavigatedWithinDocument,
@@ -166,7 +164,7 @@ export class PageCollector<T> {
     }
   }
 
-  protected splitAfterNavigation() {
+  protected splitAfterNavigation(): void {
     // Add the latest navigation first
     this.storage.unshift([]);
     this.storage.splice(this.maxNavigationSaved);
@@ -262,7 +260,7 @@ class PageEventSubscriber {
     this.#targetId = this.#session.target()._targetId;
   }
 
-  #resetIssueAggregator() {
+  #resetIssueAggregator(): void {
     this.#issueManager = new FakeIssuesManager();
     if (this.#issueAggregator) {
       this.#issueAggregator.removeEventListener(
@@ -277,7 +275,7 @@ class PageEventSubscriber {
     );
   }
 
-  subscribe() {
+  subscribe(): void {
     this.#resetIssueAggregator();
     this.#page.on('framenavigated', this.#onFrameNavigated);
     this.#page.on('issue', this.#onIssueAdded);
@@ -285,7 +283,7 @@ class PageEventSubscriber {
     this.#attachFrameNavigatedWithinDocumentListener();
   }
 
-  unsubscribe() {
+  unsubscribe(): void {
     this.#seenKeys.clear();
     this.#seenIssues.clear();
     this.#detachFrameNavigatedWithinDocumentListener();
@@ -302,7 +300,7 @@ class PageEventSubscriber {
 
   #onAggregatedIssue = (
     event: DevTools.Common.EventTarget.EventTargetEvent<DevTools.AggregatedIssue>,
-  ) => {
+  ): void => {
     if (this.#seenIssues.has(event.data)) {
       return;
     }
@@ -310,7 +308,7 @@ class PageEventSubscriber {
     this.#page.emit('devtoolsAggregatedIssue', event.data);
   };
 
-  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent) => {
+  #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
     this.#page.emit(
       'uncaughtError',
       new UncaughtError(event.exceptionDetails, this.#targetId),
@@ -318,7 +316,7 @@ class PageEventSubscriber {
   };
 
   // On navigation, we reset issue aggregation.
-  #onFrameNavigated = (frame: Frame) => {
+  #onFrameNavigated = (frame: Frame): void => {
     // Only split the storage on main frame navigation
     if (frame !== frame.page().mainFrame()) {
       return;
@@ -339,11 +337,11 @@ class PageEventSubscriber {
   // Puppeteer emits this right before the page-level navigation event for
   // same-document (SPA) navigations, which lets `framenavigated` skip the
   // issue aggregation reset for those navigations.
-  #onFrameNavigatedWithinDocument = () => {
+  #onFrameNavigatedWithinDocument = (): void => {
     this.#pendingSameDocumentNavigation = true;
   };
 
-  #attachFrameNavigatedWithinDocumentListener() {
+  #attachFrameNavigatedWithinDocumentListener(): void {
     this.#detachFrameNavigatedWithinDocumentListener();
     this.#frameNavigatedWithinDocumentTarget = this.#page.mainFrame();
     this.#frameNavigatedWithinDocumentTarget.on(
@@ -352,7 +350,7 @@ class PageEventSubscriber {
     );
   }
 
-  #detachFrameNavigatedWithinDocumentListener() {
+  #detachFrameNavigatedWithinDocumentListener(): void {
     if (this.#frameNavigatedWithinDocumentTarget) {
       this.#frameNavigatedWithinDocumentTarget.off(
         FrameEvent.FrameNavigatedWithinDocument,
@@ -362,7 +360,7 @@ class PageEventSubscriber {
     }
   }
 
-  #onIssueAdded = (inspectorIssue: Issue) => {
+  #onIssueAdded = (inspectorIssue: Issue): void => {
     try {
       // @ts-expect-error The types are missmatched but they
       // are coming from CDP
@@ -419,7 +417,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
   ) {
     super(page, listeners, {maxResourcesPerNavigation, maxNavigationSaved});
   }
-  override splitAfterNavigation() {
+  override splitAfterNavigation(): void {
     const requests = this.storage[0];
 
     const lastRequestIdx = requests.findLastIndex(request => {

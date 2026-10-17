@@ -9,15 +9,23 @@ import type {YargsOptions} from '../third_party/index.js';
 import os from 'node:os';
 import path from 'node:path';
 
-export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
-// Each retained navigation can hold up to 1,000 network requests and 10,000
-// console messages, so the history is capped to avoid running out of memory.
-export const MAX_NAVIGATION_SAVED_LIMIT = 25;
-
 import {getCategoryOptions} from './category-options.js';
 import {getBrowserOptions} from './browser-options.js';
 import {puppeteerOptions} from './puppeteer-options.js';
 import {toolOptions} from './tool-options.js';
+
+export interface McpOption extends YargsOptions {
+  /**
+   * Whether changes to this option in a config file can be applied to a running
+   * server without restarting it.
+   */
+  reloadable?: boolean;
+}
+
+export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+// Each retained navigation can hold up to 1,000 network requests and 10,000
+// console messages, so the history is capped to avoid running out of memory.
+export const MAX_NAVIGATION_SAVED_LIMIT = 25;
 
 export const mcpOptions = {
   ...getCategoryOptions(),
@@ -34,6 +42,7 @@ export const mcpOptions = {
     describe:
       'Require pageId on page-scoped tools and route requests by page ID (useful for concurrent agent sessions). Use --no-page-id-routing to disable.',
     default: true,
+    reloadable: true,
   },
   devtoolsComments: {
     type: 'boolean',
@@ -41,28 +50,33 @@ export const mcpOptions = {
       'Whether to enable DevTools comments tools. Internal WIP feature.',
     hidden: true,
     default: false,
+    reloadable: true,
   },
   experimentalDevtools: {
     type: 'boolean',
     default: false,
-    describe: 'Whether to enable automation over DevTools targets',
+    describe:
+      'Whether to enable automation over DevTools targets. This exposes the DevTools UI to input tools, including the Console, which can evaluate JavaScript in the inspected page. --no-javascript-evaluation does not restrict this path.',
   },
   experimentalVision: {
     type: 'boolean',
     default: false,
     describe:
       'Whether to enable coordinate-based tools such as click_at(x,y). Usually requires a computer-use model able to produce accurate coordinates by looking at screenshots.',
+    reloadable: true,
   },
   memoryDebugging: {
     type: 'boolean',
     default: false,
     describe: 'Whether to enable memory debugging tools.',
     alias: 'experimentalMemory',
+    reloadable: true,
   },
   experimentalStructuredContent: {
     type: 'boolean',
     default: false,
     describe: 'Whether to output structured formatted content.',
+    reloadable: true,
   },
   experimentalToonFormat: {
     type: 'boolean',
@@ -70,6 +84,7 @@ export const mcpOptions = {
     describe:
       'Deprecated: use --experimentalDataFormat=toon instead. Whether to format structured data using TOON (requires @toon-format/toon).',
     hidden: true,
+    reloadable: true,
   },
   experimentalDataFormat: {
     type: 'string',
@@ -78,40 +93,48 @@ export const mcpOptions = {
       'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
     choices: ['default', 'toon', 'gcf'] as const,
     hidden: true,
+    reloadable: true,
   },
   experimentalIncludeAllPages: {
     type: 'boolean',
     default: false,
     describe:
       'Whether to include all kinds of pages such as webviews or background pages as pages.',
+    reloadable: true,
   },
   experimentalInteropTools: {
     type: 'boolean',
     default: false,
     describe: 'Whether to enable interoperability tools',
     hidden: true,
+    reloadable: true,
   },
   experimentalScreencast: {
     type: 'boolean',
     default: false,
     describe:
-      'Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.',
+      'Use the legacy ffmpeg-based screencast implementation instead of the built-in Chrome recorder. Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH. This option is deprecated and will be removed in favour of dependency-free screencast commands that are available by default.',
+    reloadable: true,
   },
   experimentalFfmpegPath: {
     type: 'string',
-    describe: 'Path to ffmpeg executable for screencast recording.',
-  },
-  experimentalScreencastFps: {
-    type: 'number',
     describe:
-      'Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.',
+      'Path to ffmpeg executable for legacy screencast recording (requires --experimentalScreencast).',
+    reloadable: true,
+  },
+  screencastFps: {
+    type: 'number',
+    alias: 'experimentalScreencastFps',
+    describe:
+      'Frames per second to use for screencast recording. Lower values reduce file size and encoding load.',
+    reloadable: true,
     coerce: (value: number | undefined) => {
       if (value === undefined) {
         return;
       }
       if (!Number.isInteger(value) || value <= 0) {
         throw new Error(
-          `Invalid experimentalScreencastFps ${value}. Expected a positive integer.`,
+          `Invalid screencastFps ${value}. Expected a positive integer.`,
         );
       }
       return value;
@@ -122,6 +145,7 @@ export const mcpOptions = {
     default: true,
     describe:
       'Set to false to disable sending URLs from performance traces to CrUX API to get field performance data.',
+    reloadable: true,
   },
   usageStatistics: {
     type: 'boolean',
@@ -133,19 +157,22 @@ export const mcpOptions = {
     type: 'boolean',
     default: true,
     describe:
-      'Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.',
+      'Set to false to disable the server entry points for evaluating caller-provided JavaScript: evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed. This is not a JavaScript sandbox: page scripts and JavaScript triggered through other permitted browser interactions (e.g. clicks or typing) still run. If --experimentalDevtools is also enabled, the DevTools UI, including the Console that evaluates code in the inspected page, can be automated and is not restricted by this option. The client remains responsible for validating tool calls and parameters.',
+    reloadable: true,
   },
   fileNavigations: {
     type: 'boolean',
     default: true,
     describe:
       'Set to false to disallow navigating to file: URLs. When disabled, new_page, navigate_page and the slim navigate tool reject file: URLs, including view-source: URLs that target them. This restricts navigations the server performs. It is not a filesystem sandbox: it does not affect pages the browser already had open when the server connected, and the browser can reach the filesystem by other means. Use OS sandboxing for full filesystem confinement.',
+    reloadable: true,
   },
   sourceMaps: {
     type: 'boolean',
     default: true,
     describe:
       'Whether to enable source maps in DevTools. Use --no-source-maps to disable.',
+    reloadable: true,
   },
   maxNavigationSaved: {
     type: 'number',
@@ -188,6 +215,7 @@ export const mcpOptions = {
     default: false,
     describe:
       'Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.',
+    reloadable: true,
   },
   viaCli: {
     type: 'boolean',
@@ -201,6 +229,7 @@ export const mcpOptions = {
     describe:
       'If true, redacts some of the network headers considered sensitive before returning to the client.',
     default: false,
+    reloadable: true,
   },
   allowUnrestrictedPaths: {
     type: 'boolean',
@@ -208,9 +237,10 @@ export const mcpOptions = {
     deprecated: 'Use --workspace=/ instead.',
     describe:
       'If set, disables the default path restriction that applies when the MCP client does not negotiate ' +
-      'the roots capability. By default, file-writing tools are restricted to the OS temp directory when ' +
+      'the roots capability. By default, tools that read or write local files are restricted to the OS temp directory when ' +
       'no roots are configured. Use this only when connecting a trusted local client that does not implement ' +
       'MCP roots and requires access to paths outside the temp directory.',
+    reloadable: true,
   },
   filesystemRoot: {
     type: 'array',
@@ -220,6 +250,7 @@ export const mcpOptions = {
     defaultDescription: 'OS temp directory',
     describe:
       'A directory that filesystem tools are allowed to access. May be specified more than once.',
+    reloadable: true,
   },
   config: {
     type: 'string',
@@ -231,7 +262,7 @@ export const mcpOptions = {
       return path.resolve(configPath);
     },
   },
-} satisfies Record<string, YargsOptions>;
+} satisfies Record<string, McpOption>;
 
 export function getMcpOptionsForViaCli(): Record<
   keyof typeof mcpOptions,
@@ -345,7 +376,7 @@ export const CLI_EXAMPLES: Array<[string, string]> = [
   ['$0 --no-source-maps', 'Disable source maps in DevTools.'],
   [
     '$0 --no-javascript-evaluation',
-    'Disable JavaScript execution (disables evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs).',
+    'Disable server JavaScript evaluation entry points (evaluation tools, initScript in navigate_page, and navigating to javascript:, data:, or vbscript: URLs). Page scripts still run.',
   ],
   [
     '$0 --slim',
@@ -363,8 +394,6 @@ export const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
   ['allowUnrestrictedPaths', 'filesystemRoot'],
   ['categoryPwa', 'autoConnect'],
   ['categoryPwa', 'browserUrl', 'wsEndpoint'],
-  ['categoryExtensions', 'autoConnect'],
-  ['categoryExtensions', 'browserUrl', 'wsEndpoint'],
 ];
 
 export const IMPLICATIONS: Array<
@@ -372,7 +401,6 @@ export const IMPLICATIONS: Array<
 > = [
   ['wsHeaders', 'wsEndpoint'],
   ['experimentalFfmpegPath', 'experimentalScreencast'],
-  ['experimentalScreencastFps', 'experimentalScreencast'],
 ];
 
 export function withoutDefaults(
@@ -388,4 +416,9 @@ export function withoutDefaults(
     result[key] = copy;
   }
   return result;
+}
+
+export function isReloadableOption(name: keyof typeof mcpOptions): boolean {
+  const option: McpOption = mcpOptions[name];
+  return option.reloadable === true;
 }

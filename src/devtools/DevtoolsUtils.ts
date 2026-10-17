@@ -36,7 +36,7 @@ export function overrideDevToolsGlobals({
   // DevTools CDP errors can get noisy.
   DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
-  const noopAgentCommand = () => {
+  const noopAgentCommand = (): Promise<{getError: () => undefined}> => {
     return Promise.resolve({
       getError: () => undefined,
     });
@@ -320,7 +320,7 @@ export class SymbolizedError {
       opts.targetId,
     );
     if (details) {
-      return SymbolizedError.fromDetails({
+      return await SymbolizedError.fromDetails({
         details,
         devTools: opts.devTools,
         targetId: opts.targetId,
@@ -337,9 +337,17 @@ export class SymbolizedError {
     // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
     // we have to manually parse out the error text from the exception description.
     // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
-    if (details.text === 'Uncaught' && details.exception) {
+    // Unhandled promise rejections work the same way, with
+    // "Uncaught (in promise)" as `details.text` and the rejection reason as
+    // the exception.
+    if (
+      (details.text === 'Uncaught' ||
+        details.text === 'Uncaught (in promise)') &&
+      details.exception
+    ) {
       return (
-        'Uncaught ' +
+        details.text +
+        ' ' +
         SymbolizedError.#getMessageFromException(details.exception)
       );
     }
@@ -347,7 +355,14 @@ export class SymbolizedError {
   }
 
   static #getMessageFromException(error: RemoteObjectLike): string {
-    const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
+    if (error.description === undefined) {
+      // Primitive values, e.g. `Promise.reject('reason')`, have no description.
+      if (error.unserializableValue !== undefined) {
+        return error.unserializableValue;
+      }
+      return error.value === undefined ? '' : String(error.value);
+    }
+    const messageWithRest = error.description.split('\n    at ', 2);
     return messageWithRest[0] ?? '';
   }
 
@@ -400,7 +415,7 @@ export class SymbolizedError {
     message: string,
     stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
     cause?: SymbolizedError,
-  ) {
+  ): SymbolizedError {
     return new SymbolizedError(message, stackTrace, cause);
   }
 }
@@ -415,7 +430,7 @@ export async function createStackTraceForConsoleMessage(
   };
   const rawStackTrace = message._rawStackTrace();
   if (rawStackTrace) {
-    return createStackTrace(devTools, rawStackTrace, message._targetId());
+    return await createStackTrace(devTools, rawStackTrace, message._targetId());
   }
   return undefined;
 }
@@ -465,7 +480,7 @@ export async function createStackTrace(
     DevTools.DebuggerWorkspaceBinding,
   );
   // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
-  return binding.createStackTraceFromProtocolRuntime(
+  return await binding.createStackTraceFromProtocolRuntime(
     rawStackTrace as Parameters<
       DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
     >[0],
@@ -478,7 +493,7 @@ async function waitForScript(
   model: DevTools.DebuggerModel,
   scriptId: string,
   signal: AbortSignal,
-) {
+): Promise<NonNullable<ReturnType<DevTools.DebuggerModel['scriptForId']>>> {
   while (true) {
     if (signal.aborted) {
       throw signal.reason;

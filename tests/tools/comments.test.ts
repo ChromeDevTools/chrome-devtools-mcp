@@ -112,6 +112,28 @@ describe('comments tools', () => {
       sinon.assert.calledOnceWithExactly(bridge.getComments, devtoolsPage);
       sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
     });
+
+    it('reports when DevTools comments are unavailable', async t => {
+      const {page, context, response, args} = createHandlerMocks();
+      const lines = trackResponseLines(response);
+      const devtoolsPage = createMockPuppeteerPage();
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(undefined);
+
+      await getDevtoolsComments(args).handler(
+        {params: {}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        page.ensureDevToolsCommentBridge,
+        devtoolsPage,
+      );
+      sinon.assert.calledOnce(response.appendResponseLine);
+      t.assert.snapshot(lines.join('\n'));
+      sinon.assert.notCalled(response.setDevToolsComments);
+    });
   });
 
   describe('resolve_devtools_comment', () => {
@@ -135,6 +157,9 @@ describe('comments tools', () => {
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
       devtoolsPage.evaluate.resolves(true);
 
       await resolveDevtoolsComment(args).handler(
@@ -158,6 +183,9 @@ describe('comments tools', () => {
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
       devtoolsPage.evaluate.resolves(false);
 
       await resolveDevtoolsComment(args).handler(
@@ -168,6 +196,28 @@ describe('comments tools', () => {
 
       sinon.assert.calledOnce(devtoolsPage.evaluate);
       t.assert.snapshot(lines.join('\n'));
+    });
+
+    it('reports when DevTools comments are unavailable', async t => {
+      const {page, context, response, args} = createHandlerMocks();
+      const lines = trackResponseLines(response);
+      const devtoolsPage = createMockPuppeteerPage();
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(undefined);
+
+      await resolveDevtoolsComment(args).handler(
+        {params: {threadId: 'comment-1'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        page.ensureDevToolsCommentBridge,
+        devtoolsPage,
+      );
+      sinon.assert.calledOnce(response.appendResponseLine);
+      t.assert.snapshot(lines.join('\n'));
+      sinon.assert.notCalled(devtoolsPage.evaluate);
     });
   });
 
@@ -192,6 +242,9 @@ describe('comments tools', () => {
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
       page.resolveUidToBackendNodeId.resolves({
         backendNodeId: 101,
         targetId: 'target-1',
@@ -223,6 +276,9 @@ describe('comments tools', () => {
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
       page.resolveReqidToCdpRequestId.returns('cdp-req-123');
       devtoolsPage.evaluate.resolves(undefined);
 
@@ -248,6 +304,9 @@ describe('comments tools', () => {
       const lines = trackResponseLines(response);
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
       page.resolveUidToBackendNodeId.resolves(undefined);
       page.resolveReqidToCdpRequestId.returns(undefined);
       devtoolsPage.evaluate.resolves(undefined);
@@ -272,6 +331,9 @@ describe('comments tools', () => {
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
       page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(
+        sinon.createStubInstance(DevToolsCommentBridge),
+      );
       page.resolveUidToBackendNodeId.resolves({
         backendNodeId: 101,
         targetId: 'target-1',
@@ -298,6 +360,29 @@ describe('comments tools', () => {
         response.appendResponseLine,
         'Revealed target (revealing element uid-header [backend node 101]) in DevTools.',
       );
+    });
+
+    it('reports when DevTools comments are unavailable', async t => {
+      const {page, context, response, args} = createHandlerMocks();
+      const lines = trackResponseLines(response);
+      const devtoolsPage = createMockPuppeteerPage();
+      page.getDevToolsPage.resolves(devtoolsPage);
+      page.ensureDevToolsCommentBridge.resolves(undefined);
+
+      await revealInDevtools(args).handler(
+        {params: {panelName: 'elements', uid: 'uid-header'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        page.ensureDevToolsCommentBridge,
+        devtoolsPage,
+      );
+      sinon.assert.calledOnce(response.appendResponseLine);
+      t.assert.snapshot(lines.join('\n'));
+      sinon.assert.notCalled(page.resolveUidToBackendNodeId);
+      sinon.assert.notCalled(devtoolsPage.evaluate);
     });
   });
 

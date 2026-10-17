@@ -12,12 +12,74 @@ import sinon from 'sinon';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 
+import {createMockAXNode, createMockMcpPage} from './mocks.js';
 import {html, withMcpContext} from './utils.js';
 
 describe('TextSnapshot', () => {
   afterEach(() => {
     sinon.restore();
     TextSnapshot.resetCounter();
+  });
+
+  it('does not assign uids to nodes without backendNodeId', async () => {
+    const page = createMockMcpPage();
+    page.uniqueBackendNodeIdToMcpId = new Map();
+    page.extraHandles = [];
+    const mockRoot = createMockAXNode('RootWebArea', {
+      loaderId: '1',
+      backendNodeId: 1,
+      children: [
+        createMockAXNode('paragraph', {
+          loaderId: '1',
+          backendNodeId: 2,
+          children: [
+            createMockAXNode('InlineTextBox', {
+              name: 'alpha',
+              loaderId: '1',
+            }),
+          ],
+        }),
+        createMockAXNode('paragraph', {
+          loaderId: '1',
+          backendNodeId: 3,
+          children: [
+            createMockAXNode('InlineTextBox', {
+              name: 'beta',
+              loaderId: '1',
+            }),
+          ],
+        }),
+      ],
+    });
+    page.pptrPage.accessibility.snapshot.resolves(mockRoot);
+
+    const snapshot = await TextSnapshot.create(page, {verbose: true});
+    const inlineNodes = [...snapshot.idToNode.values()].filter(
+      node => node.role === 'InlineTextBox',
+    );
+
+    assert.strictEqual(inlineNodes.length, 0);
+
+    const paragraph1 = snapshot.idToNode.get('1_1');
+    assert.strictEqual(paragraph1?.role, 'paragraph');
+    assert.strictEqual(paragraph1?.children[0]?.role, 'InlineTextBox');
+    assert.strictEqual(paragraph1?.children[0]?.id, '');
+    assert.strictEqual(paragraph1?.children[0]?.name, 'alpha');
+
+    const paragraph2 = snapshot.idToNode.get('1_2');
+    assert.strictEqual(paragraph2?.role, 'paragraph');
+    assert.strictEqual(paragraph2?.children[0]?.role, 'InlineTextBox');
+    assert.strictEqual(paragraph2?.children[0]?.id, '');
+    assert.strictEqual(paragraph2?.children[0]?.name, 'beta');
+
+    assert.strictEqual(
+      page.uniqueBackendNodeIdToMcpId.has('1_undefined'),
+      false,
+    );
+    assert.strictEqual(
+      page.uniqueBackendNodeIdToMcpId.has('undefined_undefined'),
+      false,
+    );
   });
 
   it('creates a snapshot', async () => {

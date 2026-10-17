@@ -5,8 +5,9 @@
  */
 
 import assert from 'node:assert';
+import {spawn} from 'node:child_process';
 import crypto from 'node:crypto';
-import {existsSync, rmSync} from 'node:fs';
+import {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {describe, it, afterEach, beforeEach} from 'node:test';
 
@@ -16,7 +17,12 @@ import {
   stopDaemon,
   verifyDaemonVersion,
 } from '../../src/daemon/client.js';
-import {isDaemonRunning} from '../../src/daemon/utils.js';
+import {
+  DAEMON_SCRIPT_PATH,
+  getDaemonPid,
+  getPidFilePath,
+  isDaemonRunning,
+} from '../../src/daemon/utils.js';
 import {VERSION} from '../../src/version.js';
 
 describe('daemon client', () => {
@@ -72,6 +78,81 @@ describe('daemon client', () => {
         !isDaemonRunning(sessionId),
         'Daemon should still not be running',
       );
+    });
+
+    it('should stop and allow restarting a daemon when its socket is unreachable', async () => {
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH],
+        {
+          stdio: 'ignore',
+        },
+      );
+      child.unref();
+      assert.ok(child.pid, 'Child process should have a PID');
+
+      try {
+        const pidFilePath = getPidFilePath(sessionId);
+        mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+        writeFileSync(pidFilePath, String(child.pid), 'utf-8');
+        assert.ok(
+          isDaemonRunning(sessionId),
+          'Daemon should be detected as running via PID file',
+        );
+
+        await stopDaemon(sessionId);
+        assert.ok(
+          !isDaemonRunning(sessionId),
+          'Unreachable daemon should be stopped via signal fallback',
+        );
+
+        await startDaemon([], sessionId);
+        assert.ok(
+          isDaemonRunning(sessionId),
+          'New daemon should start after stopping unreachable daemon',
+        );
+        assert.notStrictEqual(getDaemonPid(sessionId), child.pid);
+      } finally {
+        child.kill();
+      }
+    });
+
+    it('should not signal an unrelated process when its PID is in the PID file', async () => {
+      const child = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        {
+          stdio: 'ignore',
+        },
+      );
+      child.unref();
+      const childPid = child.pid;
+      assert.ok(childPid, 'Child process should have a PID');
+
+      try {
+        const pidFilePath = getPidFilePath(sessionId);
+        mkdirSync(dirname(pidFilePath), {recursive: true, mode: 0o700});
+        writeFileSync(pidFilePath, String(childPid), 'utf-8');
+
+        await stopDaemon(sessionId);
+        assert.doesNotThrow(
+          () => process.kill(childPid, 0),
+          'stopDaemon must not kill the unrelated process',
+        );
+
+        await startDaemon([], sessionId);
+        assert.ok(
+          isDaemonRunning(sessionId),
+          'New daemon should start when PID file points to an unrelated process',
+        );
+        assert.notStrictEqual(getDaemonPid(sessionId), childPid);
+        assert.doesNotThrow(
+          () => process.kill(childPid, 0),
+          'startDaemon must not kill the unrelated process',
+        );
+      } finally {
+        child.kill();
+      }
     });
   });
 

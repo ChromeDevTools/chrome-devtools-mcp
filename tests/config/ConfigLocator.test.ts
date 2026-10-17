@@ -11,11 +11,9 @@ import {describe, it} from 'node:test';
 import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 
 const HOME = path.resolve('/home/user');
-const CWD = path.resolve('/work/project');
 const PLUGIN_DATA = path.resolve('/plugins/data/chrome-devtools');
 const XDG_CONFIG_HOME = path.resolve('/xdg/config');
 
-const CWD_CONFIG = path.join(CWD, 'cd4a.config.json');
 const PLUGIN_CONFIG = path.join(PLUGIN_DATA, 'cd4a.config.json');
 const XDG_CONFIG = path.join(XDG_CONFIG_HOME, 'cd4a', 'config.json');
 const HOME_CONFIG = path.join(HOME, '.config', 'cd4a', 'config.json');
@@ -36,8 +34,8 @@ class TestConfigLocator extends ConfigLocator {
     this.#platform = platform;
   }
 
-  override getSearchPaths(cwd = CWD, env = this.#env): string[] {
-    return super.getSearchPaths(cwd, env);
+  override getSearchPaths(env = this.#env): string[] {
+    return super.getSearchPaths(env);
   }
 
   override getGlobalConfigPath(
@@ -113,20 +111,11 @@ describe('ConfigLocator', () => {
 
     it('returns undefined when discovery is turned off', () => {
       assert.strictEqual(
-        new TestConfigLocator([CWD_CONFIG, PLUGIN_CONFIG, HOME_CONFIG], {
+        new TestConfigLocator([PLUGIN_CONFIG, HOME_CONFIG], {
           PLUGIN_DATA,
           CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY: 'true',
         }).locate(),
         undefined,
-      );
-    });
-
-    it('prefers the config file in the current working directory', () => {
-      assert.strictEqual(
-        new TestConfigLocator([CWD_CONFIG, PLUGIN_CONFIG, HOME_CONFIG], {
-          PLUGIN_DATA,
-        }).locate(),
-        CWD_CONFIG,
       );
     });
 

@@ -7,7 +7,7 @@
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
-  HeapSnapshotClassDiff,
+  HeapSnapshotDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
@@ -30,20 +30,25 @@ import type {
   LaunchPWAOptions,
   PWAState,
   ScreenRecorder,
+  ScreenRecording,
   UninstallPWAOptions,
   Viewport,
   DevTools,
   Protocol,
   Page,
+  WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
   CD4ACommentThread,
+  PaginationOptions,
+  ForcedColors,
+  PrefersContrast,
+  PrefersReducedMotion,
 } from '../types.js';
 import type {McpWorker} from '../McpWorker.js';
-import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
   DialogAction,
@@ -57,6 +62,17 @@ export type FileVerificationOption =
   | {
       local?: boolean;
       remote?: boolean;
+      /**
+       * When true, a value that parses as an `http(s):`/`ws(s):` URL is passed
+       * through unchanged instead of being resolved as a filesystem path. Only
+       * set this for parameters whose sink fetches the URL (for example a
+       * source map or script source the server downloads) or hands it to the
+       * browser (for example a PWA install URL). For filesystem-path
+       * parameters it MUST stay unset: otherwise a value such as
+       * `http://x/../../etc/passwd` skips `validatePath` and is resolved to an
+       * absolute host path by the downstream filesystem API.
+       */
+      allowUrl?: boolean;
     };
 
 type AllKeys<T> = T extends unknown ? keyof T : never;
@@ -89,8 +105,8 @@ export interface BaseToolDefinition<
     readOnlyHint: boolean;
     /**
      * If `'slim'` is included, the tool is only available with `--slim`. Tools
-     * without `'slim'` are only available without `--slim`. Slim tools may
-     * reuse the names of other tools, see {@link isAvailableInMode}.
+     * without `'slim'` are only available without `--slim`, see
+     * {@link isAvailableInMode}.
      */
     conditions?: Array<keyof ParsedArguments>;
   };
@@ -105,6 +121,11 @@ export interface ToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
   schema: Schema;
+  /**
+   * Only page-scoped tools are checked for open dialogs by ToolHandler, so a
+   * non-page tool must handle dialogs itself.
+   */
+  blockedByDialog: false;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -130,6 +151,34 @@ export interface SnapshotParams {
   filePath?: string;
 }
 
+export interface LighthouseAuditNode {
+  selector?: string;
+  snippet?: string;
+  nodeLabel?: string;
+  explanation?: string;
+}
+
+export interface LighthouseFailedAudit {
+  id: string;
+  title: string;
+  description?: string;
+  score: number;
+  displayValue?: string;
+  /**
+   * IDs of the categories that reference this audit.
+   */
+  categories: string[];
+  /**
+   * DOM nodes flagged by the audit, capped to a small number.
+   */
+  nodes: LighthouseAuditNode[];
+  /**
+   * Total number of distinct DOM nodes flagged by the audit, which may exceed
+   * the number of entries in `nodes`.
+   */
+  totalNodes: number;
+}
+
 export interface LighthouseData {
   summary: {
     mode: string;
@@ -148,6 +197,7 @@ export interface LighthouseData {
       total: number;
     };
   };
+  failedAudits: LighthouseFailedAudit[];
   reports: string[];
 }
 
@@ -160,7 +210,7 @@ export interface Response {
   appendResponseLine(value: string): void;
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
@@ -185,9 +235,13 @@ export interface Response {
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
     options?: HeapSnapshotFormatOptions,
   ): void;
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
+  setHeapSnapshotClassDiffs(
+    diff: HeapSnapshotDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
@@ -260,6 +314,11 @@ export type SupportedExtensions =
 /**
  * Only add methods used by tools/*.
  */
+export interface ScreenRecorderData {
+  recorder: ScreenRecorder | ScreenRecording;
+  filePath: string;
+}
+
 export type Context = Readonly<{
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
@@ -292,10 +351,6 @@ export type Context = Readonly<{
   ): Promise<{filename: string}>;
   loadResource(path: string): Promise<string>;
 
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
@@ -304,6 +359,14 @@ export type Context = Readonly<{
   getSelectedMcpPage(): McpPage;
   getWorkers(): McpWorker[];
   getWorkerById(id: string): McpWorker | undefined;
+}>;
+
+/**
+ * The context available to tools that do not need a browser connection, see
+ * {@link defineBrowserlessTool}. Using it never triggers a browser launch or
+ * connection.
+ */
+export type BrowserlessContext = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
@@ -361,7 +424,7 @@ export type Context = Readonly<{
   getHeapSnapshotClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]>;
+  ): Promise<HeapSnapshotDiff>;
   getHeapSnapshotDetailedClassDiff(
     baseFilePath: string,
     currentFilePath: string,
@@ -400,6 +463,8 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  getScreenRecorder(): ScreenRecorderData | null;
+  setScreenRecorder(data: ScreenRecorderData | null): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
@@ -409,7 +474,8 @@ export type ContextPage = Readonly<{
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult>;
-  getThirdPartyDeveloperTools(): ToolGroups;
+  getWebMcpTools(): WebMCPTool[];
+  discoverThirdPartyDeveloperTools(): Promise<ToolGroups>;
 
   executeThirdPartyDeveloperTool(
     toolName: string,
@@ -424,6 +490,9 @@ export type ContextPage = Readonly<{
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
   }): Promise<void>;
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
@@ -431,7 +500,7 @@ export type ContextPage = Readonly<{
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge>;
+  ): Promise<DevToolsCommentBridge | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(
@@ -477,6 +546,54 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
   };
 }
 
+export interface BrowserlessToolDefinition<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> extends BaseToolDefinition<Schema> {
+  browserless: true;
+  /**
+   * Browserless tools have no page, so ToolHandler never checks them for open
+   * dialogs.
+   */
+  blockedByDialog: false;
+  handler(
+    request: Request<Schema>,
+    response: Response,
+    context: BrowserlessContext,
+  ): Promise<void>;
+}
+
+/**
+ * Defines a tool that does not need a browser connection, e.g. a tool that only
+ * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ */
+export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
+  definition: (
+    args: ParsedArguments,
+  ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless'>,
+): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
+  return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
+    return {
+      ...definition(args),
+      browserless: true,
+    };
+  };
+}
+
+export type AnyToolDefinition =
+  ToolDefinition | DefinedPageTool | BrowserlessToolDefinition;
+
+export function isPageScopedTool(
+  tool: AnyToolDefinition,
+): tool is DefinedPageTool {
+  return 'pageScoped' in tool && tool.pageScoped === true;
+}
+
+export function isBrowserlessTool(
+  tool: AnyToolDefinition,
+): tool is BrowserlessToolDefinition {
+  return 'browserless' in tool && tool.browserless === true;
+}
+
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
@@ -497,6 +614,18 @@ export const timeoutSchema = {
     ),
 };
 
+const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+const VALID_VIEWPORT_TAGS = new Set(['mobile', 'touch', 'landscape']);
+
+function parseDecimal(part: string | undefined, name: string): number {
+  if (part === undefined || !DECIMAL.test(part)) {
+    throw new Error(
+      `Invalid ${name} "${part ?? ''}". Expected a decimal number.`,
+    );
+  }
+  return Number(part);
+}
+
 export function viewportTransform(arg: string | undefined):
   | {
       width: number;
@@ -511,49 +640,73 @@ export function viewportTransform(arg: string | undefined):
     return undefined;
   }
   const [dimensions, ...tags] = arg.split(',');
+  for (const tag of tags) {
+    if (!VALID_VIEWPORT_TAGS.has(tag)) {
+      throw new Error(
+        `Invalid viewport tag "${tag}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+      );
+    }
+  }
   const isMobile = tags.includes('mobile');
   const hasTouch = tags.includes('touch');
   const isLandscape = tags.includes('landscape');
-  const [width, height, dpr] = dimensions.split('x').map(Number) as [
-    number,
-    number,
-    number | undefined,
-  ];
+  const dimParts = dimensions.split('x');
+  if (dimParts.length !== 2 && dimParts.length !== 3) {
+    throw new Error(
+      `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+    );
+  }
+  const width = parseDecimal(dimParts[0], 'viewport width');
   if (!Number.isFinite(width) || width <= 0) {
     throw new Error(
       `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
     );
   }
+  const height = parseDecimal(dimParts[1], 'viewport height');
   if (!Number.isFinite(height) || height <= 0) {
     throw new Error(
       `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
     );
   }
-  if (dpr !== undefined && (!Number.isFinite(dpr) || dpr <= 0)) {
-    throw new Error(
-      `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
-    );
+  let deviceScaleFactor: number | undefined;
+  if (dimParts.length === 3) {
+    const dpr = parseDecimal(dimParts[2], 'devicePixelRatio');
+    if (!Number.isFinite(dpr) || dpr <= 0) {
+      throw new Error(
+        `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
+      );
+    }
+    deviceScaleFactor = dpr;
   }
   return {
     width,
     height,
-    deviceScaleFactor: dpr,
-    isMobile: isMobile,
-    isLandscape: isLandscape,
-    hasTouch: hasTouch,
+    deviceScaleFactor,
+    isMobile,
+    isLandscape,
+    hasTouch,
   };
 }
 
-export function geolocationTransform(arg: string | undefined) {
+export function geolocationTransform(
+  arg: string | undefined,
+): {latitude: number; longitude: number} | undefined {
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  const parts = arg.split(',');
+  if (parts.length !== 2) {
+    throw new Error(
+      `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
+    );
+  }
+  const latitude = parseDecimal(parts[0], 'latitude');
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error(
       `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
     );
   }
+  const longitude = parseDecimal(parts[1], 'longitude');
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error(
       `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
@@ -572,10 +725,8 @@ export function isSlimTool(
 }
 
 /**
- * Slim mode replaces the regular tools with the slim tools. Only the tools of
- * the current mode are registered, so a slim tool may share its name with a
- * regular tool. `--slim` requires a restart, so the mode never changes while
- * the server is running.
+ * Slim mode replaces the regular tools with the slim tools. `--slim` requires
+ * a restart, so the mode never changes while the server is running.
  */
 export function isAvailableInMode(
   tool: Pick<BaseToolDefinition, 'annotations'>,

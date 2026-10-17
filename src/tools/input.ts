@@ -7,7 +7,7 @@
 import {TimeoutError, zod} from '../third_party/index.js';
 import type {ElementHandle, KeyInput} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
-import {parseKey} from '../utils/keyboard.js';
+import {invalidKeyMessage, isValidKey, parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
@@ -27,6 +27,10 @@ const includeSnapshotSchema = zod
 
 const submitKeySchema = zod
   .string()
+  // An empty string means no submit key, as before.
+  .refine((key): boolean => key === '' || isValidKey(key), {
+    error: issue => invalidKeyMessage(String(issue.input)),
+  })
   .optional()
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
@@ -38,7 +42,11 @@ const submitKeySchema = zod
  * The open dialog is already reported in the response, so treat this as an
  * interruption instead of a failure.
  */
-function handleActionError(error: unknown, uid: string, page: ContextPage) {
+function handleActionError(
+  error: unknown,
+  uid: string,
+  page: ContextPage,
+): void {
   if (page.getDialog()) {
     logger?.('action interrupted by a dialog', error);
     return;
@@ -62,7 +70,7 @@ function handleActionError(error: unknown, uid: string, page: ContextPage) {
 async function selectNativeSelectOption(
   handle: ElementHandle<Element>,
   signal: AbortSignal,
-) {
+): Promise<boolean> {
   using selectHandle = await handle.evaluateHandle(node => {
     if (!(node instanceof HTMLOptionElement)) {
       return null;
@@ -243,7 +251,7 @@ function raceWithSignal<T>(
     return Promise.reject(signal.reason);
   }
   return new Promise<T>((resolve, reject) => {
-    const onAbort = () => {
+    const onAbort = (): void => {
       reject(signal.reason);
     };
     signal.addEventListener('abort', onAbort, {once: true});
@@ -269,7 +277,7 @@ async function selectOption(
   aXNode: TextSnapshotNode,
   value: string,
   signal: AbortSignal,
-) {
+): Promise<void> {
   let optionFound = false;
   for (const child of aXNode.children) {
     if (child.role === 'option' && child.name === value && child.value) {
@@ -298,7 +306,7 @@ async function selectOption(
   }
 }
 
-function hasOptionChildren(aXNode: TextSnapshotNode) {
+function hasOptionChildren(aXNode: TextSnapshotNode): boolean {
   return aXNode.children.some(child => child.role === 'option');
 }
 
@@ -438,16 +446,16 @@ export const typeText = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const submitKey = request.params.submitKey;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
-      if (request.params.submitKey) {
-        await page.pptrPage.keyboard.press(
-          request.params.submitKey as KeyInput,
-        );
+      // submitKeySchema has already validated the key; isValidKey narrows the type.
+      if (submitKey && isValidKey(submitKey)) {
+        await page.pptrPage.keyboard.press(submitKey);
       }
     });
     response.appendResponseLine(
-      `Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`,
+      `Typed text "${request.params.text}${submitKey ? ` + ${submitKey}` : ''}"`,
     );
     response.attachWaitForResult(result);
   },
@@ -579,21 +587,28 @@ export const uploadFile = definePageTool(() => ({
 
     try {
       await handle.uploadFile(...filePaths);
-    } catch {
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message.includes('Multiple file uploads')
+      ) {
+        throw err;
+      }
       // Some sites use a proxy element to trigger file upload instead of
       // a type=file element. In this case, we want to default to
       // Page.waitForFileChooser() and upload the file this way.
+      let fileChooser;
       try {
-        const [fileChooser] = await Promise.all([
+        [fileChooser] = await Promise.all([
           request.page.pptrPage.waitForFileChooser({timeout: 3000}),
           handle.asLocator().click(),
         ]);
-        await fileChooser.accept(filePaths);
       } catch {
         throw new Error(
           `Failed to upload file. The element could not accept the file directly, and clicking it did not trigger a file chooser.`,
         );
       }
+      await fileChooser.accept(filePaths);
     }
     if (request.params.includeSnapshot) {
       response.includeSnapshot();

@@ -9,6 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {zod} from '../../src/third_party/index.js';
 import {emulate} from '../../src/tools/emulation.js';
 import {
   geolocationTransform,
@@ -90,6 +91,25 @@ describe('emulation', () => {
       it('throws when height is missing', () => {
         assert.throws(() => viewportTransform('800'));
       });
+
+      it('throws when viewport has unknown tags', () => {
+        assert.throws(() => viewportTransform('1280x720,mobile,bogus'));
+      });
+
+      it('throws when viewport has empty tags', () => {
+        assert.throws(() => viewportTransform('1280x720,'));
+      });
+
+      it('throws when viewport has extra dimension parts', () => {
+        assert.throws(() => viewportTransform('1280x720x2x9'));
+      });
+
+      it('throws when dimension parts are empty or contain whitespace', () => {
+        assert.throws(() => viewportTransform('800x'));
+        assert.throws(() => viewportTransform('x600'));
+        assert.throws(() => viewportTransform(' 1280 x 720'));
+        assert.throws(() => viewportTransform('1280x720, mobile'));
+      });
     });
 
     describe('geolocationTransform', () => {
@@ -118,6 +138,20 @@ describe('emulation', () => {
 
       it('throws when longitude is missing', () => {
         assert.throws(() => geolocationTransform('48.1'));
+      });
+
+      it('throws when geolocation has empty parts or trailing commas', () => {
+        assert.throws(() => geolocationTransform('37.77,'));
+        assert.throws(() => geolocationTransform(','));
+      });
+
+      it('throws when geolocation has extra parts', () => {
+        assert.throws(() => geolocationTransform('37.77,-122.42,9'));
+      });
+
+      it('throws on hex coordinates or surrounding whitespace', () => {
+        assert.throws(() => geolocationTransform('0x10,0x20'));
+        assert.throws(() => geolocationTransform(' 37.77 , -122.42 '));
       });
     });
   });
@@ -555,6 +589,50 @@ describe('emulation', () => {
       sinon.assert.calledOnceWithExactly(page.emulate, {
         colorScheme: 'auto',
       });
+    });
+  });
+
+  describe('media features', () => {
+    it('emulates forced-colors, prefers-contrast and prefers-reduced-motion', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await emulate(args).handler(
+        {
+          params: {
+            forcedColors: 'active',
+            prefersContrast: 'more',
+            prefersReducedMotion: 'reduce',
+          },
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        forcedColors: 'active',
+        prefersContrast: 'more',
+        prefersReducedMotion: 'reduce',
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Emulation configured successfully',
+      );
+    });
+
+    it('rejects unsupported values', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      assert.strictEqual(
+        schema.safeParse({forcedColors: 'inactive'}).success,
+        false,
+      );
+      assert.strictEqual(
+        schema.safeParse({prefersContrast: 'high'}).success,
+        false,
+      );
+      assert.strictEqual(
+        schema.safeParse({prefersReducedMotion: 'yes'}).success,
+        false,
+      );
     });
   });
 });

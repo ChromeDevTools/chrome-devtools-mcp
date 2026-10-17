@@ -4,8 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Page, Protocol, CdpPage, Dialog} from '../third_party/index.js';
-import type {PredefinedNetworkConditions} from '../third_party/index.js';
+import type {
+  Target,
+  Page,
+  Protocol,
+  CdpPage,
+  Dialog,
+  PredefinedNetworkConditions,
+} from '../third_party/index.js';
 import {logger} from './logger.js';
 
 export type DialogAction = 'accept' | 'dismiss' | string;
@@ -13,6 +19,7 @@ export type DialogAction = 'accept' | 'dismiss' | string;
 export class WaitForHelper {
   #abortController = new AbortController();
   #page: CdpPage;
+  #publicPage: Page;
   #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
@@ -22,6 +29,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
+  #openedPages = new Set<Target>();
 
   constructor(
     page: Page,
@@ -33,6 +41,7 @@ export class WaitForHelper {
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
     this.#page = page as unknown as CdpPage;
+    this.#publicPage = page;
     this.#initialUrl = page.url();
   }
 
@@ -48,7 +57,7 @@ export class WaitForHelper {
     using stableDomObserver = await Promise.race([
       this.#page.evaluateHandle(timeout => {
         let timeoutId: ReturnType<typeof setTimeout>;
-        function callback() {
+        function callback(): void {
           clearTimeout(timeoutId);
           timeoutId = setTimeout(() => {
             domObserver.resolver.resolve();
@@ -89,7 +98,7 @@ export class WaitForHelper {
       }
     });
 
-    return Promise.race([
+    return await Promise.race([
       stableDomObserver.evaluate(async observer => {
         return await observer.resolver.promise;
       }),
@@ -127,7 +136,7 @@ export class WaitForHelper {
     }
     const dialogHandler = (
       dialog: Pick<Dialog, 'accept' | 'dismiss' | 'type'>,
-    ) => {
+    ): void => {
       this.#dialogDetected = true;
 
       let actionToTake: DialogAction | undefined;
@@ -158,6 +167,16 @@ export class WaitForHelper {
       this.#page.off('dialog', dialogHandler);
     });
 
+    const popupHandler = (page: Page | null): void => {
+      if (page) {
+        this.#openedPages.add(page.target());
+      }
+    };
+    this.#publicPage.on('popup', popupHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      this.#publicPage.off('popup', popupHandler);
+    });
+
     // A scoped AbortController used to clean up navigation probe listeners.
     // When aborted (either after navigation detection finishes or if this.#abortController
     // aborts), it removes CDP navigation probe listeners and automatically
@@ -167,7 +186,7 @@ export class WaitForHelper {
 
     const navigationListener = (
       event: Protocol.Page.FrameStartedNavigatingEvent,
-    ) => {
+    ): void => {
       if (event.frameId !== this.#page.mainFrame()._id) {
         return;
       }
@@ -182,7 +201,7 @@ export class WaitForHelper {
     };
     const requestedNavigationListener = (
       event: Protocol.Page.FrameRequestedNavigationEvent,
-    ) => {
+    ): void => {
       if (event.frameId === this.#page.mainFrame()._id) {
         navigationStartedResolvers.resolve(true);
       }
@@ -287,6 +306,7 @@ export class WaitForHelper {
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
+      ...(this.#openedPages.size ? {openedPages: this.#openedPages} : {}),
     };
   }
 }
@@ -301,6 +321,7 @@ export interface WaitForEventsResult {
    * Whether a dialog was automatically handled during the action.
    */
   dialogHandled?: boolean;
+  openedPages?: Set<Target>;
 }
 
 export function getNetworkMultiplierFromString(
