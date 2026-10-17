@@ -245,7 +245,23 @@ const performEvaluation = async (
     >(`(\n${functionSource}\n)`);
     result = await evaluatable.evaluate(
       async (fn, ...args) => {
-        return JSON.stringify(await fn(...args));
+        try {
+          return JSON.stringify(await fn(...args));
+        } catch (err) {
+          if (err instanceof Error) {
+            throw err;
+          }
+          let message: string;
+          try {
+            message =
+              typeof err === 'object' && err !== null
+                ? JSON.stringify(err)
+                : String(err);
+          } catch {
+            message = String(err);
+          }
+          throw new Error(message);
+        }
       },
       fn,
       ...args,
