@@ -14,6 +14,7 @@ import * as DevTools from '../third_party/index.js';
 import type {ConsoleMessage} from '../third_party/index.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
+import {formatRemoteObject} from './RemoteObjectFormatter.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
@@ -53,7 +54,7 @@ type RemoteObject = ReturnType<
 >;
 
 // JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
-// on symbols and cyclic objects. Those are described in the page instead.
+// on symbols and cyclic objects. Those are formatted from their preview.
 function isJsonLike(remoteObject: RemoteObject): boolean {
   if (remoteObject.type === 'object') {
     return (
@@ -67,95 +68,6 @@ function isJsonLike(remoteObject: RemoteObject): boolean {
     remoteObject.type !== 'symbol' &&
     remoteObject.type !== 'bigint'
   );
-}
-
-/**
- * Describes a value the way the DevTools console does, for example
- * `Map(1) {1 => 2}`, `Set(1) {3}`, `ƒ foo() {}`, `<html>` or `Symbol(s)`.
- * Runs in the page, so it must not reference anything outside itself.
- */
-export function describeValue(value: unknown): string {
-  const maxItems = 100;
-  const maxDepth = 3;
-  const ancestors: object[] = [];
-  const list = <T>(
-    items: Iterable<T>,
-    size: number,
-    renderItem: (item: T) => string,
-  ): string => {
-    const parts: string[] = [];
-    for (const item of items) {
-      if (parts.length === maxItems) {
-        parts.push(`…${size - maxItems} more`);
-        break;
-      }
-      parts.push(renderItem(item));
-    }
-    return parts.join(', ');
-  };
-  const render = (v: unknown, depth: number): string => {
-    switch (typeof v) {
-      case 'string':
-        return depth === 0 ? v : JSON.stringify(v);
-      case 'bigint':
-        return `${v}n`;
-      case 'symbol':
-        return v.toString();
-      case 'function': {
-        const source = Function.prototype.toString.call(v);
-        const text = `ƒ ${source.replace(/^function\s*/, '')}`;
-        return text.length > 200 ? `${text.slice(0, 199)}…` : text;
-      }
-      case 'object':
-        break;
-      default:
-        return String(v);
-    }
-    if (v === null) {
-      return 'null';
-    }
-    if (v instanceof Date) {
-      return isNaN(v.getTime()) ? 'Invalid Date' : v.toISOString();
-    }
-    if (v instanceof RegExp || v instanceof Error) {
-      return String(v);
-    }
-    if (typeof Node !== 'undefined' && v instanceof Node) {
-      return v instanceof Element ? `<${v.localName}>` : v.nodeName;
-    }
-    if (ancestors.includes(v)) {
-      return '[Circular]';
-    }
-    if (depth >= maxDepth) {
-      return Array.isArray(v) ? '[…]' : '{…}';
-    }
-    ancestors.push(v);
-    try {
-      const child = (item: unknown): string => render(item, depth + 1);
-      if (v instanceof Map) {
-        return `Map(${v.size}) {${list(
-          v,
-          v.size,
-          ([key, val]) => `${child(key)} => ${child(val)}`,
-        )}}`;
-      }
-      if (v instanceof Set) {
-        return `Set(${v.size}) {${list(v, v.size, child)}}`;
-      }
-      if (Array.isArray(v)) {
-        return `[${list(v, v.length, child)}]`;
-      }
-      const entries = Object.entries(v);
-      return `{${list(
-        entries,
-        entries.length,
-        ([key, val]) => `${JSON.stringify(key)}: ${child(val)}`,
-      )}}`;
-    } finally {
-      ancestors.pop();
-    }
-  };
-  return render(value, 0);
 }
 
 export class ConsoleFormatter {
@@ -263,13 +175,17 @@ export class ConsoleFormatter {
               });
             }
             if (!isJsonLike(remoteObject)) {
-              return await arg.evaluate(describeValue);
+              return formatRemoteObject(remoteObject);
             }
             try {
               return await arg.jsonValue();
-            } catch {
-              // JSON can't represent the value (for example, a cyclic object).
-              return await arg.evaluate(describeValue);
+            } catch (error) {
+              // JSON can't represent the value (for example, a cyclic object)
+              // or the page is gone; the preview still describes it.
+              if (remoteObject.preview) {
+                return formatRemoteObject(remoteObject);
+              }
+              throw error;
             }
           } catch {
             return `<error: Argument ${i} is no longer available>`;
