@@ -21,6 +21,20 @@ describe('TextSnapshot', () => {
     TextSnapshot.resetCounter();
   });
 
+  it('rejects with a clear error when the accessibility tree never arrives', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const page = createMockMcpPage();
+    page.pptrPage.accessibility.snapshot.returns(new Promise(() => {}));
+
+    const result = TextSnapshot.create(page).then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    await clock.tickAsync(10_000);
+
+    assert.match(await result, /Timed out after 10000ms.*accessibility tree/);
+  });
+
   it('does not assign uids to nodes without backendNodeId', async () => {
     const page = createMockMcpPage();
     page.uniqueBackendNodeIdToMcpId = new Map();

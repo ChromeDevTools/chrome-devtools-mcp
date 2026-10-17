@@ -14,6 +14,8 @@ import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';
 
+const ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS = 10_000;
+
 export class TextSnapshot {
   static nextSnapshotId = 1;
 
@@ -53,10 +55,30 @@ export class TextSnapshot {
     } = {},
   ): Promise<TextSnapshot> {
     const verbose = options.verbose ?? false;
-    const rootNode = await page.pptrPage.accessibility.snapshot({
+    const snapshotPromise = page.pptrPage.accessibility.snapshot({
       includeIframes: true,
       interestingOnly: !verbose,
     });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        // The pending protocol request is abandoned; swallow its late
+        // rejection (protocolTimeout) so it does not surface as unhandled.
+        snapshotPromise.catch(() => {});
+        reject(
+          new Error(
+            `Timed out after ${ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS}ms waiting for the accessibility tree. The page may be busy with a pending navigation or its renderer may have crashed. Try navigating or reloading the page, or select another page.`,
+          ),
+        );
+      }, ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS);
+      timer.unref?.();
+    });
+    let rootNode;
+    try {
+      rootNode = await Promise.race([snapshotPromise, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
     if (!rootNode) {
       throw new Error('Failed to create accessibility snapshot');
     }
