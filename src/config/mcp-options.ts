@@ -291,6 +291,9 @@ export function getCliOptions(): Partial<
   // Missing CLI serialization.
   delete options.viewport;
 
+  // The CLI is generated for the full mode, not slim mode.
+  delete options.slim;
+
   // Change the defaults for the CLI.
   delete options.experimentalStructuredContent;
   delete options.experimentalInteropTools;
