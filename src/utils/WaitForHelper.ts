@@ -252,6 +252,7 @@ export class WaitForHelper {
         logger?.(error);
       });
 
+    const startedAt = Date.now();
     try {
       await action(this.#abortController.signal);
     } catch (error) {
@@ -271,13 +272,21 @@ export class WaitForHelper {
     ]);
     navigationAbortController.abort();
 
+    let navigationTimedOut = false;
     try {
       // Only await navigation if one was actually initiated; otherwise, the
       // pending waitForNavigation promise will be cancelled when this.#abortController aborts.
       if (navigationStarted) {
-        await Promise.race([
-          navigationFinished,
-          this.timeout(options?.timeout ?? this.#navigationTimeout),
+        // The action may already have spent part of the timeout waiting for
+        // the navigation itself, so only wait for the remaining budget.
+        const remaining =
+          (options?.timeout ?? this.#navigationTimeout) -
+          (Date.now() - startedAt);
+        navigationTimedOut = await Promise.race([
+          navigationFinished.then(() => false),
+          this.timeout(Math.max(remaining, this.#expectNavigationIn)).then(
+            () => true,
+          ),
         ]);
       }
 
@@ -286,8 +295,10 @@ export class WaitForHelper {
       }
 
       // Wait for stable dom after navigation so we execute in
-      // the correct context
-      if (options?.waitForStableDom !== false) {
+      // the correct context. Skip it if the navigation did not finish in
+      // time: the document is not settled and the wait would only add to
+      // the time spent beyond the requested timeout.
+      if (options?.waitForStableDom !== false && !navigationTimedOut) {
         await this.waitForStableDom();
       }
     } catch (error) {

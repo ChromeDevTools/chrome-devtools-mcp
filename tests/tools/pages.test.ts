@@ -24,6 +24,7 @@ import {
 } from '../../src/tools/pages.js';
 import {zod} from '../../src/third_party/index.js';
 import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
+import {serverHooks} from '../server.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -917,6 +918,34 @@ describe('pages', () => {
     });
   });
   describe('navigate_page', () => {
+    const server = serverHooks();
+
+    it('returns close to the timeout when the server never responds', async () => {
+      await withMcpContext(async (response, context, args) => {
+        server.addRoute('/hang', () => {});
+        const timeout = 1000;
+        const start = performance.now();
+        await navigatePage(args).handler(
+          {
+            params: {url: server.baseUrl + '/hang', timeout},
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+        const elapsed = performance.now() - start;
+
+        assert.strictEqual(
+          response.responseLines.join('\n'),
+          'Unable to navigate in the selected page: Navigation timeout of 1000 ms exceeded.',
+        );
+        assert.ok(
+          elapsed < timeout + 1000,
+          `navigate_page took ${elapsed}ms with a timeout of ${timeout}ms`,
+        );
+      });
+    });
+
     it('navigates to correct page', async () => {
       await withMcpContext(async (response, context, args) => {
         await navigatePage(args).handler(
