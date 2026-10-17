@@ -139,6 +139,23 @@ describe('NetworkFormatter', () => {
       assert.equal(formatter.toJSON().url, longUrl);
     });
 
+    it('does not split a surrogate pair when truncating a url', async () => {
+      // 254 code units, then an emoji straddling the 255 limit.
+      const prefix = `http://example.com/${'a'.repeat(235)}`;
+      const url = `${prefix}\u{1F600}${'b'.repeat(20)}`;
+      const request = getMockRequest({url});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      assert.equal(
+        formatter.toString(),
+        `reqid=1 GET ${prefix}... <truncated> [pending]`,
+      );
+    });
+
     it('truncates data: urls', async () => {
       const dataUrl = `data:image/png;base64,${'A'.repeat(5000)}`;
       const request = getMockRequest({url: dataUrl});

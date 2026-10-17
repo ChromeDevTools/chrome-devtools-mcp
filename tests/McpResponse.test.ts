@@ -363,6 +363,30 @@ describe('McpResponse', () => {
       });
     });
 
+    it('truncates a long page title without splitting a surrogate pair', async () => {
+      await withMcpContext(async (response, context) => {
+        // 46 + 1 emoji: the 47-unit cut lands between the emoji's surrogates.
+        const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
+        server.addHtmlRoute(
+          '/emoji-title.html',
+          `<!doctype html><title>${title}</title><h1>Emoji</h1>`,
+        );
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.goto(server.getRoute('/emoji-title.html'));
+
+        response.setIncludePages(true);
+        const res = await response.handle(context);
+        const text = getTextContent(res.content[0]);
+        assert.ok(
+          text.includes(
+            `${'A'.repeat(46)}... (${server.getRoute('/emoji-title.html')})`,
+          ),
+          text,
+        );
+        assert.doesNotMatch(JSON.stringify(res), /\\ud83d/i);
+      });
+    });
+
     it('resets ids after navigation', async () => {
       await withMcpContext(async (response, context) => {
         server.addHtmlRoute(
