@@ -21,6 +21,7 @@ import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
+import {logger} from '../src/utils/logger.js';
 
 import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
 
@@ -55,6 +56,23 @@ describe('McpServer', () => {
     const server = await McpServer.from(serverArgs, {browserManager});
     return {server, browserManager, context};
   }
+
+  it('passes the navigation limit to the lazily connected context', async () => {
+    const context = createMockMcpContext();
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server, browserManager} = await createTestServer(
+      ['--maxNavigationSaved=5'],
+      {mockContext: false},
+    );
+
+    sinon.assert.calledOnceWithExactly(
+      createContext,
+      logger,
+      sinon.match({maxNavigationSaved: 5}),
+    );
+    sinon.assert.notCalled(browserManager.ensureBrowser);
+    await server.close();
+  });
 
   describe('callTool', () => {
     it('returns an error for unknown tool names', async () => {

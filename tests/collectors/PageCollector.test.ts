@@ -23,6 +23,7 @@ import {
 } from '../../src/collectors/PageCollector.js';
 import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
+import {createMockPuppeteerPage} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
 function createMockConsoleMessage(text: string): ConsoleMessage {
@@ -34,6 +35,37 @@ function createMockConsoleMessage(text: string): ConsoleMessage {
 }
 
 describe('PageCollector', () => {
+  afterEach(() => sinon.restore());
+
+  it('applies resource and navigation limits independently', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const collector = new PageCollector<Error>(
+      pptrPage,
+      collect => ({
+        pageerror: error => {
+          if (error instanceof Error) {
+            collect(error);
+          }
+        },
+      }),
+      {maxResourcesPerNavigation: 2, maxNavigationSaved: 4},
+    );
+    const errors: Error[] = [];
+    for (let navigation = 0; navigation < 6; navigation++) {
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+      for (let resource = 0; resource < 3; resource++) {
+        const error = new Error(`${navigation}-${resource}`);
+        pptrPage.emit('pageerror', error);
+        if (resource > 0) {
+          errors.push(error);
+        }
+      }
+    }
+    assert.deepStrictEqual(collector.getData(), errors.slice(-2));
+    assert.deepStrictEqual(collector.getData(true), errors.slice(-8));
+    collector.dispose();
+  });
+
   it('works', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
@@ -189,6 +221,42 @@ describe('PageCollector', () => {
 });
 
 describe('NetworkCollector', () => {
+  afterEach(() => sinon.restore());
+
+  it('applies both limits while retaining navigation requests', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const collector = new NetworkCollector(pptrPage, {
+      maxResourcesPerNavigation: 2,
+      maxNavigationSaved: 4,
+    });
+    const requests: HTTPRequest[] = [];
+    for (let navigation = 0; navigation < 6; navigation++) {
+      const request = getMockRequest({
+        navigationRequest: true,
+        frame: pptrPage.mainFrame(),
+      });
+      pptrPage.emit('request', request);
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+      for (let resource = 0; resource < 3; resource++) {
+        const request = getMockRequest();
+        pptrPage.emit('request', request);
+        if (resource > 0) {
+          requests.push(request);
+        }
+      }
+    }
+    assert.deepStrictEqual(collector.getData(), requests.slice(-2));
+    // The next navigation request arrives before framenavigated, evicting
+    // the oldest resource in each completed navigation.
+    assert.deepStrictEqual(collector.getData(true), [
+      requests[5],
+      requests[7],
+      requests[9],
+      ...requests.slice(-2),
+    ]);
+    collector.dispose();
+  });
+
   it('retains only the newest requests without navigation', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
@@ -337,6 +405,25 @@ describe('NetworkCollector', () => {
     assert.equal(collector.getData(true).length, 3);
   });
 
+  it('respects a custom maxNavigationSaved', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const collector = new NetworkCollector(page, {maxNavigationSaved: 5});
+
+    for (let i = 0; i < 7; i++) {
+      const req = getMockRequest({
+        url: `http://example.com/nav${i}`,
+        navigationRequest: true,
+        frame: mainFrame,
+      });
+      page.emit('request', req);
+      page.emit('framenavigated', mainFrame);
+    }
+
+    assert.equal(collector.getData(true).length, 5);
+  });
+
   it('bounds retained navigation buckets with redirects and subframes', async () => {
     class TestNetworkCollector extends NetworkCollector {
       get navigationSizes(): number[] {
@@ -347,7 +434,9 @@ describe('NetworkCollector', () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
-    const collector = new TestNetworkCollector(page, 3);
+    const collector = new TestNetworkCollector(page, {
+      maxResourcesPerNavigation: 3,
+    });
 
     const firstNavigation = getMockRequest({
       url: 'http://example.com/first',
@@ -434,6 +523,44 @@ describe('ConsoleCollector', () => {
   afterEach(() => {
     sinon.restore();
   });
+
+  for (const maxResourcesPerNavigation of [undefined, 2]) {
+    it(`retains a custom navigation history with resource limit ${maxResourcesPerNavigation}`, () => {
+      const pptrPage = createMockPuppeteerPage();
+      const collector = new ConsoleCollector(
+        pptrPage,
+        collect => ({
+          pageerror: error => {
+            if (error instanceof Error) {
+              collect(error);
+            }
+          },
+        }),
+        {maxResourcesPerNavigation, maxNavigationSaved: 4},
+      );
+      const errors: Error[] = [];
+      for (let navigation = 0; navigation < 6; navigation++) {
+        pptrPage.emit('framenavigated', pptrPage.mainFrame());
+        for (let resource = 0; resource < 3; resource++) {
+          const error = new Error(`${navigation}-${resource}`);
+          pptrPage.emit('pageerror', error);
+          if (maxResourcesPerNavigation === undefined || resource > 0) {
+            errors.push(error);
+          }
+        }
+      }
+      const retainedPerNavigation = maxResourcesPerNavigation ?? 3;
+      assert.deepStrictEqual(
+        collector.getData(),
+        errors.slice(-retainedPerNavigation),
+      );
+      assert.deepStrictEqual(
+        collector.getData(true),
+        errors.slice(-4 * retainedPerNavigation),
+      );
+      collector.dispose();
+    });
+  }
 
   it('collects issues', async () => {
     const browser = getMockBrowser();
@@ -558,7 +685,7 @@ describe('ConsoleCollector', () => {
           },
         } as ListenerMap;
       },
-      cap,
+      {maxResourcesPerNavigation: cap},
     );
 
     const messages = Array.from({length: cap + 3}, (_, i) =>

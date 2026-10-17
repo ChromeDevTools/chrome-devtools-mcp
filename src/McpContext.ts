@@ -73,6 +73,9 @@ export interface McpContextOptions {
   allowUnrestrictedPaths?: boolean;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
+  // Number of navigations (including the current one) for which network
+  // requests and console messages are retained per page.
+  maxNavigationSaved?: number;
   // Whether extension tools and targets are enabled.
   categoryExtensions?: boolean;
   // Callback when a notification should be emitted to MCP client.
@@ -681,6 +684,7 @@ export class McpContext implements Context, BrowserlessContext {
         ),
         navigationTimeout: this.#options.navigationTimeout,
         sourceMaps: this.#options.sourceMaps,
+        maxNavigationSaved: this.#options.maxNavigationSaved,
         onNotification: this.#options.onNotification,
       });
     }

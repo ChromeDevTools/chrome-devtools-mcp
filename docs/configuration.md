@@ -219,6 +219,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--maxNavigationSaved`/ `--max-navigation-saved`**
+  Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and 25. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.
+  - **Type:** number
+  - **Default:** `3`
+
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
   - **Type:** boolean

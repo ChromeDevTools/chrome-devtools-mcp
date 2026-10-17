@@ -9,6 +9,7 @@ import {afterEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {UncaughtError} from '../src/collectors/PageCollector.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
@@ -310,6 +311,54 @@ describe('McpPage', () => {
     afterEach(() => {
       sinon.restore();
     });
+
+    for (const replaceNetworkCollector of [false, true]) {
+      it(`forwards the navigation limit to collectors (replacement: ${replaceNetworkCollector})`, async () => {
+        const pptrPage = createMockPuppeteerPage();
+        const target = createMockPuppeteerTarget({page: pptrPage});
+        const mcpPage = new McpPage(target, 1, {
+          hasNetworkBlockOrAllowlist: false,
+          locatorClass: Locator,
+          maxNavigationSaved: 5,
+        });
+        await mcpPage.init();
+        if (replaceNetworkCollector) {
+          await mcpPage.setUpNetworkCollectorForTesting();
+        }
+        const requests = [];
+        const errors = [];
+        for (let navigation = 0; navigation < 7; navigation++) {
+          const request = getMockRequest({
+            url: `http://example.com/nav${navigation}`,
+            navigationRequest: true,
+            frame: pptrPage.mainFrame(),
+          });
+          requests.push(request);
+          pptrPage.emit('request', request);
+          pptrPage.emit('framenavigated', pptrPage.mainFrame());
+          const error = new UncaughtError(
+            {
+              exceptionId: navigation,
+              text: `error-${navigation}`,
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+            '<mock>',
+          );
+          errors.push(error);
+          pptrPage.emit('uncaughtError', error);
+        }
+        assert.deepStrictEqual(
+          mcpPage.networkCollector.getData(true),
+          requests.slice(-5),
+        );
+        assert.deepStrictEqual(
+          mcpPage.consoleCollector.getData(true),
+          errors.slice(-5),
+        );
+        mcpPage.dispose();
+      });
+    }
 
     it('does not initialize Puppeteer Page in constructor and throws if pptrPage is accessed before init()', async () => {
       const pptrPage = createMockPuppeteerPage();

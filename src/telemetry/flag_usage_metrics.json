@@ -470,5 +470,9 @@
   {
     "name": "screencast_fps_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "max_navigation_saved_present",
+    "flagType": "boolean"
   }
 ]

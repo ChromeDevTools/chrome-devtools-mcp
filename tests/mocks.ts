@@ -262,9 +262,8 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
 }
 
 export function createMockPuppeteerPage(): MockPuppeteerPage {
-  const page = sinon.createStubInstance(
-    CdpPage,
-  ) as unknown as sinon.SinonStubbedInstance<Page>;
+  const pptrPage = sinon.createStubInstance(CdpPage);
+  const page = pptrPage as unknown as sinon.SinonStubbedInstance<Page>;
   const pageListener = mockListener();
   page.listenerCount.callsFake(pageListener.listenerCount);
   page.on.callsFake((eventName, handler) => {
@@ -286,6 +285,7 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   // PageCollector can subscribe to FrameNavigatedWithinDocument and tests
   // can trigger it.
   const mainFrameStub = sinon.createStubInstance(CdpFrame);
+  mainFrameStub.page.returns(pptrPage);
   const mainFrameListener = mockListener();
   mainFrameStub.on.callsFake((eventName, handler) => {
     mainFrameListener.on(eventName, handler);

@@ -24,6 +24,8 @@ import {
 } from '../utils/id.js';
 import {logger} from '../utils/logger.js';
 
+import {DEFAULT_MAX_NAVIGATION_SAVED} from './constants.js';
+
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
   readonly targetId: string;
@@ -51,12 +53,18 @@ export type ListenerMap<EventMap extends PageEvents = PageEvents> = {
   ]?: (event: EventMap[K]) => void;
 };
 
+export interface PageCollectorOptions {
+  maxResourcesPerNavigation?: number;
+  maxNavigationSaved?: number;
+}
+
 export class PageCollector<T> {
   protected pptrPage: Page;
   #listeners?: ListenerMap<PageEvents>;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
-  protected maxNavigationSaved = 3;
+  static readonly MAX_NAVIGATION_SAVED = DEFAULT_MAX_NAVIGATION_SAVED;
+  protected readonly maxNavigationSaved: number;
 
   /**
    * This maps a Page to a list of navigations with a sub-list
@@ -68,9 +76,13 @@ export class PageCollector<T> {
   constructor(
     page: Page,
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
-    maxResourcesPerNavigation?: number,
+    {
+      maxResourcesPerNavigation,
+      maxNavigationSaved = PageCollector.MAX_NAVIGATION_SAVED,
+    }: PageCollectorOptions = {},
   ) {
     this.pptrPage = page;
+    this.maxNavigationSaved = maxNavigationSaved;
     this.#attachFrameNavigatedWithinDocumentListener();
 
     const idGenerator = createIdGenerator();
@@ -213,9 +225,12 @@ export class ConsoleCollector extends PageCollector<
         item: ConsoleMessage | Error | DevTools.AggregatedIssue | UncaughtError,
       ) => void,
     ) => ListenerMap<PageEvents>,
-    maxMessagesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
+    {
+      maxResourcesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
+      maxNavigationSaved,
+    }: PageCollectorOptions = {},
   ) {
-    super(page, listeners, maxMessagesPerNavigation);
+    super(page, listeners, {maxResourcesPerNavigation, maxNavigationSaved});
     this.#subscriber = new PageEventSubscriber(this.pptrPage);
     this.#subscriber.subscribe();
   }
@@ -386,7 +401,10 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
 
   constructor(
     page: Page,
-    maxRequestsPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
+    {
+      maxResourcesPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
+      maxNavigationSaved,
+    }: PageCollectorOptions = {},
     listeners: (
       collector: (item: HTTPRequest) => void,
     ) => ListenerMap<PageEvents> = collect => {
@@ -397,7 +415,7 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
       } as ListenerMap;
     },
   ) {
-    super(page, listeners, maxRequestsPerNavigation);
+    super(page, listeners, {maxResourcesPerNavigation, maxNavigationSaved});
   }
   override splitAfterNavigation(): void {
     const requests = this.storage[0];

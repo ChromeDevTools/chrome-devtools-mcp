@@ -8,11 +8,13 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import {PageCollector} from '../src/collectors/PageCollector.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {
   getCliOptions,
   mcpOptions,
   DEFAULT_FILESYSTEM_ROOT,
+  MAX_NAVIGATION_SAVED_LIMIT,
 } from '../src/config/mcp-options.js';
 import {
   buildCommand,
@@ -64,6 +66,7 @@ describe('cli args parsing', () => {
     experimentalStructuredContent: false,
     pageIdRouting: true,
     sourceMaps: true,
+    maxNavigationSaved: 3,
     clearcutIncludePidHeader: false,
     screenshotFormat: 'png',
     slim: false,
@@ -692,6 +695,52 @@ describe('cli args parsing', () => {
 
     const explicitTrueArgs = parseConfig(['--source-maps=true']);
     assert.strictEqual(explicitTrueArgs.sourceMaps, true);
+  });
+
+  it('parses maxNavigationSaved flag', async () => {
+    const defaultParsed = parseConfig(['main.js']);
+    assert.strictEqual(defaultParsed.maxNavigationSaved, 3);
+    assert.strictEqual(
+      defaultParsed.maxNavigationSaved,
+      PageCollector.MAX_NAVIGATION_SAVED,
+    );
+
+    const camelCaseArgs = parseConfig(['--maxNavigationSaved', '5']);
+    assert.strictEqual(camelCaseArgs.maxNavigationSaved, 5);
+
+    const kebabCaseArgs = parseConfig(['--max-navigation-saved=1']);
+    assert.strictEqual(kebabCaseArgs.maxNavigationSaved, 1);
+
+    assert.throws(
+      () => parseConfig(['--maxNavigationSaved', '26']),
+      /Invalid maxNavigationSaved 26/,
+    );
+  });
+
+  it('rejects invalid maxNavigationSaved values', async () => {
+    const coerce = mcpOptions.maxNavigationSaved.coerce;
+
+    assert.strictEqual(coerce(undefined), undefined);
+    assert.strictEqual(coerce(1), 1);
+    assert.strictEqual(
+      coerce(MAX_NAVIGATION_SAVED_LIMIT),
+      MAX_NAVIGATION_SAVED_LIMIT,
+    );
+
+    for (const value of [
+      0,
+      -1,
+      2.5,
+      Number.NaN,
+      MAX_NAVIGATION_SAVED_LIMIT + 1,
+      Number.MAX_SAFE_INTEGER,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      assert.throws(
+        () => coerce(value),
+        /Invalid maxNavigationSaved .* Expected an integer between 1 and 25\./,
+      );
+    }
   });
 
   it('parses config option', async () => {
