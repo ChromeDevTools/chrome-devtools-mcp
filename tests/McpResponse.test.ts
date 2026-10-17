@@ -363,9 +363,9 @@ describe('McpResponse', () => {
       });
     });
 
-    it('truncates a long page title without splitting a surrogate pair', async () => {
+    it('truncates a long page title on grapheme boundaries', async () => {
       await withMcpContext(async (response, context) => {
-        // 46 + 1 emoji: the 47-unit cut lands between the emoji's surrogates.
+        // 46 letters + 1 emoji grapheme + more: truncate keeps whole graphemes.
         const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
         server.addHtmlRoute(
           '/emoji-title.html',
@@ -379,7 +379,7 @@ describe('McpResponse', () => {
         const text = getTextContent(res.content[0]);
         assert.ok(
           text.includes(
-            `${'A'.repeat(46)}... (${server.getRoute('/emoji-title.html')})`,
+            `${'A'.repeat(46)}\u{1F600}... (${server.getRoute('/emoji-title.html')})`,
           ),
           text,
         );
