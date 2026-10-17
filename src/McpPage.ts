@@ -37,6 +37,7 @@ import type {
   DevToolsData,
   MatchedStyles,
   Response,
+  ScreenRecorderData,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -170,7 +171,8 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  eventBasedThirdPartyTools: ToolGroups = [];
+  // Screencast
+  #screenRecorder: ScreenRecorderData | null = null;
 
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
@@ -371,6 +373,14 @@ export class McpPage implements ContextPage {
     this.#dialog = undefined;
   }
 
+  getScreenRecorder(): ScreenRecorderData | null {
+    return this.#screenRecorder;
+  }
+
+  setScreenRecorder(data: ScreenRecorderData | null): void {
+    this.#screenRecorder = data;
+  }
+
   throwIfDialogOpen(): void {
     if (this.#dialog && !this.#dialog.handled) {
       throw new Error(
@@ -399,14 +409,7 @@ export class McpPage implements ContextPage {
     ];
   }
 
-  getThirdPartyDeveloperTools(): ToolGroups {
-    return [
-      ...this.#getDebuggingWebMcpToolGroups(),
-      ...this.eventBasedThirdPartyTools,
-    ];
-  }
-
-  async getToolGroups(): Promise<ToolGroups> {
+  async discoverThirdPartyDeveloperTools(): Promise<ToolGroups> {
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
@@ -416,8 +419,7 @@ export class McpPage implements ContextPage {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      this.eventBasedThirdPartyTools = [];
-      return this.getThirdPartyDeveloperTools();
+      return this.#getDebuggingWebMcpToolGroups();
     }
 
     const eventToolGroups = await this.pptrPage.evaluate(() => {
@@ -503,9 +505,7 @@ export class McpPage implements ContextPage {
       }
     }
 
-    this.eventBasedThirdPartyTools = eventToolGroups;
-
-    return this.getThirdPartyDeveloperTools();
+    return [...this.#getDebuggingWebMcpToolGroups(), ...eventToolGroups];
   }
 
   getWebMcpTools(): WebMCPTool[] {
@@ -664,6 +664,13 @@ export class McpPage implements ContextPage {
     this.#disposed = true;
     this.#commentBridge?.dispose();
     this.#commentBridge = undefined;
+    if (this.#screenRecorder) {
+      const {recorder} = this.#screenRecorder;
+      this.#screenRecorder = null;
+      void recorder.stop().catch(e => {
+        logger?.('Failed to stop screencast recording on dispose', e);
+      });
+    }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
@@ -1071,7 +1078,6 @@ export class McpPage implements ContextPage {
       await this.ensureDevToolsCommentBridge(devtoolsPage);
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
-          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
@@ -1097,6 +1103,19 @@ export class McpPage implements ContextPage {
 
   async restoreEmulation(): Promise<void> {
     const currentSetting = this.emulationSettings;
+    const {viewport} = currentSetting;
+    if (viewport) {
+      // Lighthouse's CDP session replaces the device metrics override and
+      // clears it on detach, and Chrome ignores an override identical to the
+      // last one this session sent. A different width first makes the real
+      // call take effect without a reload (`isMobile` and `hasTouch` stay the
+      // same). This also runs after snapshot audits and fires a resize event,
+      // so do not remove it as redundant.
+      await this.pptrPage.setViewport({
+        ...viewport,
+        width: Math.max(1, viewport.width - 1),
+      });
+    }
     await this.emulate(currentSetting);
   }
 
@@ -1241,13 +1260,26 @@ export class McpPage implements ContextPage {
       }
     }
 
+    const previousViewport = this.emulationSettings.viewport;
     this.emulationSettings = Object.keys(newSettings).length ? newSettings : {};
 
     this.updateTimeouts();
 
     // This should happen after updating the page timeouts.
     // Setting the viewport can trigger a reload which we don't want to timeout.
-    await page.setViewport(newSettings.viewport ?? null);
+    try {
+      await page.setViewport(newSettings.viewport ?? null);
+    } catch (error) {
+      if (previousViewport) {
+        newSettings.viewport = previousViewport;
+      } else {
+        delete newSettings.viewport;
+      }
+      this.emulationSettings = Object.keys(newSettings).length
+        ? newSettings
+        : {};
+      throw error;
+    }
   }
 
   updateTimeouts(): void {

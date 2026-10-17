@@ -44,6 +44,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
 
+// Lighthouse's navigation mode only accepts the URL schemes in
+// `allowedProtocols` (core/lib/url-utils.js) and throws a bare `INVALID_URL`
+// for anything else, such as file:// or about:blank.
+const isInvalidUrlError = (error: unknown): boolean => {
+  return isRecord(error) && error.code === 'INVALID_URL';
+};
+
 const getString = (value: unknown): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
@@ -233,13 +240,20 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        result = await lighthouseRunner.navigation(
-          page.pptrPage,
-          page.pptrPage.url(),
-          {
+        const url = page.pptrPage.url();
+        try {
+          result = await lighthouseRunner.navigation(page.pptrPage, url, {
             flags,
-          },
-        );
+          });
+        } catch (error) {
+          if (isInvalidUrlError(error)) {
+            throw new Error(
+              `Lighthouse "navigation" mode cannot audit ${url}: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.`,
+              {cause: error},
+            );
+          }
+          throw error;
+        }
       } else {
         result = await lighthouseRunner.snapshot(page.pptrPage, {
           flags,
@@ -258,7 +272,7 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
 
     const encoder = new TextEncoder();
     const savePromises = formats.map(async format => {
-      const report = generateReport(lhr, format);
+      const report = await generateReport(lhr, format);
       const data = encoder.encode(report);
       if (outputDirPath) {
         const reportPath = path.join(outputDirPath, `report`);
@@ -282,6 +296,13 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
         throw res.reason;
       }
       reportPaths.push(res.value);
+    }
+
+    // Lighthouse sets runtimeError when it could not load the page; the categories are unscored.
+    if (lhr.runtimeError) {
+      throw new Error(
+        `Lighthouse could not audit the page (${lhr.runtimeError.code}): ${lhr.runtimeError.message} Reports: ${reportPaths.join(', ')}`,
+      );
     }
 
     const categoryScores = Object.values(lhr.categories).map(c => ({

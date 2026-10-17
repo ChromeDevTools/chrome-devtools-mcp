@@ -17,10 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+        # Run Windows and macOS tests only on release PRs or on PRs with the
+        # `full-ci` label.
+        os: ${{ fromJSON((startsWith(github.head_ref, 'release-please') || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest"]') }}
         node:
           - 22
           - 24

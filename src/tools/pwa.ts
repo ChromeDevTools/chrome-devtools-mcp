@@ -56,6 +56,9 @@ export const installPwa = defineTool(() => ({
     installUrlOrBundleUrl: {
       local: true,
       remote: false,
+      // May be an http(s):// or file:// signed web bundle URL handed to the
+      // browser, so allow URLs through; a plain path is still validated.
+      allowUrl: true,
     },
   },
   handler: async (request, response, context) => {

@@ -405,7 +405,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          uid=1_5 InlineTextBox "test"
+          InlineTextBox "test"
 
 `;
 
@@ -435,7 +435,6 @@ exports[`McpResponse > returns verbose snapshot and structured content 2`] = `
                     "name": "test",
                     "children": [
                       {
-                        "id": "1_5",
                         "role": "InlineTextBox",
                         "name": "test"
                       }
@@ -468,7 +467,7 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          uid=1_5 InlineTextBox "test"
+          InlineTextBox "test"
 
 `;
 
@@ -1467,6 +1466,17 @@ exports[`lighthouse > rounds category scores and shows unscored categories as n/
       "/tmp/report.html"
     ]
   }
+}
+`;
+
+exports[`third-party developer tools > lists no third-party developer tools if there are none 1`] = `
+## Third-party developer tools
+No third-party developer tools available.
+`;
+
+exports[`third-party developer tools > lists no third-party developer tools if there are none 2`] = `
+{
+  "thirdPartyDeveloperTools": []
 }
 `;
 

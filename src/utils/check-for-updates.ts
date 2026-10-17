@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
-import {semver} from '../third_party/index.js';
+import {semver} from '../third_party/cli.js';
 import {VERSION} from '../version.js';
 
 /**

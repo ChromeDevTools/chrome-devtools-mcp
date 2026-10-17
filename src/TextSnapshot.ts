@@ -73,20 +73,22 @@ export class TextSnapshot {
     const assignIds = (node: SerializedAXNode): TextSnapshotNode => {
       let id = '';
       // @ts-expect-error untyped backendNodeId.
-      const backendNodeId: number = node.backendNodeId;
-      // @ts-expect-error untyped loaderId.
-      const uniqueBackendId = `${node.loaderId}_${backendNodeId}`;
-      const existingMcpId = uniqueBackendNodeIdToMcpId.get(uniqueBackendId);
-      if (existingMcpId !== undefined) {
-        // Re-use MCP exposed ID if the uniqueId is the same.
-        id = existingMcpId;
-      } else {
-        // Only generate a new ID if we have not seen the node before.
-        id = `${snapshotId}_${idCounter++}`;
-        uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+      const backendNodeId: number | undefined = node.backendNodeId;
+      if (backendNodeId !== undefined) {
+        // @ts-expect-error untyped loaderId.
+        const uniqueBackendId = `${node.loaderId}_${backendNodeId}`;
+        const existingMcpId = uniqueBackendNodeIdToMcpId.get(uniqueBackendId);
+        if (existingMcpId !== undefined) {
+          // Re-use MCP exposed ID if the uniqueId is the same.
+          id = existingMcpId;
+        } else {
+          // Only generate a new ID if we have not seen the node before.
+          id = `${snapshotId}_${idCounter++}`;
+          uniqueBackendNodeIdToMcpId.set(uniqueBackendId, id);
+        }
+        seenUniqueIds.add(uniqueBackendId);
+        seenBackendNodeIds.add(backendNodeId);
       }
-      seenUniqueIds.add(uniqueBackendId);
-      seenBackendNodeIds.add(backendNodeId);
 
       const nodeWithId: TextSnapshotNode = {
         ...node,
@@ -105,7 +107,9 @@ export class TextSnapshot {
         }
       }
 
-      idToNode.set(nodeWithId.id, nodeWithId);
+      if (id) {
+        idToNode.set(nodeWithId.id, nodeWithId);
+      }
       return nodeWithId;
     };
 

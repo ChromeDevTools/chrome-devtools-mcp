@@ -228,6 +228,23 @@ describe('script', () => {
         pathToFileURL(sourcePath).href,
       );
     });
+    it('throws without evaluating if a dialog is already open', async () => {
+      const {page, response, context, args} = createHandlerMocks();
+      page.throwIfDialogOpen.throws(
+        new Error('A dialog is open (alert: hello).'),
+      );
+      await assert.rejects(
+        evaluateScript(args).handler(
+          {params: {function: '() => 1'}},
+          response,
+          context,
+        ),
+        {message: 'A dialog is open (alert: hello).'},
+      );
+      sinon.assert.calledOnceWithExactly(page.throwIfDialogOpen);
+      sinon.assert.callOrder(page.init, page.throwIfDialogOpen);
+      sinon.assert.notCalled(page.waitForEventsAfterAction);
+    });
     it('skips the stable DOM wait when waitForStableDom is false', async () => {
       await withMcpContext(async (response, context, args) => {
         const spy = sinon.spy(WaitForHelper.prototype, 'waitForStableDom');

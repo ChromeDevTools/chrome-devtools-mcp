@@ -302,6 +302,7 @@ describe('performance', () => {
           .stub(context, 'saveFile')
           .resolves({filename: filePath});
 
+        const clock = sinon.useFakeTimers({toFake: ['setTimeout']});
         const handlerPromise = startTrace(args).handler(
           {
             params: {reload: true, autoStop: true, filePath},
@@ -311,10 +312,10 @@ describe('performance', () => {
           context,
         );
         // In the handler we wait 5 seconds after the page load event (which is
-        // what DevTools does), hence we now fake-progress time to allow
-        // the handler to complete. We allow extra time because the Trace
-        // Engine also uses some timers to yield updates and we need those to
-        // execute.
+        // what DevTools does). Fake only this wait, then return to real timers:
+        // gzip runs on the thread pool, and trace parsing after it uses timers.
+        await clock.tickAsync(5_000);
+        clock.restore();
         await handlerPromise;
 
         assert.ok(
@@ -392,7 +393,7 @@ describe('performance', () => {
   });
 
   describe('performance_stop_trace', () => {
-    it('does nothing if the trace is not running and does not error', async () => {
+    it('returns an error message if no trace is running', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.isRunningPerformanceTrace.returns(false);
 
@@ -400,7 +401,10 @@ describe('performance', () => {
 
       sinon.assert.notCalled(context.setIsRunningPerformanceTrace);
       sinon.assert.notCalled(context.storeTraceRecording);
-      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Error: no active performance trace recording to stop.',
+      );
     });
 
     it('will stop the trace and return trace info when a trace is running', async () => {
