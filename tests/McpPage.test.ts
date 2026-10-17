@@ -1021,6 +1021,73 @@ describe('McpPage', () => {
         assert.ok(element);
       });
     });
+
+    it('preserves default matching for hidden DOM text', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          '<p style="display:none">Saved successfully</p>',
+        );
+
+        const element = await mcpPage.waitForTextOnPage(
+          ['Saved successfully'],
+          500,
+        );
+        assert.ok(element);
+      });
+    });
+
+    it('waits for hidden text to become visible when requested', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent(
+          '<p id="saved" style="display:none">Saved successfully</p>',
+        );
+
+        const start = Date.now();
+        await page.evaluate(() => {
+          setTimeout(() => {
+            document.getElementById('saved')!.style.display = 'block';
+          }, 250);
+        });
+        const element = await mcpPage.waitForTextOnPage(
+          ['Saved successfully'],
+          1500,
+          true,
+        );
+        assert.ok(element);
+        assert.ok(Date.now() - start >= 200);
+      });
+    });
+
+    it('times out when visible text never appears', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          '<p style="display:none">Saved successfully</p>',
+        );
+
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Saved successfully'], 300, true),
+          /Timed out/,
+        );
+      });
+    });
+
+    it('visible text remains immediately matchable when requested', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent('<p>Visible from the start</p>');
+        assert.ok(
+          await mcpPage.waitForTextOnPage(
+            ['Visible from the start'],
+            500,
+            true,
+          ),
+        );
+      });
+    });
   });
 
   describe('DevToolsCommentBridge lifecycle', () => {
