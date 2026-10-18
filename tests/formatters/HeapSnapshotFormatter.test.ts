@@ -68,7 +68,7 @@ describe('HeapSnapshotFormatter', () => {
       const name = 'a'.repeat(MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
       assert.strictEqual(
         formatName(name, {}),
-        'a'.repeat(MAX_NAME_LENGTH - 1) + '...',
+        'a'.repeat(MAX_NAME_LENGTH - 1) + '\u{1F600}...',
       );
     });
 

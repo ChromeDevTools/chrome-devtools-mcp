@@ -140,7 +140,7 @@ describe('NetworkFormatter', () => {
     });
 
     it('does not split a surrogate pair when truncating a url', async () => {
-      // 254 code units, then an emoji straddling the 255 limit.
+      // 254 characters, then an emoji straddling the 255 code unit mark.
       const prefix = `http://example.com/${'a'.repeat(235)}`;
       const url = `${prefix}\u{1F600}${'b'.repeat(20)}`;
       const request = getMockRequest({url});
@@ -152,7 +152,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        `reqid=1 GET ${prefix}... <truncated> [pending]`,
+        `reqid=1 GET ${prefix}\u{1F600}... <truncated> [pending]`,
       );
     });
 

@@ -24,22 +24,40 @@ export function substitutePlaceholders(
 }
 
 /**
- * Returns the first `maxLength` UTF-16 code units of `text`, one fewer if the
- * cut would separate a surrogate pair. A lone surrogate is serialized by
- * `JSON.stringify` as an escape like `\ud83d` that strict JSON parsers, such as
- * the one the Python MCP SDK uses, reject.
+ * Truncates `text` to at most `maxLength` grapheme clusters and appends
+ * `ellipsis` when anything was cut off. Cutting on grapheme boundaries keeps
+ * surrogate pairs and emoji sequences whole, so the result never contains a
+ * lone surrogate, which `JSON.stringify` serializes as an escape like `\ud83d`
+ * that strict JSON parsers (such as the one the Python MCP SDK uses) reject.
+ *
+ * With `includeEllipsisInLength`, the ellipsis counts toward `maxLength`.
  */
-export function sliceWithoutSplittingSurrogates(
+export function truncateText(
   text: string,
   maxLength: number,
+  {
+    ellipsis = '...',
+    includeEllipsisInLength = false,
+  }: {ellipsis?: string; includeEllipsisInLength?: boolean} = {},
 ): string {
-  const end = Math.max(0, maxLength);
-  if (end >= text.length) {
+  // A grapheme cluster is at least one UTF-16 code unit long.
+  if (text.length <= maxLength) {
     return text;
   }
-  const last = text.charCodeAt(end - 1);
-  const next = text.charCodeAt(end);
-  const splitsPair =
-    last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff;
-  return text.slice(0, splitsPair ? end - 1 : end);
+  const keep = includeEllipsisInLength
+    ? Math.max(0, maxLength - ellipsis.length)
+    : maxLength;
+  const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+  let count = 0;
+  let cut = 0;
+  for (const {index} of segmenter.segment(text)) {
+    if (count === keep) {
+      cut = index;
+    }
+    if (count === maxLength) {
+      return text.slice(0, cut) + ellipsis;
+    }
+    count++;
+  }
+  return text;
 }
