@@ -619,6 +619,105 @@ describe('input', () => {
   });
 
   describe('fill', () => {
+    for (const {name, content, value, previousValue, error, useForm} of [
+      {
+        name: 'rejects a read-only input without changing its value',
+        content: html`<input
+          readonly
+          value="fixed"
+        />`,
+        value: 'changed',
+        previousValue: 'fixed',
+        error: /uid 1_1.*read-only/,
+      },
+      {
+        name: 'rejects a read-only textarea without changing its value',
+        content: html`<textarea readonly>fixed</textarea>`,
+        value: 'changed',
+        previousValue: 'fixed',
+        error: /uid 1_1.*read-only/,
+      },
+      {
+        name: 'restores a date input when it rejects the value',
+        content: html`<input
+          type="date"
+          value="2020-01-01"
+        />`,
+        value: 'next tuesday',
+        previousValue: '2020-01-01',
+        error: /uid 1_1.*The element did not accept the value "next tuesday"/,
+      },
+      {
+        name: 'restores a number input when it rejects the value',
+        content: html`<input
+          type="number"
+          value="7"
+        />`,
+        value: 'abc',
+        previousValue: '7',
+        error: /uid 1_1.*The element did not accept the value "abc"/,
+      },
+      {
+        name: 'reports a rejected value when the input was already empty',
+        content: html`<input type="number" />`,
+        value: 'abc',
+        previousValue: '',
+        error: /uid 1_1.*The element did not accept the value "abc"/,
+      },
+      {
+        name: 'restores a rejected value through fill_form',
+        content: html`<input
+          type="date"
+          value="2020-01-01"
+        />`,
+        value: 'next tuesday',
+        previousValue: '2020-01-01',
+        error: /uid 1_1.*The element did not accept the value "next tuesday"/,
+        useForm: true,
+      },
+    ]) {
+      it(name, async () => {
+        await withMcpContext(async (response, context, args) => {
+          const page = context.getSelectedMcpPage().pptrPage;
+          await page.setContent(content);
+          context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+            context.getSelectedMcpPage(),
+          );
+          await assert.rejects(
+            () =>
+              useForm
+                ? fillForm(args).handler(
+                    {
+                      params: {elements: [{uid: '1_1', value}]},
+                      page: context.getSelectedMcpPage(),
+                    },
+                    response,
+                    context,
+                  )
+                : fill(args).handler(
+                    {
+                      params: {uid: '1_1', value},
+                      page: context.getSelectedMcpPage(),
+                    },
+                    response,
+                    context,
+                  ),
+            error,
+          );
+          assert.strictEqual(
+            await page.evaluate(
+              () =>
+                document.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+                  'input, textarea',
+                )?.value,
+            ),
+            previousValue,
+          );
+          assert.deepStrictEqual(response.responseLines, []);
+        });
+      });
+    }
+
     it('fills out an input', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

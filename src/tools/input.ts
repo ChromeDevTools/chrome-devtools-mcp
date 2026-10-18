@@ -367,6 +367,21 @@ async function fillFormElements(
               );
             }
           } else {
+            const previousValue = await raceWithSignal(
+              handle.evaluate(el => {
+                if (
+                  el instanceof HTMLInputElement ||
+                  el instanceof HTMLTextAreaElement
+                ) {
+                  if (el.readOnly) {
+                    throw new Error('The element is read-only.');
+                  }
+                  return el.value;
+                }
+                return undefined;
+              }),
+              signal,
+            );
             // Increase timeout for longer input values.
             const timeoutPerChar = 10; // ms
             const fillTimeout =
@@ -375,6 +390,28 @@ async function fillFormElements(
               .asLocator()
               .setTimeout(fillTimeout)
               .fill(value, {signal});
+            await raceWithSignal(
+              handle.evaluate(
+                (el, value, previousValue) => {
+                  if (
+                    (el instanceof HTMLInputElement ||
+                      el instanceof HTMLTextAreaElement) &&
+                    value !== '' &&
+                    el.value === ''
+                  ) {
+                    if (previousValue) {
+                      el.value = previousValue;
+                    }
+                    throw new Error(
+                      `The element did not accept the value "${value}".`,
+                    );
+                  }
+                },
+                value,
+                previousValue,
+              ),
+              signal,
+            );
           }
         }
         signal.throwIfAborted();
