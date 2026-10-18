@@ -37,6 +37,33 @@ describe('script', () => {
   const server = serverHooks();
 
   describe('browser_evaluate_script', () => {
+    it('emulates focus before evaluating on an untouched background page', async () => {
+      const focusStates: boolean[] = [];
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        const foregroundPage = await context.browser.newPage();
+        await foregroundPage.bringToFront();
+        focusStates.push(
+          await page.pptrPage.evaluate(() => document.hasFocus()),
+        );
+
+        await evaluateScript(args).handler(
+          {
+            params: {
+              pageId: page.id,
+              function: '() => document.hasFocus()',
+              waitForStableDom: false,
+            },
+          },
+          response,
+          context,
+        );
+
+        focusStates.push(JSON.parse(response.responseLines.at(2) ?? 'null'));
+      });
+      assert.deepStrictEqual(focusStates, [false, true]);
+    });
+
     it('evaluates', async () => {
       await withMcpContext(async (response, context, args) => {
         await evaluateScript(args).handler(

@@ -844,7 +844,8 @@ export class McpContext implements Context, BrowserlessContext {
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {
-      await this.#selectedPage.init();
+      // Preserve real focus on untouched tabs during discovery and fallback selection.
+      await this.#selectedPage.init({emulateFocus: false});
     }
 
     return pages;
