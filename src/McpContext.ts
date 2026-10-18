@@ -844,7 +844,7 @@ export class McpContext implements Context, BrowserlessContext {
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {
-      // Listing pages must not make untouched background tabs report focus.
+      // Automatic page snapshots must preserve real focus on untouched tabs.
       await this.#selectedPage.init({emulateFocus: false});
     }
 
