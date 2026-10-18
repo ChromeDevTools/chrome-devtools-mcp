@@ -11,15 +11,12 @@ import {describe, it} from 'node:test';
 import ts from 'typescript';
 
 import type {ParsedArguments} from '../../src/config/ConfigParser.js';
+import {LogpointFormatter} from '../../src/formatters/LogpointFormatter.js';
 import type {McpContext} from '../../src/McpContext.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {listConsoleMessages} from '../../src/tools/console.js';
-import {
-  listLogpoints,
-  listScripts,
-  removeLogpoint,
-  setLogpoint,
-} from '../../src/tools/logpoints.js';
+import {parseLogpoint} from '../../src/LogpointManager.js';
+import {setLogpoints} from '../../src/tools/logpoints.js';
 import {serverHooks} from '../server.js';
 import {
   getTextContent,
@@ -135,6 +132,36 @@ function evaluateWithTimeout(
   ]);
 }
 
+interface LogpointParams {
+  url: string;
+  lineNumber: number;
+  columnNumber?: number;
+  expression: string;
+}
+
+function formatLogpointParam(logpoint: LogpointParams): string {
+  const column =
+    logpoint.columnNumber === undefined ? '' : `:${logpoint.columnNumber}`;
+  return `${logpoint.url}:${logpoint.lineNumber}${column} ${logpoint.expression}`;
+}
+
+async function callSetLogpoints(
+  context: McpContext,
+  args: ParsedArguments,
+  logpoints: LogpointParams[],
+): Promise<McpResponse> {
+  const response = new McpResponse(args);
+  await setLogpoints(args).handler(
+    {
+      params: {logpoints: logpoints.map(formatLogpointParam)},
+      page: context.getSelectedMcpPage(),
+    },
+    response,
+    context,
+  );
+  return response;
+}
+
 describe('logpoints', () => {
   const server = serverHooks();
 
@@ -143,28 +170,24 @@ describe('logpoints', () => {
     server.addHtmlRoute('/', html`<script src="/app.js"></script>`);
   }
 
-  describe('set_logpoint', () => {
+  describe('set_logpoints', () => {
     it('logs the expression when the line executes', async () => {
       await withMcpContext(async (response, context, args) => {
         setupRoutes();
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/'));
 
-        await setLogpoint(args).handler(
+        response = await callSetLogpoints(context, args, [
           {
-            params: {
-              url: server.getRoute('/app.js'),
-              lineNumber: 2,
-              expression: `'greeting for', name`,
-            },
-            page: context.getSelectedMcpPage(),
+            url: server.getRoute('/app.js'),
+            lineNumber: 2,
+            expression: `'greeting for', name`,
           },
-          response,
-          context,
-        );
+        ]);
 
         assert.ok(
-          response.responseLines[0].includes('[bound]'),
+          response.responseLines[0].includes('1 logpoint(s)') &&
+            response.responseLines[0].includes('[bound]'),
           `Expected a bound logpoint, got: ${response.responseLines[0]}`,
         );
 
@@ -179,18 +202,9 @@ describe('logpoints', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/'));
 
-        await setLogpoint(args).handler(
-          {
-            params: {
-              url: 'app.js',
-              lineNumber: 2,
-              expression: `'suffix match', name`,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
+        response = await callSetLogpoints(context, args, [
+          {url: 'app.js', lineNumber: 2, expression: `'suffix match', name`},
+        ]);
 
         assert.ok(
           response.responseLines[0].includes(server.getRoute('/app.js')),
@@ -207,18 +221,13 @@ describe('logpoints', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/'));
 
-        await setLogpoint(args).handler(
+        await callSetLogpoints(context, args, [
           {
-            params: {
-              url: server.getRoute('/app.js'),
-              lineNumber: 2,
-              expression: `'after reload', name`,
-            },
-            page: context.getSelectedMcpPage(),
+            url: server.getRoute('/app.js'),
+            lineNumber: 2,
+            expression: `'after reload', name`,
           },
-          response,
-          context,
-        );
+        ]);
 
         await page.reload();
         await page.evaluate(`greet('Again')`);
@@ -232,18 +241,13 @@ describe('logpoints', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/'));
 
-        await setLogpoint(args).handler(
+        await callSetLogpoints(context, args, [
           {
-            params: {
-              url: server.getRoute('/app.js'),
-              lineNumber: 2,
-              expression: `'logpoint is set'`,
-            },
-            page: context.getSelectedMcpPage(),
+            url: server.getRoute('/app.js'),
+            lineNumber: 2,
+            expression: `'logpoint is set'`,
           },
-          response,
-          context,
-        );
+        ]);
 
         const result = await evaluateWithTimeout(
           context,
@@ -268,43 +272,37 @@ describe('logpoints', () => {
         await page.goto(server.getRoute('/'));
 
         await assert.rejects(
-          setLogpoint(args).handler(
+          callSetLogpoints(context, args, [
             {
-              params: {
-                url: server.getRoute('/app.js'),
-                lineNumber: 2,
-                expression: `'unbalanced', (`,
-              },
-              page: context.getSelectedMcpPage(),
+              url: server.getRoute('/app.js'),
+              lineNumber: 2,
+              expression: `'unbalanced', (`,
             },
-            response,
-            context,
-          ),
+          ]),
           /does not compile/,
         );
       });
     });
 
-    it('rejects locations that match no script', async () => {
+    it('rejects locations that match no script and suggests similar files', async () => {
       await withMcpContext(async (response, context, args) => {
         setupRoutes();
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/'));
 
         await assert.rejects(
-          setLogpoint(args).handler(
-            {
-              params: {
-                url: 'nonexistent.js',
-                lineNumber: 2,
-                expression: `'never'`,
-              },
-              page: context.getSelectedMcpPage(),
-            },
-            response,
-            context,
+          callSetLogpoints(context, args, [
+            {url: 'nonexistent.js', lineNumber: 2, expression: `'never'`},
+          ]),
+          /No parsed script or original source file matches "nonexistent.js"/,
+        );
+        await assert.rejects(
+          callSetLogpoints(context, args, [
+            {url: 'other/app.js', lineNumber: 2, expression: `'never'`},
+          ]),
+          new RegExp(
+            `Sources with the same file name: ${server.getRoute('/app.js')}`,
           ),
-          /No parsed script or original source file matches "nonexistent.js".*list_scripts/,
         );
       });
     });
@@ -315,28 +313,17 @@ describe('logpoints', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/'));
 
-        const params = {
-          url: server.getRoute('/app.js'),
-          lineNumber: 2,
-          expression: `'first', name`,
-        };
-        await setLogpoint(args).handler(
-          {params, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        response.resetResponseLineForTesting();
-        await setLogpoint(args).handler(
-          {
-            params: {...params, expression: `'second', name`},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
+        const location = {url: server.getRoute('/app.js'), lineNumber: 2};
+        await callSetLogpoints(context, args, [
+          {...location, expression: `'first', name`},
+        ]);
+        response = await callSetLogpoints(context, args, [
+          {...location, expression: `'second', name`},
+        ]);
         assert.ok(
-          response.responseLines[0].startsWith('Logpoint 1 at'),
-          `Expected the same logpoint id, got: ${response.responseLines[0]}`,
+          response.responseLines[0].includes('1 logpoint(s)') &&
+            response.responseLines[0].includes("`'second', name`"),
+          `Expected one logpoint with the new expression, got: ${response.responseLines[0]}`,
         );
 
         await page.evaluate(`greet('World')`);
@@ -346,14 +333,55 @@ describe('logpoints', () => {
           !text.includes('first World'),
           `Expected the first expression to be replaced, got:\n${text}`,
         );
+      });
+    });
 
-        response.resetResponseLineForTesting();
-        await listLogpoints(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
+    it('removes logpoints that are left out of the list', async () => {
+      await withMcpContext(async (response, context, args) => {
+        setupRoutes();
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.goto(server.getRoute('/'));
+
+        const url = server.getRoute('/app.js');
+        response = await callSetLogpoints(context, args, [
+          {url, lineNumber: 2, expression: `'line 2'`},
+          {url, lineNumber: 3, expression: `'line 3'`},
+        ]);
+        assert.ok(
+          response.responseLines[0].includes('2 logpoint(s)'),
+          `Expected two logpoints, got: ${response.responseLines[0]}`,
         );
-        assert.strictEqual(response.responseLines.length, 1);
+
+        // Keep only line 3; line 2 must stop logging.
+        response = await callSetLogpoints(context, args, [
+          {url, lineNumber: 3, expression: `'line 3'`},
+        ]);
+        assert.ok(
+          response.responseLines[0].includes('1 logpoint(s)') &&
+            !response.responseLines[0].includes(`${url}:2 `),
+          `Expected only line 3, got: ${response.responseLines[0]}`,
+        );
+
+        await page.evaluate(`greet('World')`);
+        await waitForConsoleText(context, args, 'line 3');
+        const text = await readConsoleMessages(context, args);
+        assert.ok(
+          !text.includes('line 2'),
+          `Expected line 2 to be removed, got:\n${text}`,
+        );
+
+        // An empty list removes all logpoints.
+        response = await callSetLogpoints(context, args, []);
+        assert.ok(
+          response.responseLines[0].includes('No logpoints are set'),
+          `Expected no logpoints, got: ${response.responseLines[0]}`,
+        );
+        await page.evaluate(`greet('World')`);
+        await page.evaluate(`console.log('sentinel after removal')`);
+        await waitForConsoleText(context, args, 'sentinel after removal');
+        const occurrences =
+          (await readConsoleMessages(context, args)).split('line 3').length - 1;
+        assert.strictEqual(occurrences, 1);
       });
     });
   });
@@ -384,18 +412,9 @@ describe('logpoints', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/sm'));
 
-        await setLogpoint(args).handler(
-          {
-            params: {
-              url: 'app.ts',
-              lineNumber: 2,
-              expression: `'ts greeting', name`,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
+        response = await callSetLogpoints(context, args, [
+          {url: 'app.ts', lineNumber: 2, expression: `'ts greeting', name`},
+        ]);
 
         assert.ok(
           response.responseLines[0].includes('bound via source map at') &&
@@ -414,18 +433,9 @@ describe('logpoints', () => {
         const page = context.getSelectedMcpPage().pptrPage;
         await page.goto(server.getRoute('/sm'));
 
-        await setLogpoint(args).handler(
-          {
-            params: {
-              url: 'app.ts',
-              lineNumber: 2,
-              expression: `'ts greeting', name`,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
+        response = await callSetLogpoints(context, args, [
+          {url: 'app.ts', lineNumber: 2, expression: `'ts greeting', name`},
+        ]);
         const generatedLine = Number(
           response.responseLines[0].match(/bundle\.js:(\d+):/)?.[1],
         );
@@ -442,20 +452,11 @@ describe('logpoints', () => {
         // The logpoint re-binds asynchronously when the new source map
         // attaches; wait until the moved generated location is visible.
         await waitExecutionFor(async () => {
-          const listResponse = new McpResponse(args);
-          await listLogpoints(args).handler(
-            {params: {}, page: context.getSelectedMcpPage()},
-            listResponse,
-            context,
-          );
-          if (
-            !listResponse.responseLines[0].includes(
-              `bundle.js:${generatedLine + extraLines}:`,
-            )
-          ) {
-            throw new Error(
-              `Logpoint not rebound yet: ${listResponse.responseLines[0]}`,
-            );
+          const text = new LogpointFormatter(
+            context.getSelectedMcpPage().getLogpoints(),
+          ).toString();
+          if (!text.includes(`bundle.js:${generatedLine + extraLines}:`)) {
+            throw new Error(`Logpoint not rebound yet: ${text}`);
           }
         }, 5000);
 
@@ -471,184 +472,100 @@ describe('logpoints', () => {
         await page.goto(server.getRoute('/sm'));
 
         await assert.rejects(
-          setLogpoint(args).handler(
-            {
-              params: {
-                url: 'app.ts',
-                lineNumber: 999,
-                expression: `'never'`,
-              },
-              page: context.getSelectedMcpPage(),
-            },
-            response,
-            context,
-          ),
-          /contains no executable code/,
+          callSetLogpoints(context, args, [
+            {url: 'app.ts', lineNumber: 999, expression: `'never'`},
+          ]),
+          /No executable code at .*app\.ts:999/,
         );
-
-        response.resetResponseLineForTesting();
-        await listLogpoints(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.ok(response.responseLines[0].includes('No logpoints are set'));
-      });
-    });
-  });
-
-  describe('list_scripts', () => {
-    it('lists scripts and finds original sources by filter', async () => {
-      await withMcpContext(async (response, context, args) => {
-        server.addHtmlRoute('/sm', html`<script src="/bundle.js"></script>`);
-        const bundle = transpileTsBundle();
-        server.addRoute('/bundle.js', (req, res) => {
-          res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
-          res.end(bundle.js);
-        });
-        server.addRoute('/app.js.map', (req, res) => {
-          res.setHeader('Content-Type', 'application/json');
-          res.end(bundle.map);
-        });
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/sm'));
-
-        await listScripts(args).handler(
-          {params: {filter: 'app.ts'}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        const text = response.responseLines.join('\n');
-        assert.ok(
-          text.includes('/bundle.js') &&
-            text.includes('matching source:') &&
-            text.includes('app.ts'),
-          `Expected bundle with matching source, got:\n${text}`,
-        );
-        assert.ok(
-          text.includes('[source map: 1 original source(s)]'),
-          `Expected source map info, got:\n${text}`,
-        );
-
-        response.resetResponseLineForTesting();
-        await listScripts(args).handler(
-          {
-            params: {filter: 'no-such-script-anywhere'},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        assert.ok(
-          response.responseLines[0].includes('No parsed script'),
-          `Expected no-match message, got: ${response.responseLines[0]}`,
-        );
-      });
-    });
-  });
-
-  describe('remove_logpoint', () => {
-    it('stops logging after removal', async () => {
-      await withMcpContext(async (response, context, args) => {
-        setupRoutes();
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/'));
-
-        await setLogpoint(args).handler(
-          {
-            params: {
-              url: server.getRoute('/app.js'),
-              lineNumber: 2,
-              expression: `'before removal'`,
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
-        await page.evaluate(`greet('World')`);
-        await waitForConsoleText(context, args, 'before removal');
-
-        response.resetResponseLineForTesting();
-        await removeLogpoint(args).handler(
-          {params: {id: 1}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.ok(response.responseLines[0].startsWith('Removed Logpoint 1'));
-
-        await page.evaluate(`greet('World')`);
-        await page.evaluate(`console.log('sentinel after removal')`);
-        await waitForConsoleText(context, args, 'sentinel after removal');
-
-        const text = await readConsoleMessages(context, args);
-        const occurrences = text.split('before removal').length - 1;
         assert.strictEqual(
-          occurrences,
-          1,
-          `Expected exactly one logged message, got ${occurrences}:\n${text}`,
+          context.getSelectedMcpPage().getLogpoints().length,
+          0,
         );
       });
     });
+  });
 
-    it('removes all logpoints when no id is provided', async () => {
-      await withMcpContext(async (response, context, args) => {
-        setupRoutes();
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/'));
+  describe('parseLogpoint', () => {
+    it('parses locations with ports, columns and expressions', () => {
+      assert.deepStrictEqual(
+        parseLogpoint(`http://127.0.0.1:16552/app.js:2 'greeting for', name`),
+        {
+          url: 'http://127.0.0.1:16552/app.js',
+          lineNumber: 2,
+          expression: `'greeting for', name`,
+        },
+      );
+      assert.deepStrictEqual(parseLogpoint('src/app.ts:42:7 cart.total'), {
+        url: 'src/app.ts',
+        lineNumber: 42,
+        columnNumber: 7,
+        expression: 'cart.total',
+      });
+      assert.throws(() => parseLogpoint('src/app.ts cart.total'), /format/);
+      assert.throws(() => parseLogpoint('src/app.ts:0 x'), /1-based/);
+    });
+  });
 
-        for (const lineNumber of [2, 3]) {
-          await setLogpoint(args).handler(
+  describe('LogpointFormatter', () => {
+    it('formats toString from toJSON', () => {
+      const formatter = new LogpointFormatter([
+        {
+          url: 'http://example.com/src/app.ts',
+          lineNumber: 2,
+          expression: `'x', x`,
+          sourceMapped: true,
+          generatedLocations: [
             {
-              params: {
-                url: server.getRoute('/app.js'),
-                lineNumber,
-                expression: `'line ${lineNumber}'`,
-              },
-              page: context.getSelectedMcpPage(),
+              url: 'http://example.com/bundle.js',
+              lineNumber: 7,
+              columnNumber: 3,
             },
-            response,
-            context,
-          );
-        }
-
-        response.resetResponseLineForTesting();
-        await listLogpoints(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.strictEqual(response.responseLines.length, 2);
-
-        response.resetResponseLineForTesting();
-        await removeLogpoint(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.strictEqual(response.responseLines.length, 2);
-
-        response.resetResponseLineForTesting();
-        await listLogpoints(args).handler(
-          {params: {}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
-        assert.ok(response.responseLines[0].includes('No logpoints are set'));
-      });
-    });
-
-    it('reports an error for an unknown id', async () => {
-      await withMcpContext(async (response, context, args) => {
-        await assert.rejects(
-          removeLogpoint(args).handler(
-            {params: {id: 99}, page: context.getSelectedMcpPage()},
-            response,
-            context,
-          ),
-          /No logpoint found with id 99/,
-        );
-      });
+          ],
+        },
+        {
+          url: 'http://example.com/app.js',
+          lineNumber: 4,
+          columnNumber: 10,
+          expression: `'y'`,
+          sourceMapped: false,
+          generatedLocations: [],
+        },
+      ]);
+      assert.deepStrictEqual(formatter.toJSON(), [
+        {
+          url: 'http://example.com/src/app.ts',
+          lineNumber: 2,
+          expression: `'x', x`,
+          sourceMapped: true,
+          generatedLocations: [
+            {
+              url: 'http://example.com/bundle.js',
+              lineNumber: 7,
+              columnNumber: 3,
+            },
+          ],
+        },
+        {
+          url: 'http://example.com/app.js',
+          lineNumber: 4,
+          columnNumber: 10,
+          expression: `'y'`,
+          sourceMapped: false,
+          generatedLocations: [],
+        },
+      ]);
+      assert.strictEqual(
+        formatter.toString(),
+        [
+          '2 logpoint(s) set on the page:',
+          "- http://example.com/src/app.ts:2 logging `'x', x` [bound via source map at http://example.com/bundle.js:7:3]",
+          "- http://example.com/app.js:4:10 logging `'y'` [not bound (no parsed script contains the location)]",
+        ].join('\n'),
+      );
+      assert.strictEqual(
+        new LogpointFormatter([]).toString(),
+        'No logpoints are set on the page.',
+      );
     });
   });
 });

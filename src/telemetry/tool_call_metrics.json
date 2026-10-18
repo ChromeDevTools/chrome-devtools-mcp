@@ -1362,7 +1362,8 @@
         "name": "page_id",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "list_scripts",
@@ -1383,7 +1384,8 @@
         "name": "page_idx",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "remove_logpoint",
@@ -1396,7 +1398,8 @@
         "name": "id",
         "argType": "number"
       }
-    ]
+    ],
+    "isDeprecated": true
   },
   {
     "name": "set_logpoint",
@@ -1419,6 +1422,20 @@
       },
       {
         "name": "expression_length",
+        "argType": "number"
+      }
+    ],
+    "isDeprecated": true
+  },
+  {
+    "name": "set_logpoints",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "logpoints_count",
         "argType": "number"
       }
     ]

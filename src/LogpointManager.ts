@@ -34,13 +34,15 @@ export interface GeneratedLocation {
   columnNumber: number;
 }
 
-export interface Logpoint extends LogpointOptions {
-  id: number;
+export interface Logpoint {
   /** The full URL of the script or original source the logpoint was set in. */
-  sourceUrl: string;
+  url: string;
+  lineNumber: number;
+  columnNumber?: number;
+  expression: string;
   /**
-   * Whether `sourceUrl` is an original source file from a source map rather
-   * than a script as served to the browser.
+   * Whether `url` is an original source file from a source map rather than
+   * a script as served to the browser.
    */
   sourceMapped: boolean;
   /**
@@ -51,23 +53,18 @@ export interface Logpoint extends LogpointOptions {
   generatedLocations: GeneratedLocation[];
 }
 
-export interface ScriptInfo {
-  url: string;
-  /** Whether the script references a source map. */
-  hasSourceMap: boolean;
-  /** Number of original sources in the source map, if it loaded. */
-  sourceCount?: number;
-  /** Original source URLs matching the list filter. */
-  matchedSources: string[];
-}
-
 type Breakpoint = Breakpoints.BreakpointManager.Breakpoint;
 type UISourceCode = Workspace.UISourceCode.UISourceCode;
-type SdkScript = ReturnType<DevTools.DebuggerModel['scripts']>[number];
 
 interface LogpointRecord {
   logpoint: Logpoint;
   breakpoint: Breakpoint;
+}
+
+interface ResolvedLogpoint {
+  options: LogpointOptions;
+  uiSourceCode: UISourceCode;
+  key: string;
 }
 
 /**
@@ -78,6 +75,38 @@ function toUserCondition(
   expression: string,
 ): Breakpoints.BreakpointManager.UserCondition {
   return expression as Breakpoints.BreakpointManager.UserCondition;
+}
+
+export const LOGPOINT_FORMAT =
+  '<url>:<lineNumber>[:<columnNumber>] <expression>';
+
+/**
+ * Parses a logpoint given as `<url>:<lineNumber>[:<columnNumber>] <expression>`.
+ * The url may itself contain colons (for example a port), so the location is
+ * the shortest prefix that ends in one or two numbers followed by whitespace.
+ */
+export function parseLogpoint(text: string): LogpointOptions {
+  const match = /^(\S+?):(\d+)(?::(\d+))?\s+(\S.*)$/s.exec(text.trim());
+  if (!match) {
+    throw new Error(
+      `Invalid logpoint "${text}". Expected the format ${LOGPOINT_FORMAT}, for example "src/app.ts:42 'total', cart.total".`,
+    );
+  }
+  const [, url, lineNumber, columnNumber, expression] = match;
+  const logpoint: LogpointOptions = {
+    url,
+    lineNumber: Number(lineNumber),
+    expression,
+  };
+  if (columnNumber !== undefined) {
+    logpoint.columnNumber = Number(columnNumber);
+  }
+  if (logpoint.lineNumber < 1 || logpoint.columnNumber === 0) {
+    throw new Error(
+      `Invalid logpoint "${text}": line and column numbers are 1-based.`,
+    );
+  }
+  return logpoint;
 }
 
 /**
@@ -91,7 +120,7 @@ export function validateExpression(expression: string): void {
     new Script(`console.log(${expression})`);
   } catch (error) {
     throw new Error(
-      `The logpoint expression does not compile: ${error instanceof Error ? error.message : String(error)}. Provide the expression like arguments to console.log(...).`,
+      `The logpoint expression \`${expression}\` does not compile: ${error instanceof Error ? error.message : String(error)}. Provide the expression like arguments to console.log(...).`,
     );
   }
 }
@@ -116,62 +145,16 @@ async function loadSourceMaps(model: DevTools.DebuggerModel): Promise<void> {
   );
 }
 
-/**
- * Lists the scripts currently parsed on a page based on the DevTools
- * debugger model, including the original sources from their source maps.
- * The filter is matched case-insensitively against both script URLs and
- * source-map source URLs.
- */
-export async function listParsedScripts(
-  model: DevTools.DebuggerModel,
-  filter?: string,
-): Promise<ScriptInfo[]> {
-  const needle = filter?.toLowerCase();
-  const byUrl = new Map<string, SdkScript>();
-  for (const script of model.scripts()) {
-    if (!script.sourceURL) {
-      continue;
-    }
-    // Keep the last parsed script per URL.
-    byUrl.set(script.sourceURL, script);
-  }
+function locationKey(
+  url: string,
+  lineNumber: number,
+  columnNumber: number | undefined,
+): string {
+  return `${url}:${lineNumber}${columnNumber === undefined ? '' : `:${columnNumber}`}`;
+}
 
-  const result: ScriptInfo[] = [];
-  for (const [url, script] of byUrl) {
-    const hasSourceMap = Boolean(script.sourceMapURL);
-    let sourceCount: number | undefined;
-    const matchedSources: string[] = [];
-
-    if (hasSourceMap) {
-      const sourceMap = await model
-        .sourceMapManager()
-        .sourceMapForClientPromise(script);
-      if (sourceMap) {
-        const sources = sourceMap.sourceURLs();
-        sourceCount = sources.length;
-        if (needle) {
-          for (const sourceUrl of sources) {
-            if (sourceUrl.toLowerCase().includes(needle)) {
-              matchedSources.push(sourceUrl);
-            }
-          }
-        }
-      }
-    }
-
-    if (
-      !needle ||
-      url.toLowerCase().includes(needle) ||
-      matchedSources.length > 0
-    ) {
-      result.push({url, hasSourceMap, sourceCount, matchedSources});
-    }
-  }
-
-  result.sort((a, b) => {
-    return a.url.localeCompare(b.url);
-  });
-  return result;
+function baseName(url: string): string {
+  return url.slice(url.lastIndexOf('/') + 1).toLowerCase();
 }
 
 /**
@@ -183,12 +166,12 @@ export async function listParsedScripts(
  * location through source maps, substitutes minified variable names in the
  * expression and keeps the breakpoint bound across reloads and rebuilt
  * bundles. This class only maps the tool API (URLs and 1-based positions)
- * onto workspace source codes and keeps the ids handed out to the tools.
+ * onto workspace source codes.
  */
 export class LogpointManager {
   readonly #devTools: TargetUniverse;
-  readonly #records = new Map<number, LogpointRecord>();
-  #nextId = 1;
+  /** Keyed by the resolved source URL and position. */
+  readonly #records = new Map<string, LogpointRecord>();
   #scriptListener?: () => void;
 
   constructor(devTools: TargetUniverse) {
@@ -209,86 +192,94 @@ export class LogpointManager {
     );
   }
 
-  async setLogpoint(options: LogpointOptions): Promise<Logpoint> {
-    validateExpression(options.expression);
-
-    const uiSourceCode = await this.#findUISourceCode(options.url);
-    if (!uiSourceCode) {
-      throw new Error(
-        `No parsed script or original source file matches "${options.url}". The url must match the URL of a script as served to the browser or an original source file from a source map (exactly or as a path suffix). Use list_scripts to see the parsed scripts and their original sources.`,
+  /**
+   * Makes the given logpoints the complete set of logpoints on the page:
+   * logpoints not in the list are removed, new ones are added and the
+   * expression of an existing logpoint at the same location is replaced.
+   * Expressions and locations are validated before anything is changed.
+   */
+  async setLogpoints(desired: LogpointOptions[]): Promise<Logpoint[]> {
+    for (const options of desired) {
+      validateExpression(options.expression);
+    }
+    const resolved = new Map<string, ResolvedLogpoint>();
+    for (const options of desired) {
+      const uiSourceCode = await this.#findUISourceCode(options.url);
+      const key = locationKey(
+        uiSourceCode.url(),
+        options.lineNumber,
+        options.columnNumber,
       );
+      // The last entry for a location wins, like setting it twice would.
+      resolved.set(key, {options, uiSourceCode, key});
     }
 
-    const breakpoint = await this.#devTools.breakpointManager.setBreakpoint(
-      uiSourceCode,
-      // The tool API is 1-based like the DevTools UI; the model is 0-based.
-      options.lineNumber - 1,
-      options.columnNumber === undefined ? undefined : options.columnNumber - 1,
-      toUserCondition(options.expression),
-      /* enabled */ true,
-      /* isLogpoint */ true,
-      Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
-    );
-    if (!breakpoint) {
-      throw new Error(
-        `Failed to set a logpoint in ${uiSourceCode.url()}: the location is not valid.`,
-      );
-    }
-    // Wait for the breakpoint to be set in the backend so that the result
-    // reports whether the location resolved.
-    await breakpoint.updateBreakpoint();
-
-    const existing = [...this.#records.values()].find(record => {
-      return record.breakpoint === breakpoint;
-    });
-    if (existing) {
-      // DevTools keeps one breakpoint per location, so the expression of the
-      // existing logpoint was replaced.
-      Object.assign(existing.logpoint, options);
-      return this.#snapshot(existing);
-    }
-
-    if (!breakpoint.bound()) {
-      await breakpoint.remove(/* keepInStorage */ false);
-      throw new Error(
-        `Line ${options.lineNumber} of ${uiSourceCode.url()} contains no executable code${uiSourceCode.contentType().isFromSourceMap() ? ' or is not mapped to the generated script (for example a comment, type annotation or empty line)' : ''}. Pick a line containing executable code.`,
-      );
-    }
-
-    const record: LogpointRecord = {
-      logpoint: {
-        ...options,
-        id: this.#nextId++,
-        sourceUrl: uiSourceCode.url(),
-        sourceMapped: uiSourceCode.contentType().isFromSourceMap(),
-        generatedLocations: [],
-      },
-      breakpoint,
-    };
-    this.#records.set(record.logpoint.id, record);
-    this.#ensureSourceMapsLoadOnParse();
-    return this.#snapshot(record);
-  }
-
-  async removeLogpoint(id?: number): Promise<Logpoint[]> {
-    if (id === undefined) {
-      const removed: Logpoint[] = [];
-      for (const existingId of [...this.#records.keys()]) {
-        removed.push(...(await this.removeLogpoint(existingId)));
+    for (const [key, record] of [...this.#records]) {
+      if (!resolved.has(key)) {
+        this.#records.delete(key);
+        await record.breakpoint.remove(/* keepInStorage */ false);
       }
-      return removed;
     }
-    const record = this.#records.get(id);
-    if (!record) {
-      throw new Error(`No logpoint found with id ${id}.`);
+
+    const unbound: string[] = [];
+    for (const {options, uiSourceCode, key} of resolved.values()) {
+      const breakpoint = await this.#devTools.breakpointManager.setBreakpoint(
+        uiSourceCode,
+        // The tool API is 1-based like the DevTools UI; the model is 0-based.
+        options.lineNumber - 1,
+        options.columnNumber === undefined
+          ? undefined
+          : options.columnNumber - 1,
+        toUserCondition(options.expression),
+        /* enabled */ true,
+        /* isLogpoint */ true,
+        Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
+      );
+      if (!breakpoint) {
+        unbound.push(key);
+        continue;
+      }
+      // Wait for the breakpoint to be set in the backend so that the result
+      // reports whether the location resolved.
+      await breakpoint.updateBreakpoint();
+
+      const existing = this.#records.get(key);
+      if (existing) {
+        // DevTools keeps one breakpoint per location, so the expression of
+        // the existing logpoint was replaced.
+        existing.logpoint.expression = options.expression;
+        continue;
+      }
+      if (!breakpoint.bound()) {
+        await breakpoint.remove(/* keepInStorage */ false);
+        unbound.push(key);
+        continue;
+      }
+      this.#records.set(key, {
+        logpoint: {
+          url: uiSourceCode.url(),
+          lineNumber: options.lineNumber,
+          columnNumber: options.columnNumber,
+          expression: options.expression,
+          sourceMapped: uiSourceCode.contentType().isFromSourceMap(),
+          generatedLocations: [],
+        },
+        breakpoint,
+      });
     }
-    const snapshot = this.#snapshot(record);
-    this.#records.delete(id);
-    await record.breakpoint.remove(/* keepInStorage */ false);
+
     if (this.#records.size === 0) {
       this.#stopLoadingSourceMapsOnParse();
+    } else {
+      this.#ensureSourceMapsLoadOnParse();
     }
-    return [snapshot];
+
+    if (unbound.length) {
+      throw new Error(
+        `No executable code at ${unbound.join(', ')} (for example a comment, type annotation or empty line, or a line not mapped to the generated script). Pick lines containing executable code. The other logpoints were applied.`,
+      );
+    }
+    return this.getLogpoints();
   }
 
   getLogpoints(): Logpoint[] {
@@ -329,7 +320,12 @@ export class LogpointManager {
     return {...record.logpoint, generatedLocations: [...generatedLocations]};
   }
 
-  async #findUISourceCode(url: string): Promise<UISourceCode | null> {
+  /**
+   * Finds the workspace source code for a script or original source URL,
+   * loading source maps if needed. Throws a descriptive error, including
+   * sources with the same file name, when nothing matches.
+   */
+  async #findUISourceCode(url: string): Promise<UISourceCode> {
     let match = this.#matchUISourceCode(url);
     if (!match) {
       // Original sources only appear in the workspace once their source map
@@ -337,7 +333,28 @@ export class LogpointManager {
       await loadSourceMaps(this.#debuggerModel);
       match = this.#matchUISourceCode(url);
     }
-    return match;
+    if (match) {
+      return match;
+    }
+    const name = baseName(url);
+    const similar = [...this.#sourceUrls()]
+      .filter(candidate => baseName(candidate) === name)
+      .slice(0, 5);
+    throw new Error(
+      `No parsed script or original source file matches "${url}". The url must match the URL of a script as served to the browser or an original source file from a source map, exactly or as a path suffix.${similar.length ? ` Sources with the same file name: ${similar.join(', ')}.` : ''}`,
+    );
+  }
+
+  *#sourceUrls(): Iterable<string> {
+    for (const uiSourceCode of this.#workspace.uiSourceCodes()) {
+      const projectType = uiSourceCode.project().type();
+      if (
+        projectType === Workspace.Workspace.projectTypes.Network ||
+        projectType === Workspace.Workspace.projectTypes.ContentScripts
+      ) {
+        yield uiSourceCode.url();
+      }
+    }
   }
 
   /**

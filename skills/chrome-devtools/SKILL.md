@@ -36,18 +36,7 @@ Note: For `evaluate_script`, `pageId` is required when targeting pages. However,
 - **Visual inspection**: `take_screenshot` (when user needs to see visual state)
 - **CSS & Styling inspection**: Use `get_css_styles` to inspect matched rules, cascade, and CSS variables. Treat the output as authoritative and complete.
 - **Additional details**: Use `evaluate_script` for runtime DOM/JS data not available via `get_css_styles` or `take_snapshot`.
-
-### Debugging with logpoints
-
-Prefer `set_logpoint` over editing source code to add temporary `console.log()` calls:
-
-1. Locate: `list_scripts` with a `filter` shows the parsed scripts and which bundle contains a given original source file (via source maps).
-2. Set: `set_logpoint` with the script `url` (or an original source file such as `src/app.ts`, matched as a path suffix), a 1-based `lineNumber` and an `expression` formatted like `console.log()` arguments (local variables are in scope). Original source files are resolved through source maps and re-resolved automatically after rebuilds.
-3. Trigger: Interact with the page (or `evaluate_script`) so the line executes.
-4. Read: `list_console_messages` shows the logged output.
-5. Clean up: `remove_logpoint` when done; logpoints otherwise stay active across navigations until the page is closed.
-
-Note: on the first page load after a rebuild, source-map-resolved logpoints in load-time code do not log yet; reload once more before concluding the line does not run.
+- **Runtime values**: Use `set_logpoints` to log expressions at script or source-file lines (source maps supported) instead of editing code; read the output with `list_console_messages`.
 
 ### Parallel execution
 

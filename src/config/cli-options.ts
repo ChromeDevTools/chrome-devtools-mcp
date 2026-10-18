@@ -1347,20 +1347,6 @@ export const commands: Commands = {
     category: 'Extensions',
     args: {},
   },
-  list_logpoints: {
-    description:
-      'List the logpoints that are currently set on the selected page. Logpoints are set with set_logpoint.',
-    category: 'Debugging',
-    args: {
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-        positional: true,
-      },
-    },
-  },
   list_network_requests: {
     description:
       'Lists the most recent requests for the target page since the last navigation.',
@@ -1413,44 +1399,6 @@ export const commands: Commands = {
       'Get a list of pages including extension service workers open in the browser.',
     category: 'Navigation automation',
     args: {},
-  },
-  list_scripts: {
-    description:
-      'List the scripts parsed by the selected page, including the original source files from their source maps. Useful to find the correct location for set_logpoint, for example which bundle contains a given original source file.',
-    category: 'Debugging',
-    args: {
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-        positional: true,
-      },
-      filter: {
-        name: 'filter',
-        type: 'string',
-        description:
-          'Case-insensitive substring matched against script URLs and against the original source file paths from source maps. When omitted, all scripts are listed.',
-        required: false,
-        positional: false,
-      },
-      pageSize: {
-        name: 'pageSize',
-        type: 'integer',
-        description:
-          'Maximum number of scripts to return. When omitted, returns all scripts.',
-        required: false,
-        positional: false,
-      },
-      pageIdx: {
-        name: 'pageIdx',
-        type: 'integer',
-        description:
-          'Page number to return (0-based). When omitted, returns the first page.',
-        required: false,
-        positional: false,
-      },
-    },
   },
   list_webmcp_tools: {
     description:
@@ -1804,28 +1752,6 @@ export const commands: Commands = {
       },
     },
   },
-  remove_logpoint: {
-    description:
-      'Remove a logpoint that was set with set_logpoint from the selected page.',
-    category: 'Debugging',
-    args: {
-      pageId: {
-        name: 'pageId',
-        type: 'number',
-        description: 'Targets a specific page by ID.',
-        required: true,
-        positional: true,
-      },
-      id: {
-        name: 'id',
-        type: 'integer',
-        description:
-          'The id of the logpoint to remove, as reported by set_logpoint or list_logpoints. When omitted, all logpoints on the page are removed.',
-        required: false,
-        positional: false,
-      },
-    },
-  },
   resize_page: {
     description:
       "Resizes the page's window so that the page has specified dimension",
@@ -1909,9 +1835,9 @@ export const commands: Commands = {
       },
     },
   },
-  set_logpoint: {
+  set_logpoints: {
     description:
-      'Set a logpoint in a script of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The location may be given as the URL of a script as served to the browser, or as an original source file (for example a TypeScript file) which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. Use list_scripts to inspect the available scripts and their original sources. The logged output appears as regular console messages that can be read with list_console_messages. Logpoints stay active across page reloads and navigations until they are removed or the page is closed. Setting a logpoint at the location of an existing logpoint replaces its expression.',
+      'Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. The logged output appears as regular console messages that can be read with list_console_messages. Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.',
     category: 'Debugging',
     args: {
       pageId: {
@@ -1921,35 +1847,11 @@ export const commands: Commands = {
         required: true,
         positional: true,
       },
-      url: {
-        name: 'url',
-        type: 'string',
+      logpoints: {
+        name: 'logpoints',
+        type: 'array',
         description:
-          'The URL of the script to set the logpoint in, or the path of an original source file resolvable through source maps. Matched exactly or as a path suffix, e.g. "src/app.ts" or "app.ts".',
-        required: true,
-        positional: true,
-      },
-      lineNumber: {
-        name: 'lineNumber',
-        type: 'integer',
-        description:
-          'The 1-based line number to log at, in the coordinates of the given url (for original source files: the line in that source file). The logpoint fires whenever this line executes. If the line contains no executable code, the logpoint is moved to the next possible location.',
-        required: true,
-        positional: true,
-      },
-      columnNumber: {
-        name: 'columnNumber',
-        type: 'integer',
-        description:
-          'Optional 1-based column number, useful for lines containing multiple statements (for example, in minified scripts).',
-        required: false,
-        positional: false,
-      },
-      expression: {
-        name: 'expression',
-        type: 'string',
-        description:
-          "The expression(s) to log, formatted like the arguments of console.log(). Evaluated in the scope of the logpoint location, so local variables are accessible; for source-mapped locations, the original variable names can be used. Example: 'cart total:', cart.total, cart.items.length",
+          'The complete set of logpoints for the page, each formatted as <url>:<lineNumber>[:<columnNumber>] <expression>. The url is the URL of a script as served to the browser or the path of an original source file resolvable through source maps, matched exactly or as a path suffix (e.g. "src/app.ts"). lineNumber and the optional columnNumber are 1-based in the coordinates of the url; a line without executable code moves the logpoint to the next possible location. The expression is formatted like the arguments of console.log() and is evaluated in the scope of the location, so local variables are accessible (for source-mapped locations by their original names). Example: "src/cart.ts:42 \'cart total:\', cart.total, cart.items.length". Pass an empty array to remove all logpoints.',
         required: true,
         positional: true,
       },

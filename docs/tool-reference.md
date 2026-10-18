@@ -30,18 +30,15 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (13 tools)
+- **[Debugging](#debugging)** (10 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
   - [`lighthouse_audit`](#lighthouse_audit)
   - [`list_console_messages`](#list_console_messages)
-  - [`list_logpoints`](#list_logpoints)
-  - [`list_scripts`](#list_scripts)
-  - [`remove_logpoint`](#remove_logpoint)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-  - [`set_logpoint`](#set_logpoint)
+  - [`set_logpoints`](#set_logpoints)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 - **[Memory](#memory)** (14 tools)
@@ -458,40 +455,6 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ---
 
-### `list_logpoints`
-
-**Description:** List the logpoints that are currently set on the selected page. Logpoints are set with [`set_logpoint`](#set_logpoint).
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-
----
-
-### `list_scripts`
-
-**Description:** List the scripts parsed by the selected page, including the original source files from their source maps. Useful to find the correct location for [`set_logpoint`](#set_logpoint), for example which bundle contains a given original source file.
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-- **filter** (string) _(optional)_: Case-insensitive substring matched against script URLs and against the original source file paths from source maps. When omitted, all scripts are listed.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
-- **pageSize** (integer) _(optional)_: Maximum number of scripts to return. When omitted, returns all scripts.
-
----
-
-### `remove_logpoint`
-
-**Description:** Remove a logpoint that was set with [`set_logpoint`](#set_logpoint) from the selected page.
-
-**Parameters:**
-
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-- **id** (integer) _(optional)_: The id of the logpoint to remove, as reported by [`set_logpoint`](#set_logpoint) or [`list_logpoints`](#list_logpoints). When omitted, all logpoints on the page are removed.
-
----
-
 ### `screencast_start`
 
 **Description:** Starts recording a screencast (video) of the target page.
@@ -513,17 +476,14 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ---
 
-### `set_logpoint`
+### `set_logpoints`
 
-**Description:** Set a logpoint in a script of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The location may be given as the URL of a script as served to the browser, or as an original source file (for example a TypeScript file) which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. Use [`list_scripts`](#list_scripts) to inspect the available scripts and their original sources. The logged output appears as regular console messages that can be read with [`list_console_messages`](#list_console_messages). Logpoints stay active across page reloads and navigations until they are removed or the page is closed. Setting a logpoint at the location of an existing logpoint replaces its expression.
+**Description:** Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. The logged output appears as regular console messages that can be read with [`list_console_messages`](#list_console_messages). Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.
 
 **Parameters:**
 
-- **expression** (string) **(required)**: The expression(s) to log, formatted like the arguments of console.log(). Evaluated in the scope of the logpoint location, so local variables are accessible; for source-mapped locations, the original variable names can be used. Example: 'cart total:', cart.total, cart.items.length
-- **lineNumber** (integer) **(required)**: The 1-based line number to log at, in the coordinates of the given url (for original source files: the line in that source file). The logpoint fires whenever this line executes. If the line contains no executable code, the logpoint is moved to the next possible location.
+- **logpoints** (array) **(required)**: The complete set of logpoints for the page, each formatted as &lt;url&gt;:&lt;lineNumber&gt;[:&lt;columnNumber&gt;] &lt;expression&gt;. The url is the URL of a script as served to the browser or the path of an original source file resolvable through source maps, matched exactly or as a path suffix (e.g. "src/app.ts"). lineNumber and the optional columnNumber are 1-based in the coordinates of the url; a line without executable code moves the logpoint to the next possible location. The expression is formatted like the arguments of console.log() and is evaluated in the scope of the location, so local variables are accessible (for source-mapped locations by their original names). Example: "src/cart.ts:42 'cart total:', cart.total, cart.items.length". Pass an empty array to remove all logpoints.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **url** (string) **(required)**: The URL of the script to set the logpoint in, or the path of an original source file resolvable through source maps. Matched exactly or as a path suffix, e.g. "src/app.ts" or "app.ts".
-- **columnNumber** (integer) _(optional)_: Optional 1-based column number, useful for lines containing multiple statements (for example, in minified scripts).
 
 ---
 

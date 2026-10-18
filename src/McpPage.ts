@@ -16,8 +16,8 @@ import {
   type ListenerMap,
   type UncaughtError,
 } from './collectors/PageCollector.js';
-import type {Logpoint, LogpointOptions, ScriptInfo} from './LogpointManager.js';
-import {listParsedScripts, LogpointManager} from './LogpointManager.js';
+import type {Logpoint, LogpointOptions} from './LogpointManager.js';
+import {LogpointManager} from './LogpointManager.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
   type Locator,
@@ -413,33 +413,15 @@ export class McpPage implements ContextPage {
     return this.#logpointManager;
   }
 
-  setLogpoint(options: LogpointOptions): Promise<Logpoint> {
-    return this.#logpoints.setLogpoint(options);
-  }
-
-  removeLogpoint(id?: number): Promise<Logpoint[]> {
-    if (!this.#logpointManager) {
-      if (id === undefined) {
-        return Promise.resolve([]);
-      }
-      throw new Error(`No logpoint found with id ${id}.`);
+  setLogpoints(logpoints: LogpointOptions[]): Promise<Logpoint[]> {
+    if (!this.#logpointManager && logpoints.length === 0) {
+      return Promise.resolve([]);
     }
-    return this.#logpointManager.removeLogpoint(id);
+    return this.#logpoints.setLogpoints(logpoints);
   }
 
   getLogpoints(): Logpoint[] {
     return this.#logpointManager?.getLogpoints() ?? [];
-  }
-
-  async listScripts(filter?: string): Promise<ScriptInfo[]> {
-    const devTools = this.#requireDevToolsUniverse();
-    const model = devTools.target.model(DevTools.DebuggerModel);
-    if (!model) {
-      throw new Error(
-        `Script information is not available for page ${this.id ?? '?'}.`,
-      );
-    }
-    return await listParsedScripts(model, filter);
   }
 
   getDialog(): Dialog | undefined {
