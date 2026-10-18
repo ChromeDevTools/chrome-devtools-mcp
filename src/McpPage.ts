@@ -303,7 +303,7 @@ export class McpPage implements ContextPage {
       });
     }
     await this.#initPromise;
-    // Tools can request focus after an earlier initialization skipped it.
+    // Discovery skips focus emulation, but a later page tool still needs it.
     if (
       options?.emulateFocus !== false &&
       !this.#disposed &&
@@ -350,7 +350,7 @@ export class McpPage implements ContextPage {
   }
 
   #initFocusEmulationNoThrow(): void {
-    // Emulate focus on targeted pages so agents can work on multiple pages.
+    // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
       logger?.('Error turning on focused page emulation', error);
     });
