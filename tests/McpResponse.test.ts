@@ -969,6 +969,13 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
+        const typedStructuredContent = structuredContent as {
+          traceInsight?: string;
+        };
+        assert.ok(
+          typedStructuredContent.traceInsight,
+          'Expected traceInsight in structuredContent',
+        );
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
@@ -988,6 +995,13 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
+        const typedStructuredContent = structuredContent as {
+          error?: string;
+        };
+        assert.ok(
+          typedStructuredContent.error,
+          'Expected error in structuredContent',
+        );
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });

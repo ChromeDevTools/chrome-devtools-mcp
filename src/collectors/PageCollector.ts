@@ -27,10 +27,16 @@ import {logger} from '../utils/logger.js';
 export class UncaughtError {
   readonly details: Protocol.Runtime.ExceptionDetails;
   readonly targetId: string;
+  readonly session?: CDPSession;
 
-  constructor(details: Protocol.Runtime.ExceptionDetails, targetId: string) {
+  constructor(
+    details: Protocol.Runtime.ExceptionDetails,
+    targetId: string,
+    session?: CDPSession,
+  ) {
     this.details = details;
     this.targetId = targetId;
+    this.session = session;
   }
 }
 
@@ -296,7 +302,7 @@ class PageEventSubscriber {
   #onExceptionThrown = (event: Protocol.Runtime.ExceptionThrownEvent): void => {
     this.#page.emit(
       'uncaughtError',
-      new UncaughtError(event.exceptionDetails, this.#targetId),
+      new UncaughtError(event.exceptionDetails, this.#targetId, this.#session),
     );
   };
 

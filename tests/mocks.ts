@@ -29,8 +29,8 @@ import sinon from 'sinon';
 
 import {
   type ParsedArguments,
-  ConfigParser,
-} from '../src/config/ConfigParser.js';
+  ServerConfig,
+} from '../src/config/ServerConfig.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -466,11 +466,16 @@ export function createMockMcpPage(
 }
 
 export function createMockDialog(
-  options: {type?: Protocol.Page.DialogType; message?: string} = {},
+  options: {
+    type?: Protocol.Page.DialogType;
+    message?: string;
+    handled?: boolean;
+  } = {},
 ): sinon.SinonStubbedInstance<Dialog> {
   const dialog = sinon.createStubInstance(Dialog);
   dialog.type.returns(options.type ?? 'alert');
   dialog.message.returns(options.message ?? '');
+  sinon.stub(dialog, 'handled').get(() => options.handled ?? false);
   return dialog;
 }
 
@@ -1302,12 +1307,10 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = new ConfigParser(
-    '0.0.0',
-    ['node', 'main.js'],
-    process.env,
-    false,
-  ).parse();
+  const defaultArgs = ServerConfig.applyDefaults(
+    {},
+    {suppressUsageStatisticsNotice: true},
+  );
   return {...defaultArgs, ...options};
 }
 

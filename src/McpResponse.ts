@@ -893,6 +893,8 @@ export class McpResponse implements Response {
         insightName: string;
         insightKey: string | undefined;
       }>;
+      traceInsight?: string;
+      error?: string;
       lighthouseResult?: object;
       extensions?: object[];
       thirdPartyDeveloperTools?: object[];
@@ -1232,8 +1234,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       );
       if ('error' in insightOutput) {
         response.push(insightOutput.error);
+        structuredContent.error = insightOutput.error;
       } else {
         response.push(insightOutput.output);
+        structuredContent.traceInsight = insightOutput.output;
       }
     }
 

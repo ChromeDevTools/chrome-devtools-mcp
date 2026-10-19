@@ -16,6 +16,7 @@ import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
+  createMockDialog,
   createMockMcpResponse,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
@@ -1737,6 +1738,34 @@ describe('McpPage', () => {
         nonDebuggingTool,
         unannotatedTool,
       ]);
+    });
+  });
+
+  describe('dialogs', () => {
+    it('returns the dialog and throws when unhandled', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const dialog = createMockDialog({type: 'alert', message: 'hello'});
+
+      pptrPage.emit('dialog', dialog);
+
+      assert.strictEqual(mcpPage.getDialog(), dialog);
+      assert.throws(() => mcpPage.throwIfDialogOpen(), {
+        message: 'A dialog is open (alert: hello).',
+      });
+    });
+
+    it('clears the dialog and does not throw when handled', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const dialog = createMockDialog({
+        type: 'alert',
+        message: 'hello',
+        handled: true,
+      });
+
+      pptrPage.emit('dialog', dialog);
+
+      assert.strictEqual(mcpPage.getDialog(), undefined);
+      assert.doesNotThrow(() => mcpPage.throwIfDialogOpen());
     });
   });
 });
