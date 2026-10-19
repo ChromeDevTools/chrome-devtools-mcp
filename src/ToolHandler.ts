@@ -35,7 +35,8 @@ import {isLocalhost} from './utils/url.js';
 
 /**
  * Lock key for the browser-wide state owned by `McpContext` (page list,
- * selected page, trace state). Held exclusively by every tool call today.
+ * selected page, trace state). Held exclusively by every tool call except
+ * browserless tools (`concurrency: 'none'`).
  */
 export const CONTEXT_LOCK_KEY = 'context';
 
@@ -375,15 +376,20 @@ export class ToolHandler {
     return await response.handle(context, this.#dataFormat());
   }
 
-  #acquireToolLock(): Promise<Disposable> {
-    return this.toolLocks.acquire([{key: CONTEXT_LOCK_KEY, mode: 'exclusive'}]);
+  async #acquireToolLock(): Promise<Disposable | undefined> {
+    if (this.tool.concurrency === 'none') {
+      return undefined;
+    }
+    return await this.toolLocks.acquire([
+      {key: CONTEXT_LOCK_KEY, mode: 'exclusive'},
+    ]);
   }
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
-    let guard: Disposable | undefined = await this.#acquireToolLock();
+    let guard = await this.#acquireToolLock();
 
     if (this.disabledReason) {
-      guard[Symbol.dispose]();
+      guard?.[Symbol.dispose]();
       return {
         content: [
           {
@@ -419,7 +425,9 @@ export class ToolHandler {
           }
         },
         reacquire: async () => {
-          guard ??= await this.#acquireToolLock();
+          if (this.tool.concurrency === 'yielding' && !guard) {
+            guard = await this.#acquireToolLock();
+          }
         },
       };
       const {content, structuredContent} = isBrowserlessTool(this.tool)

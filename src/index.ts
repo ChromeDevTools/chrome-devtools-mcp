@@ -67,10 +67,11 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   /**
-   * Whether a tool call already waited for the initial `roots/list`, so a
-   * client that negotiates roots but never answers only delays the first call.
+   * The bounded initial `roots/list` request. Every tool call that starts
+   * before the client answered waits on the same request, so a client that
+   * negotiates roots but never answers only delays the first calls.
    */
-  #awaitedInitialRoots = false;
+  #initialRoots?: Promise<void>;
   #toolLocks = new KeyedLock();
   #tools = new Map<string, ToolEntry>();
 
@@ -274,11 +275,11 @@ export class McpServer {
   }
 
   async #getContext(): Promise<McpContext> {
-    if (this.#lastClientRoots === undefined && !this.#awaitedInitialRoots) {
-      this.#awaitedInitialRoots = true;
+    if (this.#lastClientRoots === undefined) {
       // Nothing listed yet, so this call has to wait – bounded, since it is
       // holding the context lock, and a later background refresh still lands
-      await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
+      this.#initialRoots ??= this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
+      await this.#initialRoots;
     }
     return this.#context;
   }

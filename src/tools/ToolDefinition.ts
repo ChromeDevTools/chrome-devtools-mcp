@@ -85,8 +85,11 @@ type AllKeys<T> = T extends unknown ? keyof T : never;
  * - `'yielding'`: like `'exclusive'`, but the handler runs unlocked. Page
  *   lookup before the handler and response formatting after it stay locked.
  *   Only for tools that wait for external events.
+ * - `'none'`: no lock. The tool runs at the same time as any other tool.
+ *   Only for browserless tools; the data they read guards itself (see
+ *   `HeapSnapshotManager`).
  */
-export type ToolConcurrency = 'exclusive' | 'yielding';
+export type ToolConcurrency = 'exclusive' | 'yielding' | 'none';
 
 type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
   ? K extends keyof Schema
@@ -581,6 +584,8 @@ export interface BrowserlessToolDefinition<
 /**
  * Defines a tool that does not need a browser connection, e.g. a tool that only
  * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ * Such a tool runs without the context lock (`concurrency: 'none'`) unless
+ * the definition sets another value.
  */
 export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
   definition: (
@@ -589,6 +594,7 @@ export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
 ): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
   return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
     return {
+      concurrency: 'none',
       ...definition(args),
       browserless: true,
     };

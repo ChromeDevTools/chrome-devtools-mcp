@@ -1767,5 +1767,54 @@ describe('ToolHandler', () => {
       );
       sinon.assert.calledOnceWithExactly(handleStub, mockContext, 'default');
     });
+
+    it('defaults to concurrency none', () => {
+      const tool = createBrowserlessTool(sinon.stub().resolves());
+      assert.strictEqual(tool.concurrency, 'none');
+    });
+
+    it('does not acquire the context lock', async () => {
+      const mockContext = createMockMcpContext();
+      mockContext.validatePath.resolves('/canonical/file.heapsnapshot');
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const toolLocks = sinon.createStubInstance(KeyedLock);
+
+      const result = await new ToolHandler(
+        createBrowserlessTool(sinon.stub().resolves()),
+        createServerArgs(),
+        async () => mockContext,
+        toolLocks,
+        sinon.spy(),
+      ).handle({filePath: 'file.heapsnapshot'});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.notCalled(toolLocks.acquire);
+    });
+
+    it('runs while another tool holds the context lock', async () => {
+      const toolLocks = new KeyedLock();
+      const mockContext = createMockMcpContext();
+      mockContext.validatePath.resolves('/canonical/file.heapsnapshot');
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const handler = sinon.stub().resolves();
+
+      using guard = await toolLocks.acquire([
+        {key: CONTEXT_LOCK_KEY, mode: 'exclusive'},
+      ]);
+      const result = await new ToolHandler(
+        createBrowserlessTool(handler),
+        createServerArgs(),
+        async () => mockContext,
+        toolLocks,
+        sinon.spy(),
+      ).handle({filePath: 'file.heapsnapshot'});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.calledOnce(handler);
+    });
   });
 });

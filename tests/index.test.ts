@@ -239,6 +239,49 @@ describe('e2e', {concurrency: true}, () => {
     );
   });
 
+  it('makes concurrent first calls wait for the same roots/list', async () => {
+    const fixturesRoot = path.resolve('tests/fixtures');
+    await withClient(
+      async client => {
+        // Answers late enough that both calls start before the roots arrive.
+        // Browserless tools hold no lock, so without a shared initial roots
+        // request the second call validates its path against no roots.
+        client.setRequestHandler('roots/list', async () => {
+          await new Promise(resolve => setTimeout(resolve, 1_000));
+          return {
+            roots: [{uri: pathToFileURL(fixturesRoot).href, name: 'fixtures'}],
+          };
+        });
+
+        const results = await Promise.all([
+          client.callTool({
+            name: 'get_heapsnapshot_summary',
+            arguments: {
+              filePath: path.join(fixturesRoot, 'example.heapsnapshot'),
+            },
+          }),
+          client.callTool({
+            name: 'get_heapsnapshot_summary',
+            arguments: {
+              filePath: path.join(fixturesRoot, 'example.heapsnapshot'),
+            },
+          }),
+        ]);
+
+        for (const result of results) {
+          const content = result.content as TextContent[];
+          assert.strictEqual(result.isError, undefined, content[0]?.text);
+        }
+      },
+      ['--memoryDebugging'],
+      {
+        capabilities: {
+          roots: {listChanged: true},
+        },
+      },
+    );
+  });
+
   it('does not block tools if the client never answers roots/list', async () => {
     await withClient(
       async client => {

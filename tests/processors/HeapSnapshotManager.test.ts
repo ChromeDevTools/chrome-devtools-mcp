@@ -17,7 +17,7 @@ describe('HeapSnapshotManager', () => {
     const manager = new HeapSnapshotManager();
 
     await assert.rejects(
-      manager.getSnapshot('tests/fixtures/snapshot_diffs.js'),
+      manager.getStats('tests/fixtures/snapshot_diffs.js'),
       /must have a \.heapsnapshot or \.heaptimeline extension/,
     );
   });
@@ -36,7 +36,7 @@ describe('HeapSnapshotManager', () => {
     // otherwise it leaks for the life of the process (it is never added to the
     // #snapshots map, so dispose()/disposeAll() cannot reach it).
     await assert.rejects(
-      manager.getSnapshot('/nonexistent/does-not-exist.heapsnapshot'),
+      manager.getStats('/nonexistent/does-not-exist.heapsnapshot'),
     );
 
     sinon.assert.calledOnce(disposeSpy);
@@ -196,6 +196,29 @@ describe('HeapSnapshotManager', () => {
       assert.strictEqual(manager.hasSnapshots(), true);
       assert.strictEqual(await manager.disposeSnapshot(filePath), true);
       assert.strictEqual(await manager.disposeSnapshot(filePath), false);
+      assert.strictEqual(manager.hasSnapshots(), false);
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('makes disposeSnapshot wait for an in-flight read of the same file', async () => {
+    const manager = new HeapSnapshotManager();
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const order: string[] = [];
+      const read = manager.getStats(filePath).then(stats => {
+        order.push('read');
+        return stats;
+      });
+      const dispose = manager.disposeSnapshot(filePath).then(disposed => {
+        order.push('dispose');
+        return disposed;
+      });
+      const [stats, disposed] = await Promise.all([read, dispose]);
+      assert.ok(stats.total > 0);
+      assert.strictEqual(disposed, true);
+      assert.deepStrictEqual(order, ['read', 'dispose']);
       assert.strictEqual(manager.hasSnapshots(), false);
     } finally {
       manager.dispose();
