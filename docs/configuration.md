@@ -59,6 +59,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--categoryWebauthn`/ `--category-webauthn`**
+  Set to true to include a tool that manages virtual WebAuthn authenticators, for testing passkey and security key flows.
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--autoConnect`/ `--auto-connect`**
   If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
   - **Type:** boolean

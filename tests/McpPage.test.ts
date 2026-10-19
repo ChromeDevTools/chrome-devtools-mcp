@@ -28,6 +28,7 @@ import {
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
   createMockServerConfig,
+  createMockWebAuthnModel,
   createMockWebMCPTool,
 } from './mocks.js';
 import {serverHooks} from './server.js';
@@ -2234,6 +2235,185 @@ describe('McpPage', () => {
 
       assert.strictEqual(mcpPage.getDialog(), undefined);
       assert.doesNotThrow(() => mcpPage.throwIfDialogOpen());
+    });
+  });
+
+  describe('configureWebAuthn()', () => {
+    function authenticatorId(
+      id: string,
+    ): DevTools.Protocol.WebAuthn.AuthenticatorId {
+      return id as DevTools.Protocol.WebAuthn.AuthenticatorId;
+    }
+
+    async function createWebAuthnPage() {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      const mcpPage = new McpPage(
+        createMockPuppeteerTarget({page: pptrPage}),
+        1,
+        {config: createMockServerConfig(), locatorClass: Locator},
+      );
+      const model = createMockWebAuthnModel();
+      sinon
+        .stub(mcpPage, 'devtoolsUniverse')
+        .get(
+          () => ({target: {model: () => model}}) as unknown as TargetUniverse,
+        );
+      await mcpPage.init();
+      return {mcpPage, model};
+    }
+
+    it('creates an authenticator with defaults', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+
+      const result = await mcpPage.configureWebAuthn([{}]);
+
+      sinon.assert.calledOnceWithExactly(
+        model.setVirtualAuthEnvEnabled,
+        true,
+        false,
+      );
+      sinon.assert.calledOnceWithExactly(model.addAuthenticator, {
+        protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
+        transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      });
+      assert.deepStrictEqual(result, [
+        {
+          id: 'auth-1',
+          protocol: 'ctap2',
+          transport: 'internal',
+          hasResidentKey: true,
+          hasUserVerification: true,
+          isUserVerified: true,
+          credentials: [],
+        },
+      ]);
+      assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticatorIds(), ['auth-1']);
+    });
+
+    it('updates listed authenticators and removes the others', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(authenticatorId('auth-1'))
+        .onSecondCall()
+        .resolves(authenticatorId('auth-2'));
+      await mcpPage.configureWebAuthn([{}, {transport: 'usb'}]);
+
+      await mcpPage.configureWebAuthn([{id: 'auth-2', isUserVerified: false}]);
+
+      sinon.assert.calledOnce(model.setVirtualAuthEnvEnabled);
+      sinon.assert.calledOnceWithExactly(
+        model.removeAuthenticator,
+        authenticatorId('auth-1'),
+      );
+      sinon.assert.calledOnceWithExactly(
+        model.setUserVerified,
+        authenticatorId('auth-2'),
+        false,
+      );
+      assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticatorIds(), ['auth-2']);
+    });
+
+    it('disables the virtual environment for an empty list', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn([{}]);
+
+      assert.deepStrictEqual(await mcpPage.configureWebAuthn([]), []);
+
+      sinon.assert.calledWithExactly(
+        model.setVirtualAuthEnvEnabled.secondCall,
+        false,
+      );
+      sinon.assert.notCalled(model.removeAuthenticator);
+      assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticatorIds(), []);
+    });
+
+    it('rejects an unknown id', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+
+      await assert.rejects(
+        mcpPage.configureWebAuthn([{id: 'nope'}]),
+        /No virtual authenticator with id "nope"/,
+      );
+      sinon.assert.notCalled(model.setVirtualAuthEnvEnabled);
+    });
+
+    it('rejects changing the options of an existing authenticator', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn([{}]);
+
+      await assert.rejects(
+        mcpPage.configureWebAuthn([{id: 'auth-1', transport: 'usb'}]),
+        /cannot be changed/,
+      );
+    });
+
+    it('replaces stored credentials', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      const stored = {
+        credentialId: 'new',
+        rpId: 'example.com',
+        privateKey: 'key',
+        isResidentCredential: true,
+        signCount: 0,
+      };
+      model.getCredentials
+        .onFirstCall()
+        .resolves([{...stored, credentialId: 'old'}])
+        .resolves([stored]);
+
+      const [authenticator] = await mcpPage.configureWebAuthn([
+        {
+          credentials: [
+            {credentialId: 'new', rpId: 'example.com', privateKey: 'key'},
+          ],
+        },
+      ]);
+
+      sinon.assert.calledOnceWithExactly(
+        model.removeCredential,
+        authenticatorId('auth-1'),
+        'old',
+      );
+      sinon.assert.calledOnceWithExactly(
+        model.addCredential,
+        authenticatorId('auth-1'),
+        stored,
+      );
+      assert.deepStrictEqual(authenticator?.credentials, [
+        {
+          credentialId: 'new',
+          rpId: 'example.com',
+          isResidentCredential: true,
+          userName: undefined,
+          signCount: 0,
+        },
+      ]);
+    });
+
+    it('reports credentials the authenticator rejected', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+
+      await assert.rejects(
+        mcpPage.configureWebAuthn([
+          {
+            credentials: [
+              {credentialId: 'bad', rpId: 'example.com', privateKey: 'x'},
+            ],
+          },
+        ]),
+        /rejected credentials "bad"/,
+      );
     });
   });
 });

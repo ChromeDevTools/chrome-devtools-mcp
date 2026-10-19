@@ -1358,5 +1358,18 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "configure_webauthn",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "authenticators_count",
+        "argType": "number"
+      }
+    ]
   }
 ]

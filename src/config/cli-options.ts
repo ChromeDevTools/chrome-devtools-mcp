@@ -250,6 +250,27 @@ export const commands: Commands = {
       },
     },
   },
+  configure_webauthn: {
+    description:
+      'Sets the virtual WebAuthn authenticators of the selected page so passkey and security key flows can be tested without a physical device. Pass the full list of authenticators the page should have: entries with an id keep and update that authenticator, entries without an id create a new one, and existing authenticators not in the list are removed. Pass [] to remove all of them. Authenticators answer navigator.credentials.create() and get() automatically and are removed when the page closes. The response lists every authenticator with its stored credentials. (requires flag: --categoryWebauthn=true)',
+    category: 'WebAuthn',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      authenticators: {
+        name: 'authenticators',
+        type: 'array',
+        description: 'The virtual authenticators the page should have.',
+        required: true,
+        positional: true,
+      },
+    },
+  },
   drag: {
     description: 'Drag an element onto another element',
     category: 'Input automation',

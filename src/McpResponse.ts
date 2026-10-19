@@ -1141,7 +1141,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
             targetInfos.get(mcpPage.targetId),
           );
           parts.push(
-            `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
+            `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}${formatWebAuthnLabel(mcpPage)}`,
           );
           structuredPages.push(page.structured);
         }
@@ -1164,7 +1164,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
               targetInfos.get(mcpPage.targetId),
             );
             response.push(
-              `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
+              `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}${formatWebAuthnLabel(mcpPage)}`,
             );
             structuredExtensionPages.push(page.structured);
           }
@@ -1887,6 +1887,11 @@ function formatPage(
     structured: createStructuredPage(mcpPage, context, title),
   };
 }
+function formatWebAuthnLabel(mcpPage: McpPage): string {
+  const ids = mcpPage.getWebAuthnAuthenticatorIds();
+  return ids.length ? ` webauthnAuthenticators=${ids.join(',')}` : '';
+}
+
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
@@ -1897,6 +1902,7 @@ function createStructuredPage(
   title: string;
   selected: boolean;
   isolatedContext?: string;
+  webauthnAuthenticators?: string[];
 } {
   const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
@@ -1906,6 +1912,7 @@ function createStructuredPage(
     title: string;
     selected: boolean;
     isolatedContext?: string;
+    webauthnAuthenticators?: string[];
   } = {
     id: mcpPage.id,
     url: mcpPage.url(),
@@ -1914,6 +1921,10 @@ function createStructuredPage(
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
+  }
+  const webAuthnAuthenticatorIds = mcpPage.getWebAuthnAuthenticatorIds();
+  if (webAuthnAuthenticatorIds.length) {
+    entry.webauthnAuthenticators = webAuthnAuthenticatorIds;
   }
   return entry;
 }

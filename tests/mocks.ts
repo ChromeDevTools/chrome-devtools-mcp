@@ -462,6 +462,7 @@ export function createMockMcpPage(
   });
   page.getWebMcpTools.returns([]);
   page.discoverThirdPartyDeveloperTools.resolves([]);
+  page.getWebAuthnAuthenticatorIds.returns([]);
   Object.defineProperty(page, 'pptrPage', {
     value: pptrPage,
     writable: true,
@@ -566,6 +567,13 @@ export function createMockMcpContext(
   });
 
   return context;
+}
+
+export function createMockWebAuthnModel(): sinon.SinonStubbedInstance<DevTools.WebAuthnModel.WebAuthnModel> {
+  const model = sinon.createStubInstance(DevTools.WebAuthnModel.WebAuthnModel);
+  model.setVirtualAuthEnvEnabled.resolves({});
+  model.getCredentials.resolves([]);
+  return model;
 }
 
 export function createMockMcpResponse(): MockMcpResponse {

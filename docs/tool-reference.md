@@ -72,6 +72,8 @@
   - [`install_pwa`](#install_pwa)
   - [`launch_pwa`](#launch_pwa)
   - [`uninstall_pwa`](#uninstall_pwa)
+- **[WebAuthn](#webauthn)** (1 tools)
+  - [`configure_webauthn`](#configure_webauthn)
 
 ## Input automation
 
@@ -857,5 +859,20 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Parameters:**
 
 - **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
+
+---
+
+## WebAuthn
+
+> NOTE: The WebAuthn category is not active by default. Use the '--categoryWebauthn' flag.
+
+### `configure_webauthn`
+
+**Description:** Sets the virtual WebAuthn authenticators of the selected page so passkey and security key flows can be tested without a physical device. Pass the full list of authenticators the page should have: entries with an id keep and update that authenticator, entries without an id create a new one, and existing authenticators not in the list are removed. Pass [] to remove all of them. Authenticators answer navigator.credentials.create() and get() automatically and are removed when the page closes. The response lists every authenticator with its stored credentials. (requires flag: --categoryWebauthn=true)
+
+**Parameters:**
+
+- **authenticators** (array) **(required)**: The virtual authenticators the page should have.
+- **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---

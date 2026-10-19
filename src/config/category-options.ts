@@ -58,6 +58,11 @@ const categoryOverrides: Record<
       'Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.',
     offByDefault: true,
   },
+  [ToolCategory.WEBAUTHN]: {
+    describe:
+      'Set to true to include a tool that manages virtual WebAuthn authenticators, for testing passkey and security key flows.',
+    offByDefault: true,
+  },
 };
 
 function createOption(category: ToolCategory): CategoryOption {

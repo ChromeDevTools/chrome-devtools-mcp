@@ -478,5 +478,13 @@
   {
     "name": "watch_config",
     "flagType": "boolean"
+  },
+  {
+    "name": "category_webauthn_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_webauthn",
+    "flagType": "boolean"
   }
 ]

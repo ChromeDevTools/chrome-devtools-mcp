@@ -40,6 +40,8 @@ import type {
   MatchedStyles,
   Response,
   ScreenRecorderData,
+  WebAuthnAuthenticatorConfig,
+  WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -56,6 +58,24 @@ import {
   type WaitForEventsResult,
   type DialogAction,
 } from './utils/WaitForHelper.js';
+
+const WEBAUTHN_PROTOCOLS = {
+  ctap2: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
+  u2f: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
+};
+
+const WEBAUTHN_TRANSPORTS = {
+  internal: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
+  usb: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Usb,
+  nfc: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Nfc,
+  ble: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Ble,
+  hybrid: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Hybrid,
+};
+
+interface WebAuthnAuthenticator {
+  id: DevTools.Protocol.WebAuthn.AuthenticatorId;
+  options: Omit<WebAuthnAuthenticatorState, 'id' | 'credentials'>;
+}
 
 export function replaceHtmlElementsWithUids(
   schema: JSONSchema7Definition,
@@ -169,6 +189,8 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   #devtoolsUniverse?: TargetUniverse;
+  #webAuthnEnabled = false;
+  #webAuthnAuthenticators = new Map<string, WebAuthnAuthenticator>();
 
   // Dialog
   #dialog?: Dialog;
@@ -389,6 +411,158 @@ export class McpPage implements ContextPage {
 
   get devtoolsUniverse(): TargetUniverse | undefined {
     return this.#devtoolsUniverse;
+  }
+
+  getWebAuthnAuthenticatorIds(): string[] {
+    return [...this.#webAuthnAuthenticators.keys()];
+  }
+
+  async configureWebAuthn(
+    configs: WebAuthnAuthenticatorConfig[],
+  ): Promise<WebAuthnAuthenticatorState[]> {
+    const model = this.devtoolsUniverse?.target.model(
+      DevTools.WebAuthnModel.WebAuthnModel,
+    );
+    if (!model) {
+      throw new Error(`WebAuthn is not available for page ${this.id}.`);
+    }
+    const keptIds = new Set<string>();
+    for (const config of configs) {
+      if (config.id === undefined) {
+        continue;
+      }
+      if (!this.#webAuthnAuthenticators.has(config.id)) {
+        throw new Error(
+          `No virtual authenticator with id "${config.id}" on page ${this.id}.`,
+        );
+      }
+      if (keptIds.has(config.id)) {
+        throw new Error(`Authenticator "${config.id}" is listed twice.`);
+      }
+      if (
+        config.protocol !== undefined ||
+        config.transport !== undefined ||
+        config.hasResidentKey !== undefined ||
+        config.hasUserVerification !== undefined
+      ) {
+        throw new Error(
+          `The protocol, transport, hasResidentKey and hasUserVerification of authenticator "${config.id}" cannot be changed. Omit its id to create a new authenticator instead.`,
+        );
+      }
+      keptIds.add(config.id);
+    }
+
+    if (!configs.length) {
+      if (this.#webAuthnEnabled) {
+        await model.setVirtualAuthEnvEnabled(false);
+        this.#webAuthnEnabled = false;
+      }
+      this.#webAuthnAuthenticators.clear();
+      return [];
+    }
+    if (!this.#webAuthnEnabled) {
+      await model.setVirtualAuthEnvEnabled(true, false);
+      this.#webAuthnEnabled = true;
+    }
+    for (const [key, authenticator] of this.#webAuthnAuthenticators) {
+      if (!keptIds.has(key)) {
+        await model.removeAuthenticator(authenticator.id);
+        this.#webAuthnAuthenticators.delete(key);
+      }
+    }
+
+    const authenticators: WebAuthnAuthenticator[] = [];
+    for (const config of configs) {
+      let authenticator =
+        config.id === undefined
+          ? undefined
+          : this.#webAuthnAuthenticators.get(config.id);
+      if (authenticator) {
+        if (
+          config.isUserVerified !== undefined &&
+          config.isUserVerified !== authenticator.options.isUserVerified
+        ) {
+          await model.setUserVerified(authenticator.id, config.isUserVerified);
+          authenticator.options.isUserVerified = config.isUserVerified;
+        }
+      } else {
+        const options = {
+          protocol: config.protocol ?? 'ctap2',
+          transport: config.transport ?? 'internal',
+          hasResidentKey: config.hasResidentKey ?? true,
+          hasUserVerification: config.hasUserVerification ?? true,
+          isUserVerified: config.isUserVerified ?? true,
+        };
+        const id = await model.addAuthenticator({
+          ...options,
+          protocol: WEBAUTHN_PROTOCOLS[options.protocol],
+          transport: WEBAUTHN_TRANSPORTS[options.transport],
+          automaticPresenceSimulation: true,
+        });
+        if (!id) {
+          throw new Error('Failed to add a virtual authenticator.');
+        }
+        authenticator = {id, options};
+        this.#webAuthnAuthenticators.set(id, authenticator);
+      }
+      if (config.credentials) {
+        await this.#replaceWebAuthnCredentials(
+          model,
+          authenticator,
+          config.credentials,
+        );
+      }
+      authenticators.push(authenticator);
+    }
+
+    const states = [];
+    for (const authenticator of authenticators) {
+      const credentials = await model.getCredentials(authenticator.id);
+      states.push({
+        id: authenticator.id,
+        ...authenticator.options,
+        credentials: credentials.map(credential => ({
+          credentialId: credential.credentialId,
+          rpId: credential.rpId,
+          isResidentCredential: credential.isResidentCredential,
+          userName: credential.userName,
+          signCount: credential.signCount,
+        })),
+      });
+    }
+    return states;
+  }
+
+  async #replaceWebAuthnCredentials(
+    model: DevTools.WebAuthnModel.WebAuthnModel,
+    authenticator: WebAuthnAuthenticator,
+    credentials: NonNullable<WebAuthnAuthenticatorConfig['credentials']>,
+  ): Promise<void> {
+    for (const credential of await model.getCredentials(authenticator.id)) {
+      await model.removeCredential(authenticator.id, credential.credentialId);
+    }
+    for (const credential of credentials) {
+      await model.addCredential(authenticator.id, {
+        ...credential,
+        isResidentCredential:
+          credential.isResidentCredential ??
+          authenticator.options.hasResidentKey,
+        signCount: credential.signCount ?? 0,
+      });
+    }
+    const stored = new Set(
+      (await model.getCredentials(authenticator.id)).map(
+        credential => credential.credentialId,
+      ),
+    );
+    const rejected = credentials.filter(
+      credential => !stored.has(credential.credentialId),
+    );
+    if (rejected.length) {
+      throw new Error(
+        `Authenticator "${authenticator.id}" rejected credentials ${rejected.map(credential => `"${credential.credentialId}"`).join(', ')}. credentialId must be base64 and privateKey a base64 PKCS#8 key.`,
+      );
+    }
   }
 
   getDialog(): Dialog | undefined {
@@ -719,6 +893,7 @@ export class McpPage implements ContextPage {
     this.#consoleCollector?.dispose();
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
+    this.#webAuthnAuthenticators.clear();
     devtoolsUniverse?.universe.dispose();
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
