@@ -162,10 +162,10 @@ describe('comments tools', () => {
         response.appendResponseLine,
         'Waited 5000ms for new DevTools comments. Call get_devtools_comments again to keep waiting.',
       );
-      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
+      sinon.assert.notCalled(response.setDevToolsComments);
     });
 
-    it('returns an empty list after the wait times out', async () => {
+    it('does not set comments after the wait times out', async () => {
       const clock = sinon.useFakeTimers();
       const {page, context, response, args} = createHandlerMocks();
       const devtoolsPage = createMockPuppeteerPage();
@@ -190,7 +190,7 @@ describe('comments tools', () => {
         response.appendResponseLine,
         'Waited 10000ms for new DevTools comments. Call get_devtools_comments again to keep waiting.',
       );
-      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
+      sinon.assert.notCalled(response.setDevToolsComments);
     });
 
     it('reports the elapsed time when the wait ends early', async () => {
@@ -217,7 +217,7 @@ describe('comments tools', () => {
         response.appendResponseLine,
         'Waited 1500ms for new DevTools comments. Call get_devtools_comments again to keep waiting.',
       );
-      sinon.assert.calledOnceWithExactly(response.setDevToolsComments, []);
+      sinon.assert.notCalled(response.setDevToolsComments);
     });
 
     it('does not wait when timeout is 0', async () => {

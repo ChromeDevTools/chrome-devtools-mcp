@@ -109,6 +109,7 @@ export const getDevtoolsComments = definePageTool(() => ({
       response.appendResponseLine(
         `Waited ${Date.now() - start}ms for new DevTools comments. Call get_devtools_comments again to keep waiting.`,
       );
+      return;
     }
     response.setDevToolsComments(threads);
   },
