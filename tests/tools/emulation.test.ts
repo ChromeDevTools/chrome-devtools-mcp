@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,10 +18,6 @@ import {
 import {createHandlerMocks} from '../mocks.js';
 
 describe('emulation', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('transforms', () => {
     describe('viewportTransform', () => {
       it('returns undefined for undefined input', () => {
@@ -91,6 +87,25 @@ describe('emulation', () => {
       it('throws when height is missing', () => {
         assert.throws(() => viewportTransform('800'));
       });
+
+      it('throws when viewport has unknown tags', () => {
+        assert.throws(() => viewportTransform('1280x720,mobile,bogus'));
+      });
+
+      it('throws when viewport has empty tags', () => {
+        assert.throws(() => viewportTransform('1280x720,'));
+      });
+
+      it('throws when viewport has extra dimension parts', () => {
+        assert.throws(() => viewportTransform('1280x720x2x9'));
+      });
+
+      it('throws when dimension parts are empty or contain whitespace', () => {
+        assert.throws(() => viewportTransform('800x'));
+        assert.throws(() => viewportTransform('x600'));
+        assert.throws(() => viewportTransform(' 1280 x 720'));
+        assert.throws(() => viewportTransform('1280x720, mobile'));
+      });
     });
 
     describe('geolocationTransform', () => {
@@ -119,6 +134,20 @@ describe('emulation', () => {
 
       it('throws when longitude is missing', () => {
         assert.throws(() => geolocationTransform('48.1'));
+      });
+
+      it('throws when geolocation has empty parts or trailing commas', () => {
+        assert.throws(() => geolocationTransform('37.77,'));
+        assert.throws(() => geolocationTransform(','));
+      });
+
+      it('throws when geolocation has extra parts', () => {
+        assert.throws(() => geolocationTransform('37.77,-122.42,9'));
+      });
+
+      it('throws on hex coordinates or surrounding whitespace', () => {
+        assert.throws(() => geolocationTransform('0x10,0x20'));
+        assert.throws(() => geolocationTransform(' 37.77 , -122.42 '));
       });
     });
   });
@@ -484,6 +513,76 @@ describe('emulation', () => {
       sinon.assert.calledOnceWithExactly(page.emulate, {
         extraHttpHeaders: {'X-Page': 'one'},
       });
+    });
+
+    it('parses valid extraHttpHeaders JSON and empty string in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: '{"X-Custom": "value"}',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            extraHttpHeaders: {'X-Custom': 'value'},
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: '',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            extraHttpHeaders: {},
+          },
+        },
+      );
+    });
+
+    it('reports validation issues instead of throwing for invalid transform inputs', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+
+      const geoResult = schema.safeParse({pageId: 1, geolocation: '0x0'});
+      assert.strictEqual(geoResult.success, false);
+      assert.strictEqual(
+        geoResult.error.issues[0].message,
+        'Invalid geolocation "0x0". Expected \'<latitude>,<longitude>\'.',
+      );
+
+      const viewportResult = schema.safeParse({pageId: 1, viewport: '0x0'});
+      assert.strictEqual(viewportResult.success, false);
+      assert.strictEqual(
+        viewportResult.error.issues[0].message,
+        'Invalid viewport width "0". Expected format \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\' with a positive width.',
+      );
+
+      const invalidJsonResult = schema.safeParse({
+        pageId: 1,
+        extraHttpHeaders: 'notjson',
+      });
+      assert.strictEqual(invalidJsonResult.success, false);
+      assert.match(
+        invalidJsonResult.error.issues[0].message,
+        /^Invalid JSON for headers:/,
+      );
+
+      const nonObjectHeadersResult = schema.safeParse({
+        pageId: 1,
+        extraHttpHeaders: '[]',
+      });
+      assert.strictEqual(nonObjectHeadersResult.success, false);
+      assert.strictEqual(
+        nonObjectHeadersResult.error.issues[0].message,
+        'Invalid JSON for headers: Headers must be a JSON object',
+      );
     });
   });
 

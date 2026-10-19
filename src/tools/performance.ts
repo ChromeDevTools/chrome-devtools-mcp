@@ -158,6 +158,9 @@ export const stopTrace = definePageTool(() => ({
   },
   handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
+      response.appendResponseLine(
+        'Error: no active performance trace recording to stop.',
+      );
       return;
     }
     const page = request.page;

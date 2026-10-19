@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
+
+import sinon from 'sinon';
 
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
@@ -14,6 +17,7 @@ import type {
   Protocol,
   DevTools,
 } from '../../src/third_party/index.js';
+import {createMockCDPSession} from '../mocks.js';
 
 interface MockConsoleMessage {
   type: () => string;
@@ -610,6 +614,7 @@ describe('ConsoleFormatter', () => {
             column: i,
             url: 'main.js',
             name: `fn${i}`,
+            toUiLocation: () => null,
           });
         }
         const stackTrace = {
@@ -847,5 +852,165 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+  });
+
+  it('resolves the cause of an UncaughtError on its session', async t => {
+    const session = createMockCDPSession();
+    const send: sinon.SinonStub = session.send;
+    send.onFirstCall().resolves({
+      result: [
+        {
+          name: 'cause',
+          configurable: true,
+          enumerable: false,
+          value: {
+            type: 'object',
+            subtype: 'error',
+            objectId: 'cause-id',
+            description: 'Error: root cause',
+          },
+        },
+      ],
+    });
+    send.onSecondCall().resolves({
+      exceptionDetails: {
+        exceptionId: 2,
+        lineNumber: 0,
+        columnNumber: 0,
+        text: 'root cause',
+      },
+    });
+    const error = new UncaughtError(
+      {
+        exceptionId: 1,
+        lineNumber: 0,
+        columnNumber: 5,
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          objectId: 'error-id',
+          description: 'Error: wrapper',
+        },
+        text: 'Uncaught',
+      },
+      '<mock target ID>',
+      session,
+    );
+
+    const formatter = await ConsoleFormatter.from(error, {
+      id: 18,
+      fetchDetailedData: true,
+      resolvedStackTraceForTesting: {
+        syncFragment: {
+          frames: [{line: 1, column: 1, url: 'main.js', name: 'main'}],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
+    });
+
+    sinon.assert.calledWithExactly(send.firstCall, 'Runtime.getProperties', {
+      objectId: 'error-id',
+    });
+    sinon.assert.calledWithExactly(
+      send.secondCall,
+      'Runtime.getExceptionDetails',
+      {errorObjectId: 'cause-id'},
+    );
+    t.assert.match(formatter.toStringDetailed(), /Caused by: root cause/);
+  });
+});
+
+describe('ConsoleFormatter arguments', () => {
+  it('formats non-JSON arguments from their preview and keeps JSON for plain values', async () => {
+    const message = createMockMessage({
+      type: () => 'log',
+      text: () => 'values',
+      args: () => [
+        {
+          jsonValue: async () => ({}),
+          remoteObject: () => ({
+            type: 'object',
+            subtype: 'map',
+            description: 'Map(1)',
+            preview: {
+              type: 'object',
+              subtype: 'map',
+              description: 'Map(1)',
+              overflow: false,
+              properties: [{name: 'size', type: 'number', value: '1'}],
+              entries: [
+                {
+                  key: {
+                    type: 'number',
+                    description: '1',
+                    overflow: false,
+                    properties: [],
+                  },
+                  value: {
+                    type: 'number',
+                    description: '2',
+                    overflow: false,
+                    properties: [],
+                  },
+                },
+              ],
+            },
+          }),
+        },
+        {
+          jsonValue: async () => {
+            throw new Error('Object reference chain is too long');
+          },
+          remoteObject: () => ({
+            type: 'object',
+            description: 'Object',
+            preview: {
+              type: 'object',
+              description: 'Object',
+              overflow: false,
+              properties: [
+                {name: 'name', type: 'string', value: 'cyc'},
+                {name: 'self', type: 'object', value: 'Object'},
+              ],
+            },
+          }),
+        },
+        {
+          jsonValue: async () => ({a: 1}),
+          remoteObject: () => ({type: 'object'}),
+        },
+      ],
+    });
+    const formatter = await ConsoleFormatter.from(message, {
+      id: 1,
+      fetchDetailedData: true,
+    });
+    assert.deepStrictEqual(formatter.toJSONDetailed().args, [
+      'Map(1) {1 => 2}',
+      "{name: 'cyc', self: {…}}",
+      '{"a":1}',
+    ]);
+  });
+
+  it('reports an argument without a preview whose jsonValue() fails as unavailable', async () => {
+    const message = createMockMessage({
+      type: () => 'log',
+      text: () => 'gone',
+      args: () => [
+        {
+          jsonValue: async () => {
+            throw new Error('Execution context was destroyed');
+          },
+          remoteObject: () => ({type: 'object', description: 'Object'}),
+        },
+      ],
+    });
+    const formatter = await ConsoleFormatter.from(message, {
+      id: 1,
+      fetchDetailedData: true,
+    });
+    assert.deepStrictEqual(formatter.toJSONDetailed().args, [
+      '<error: Argument 0 is no longer available>',
+    ]);
   });
 });

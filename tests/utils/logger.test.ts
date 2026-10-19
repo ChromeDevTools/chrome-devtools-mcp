@@ -11,6 +11,9 @@ import util from 'node:util';
 
 import {
   escapeForLog,
+  redactConnectOptionsForLogging,
+  redactDaemonArgsForLogging,
+  redactUrlForLogging,
   puppeteerLogger,
   saveLogsToFile,
 } from '../../src/utils/logger.js';
@@ -91,5 +94,73 @@ describe('escapeForLog', () => {
       assert.strictEqual(escapeForLog(`a${char}b`), `"a${escaped}b"`);
       assert.strictEqual(JSON.parse(escapeForLog(`a${char}b`)), `a${char}b`);
     }
+  });
+});
+
+describe('sensitive connection logging', () => {
+  it('removes URL userinfo and query parameters, failing closed on invalid URLs', () => {
+    assert.strictEqual(
+      redactUrlForLogging('wss://user:pass@example.test/browser?token=SECRET'),
+      'wss://example.test/browser?REDACTED',
+    );
+    assert.strictEqual(
+      redactUrlForLogging('http://example.test/json/version?key=SECRET'),
+      'http://example.test/json/version?REDACTED',
+    );
+    assert.strictEqual(redactUrlForLogging('not a URL:SECRET'), '[REDACTED]');
+  });
+
+  it('redacts URLs and headers without changing the connection options', () => {
+    const options = {
+      browserWSEndpoint: 'wss://admin:password@example.test/ws?key=URL_SECRET',
+      browserURL: 'http://example.test/json?token=OTHER_SECRET',
+      headers: {
+        Authorization: 'Bearer HEADER_SECRET',
+        'X-Token': 'ALSO_SECRET',
+      },
+    };
+    const sanitized = redactConnectOptionsForLogging(options);
+    assert.deepStrictEqual(sanitized.headers, {
+      Authorization: '[REDACTED]',
+      'X-Token': '[REDACTED]',
+    });
+    for (const secret of [
+      'password',
+      'URL_SECRET',
+      'OTHER_SECRET',
+      'HEADER_SECRET',
+      'ALSO_SECRET',
+    ]) {
+      assert.ok(!JSON.stringify(sanitized).includes(secret));
+    }
+    assert.strictEqual(options.headers.Authorization, 'Bearer HEADER_SECRET');
+    assert.match(options.browserWSEndpoint, /URL_SECRET/);
+  });
+
+  it('redacts daemon startup flags without modifying the arguments passed to spawn', () => {
+    const args = [
+      '--wsHeaders',
+      '{"Authorization":"Bearer HEADER_SECRET"}',
+      '--wsEndpoint=wss://user:password@example.test/ws?token=URL_SECRET',
+      '--browserUrl',
+      'http://example.test?key=OTHER_SECRET',
+      '--logFile',
+      '/tmp/example.log',
+      '--ws-headers={"X-Api-Key":"DASH_SECRET"}',
+    ];
+    const sanitized = redactDaemonArgsForLogging(args);
+    assert.deepStrictEqual(sanitized, [
+      '--wsHeaders',
+      '[REDACTED]',
+      '--wsEndpoint=wss://example.test/ws?REDACTED',
+      '--browserUrl',
+      'http://example.test/?REDACTED',
+      '--logFile',
+      '/tmp/example.log',
+      '--ws-headers=[REDACTED]',
+    ]);
+    assert.match(args[1], /HEADER_SECRET/);
+    assert.ok(!JSON.stringify(sanitized).includes('SECRET'));
+    assert.ok(!JSON.stringify(sanitized).includes('password'));
   });
 });

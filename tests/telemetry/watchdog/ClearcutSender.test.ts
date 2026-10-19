@@ -39,7 +39,6 @@ describe('ClearcutSender', () => {
     randomUUIDStub.restore();
     fetchStub.restore();
     clock.restore();
-    sinon.restore();
   });
 
   it('enriches events with app version, os type, and session id', async () => {
