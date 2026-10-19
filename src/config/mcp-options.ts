@@ -124,7 +124,7 @@ export const mcpOptions = {
     describe:
       'Frames per second to use for screencast recording. Lower values reduce file size and encoding load.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -231,7 +231,7 @@ export const mcpOptions = {
   config: {
     type: 'string',
     describe: 'Path to JSON configuration file.',
-    coerce: (configPath: string | undefined) => {
+    coerce: (configPath: string | undefined): string | undefined => {
       if (!configPath) {
         return;
       }

@@ -11,7 +11,6 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {lighthouseRunner} from '../../src/third_party/index.js';
 import {lighthouseAudit} from '../../src/tools/lighthouse.js';
 import {createHandlerMocks, createMockRunnerResult} from '../mocks.js';
 import {serverHooks} from '../server.js';
@@ -90,7 +89,7 @@ describe('lighthouse', () => {
       const invalidUrl = Object.assign(new Error('INVALID_URL'), {
         code: 'INVALID_URL',
       });
-      sinon.stub(lighthouseRunner, 'navigation').rejects(invalidUrl);
+      page.lighthouseNavigation.rejects(invalidUrl);
 
       await assert.rejects(
         () =>
@@ -115,9 +114,7 @@ describe('lighthouse', () => {
 
     it('passes other navigation errors through unchanged', async () => {
       const {page, context, response, args} = createHandlerMocks();
-      sinon
-        .stub(lighthouseRunner, 'navigation')
-        .rejects(new Error('PROTOCOL_TIMEOUT'));
+      page.lighthouseNavigation.rejects(new Error('PROTOCOL_TIMEOUT'));
 
       await assert.rejects(
         () =>
@@ -139,9 +136,7 @@ describe('lighthouse', () => {
     it('restores emulation', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
-      sinon
-        .stub(lighthouseRunner, 'snapshot')
-        .resolves(createMockRunnerResult());
+      page.lighthouseSnapshot.resolves(createMockRunnerResult());
 
       await lighthouseAudit(args).handler(
         {
@@ -160,9 +155,7 @@ describe('lighthouse', () => {
 
     it('restores emulation even when audit fails', async () => {
       const {page, context, response, args} = createHandlerMocks();
-      sinon
-        .stub(lighthouseRunner, 'snapshot')
-        .rejects(new Error('Audit failed'));
+      page.lighthouseSnapshot.rejects(new Error('Audit failed'));
 
       await assert.rejects(
         () =>
@@ -186,7 +179,7 @@ describe('lighthouse', () => {
     it('fails when Lighthouse reports a runtime error', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
-      sinon.stub(lighthouseRunner, 'navigation').resolves(
+      page.lighthouseNavigation.resolves(
         createMockRunnerResult({
           runtimeError: {
             code: 'ERRORED_DOCUMENT_REQUEST',
@@ -222,9 +215,7 @@ describe('lighthouse', () => {
     it('emulates a desktop user agent for desktop audits', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
-      const navigation = sinon
-        .stub(lighthouseRunner, 'navigation')
-        .resolves(createMockRunnerResult());
+      page.lighthouseNavigation.resolves(createMockRunnerResult());
 
       await lighthouseAudit(args).handler(
         {
@@ -238,7 +229,7 @@ describe('lighthouse', () => {
         context,
       );
 
-      const {flags} = navigation.firstCall.args[2];
+      const [flags] = page.lighthouseNavigation.firstCall.args;
       assert.equal(flags?.formFactor, 'desktop');
       assert.match(String(flags?.emulatedUserAgent), /Macintosh/);
       assert.doesNotMatch(String(flags?.emulatedUserAgent), /Mobile/);
@@ -247,9 +238,7 @@ describe('lighthouse', () => {
     it('emulates a mobile user agent for mobile audits', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
-      const snapshot = sinon
-        .stub(lighthouseRunner, 'snapshot')
-        .resolves(createMockRunnerResult());
+      page.lighthouseSnapshot.resolves(createMockRunnerResult());
 
       await lighthouseAudit(args).handler(
         {
@@ -263,7 +252,7 @@ describe('lighthouse', () => {
         context,
       );
 
-      const {flags} = snapshot.firstCall.args[1];
+      const [flags] = page.lighthouseSnapshot.firstCall.args;
       assert.equal(flags?.formFactor, 'mobile');
       assert.match(String(flags?.emulatedUserAgent), /Mobile Safari/);
     });
@@ -271,7 +260,7 @@ describe('lighthouse', () => {
     it('reports the URL in snapshot mode, where mainDocumentUrl is unset', async () => {
       const {page, context, response, args} = createHandlerMocks();
       context.saveTemporaryFile.resolves({filepath: 'report.json'});
-      sinon.stub(lighthouseRunner, 'snapshot').resolves(
+      page.lighthouseSnapshot.resolves(
         createMockRunnerResult({
           mainDocumentUrl: undefined,
           finalDisplayedUrl: 'https://example.com/page',
@@ -305,10 +294,7 @@ describe('lighthouse', () => {
       context.saveTemporaryFile
         .withArgs(sinon.match.instanceOf(Uint8Array), 'report.html')
         .resolves({filepath: '/tmp/report.html'});
-      const snapshot = sinon
-        .stub(lighthouseRunner, 'snapshot')
-        .resolves(createMockRunnerResult());
-      const navigation = sinon.stub(lighthouseRunner, 'navigation');
+      page.lighthouseSnapshot.resolves(createMockRunnerResult());
 
       await lighthouseAudit(args).handler(
         {
@@ -322,8 +308,8 @@ describe('lighthouse', () => {
         context,
       );
 
-      sinon.assert.calledOnce(snapshot);
-      sinon.assert.notCalled(navigation);
+      sinon.assert.calledOnce(page.lighthouseSnapshot);
+      sinon.assert.notCalled(page.lighthouseNavigation);
       sinon.assert.calledTwice(context.saveTemporaryFile);
       sinon.assert.notCalled(context.saveFile);
       sinon.assert.calledOnce(response.attachLighthouseResult);
@@ -344,9 +330,7 @@ describe('lighthouse', () => {
       context.saveFile
         .withArgs(sinon.match.instanceOf(Uint8Array), reportPath, '.html')
         .resolves({filename: `${reportPath}.html`});
-      sinon
-        .stub(lighthouseRunner, 'snapshot')
-        .resolves(createMockRunnerResult());
+      page.lighthouseSnapshot.resolves(createMockRunnerResult());
 
       await lighthouseAudit(args).handler(
         {
@@ -389,7 +373,7 @@ describe('lighthouse', () => {
         snippet: `<div class="item-${id}">`,
         nodeLabel: `Item ${id}`,
       });
-      sinon.stub(lighthouseRunner, 'snapshot').resolves(
+      page.lighthouseSnapshot.resolves(
         createMockRunnerResult({
           categories: {
             accessibility: {

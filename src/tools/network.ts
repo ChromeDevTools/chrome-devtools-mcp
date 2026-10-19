@@ -8,7 +8,7 @@ import {zod} from '../third_party/index.js';
 import type {ResourceType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'document',
@@ -32,7 +32,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
-export const listNetworkRequests = definePageTool(() => ({
+export const listNetworkRequests: PageToolFactory = definePageTool(() => ({
   name: 'list_network_requests',
   description: `Lists the most recent requests for the target page since the last navigation.`,
   annotations: {
@@ -88,7 +88,7 @@ export const listNetworkRequests = definePageTool(() => ({
   },
 }));
 
-export const getNetworkRequest = definePageTool(() => ({
+export const getNetworkRequest: PageToolFactory = definePageTool(() => ({
   name: 'get_network_request',
   description: `Gets a network request by an optional reqid, if omitted returns the currently selected request in the DevTools Network panel. Useful for inspecting request headers (including 'Cookie') and response headers (including 'Set-Cookie' and directives).`,
   annotations: {

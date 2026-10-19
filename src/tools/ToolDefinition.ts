@@ -35,8 +35,10 @@ import type {
   UninstallPWAOptions,
   Viewport,
   DevTools,
+  Flags,
   Protocol,
   Page,
+  RunnerResult,
   WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
@@ -514,11 +516,17 @@ export type ContextPage = Readonly<{
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined>;
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
 }>;
 
+export type ToolFactory<Schema extends zod.ZodRawShape = zod.ZodRawShape> = (
+  args: ParsedArguments,
+) => ToolDefinition<Schema>;
+
 export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: (args: ParsedArguments) => ToolDefinition<Schema>,
-): (args: ParsedArguments) => ToolDefinition<Schema> {
+  definition: ToolFactory<Schema>,
+): ToolFactory<Schema> {
   return definition;
 }
 
@@ -538,9 +546,12 @@ export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
     pageScoped: true;
   };
 
+export type PageToolFactory<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
+  (args: ParsedArguments) => DefinedPageTool<Schema>;
+
 export function definePageTool<Schema extends zod.ZodRawShape>(
   definition: (args: ParsedArguments) => PageToolDefinition<Schema>,
-): (args: ParsedArguments) => DefinedPageTool<Schema> {
+): PageToolFactory<Schema> {
   return (args: ParsedArguments): DefinedPageTool<Schema> => {
     const tool = definition(args);
     return {
@@ -570,6 +581,10 @@ export interface BrowserlessToolDefinition<
   ): Promise<void>;
 }
 
+export type BrowserlessToolFactory<
+  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+> = (args: ParsedArguments) => BrowserlessToolDefinition<Schema>;
+
 /**
  * Defines a tool that does not need a browser connection, e.g. a tool that only
  * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
@@ -578,7 +593,7 @@ export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
   definition: (
     args: ParsedArguments,
   ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless'>,
-): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
+): BrowserlessToolFactory<Schema> {
   return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
     return {
       ...definition(args),
@@ -605,7 +620,9 @@ export function isBrowserlessTool(
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
-export const pageIdSchema = {
+export const pageIdSchema: {
+  pageId: zod.ZodNumber;
+} = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
@@ -625,7 +642,11 @@ export function zodTransform<Input, Output>(
   };
 }
 
-export const timeoutSchema = {
+export const timeoutSchema: {
+  timeout: zod.ZodOptional<
+    zod.ZodPipe<zod.ZodNumber, zod.ZodTransform<number | undefined, number>>
+  >;
+} = {
   timeout: zod
     .number()
     .int()

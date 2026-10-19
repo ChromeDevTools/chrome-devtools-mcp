@@ -17,7 +17,7 @@ export class TestServer {
   #port: number;
   #server: Server;
 
-  static randomPort() {
+  static randomPort(): number {
     /**
      * Some ports are restricted by Chromium and will fail to connect
      * to prevent we start after the
@@ -41,14 +41,14 @@ export class TestServer {
     return `http://127.0.0.1:${this.#port}`;
   }
 
-  getRoute(path: string) {
+  getRoute(path: string): string {
     if (!this.#routes[path]) {
       throw new Error(`Route ${path} was not setup.`);
     }
     return `${this.baseUrl}${path}`;
   }
 
-  addHtmlRoute(path: string, htmlContent: string) {
+  addHtmlRoute(path: string, htmlContent: string): void {
     if (this.#routes[path]) {
       throw new Error(`Route ${path} was already setup.`);
     }
@@ -62,7 +62,7 @@ export class TestServer {
   addRoute(
     path: string,
     handler: (req: IncomingMessage, res: ServerResponse) => void,
-  ) {
+  ): void {
     if (this.#routes[path]) {
       throw new Error(`Route ${path} was already setup.`);
     }
@@ -83,7 +83,7 @@ export class TestServer {
     }
   }
 
-  restore() {
+  restore(): void {
     this.#routes = {};
   }
 
@@ -129,7 +129,7 @@ export class TestServer {
   }
 }
 
-export function serverHooks() {
+export function serverHooks(): TestServer {
   const server = new TestServer(TestServer.randomPort());
   before(async () => {
     await server.start();
