@@ -73,7 +73,8 @@ Complete every item before you upload a PR or push a new revision.
       fixes that the diff does not contain.
 - [ ] The PR description names new functions that have no production caller
       yet, or the PR removes them.
-- [ ] The branch is rebased onto `main` and has no merge conflicts.
+- [ ] The branch has no merge conflicts with `main`. Rebase only when a
+      conflict exists.
 - [ ] `npm run gen` ran after a change to a tool schema, a tool description,
       or a CLI option. The generated files are committed.
 - [ ] `npm run format` ran. No line is longer than 80 columns.
