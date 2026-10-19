@@ -7,6 +7,10 @@
 import {ISSUE_UTILS} from '../devtools/issueDescriptions.js';
 import {DevTools} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
+import {
+  formatMwgRampSection,
+  getMwgGuidesForDevToolsIssue,
+} from '../utils/mwgMapping.js';
 import {substitutePlaceholders} from '../utils/text.js';
 
 export interface IssueFormatterOptions {
@@ -35,6 +39,7 @@ interface IssueDetailed extends IssueConcise {
     linkTitle: string;
   }>;
   affectedResources: AffectedResource[];
+  modernWebGuidance?: string[];
 }
 
 const parsedDescriptionCache = new WeakMap<
@@ -68,7 +73,12 @@ export class IssueFormatter {
     };
   }
 
+  getModernWebGuidance(): string[] {
+    return getMwgGuidesForDevToolsIssue(this.#issue.getDescription()?.file);
+  }
+
   toJSONDetailed(): IssueDetailed {
+    const modernWebGuidance = this.getModernWebGuidance();
     return {
       id: this.#options.id,
       type: 'issue',
@@ -77,6 +87,7 @@ export class IssueFormatter {
       description: this.#getDescription(),
       links: this.#issue.getDescription()?.links,
       affectedResources: this.#getAffectedResources(),
+      ...(modernWebGuidance.length ? {modernWebGuidance} : {}),
     };
   }
 
@@ -269,6 +280,10 @@ function convertIssueDetailedToString(issue: IssueDetailed): string {
         return details.join(' ');
       }),
     );
+  }
+
+  if (issue.modernWebGuidance?.length) {
+    bodyParts.push(formatMwgRampSection(issue.modernWebGuidance));
   }
 
   result.push(`Message: issue> ${bodyParts.join('\n')}`);

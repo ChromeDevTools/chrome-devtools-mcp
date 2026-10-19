@@ -318,4 +318,63 @@ describe('IssueFormatter', () => {
       assert.ok(detailed.includes('Valid Title'));
     });
   });
+
+  describe('Modern Web Guidance', () => {
+    it('includes modernWebGuidance in detailed views when description file matches MWG guides, and omits it from concise views', () => {
+      const mockAggregatedIssue = getMockAggregatedIssue();
+      mockAggregatedIssue.getDescription.returns({
+        file: 'cspTrustedTypesSinkViolation.md',
+        links: [],
+      });
+      mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
+      getIssueDescriptionStub
+        .withArgs('cspTrustedTypesSinkViolation.md')
+        .returns(
+          '# Prevent DOM-based XSS with Trusted Types\n\nDOM XSS sink violation description.',
+        );
+
+      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 10});
+
+      const conciseJson = formatter.toJSON();
+      assert.strictEqual('modernWebGuidance' in conciseJson, false);
+      assert.strictEqual(
+        formatter.toString().includes('Modern Web Guidance'),
+        false,
+      );
+
+      const detailedJson = formatter.toJSONDetailed();
+      assert.deepStrictEqual(detailedJson.modernWebGuidance, [
+        'mitigate-dom-xss-trusted-types',
+      ]);
+
+      const detailedString = formatter.toStringDetailed();
+      assert.ok(
+        detailedString.endsWith(
+          'Get implementation help with `npx -y modern-web-guidance retrieve mitigate-dom-xss-trusted-types`',
+        ),
+      );
+    });
+
+    it('omits modernWebGuidance from detailed views when description file has no match', () => {
+      const mockAggregatedIssue = getMockAggregatedIssue();
+      mockAggregatedIssue.getDescription.returns({
+        file: 'mock.md',
+        links: [],
+      });
+      mockAggregatedIssue.getAggregatedIssuesCount.returns(1);
+      getIssueDescriptionStub
+        .withArgs('mock.md')
+        .returns('# Mock Issue Title\n\nThis is a mock issue description');
+
+      const formatter = new IssueFormatter(mockAggregatedIssue, {id: 11});
+
+      const detailedJson = formatter.toJSONDetailed();
+      assert.strictEqual(detailedJson.modernWebGuidance, undefined);
+      assert.strictEqual('modernWebGuidance' in detailedJson, false);
+      assert.strictEqual(
+        formatter.toStringDetailed().includes('modern-web-guidance'),
+        false,
+      );
+    });
+  });
 });

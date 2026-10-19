@@ -12,6 +12,7 @@ import {afterEach, describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/ConfigParser.js';
+import {ISSUE_UTILS} from '../src/devtools/issueDescriptions.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -1096,6 +1097,196 @@ describe('lighthouse', () => {
       t.assert.snapshot(text);
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
+  });
+
+  it('appends a deduplicated Modern Web Guidance footer section without inline lines under failed audits', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const context = createMockMcpContext();
+
+    response.attachLighthouseResult({
+      summary: {
+        mode: 'snapshot',
+        device: 'desktop',
+        url: 'https://example.com',
+        scores: [
+          {
+            id: 'accessibility',
+            title: 'Accessibility',
+            score: 0.5,
+          },
+        ],
+        audits: {
+          failed: 3,
+          passed: 10,
+        },
+        timing: {
+          total: 500,
+        },
+      },
+      failedAudits: [
+        {
+          id: 'color-contrast',
+          title: 'Insufficient contrast',
+          description: 'Low-contrast text is difficult to read.',
+          score: 0,
+          categories: ['accessibility'],
+          modernWebGuidance: [
+            'ensure-sufficient-color-contrast',
+            'contrast-color',
+            'color',
+          ],
+          nodes: [
+            {
+              selector: 'body > p',
+              snippet: '<p class="faint">',
+              nodeLabel: 'Hello',
+            },
+          ],
+          totalNodes: 1,
+        },
+        {
+          id: 'csp-xss',
+          title: 'Ensure CSP is effective against XSS attacks',
+          description: 'A strong CSP helps prevent XSS.',
+          score: 0,
+          categories: ['best-practices'],
+          modernWebGuidance: [
+            'security',
+            'sanitize-untrusted-html',
+            'ensure-sufficient-color-contrast',
+          ],
+          nodes: [],
+          totalNodes: 0,
+        },
+        {
+          id: 'document-title',
+          title: 'Document does not have a `<title>` element',
+          description: 'Titles matter.',
+          score: 0,
+          categories: ['accessibility', 'seo'],
+          nodes: [],
+          totalNodes: 0,
+        },
+      ],
+      reports: ['/tmp/report.json', '/tmp/report.html'],
+    });
+
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(
+      text.includes(
+        [
+          '- color-contrast [accessibility]: Insufficient contrast (score: 0)',
+          '  Low-contrast text is difficult to read.',
+          '  Nodes (1):',
+        ].join('\n'),
+      ),
+    );
+    assert.ok(
+      text.includes(
+        [
+          '- csp-xss [best-practices]: Ensure CSP is effective against XSS attacks (score: 0)',
+          '  A strong CSP helps prevent XSS.',
+          '- document-title [accessibility, seo]: Document does not have a `<title>` element (score: 0)',
+          '  Titles matter.',
+          '### Reports',
+        ].join('\n'),
+      ),
+    );
+    assert.ok(
+      text.endsWith(
+        [
+          '### Reports',
+          '- /tmp/report.json',
+          '- /tmp/report.html',
+          'Get implementation help with `npx -y modern-web-guidance retrieve ensure-sufficient-color-contrast,contrast-color,color,security,sanitize-untrusted-html`',
+        ].join('\n'),
+      ),
+    );
+  });
+
+  it('omits Modern Web Guidance inline lines and footer when no failed audits match', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const context = createMockMcpContext();
+
+    response.attachLighthouseResult({
+      summary: {
+        mode: 'snapshot',
+        device: 'desktop',
+        url: 'https://example.com',
+        scores: [
+          {
+            id: 'seo',
+            title: 'SEO',
+            score: 0.5,
+          },
+        ],
+        audits: {
+          failed: 1,
+          passed: 5,
+        },
+        timing: {
+          total: 300,
+        },
+      },
+      failedAudits: [
+        {
+          id: 'document-title',
+          title: 'Document does not have a `<title>` element',
+          description: 'Titles matter.',
+          score: 0,
+          categories: ['seo'],
+          nodes: [],
+          totalNodes: 0,
+        },
+      ],
+      reports: ['/tmp/report.json', '/tmp/report.html'],
+    });
+
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.strictEqual(text.includes('modern-web-guidance'), false);
+  });
+
+  it('appends a deduplicated Modern Web Guidance footer section when console messages include matched DevTools issues', async () => {
+    sinon
+      .stub(ISSUE_UTILS, 'getIssueDescription')
+      .withArgs('cspTrustedTypesSinkViolation.md')
+      .returns('# Trusted Type expected, but got String\n\nFix violations.')
+      .withArgs('LowTextContrast.md')
+      .returns(
+        '# Users may have difficulties reading text content due to Certain color combinations\n\nContrast issue.',
+      );
+
+    const response = new McpResponse(createMockParsedArguments());
+    const context = createMockMcpContext();
+    const page = createMockMcpPage();
+
+    const trustedTypesIssue = getMockAggregatedIssue();
+    trustedTypesIssue.getDescription.returns({
+      file: 'cspTrustedTypesSinkViolation.md',
+      links: [],
+    });
+    const contrastIssue = getMockAggregatedIssue();
+    contrastIssue.getDescription.returns({
+      file: 'LowTextContrast.md',
+      links: [],
+    });
+
+    page.getConsoleData.returns([trustedTypesIssue, contrastIssue]);
+    response.setPage(page);
+    response.setIncludeConsoleData(true);
+
+    const {content} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(
+      text.endsWith(
+        'Get implementation help with `npx -y modern-web-guidance retrieve mitigate-dom-xss-trusted-types,ensure-sufficient-color-contrast`',
+      ),
+    );
   });
 });
 
