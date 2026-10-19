@@ -284,6 +284,12 @@ export class BrowserManager {
         blocklist,
         allowlist,
         logger: puppeteerLogger,
+        // The entry points own signal handling and call close(), which
+        // closes the browser gracefully. Puppeteer's handlers would SIGKILL
+        // Chrome synchronously on the same signal and win the race.
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false,
       });
       if (this.#options.logFile) {
         // FIXME: we are probably subscribing too late to catch startup logs. We
