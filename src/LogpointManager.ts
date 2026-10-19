@@ -223,18 +223,19 @@ export class LogpointManager {
 
     const unbound: string[] = [];
     for (const {options, uiSourceCode, key} of resolved.values()) {
-      const breakpoint = await this.#devTools.breakpointManager.setBreakpoint(
-        uiSourceCode,
-        // The tool API is 1-based like the DevTools UI; the model is 0-based.
-        options.lineNumber - 1,
-        options.columnNumber === undefined
-          ? undefined
-          : options.columnNumber - 1,
-        toUserCondition(options.expression),
-        /* enabled */ true,
-        /* isLogpoint */ true,
-        Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
-      );
+      const breakpoint =
+        await this.#devTools.universe.breakpointManager.setBreakpoint(
+          uiSourceCode,
+          // The tool API is 1-based like the DevTools UI; the model is 0-based.
+          options.lineNumber - 1,
+          options.columnNumber === undefined
+            ? undefined
+            : options.columnNumber - 1,
+          toUserCondition(options.expression),
+          /* enabled */ true,
+          /* isLogpoint */ true,
+          Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
+        );
       if (!breakpoint) {
         unbound.push(key);
         continue;

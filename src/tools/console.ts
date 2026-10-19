@@ -38,7 +38,7 @@ const FILTERABLE_MESSAGE_TYPES: [
   'issue',
 ];
 
-const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
+export const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 
 export const listConsoleMessages = definePageTool(
   (cliArgs: ParsedArguments) => {

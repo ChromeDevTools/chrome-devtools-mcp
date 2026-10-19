@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Breakpoints, DevTools, Workspace} from '../third_party/index.js';
+import {DevTools, Workspace} from '../third_party/index.js';
 import type {
   CDPSession,
   ConsoleMessage,
@@ -135,8 +135,6 @@ export interface TargetUniverse {
   universe: DevTools.Foundation.Universe.Universe;
   /** The secondary session created for this page */
   session: CDPSession;
-  /** The breakpoint manager of this universe, used for logpoints */
-  breakpointManager: Breakpoints.BreakpointManager.BreakpointManager;
 }
 
 let uiLocationRevealerRegistered = false;
@@ -222,23 +220,11 @@ export async function createTargetUniverse(
     connection,
   );
 
+  // Logpoints use the universe's breakpoint manager, which may reveal
+  // locations.
   registerUILocationRevealer();
-  // DevTools keeps a single global breakpoint manager, while there is one
-  // universe per page here. `forceNew` creates a manager bound to this
-  // universe; nothing in the bundled DevTools code relies on the global
-  // instance.
-  const breakpointManager =
-    Breakpoints.BreakpointManager.BreakpointManager.instance({
-      forceNew: true,
-      targetManager,
-      workspace: universe.context.get(Workspace.Workspace.WorkspaceImpl),
-      debuggerWorkspaceBinding: universe.context.get(
-        DevTools.DebuggerWorkspaceBinding,
-      ),
-      settings: universe.settings,
-    });
 
-  return {target, universe, session, breakpointManager};
+  return {target, universe, session};
 }
 
 // Not recording network requests in the DevTools universe.

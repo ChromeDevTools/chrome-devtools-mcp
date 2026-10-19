@@ -9,10 +9,10 @@ import {LOGPOINT_FORMAT, parseLogpoint} from '../LogpointManager.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
+import {LIST_CONSOLE_MESSAGES_TOOL_NAME} from './console.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const SET_LOGPOINTS_TOOL_NAME = 'set_logpoints';
-const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 
 export const setLogpoints = definePageTool(() => ({
   name: SET_LOGPOINTS_TOOL_NAME,

@@ -64,19 +64,18 @@ export class LogpointFormatter {
 
   constructor(logpoints: readonly Logpoint[]) {
     this.#logpoints = logpoints.map(logpoint => {
-      const item: StructuredLogpoint = {
+      return {
         url: logpoint.url,
         lineNumber: logpoint.lineNumber,
+        ...(logpoint.columnNumber === undefined
+          ? {}
+          : {columnNumber: logpoint.columnNumber}),
         expression: logpoint.expression,
         sourceMapped: logpoint.sourceMapped,
         generatedLocations: logpoint.generatedLocations.map(generated => {
           return {...generated};
         }),
       };
-      if (logpoint.columnNumber !== undefined) {
-        item.columnNumber = logpoint.columnNumber;
-      }
-      return item;
     });
   }
 
