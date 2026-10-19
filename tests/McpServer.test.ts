@@ -88,6 +88,35 @@ describe('McpServer', () => {
       sinon.assert.notCalled(browserManager.ensureBrowser);
     });
 
+    it('returns a validation error when transform validation fails', async () => {
+      const {server, browserManager} = await createTestServer();
+      const cases: Array<[Record<string, unknown>, RegExp]> = [
+        [
+          {pageId: 1, geolocation: '0x0'},
+          /^Input validation error: Invalid arguments for tool emulate: geolocation: Invalid geolocation "0x0"\. Expected '<latitude>,<longitude>'\.$/,
+        ],
+        [
+          {pageId: 1, viewport: '0x0'},
+          /^Input validation error: Invalid arguments for tool emulate: viewport: Invalid viewport width "0"\./,
+        ],
+        [
+          {pageId: 1, extraHttpHeaders: 'notjson'},
+          /^Input validation error: Invalid arguments for tool emulate: extraHttpHeaders: Invalid JSON for headers:/,
+        ],
+      ];
+
+      for (const [args, expectedPattern] of cases) {
+        const result = await server.callTool('emulate', args);
+
+        assert.strictEqual(result.isError, true);
+        assert.strictEqual(result.content.length, 1);
+        const firstBlock = result.content[0];
+        assert.strictEqual(firstBlock.type, 'text');
+        assert.match(firstBlock.text, expectedPattern);
+      }
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+    });
+
     it('executes the tool handler when arguments are valid', async () => {
       const {server, context} = await createTestServer();
 

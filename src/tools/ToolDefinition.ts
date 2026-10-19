@@ -608,13 +608,31 @@ export const pageIdSchema = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
+export function zodTransform<Input, Output>(
+  transform: (arg: Input) => Output,
+): (arg: Input, ctx: zod.RefinementCtx) => Output {
+  return (arg: Input, ctx: zod.RefinementCtx): Output => {
+    try {
+      return transform(arg);
+    } catch (error) {
+      ctx.addIssue({
+        code: 'custom',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return zod.NEVER;
+    }
+  };
+}
+
 export const timeoutSchema = {
   timeout: zod
     .number()
     .int()
-    .transform(value => {
-      return value <= 0 ? undefined : value;
-    })
+    .transform(
+      zodTransform(value => {
+        return value <= 0 ? undefined : value;
+      }),
+    )
     .optional()
     .describe(
       `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,

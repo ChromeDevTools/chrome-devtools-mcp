@@ -946,6 +946,7 @@ describe('cli args parsing', () => {
     const cliOptions = getCliOptions();
 
     assert.strictEqual(cliOptions.viewport, undefined);
+    assert.strictEqual(cliOptions.slim, undefined);
     assert.strictEqual(cliOptions.experimentalStructuredContent, undefined);
     assert.strictEqual(cliOptions.experimentalInteropTools, undefined);
 

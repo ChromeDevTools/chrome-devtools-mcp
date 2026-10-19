@@ -721,7 +721,9 @@ No Performance Insights for the given insight set id. Only use ids given in the 
 `;
 
 exports[`McpResponse network pagination > trace insights > includes error if insight not found 2`] = `
-{}
+{
+  "error": "No Performance Insights for the given insight set id. Only use ids given in the \\"Available insight sets\\" list."
+}
 `;
 
 exports[`McpResponse network pagination > trace insights > includes the trace insight output 1`] = `
@@ -770,7 +772,9 @@ We can break this time down into the 4 subparts that combine to make the LCP tim
 `;
 
 exports[`McpResponse network pagination > trace insights > includes the trace insight output 2`] = `
-{}
+{
+  "traceInsight": "## Insight Title: LCP breakdown\\n\\n## Insight Summary:\\nThis insight is used to analyze the time spent that contributed to the final LCP time and identify which of the 4 subparts (or 2 if there was no LCP resource) are contributing most to the delay in rendering the LCP element.\\n\\n## Detailed analysis:\\nThe Largest Contentful Paint (LCP) time for this navigation was 129 ms.\\nThe LCP element is an image fetched from https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg (eventKey: s-1314, ts: 122411037986).\\n## LCP resource network request: https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg\\neventKey: s-1314\\nTimings:\\n- Queued at: 41 ms\\n- Request sent at: 47 ms\\n- Download complete at: 56 ms\\n- Main thread processing completed at: 58 ms\\nDurations:\\n- Download time: 0.3 ms\\n- Main thread processing time: 2 ms\\n- Total duration: 17 ms\\nRedirects: no redirects\\nStatus code: 200\\nMIME Type: image/svg+xml\\nProtocol: unknown\\nPriority: VeryHigh\\nRender-blocking: No\\nFrom a service worker: No\\nInitiators (root request to the request that directly loaded this one): none\\n\\n\\nWe can break this time down into the 4 subparts that combine to make the LCP time:\\n\\n- Time to first byte: 8 ms (6.1% of total LCP time)\\n- Resource load delay: 33 ms (25.7% of total LCP time)\\n- Resource load duration: 15 ms (11.4% of total LCP time)\\n- Element render delay: 73 ms (56.8% of total LCP time)\\n\\n## Estimated savings: none\\n\\n## External resources:\\n- https://developer.chrome.com/docs/performance/insights/lcp-breakdown\\n- https://web.dev/articles/lcp\\n- https://web.dev/articles/optimize-lcp"
+}
 `;
 
 exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 1`] = `
