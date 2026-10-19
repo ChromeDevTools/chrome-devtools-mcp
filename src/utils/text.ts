@@ -23,12 +23,17 @@ export function substitutePlaceholders(
   );
 }
 
+const graphemeSegmenter = new Intl.Segmenter(undefined, {
+  granularity: 'grapheme',
+});
+
 /**
- * Truncates `text` to at most `maxLength` grapheme clusters and appends
- * `ellipsis` when anything was cut off. Cutting on grapheme boundaries keeps
- * surrogate pairs and emoji sequences whole, so the result never contains a
- * lone surrogate, which `JSON.stringify` serializes as an escape like `\ud83d`
- * that strict JSON parsers (such as the one the Python MCP SDK uses) reject.
+ * Truncates `text` to at most `maxLength` UTF-16 code units and appends
+ * `ellipsis` when anything was cut off. The cut moves back to the last
+ * grapheme boundary at or before the limit, so surrogate pairs and emoji
+ * sequences stay whole and the result never contains a lone surrogate, which
+ * `JSON.stringify` serializes as an escape like `\ud83d` that strict JSON
+ * parsers (such as the one the Python MCP SDK uses) reject.
  *
  * With `includeEllipsisInLength`, the ellipsis counts toward `maxLength`.
  */
@@ -40,24 +45,18 @@ export function truncateText(
     includeEllipsisInLength = false,
   }: {ellipsis?: string; includeEllipsisInLength?: boolean} = {},
 ): string {
-  // A grapheme cluster is at least one UTF-16 code unit long.
   if (text.length <= maxLength) {
     return text;
   }
   const keep = includeEllipsisInLength
     ? Math.max(0, maxLength - ellipsis.length)
     : maxLength;
-  const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
-  let count = 0;
   let cut = 0;
-  for (const {index} of segmenter.segment(text)) {
-    if (count === keep) {
-      cut = index;
+  for (const {index} of graphemeSegmenter.segment(text)) {
+    if (index > keep) {
+      break;
     }
-    if (count === maxLength) {
-      return text.slice(0, cut) + ellipsis;
-    }
-    count++;
+    cut = index;
   }
-  return text;
+  return text.slice(0, cut) + ellipsis;
 }

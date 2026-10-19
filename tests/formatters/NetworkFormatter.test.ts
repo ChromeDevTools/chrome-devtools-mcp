@@ -152,7 +152,7 @@ describe('NetworkFormatter', () => {
 
       assert.equal(
         formatter.toString(),
-        `reqid=1 GET ${prefix}\u{1F600}... <truncated> [pending]`,
+        `reqid=1 GET ${prefix}... <truncated> [pending]`,
       );
     });
 

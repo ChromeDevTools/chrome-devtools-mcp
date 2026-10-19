@@ -92,6 +92,30 @@ after(() => {
 });
 
 describe('McpResponse', () => {
+  it('truncates a long page title without splitting a surrogate pair', async () => {
+    // The 50 code unit limit leaves 47 for the title; the emoji sits at 46-47.
+    const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
+    const page = createMockMcpPage();
+    Object.defineProperty(page, 'id', {value: 1});
+    page.url.returns('https://example.com/emoji');
+    page.getTitle.returns(title);
+    const context = createMockMcpContext({selectedPage: page});
+    context.getPages.returns([page]);
+    context.isPageSelected.returns(true);
+    const response = new McpResponse(createMockParsedArguments());
+    response.setIncludePages(true);
+
+    const result = await response.handle(context);
+
+    assert.ok(
+      getTextContent(result.content[0]).includes(
+        `1: ${'A'.repeat(46)}... (https://example.com/emoji)`,
+      ),
+      getTextContent(result.content[0]),
+    );
+    assert.doesNotMatch(JSON.stringify(result), /\\ud83d/i);
+  });
+
   it('reports only pages opened by the attached action', async () => {
     const openedTarget = createMockPuppeteerTarget({
       url: 'https://example.com/opened',
@@ -360,30 +384,6 @@ describe('McpResponse', () => {
             `Changed By Script (${server.getRoute('/titled.html')})`,
           ),
         );
-      });
-    });
-
-    it('truncates a long page title on grapheme boundaries', async () => {
-      await withMcpContext(async (response, context) => {
-        // 46 letters + 1 emoji grapheme + more: truncate keeps whole graphemes.
-        const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
-        server.addHtmlRoute(
-          '/emoji-title.html',
-          `<!doctype html><title>${title}</title><h1>Emoji</h1>`,
-        );
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.goto(server.getRoute('/emoji-title.html'));
-
-        response.setIncludePages(true);
-        const res = await response.handle(context);
-        const text = getTextContent(res.content[0]);
-        assert.ok(
-          text.includes(
-            `${'A'.repeat(46)}\u{1F600}... (${server.getRoute('/emoji-title.html')})`,
-          ),
-          text,
-        );
-        assert.doesNotMatch(JSON.stringify(res), /\\ud83d/i);
       });
     });
 
