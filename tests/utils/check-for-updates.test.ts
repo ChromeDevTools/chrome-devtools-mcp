@@ -27,7 +27,6 @@ describe('checkForUpdates', () => {
   });
 
   afterEach(() => {
-    sinon.restore();
     resetUpdateCheckFlagForTesting();
   });
 

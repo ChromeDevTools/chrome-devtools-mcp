@@ -42,7 +42,7 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     const line =
       ' '.repeat(depth * 2) +
       attributes.join(' ') +
-      (node.id === this.#snapshot.selectedElementUid
+      (node.id && node.id === this.#snapshot.selectedElementUid
         ? ' [selected in the DevTools Elements panel]'
         : '') +
       '\n';
@@ -85,7 +85,10 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   }
 
   #getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
-    const attributes = [`uid=${serializedAXNodeRoot.id}`];
+    const attributes: string[] = [];
+    if (serializedAXNodeRoot.id) {
+      attributes.push(`uid=${serializedAXNodeRoot.id}`);
+    }
 
     if (
       serializedAXNodeRoot.role &&
@@ -141,7 +144,9 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     if (!excludeSpecial) {
-      result.id = node.id;
+      if (node.id) {
+        result.id = node.id;
+      }
       if (node.role) {
         result.role = node.role;
       }

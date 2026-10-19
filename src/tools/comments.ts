@@ -41,16 +41,36 @@ export const openDevtools = definePageTool(() => ({
   },
 }));
 
+const DEFAULT_COMMENT_WAIT_MS = 10_000;
+const MAX_COMMENT_WAIT_MS = 30_000;
+
 export const getDevtoolsComments = definePageTool(() => ({
   name: 'get_devtools_comments',
-  description: 'Retrieve user comments from the DevTools window for the page.',
+  description:
+    'Retrieve user comments from the DevTools window for the page. ' +
+    'If no comment is pending, waits up to `timeout` ms for the user to send one, then returns. ' +
+    'Call it again to keep waiting.',
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: true,
     conditions: ['devtoolsComments'],
   },
-  schema: {},
+  schema: {
+    timeout: zod
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_COMMENT_WAIT_MS)
+      .optional()
+      .describe(
+        `Maximum time in milliseconds to wait for a new comment when none is pending. ` +
+          `Defaults to ${DEFAULT_COMMENT_WAIT_MS}, maximum ${MAX_COMMENT_WAIT_MS}. ` +
+          `Set to 0 to return immediately without waiting.`,
+      ),
+  },
   blockedByDialog: false,
+  // The handler waits for comment events. Other tools run during the wait.
+  yieldsToolLock: true,
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -67,8 +87,30 @@ export const getDevtoolsComments = definePageTool(() => ({
       response.appendResponseLine(DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE);
       return;
     }
-    const threads = await bridge.getComments(devtoolsPage);
 
+    const timeout = request.params.timeout ?? DEFAULT_COMMENT_WAIT_MS;
+    const start = Date.now();
+    const deadline = start + timeout;
+    let threads = await bridge.getComments(devtoolsPage);
+    while (threads.length === 0) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        break;
+      }
+      const changed = await bridge.waitForCommentEvent(remaining);
+      if (!changed) {
+        break;
+      }
+      // Another tool may have changed state during the wait, so fetch again.
+      threads = await bridge.getComments(devtoolsPage);
+    }
+
+    if (threads.length === 0 && timeout > 0) {
+      response.appendResponseLine(
+        `Waited ${Date.now() - start}ms for new DevTools comments. Call get_devtools_comments again to keep waiting.`,
+      );
+      return;
+    }
     response.setDevToolsComments(threads);
   },
 }));

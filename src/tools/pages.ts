@@ -323,8 +323,8 @@ export const resizePage = definePageTool(() => ({
     readOnlyHint: false,
   },
   schema: {
-    width: zod.number().describe('Page width'),
-    height: zod.number().describe('Page height'),
+    width: zod.number().int().positive().describe('Page width'),
+    height: zod.number().int().positive().describe('Page height'),
   },
   blockedByDialog: false,
   verifyFilesSchema: {},

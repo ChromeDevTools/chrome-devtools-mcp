@@ -37,6 +37,7 @@ import type {
   DevToolsData,
   MatchedStyles,
   Response,
+  ScreenRecorderData,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -118,6 +119,19 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 
+/**
+ * Chrome reports a URL-derived placeholder as the target title until the
+ * document provides one. The placeholder omits the `http://` / `https://`
+ * scheme and the trailing slash of a bare hostname.
+ */
+function isPlaceholderTitle(title: string, url: string): boolean {
+  if (title === url) {
+    return true;
+  }
+  const withoutScheme = url.replace(/^https?:\/\//, '');
+  return title === withoutScheme || title === withoutScheme.replace(/\/$/, '');
+}
+
 function isBackendNodeId(
   id: unknown,
 ): id is DevTools.Protocol.DOM.BackendNodeId {
@@ -157,7 +171,8 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  eventBasedThirdPartyTools: ToolGroups = [];
+  // Screencast
+  #screenRecorder: ScreenRecorderData | null = null;
 
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
@@ -167,7 +182,6 @@ export class McpPage implements ContextPage {
   #navigationTimeout: number;
   #sourceMaps: boolean;
   #commentBridge?: DevToolsCommentBridge;
-  #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
@@ -178,14 +192,12 @@ export class McpPage implements ContextPage {
       isolatedContextName?: string;
       navigationTimeout?: number;
       sourceMaps?: boolean;
-      onNotification?: (message: string) => void;
     },
   ) {
     this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
     this.#sourceMaps = options.sourceMaps ?? true;
-    this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
@@ -226,13 +238,29 @@ export class McpPage implements ContextPage {
   }
 
   url(): string {
-    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+    return this.#pptrPage?.url() ?? this.target.url();
   }
 
-  getTitle(): string {
+  get targetId(): string {
     // @ts-expect-error internal types
-    const info = this.target._getTargetInfo();
-    return info.title !== this.target.url() ? info.title : '';
+    const info: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    return info.targetId;
+  }
+
+  /**
+   * Returns the page title or an empty string if the target only has Chrome's
+   * URL-based placeholder title.
+   *
+   * Puppeteer's cached target info is only refreshed by
+   * `Target.targetInfoChanged`, which Chrome emits on navigation commit (before
+   * the document title is known) but not on title changes. Callers should pass
+   * fresh target info (e.g., from `Target.getTargets`) when available.
+   */
+  getTitle(freshTargetInfo?: Protocol.Target.TargetInfo): string {
+    // @ts-expect-error internal types
+    const cachedInfo: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    const info = freshTargetInfo ?? cachedInfo;
+    return isPlaceholderTitle(info.title, info.url) ? '' : info.title;
   }
 
   isClosed(): boolean {
@@ -342,6 +370,14 @@ export class McpPage implements ContextPage {
     this.#dialog = undefined;
   }
 
+  getScreenRecorder(): ScreenRecorderData | null {
+    return this.#screenRecorder;
+  }
+
+  setScreenRecorder(data: ScreenRecorderData | null): void {
+    this.#screenRecorder = data;
+  }
+
   throwIfDialogOpen(): void {
     if (this.#dialog && !this.#dialog.handled) {
       throw new Error(
@@ -351,10 +387,7 @@ export class McpPage implements ContextPage {
   }
 
   #getDebuggingWebMcpToolGroups(): ToolGroups {
-    if (!this.#pptrPage) {
-      return [];
-    }
-    const webmcpTools = this.#pptrPage.webmcp
+    const webmcpTools = this.pptrPage.webmcp
       .tools()
       .filter(isDebuggingWebMcpTool);
     if (webmcpTools.length === 0) {
@@ -373,14 +406,7 @@ export class McpPage implements ContextPage {
     ];
   }
 
-  getThirdPartyDeveloperTools(): ToolGroups {
-    return [
-      ...this.#getDebuggingWebMcpToolGroups(),
-      ...this.eventBasedThirdPartyTools,
-    ];
-  }
-
-  async getToolGroups(): Promise<ToolGroups> {
+  async discoverThirdPartyDeveloperTools(): Promise<ToolGroups> {
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
@@ -390,8 +416,7 @@ export class McpPage implements ContextPage {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      this.eventBasedThirdPartyTools = [];
-      return this.getThirdPartyDeveloperTools();
+      return this.#getDebuggingWebMcpToolGroups();
     }
 
     const eventToolGroups = await this.pptrPage.evaluate(() => {
@@ -477,9 +502,7 @@ export class McpPage implements ContextPage {
       }
     }
 
-    this.eventBasedThirdPartyTools = eventToolGroups;
-
-    return this.getThirdPartyDeveloperTools();
+    return [...this.#getDebuggingWebMcpToolGroups(), ...eventToolGroups];
   }
 
   getWebMcpTools(): WebMCPTool[] {
@@ -529,9 +552,7 @@ export class McpPage implements ContextPage {
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
-      this.#commentBridge = new DevToolsCommentBridge({
-        onNotification: this.#onNotification,
-      });
+      this.#commentBridge = new DevToolsCommentBridge();
     }
     const attached = await this.#commentBridge.attach(devtoolsPage);
     return attached ? this.#commentBridge : undefined;
@@ -638,6 +659,13 @@ export class McpPage implements ContextPage {
     this.#disposed = true;
     this.#commentBridge?.dispose();
     this.#commentBridge = undefined;
+    if (this.#screenRecorder) {
+      const {recorder} = this.#screenRecorder;
+      this.#screenRecorder = null;
+      void recorder.stop().catch(e => {
+        logger?.('Failed to stop screencast recording on dispose', e);
+      });
+    }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
@@ -658,9 +686,13 @@ export class McpPage implements ContextPage {
       .tools()
       .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
     if (webmcpTool) {
-      const {status, output, errorText} = await webmcpTool.execute(params);
+      const {status, output, errorText, exception} =
+        await webmcpTool.execute(params);
       if (status !== 'Completed') {
-        throw new Error(errorText || `Tool execution failed: ${status}`);
+        const error = exception?.description ?? exception?.value ?? errorText;
+        throw new Error(
+          error ? String(error) : `Tool execution failed: ${status}`,
+        );
       }
       if (output !== undefined) {
         response.appendResponseLine(JSON.stringify(output, null, 2));
@@ -1041,7 +1073,6 @@ export class McpPage implements ContextPage {
       await this.ensureDevToolsCommentBridge(devtoolsPage);
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
-          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
@@ -1067,6 +1098,19 @@ export class McpPage implements ContextPage {
 
   async restoreEmulation(): Promise<void> {
     const currentSetting = this.emulationSettings;
+    const {viewport} = currentSetting;
+    if (viewport) {
+      // Lighthouse's CDP session replaces the device metrics override and
+      // clears it on detach, and Chrome ignores an override identical to the
+      // last one this session sent. A different width first makes the real
+      // call take effect without a reload (`isMobile` and `hasTouch` stay the
+      // same). This also runs after snapshot audits and fires a resize event,
+      // so do not remove it as redundant.
+      await this.pptrPage.setViewport({
+        ...viewport,
+        width: Math.max(1, viewport.width - 1),
+      });
+    }
     await this.emulate(currentSetting);
   }
 
@@ -1211,13 +1255,26 @@ export class McpPage implements ContextPage {
       }
     }
 
+    const previousViewport = this.emulationSettings.viewport;
     this.emulationSettings = Object.keys(newSettings).length ? newSettings : {};
 
     this.updateTimeouts();
 
     // This should happen after updating the page timeouts.
     // Setting the viewport can trigger a reload which we don't want to timeout.
-    await page.setViewport(newSettings.viewport ?? null);
+    try {
+      await page.setViewport(newSettings.viewport ?? null);
+    } catch (error) {
+      if (previousViewport) {
+        newSettings.viewport = previousViewport;
+      } else {
+        delete newSettings.viewport;
+      }
+      this.emulationSettings = Object.keys(newSettings).length
+        ? newSettings
+        : {};
+      throw error;
+    }
   }
 
   updateTimeouts(): void {
@@ -1227,14 +1284,14 @@ export class McpPage implements ContextPage {
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.#pptrPage.setDefaultNavigationTimeout(
+    this.pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }

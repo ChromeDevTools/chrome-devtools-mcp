@@ -25,7 +25,7 @@ exports[`pages > list_pages > list pages for side panels with --category-extensi
 ## Pages
 1: about:blank
 ## Extension Pages
-2: chrome-extension://<extension-id>/sidepanel.html [selected]
+2: Side Panel (chrome-extension://<extension-id>/sidepanel.html) [selected]
 ## Extension Service Workers
 sw-1: chrome-extension://<extension-id>/sw.js
 `;

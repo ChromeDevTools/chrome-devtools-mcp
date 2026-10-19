@@ -610,6 +610,7 @@ describe('ConsoleFormatter', () => {
             column: i,
             url: 'main.js',
             name: `fn${i}`,
+            toUiLocation: () => null,
           });
         }
         const stackTrace = {
