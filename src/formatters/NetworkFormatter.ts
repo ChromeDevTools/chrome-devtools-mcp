@@ -23,11 +23,16 @@ const URL_CONTEXT_SIZE_LIMIT = 255;
 export const RESPONSE_BODY_TIMEOUT_MS = 5000;
 
 class ResponseBodyTimeoutError extends Error {
+  readonly timeout: number;
+
   constructor(timeout: number) {
-    super(
-      `<Response body not available: the response did not finish loading within ${timeout} ms>`,
-    );
+    super(`Response body timed out after ${timeout} ms`);
+    this.timeout = timeout;
   }
+}
+
+function responseBodyTimeoutMessage(error: ResponseBodyTimeoutError): string {
+  return `<Response body not available: the response did not finish loading within ${error.timeout} ms>`;
 }
 
 export interface NetworkFormatterOptions {
@@ -135,11 +140,10 @@ export class NetworkFormatter {
         try {
           buffer = await this.#readResponseBody(response);
         } catch (error) {
-          if (error instanceof ResponseBodyTimeoutError) {
-            this.#responseBody = error.message;
-            return;
-          }
-          // Response body is not available anymore
+          this.#responseBody =
+            error instanceof ResponseBodyTimeoutError
+              ? responseBodyTimeoutMessage(error)
+              : responseBodyNotAvailableMessage;
         }
 
         if (buffer) {
@@ -154,8 +158,6 @@ export class NetworkFormatter {
             '.network-response',
           );
           this.#responseBodyFilePath = result.filename;
-        } else {
-          this.#responseBody = responseBodyNotAvailableMessage;
         }
       } else {
         this.#responseBody = await this.#getFormattedResponseBody(
@@ -274,7 +276,7 @@ export class NetworkFormatter {
       return '<binary data>';
     } catch (error) {
       if (error instanceof ResponseBodyTimeoutError) {
-        return error.message;
+        return responseBodyTimeoutMessage(error);
       }
       return '<not available anymore>';
     }
