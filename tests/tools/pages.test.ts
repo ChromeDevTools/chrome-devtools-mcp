@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
@@ -40,10 +40,6 @@ const EXTENSION_SIDE_PANEL_PATH = path.join(
 );
 
 describe('pages', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('list_pages', () => {
     it('list pages', async () => {
       const {context, response, args} = createHandlerMocks();

@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,10 +18,6 @@ import {
 import {createHandlerMocks} from '../mocks.js';
 
 describe('emulation', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('transforms', () => {
     describe('viewportTransform', () => {
       it('returns undefined for undefined input', () => {

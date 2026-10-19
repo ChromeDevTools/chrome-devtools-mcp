@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -37,10 +37,6 @@ import {
 
 describe('input', () => {
   const server = serverHooks();
-
-  afterEach(() => {
-    sinon.restore();
-  });
 
   describe('click', () => {
     it('clicks', async () => {

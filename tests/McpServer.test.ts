@@ -27,7 +27,6 @@ import {createTempFile} from './utils.js';
 
 describe('McpServer', () => {
   afterEach(() => {
-    sinon.restore();
     ClearcutLogger.resetForTesting();
   });
 

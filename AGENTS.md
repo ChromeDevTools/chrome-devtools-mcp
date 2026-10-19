@@ -48,7 +48,7 @@ This repository contains an MCP server and CLI for Chrome DevTools.
   - Use `sinon.assert.calledOnceWithExactly(stub, ...args)` for single calls with exact arguments.
   - Use `sinon.assert.calledWithExactly(stub.secondCall, ...args)` for subsequent calls.
   - Use `sinon.assert.notCalled(stub)` to assert a method was not invoked.
-- **Clean up stubs**: Always include `afterEach(() => sinon.restore());` in test suites when using Sinon.
+- **Clean up stubs**: `tests/setup.ts` runs `sinon.restore()` after every test. Do not add `afterEach(() => sinon.restore());` to test suites.
 
 ### Test Cleanliness
 

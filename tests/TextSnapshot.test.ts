@@ -7,8 +7,6 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
-import sinon from 'sinon';
-
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 
@@ -17,7 +15,6 @@ import {html, withMcpContext} from './utils.js';
 
 describe('TextSnapshot', () => {
   afterEach(() => {
-    sinon.restore();
     TextSnapshot.resetCounter();
   });
 

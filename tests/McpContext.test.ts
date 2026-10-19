@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import {Locator} from 'puppeteer';
@@ -61,10 +61,6 @@ const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
 );
 
 describe('McpContext', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   function createPageTarget() {
     const page = createMockPuppeteerPage();
     page.emulateFocusedPage.resolves();

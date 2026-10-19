@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {after, afterEach, describe, it} from 'node:test';
+import {after, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -91,10 +91,6 @@ after(() => {
 });
 
 describe('McpResponse', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('reports only pages opened by the attached action', async () => {
     const openedTarget = createMockPuppeteerTarget({
       url: 'https://example.com/opened',
@@ -1170,10 +1166,6 @@ describe('lighthouse', () => {
 });
 
 describe('third-party developer tools', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('lists third-party developer tools', async t => {
     const args = createMockParsedArguments({
       categoryExperimentalThirdParty: true,
@@ -1346,10 +1338,6 @@ describe('third-party developer tools', () => {
 });
 
 describe('webmcp', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   async function testIncludesWebmcpTools(
     t: it.TestContext,
     parseArguments: Partial<ParsedArguments>,

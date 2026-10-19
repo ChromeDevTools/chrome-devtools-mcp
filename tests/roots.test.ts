@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
@@ -169,8 +169,6 @@ function stubMissingPaths(...missingPaths: string[]) {
 }
 
 describe('McpContext path validation escaping', () => {
-  afterEach(() => sinon.restore());
-
   async function createContext(): Promise<McpContext> {
     const browser = createMockPuppeteerBrowser();
     browser.targets.returns([]);

@@ -21,7 +21,6 @@ describe('DevToolsCommentBridge', () => {
 
   afterEach(() => {
     clock.restore();
-    sinon.restore();
   });
 
   it('attaches to DevTools page and registers function and evaluation', async () => {

@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {stat, chmod, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {describe, it, afterEach} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -36,10 +36,6 @@ function pngHeight(data: Buffer): number {
 }
 
 describe('screenshot', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('downscale clip', () => {
     for (const viewport of [{width: 800, height: 600}, null]) {
       const mode = viewport ? 'emulated viewport' : 'native viewport';

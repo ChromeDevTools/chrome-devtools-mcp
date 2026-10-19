@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
@@ -35,8 +35,6 @@ const EXTENSION_PATH = path.join(
 
 describe('script', () => {
   const server = serverHooks();
-
-  afterEach(() => sinon.restore());
 
   describe('browser_evaluate_script', () => {
     it('evaluates', async () => {

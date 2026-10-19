@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {beforeEach, describe, it} from 'node:test';
 
 import type {
   ConsoleMessage,
@@ -429,10 +429,6 @@ describe('ConsoleCollector', () => {
         },
       },
     };
-  });
-
-  afterEach(() => {
-    sinon.restore();
   });
 
   it('collects issues', async () => {

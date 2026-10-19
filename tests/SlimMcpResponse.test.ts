@@ -5,18 +5,12 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
-
-import sinon from 'sinon';
+import {describe, it} from 'node:test';
 
 import {SlimMcpResponse} from '../src/SlimMcpResponse.js';
 import {createMockMcpContext, createMockParsedArguments} from './mocks.js';
 
 describe('SlimMcpResponse', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('preserves response lines when there is no error', async () => {
     const response = new SlimMcpResponse(createMockParsedArguments());
     response.appendResponseLine('Navigation complete');

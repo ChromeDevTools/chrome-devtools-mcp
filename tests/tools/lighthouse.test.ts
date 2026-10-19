@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,10 +18,6 @@ import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('lighthouse', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   const server = serverHooks();
   describe('lighthouse_audit', () => {
     it('runs Lighthouse audit by default (navigation, desktop)', async () => {

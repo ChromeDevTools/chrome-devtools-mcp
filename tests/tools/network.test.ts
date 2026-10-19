@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -15,10 +15,6 @@ import {
 import {createHandlerMocks} from '../mocks.js';
 
 describe('network', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('list_network_requests', () => {
     it('handles default parameters', async () => {
       const {page, context, response, args} = createHandlerMocks();

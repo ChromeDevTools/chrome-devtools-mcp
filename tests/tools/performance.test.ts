@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it, beforeEach} from 'node:test';
 import zlib from 'node:zlib';
 
 import sinon from 'sinon';
@@ -26,10 +26,6 @@ import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withMcpContext} from '../utils.js';
 
 describe('performance', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   beforeEach(() => {
     sinon.stub(globalThis, 'fetch').callsFake(async url => {
       const cruxEndpoint =

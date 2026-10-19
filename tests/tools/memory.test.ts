@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {existsSync} from 'node:fs';
 import {join} from 'node:path';
-import {describe, it, afterEach} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -48,10 +48,6 @@ import {
 import {createTempDir, withMcpContext} from '../utils.js';
 
 describe('memory', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('take_heapsnapshot', () => {
     it('with default options', async () => {
       using tmpDir = createTempDir();

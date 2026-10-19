@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -307,10 +307,6 @@ describe('McpPage', () => {
   }
 
   describe('lazy initialization', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('does not initialize Puppeteer Page in constructor and throws if pptrPage is accessed before init()', async () => {
       const pptrPage = createMockPuppeteerPage();
       pptrPage.emulateFocusedPage.resolves();
@@ -413,10 +409,6 @@ describe('McpPage', () => {
   });
 
   describe('getTitle()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     function createPage(url: string, title: string): McpPage {
       const target = createMockPuppeteerTarget({url, title});
       return new McpPage(target, 1, {
@@ -476,10 +468,6 @@ describe('McpPage', () => {
   });
 
   describe('emulate()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Offline'});
@@ -794,10 +782,6 @@ describe('McpPage', () => {
   });
 
   describe('restoreEmulation()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('re-applies previously configured viewport emulation', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
@@ -1024,10 +1008,6 @@ describe('McpPage', () => {
   });
 
   describe('DevToolsCommentBridge lifecycle', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('does not create commentBridge on construction or getDevToolsPage', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
@@ -1120,10 +1100,6 @@ describe('McpPage', () => {
   });
 
   describe('resolveBackendNodeId()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     function createSnapshotWithNodes(
       nodes: Array<{id: string; backendNodeId?: number}>,
       verbose = false,
@@ -1255,10 +1231,6 @@ describe('McpPage', () => {
       assert.ok(matchedStyles);
       return getSelectors(matchedStyles);
     }
-
-    afterEach(() => {
-      sinon.restore();
-    });
 
     it('throws when snapshot has not been captured', async () => {
       const {mcpPage} = await createMcpPage();
@@ -1432,10 +1404,6 @@ describe('McpPage', () => {
   });
 
   describe('executeThirdPartyDeveloperTool()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('appends "Tool returned no result." and skips cleanup evaluate when the tool returns undefined and stashed is 0', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const response = createMockMcpResponse();
@@ -1472,10 +1440,6 @@ describe('McpPage', () => {
   });
 
   describe('WebMCP third-party developer tools', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('filters WebMCP tools by annotations.debugging in discoverThirdPartyDeveloperTools()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 

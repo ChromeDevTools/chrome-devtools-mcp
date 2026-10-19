@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,8 +16,6 @@ import {DEFAULT_FILESYSTEM_ROOT} from '../../src/config/mcp-options.js';
 import {createTempFile} from '../utils.js';
 
 describe('mcp-options steps', () => {
-  afterEach(() => sinon.restore());
-
   const parser = new ConfigParser('0.0.0');
 
   describe('parseCliArgs', () => {

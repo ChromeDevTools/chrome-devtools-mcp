@@ -35,7 +35,6 @@ import {getMockBrowser} from './utils.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {
-    sinon.restore();
     ClearcutLogger.resetForTesting();
   });
 
