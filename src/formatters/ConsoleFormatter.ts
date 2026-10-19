@@ -11,7 +11,7 @@ import {
 } from '../devtools/DevtoolsUtils.js';
 import {UncaughtError} from '../collectors/PageCollector.js';
 import * as DevTools from '../third_party/index.js';
-import type {ConsoleMessage} from '../third_party/index.js';
+import type {ConsoleMessage, Protocol} from '../third_party/index.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
 import {formatRemoteObject} from './RemoteObjectFormatter.js';
@@ -49,13 +49,9 @@ interface ConsoleMessageDetailed extends ConsoleMessageConcise {
   stackTrace?: string;
 }
 
-type RemoteObject = ReturnType<
-  Awaited<ReturnType<ConsoleMessage['args']>>[number]['remoteObject']
->;
-
 // JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
 // on symbols and cyclic objects. Those are formatted from their preview.
-function isJsonLike(remoteObject: RemoteObject): boolean {
+function isJsonLike(remoteObject: Protocol.Runtime.RemoteObject): boolean {
   if (remoteObject.type === 'object') {
     return (
       remoteObject.subtype === undefined ||
