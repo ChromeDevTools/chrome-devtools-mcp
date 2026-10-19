@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
 import {Client, InMemoryTransport} from '@modelcontextprotocol/client';
 import sinon from 'sinon';
@@ -54,6 +55,30 @@ describe('McpServer', () => {
     const config = parseConfig(extraArgs);
     const server = await McpServer.from(config, {browserManager});
     return {server, browserManager, context, config};
+  }
+
+  async function connectClient(server: McpServer): Promise<Client> {
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({name: 'test', version: '1.0.0'});
+    await client.connect(clientTransport);
+    return client;
+  }
+
+  async function listServerTools(server: McpServer) {
+    const client = await connectClient(server);
+    try {
+      const {tools} = await client.listTools();
+      return tools;
+    } finally {
+      await client.close();
+    }
+  }
+
+  async function listServerToolNames(server: McpServer): Promise<string[]> {
+    const tools = await listServerTools(server);
+    return tools.map(tool => tool.name);
   }
 
   describe('callTool', () => {
@@ -247,16 +272,9 @@ describe('McpServer', () => {
   describe('tool list', () => {
     async function listToolNames(extraArgs: string[] = []): Promise<string[]> {
       const {server} = await createTestServer(extraArgs);
-      const [clientTransport, serverTransport] =
-        InMemoryTransport.createLinkedPair();
-      await server.connect(serverTransport);
-      const client = new Client({name: 'test', version: '1.0.0'});
-      await client.connect(clientTransport);
       try {
-        const {tools} = await client.listTools();
-        return tools.map(tool => tool.name).sort();
+        return (await listServerToolNames(server)).sort();
       } finally {
-        await client.close();
         await server.close();
       }
     }
@@ -317,30 +335,20 @@ describe('McpServer', () => {
   });
 
   describe('applyConfig', () => {
-    async function listToolNames(server: McpServer): Promise<string[]> {
-      const [clientTransport, serverTransport] =
-        InMemoryTransport.createLinkedPair();
-      await server.connect(serverTransport);
-      const client = new Client({name: 'test', version: '1.0.0'});
-      await client.connect(clientTransport);
-      try {
-        const {tools} = await client.listTools();
-        return tools.map(tool => tool.name);
-      } finally {
-        await client.close();
-      }
-    }
-
     it('enables tools that were disabled', async () => {
       const {server} = await createTestServer();
       assert.ok(
-        !(await listToolNames(server)).includes('get_heapsnapshot_summary'),
+        !(await listServerToolNames(server)).includes(
+          'get_heapsnapshot_summary',
+        ),
       );
 
       await server.applyConfig(parseConfig(['--memoryDebugging']));
 
       assert.ok(
-        (await listToolNames(server)).includes('get_heapsnapshot_summary'),
+        (await listServerToolNames(server)).includes(
+          'get_heapsnapshot_summary',
+        ),
       );
     });
 
@@ -349,7 +357,7 @@ describe('McpServer', () => {
 
       await server.applyConfig(parseConfig(['--slim']));
 
-      const slimToolNames = await listToolNames(server);
+      const slimToolNames = await listServerToolNames(server);
       assert.ok(!slimToolNames.includes('navigate_page'));
       assert.ok(slimToolNames.includes('navigate'));
     });
@@ -360,8 +368,21 @@ describe('McpServer', () => {
       await server.applyConfig(parseConfig(['--no-category-network']));
 
       assert.ok(
-        !(await listToolNames(server)).includes('list_network_requests'),
+        !(await listServerToolNames(server)).includes('list_network_requests'),
       );
+    });
+
+    it('updates the listed tool schema when options change', async () => {
+      const {server} = await createTestServer();
+
+      await server.applyConfig(parseConfig(['--no-page-id-routing']));
+
+      const tools = await listServerTools(server);
+      const consoleTool = tools.find(
+        tool => tool.name === 'list_console_messages',
+      );
+      assert.ok(consoleTool);
+      assert.ok(!('pageId' in (consoleTool.inputSchema.properties ?? {})));
     });
 
     it('uses the new arguments for tool calls', async () => {
@@ -374,20 +395,15 @@ describe('McpServer', () => {
       });
 
       assert.strictEqual(result.isError, true);
-      assert.match(
-        result.content[0]?.type === 'text' ? result.content[0].text : '',
-        /requires flag --javascriptEvaluation/,
-      );
+      const firstBlock = result.content[0];
+      assert.strictEqual(firstBlock.type, 'text');
+      assert.match(firstBlock.text, /requires flag --javascriptEvaluation/);
       sinon.assert.notCalled(browserManager.ensureBrowser);
     });
 
     it('validates MCP tool calls queued behind applyConfig against the updated config', async () => {
       const {server, context} = await createTestServer();
-      const [clientTransport, serverTransport] =
-        InMemoryTransport.createLinkedPair();
-      await server.connect(serverTransport);
-      const client = new Client({name: 'test', version: '1.0.0'});
-      await client.connect(clientTransport);
+      const client = await connectClient(server);
 
       try {
         const {promise: firstBrowser, resolve: releaseFirstCall} =
@@ -420,9 +436,10 @@ describe('McpServer', () => {
         assert.strictEqual(secondResult.isError, true);
         const content = secondResult.content;
         assert.ok(Array.isArray(content));
-        assert.strictEqual(content[0]?.type, 'text');
+        const firstBlock = content[0];
+        assert.strictEqual(firstBlock.type, 'text');
         assert.match(
-          content[0].text,
+          firstBlock.text,
           /^Input validation error: Invalid arguments for tool list_console_messages: .*pageId/,
         );
       } finally {
@@ -430,7 +447,7 @@ describe('McpServer', () => {
       }
     });
 
-    it('commits the shared config and notifies the context with previous args', async () => {
+    it('commits the shared config, updates roots, and notifies the context with previous args', async () => {
       const {server, context, config} = await createTestServer([
         '--blockedUrlPattern',
         'https://example.com/*',
@@ -440,9 +457,18 @@ describe('McpServer', () => {
       context.onConfigChanged.callsFake(async () => {
         cruxWhenNotified = config.resolved.performanceCrux;
       });
+      const rootPath = path.resolve('/tmp/reloaded-workspace');
 
-      await server.applyConfig(parseConfig(['--no-performance-crux']));
+      await server.applyConfig(
+        parseConfig(['--no-performance-crux', `--workspace=${rootPath}`]),
+      );
 
+      sinon.assert.calledWithExactly(context.setRoots.secondCall, [
+        {
+          uri: pathToFileURL(rootPath).href,
+          name: 'reloaded-workspace',
+        },
+      ]);
       sinon.assert.calledOnceWithExactly(context.onConfigChanged, previousArgs);
       assert.strictEqual(cruxWhenNotified, false);
       assert.deepStrictEqual(config.resolved.blockedUrlPattern, [
@@ -450,15 +476,34 @@ describe('McpServer', () => {
       ]);
     });
 
+    it('logs the CrUX disclaimer only when CrUX becomes active', async () => {
+      const {server} = await createTestServer(['--no-performance-crux']);
+      const defaultConfig = parseConfig();
+      const errorStub = sinon.stub(console, 'error');
+
+      await server.applyConfig(defaultConfig);
+
+      sinon.assert.calledOnceWithExactly(
+        errorStub,
+        'Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.',
+      );
+
+      await server.applyConfig(defaultConfig);
+
+      sinon.assert.calledOnce(errorStub);
+    });
+
     it('keeps restart-required options the server was started with', async () => {
       const {server} = await createTestServer();
 
       await server.applyConfig(parseConfig(['--categoryExtensions']));
 
-      assert.ok(!(await listToolNames(server)).includes('install_extension'));
+      assert.ok(
+        !(await listServerToolNames(server)).includes('install_extension'),
+      );
     });
 
-    it('does not notify the client when no tool changed', async () => {
+    it('notifies the client only when a tool changed', async () => {
       const {server} = await createTestServer();
       const sendToolListChanged = sinon.spy(
         server.server,
@@ -466,8 +511,10 @@ describe('McpServer', () => {
       );
 
       await server.applyConfig(parseConfig());
-
       sinon.assert.notCalled(sendToolListChanged);
+
+      await server.applyConfig(parseConfig(['--memoryDebugging']));
+      sinon.assert.called(sendToolListChanged);
     });
 
     it('does not connect a browser when experimentalIncludeAllPages changes before a browser connects', async () => {

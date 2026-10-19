@@ -206,11 +206,7 @@ export class McpServer {
       }
     }
 
-    if (
-      (!previousArgs.performanceCrux || previousArgs.slim) &&
-      !nextArgs.slim &&
-      nextArgs.performanceCrux
-    ) {
+    if (!previousArgs.performanceCrux || previousArgs.slim) {
       logCruxDisclaimer(nextArgs);
     }
 
