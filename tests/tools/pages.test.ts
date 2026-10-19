@@ -1696,7 +1696,7 @@ describe('pages', () => {
         await evalPromise;
       });
     });
-    it('can dismiss already dismissed dialog dialogs', async () => {
+    it('throws when the dialog was already dismissed', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         const dialogPromise = new Promise<Dialog>(resolve => {
@@ -1709,20 +1709,19 @@ describe('pages', () => {
         });
         const dialog = await dialogPromise;
         await dialog.dismiss();
-        await handleDialog(args).handler(
-          {
-            params: {
-              action: 'dismiss',
-            },
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
         assert.strictEqual(context.getSelectedMcpPage().getDialog(), undefined);
-        assert.strictEqual(
-          response.responseLines[0],
-          'Successfully dismissed the dialog',
+        await assert.rejects(
+          handleDialog(args).handler(
+            {
+              params: {
+                action: 'dismiss',
+              },
+              page: context.getSelectedMcpPage(),
+            },
+            response,
+            context,
+          ),
+          {message: 'No open dialog found'},
         );
         await evalPromise;
       });

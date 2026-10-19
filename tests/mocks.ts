@@ -466,11 +466,16 @@ export function createMockMcpPage(
 }
 
 export function createMockDialog(
-  options: {type?: Protocol.Page.DialogType; message?: string} = {},
+  options: {
+    type?: Protocol.Page.DialogType;
+    message?: string;
+    handled?: boolean;
+  } = {},
 ): sinon.SinonStubbedInstance<Dialog> {
   const dialog = sinon.createStubInstance(Dialog);
   dialog.type.returns(options.type ?? 'alert');
   dialog.message.returns(options.message ?? '');
+  sinon.stub(dialog, 'handled').get(() => options.handled ?? false);
   return dialog;
 }
 
