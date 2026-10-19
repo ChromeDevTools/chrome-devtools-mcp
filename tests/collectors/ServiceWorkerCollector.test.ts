@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -20,10 +20,6 @@ import {
 } from '../mocks.js';
 
 describe('ServiceWorkerConsoleCollector', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('limits logs to 1000 per extension', () => {
     const collector = new ServiceWorkerConsoleCollector(undefined, 10);
     const extensionId = 'test-extension';

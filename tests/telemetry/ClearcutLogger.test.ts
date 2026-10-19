@@ -31,7 +31,6 @@ describe('ClearcutLogger', () => {
   });
 
   afterEach(() => {
-    sinon.restore();
     ClearcutLogger.resetForTesting();
   });
 

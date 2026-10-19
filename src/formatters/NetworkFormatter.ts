@@ -114,8 +114,14 @@ export class NetworkFormatter {
       const responseBodyNotAvailableMessage =
         '<Response body not available anymore>';
       if (this.#options.responseFilePath) {
+        let buffer: Uint8Array | undefined;
         try {
-          const buffer = await response.buffer();
+          buffer = await response.buffer();
+        } catch {
+          // Response body is not available anymore
+        }
+
+        if (buffer) {
           if (!this.#options.saveFile) {
             throw new Error(
               'Unable to save the response body to a file: no saveFile callback was configured.',
@@ -127,11 +133,7 @@ export class NetworkFormatter {
             '.network-response',
           );
           this.#responseBodyFilePath = result.filename;
-        } catch {
-          // Flatten error handling for buffer() failure and save failure
-        }
-
-        if (!this.#responseBodyFilePath) {
+        } else {
           this.#responseBody = responseBodyNotAvailableMessage;
         }
       } else {
@@ -176,7 +178,13 @@ export class NetworkFormatter {
   }
 
   toJSONDetailed(): NetworkRequestDetailed {
-    const redirectChain = this.#request.redirectChain();
+    // Puppeteer shares one redirect chain array between all hops of a
+    // redirect, so earlier hops also list themselves and the hops after them.
+    // Keep only the requests that redirected to this one.
+    const fullChain = this.#request.redirectChain();
+    const ownIndex = fullChain.indexOf(this.#request);
+    const redirectChain =
+      ownIndex === -1 ? fullChain : fullChain.slice(0, ownIndex);
     const formattedRedirectChain = redirectChain.reverse().map(request => {
       const id = this.#options.requestIdResolver
         ? this.#options.requestIdResolver(request)

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -12,10 +12,6 @@ import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
 import {createHandlerMocks} from '../mocks.js';
 
 describe('snapshot', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('take_snapshot', () => {
     it('includes a snapshot', async () => {
       const {page, context, response, args} = createHandlerMocks();

@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,16 +16,7 @@ import {DEFAULT_FILESYSTEM_ROOT} from '../../src/config/mcp-options.js';
 import {createTempFile} from '../utils.js';
 
 describe('mcp-options steps', () => {
-  afterEach(() => sinon.restore());
-
   const parser = new ConfigParser('0.0.0');
-
-  describe('constructor', () => {
-    it('initializes configLocator', () => {
-      const testParser = new ConfigParser('0.0.0');
-      assert.ok(testParser.configLocator instanceof ConfigLocator);
-    });
-  });
 
   describe('parseCliArgs', () => {
     it('returns only explicitly passed flags', () => {
@@ -81,11 +72,11 @@ describe('mcp-options steps', () => {
 
   describe('validateConflicts', () => {
     it('accepts a single argument from a conflict group', () => {
-      parser.validateConflicts({browserUrl: 'http://localhost:9222'});
+      ConfigParser.validateConflicts({browserUrl: 'http://localhost:9222'});
     });
 
     it('ignores false and undefined values', () => {
-      parser.validateConflicts({
+      ConfigParser.validateConflicts({
         browserUrl: 'http://localhost:9222',
         wsEndpoint: undefined,
         categoryExtensions: false,
@@ -95,7 +86,7 @@ describe('mcp-options steps', () => {
     it('rejects two arguments from the same group', () => {
       assert.throws(
         () =>
-          parser.validateConflicts({
+          ConfigParser.validateConflicts({
             browserUrl: 'http://localhost:9222',
             channel: 'canary',
           }),
@@ -105,11 +96,11 @@ describe('mcp-options steps', () => {
 
     describe('validateImplications', () => {
       it('accepts when implying key is not set', () => {
-        parser.validateImplications({wsEndpoint: 'ws://localhost:9222'});
+        ConfigParser.validateImplications({wsEndpoint: 'ws://localhost:9222'});
       });
 
       it('accepts when both implying and implied keys are set', () => {
-        parser.validateImplications({
+        ConfigParser.validateImplications({
           wsHeaders: {Auth: 'token'},
           wsEndpoint: 'ws://localhost:9222',
         });
@@ -117,7 +108,7 @@ describe('mcp-options steps', () => {
 
       it('rejects when implying key is set but implied key is missing', () => {
         assert.throws(
-          () => parser.validateImplications({wsHeaders: {Auth: 'token'}}),
+          () => ConfigParser.validateImplications({wsHeaders: {Auth: 'token'}}),
           /Implications failed:\n {2}wsHeaders -> wsEndpoint/,
         );
       });
@@ -125,7 +116,7 @@ describe('mcp-options steps', () => {
       it('rejects when implying key is set but implied key is negated', () => {
         assert.throws(
           () =>
-            parser.validateImplications({
+            ConfigParser.validateImplications({
               experimentalFfmpegPath: '/bin/ffmpeg',
               experimentalScreencast: false,
             }),
@@ -197,13 +188,32 @@ describe('mcp-options steps', () => {
       });
       assert.strictEqual(args.usageStatistics, false);
     });
+
+    it('prints the usage statistics notice once', () => {
+      const consoleError = sinon.stub(console, 'error');
+      const parser = new ConfigParser('0.0.0', [], {CI: 'true'});
+
+      parser.applyDefaults({});
+      const args = parser.applyDefaults({});
+
+      assert.strictEqual(args.usageStatistics, false);
+      sinon.assert.calledOnce(consoleError);
+    });
   });
 
   describe('config discovery', () => {
-    it('does not discover a config file without a locator', () => {
-      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      sinon.stub(parser.configLocator, 'locate').returns(undefined);
+    it('does not discover a config file when locator returns undefined', () => {
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js'],
+        {},
+        false,
+        locator,
+      );
       assert.strictEqual(parser.parse().config, undefined);
+      assert.strictEqual(parser.configPath, undefined);
     });
 
     it('uses the config file found by the locator', () => {
@@ -212,15 +222,13 @@ describe('mcp-options steps', () => {
         'cd4a.config.json',
       );
       const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      const locateStub = sinon
-        .stub(parser.configLocator, 'locate')
-        .returns(configFile.path);
+      sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
 
       const args = parser.parse();
 
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.config, configFile.path);
-      sinon.assert.calledOnce(locateStub);
+      assert.strictEqual(parser.configPath, configFile.path);
     });
 
     it('prefers --config over a discovered config file', () => {
@@ -298,6 +306,85 @@ describe('mcp-options steps', () => {
       fs.writeFileSync(configFile.path, '{');
 
       assert.throws(() => parser.reload(), /Invalid JSON config file/);
+    });
+  });
+
+  describe('mergeReloadableOptions', () => {
+    function parseArgs(argv: string[] = []) {
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      return new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js', ...argv],
+        {},
+        false,
+        locator,
+      ).parse();
+    }
+
+    it('applies reloadable options', () => {
+      const merged = ConfigParser.mergeReloadableOptions(
+        parseArgs(),
+        parseArgs([
+          '--memoryDebugging',
+          '--no-category-network',
+          '--no-file-navigations',
+          '--slim',
+        ]),
+      );
+
+      assert.strictEqual(merged.memoryDebugging, true);
+      assert.strictEqual(merged.categoryNetwork, false);
+      assert.strictEqual(merged.fileNavigations, false);
+      assert.strictEqual(merged.slim, true);
+    });
+
+    it('keeps restart-required options', () => {
+      const merged = ConfigParser.mergeReloadableOptions(
+        parseArgs(),
+        parseArgs([
+          '--categoryExtensions',
+          '--blockedUrlPattern=https://example.com/*',
+          '--experimentalDevtools',
+        ]),
+      );
+
+      assert.strictEqual(merged.categoryExtensions, undefined);
+      assert.strictEqual(merged.blockedUrlPattern, undefined);
+      assert.strictEqual(merged.experimentalDevtools, false);
+    });
+
+    it('keeps options derived from restart-required options', () => {
+      const previous = parseArgs(['--viaCli']);
+      const next = parseArgs([
+        '--viaCli',
+        '--browserUrl=http://127.0.0.1:9222',
+      ]);
+
+      const merged = ConfigParser.mergeReloadableOptions(previous, next);
+
+      assert.strictEqual(merged.categoryExtensions, true);
+      assert.strictEqual(merged.browserUrl, undefined);
+    });
+
+    it('rejects reloadable options that conflict with startup restart-required options', () => {
+      const previous = parseArgs(['--browserUrl=http://127.0.0.1:9222']);
+      const next = parseArgs(['--categoryPwa']);
+
+      assert.throws(
+        () => ConfigParser.mergeReloadableOptions(previous, next),
+        /Arguments categoryPwa and browserUrl are mutually exclusive/,
+      );
+    });
+
+    it('does not conflict with default options', () => {
+      const merged = ConfigParser.mergeReloadableOptions(
+        parseArgs(),
+        parseArgs(['--allow-unrestricted-paths']),
+      );
+
+      assert.strictEqual(merged.allowUnrestrictedPaths, true);
+      assert.strictEqual(merged.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
   });
 });
