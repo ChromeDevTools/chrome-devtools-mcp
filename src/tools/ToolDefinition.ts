@@ -77,6 +77,17 @@ export type FileVerificationOption =
 
 type AllKeys<T> = T extends unknown ? keyof T : never;
 
+/**
+ * Which locks `ToolHandler` holds while a tool runs.
+ *
+ * - `'exclusive'`: the context lock, exclusive, for the whole call. No other
+ *   tool runs at the same time. This is the default.
+ * - `'yielding'`: like `'exclusive'`, but the handler runs unlocked. Page
+ *   lookup before the handler and response formatting after it stay locked.
+ *   Only for tools that wait for external events.
+ */
+export type ToolConcurrency = 'exclusive' | 'yielding';
+
 type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
   ? K extends keyof Schema
     ? Exclude<Schema[K], undefined>
@@ -113,12 +124,10 @@ export interface BaseToolDefinition<
   schema: Schema;
   blockedByDialog: boolean;
   /**
-   * When true, the handler runs without the server tool lock, so other tool
-   * calls proceed while this handler waits. Page lookup before the handler
-   * and response formatting after it still run under the lock. Only set
-   * this for tools that wait for external events.
+   * Which locks the server holds while the tool runs. Defaults to
+   * `'exclusive'`. See {@link ToolConcurrency}.
    */
-  yieldsToolLock?: boolean;
+  concurrency?: ToolConcurrency;
   verifyFilesSchema: Partial<
     Record<keyof MergeSchema<Schema>, FileVerificationOption>
   >;

@@ -186,8 +186,9 @@ export class BrowserManager {
    * McpContext initialization built on it — if ensureBrowser() already
    * resolved and it's that later step hanging (e.g. a dead CDP transport),
    * the token rotation alone does nothing, since #browser is already
-   * cached. Safe to forget unconditionally here: the tool mutex serializes
-   * every call, so there's no concurrent caller to disrupt.
+   * cached. Safe to forget unconditionally here: the exclusive context lock
+   * serializes every browser tool call, so there's no concurrent caller to
+   * disrupt.
    */
   abandonPendingAttempt(): void {
     this.#browserAttempt = new BrowserAttempt();
@@ -361,7 +362,7 @@ export class BrowserManager {
       // periodically and terminates it on a missed pong, which rejects the
       // in-flight CDP calls and fires `disconnected` so #evictIfCurrent()
       // drops the stale handle. Without this, such a call would hang until
-      // protocolTimeout while holding the tool mutex.
+      // protocolTimeout while holding the context lock.
       wsOptions: {
         keepAlive: true,
         headers: wsHeaders,

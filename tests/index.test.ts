@@ -243,7 +243,7 @@ describe('e2e', {concurrency: true}, () => {
     await withClient(
       async client => {
         // A client that negotiates roots but never responds. getContext()
-        // awaits updateRoots() while holding the tool mutex, so an unbounded
+        // awaits updateRoots() while holding the context lock, so an unbounded
         // request would stall this call for the SDK default of 60s.
         client.setRequestHandler('roots/list', () => {
           return new Promise<never>(() => {

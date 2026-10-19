@@ -70,7 +70,7 @@ export const getDevtoolsComments = definePageTool(() => ({
   },
   blockedByDialog: false,
   // The handler waits for comment events. Other tools run during the wait.
-  yieldsToolLock: true,
+  concurrency: 'yielding',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

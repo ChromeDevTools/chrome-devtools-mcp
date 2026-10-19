@@ -17,8 +17,12 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
-import {zod, Mutex} from '../src/third_party/index.js';
-import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
+import {zod} from '../src/third_party/index.js';
+import {
+  CONTEXT_LOCK_KEY,
+  TOOL_CALL_TIMEOUT_MS,
+  ToolHandler,
+} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import {
   defineBrowserlessTool,
@@ -26,10 +30,12 @@ import {
   type BrowserlessToolDefinition,
   type DefinedPageTool,
   type DevToolsData,
+  type ToolConcurrency,
   type ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
+import {KeyedLock} from '../src/utils/KeyedLock.js';
 import {createMockMcpContext} from './mocks.js';
 import {getMockBrowser} from './utils.js';
 
@@ -64,13 +70,13 @@ describe('ToolHandler', () => {
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getPageById.returns(mockPage);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
 
     const toolHandler = new ToolHandler(
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -110,13 +116,13 @@ describe('ToolHandler', () => {
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getSelectedMcpPage.returns(mockPage);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
 
     const toolHandler = new ToolHandler(
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -149,7 +155,7 @@ describe('ToolHandler', () => {
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -158,7 +164,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -172,10 +178,10 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
   });
 
-  describe('yieldsToolLock', () => {
+  describe("concurrency: 'yielding'", () => {
     function createGlobalTool(
       handler: ToolDefinition['handler'],
-      options: {name?: string; yieldsToolLock?: boolean} = {},
+      options: {name?: string; concurrency?: ToolConcurrency} = {},
     ): ToolDefinition {
       return {
         name: options.name ?? 'global_tool',
@@ -186,13 +192,13 @@ describe('ToolHandler', () => {
         },
         schema: {},
         blockedByDialog: false,
-        yieldsToolLock: options.yieldsToolLock,
+        concurrency: options.concurrency,
         verifyFilesSchema: {},
         handler,
       };
     }
 
-    function createHandler(tool: ToolDefinition, toolMutex: Mutex) {
+    function createHandler(tool: ToolDefinition, toolLocks: KeyedLock) {
       const mockContext = sinon.createStubInstance(McpContext);
       const mockProcess = sinon.createStubInstance(ChildProcess);
       mockContext.ensureBrowser.resolves(
@@ -205,13 +211,13 @@ describe('ToolHandler', () => {
         tool,
         serverArgs,
         async () => mockContext,
-        toolMutex,
+        toolLocks,
         sinon.spy(),
       );
     }
 
     it('lets another tool run while a yielding tool waits', async () => {
-      const toolMutex = new Mutex();
+      const toolLocks = new KeyedLock();
       const events: string[] = [];
       const {promise: release, resolve: finishWait} =
         Promise.withResolvers<void>();
@@ -222,7 +228,7 @@ describe('ToolHandler', () => {
           await release;
           events.push('waiting:end');
         },
-        {name: 'waiting_tool', yieldsToolLock: true},
+        {name: 'waiting_tool', concurrency: 'yielding'},
       );
       const otherTool = createGlobalTool(
         async () => {
@@ -231,8 +237,8 @@ describe('ToolHandler', () => {
         {name: 'other_tool'},
       );
 
-      const waitingHandler = createHandler(waitingTool, toolMutex);
-      const otherHandler = createHandler(otherTool, toolMutex);
+      const waitingHandler = createHandler(waitingTool, toolLocks);
+      const otherHandler = createHandler(otherTool, toolLocks);
 
       const waitingResult = waitingHandler.handle({});
       // Let the waiting tool enter its handler before the other tool is
@@ -251,7 +257,7 @@ describe('ToolHandler', () => {
     });
 
     it('holds the lock for tools that do not yield', async () => {
-      const toolMutex = new Mutex();
+      const toolLocks = new KeyedLock();
       const events: string[] = [];
       const {promise: release, resolve: finishWait} =
         Promise.withResolvers<void>();
@@ -271,8 +277,8 @@ describe('ToolHandler', () => {
         {name: 'other_tool'},
       );
 
-      const blockingHandler = createHandler(blockingTool, toolMutex);
-      const otherHandler = createHandler(otherTool, toolMutex);
+      const blockingHandler = createHandler(blockingTool, toolLocks);
+      const otherHandler = createHandler(otherTool, toolLocks);
 
       const blockingResult = blockingHandler.handle({});
       await new Promise(resolve => setImmediate(resolve));
@@ -289,7 +295,7 @@ describe('ToolHandler', () => {
     });
 
     it('builds the response only after a queued tool releases the lock', async () => {
-      const toolMutex = new Mutex();
+      const toolLocks = new KeyedLock();
       const events: string[] = [];
       const {promise: otherBlocked, resolve: unblockOther} =
         Promise.withResolvers<void>();
@@ -299,7 +305,7 @@ describe('ToolHandler', () => {
           await new Promise(resolve => setImmediate(resolve));
           events.push('waiting:handler-done');
         },
-        {name: 'waiting_tool', yieldsToolLock: true},
+        {name: 'waiting_tool', concurrency: 'yielding'},
       );
       const otherTool = createGlobalTool(
         async () => {
@@ -310,8 +316,8 @@ describe('ToolHandler', () => {
         {name: 'other_tool'},
       );
 
-      const waitingHandler = createHandler(waitingTool, toolMutex);
-      const otherHandler = createHandler(otherTool, toolMutex);
+      const waitingHandler = createHandler(waitingTool, toolLocks);
+      const otherHandler = createHandler(otherTool, toolLocks);
 
       const waitingResult = waitingHandler.handle({}).then(result => {
         events.push('waiting:result');
@@ -333,20 +339,22 @@ describe('ToolHandler', () => {
     });
 
     it('re-acquires the lock when a yielding handler throws', async () => {
-      const toolMutex = new Mutex();
+      const toolLocks = new KeyedLock();
       const tool = createGlobalTool(
         async () => {
           throw new Error('handler failed');
         },
-        {yieldsToolLock: true},
+        {concurrency: 'yielding'},
       );
-      const handler = createHandler(tool, toolMutex);
+      const handler = createHandler(tool, toolLocks);
 
       const result = await handler.handle({});
 
       assert.strictEqual(result.isError, true);
       // The lock is free again: a plain acquire must resolve.
-      const guard = await toolMutex.acquire();
+      const guard = await toolLocks.acquire([
+        {key: CONTEXT_LOCK_KEY, mode: 'exclusive'},
+      ]);
       guard[Symbol.dispose]();
     });
   });
@@ -397,7 +405,7 @@ describe('ToolHandler', () => {
         tool,
         serverArgs,
         async () => mockContext,
-        new Mutex(),
+        new KeyedLock(),
         sinon.spy(),
       ).handle({});
 
@@ -469,13 +477,13 @@ describe('ToolHandler', () => {
         logToolInvocation: logSpy,
       } as unknown as ClearcutLogger);
 
-      const toolMutex = new Mutex();
+      const toolLocks = new KeyedLock();
 
       const toolHandler = new ToolHandler(
         testCase.tool,
         serverArgs,
         async () => mockContext,
-        toolMutex,
+        toolLocks,
         sinon.spy(),
       );
 
@@ -514,7 +522,7 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -523,7 +531,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -567,7 +575,7 @@ describe('ToolHandler', () => {
     };
 
     const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser(
       '1.0.0',
       ['node', 'script.js', '--categoryEmulation=false'],
@@ -578,7 +586,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -595,7 +603,7 @@ describe('ToolHandler', () => {
 
   it('registers evaluate_script by default and disables it when javascriptEvaluation is false', async () => {
     const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
 
     const defaultServerArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
@@ -610,7 +618,7 @@ describe('ToolHandler', () => {
       defaultTool,
       defaultServerArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
     assert.strictEqual(defaultHandler.disabled, false);
@@ -630,7 +638,7 @@ describe('ToolHandler', () => {
       disabledTool,
       disabledServerArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
     assert.strictEqual(disabledHandler.disabled, true);
@@ -659,7 +667,7 @@ describe('ToolHandler', () => {
       cliTool,
       cliServerArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
     assert.strictEqual(cliHandler.disabled, false);
@@ -673,7 +681,7 @@ describe('ToolHandler', () => {
 
   it('disables slim evaluate tool when javascriptEvaluation is false', async () => {
     const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
 
     const defaultServerArgs = new ConfigParser(
       '1.0.0',
@@ -690,7 +698,7 @@ describe('ToolHandler', () => {
       defaultTool,
       defaultServerArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
     assert.strictEqual(defaultHandler.disabled, false);
@@ -710,7 +718,7 @@ describe('ToolHandler', () => {
       disabledTool,
       disabledServerArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
     assert.strictEqual(disabledHandler.disabled, true);
@@ -731,7 +739,7 @@ describe('ToolHandler', () => {
         tool,
         serverArgs,
         async () => sinon.createStubInstance(McpContext),
-        new Mutex(),
+        new KeyedLock(),
         sinon.spy(),
       );
     }
@@ -813,7 +821,7 @@ describe('ToolHandler', () => {
       );
     });
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -822,7 +830,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -890,7 +898,7 @@ describe('ToolHandler', () => {
       new Error('Access denied: path is outside roots'),
     );
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -899,7 +907,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -931,7 +939,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      new Mutex(),
+      new KeyedLock(),
       sinon.spy(),
     );
     const sourcePath = path.resolve('/outside/workspace/script.js');
@@ -979,7 +987,7 @@ describe('ToolHandler', () => {
     const canonicalPath = path.resolve('/canonical/workspace/upload.png');
     mockContext.validatePath.resolves(canonicalPath);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -988,7 +996,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1039,7 +1047,7 @@ describe('ToolHandler', () => {
     const canonicalBundlePath = path.resolve('/canonical/workspace/app.swbn');
     mockContext.validatePath.resolves(canonicalBundlePath);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1048,7 +1056,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1102,7 +1110,7 @@ describe('ToolHandler', () => {
       }),
     );
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1111,7 +1119,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1153,7 +1161,7 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     mockContext.ensureBrowser.resolves(getMockBrowser());
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1162,7 +1170,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1203,7 +1211,7 @@ describe('ToolHandler', () => {
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1212,7 +1220,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1254,7 +1262,7 @@ describe('ToolHandler', () => {
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1263,7 +1271,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1316,7 +1324,7 @@ describe('ToolHandler', () => {
     const canonicalOutputPath = path.resolve('/canonical/output.json');
     mockContext.validatePath.resolves(canonicalOutputPath);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1325,7 +1333,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1378,7 +1386,7 @@ describe('ToolHandler', () => {
       new Error('Path is outside configured roots'),
     );
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1387,7 +1395,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1426,7 +1434,7 @@ describe('ToolHandler', () => {
       },
     };
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1444,7 +1452,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockRemoteContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1466,7 +1474,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockLocalContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1517,13 +1525,13 @@ describe('ToolHandler', () => {
     const canonicalFilePath = path.resolve('/canonical/output.png');
     mockContext.validatePath.resolves(canonicalFilePath);
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
 
     const toolHandler = new ToolHandler(
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1575,7 +1583,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      new Mutex(),
+      new KeyedLock(),
       sinon.spy(),
     );
 
@@ -1617,7 +1625,7 @@ describe('ToolHandler', () => {
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1626,7 +1634,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       sinon.spy(),
     );
 
@@ -1671,7 +1679,7 @@ describe('ToolHandler', () => {
     );
     const abandonPendingBrowserAttemptSpy = sinon.spy();
 
-    const toolMutex = new Mutex();
+    const toolLocks = new KeyedLock();
     const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
       CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
     }).parse();
@@ -1680,7 +1688,7 @@ describe('ToolHandler', () => {
       tool,
       serverArgs,
       async () => mockContext,
-      toolMutex,
+      toolLocks,
       abandonPendingBrowserAttemptSpy,
     );
 
@@ -1739,7 +1747,7 @@ describe('ToolHandler', () => {
         createBrowserlessTool(handler),
         createServerArgs(),
         async () => mockContext,
-        new Mutex(),
+        new KeyedLock(),
         sinon.spy(),
       ).handle({filePath: 'file.heapsnapshot'});
 

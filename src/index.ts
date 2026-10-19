@@ -22,12 +22,12 @@ import {
   type RegisteredTool,
   type Root,
   type Transport,
-  Mutex,
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
+import {KeyedLock} from './utils/KeyedLock.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
 
@@ -36,7 +36,7 @@ puppeteer.setFollowSymlinks(false);
 /**
  * Timeout for a `roots/list` that a tool call is waiting on, matching the 5s
  * default used for page operations. `getContext()` awaits it while
- * `ToolHandler` holds the tool mutex, so leaving it unbounded lets a client
+ * `ToolHandler` holds the context lock, so leaving it unbounded lets a client
  * that negotiates `roots` but does not answer block every tool for the SDK's
  * default of 60s. Background refreshes are not bounded by this, so roots a
  * slow client sends late still land.
@@ -71,7 +71,7 @@ export class McpServer {
    * client that negotiates roots but never answers only delays the first call.
    */
   #awaitedInitialRoots = false;
-  #toolMutex = new Mutex();
+  #toolLocks = new KeyedLock();
   #tools = new Map<string, ToolEntry>();
 
   private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
@@ -277,7 +277,7 @@ export class McpServer {
     if (this.#lastClientRoots === undefined && !this.#awaitedInitialRoots) {
       this.#awaitedInitialRoots = true;
       // Nothing listed yet, so this call has to wait – bounded, since it is
-      // holding the tool mutex, and a later background refresh still lands
+      // holding the context lock, and a later background refresh still lands
       await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
     }
     return this.#context;
@@ -288,7 +288,7 @@ export class McpServer {
       tool,
       this.#serverArgs,
       () => this.#getContext(),
-      this.#toolMutex,
+      this.#toolLocks,
       () => this.#browserManager.abandonPendingAttempt(),
     );
   }

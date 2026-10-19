@@ -10,7 +10,7 @@ import type {McpPage} from './McpPage.js';
 import {McpResponse, type DataFormat} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import type {Browser, CallToolResult, Mutex} from './third_party/index.js';
+import type {Browser, CallToolResult} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
@@ -28,11 +28,16 @@ import {
   isPageScopedTool,
   isSlimTool,
 } from './tools/ToolDefinition.js';
+import type {KeyedLock} from './utils/KeyedLock.js';
 import {logger} from './utils/logger.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isLocalhost} from './utils/url.js';
 
-type ToolLockGuard = Awaited<ReturnType<Mutex['acquire']>>;
+/**
+ * Lock key for the browser-wide state owned by `McpContext` (page list,
+ * selected page, trace state). Held exclusively by every tool call today.
+ */
+export const CONTEXT_LOCK_KEY = 'context';
 
 interface ToolLockControl {
   releaseIfYielding: () => void;
@@ -221,7 +226,7 @@ export class ToolHandler {
     private readonly tool: AnyToolDefinition,
     private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
-    private readonly toolMutex: Mutex,
+    private readonly toolLocks: KeyedLock,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
   ) {
     const {disabled, reason, unavailableInMode} = getToolStatusInfo(
@@ -370,8 +375,12 @@ export class ToolHandler {
     return await response.handle(context, this.#dataFormat());
   }
 
+  #acquireToolLock(): Promise<Disposable> {
+    return this.toolLocks.acquire([{key: CONTEXT_LOCK_KEY, mode: 'exclusive'}]);
+  }
+
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
-    let guard: ToolLockGuard | undefined = await this.toolMutex.acquire();
+    let guard: Disposable | undefined = await this.#acquireToolLock();
 
     if (this.disabledReason) {
       guard[Symbol.dispose]();
@@ -404,13 +413,13 @@ export class ToolHandler {
       // before the response is built.
       const lock: ToolLockControl = {
         releaseIfYielding: () => {
-          if (this.tool.yieldsToolLock && guard) {
+          if (this.tool.concurrency === 'yielding' && guard) {
             guard[Symbol.dispose]();
             guard = undefined;
           }
         },
         reacquire: async () => {
-          guard ??= await this.toolMutex.acquire();
+          guard ??= await this.#acquireToolLock();
         },
       };
       const {content, structuredContent} = isBrowserlessTool(this.tool)
