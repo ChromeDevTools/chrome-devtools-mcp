@@ -263,7 +263,7 @@ export class SymbolizedError {
     resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
     const message = SymbolizedError.#getMessage(opts.details);
-    if (!opts.includeStackAndCause || !opts.devTools) {
+    if (!opts.includeStackAndCause || (!opts.devTools && !opts.session)) {
       return new SymbolizedError(
         message,
         opts.resolvedStackTraceForTesting,
@@ -274,7 +274,7 @@ export class SymbolizedError {
     let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
     if (opts.resolvedStackTraceForTesting) {
       stackTrace = opts.resolvedStackTraceForTesting;
-    } else if (opts.details.stackTrace) {
+    } else if (opts.devTools && opts.details.stackTrace) {
       try {
         stackTrace = await createStackTrace(
           opts.devTools,
@@ -380,16 +380,23 @@ export class SymbolizedError {
     targetId: string,
     session?: CDPSession,
   ): Promise<ExceptionDetailsLike | null> {
-    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
     }
 
     if (session) {
+      if (!error.objectId) {
+        return null;
+      }
       const {exceptionDetails} = await session.send(
         'Runtime.getExceptionDetails',
-        {errorObjectId: error.objectId as Protocol.Runtime.RemoteObjectId},
+        {errorObjectId: error.objectId},
       );
       return exceptionDetails ?? null;
+    }
+
+    if (!devTools) {
+      return null;
     }
 
     const targetManager = devTools.universe.context.get(DevTools.TargetManager);
@@ -410,15 +417,22 @@ export class SymbolizedError {
     targetId: string,
     session?: CDPSession,
   ): Promise<RemoteObjectLike | null> {
-    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    if (error.type !== 'object' && error.subtype !== 'error') {
       return null;
     }
 
     if (session) {
+      if (!error.objectId) {
+        return null;
+      }
       const {result} = await session.send('Runtime.getProperties', {
-        objectId: error.objectId as Protocol.Runtime.RemoteObjectId,
+        objectId: error.objectId,
       });
       return result.find(prop => prop.name === 'cause')?.value ?? null;
+    }
+
+    if (!devTools) {
+      return null;
     }
 
     const targetManager = devTools.universe.context.get(DevTools.TargetManager);

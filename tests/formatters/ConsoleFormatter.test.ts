@@ -6,9 +6,12 @@
 
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
+import {CDPSession} from '../../src/third_party/index.js';
 import type {
   ConsoleMessage,
   Protocol,
@@ -848,5 +851,71 @@ describe('ConsoleFormatter', () => {
         });
       },
     );
+  });
+
+  it('resolves the cause of an UncaughtError on its session', async t => {
+    // `send` is abstract on CDPSession, so it is not on the prototype for
+    // createStubInstance to stub and is added explicitly.
+    const session = sinon.createStubInstance(CDPSession);
+    const send = sinon.stub();
+    Object.defineProperty(session, 'send', {value: send});
+    send.withArgs('Runtime.getProperties').resolves({
+      result: [
+        {
+          name: 'cause',
+          configurable: true,
+          enumerable: false,
+          value: {
+            type: 'object',
+            subtype: 'error',
+            objectId: 'cause-id',
+            description: 'Error: root cause',
+          },
+        },
+      ],
+    });
+    send.withArgs('Runtime.getExceptionDetails').resolves({
+      exceptionDetails: {
+        exceptionId: 2,
+        lineNumber: 0,
+        columnNumber: 0,
+        text: 'root cause',
+      },
+    });
+    const error = new UncaughtError(
+      {
+        exceptionId: 1,
+        lineNumber: 0,
+        columnNumber: 5,
+        exception: {
+          type: 'object',
+          subtype: 'error',
+          objectId: 'error-id',
+          description: 'Error: wrapper',
+        },
+        text: 'Uncaught',
+      },
+      '<mock target ID>',
+      session,
+    );
+
+    const formatter = await ConsoleFormatter.from(error, {
+      id: 18,
+      fetchDetailedData: true,
+      resolvedStackTraceForTesting: {
+        syncFragment: {
+          frames: [{line: 1, column: 1, url: 'main.js', name: 'main'}],
+        },
+        asyncFragments: [],
+      } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
+    });
+
+    sinon.assert.calledWith(send, 'Runtime.getProperties', {
+      objectId: 'error-id',
+    });
+    sinon.assert.calledWith(send, 'Runtime.getExceptionDetails', {
+      errorObjectId: 'cause-id',
+    });
+    t.assert.match(formatter.toStringDetailed(), /Caused by: root cause/);
   });
 });
