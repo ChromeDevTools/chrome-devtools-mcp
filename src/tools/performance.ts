@@ -247,6 +247,16 @@ async function stopTracingAndAppendOutput(
     if (traceResultIsSuccess(result)) {
       if (context.isCruxEnabled()) {
         await populateCruxData(result);
+      } else {
+        try {
+          DevTools.Common.Settings.Settings.instance()
+            .createSetting('field-data', {
+              enabled: false,
+            })
+            .set({enabled: false});
+        } catch {
+          // Settings may not be initialized in unit tests with mocked pages.
+        }
       }
       context.storeTraceRecording(result);
       response.attachTraceSummary(result);

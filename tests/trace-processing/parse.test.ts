@@ -110,4 +110,23 @@ describe('Trace parsing', () => {
     assert.ok(summary.includes('CPU throttling: 4x'));
     assert.ok(summary.includes('Network throttling: Slow 3G'));
   });
+
+  it('reports that field data was not requested when CrUX is disabled', async () => {
+    sinon.stub(DevTools.CrUXManager.CrUXManager, 'instance').returns({
+      isEnabled: () => false,
+    } as unknown as DevTools.CrUXManager.CrUXManager);
+    const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
+    const result = await parseRawTraceBuffer(rawData);
+    if ('error' in result) {
+      assert.fail(`Unexpected parse failure: ${result.error}`);
+    }
+
+    const summary = getTraceSummary(result);
+    assert.ok(
+      summary.includes(
+        'Metrics (field / real users): n/a – field data was not requested',
+      ),
+    );
+    assert.ok(!summary.includes('no data for this page in CrUX'));
+  });
 });
