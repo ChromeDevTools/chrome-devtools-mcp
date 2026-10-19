@@ -121,7 +121,7 @@ describe('script', () => {
       });
     });
     it('surfaces non-Error values when script throws or rejects', async () => {
-      await withMcpContext(async (_response, context, args) => {
+      await withMcpContext(async (response, context, args) => {
         const cases = [
           {fn: "() => { throw 'str-thrown'; }", expected: 'str-thrown'},
           {fn: "async () => { throw 'async-str'; }", expected: 'async-str'},
@@ -137,7 +137,7 @@ describe('script', () => {
           try {
             await evaluateScript(args).handler(
               {params: {function: testCase.fn}},
-              _response,
+              response,
               context,
             );
           } catch (err) {
