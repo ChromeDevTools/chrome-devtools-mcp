@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,10 +16,6 @@ import {createHandlerMocks, createMockWebMCPTool} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('list_webmcp_tools', () => {
     it('list webmcp tools in navigate_page response', async () => {
       await withMcpContext(async (response, context, args) => {

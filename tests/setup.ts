@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import '../src/utils/polyfill.js';
-
 import path from 'node:path';
-import {before, it} from 'node:test';
+import {afterEach, it} from 'node:test';
 
-import {overrideDevToolsGlobals} from '../src/devtools/DevtoolsUtils.js';
+import sinon from 'sinon';
 
-before(() => {
-  overrideDevToolsGlobals({
-    loadResource: async () => '',
-  });
+// This module runs for every test file, so it must not import src code. Test
+// files that use DevTools import tests/setupDevTools.ts.
+
+// Root-level hooks are inherited by every test in the file, so one hook
+// restores all Sinon stubs, spies, and fake timers after each test.
+afterEach(() => {
+  sinon.restore();
 });
 
 // This is run by Node when we execute the tests via the --import flag.

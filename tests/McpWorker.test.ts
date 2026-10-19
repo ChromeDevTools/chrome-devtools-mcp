@@ -5,19 +5,13 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
-
-import sinon from 'sinon';
+import {describe, it} from 'node:test';
 
 import {McpWorker, workerIdPrefix} from '../src/McpWorker.js';
 
 import {createMockTarget, createMockWebWorker} from './mocks.js';
 
 describe('McpWorker', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('labels ids by worker type', () => {
     assert.equal(workerIdPrefix('service_worker'), 'sw');
     assert.equal(workerIdPrefix('dedicated_worker'), 'dw');

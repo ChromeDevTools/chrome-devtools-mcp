@@ -8,22 +8,30 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 
 import {DevTools} from '../third_party/index.js';
-import {
-  createIdGenerator,
-  stableIdSymbol,
-  type WithSymbolId,
-} from '../utils/id.js';
+import {createIdGenerator} from '../utils/id.js';
 
-export type AggregatedInfoWithId =
-  WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
+export interface HeapSnapshotAggregate {
+  id: number;
+  className: string;
+  count: number;
+  selfSize: number;
+  retainedSize: number;
+}
 
 export interface HeapSnapshotAggregateData {
-  aggregates: Record<string, AggregatedInfoWithId>;
+  aggregates: HeapSnapshotAggregate[];
   objectCount: number;
   totalSelfSize: number;
 }
 
+export interface HeapSnapshotDiff {
+  classDiffs: HeapSnapshotClassDiff[];
+  totals: HeapSnapshotClassDiffTotals;
+}
+
 export interface HeapSnapshotClassDiff {
+  /** Position in the full sorted diff list. Use as `classIndex`. */
+  index: number;
   className: string;
   addedCount: number;
   removedCount: number;
@@ -33,11 +41,24 @@ export interface HeapSnapshotClassDiff {
   sizeDelta: number;
 }
 
-export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
-  addedIds: number[];
-  addedSelfSizes: number[];
-  deletedIds: number[];
-  deletedSelfSizes: number[];
+export interface HeapSnapshotDetailedClassDiff {
+  classDiff: HeapSnapshotClassDiff;
+  objects: readonly HeapSnapshotDiffObject[];
+}
+
+export interface HeapSnapshotDiffObject {
+  id: number;
+  selfSize: number;
+  change: 'added' | 'deleted';
+}
+
+export interface HeapSnapshotClassDiffTotals {
+  addedCount: number;
+  removedCount: number;
+  countDelta: number;
+  addedSize: number;
+  removedSize: number;
+  sizeDelta: number;
 }
 
 export type DuplicateStringGroup =
@@ -48,6 +69,22 @@ export type HeapQueryOptions =
 
 export type HeapEdgesQueryOptions =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
+
+function toClassDiff(
+  index: number,
+  rawDiff: DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff,
+): HeapSnapshotClassDiff {
+  return {
+    index,
+    className: rawDiff.name,
+    addedCount: rawDiff.addedCount,
+    removedCount: rawDiff.removedCount,
+    countDelta: rawDiff.countDelta,
+    addedSize: rawDiff.addedSize,
+    removedSize: rawDiff.removedSize,
+    sizeDelta: rawDiff.sizeDelta,
+  };
+}
 
 export class HeapSnapshot {
   proxy: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
@@ -141,17 +178,28 @@ export class HeapSnapshotManager {
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
     await this.#applyNodeFilter(snapshot.proxy, filter, filterName, objectId);
-    const aggregates: Record<string, AggregatedInfoWithId> =
-      await snapshot.proxy.aggregatesWithFilter(filter);
+    const rawAggregates = await snapshot.proxy.aggregatesWithFilter(filter);
     let objectCount = 0;
     let totalSelfSize = 0;
+    const aggregates: HeapSnapshotAggregate[] = [];
 
-    for (const [key, aggregate] of Object.entries(aggregates)) {
+    for (const [key, aggregate] of Object.entries(rawAggregates)) {
       const id = snapshot.resolveIdFromClassKey(key);
-      aggregate[stableIdSymbol] = id;
+      if (id === undefined) {
+        throw new Error(`No class ID found for class key ${key}`);
+      }
       objectCount += aggregate.count;
       totalSelfSize += aggregate.self;
+      aggregates.push({
+        id,
+        className: aggregate.name,
+        count: aggregate.count,
+        selfSize: aggregate.self,
+        retainedSize: aggregate.maxRet,
+      });
     }
+
+    aggregates.sort((a, b) => b.retainedSize - a.retainedSize);
 
     return {
       aggregates,
@@ -291,20 +339,30 @@ export class HeapSnapshotManager {
   async getClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]> {
+  ): Promise<HeapSnapshotDiff> {
     const rawDiffs = await this.#getSortedRawClassDiffs(
       baseFilePath,
       currentFilePath,
     );
-    return rawDiffs.map(rawDiff => ({
-      className: rawDiff.name,
-      addedCount: rawDiff.addedCount,
-      removedCount: rawDiff.removedCount,
-      countDelta: rawDiff.countDelta,
-      addedSize: rawDiff.addedSize,
-      removedSize: rawDiff.removedSize,
-      sizeDelta: rawDiff.sizeDelta,
-    }));
+    const classDiffs: HeapSnapshotClassDiff[] = [];
+    const totals: HeapSnapshotClassDiffTotals = {
+      addedCount: 0,
+      removedCount: 0,
+      countDelta: 0,
+      addedSize: 0,
+      removedSize: 0,
+      sizeDelta: 0,
+    };
+    for (const [index, rawDiff] of rawDiffs.entries()) {
+      classDiffs.push(toClassDiff(index, rawDiff));
+      totals.addedCount += rawDiff.addedCount;
+      totals.removedCount += rawDiff.removedCount;
+      totals.countDelta += rawDiff.countDelta;
+      totals.addedSize += rawDiff.addedSize;
+      totals.removedSize += rawDiff.removedSize;
+      totals.sizeDelta += rawDiff.sizeDelta;
+    }
+    return {classDiffs, totals};
   }
 
   async getDetailedClassDiff(
@@ -322,19 +380,21 @@ export class HeapSnapshotManager {
         `Invalid classIndex: ${classIndex}. Total classes with changes: ${classDiffs.length}`,
       );
     }
-    return {
-      className: rawDiff.name,
-      addedCount: rawDiff.addedCount,
-      removedCount: rawDiff.removedCount,
-      countDelta: rawDiff.countDelta,
-      addedSize: rawDiff.addedSize,
-      removedSize: rawDiff.removedSize,
-      sizeDelta: rawDiff.sizeDelta,
-      addedIds: rawDiff.addedIds ?? [],
-      addedSelfSizes: rawDiff.addedSelfSizes ?? [],
-      deletedIds: rawDiff.deletedIds ?? [],
-      deletedSelfSizes: rawDiff.deletedSelfSizes ?? [],
-    };
+    const objects: HeapSnapshotDiffObject[] = [];
+    const addedIds = rawDiff.addedIds ?? [];
+    const addedSelfSizes = rawDiff.addedSelfSizes ?? [];
+    for (const [i, id] of addedIds.entries()) {
+      objects.push({id, selfSize: addedSelfSizes[i], change: 'added'});
+    }
+    const deletedIds = rawDiff.deletedIds ?? [];
+    const deletedSelfSizes = rawDiff.deletedSelfSizes ?? [];
+    for (const [i, id] of deletedIds.entries()) {
+      objects.push({id, selfSize: deletedSelfSizes[i], change: 'deleted'});
+    }
+    // Largest objects first so that the first page of paginated output shows
+    // the most significant changes.
+    objects.sort((a, b) => b.selfSize - a.selfSize);
+    return {classDiff: toClassDiff(classIndex, rawDiff), objects};
   }
 
   async #getSortedRawClassDiffs(

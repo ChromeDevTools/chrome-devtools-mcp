@@ -351,6 +351,8 @@ export default [
         './bidi.js',
         '../bidi/bidi.js',
         './lighthouse-devtools-mcp-bundle.js',
+        // The CLI client loads only this small bundle. See src/third_party/cli.ts.
+        './cli.js',
       ];
 
       if (existingExternals.includes(source)) {
@@ -358,6 +360,13 @@ export default [
       }
       return false;
     },
+  ),
+  bundleDependency(
+    'cli.js',
+    {
+      inlineDynamicImports: true,
+    },
+    (_source, _importer, _isResolved) => false,
   ),
   bundleDependency(
     'devtools-formatter-worker.js',

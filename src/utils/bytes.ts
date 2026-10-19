@@ -5,6 +5,7 @@
  */
 
 import {zod} from '../third_party/index.js';
+import {zodTransform} from '../tools/ToolDefinition.js';
 
 const BYTE_UNITS: Readonly<Record<string, number>> = {
   b: 1,
@@ -120,17 +121,6 @@ export function byteSizeRangeSchema(
 ): zod.ZodType<ByteSizeRange> {
   return zod
     .string()
-    .transform((value, context) => {
-      try {
-        return parseByteSizeRange(value);
-      } catch (error) {
-        context.addIssue({
-          code: zod.ZodIssueCode.custom,
-          message:
-            error instanceof Error ? error.message : 'Invalid byte size range',
-        });
-        return zod.NEVER;
-      }
-    })
+    .transform(zodTransform(parseByteSizeRange))
     .describe(description);
 }

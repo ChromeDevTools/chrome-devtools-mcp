@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {describe, it} from 'node:test';
+import {after, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,7 +18,6 @@ import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools, type Extension} from '../src/third_party/index.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {parseByteSizeRange} from '../src/utils/bytes.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
   closePage,
   listPages,
@@ -36,14 +35,17 @@ import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   createHandlerMocks,
-  createMockAggregatedInfo,
+  createMockHeapSnapshotAggregate,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
   createMockCSSStyleDeclaration,
   createMockCSSStyleRule,
-  createMockClassDiffs,
+  createMockClassDiff,
+  createMockClassDiffTotals,
   createMockContextAnalysisResult,
   createMockDetailedClassDiff,
+  createMockDiffObject,
+  createMockHeapSnapshotDiff,
   createMockHeapSnapshotEdge,
   createMockHeapSnapshotNode,
   createMockHeapSnapshotStats,
@@ -53,6 +55,9 @@ import {
   createMockMcpWorker,
   createMockObjectInfo,
   createMockParsedArguments,
+  createMockPuppeteerTarget,
+  createMockWebMCPTool,
+  type MockMcpPage,
 } from './mocks.js';
 import {
   createTempDir,
@@ -67,7 +72,73 @@ import {
   withMcpContext,
 } from './utils.js';
 
+let webDevTrace: ReturnType<typeof parseRawTraceBuffer> | undefined;
+
+/**
+ * Parses the web.dev trace fixture one time for this file. A parse takes
+ * about 0.8 s of CPU time, and the tests only read the result.
+ */
+function parseWebDevTrace(): ReturnType<typeof parseRawTraceBuffer> {
+  webDevTrace ??= parseRawTraceBuffer(
+    loadTraceAsBuffer('web-dev-with-commit.json.gz'),
+  );
+  return webDevTrace;
+}
+
+// Releases the shared trace after all tests in this file.
+after(() => {
+  webDevTrace = undefined;
+});
+
 describe('McpResponse', () => {
+  it('reports only pages opened by the attached action', async () => {
+    const openedTarget = createMockPuppeteerTarget({
+      url: 'https://example.com/opened',
+      title: 'Opened page',
+    });
+    const openedPage = createMockMcpPage({target: openedTarget});
+    const unrelatedPage = createMockMcpPage();
+    Object.defineProperty(openedPage, 'id', {value: 2});
+    openedPage.url.returns('https://example.com/opened');
+    openedPage.getTitle.returns('Opened page');
+    Object.defineProperty(unrelatedPage, 'id', {value: 3});
+    unrelatedPage.url.returns('https://example.com/unrelated');
+    unrelatedPage.getTitle.returns('Unrelated page');
+
+    const context = createMockMcpContext();
+    const targetInfo = openedTarget._getTargetInfo();
+    context.getTargetInfos.resolves(
+      new Map([[targetInfo.targetId, targetInfo]]),
+    );
+    context.getPages.returns([openedPage, unrelatedPage]);
+    context.isPageSelected.returns(false);
+    const response = new McpResponse(createMockParsedArguments());
+    response.attachWaitForResult({
+      openedPages: new Set([openedPage.target]),
+    });
+
+    const result = await response.handle(context);
+
+    sinon.assert.calledOnceWithExactly(context.createPagesSnapshot);
+    sinon.assert.calledOnceWithExactly(context.getTargetInfos);
+    sinon.assert.calledOnceWithExactly(openedPage.getTitle, targetInfo);
+    assert.match(
+      getTextContent(result.content[0]),
+      /## Opened pages\n2: Opened page \(https:\/\/example\.com\/opened\)/,
+    );
+    assert.ok(!getTextContent(result.content[0]).includes('Unrelated page'));
+    assert.deepStrictEqual(result.structuredContent, {
+      openedPages: [
+        {
+          id: 2,
+          url: 'https://example.com/opened',
+          title: 'Opened page',
+          selected: false,
+        },
+      ],
+    });
+  });
+
   it('list pages', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);
@@ -261,6 +332,35 @@ describe('McpResponse', () => {
 
   describe('navigation', () => {
     const server = serverHooks();
+
+    it('lists current page titles', async () => {
+      await withMcpContext(async (response, context) => {
+        server.addHtmlRoute(
+          '/titled.html',
+          '<!doctype html><title>Real Title</title><h1>Titled</h1>',
+        );
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.goto(server.getRoute('/titled.html'));
+
+        response.setIncludePages(true);
+        const res1 = await response.handle(context);
+        assert.ok(
+          getTextContent(res1.content[0]).includes(
+            `Real Title (${server.getRoute('/titled.html')})`,
+          ),
+        );
+
+        await page.evaluate(() => {
+          document.title = 'Changed By Script';
+        });
+        const res2 = await response.handle(context);
+        assert.ok(
+          getTextContent(res2.content[0]).includes(
+            `Changed By Script (${server.getRoute('/titled.html')})`,
+          ),
+        );
+      });
+    });
 
     it('resets ids after navigation', async () => {
       await withMcpContext(async (response, context) => {
@@ -593,6 +693,58 @@ describe('McpResponse', () => {
 });
 
 describe('McpResponse network request filtering', () => {
+  const server = serverHooks();
+
+  it('filters CORS preflights and prefetches by their own types', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addRoute('/data?prefetch', (_req, res) => {
+        res.writeHead(200, {'Content-Type': 'text/plain'});
+        res.end('prefetched');
+      });
+      server.addRoute('/data?cors', (_req, res) => {
+        res.writeHead(200, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'PUT',
+          'Access-Control-Allow-Headers': 'x-custom',
+          'Content-Type': 'text/plain',
+        });
+        res.end('cors');
+      });
+      // localhost vs 127.0.0.1 makes the PUT cross-origin, so it is preflighted.
+      const crossOrigin = server
+        .getRoute('/data?cors')
+        .replace('127.0.0.1', 'localhost');
+      server.addHtmlRoute(
+        '/types.html',
+        `<!doctype html><link rel="prefetch" href="/data?prefetch"><script>fetch(${JSON.stringify(crossOrigin)}, {method: 'PUT', headers: {'x-custom': '1'}});</script>`,
+      );
+      const page = context.getSelectedMcpPage().pptrPage;
+      const done = Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/data?prefetch')),
+        page.waitForResponse(
+          r => r.url() === crossOrigin && r.request().method() === 'PUT',
+        ),
+      ]);
+      await page.goto(server.getRoute('/types.html'));
+      await done;
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['preflight']});
+      let text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /OPTIONS \S+\/data\?cors/, text);
+      assert.doesNotMatch(text, /PUT|prefetch/, text);
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['prefetch']});
+      text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /GET \S+\/data\?prefetch/, text);
+      assert.doesNotMatch(text, /OPTIONS|PUT/, text);
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['fetch']});
+      text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /PUT \S+\/data\?cors/, text);
+      assert.doesNotMatch(text, /OPTIONS|prefetch/, text);
+    });
+  });
+
   it('filters network requests by resource type', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
@@ -777,8 +929,7 @@ describe('McpResponse network pagination', () => {
 
   describe('trace summaries', () => {
     it('includes the trace summary text and structured data', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      const result = await parseRawTraceBuffer(rawData);
+      const result = await parseWebDevTrace();
       if (!traceResultIsSuccess(result)) {
         throw new Error(result.error);
       }
@@ -804,8 +955,7 @@ describe('McpResponse network pagination', () => {
 
   describe('trace insights', () => {
     it('includes the trace insight output', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      const result = await parseRawTraceBuffer(rawData);
+      const result = await parseWebDevTrace();
       if (!traceResultIsSuccess(result)) {
         throw new Error(result.error);
       }
@@ -819,13 +969,19 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
+        const typedStructuredContent = structuredContent as {
+          traceInsight?: string;
+        };
+        assert.ok(
+          typedStructuredContent.traceInsight,
+          'Expected traceInsight in structuredContent',
+        );
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
 
     it('includes error if insight not found', async t => {
-      const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
-      const result = await parseRawTraceBuffer(rawData);
+      const result = await parseWebDevTrace();
       if (!traceResultIsSuccess(result)) {
         throw new Error(result.error);
       }
@@ -839,6 +995,13 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
+        const typedStructuredContent = structuredContent as {
+          error?: string;
+        };
+        assert.ok(
+          typedStructuredContent.error,
+          'Expected error in structuredContent',
+        );
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
@@ -916,6 +1079,39 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [
+          {
+            id: 'color-contrast',
+            title:
+              'Background and foreground colors do not have a sufficient contrast ratio.',
+            description: 'Low-contrast text is difficult to read.',
+            score: 0,
+            categories: ['accessibility'],
+            nodes: [
+              {
+                selector: 'body > p',
+                snippet: '<p class="faint">',
+                nodeLabel: 'Hello',
+                explanation:
+                  'Fix any of the following:\n  Element has insufficient color contrast',
+              },
+              {
+                selector: 'a[title="Say \\"hi\\""]',
+                snippet: '<a title="Say &quot;hi&quot;">',
+                nodeLabel: 'Say "hi"\nnow',
+              },
+            ],
+            totalNodes: 12,
+          },
+          {
+            id: 'document-title',
+            title: 'Document does not have a `<title>` element',
+            score: 0,
+            categories: ['accessibility', 'seo'],
+            nodes: [],
+            totalNodes: 0,
+          },
+        ],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 
@@ -923,6 +1119,7 @@ describe('lighthouse', () => {
       const {content, structuredContent} = await response.handle(context);
 
       const text = getTextContent(content[0]);
+      assert.ok(text.includes('### Failed audits'));
       assert.ok(text.includes('### Reports'));
       assert.ok(text.includes('- /tmp/report.json'));
       assert.ok(text.includes('- /tmp/report.html'));
@@ -964,6 +1161,7 @@ describe('lighthouse', () => {
             total: 1000,
           },
         },
+        failedAudits: [],
         reports: ['/tmp/report.json', '/tmp/report.html'],
       };
 
@@ -982,68 +1180,59 @@ describe('lighthouse', () => {
 });
 
 describe('third-party developer tools', () => {
-  function stubToolDiscovery(page: object) {
-    // @ts-expect-error Internal API
-    const client = page._client();
-    const originalSend = client.send.bind(client);
-    sinon
-      .stub(client, 'send')
-      .callsFake(async (method: string, params?: Record<string, unknown>) => {
-        if (method === 'DOMDebugger.getEventListeners') {
-          return {
-            listeners: [
-              {
-                type: 'devtoolstooldiscovery',
-                useCapture: false,
-                passive: false,
-                once: false,
-                scriptId: '0',
-                lineNumber: 0,
-                columnNumber: 0,
-              },
-            ],
-          };
-        }
-        return originalSend(method, params);
-      });
-  }
-
   it('lists third-party developer tools', async t => {
-    await withMcpContext(
-      async (response, context) => {
-        const mcpPage = context.getSelectedMcpPage();
-        stubToolDiscovery(mcpPage.pptrPage);
-        sinon.stub(mcpPage.pptrPage, 'evaluate').resolves([
+    const args = createMockParsedArguments({
+      categoryExperimentalThirdParty: true,
+    });
+    const page = createMockMcpPage();
+    page.discoverThirdPartyDeveloperTools.resolves([
+      {
+        name: 'My Tool Group',
+        description: 'A group of tools',
+        tools: [
           {
-            name: 'My Tool Group',
-            description: 'A group of tools',
-            tools: [
-              {
-                name: 'myTool',
-                description: 'Does something',
-                inputSchema: {
-                  type: 'object',
-                  properties: {
-                    foo: {type: 'string'},
-                  },
-                },
+            name: 'myTool',
+            description: 'Does something',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                foo: {type: 'string'},
               },
-            ],
+            },
           },
-        ]);
-        response.setListThirdPartyDeveloperTools();
-        const {content, structuredContent} = await response.handle(context);
-        const responseText = getTextContent(content[0]);
-        t.assert.snapshot(responseText);
-        assert.ok(
-          responseText.includes('inputSchema={"type":"object"'),
-          'Response should include inputSchema',
-        );
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+        ],
       },
-      undefined,
-      {categoryExperimentalThirdParty: true},
+    ]);
+    const context = createMockMcpContext({selectedPage: page});
+    const response = new McpResponse(args);
+    response.setPage(page);
+    response.setListThirdPartyDeveloperTools();
+
+    const {content, structuredContent} = await response.handle(context);
+    const responseText = getTextContent(content[0]);
+    t.assert.snapshot(responseText);
+    assert.ok(
+      responseText.includes('inputSchema={"type":"object"'),
+      'Response should include inputSchema',
     );
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
+  });
+
+  it('lists no third-party developer tools if there are none', async t => {
+    const response = new McpResponse(
+      createMockParsedArguments({categoryExperimentalThirdParty: true}),
+    );
+    const page = createMockMcpPage();
+    page.discoverThirdPartyDeveloperTools.resolves([]);
+    response.setPage(page);
+    response.setListThirdPartyDeveloperTools();
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const firstContent = content[0];
+    assert.ok(firstContent);
+    t.assert.snapshot(getTextContent(firstContent));
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
   });
 
   async function testIncludesThirdPartyDeveloperTools(
@@ -1051,50 +1240,45 @@ describe('third-party developer tools', () => {
       response: McpResponse,
       context: McpContext,
       args: ParsedArguments,
+      page: MockMcpPage,
     ) => Promise<void>,
     toolName: string,
   ) {
-    await withMcpContext(
-      async (response, context, args) => {
-        const mcpPage = context.getSelectedMcpPage();
-        stubToolDiscovery(mcpPage.pptrPage);
-
-        const initScript = `
-          window.__dtmcp = {
-            toolGroup: {
-              name: 'Tool group name',
-              description: 'Test tools',
-              tools: [
-                {
-                  name: '3pDeveloperTool',
-                  description: 'A test tool',
-                  inputSchema: {
-                    type: 'object',
-                    properties: {},
-                  },
-                  execute: () => 'result',
-                },
-              ],
+    const args = createMockParsedArguments({
+      categoryExperimentalThirdParty: true,
+    });
+    const page = createMockMcpPage();
+    Object.defineProperty(page, 'id', {value: 1});
+    page.url.returns('about:blank');
+    page.discoverThirdPartyDeveloperTools.resolves([
+      {
+        name: 'Tool group name',
+        description: 'Test tools',
+        tools: [
+          {
+            name: '3pDeveloperTool',
+            description: 'A test tool',
+            inputSchema: {
+              type: 'object',
+              properties: {},
             },
-          };
-          window.addEventListener('devtoolstooldiscovery', (e) => {
-            e.respondWith(window.__dtmcp?.toolGroup);
-          });
-        `;
-        await mcpPage.pptrPage.evaluateOnNewDocument(initScript);
-        await mcpPage.pptrPage.evaluate(initScript);
-
-        await handlerAction(response, context, args);
-
-        const {content} = await response.handle(context);
-        const responseText = getTextContent(content[0]);
-        assert.ok(
-          responseText.includes('3pDeveloperTool'),
-          `Should include third-party developer tool name in the ${toolName} response`,
-        );
+          },
+        ],
       },
-      undefined,
-      {categoryExperimentalThirdParty: true},
+    ]);
+    const context = createMockMcpContext({selectedPage: page});
+    context.getPages.returns([page]);
+    context.getPageById.withArgs(1).returns(page);
+    context.newPage.resolves(page);
+    const response = new McpResponse(args);
+
+    await handlerAction(response, context, args, page);
+
+    const {content} = await response.handle(context);
+    const responseText = getTextContent(content[0]);
+    assert.ok(
+      responseText.includes('3pDeveloperTool'),
+      `Should include third-party developer tool name in the ${toolName} response`,
     );
   }
 
@@ -1110,9 +1294,12 @@ describe('third-party developer tools', () => {
 
   it('includes third-party developer tools in select_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(
-      async (response, context, args) => {
-        const pageId = context.getSelectedMcpPage().id;
-        await selectPage(args).handler({params: {pageId}}, response, context);
+      async (response, context, args, page) => {
+        await selectPage(args).handler(
+          {params: {pageId: page.id}},
+          response,
+          context,
+        );
       },
       'select_page',
     );
@@ -1120,9 +1307,12 @@ describe('third-party developer tools', () => {
 
   it('includes third-party developer tools in close_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(
-      async (response, context, args) => {
-        const pageId = context.getSelectedMcpPage().id;
-        await closePage(args).handler({params: {pageId}}, response, context);
+      async (response, context, args, page) => {
+        await closePage(args).handler(
+          {params: {pageId: page.id}},
+          response,
+          context,
+        );
       },
       'close_page',
     );
@@ -1130,11 +1320,12 @@ describe('third-party developer tools', () => {
 
   it('includes third-party developer tools in navigate_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(
-      async (response, context, args) => {
+      async (response, context, args, page) => {
+        response.setPage(page);
         await navigatePage(args).handler(
           {
             params: {type: 'url', url: 'about:blank'},
-            page: context.getSelectedMcpPage(),
+            page,
           },
           response,
           context,
@@ -1147,9 +1338,6 @@ describe('third-party developer tools', () => {
   it('includes third-party developer tools in new_page response', async () => {
     await testIncludesThirdPartyDeveloperTools(
       async (response, context, args) => {
-        // Workaround to ensure the test environment's new page contain third-party developer tools
-        sinon.stub(context, 'newPage').resolves(context.getSelectedMcpPage());
-
         await newPage(args).handler(
           {
             params: {url: 'about:blank'},
@@ -1171,35 +1359,37 @@ describe('webmcp', () => {
       response: McpResponse,
       context: McpContext,
       args: ParsedArguments,
+      page: MockMcpPage,
     ) => Promise<void>,
   ) {
-    await withMcpContext(
-      async (response, context, args) => {
-        response.setListWebMcpTools();
+    const args = createMockParsedArguments(parseArguments);
+    const page = createMockMcpPage();
+    Object.defineProperty(page, 'id', {value: 1});
+    page.url.returns('about:blank');
+    page.getTitle.returns('My test page');
+    page.getWebMcpTools.returns([
+      createMockWebMCPTool({
+        name: 'test_tool',
+        description: 'A test tool',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      }),
+    ]);
+    const context = createMockMcpContext({selectedPage: page});
+    context.getPages.returns([page]);
+    context.isPageSelected.returns(true);
+    context.getPageById.withArgs(1).returns(page);
+    const response = new McpResponse(args);
 
-        await handlerAction(response, context, args);
+    await handlerAction(response, context, args, page);
 
-        const page = context.getSelectedMcpPage().pptrPage;
-        const {resolve, promise} = Promise.withResolvers();
-        page.webmcp.once('toolsadded', () => {
-          resolve(undefined);
-        });
-        await page.setContent(
-          html`<form
-            toolname="test_tool"
-            tooldescription="A test tool"
-          ></form>`,
-        );
-        await promise;
-
-        const {content, structuredContent} = await response.handle(context);
-        assert.ok(getTextContent(content[0]));
-        t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
-      },
-      {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
-      parseArguments,
-    );
+    const {content, structuredContent} = await response.handle(context);
+    assert.ok(getTextContent(content[0]));
+    t.assert.snapshot(getTextContent(content[0]));
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
   }
 
   it('includes webmcp tools in list_pages response', async t => {
@@ -1216,9 +1406,12 @@ describe('webmcp', () => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: true},
-      async (response, context, args) => {
-        const pageId = context.getSelectedMcpPage().id;
-        await selectPage(args).handler({params: {pageId}}, response, context);
+      async (response, context, args, page) => {
+        await selectPage(args).handler(
+          {params: {pageId: page.id}},
+          response,
+          context,
+        );
       },
     );
   });
@@ -1227,11 +1420,12 @@ describe('webmcp', () => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: true},
-      async (response, context, args) => {
+      async (response, context, args, page) => {
+        response.setPage(page);
         await navigatePage(args).handler(
           {
             params: {type: 'url', url: 'about:blank'},
-            page: context.getSelectedMcpPage(),
+            page,
           },
           response,
           context,
@@ -1241,28 +1435,31 @@ describe('webmcp', () => {
   });
 
   it('list no webmcp tools if there are none', async t => {
-    await withMcpContext(
-      async (response, context) => {
-        response.setListWebMcpTools();
-        const {content, structuredContent} = await response.handle(context);
-        assert.ok(getTextContent(content[0]));
-        t.assert.snapshot(getTextContent(content[0]));
-        t.assert.snapshot(stabilizeStructuredContent(structuredContent));
-      },
-      {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
-      {categoryExperimentalWebmcp: true},
-    );
+    const args = createMockParsedArguments({
+      categoryExperimentalWebmcp: true,
+    });
+    const page = createMockMcpPage();
+    const context = createMockMcpContext({selectedPage: page});
+    const response = new McpResponse(args);
+    response.setPage(page);
+    response.setListWebMcpTools();
+
+    const {content, structuredContent} = await response.handle(context);
+    assert.ok(getTextContent(content[0]));
+    t.assert.snapshot(getTextContent(content[0]));
+    t.assert.snapshot(stabilizeStructuredContent(structuredContent));
   });
 
   it('list no webmcp tools if experimentalWebmcp is false', async t => {
     await testIncludesWebmcpTools(
       t,
       {categoryExperimentalWebmcp: false},
-      async (response, context, args) => {
+      async (response, context, args, page) => {
+        response.setPage(page);
         await navigatePage(args).handler(
           {
             params: {type: 'url', url: 'about:blank'},
-            page: context.getSelectedMcpPage(),
+            page,
           },
           response,
           context,
@@ -1369,26 +1566,22 @@ describe('McpResponse heap snapshot formatting', () => {
   it('formats aggregate data with shallow size and pagination summaries', async () => {
     const response = new McpResponse(createMockParsedArguments());
     const aggregates = {
-      aggregates: {
-        ObjectA: createMockAggregatedInfo({
-          name: 'ObjectA',
+      aggregates: [
+        createMockHeapSnapshotAggregate({
+          id: 1,
+          className: 'ObjectA',
           count: 10,
-          self: 100,
-          maxRet: 1000,
-          distance: 1,
-          idxs: [],
-          [stableIdSymbol]: 1,
+          selfSize: 100,
+          retainedSize: 1000,
         }),
-        ObjectB: createMockAggregatedInfo({
-          name: 'ObjectB',
+        createMockHeapSnapshotAggregate({
+          id: 2,
+          className: 'ObjectB',
           count: 5,
-          self: 50,
-          maxRet: 500,
-          distance: 2,
-          idxs: [],
-          [stableIdSymbol]: 2,
+          selfSize: 50,
+          retainedSize: 500,
         }),
-      },
+      ],
       objectCount: 15,
       totalSelfSize: 150,
     };
@@ -1415,6 +1608,10 @@ describe('McpResponse heap snapshot formatting', () => {
       objectCount: 15,
       totalSelfSize: 150,
     });
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotAggregates'),
+      [aggregates.aggregates[0]],
+    );
   });
 
   it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
@@ -1572,8 +1769,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
   it('formats class diff summary and detailed diff headers', async () => {
     const response = new McpResponse(createMockParsedArguments());
-    const diffs = createMockClassDiffs();
-    response.setHeapSnapshotClassDiffs(diffs);
+    response.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff());
 
     const context = createMockMcpContext();
     const {content} = await response.handle(context);
@@ -1590,6 +1786,89 @@ describe('McpResponse heap snapshot formatting', () => {
     const detailedText = getTextContent(detailedResult.content[0]);
     assert.ok(detailedText.includes('### Heap Snapshot Detailed Diff'));
     assert.ok(detailedText.includes('TestClass: # new: 1, # deleted: 0'));
+  });
+
+  it('paginates detailed class diff objects below the class header', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const objects = [
+      createMockDiffObject({id: 101, change: 'added'}),
+      createMockDiffObject({id: 102, change: 'added'}),
+      createMockDiffObject({id: 201, change: 'deleted'}),
+    ];
+    const classDiff = createMockClassDiff({className: 'Leaky'});
+    response.setHeapSnapshotDetailedClassDiff(
+      createMockDetailedClassDiff({classDiff, objects}),
+      {pageIdx: 1, pageSize: 2},
+    );
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('Leaky: # new: 1, # deleted: 0'));
+    assert.ok(text.includes('Showing 3-3 of 3 (Page 2 of 2).'));
+    assert.ok(text.includes('  - @201'));
+    assert.ok(!text.includes('@101'));
+    assert.ok(!text.includes('@102'));
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotDetailedClassDiff'),
+      {classDiff, objects: [objects[2]]},
+    );
+  });
+
+  it('paginates class diff summary and keeps global indices', async () => {
+    const response = new McpResponse(createMockParsedArguments());
+    const classDiffs = [
+      createMockClassDiff({index: 0, className: 'ClassA'}),
+      createMockClassDiff({index: 1, className: 'ClassB'}),
+      createMockClassDiff({index: 2, className: 'ClassC'}),
+    ];
+    const totals = createMockClassDiffTotals({addedCount: 3, countDelta: 3});
+    response.setHeapSnapshotClassDiffs(
+      createMockHeapSnapshotDiff({classDiffs, totals}),
+      {pageIdx: 1, pageSize: 2},
+    );
+
+    const context = createMockMcpContext();
+    const {content, structuredContent} = await response.handle(context);
+    const text = getTextContent(content[0]);
+
+    assert.ok(text.includes('Showing 3-3 of 3 (Page 2 of 2).'));
+    assert.ok(text.includes('Previous page: 0'));
+    assert.ok(text.includes('Total: # new: 3, # deleted: 0, # delta: +3'));
+    assert.ok(text.includes('\n2,ClassC,'));
+    assert.ok(!text.includes('ClassA'));
+    assert.ok(!text.includes('ClassB'));
+    assert.deepStrictEqual(
+      Reflect.get(structuredContent, 'heapSnapshotClassDiffs'),
+      [classDiffs[2]],
+    );
+    const heapData: unknown = Reflect.get(structuredContent, 'heapSnapshot');
+    assert.ok(heapData && typeof heapData === 'object');
+    assert.deepStrictEqual(Reflect.get(heapData, 'classDiffStats'), totals);
+  });
+
+  it('truncates class diff names in compact format', async () => {
+    const context = createMockMcpContext();
+    const toonDiffResponse = new McpResponse(createMockParsedArguments());
+    toonDiffResponse.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff(), {
+      maxNameLength: 4,
+    });
+    const toonDiffResult = await toonDiffResponse.handle(context, 'toon');
+    const toonDiffText = getTextContent(toonDiffResult.content[0]);
+    assert.ok(toonDiffText.includes('Test...'));
+
+    const detailedDiff = createMockDetailedClassDiff();
+    const toonDetailedResponse = new McpResponse(createMockParsedArguments());
+    toonDetailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff, {
+      maxNameLength: 4,
+    });
+    const toonDetailedResult = await toonDetailedResponse.handle(
+      context,
+      'toon',
+    );
+    const toonDetailedText = getTextContent(toonDetailedResult.content[0]);
+    assert.ok(toonDetailedText.includes('Test...'));
   });
 
   it('formats duplicate strings with pagination and object details', async () => {

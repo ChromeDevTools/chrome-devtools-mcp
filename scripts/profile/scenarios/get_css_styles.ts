@@ -10,7 +10,9 @@ import {uidsFromSnapshotResult} from '../utils.ts';
 export function getNumIterations(): ScenarioIterations {
   return {
     iterations: 10,
-    warmupIterations: 10,
+    // V8 still compiles get_css_styles code after 10 warm-up iterations. That
+    // compiled code shows as heap growth in the measured iterations.
+    warmupIterations: 20,
   };
 }
 

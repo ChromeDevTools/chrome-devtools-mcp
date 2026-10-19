@@ -5,17 +5,18 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {DevTools, Locator} from '../src/third_party/index.js';
+import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
+  createMockDialog,
   createMockMcpResponse,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
@@ -307,10 +308,6 @@ describe('McpPage', () => {
   }
 
   describe('lazy initialization', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('does not initialize Puppeteer Page in constructor and throws if pptrPage is accessed before init()', async () => {
       const pptrPage = createMockPuppeteerPage();
       pptrPage.emulateFocusedPage.resolves();
@@ -327,6 +324,11 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.page);
       sinon.assert.notCalled(target.asPage);
       assert.throws(() => mcpPage.pptrPage, /not initialized/);
+      await assert.rejects(
+        () => mcpPage.discoverThirdPartyDeveloperTools(),
+        /not initialized/,
+      );
+      assert.throws(() => mcpPage.getWebMcpTools(), /not initialized/);
       assert.strictEqual(mcpPage.url(), 'https://target-only.example.com');
       assert.strictEqual(mcpPage.getTitle(), 'Target Title');
 
@@ -389,13 +391,84 @@ describe('McpPage', () => {
       });
       sinon.assert.notCalled(pptrPage.emulateFocusedPage);
     });
+
+    it('stops and clears an active screenRecorder on dispose()', async () => {
+      const target = createMockPuppeteerTarget();
+      const mcpPage = new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+      const recorder = sinon.createStubInstance(ScreenRecorder);
+      recorder.stop.resolves();
+      mcpPage.setScreenRecorder({recorder, filePath: '/tmp/video.mp4'});
+
+      mcpPage.dispose();
+
+      sinon.assert.calledOnceWithExactly(recorder.stop);
+      assert.strictEqual(mcpPage.getScreenRecorder(), null);
+    });
+  });
+
+  describe('getTitle()', () => {
+    function createPage(url: string, title: string): McpPage {
+      const target = createMockPuppeteerTarget({url, title});
+      return new McpPage(target, 1, {
+        hasNetworkBlockOrAllowlist: false,
+        locatorClass: Locator,
+      });
+    }
+
+    function targetInfo(url: string, title: string) {
+      return {
+        targetId: '<mock-target-id>',
+        type: 'page',
+        title,
+        url,
+        attached: true,
+        canAccessOpener: false,
+      };
+    }
+
+    it('prefers fresh target info over cached target info', () => {
+      const mcpPage = createPage(
+        'http://127.0.0.1:8080/titled.html',
+        '127.0.0.1:8080/titled.html',
+      );
+      assert.strictEqual(
+        mcpPage.getTitle(
+          targetInfo('http://127.0.0.1:8080/titled.html', 'Real Title'),
+        ),
+        'Real Title',
+      );
+    });
+
+    it('ignores Chrome URL placeholder titles', () => {
+      assert.strictEqual(
+        createPage(
+          'http://127.0.0.1:8080/titled.html',
+          '127.0.0.1:8080/titled.html',
+        ).getTitle(),
+        '',
+      );
+      assert.strictEqual(
+        createPage('https://example.com/', 'example.com').getTitle(),
+        '',
+      );
+      assert.strictEqual(
+        createPage('about:blank', 'about:blank').getTitle(),
+        '',
+      );
+    });
+
+    it('exposes the target id', () => {
+      assert.strictEqual(
+        createPage('https://example.com', '').targetId,
+        '<mock-target-id>',
+      );
+    });
   });
 
   describe('emulate()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Offline'});
@@ -644,6 +717,43 @@ describe('McpPage', () => {
       sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, null);
     });
 
+    it('does not store a viewport that setViewport rejects', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.setViewport.rejects(new Error('Invalid parameters'));
+
+      await assert.rejects(
+        () => mcpPage.emulate({viewport: {width: 800.5, height: 600}}),
+        /Invalid parameters/,
+      );
+
+      assert.strictEqual(mcpPage.viewport, null);
+    });
+
+    it('keeps the previous viewport when setViewport rejects a new one', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.emulate({viewport: {width: 400, height: 400}});
+      pptrPage.setViewport.rejects(new Error('Invalid parameters'));
+
+      await assert.rejects(
+        () =>
+          mcpPage.emulate({
+            viewport: {width: 20000000, height: 600},
+            cpuThrottlingRate: 4,
+          }),
+        /Invalid parameters/,
+      );
+
+      assert.deepStrictEqual(mcpPage.viewport, {
+        width: 400,
+        height: 400,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      });
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 4);
+    });
+
     it('calls setExtraHTTPHeaders with the given headers', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
@@ -673,10 +783,6 @@ describe('McpPage', () => {
   });
 
   describe('restoreEmulation()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('re-applies previously configured viewport emulation', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
@@ -693,8 +799,18 @@ describe('McpPage', () => {
 
       await mcpPage.restoreEmulation();
 
-      sinon.assert.calledTwice(pptrPage.setViewport);
+      // A different width first, because Chrome ignores an override that is
+      // identical to the last one of this session (see restoreEmulation).
+      sinon.assert.calledThrice(pptrPage.setViewport);
       sinon.assert.calledWithExactly(pptrPage.setViewport.secondCall, {
+        width: 399,
+        height: 400,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: false,
+      });
+      sinon.assert.calledWithExactly(pptrPage.setViewport.thirdCall, {
         width: 400,
         height: 400,
         deviceScaleFactor: 1,
@@ -702,6 +818,16 @@ describe('McpPage', () => {
         hasTouch: false,
         isLandscape: false,
       });
+    });
+
+    it('does not send a scratch viewport when none was configured', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      await mcpPage.emulate({cpuThrottlingRate: 4});
+      pptrPage.setViewport.resetHistory();
+
+      await mcpPage.restoreEmulation();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.setViewport, null);
     });
 
     it('re-applies previously configured network and cpu throttling emulation', async () => {
@@ -883,10 +1009,6 @@ describe('McpPage', () => {
   });
 
   describe('DevToolsCommentBridge lifecycle', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('does not create commentBridge on construction or getDevToolsPage', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       pptrPage.hasDevTools.resolves(true);
@@ -979,10 +1101,6 @@ describe('McpPage', () => {
   });
 
   describe('resolveBackendNodeId()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     function createSnapshotWithNodes(
       nodes: Array<{id: string; backendNodeId?: number}>,
       verbose = false,
@@ -1114,10 +1232,6 @@ describe('McpPage', () => {
       assert.ok(matchedStyles);
       return getSelectors(matchedStyles);
     }
-
-    afterEach(() => {
-      sinon.restore();
-    });
 
     it('throws when snapshot has not been captured', async () => {
       const {mcpPage} = await createMcpPage();
@@ -1291,10 +1405,6 @@ describe('McpPage', () => {
   });
 
   describe('executeThirdPartyDeveloperTool()', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     it('appends "Tool returned no result." and skips cleanup evaluate when the tool returns undefined and stashed is 0', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       const response = createMockMcpResponse();
@@ -1331,11 +1441,7 @@ describe('McpPage', () => {
   });
 
   describe('WebMCP third-party developer tools', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('filters WebMCP tools by annotations.debugging in getToolGroups()', async () => {
+    it('filters WebMCP tools by annotations.debugging in discoverThirdPartyDeveloperTools()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 
       const debuggingTool = createMockWebMCPTool({
@@ -1361,7 +1467,7 @@ describe('McpPage', () => {
         unannotatedTool,
       ]);
 
-      const groups = await mcpPage.getToolGroups();
+      const groups = await mcpPage.discoverThirdPartyDeveloperTools();
       assert.deepStrictEqual(groups, [
         {
           name: 'WebMCP Tools',
@@ -1375,10 +1481,9 @@ describe('McpPage', () => {
           ],
         },
       ]);
-      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), groups);
     });
 
-    it('combines WebMCP debugging tools and devtoolstooldiscovery tools in getThirdPartyDeveloperTools()', async () => {
+    it('combines WebMCP debugging tools and devtoolstooldiscovery tools in discoverThirdPartyDeveloperTools()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 
       const debuggingTool = createMockWebMCPTool({
@@ -1387,7 +1492,10 @@ describe('McpPage', () => {
         annotations: {debugging: true},
       });
       pptrPage.webmcp.tools.returns([debuggingTool]);
-      mcpPage.eventBasedThirdPartyTools = [
+      pptrPage.cdpSession.send.resolves({
+        listeners: [{type: 'devtoolstooldiscovery'}],
+      });
+      pptrPage.evaluate.resolves([
         {
           name: 'Custom Tools',
           description: 'Tools exposed via event',
@@ -1399,17 +1507,16 @@ describe('McpPage', () => {
                 type: 'object',
                 properties: {
                   el: {
-                    properties: {uid: {type: 'string'}},
-                    required: ['uid'],
+                    'x-mcp-type': 'HTMLElement',
                   },
                 },
               },
             },
           ],
         },
-      ];
+      ]);
 
-      const groups = mcpPage.getThirdPartyDeveloperTools();
+      const groups = await mcpPage.discoverThirdPartyDeveloperTools();
       assert.deepStrictEqual(groups, [
         {
           name: 'WebMCP Tools',
@@ -1433,6 +1540,7 @@ describe('McpPage', () => {
                 type: 'object',
                 properties: {
                   el: {
+                    'x-mcp-type': 'HTMLElement',
                     properties: {uid: {type: 'string'}},
                     required: ['uid'],
                   },
@@ -1444,10 +1552,13 @@ describe('McpPage', () => {
       ]);
     });
 
-    it('reflects dynamically added and removed WebMCP debugging tools in getThirdPartyDeveloperTools()', async () => {
+    it('reflects dynamically added and removed WebMCP debugging tools in discoverThirdPartyDeveloperTools()', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
 
-      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), []);
+      assert.deepStrictEqual(
+        await mcpPage.discoverThirdPartyDeveloperTools(),
+        [],
+      );
 
       const debuggingTool = createMockWebMCPTool({
         name: 'dynamic_debug_tool',
@@ -1457,7 +1568,7 @@ describe('McpPage', () => {
       });
       pptrPage.webmcp.tools.returns([debuggingTool]);
 
-      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), [
+      assert.deepStrictEqual(await mcpPage.discoverThirdPartyDeveloperTools(), [
         {
           name: 'WebMCP Tools',
           description: 'Tools exposed via WebMCP',
@@ -1472,7 +1583,10 @@ describe('McpPage', () => {
       ]);
 
       pptrPage.webmcp.tools.returns([]);
-      assert.deepStrictEqual(mcpPage.getThirdPartyDeveloperTools(), []);
+      assert.deepStrictEqual(
+        await mcpPage.discoverThirdPartyDeveloperTools(),
+        [],
+      );
     });
 
     it('executes a WebMCP tool in executeThirdPartyDeveloperTool()', async () => {
@@ -1624,6 +1738,34 @@ describe('McpPage', () => {
         nonDebuggingTool,
         unannotatedTool,
       ]);
+    });
+  });
+
+  describe('dialogs', () => {
+    it('returns the dialog and throws when unhandled', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const dialog = createMockDialog({type: 'alert', message: 'hello'});
+
+      pptrPage.emit('dialog', dialog);
+
+      assert.strictEqual(mcpPage.getDialog(), dialog);
+      assert.throws(() => mcpPage.throwIfDialogOpen(), {
+        message: 'A dialog is open (alert: hello).',
+      });
+    });
+
+    it('clears the dialog and does not throw when handled', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const dialog = createMockDialog({
+        type: 'alert',
+        message: 'hello',
+        handled: true,
+      });
+
+      pptrPage.emit('dialog', dialog);
+
+      assert.strictEqual(mcpPage.getDialog(), undefined);
+      assert.doesNotThrow(() => mcpPage.throwIfDialogOpen());
     });
   });
 });

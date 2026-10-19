@@ -265,13 +265,25 @@ const validKeys = new Set([
   'VolumeUp',
 ]);
 
+/**
+ * Whether the string is a single valid key name (no `+` combinations).
+ */
+export function isValidKey(key: string): key is KeyInput {
+  return validKeys.has(key);
+}
+
+/**
+ * Error message for a string that is not a valid key name.
+ */
+export function invalidKeyMessage(key: string): string {
+  return `${key} is invalid. Valid keys are: ${Array.from(validKeys.values()).join(',')}.`;
+}
+
 function throwIfInvalidKey(key: string): KeyInput {
-  if (validKeys.has(key)) {
-    return key as KeyInput;
+  if (isValidKey(key)) {
+    return key;
   }
-  throw new Error(
-    `${key} is invalid. Valid keys are: ${Array.from(validKeys.values()).join(',')}.`,
-  );
+  throw new Error(invalidKeyMessage(key));
 }
 
 /**
