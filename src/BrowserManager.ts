@@ -186,9 +186,9 @@ export class BrowserManager {
    * McpContext initialization built on it — if ensureBrowser() already
    * resolved and it's that later step hanging (e.g. a dead CDP transport),
    * the token rotation alone does nothing, since #browser is already
-   * cached. Safe to forget unconditionally here: the exclusive context lock
-   * serializes every browser tool call, so there's no concurrent caller to
-   * disrupt.
+   * cached. Safe to forget unconditionally here: a tool call that already
+   * received a Browser keeps using it, so forgetting the cached value only
+   * makes the next ensureBrowser() reconnect.
    */
   abandonPendingAttempt(): void {
     this.#browserAttempt = new BrowserAttempt();

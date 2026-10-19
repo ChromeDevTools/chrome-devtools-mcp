@@ -35,10 +35,22 @@ import {isLocalhost} from './utils/url.js';
 
 /**
  * Lock key for the browser-wide state owned by `McpContext` (page list,
- * selected page, trace state). Held exclusively by every tool call except
- * browserless tools (`concurrency: 'none'`).
+ * selected page, trace state). Tools with `concurrency: 'page'` hold it
+ * shared, browserless tools (`concurrency: 'none'`) do not hold it, every
+ * other tool holds it exclusively.
  */
 export const CONTEXT_LOCK_KEY = 'context';
+
+/**
+ * Lock key for the state of one page (`McpPage`): text snapshot, dialog,
+ * recorder, emulation. Held exclusively by tools with `concurrency: 'page'`
+ * from page lookup until the response is built. A page lock holder never
+ * waits for the context key, so acquiring the page key after the context key
+ * cannot deadlock.
+ */
+export function pageLockKey(pageId: number): string {
+  return `page:${pageId}`;
+}
 
 interface ToolLockControl {
   releaseIfYielding: () => void;
@@ -329,60 +341,77 @@ export class ToolHandler {
       response.setReconnectNotice();
     }
     let page: McpPage | undefined;
+    // Held until the response is built because formatting writes the page.
+    let pageGuard: Disposable | undefined;
     try {
-      await validateToolFiles(tool, params, context, isLocalBrowser(browser));
-      if (isPageScopedTool(tool)) {
-        const pageId =
-          typeof params.pageId === 'number' ? params.pageId : undefined;
-        page =
-          this.serverArgs.pageIdRouting &&
-          pageId !== undefined &&
-          !isSlimTool(tool)
-            ? context.getPageById(pageId)
-            : context.getSelectedMcpPage();
-        await page?.init();
-        response.setPage(page);
-        if (tool.blockedByDialog) {
-          page.throwIfDialogOpen();
+      try {
+        await validateToolFiles(tool, params, context, isLocalBrowser(browser));
+        if (isPageScopedTool(tool)) {
+          const pageId =
+            typeof params.pageId === 'number' ? params.pageId : undefined;
+          page =
+            this.serverArgs.pageIdRouting &&
+            pageId !== undefined &&
+            !isSlimTool(tool)
+              ? context.getPageById(pageId)
+              : context.getSelectedMcpPage();
+          if (tool.concurrency === 'page') {
+            pageGuard = await this.toolLocks.acquire([
+              {key: pageLockKey(page.id), mode: 'exclusive'},
+            ]);
+          }
+          await page?.init();
+          response.setPage(page);
+          if (tool.blockedByDialog) {
+            page.throwIfDialogOpen();
+          }
+          lock.releaseIfYielding();
+          await tool.handler(
+            {
+              params,
+              page,
+            },
+            response,
+            context,
+          );
+        } else {
+          lock.releaseIfYielding();
+          await tool.handler(
+            {
+              params,
+            },
+            response,
+            context,
+          );
         }
-        lock.releaseIfYielding();
-        await tool.handler(
-          {
-            params,
-            page,
-          },
-          response,
-          context,
-        );
-      } else {
-        lock.releaseIfYielding();
-        await tool.handler(
-          {
-            params,
-          },
-          response,
-          context,
-        );
+      } catch (err) {
+        response.setError(err);
+      } finally {
+        await lock.reacquire();
       }
-    } catch (err) {
-      response.setError(err);
+      onTelemetryData(
+        await context.getDevToolsData(page),
+        context.getSelectedMcpPageUrl(page),
+      );
+      return await response.handle(context, this.#dataFormat());
     } finally {
-      await lock.reacquire();
+      pageGuard?.[Symbol.dispose]();
     }
-    onTelemetryData(
-      await context.getDevToolsData(page),
-      context.getSelectedMcpPageUrl(page),
-    );
-    return await response.handle(context, this.#dataFormat());
   }
 
   async #acquireToolLock(): Promise<Disposable | undefined> {
-    if (this.tool.concurrency === 'none') {
-      return undefined;
+    switch (this.tool.concurrency) {
+      case 'none':
+        return undefined;
+      case 'page':
+        return await this.toolLocks.acquire([
+          {key: CONTEXT_LOCK_KEY, mode: 'shared'},
+        ]);
+      default:
+        return await this.toolLocks.acquire([
+          {key: CONTEXT_LOCK_KEY, mode: 'exclusive'},
+        ]);
     }
-    return await this.toolLocks.acquire([
-      {key: CONTEXT_LOCK_KEY, mode: 'exclusive'},
-    ]);
   }
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {

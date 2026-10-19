@@ -663,6 +663,28 @@ describe('McpContext', () => {
       return browser;
     }
 
+    it('serializes concurrent createPagesSnapshot() calls', async () => {
+      const browser = createBrowser();
+      browser.targets.returns([createMockPuppeteerTarget()]);
+      const {promise: initDone, resolve: finishInit} =
+        Promise.withResolvers<void>();
+      const init = sinon.stub(McpPage.prototype, 'init').resolves();
+      init.onSecondCall().returns(initDone);
+      const context = createLazyContext(async () => browser);
+      await context.ensureBrowser();
+      sinon.assert.calledOnce(init);
+
+      const first = context.createPagesSnapshot();
+      const second = context.createPagesSnapshot();
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledTwice(init);
+
+      finishInit();
+      await Promise.all([first, second]);
+      sinon.assert.calledThrice(init);
+      context.dispose();
+    });
+
     it('does not connect until ensureBrowser() is called', async () => {
       const browser = createBrowser();
       const getBrowser = sinon.stub<[], Promise<Browser>>().resolves(browser);

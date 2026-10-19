@@ -193,6 +193,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
       const page = request.page;
@@ -373,6 +374,7 @@ export const handleDialog = definePageTool(() => ({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -419,6 +421,7 @@ export const getTabId = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

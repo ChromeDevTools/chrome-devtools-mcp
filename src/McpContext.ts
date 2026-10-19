@@ -24,6 +24,7 @@ import {type UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
+  Mutex,
   type Browser,
   type BrowserContext,
   type Connection,
@@ -109,6 +110,12 @@ export class McpContext implements Context, BrowserlessContext {
   #workers = new Map<Target, McpWorker>();
 
   #mcpPages = new Map<Target, McpPage>();
+  /**
+   * Serializes `createPagesSnapshot()`. Tools with `concurrency: 'page'` hold
+   * the context lock shared, so two of them can build a pages snapshot at
+   * the same time.
+   */
+  #pagesSnapshotMutex = new Mutex();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
   #selectedPageFallbackRead = false;
@@ -686,6 +693,7 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   async createPagesSnapshot(): Promise<McpPage[]> {
+    using guard = await this.#pagesSnapshotMutex.acquire();
     const allTargets = this.#fetchPageTargets();
 
     for (const target of allTargets) {

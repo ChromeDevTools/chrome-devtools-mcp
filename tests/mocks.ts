@@ -431,12 +431,16 @@ export function createMockPuppeteerTarget(
 
 export function createMockMcpPage(
   options: {
+    id?: number;
     pptrPage?: MockPuppeteerPage;
     target?: sinon.SinonStubbedInstance<MockTarget>;
   } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   page.emulationSettings = {};
+  if (options.id !== undefined) {
+    Object.defineProperty(page, 'id', {value: options.id});
+  }
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();

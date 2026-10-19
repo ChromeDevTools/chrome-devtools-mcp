@@ -85,11 +85,15 @@ type AllKeys<T> = T extends unknown ? keyof T : never;
  * - `'yielding'`: like `'exclusive'`, but the handler runs unlocked. Page
  *   lookup before the handler and response formatting after it stay locked.
  *   Only for tools that wait for external events.
+ * - `'page'`: the context lock shared, plus the lock of the target page
+ *   exclusive. Tools on different pages run at the same time; tools on one
+ *   page and `'exclusive'` tools wait. Only for page-scoped tools whose
+ *   handler touches the target page and no browser-global state.
  * - `'none'`: no lock. The tool runs at the same time as any other tool.
  *   Only for browserless tools; the data they read guards itself (see
  *   `HeapSnapshotManager`).
  */
-export type ToolConcurrency = 'exclusive' | 'yielding' | 'none';
+export type ToolConcurrency = 'exclusive' | 'yielding' | 'page' | 'none';
 
 type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
   ? K extends keyof Schema
@@ -145,6 +149,10 @@ export interface ToolDefinition<
    * non-page tool must handle dialogs itself.
    */
   blockedByDialog: false;
+  /**
+   * A non-page tool has no target page, so it cannot take the page lock.
+   */
+  concurrency?: Exclude<ToolConcurrency, 'page'>;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -531,6 +539,10 @@ export function defineTool<Schema extends zod.ZodRawShape>(
 interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
+  /**
+   * A page tool reads page state, so it always holds a lock.
+   */
+  concurrency?: Exclude<ToolConcurrency, 'none'>;
   handler(
     request: Request<Schema> & {page: ContextPage},
     response: Response,
@@ -574,6 +586,10 @@ export interface BrowserlessToolDefinition<
    * dialogs.
    */
   blockedByDialog: false;
+  /**
+   * A browserless tool has no page and does not wait for browser events.
+   */
+  concurrency?: Exclude<ToolConcurrency, 'page' | 'yielding'>;
   handler(
     request: Request<Schema>,
     response: Response,

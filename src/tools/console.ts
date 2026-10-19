@@ -94,6 +94,7 @@ export const listConsoleMessages = definePageTool(
           ),
       },
       blockedByDialog: false,
+      concurrency: 'page',
       verifyFilesSchema: {},
       handler: async (request, response) => {
         response.setIncludeConsoleData(true, {
@@ -124,6 +125,7 @@ export const getConsoleMessage = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     response.attachConsoleMessage(request.params.msgid);

@@ -20,6 +20,7 @@ import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {zod} from '../src/third_party/index.js';
 import {
   CONTEXT_LOCK_KEY,
+  pageLockKey,
   TOOL_CALL_TIMEOUT_MS,
   ToolHandler,
 } from '../src/ToolHandler.js';
@@ -27,16 +28,16 @@ import {ToolCategory} from '../src/tools/categories.js';
 import {
   defineBrowserlessTool,
   definePageTool,
+  type AnyToolDefinition,
   type BrowserlessToolDefinition,
   type DefinedPageTool,
   type DevToolsData,
-  type ToolConcurrency,
   type ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
 import {KeyedLock} from '../src/utils/KeyedLock.js';
-import {createMockMcpContext} from './mocks.js';
+import {createMockMcpContext, createMockMcpPage} from './mocks.js';
 import {getMockBrowser} from './utils.js';
 
 describe('ToolHandler', () => {
@@ -181,7 +182,10 @@ describe('ToolHandler', () => {
   describe("concurrency: 'yielding'", () => {
     function createGlobalTool(
       handler: ToolDefinition['handler'],
-      options: {name?: string; concurrency?: ToolConcurrency} = {},
+      options: {
+        name?: string;
+        concurrency?: ToolDefinition['concurrency'];
+      } = {},
     ): ToolDefinition {
       return {
         name: options.name ?? 'global_tool',
@@ -359,6 +363,307 @@ describe('ToolHandler', () => {
     });
   });
 
+  describe("concurrency: 'page'", () => {
+    function createServerArgs() {
+      return new ConfigParser('1.0.0', ['node', 'script.js'], {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      }).parse();
+    }
+
+    function createPageTool(
+      name: string,
+      handler: () => Promise<void>,
+      concurrency: DefinedPageTool['concurrency'] = 'page',
+    ): DefinedPageTool {
+      return definePageTool(() => ({
+        name,
+        description: 'A page tool',
+        annotations: {
+          category: ToolCategory.INPUT,
+          readOnlyHint: false,
+        },
+        schema: {},
+        blockedByDialog: false,
+        concurrency,
+        verifyFilesSchema: {},
+        handler,
+      }))(createServerArgs());
+    }
+
+    function createExclusiveTool(
+      name: string,
+      handler: () => Promise<void>,
+    ): ToolDefinition {
+      return {
+        name,
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler,
+      };
+    }
+
+    function createPages(ids: number[]) {
+      const mockContext = createMockMcpContext();
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({process: mockProcess}),
+      );
+      const pages = new Map(ids.map(id => [id, createMockMcpPage({id})]));
+      mockContext.getPageById.callsFake(id => {
+        const page = pages.get(id);
+        assert.ok(page);
+        return page;
+      });
+      return mockContext;
+    }
+
+    function createHandler(
+      tool: AnyToolDefinition,
+      mockContext: McpContext,
+      toolLocks: KeyedLock,
+    ) {
+      return new ToolHandler(
+        tool,
+        createServerArgs(),
+        async () => mockContext,
+        toolLocks,
+        sinon.spy(),
+      );
+    }
+
+    async function settle() {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+
+    it('runs page tools on different pages at the same time', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const toolLocks = new KeyedLock();
+      const mockContext = createPages([1, 2]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
+
+      const first = createHandler(
+        createPageTool('first', async () => {
+          events.push('first:start');
+          await release;
+          events.push('first:end');
+        }),
+        mockContext,
+        toolLocks,
+      );
+      const second = createHandler(
+        createPageTool('second', async () => {
+          events.push('second:run');
+        }),
+        mockContext,
+        toolLocks,
+      );
+
+      const firstResult = first.handle({pageId: 1});
+      await settle();
+      await second.handle({pageId: 2});
+      finishFirst();
+      await firstResult;
+
+      assert.deepStrictEqual(events, [
+        'first:start',
+        'second:run',
+        'first:end',
+      ]);
+    });
+
+    it('serializes page tools on the same page', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const toolLocks = new KeyedLock();
+      const mockContext = createPages([1]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
+
+      const first = createHandler(
+        createPageTool('first', async () => {
+          events.push('first:start');
+          await release;
+          events.push('first:end');
+        }),
+        mockContext,
+        toolLocks,
+      );
+      const second = createHandler(
+        createPageTool('second', async () => {
+          events.push('second:run');
+        }),
+        mockContext,
+        toolLocks,
+      );
+
+      const firstResult = first.handle({pageId: 1});
+      await settle();
+      const secondResult = second.handle({pageId: 1});
+      await settle();
+      assert.deepStrictEqual(events, ['first:start']);
+
+      finishFirst();
+      await Promise.all([firstResult, secondResult]);
+      assert.deepStrictEqual(events, [
+        'first:start',
+        'first:end',
+        'second:run',
+      ]);
+    });
+
+    it('queues an exclusive tool behind running page tools in FIFO order', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const toolLocks = new KeyedLock();
+      const mockContext = createPages([1, 2]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
+
+      const pageTool = createHandler(
+        createPageTool('page_tool', async () => {
+          events.push('page:start');
+          await release;
+          events.push('page:end');
+        }),
+        mockContext,
+        toolLocks,
+      );
+      const exclusiveTool = createHandler(
+        createExclusiveTool('exclusive_tool', async () => {
+          events.push('exclusive:run');
+        }),
+        mockContext,
+        toolLocks,
+      );
+      const latePageTool = createHandler(
+        createPageTool('late_page_tool', async () => {
+          events.push('late:run');
+        }),
+        mockContext,
+        toolLocks,
+      );
+
+      const pageResult = pageTool.handle({pageId: 1});
+      await settle();
+      const exclusiveResult = exclusiveTool.handle({});
+      await settle();
+      // Targets another page, but waits behind the queued exclusive tool.
+      const lateResult = latePageTool.handle({pageId: 2});
+      await settle();
+      assert.deepStrictEqual(events, ['page:start']);
+
+      finishFirst();
+      await Promise.all([pageResult, exclusiveResult, lateResult]);
+      assert.deepStrictEqual(events, [
+        'page:start',
+        'page:end',
+        'exclusive:run',
+        'late:run',
+      ]);
+    });
+
+    it('holds the page lock until the response is built', async () => {
+      const {promise: responseReady, resolve: finishResponse} =
+        Promise.withResolvers<void>();
+      const handleStub = sinon.stub(McpResponse.prototype, 'handle');
+      handleStub.onFirstCall().callsFake(async () => {
+        await responseReady;
+        return {content: [], structuredContent: {}};
+      });
+      handleStub.resolves({content: [], structuredContent: {}});
+      const toolLocks = new KeyedLock();
+      const mockContext = createPages([1]);
+      const events: string[] = [];
+
+      const first = createHandler(
+        createPageTool('first', async () => {
+          events.push('first:run');
+        }),
+        mockContext,
+        toolLocks,
+      );
+      const second = createHandler(
+        createPageTool('second', async () => {
+          events.push('second:run');
+        }),
+        mockContext,
+        toolLocks,
+      );
+
+      const firstResult = first.handle({pageId: 1});
+      await settle();
+      const secondResult = second.handle({pageId: 1});
+      await settle();
+      assert.deepStrictEqual(events, ['first:run']);
+
+      finishResponse();
+      await Promise.all([firstResult, secondResult]);
+      assert.deepStrictEqual(events, ['first:run', 'second:run']);
+    });
+
+    it('acquires the context key shared and the page key exclusive', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const toolLocks = sinon.createStubInstance(KeyedLock);
+      const guard = {[Symbol.dispose]: sinon.spy()};
+      toolLocks.acquire.resolves(guard);
+      const mockContext = createPages([7]);
+
+      const result = await createHandler(
+        createPageTool('page_tool', async () => {}),
+        mockContext,
+        toolLocks,
+      ).handle({pageId: 7});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.calledTwice(toolLocks.acquire);
+      sinon.assert.calledWithExactly(toolLocks.acquire.firstCall, [
+        {key: CONTEXT_LOCK_KEY, mode: 'shared'},
+      ]);
+      sinon.assert.calledWithExactly(toolLocks.acquire.secondCall, [
+        {key: pageLockKey(7), mode: 'exclusive'},
+      ]);
+      sinon.assert.calledTwice(guard[Symbol.dispose]);
+    });
+
+    it('releases the page lock when the handler throws', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const toolLocks = new KeyedLock();
+      const mockContext = createPages([1]);
+
+      const result = await createHandler(
+        createPageTool('failing', async () => {
+          throw new Error('handler failed');
+        }),
+        mockContext,
+        toolLocks,
+      ).handle({pageId: 1});
+
+      assert.strictEqual(result.isError, true);
+      const guard = await toolLocks.acquire([
+        {key: pageLockKey(1), mode: 'exclusive'},
+      ]);
+      guard[Symbol.dispose]();
+    });
+  });
+
   const dataFormatCases: Array<{argv: string[]; expected: DataFormat}> = [
     {argv: [], expected: 'default'},
     {argv: ['--experimentalToonFormat'], expected: 'toon'},
@@ -414,7 +719,7 @@ describe('ToolHandler', () => {
   }
 
   it('passes devToolsData and pageUrl to logger', async () => {
-    const baseTool: ToolDefinition = {
+    const baseTool = {
       name: 'test_tool',
       description: 'A test tool',
       annotations: {
@@ -422,7 +727,7 @@ describe('ToolHandler', () => {
         readOnlyHint: true,
       },
       schema: {},
-      blockedByDialog: false,
+      blockedByDialog: false as const,
       verifyFilesSchema: {},
       handler: async () => {
         return;
