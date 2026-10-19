@@ -50,6 +50,7 @@ export type ShapeOutput<T extends zod.ZodRawShape> = zod.output<
 
 export {default as ajv} from 'ajv';
 export {
+  ConsoleMessage,
   Dialog,
   ElementHandle,
   Locator,
