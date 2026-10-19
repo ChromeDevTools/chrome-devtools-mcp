@@ -11,12 +11,12 @@ import sinon from 'sinon';
 import {SymbolizedError} from '../../src/devtools/DevtoolsUtils.js';
 import {ConsoleFormatter} from '../../src/formatters/ConsoleFormatter.js';
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
-import {CDPSession} from '../../src/third_party/index.js';
 import type {
   ConsoleMessage,
   Protocol,
   DevTools,
 } from '../../src/third_party/index.js';
+import {createMockCDPSession} from '../mocks.js';
 
 interface MockConsoleMessage {
   type: () => string;
@@ -854,12 +854,9 @@ describe('ConsoleFormatter', () => {
   });
 
   it('resolves the cause of an UncaughtError on its session', async t => {
-    // `send` is abstract on CDPSession, so it is not on the prototype for
-    // createStubInstance to stub and is added explicitly.
-    const session = sinon.createStubInstance(CDPSession);
-    const send = sinon.stub();
-    Object.defineProperty(session, 'send', {value: send});
-    send.withArgs('Runtime.getProperties').resolves({
+    const session = createMockCDPSession();
+    const send: sinon.SinonStub = session.send;
+    send.onFirstCall().resolves({
       result: [
         {
           name: 'cause',
@@ -874,7 +871,7 @@ describe('ConsoleFormatter', () => {
         },
       ],
     });
-    send.withArgs('Runtime.getExceptionDetails').resolves({
+    send.onSecondCall().resolves({
       exceptionDetails: {
         exceptionId: 2,
         lineNumber: 0,
@@ -910,12 +907,14 @@ describe('ConsoleFormatter', () => {
       } as unknown as DevTools.StackTrace.StackTrace.StackTrace,
     });
 
-    sinon.assert.calledWith(send, 'Runtime.getProperties', {
+    sinon.assert.calledWithExactly(send.firstCall, 'Runtime.getProperties', {
       objectId: 'error-id',
     });
-    sinon.assert.calledWith(send, 'Runtime.getExceptionDetails', {
-      errorObjectId: 'cause-id',
-    });
+    sinon.assert.calledWithExactly(
+      send.secondCall,
+      'Runtime.getExceptionDetails',
+      {errorObjectId: 'cause-id'},
+    );
     t.assert.match(formatter.toStringDetailed(), /Caused by: root cause/);
   });
 });
