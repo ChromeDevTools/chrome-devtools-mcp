@@ -215,9 +215,7 @@ function formatEntryItems(preview: Protocol.Runtime.ObjectPreview): string[] {
  * Formats a `Runtime.ObjectPreview` the way the DevTools console previews it,
  * for example `Map(1) {1 => 2}`, `(3) [1, 2, 3]` or `{a: 1, self: {…}}`.
  */
-export function formatObjectPreview(
-  preview: Protocol.Runtime.ObjectPreview,
-): string {
+function formatObjectPreview(preview: Protocol.Runtime.ObjectPreview): string {
   const description = preview.description ?? '';
   if (
     preview.type !== 'object' ||

@@ -14,8 +14,10 @@ function preview(
   subtype: Protocol.Runtime.ObjectPreview['subtype'],
   description: string,
   properties: Protocol.Runtime.PropertyPreview[],
-  overflow = false,
-  entries?: Protocol.Runtime.EntryPreview[],
+  {
+    overflow = false,
+    entries,
+  }: {overflow?: boolean; entries?: Protocol.Runtime.EntryPreview[]} = {},
 ): Protocol.Runtime.RemoteObject {
   return {
     type: 'object',
@@ -44,18 +46,19 @@ describe('formatRemoteObject', () => {
       'map',
       'Map(1)',
       [{name: 'size', type: 'number', value: '1'}],
-      false,
-      [
-        {
-          key: number('1'),
-          value: {
-            type: 'object',
-            description: 'Object',
-            overflow: false,
-            properties: [{name: 'a', type: 'number', value: '2'}],
+      {
+        entries: [
+          {
+            key: number('1'),
+            value: {
+              type: 'object',
+              description: 'Object',
+              overflow: false,
+              properties: [{name: 'a', type: 'number', value: '2'}],
+            },
           },
-        },
-      ],
+        ],
+      },
     );
     assert.strictEqual(formatRemoteObject(map), 'Map(1) {1 => {…}}');
 
@@ -63,18 +66,19 @@ describe('formatRemoteObject', () => {
       'set',
       'Set(2)',
       [{name: 'size', type: 'number', value: '2'}],
-      false,
-      [
-        {value: number('3')},
-        {
-          value: {
-            type: 'string',
-            description: 'x',
-            overflow: false,
-            properties: [],
+      {
+        entries: [
+          {value: number('3')},
+          {
+            value: {
+              type: 'string',
+              description: 'x',
+              overflow: false,
+              properties: [],
+            },
           },
-        },
-      ],
+        ],
+      },
     );
     assert.strictEqual(formatRemoteObject(set), "Set(2) {3, 'x'}");
   });
@@ -111,7 +115,7 @@ describe('formatRemoteObject', () => {
             {name: '0', type: 'number', value: '0'},
             {name: '1', type: 'number', value: '1'},
           ],
-          true,
+          {overflow: true},
         ),
       ),
       '(120) [0, 1, …]',
@@ -147,7 +151,7 @@ describe('formatRemoteObject', () => {
       'Thu Jan 01 1970 00:00:00 GMT+0000',
     );
     assert.strictEqual(
-      formatRemoteObject(preview('node', 'body', [], true)),
+      formatRemoteObject(preview('node', 'body', [], {overflow: true})),
       'body',
     );
     assert.strictEqual(

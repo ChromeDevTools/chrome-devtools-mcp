@@ -923,4 +923,26 @@ describe('ConsoleFormatter arguments', () => {
       '{"a":1}',
     ]);
   });
+
+  it('reports an argument without a preview whose jsonValue() fails as unavailable', async () => {
+    const message = createMockMessage({
+      type: () => 'log',
+      text: () => 'gone',
+      args: () => [
+        {
+          jsonValue: async () => {
+            throw new Error('Execution context was destroyed');
+          },
+          remoteObject: () => ({type: 'object', description: 'Object'}),
+        },
+      ],
+    });
+    const formatter = await ConsoleFormatter.from(message, {
+      id: 1,
+      fetchDetailedData: true,
+    });
+    assert.deepStrictEqual(formatter.toJSONDetailed().args, [
+      '<error: Argument 0 is no longer available>',
+    ]);
+  });
 });
