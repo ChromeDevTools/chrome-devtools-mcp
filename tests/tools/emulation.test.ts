@@ -514,6 +514,76 @@ describe('emulation', () => {
         extraHttpHeaders: {'X-Page': 'one'},
       });
     });
+
+    it('parses valid extraHttpHeaders JSON and empty string in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: '{"X-Custom": "value"}',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            extraHttpHeaders: {'X-Custom': 'value'},
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          extraHttpHeaders: '',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            extraHttpHeaders: {},
+          },
+        },
+      );
+    });
+
+    it('reports validation issues instead of throwing for invalid transform inputs', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+
+      const geoResult = schema.safeParse({pageId: 1, geolocation: '0x0'});
+      assert.strictEqual(geoResult.success, false);
+      assert.strictEqual(
+        geoResult.error.issues[0].message,
+        'Invalid geolocation "0x0". Expected \'<latitude>,<longitude>\'.',
+      );
+
+      const viewportResult = schema.safeParse({pageId: 1, viewport: '0x0'});
+      assert.strictEqual(viewportResult.success, false);
+      assert.strictEqual(
+        viewportResult.error.issues[0].message,
+        'Invalid viewport width "0". Expected format \'<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]\' with a positive width.',
+      );
+
+      const invalidJsonResult = schema.safeParse({
+        pageId: 1,
+        extraHttpHeaders: 'notjson',
+      });
+      assert.strictEqual(invalidJsonResult.success, false);
+      assert.match(
+        invalidJsonResult.error.issues[0].message,
+        /^Invalid JSON for headers:/,
+      );
+
+      const nonObjectHeadersResult = schema.safeParse({
+        pageId: 1,
+        extraHttpHeaders: '[]',
+      });
+      assert.strictEqual(nonObjectHeadersResult.success, false);
+      assert.strictEqual(
+        nonObjectHeadersResult.error.issues[0].message,
+        'Invalid JSON for headers: Headers must be a JSON object',
+      );
+    });
   });
 
   describe('colorScheme', () => {

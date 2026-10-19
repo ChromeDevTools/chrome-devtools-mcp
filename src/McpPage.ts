@@ -363,6 +363,9 @@ export class McpPage implements ContextPage {
   }
 
   getDialog(): Dialog | undefined {
+    if (this.#dialog?.handled) {
+      this.#dialog = undefined;
+    }
     return this.#dialog;
   }
 
@@ -379,9 +382,10 @@ export class McpPage implements ContextPage {
   }
 
   throwIfDialogOpen(): void {
-    if (this.#dialog && !this.#dialog.handled) {
+    const dialog = this.getDialog();
+    if (dialog) {
       throw new Error(
-        `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
+        `A dialog is open (${dialog.type()}: ${dialog.message()}).`,
       );
     }
   }
