@@ -56,7 +56,6 @@ export const navigate = definePageTool((args: ParsedArguments) => {
         javascriptEvaluation: args?.javascriptEvaluation,
         categoryExtensions: args?.categoryExtensions,
         fileNavigations: args?.fileNavigations,
-        experimentalDevtools: args?.experimentalDevtools,
       });
 
       const page = request.page;

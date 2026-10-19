@@ -22,7 +22,7 @@ import {
   handleDialog,
   getTabId,
 } from '../../src/tools/pages.js';
-import {createMockParsedArguments} from '../mocks.js';
+import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -395,23 +395,22 @@ describe('pages', () => {
         );
       });
     });
-    it('rejects devtools: URLs unless experimentalDevtools is enabled', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const tool = newPage(args);
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {params: {url: 'devtools://devtools/bundled/devtools_app.html'}},
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to devtools: URLs is not allowed without --experimentalDevtools.',
-          },
-        );
-      });
+    it('rejects devtools: URLs', async () => {
+      const {response, context} = createHandlerMocks();
+      const tool = newPage(createMockParsedArguments());
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {params: {url: 'devtools://devtools/bundled/devtools_app.html'}},
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to devtools: URLs is not allowed.',
+        },
+      );
+      sinon.assert.notCalled(context.newPage);
     });
     it('allows chrome://newtab/', async () => {
       await withMcpContext(async (response, context, args) => {
@@ -1343,26 +1342,25 @@ describe('pages', () => {
       });
     });
 
-    it('rejects devtools: URLs unless experimentalDevtools is enabled', async () => {
-      await withMcpContext(async (response, context, args) => {
-        const tool = navigatePage(args);
-        await assert.rejects(
-          async () => {
-            await tool.handler(
-              {
-                params: {url: 'devtools://devtools/bundled/devtools_app.html'},
-                page: context.getSelectedMcpPage(),
-              },
-              response,
-              context,
-            );
-          },
-          {
-            message:
-              'Navigating to devtools: URLs is not allowed without --experimentalDevtools.',
-          },
-        );
-      });
+    it('rejects devtools: URLs', async () => {
+      const {page, response, context} = createHandlerMocks();
+      const tool = navigatePage(createMockParsedArguments());
+      await assert.rejects(
+        async () => {
+          await tool.handler(
+            {
+              params: {url: 'devtools://devtools/bundled/devtools_app.html'},
+              page,
+            },
+            response,
+            context,
+          );
+        },
+        {
+          message: 'Navigating to devtools: URLs is not allowed.',
+        },
+      );
+      sinon.assert.notCalled(page.pptrPage.goto);
     });
 
     it('allows chrome://newtab/', async () => {

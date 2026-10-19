@@ -644,7 +644,6 @@ export class McpContext implements Context {
     if (
       !isAllowedUrl(url, {
         categoryExtensions: this.#options.categoryExtensions,
-        experimentalDevtools: this.#options.experimentalDevToolsDebugging,
       })
     ) {
       return false;
