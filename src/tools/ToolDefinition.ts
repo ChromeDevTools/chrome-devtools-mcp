@@ -435,6 +435,10 @@ export type ContextPage = Readonly<{
     viewport?: Viewport;
   }): Promise<void>;
   waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  resize(
+    width: number,
+    height: number,
+  ): Promise<{width: number; height: number} | undefined>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(

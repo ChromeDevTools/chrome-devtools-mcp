@@ -317,7 +317,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
 
 export const resizePage = definePageTool(() => ({
   name: 'resize_page',
-  description: `Resizes the page's window so that the page has specified dimension`,
+  description: `Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -330,55 +330,16 @@ export const resizePage = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const {width, height} = request.params;
 
-    try {
-      const browser = page.pptrPage.browser();
-      const windowId = await page.pptrPage.windowId();
-
-      const bounds = await browser.getWindowBounds(windowId);
-
-      if (bounds.windowState === 'fullscreen') {
-        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      } else if (bounds.windowState !== 'normal') {
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      }
-    } catch {
-      // Window APIs are not supported on all platforms
-    }
-    await page.pptrPage.resize({
-      contentWidth: request.params.width,
-      contentHeight: request.params.height,
-    });
-
-    try {
-      const browser = page.pptrPage.browser();
-      const windowId = await page.pptrPage.windowId();
-      const newBounds = await browser.getWindowBounds(windowId);
-      if (
-        newBounds.width !== undefined &&
-        newBounds.width !== request.params.width
-      ) {
-        throw new Error(
-          `Could not resize page to ${request.params.width}x${request.params.height}. Resulting width is ${newBounds.width}.`,
-        );
-      }
-      if (
-        newBounds.height !== undefined &&
-        newBounds.height < request.params.height
-      ) {
-        throw new Error(
-          `Could not resize page to ${request.params.width}x${request.params.height}. Resulting height is ${newBounds.height}.`,
-        );
-      }
-    } catch (err) {
-      if (
-        err instanceof Error &&
-        err.message.startsWith('Could not resize page')
-      ) {
-        throw err;
-      }
+    const actualSize = await page.resize(width, height);
+    if (
+      actualSize &&
+      (actualSize.width !== width || actualSize.height !== height)
+    ) {
+      response.appendResponseLine(
+        `Requested ${width}x${height}, page is ${actualSize.width}x${actualSize.height}`,
+      );
     }
 
     response.setIncludePages(true);
