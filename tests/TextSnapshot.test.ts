@@ -33,7 +33,7 @@ describe('TextSnapshot', () => {
           loaderId: '1',
           backendNodeId: 2,
           children: [
-            createMockAXNode('InlineTextBox', {
+            createMockAXNode('StaticText', {
               name: 'alpha',
               loaderId: '1',
             }),
@@ -43,7 +43,7 @@ describe('TextSnapshot', () => {
           loaderId: '1',
           backendNodeId: 3,
           children: [
-            createMockAXNode('InlineTextBox', {
+            createMockAXNode('StaticText', {
               name: 'beta',
               loaderId: '1',
             }),
@@ -54,21 +54,21 @@ describe('TextSnapshot', () => {
     page.pptrPage.accessibility.snapshot.resolves(mockRoot);
 
     const snapshot = await TextSnapshot.create(page, {verbose: true});
-    const inlineNodes = [...snapshot.idToNode.values()].filter(
-      node => node.role === 'InlineTextBox',
+    const textNodes = [...snapshot.idToNode.values()].filter(
+      node => node.role === 'StaticText',
     );
 
-    assert.strictEqual(inlineNodes.length, 0);
+    assert.strictEqual(textNodes.length, 0);
 
     const paragraph1 = snapshot.idToNode.get('1_1');
     assert.strictEqual(paragraph1?.role, 'paragraph');
-    assert.strictEqual(paragraph1?.children[0]?.role, 'InlineTextBox');
+    assert.strictEqual(paragraph1?.children[0]?.role, 'StaticText');
     assert.strictEqual(paragraph1?.children[0]?.id, '');
     assert.strictEqual(paragraph1?.children[0]?.name, 'alpha');
 
     const paragraph2 = snapshot.idToNode.get('1_2');
     assert.strictEqual(paragraph2?.role, 'paragraph');
-    assert.strictEqual(paragraph2?.children[0]?.role, 'InlineTextBox');
+    assert.strictEqual(paragraph2?.children[0]?.role, 'StaticText');
     assert.strictEqual(paragraph2?.children[0]?.id, '');
     assert.strictEqual(paragraph2?.children[0]?.name, 'beta');
 
