@@ -14,9 +14,14 @@ import {
   mcpOptions,
   DEFAULT_FILESYSTEM_ROOT,
 } from '../src/config/mcp-options.js';
-import {buildCommand} from '../src/config/cli-commands.js';
+import {
+  buildCommand,
+  getCommandArgSpec,
+  shieldLiteralArgs,
+} from '../src/config/cli-commands.js';
 import {commands} from '../src/config/cli-options.js';
 import {computeFlagUsage} from '../src/telemetry/flagUtils.js';
+import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 
 import {createTempFile} from './utils.js';
 
@@ -149,6 +154,29 @@ describe('cli args parsing', () => {
         height: 777,
       },
     });
+  });
+
+  it('rejects non-positive viewport dimensions', async () => {
+    const coerce = puppeteerOptions.viewport.coerce;
+    assert.ok(coerce);
+
+    assert.strictEqual(coerce(undefined), undefined);
+
+    for (const value of [
+      '800x-1',
+      '-100x800',
+      '800x0',
+      '0x800',
+      'Infinityx600',
+      '800xInfinity',
+      '1280.5x720',
+      '1280x720.5',
+    ]) {
+      assert.throws(
+        () => coerce(value),
+        /Invalid viewport\. Expected format is `1280x720` with positive integer width and height\./,
+      );
+    }
   });
 
   it('parses chrome args', async () => {
@@ -348,7 +376,7 @@ describe('cli args parsing', () => {
   });
 
   it('rejects invalid screencast fps values', async () => {
-    const coerce = mcpOptions.experimentalScreencastFps.coerce;
+    const coerce = mcpOptions.screencastFps.coerce;
     assert.ok(coerce);
 
     assert.strictEqual(coerce(undefined), undefined);
@@ -357,9 +385,27 @@ describe('cli args parsing', () => {
     for (const value of [0, -1, 10.5, Number.NaN]) {
       assert.throws(
         () => coerce(value),
-        /Invalid experimentalScreencastFps .* Expected a positive integer\./,
+        /Invalid screencastFps .* Expected a positive integer\./,
       );
     }
+  });
+
+  it('parses screencast fps without requiring experimental screencast', async () => {
+    const args = parseConfig(['--screencast-fps=5']);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      channel: 'stable',
+      screencastFps: 5,
+    });
+  });
+
+  it('accepts --experimental-screencast-fps as an alias for --screencast-fps', async () => {
+    const args = parseConfig(['--experimental-screencast-fps=5']);
+    assert.deepStrictEqual(args, {
+      ...defaultArgs,
+      channel: 'stable',
+      screencastFps: 5,
+    });
   });
 
   it('parses usage statistics flag', async () => {
@@ -526,13 +572,13 @@ describe('cli args parsing', () => {
     ]);
   });
 
-  it('rejects url-pattern with a regexp group or named group', async () => {
+  it('rejects url-pattern with a regexp group, named group, or partial IPv4 wildcard', async () => {
     assert.throws(
       () =>
         parseConfig([
           String.raw`--blockedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
     );
 
     assert.throws(
@@ -540,17 +586,27 @@ describe('cli args parsing', () => {
         parseConfig([
           String.raw`--allowedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
         ]),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
     );
 
     assert.throws(
       () => parseConfig(['--blockedUrlPattern=*://127.0.0.1::port/secret']),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a ":name" named group is not enforced/,
     );
 
     assert.throws(
       () => parseConfig(['--allowedUrlPattern=*://127.0.0.1::port/secret']),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a ":name" named group is not enforced/,
+    );
+
+    assert.throws(
+      () => parseConfig(['--blockedUrlPattern=*://127.0.0.*/*']),
+      /Invalid --blockedUrlPattern .*a partial IPv4 wildcard is not enforced/,
+    );
+
+    assert.throws(
+      () => parseConfig(['--allowedUrlPattern=*://127.0.0.*/*']),
+      /Invalid --allowedUrlPattern .*a partial IPv4 wildcard is not enforced/,
     );
   });
 
@@ -561,7 +617,7 @@ describe('cli args parsing', () => {
           '--blocked-url-pattern=https://a.com/*',
           String.raw`--blocked-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --blockedUrlPattern .*is not enforced/,
+      /Invalid --blockedUrlPattern .*a regexp group is not enforced/,
     );
     assert.throws(
       () =>
@@ -569,16 +625,20 @@ describe('cli args parsing', () => {
           '--allowed-url-pattern=https://a.com/*',
           String.raw`--allowed-url-pattern=*://example.com/(foo|bar)`,
         ]),
-      /Invalid --allowedUrlPattern .*is not enforced/,
+      /Invalid --allowedUrlPattern .*a regexp group is not enforced/,
     );
   });
 
   it('rejects url-pattern with invalid syntax', async () => {
-    assert.throws(() =>
-      parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
+    assert.throws(
+      () =>
+        parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']),
+      /Invalid --blockedUrlPattern "\*:\/\/example\.com\/\(unterminated":/,
     );
-    assert.throws(() =>
-      parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']),
+    assert.throws(
+      () =>
+        parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']),
+      /Invalid --allowedUrlPattern "\*:\/\/example\.com\/\(unterminated":/,
     );
   });
 
@@ -1222,19 +1282,26 @@ describe('cli args parsing', () => {
 });
 
 describe('cli command strings', () => {
+  const required = {description: '', required: true, positional: true};
   const dummyArgsVariadic = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    arrArg: {name: 'arrArg', type: 'array', description: '', required: true},
+    arg1: {name: 'arg1', type: 'string', ...required},
+    arrArg: {name: 'arrArg', type: 'array', ...required},
   };
 
   const dummyArgsPlain = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    arg2: {name: 'arg2', type: 'string', description: '', required: true},
+    arg1: {name: 'arg1', type: 'string', ...required},
+    arg2: {name: 'arg2', type: 'string', ...required},
   };
 
   const dummyArgsOptional = {
-    arg1: {name: 'arg1', type: 'string', description: '', required: true},
-    optArg: {name: 'optArg', type: 'boolean', description: '', required: false},
+    arg1: {name: 'arg1', type: 'string', ...required},
+    optArg: {
+      name: 'optArg',
+      type: 'boolean',
+      description: '',
+      required: false,
+      positional: false,
+    },
   };
 
   it('renders a required array arg as a variadic positional', () => {
@@ -1291,6 +1358,129 @@ describe('cli command strings', () => {
         }
       }
     }
+  });
+});
+
+describe('cli literal args', () => {
+  const getSpec = (name: string) =>
+    name in commands ? getCommandArgSpec(commands[name].args) : undefined;
+
+  function shield(argv: string[]) {
+    const {argv: shielded, restore} = shieldLiteralArgs(argv, getSpec);
+    return {
+      shielded,
+      restored: shielded.map(restore),
+      literalIndexes: shielded.flatMap((t, i) => (t !== argv[i] ? [i] : [])),
+    };
+  }
+
+  it('passes regular args through unchanged', () => {
+    const input = ['fill', '1', '1_1', 'a-b', '-5', '--output-format', 'json'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('shields a lone dash', () => {
+    const {shielded, restored} = shield(['fill', '1', '1_1', '-']);
+    assert.ok(!shielded[3].startsWith('-'));
+    assert.deepStrictEqual(restored, ['fill', '1', '1_1', '-']);
+  });
+
+  it('shields unknown dash tokens in unfilled positional slots', () => {
+    for (const value of ['--weird', '-abc', '- item', '--pageId=2']) {
+      const {shielded, restored} = shield(['fill', '1', '1_1', value]);
+      assert.ok(!shielded[3].startsWith('-'), value);
+      assert.deepStrictEqual(restored, ['fill', '1', '1_1', value]);
+    }
+  });
+
+  it('leaves unknown dash tokens alone once positionals are filled', () => {
+    const input = ['fill', '1', '1_1', 'x', '--pageid', '2'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('skips known options and their values', () => {
+    const input = [
+      '--sessionId',
+      'abc',
+      'click',
+      '--dblClick',
+      'true',
+      '--output-format=json',
+      '1',
+      '1_1',
+      '--help',
+    ];
+    assert.deepStrictEqual(shield(input).shielded, input);
+
+    const {restored, literalIndexes} = shield([
+      'evaluate_script',
+      '--pageId',
+      '1',
+      '--args',
+      'a',
+      'b',
+      '--weird',
+    ]);
+    assert.deepStrictEqual(literalIndexes, [6]);
+    assert.strictEqual(restored[6], '--weird');
+  });
+
+  it('accepts kebab-case and negated forms of known options', () => {
+    const input = ['click', '1', '1_1', '--dbl-click', '--no-dblClick'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('fills a variadic positional with any dash tokens', () => {
+    const {restored, literalIndexes} = shield([
+      'upload_file',
+      '1',
+      '1_1',
+      '-',
+      '--a',
+      '-b',
+    ]);
+    assert.deepStrictEqual(literalIndexes, [3, 4, 5]);
+    assert.deepStrictEqual(restored, [
+      'upload_file',
+      '1',
+      '1_1',
+      '-',
+      '--a',
+      '-b',
+    ]);
+  });
+
+  it('shields every token after -- and drops the separator', () => {
+    const {argv, restore} = shieldLiteralArgs(
+      ['fill', '1', '--', '--weird', '- item', '--', '-abc'],
+      getSpec,
+    );
+    assert.strictEqual(argv.length, 6);
+    assert.deepStrictEqual(argv.slice(0, 2), ['fill', '1']);
+    for (const token of argv.slice(2)) {
+      assert.ok(!token.startsWith('-'), `unexpected token ${token}`);
+    }
+    assert.deepStrictEqual(argv.slice(2).map(restore), [
+      '--weird',
+      '- item',
+      '--',
+      '-abc',
+    ]);
+  });
+
+  it('does not shield unknown flags of non-tool commands', () => {
+    const input = ['start', '--weird', 'status', '-x'];
+    assert.deepStrictEqual(shield(input).shielded, input);
+  });
+
+  it('restores values nested in arrays and leaves other values alone', () => {
+    const {argv, restore} = shieldLiteralArgs(
+      ['cmd', '--', '-a', '-b'],
+      getSpec,
+    );
+    assert.deepStrictEqual(restore([argv[1], argv[2], 'x']), ['-a', '-b', 'x']);
+    assert.strictEqual(restore(42), 42);
+    assert.strictEqual(restore(undefined), undefined);
   });
 });
 

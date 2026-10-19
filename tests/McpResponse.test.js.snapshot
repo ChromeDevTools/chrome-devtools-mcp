@@ -405,7 +405,6 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          uid=1_5 InlineTextBox "test"
 
 `;
 
@@ -432,14 +431,7 @@ exports[`McpResponse > returns verbose snapshot and structured content 2`] = `
                   {
                     "id": "1_4",
                     "role": "StaticText",
-                    "name": "test",
-                    "children": [
-                      {
-                        "id": "1_5",
-                        "role": "InlineTextBox",
-                        "name": "test"
-                      }
-                    ]
+                    "name": "test"
                   }
                 ]
               }
@@ -468,7 +460,6 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          uid=1_5 InlineTextBox "test"
 
 `;
 
@@ -1322,16 +1313,24 @@ exports[`extensions > lists extensions 2`] = `
 `;
 
 exports[`lighthouse > includes lighthouse report paths 1`] = `
-## Lighthouse Audit Results
+## Lighthouse audit results
 Mode: navigation
 Device: desktop
 URL: https://example.com
-### Category Scores
+### Category scores
 - Performance: 90 (performance)
-### Audit Summary
+### Audit summary
 Passed: 10
 Failed: 1
-Total Timing: 1000ms
+Total timing: 1000ms
+### Failed audits
+- color-contrast [accessibility]: Background and foreground colors do not have a sufficient contrast ratio. (score: 0)
+  Low-contrast text is difficult to read.
+  Nodes (12, showing 2):
+  - selector="body > p" label="Hello" snippet="<p class=\\"faint\\">"
+    Fix any of the following: Element has insufficient color contrast
+  - selector="a[title=\\"Say \\\\\\"hi\\\\\\"\\"]" label="Say \\"hi\\" now" snippet="<a title=\\"Say &quot;hi&quot;\\">"
+- document-title [accessibility, seo]: Document does not have a \`<title>\` element (score: 0)
 ### Reports
 - /tmp/report.json
 - /tmp/report.html
@@ -1359,6 +1358,42 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
         "total": 1000
       }
     },
+    "failedAudits": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "description": "Low-contrast text is difficult to read.",
+        "score": 0,
+        "categories": [
+          "accessibility"
+        ],
+        "nodes": [
+          {
+            "selector": "body > p",
+            "snippet": "<p class=\\"faint\\">",
+            "nodeLabel": "Hello",
+            "explanation": "Fix any of the following:\\n  Element has insufficient color contrast"
+          },
+          {
+            "selector": "a[title=\\"Say \\\\\\"hi\\\\\\"\\"]",
+            "snippet": "<a title=\\"Say &quot;hi&quot;\\">",
+            "nodeLabel": "Say \\"hi\\"\\nnow"
+          }
+        ],
+        "totalNodes": 12
+      },
+      {
+        "id": "document-title",
+        "title": "Document does not have a \`<title>\` element",
+        "score": 0,
+        "categories": [
+          "accessibility",
+          "seo"
+        ],
+        "nodes": [],
+        "totalNodes": 0
+      }
+    ],
     "reports": [
       "/tmp/report.json",
       "/tmp/report.html"
@@ -1368,18 +1403,18 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
 `;
 
 exports[`lighthouse > rounds category scores and shows unscored categories as n/a 1`] = `
-## Lighthouse Audit Results
+## Lighthouse audit results
 Mode: navigation
 Device: desktop
 URL: https://example.com
-### Category Scores
+### Category scores
 - Accessibility: 57 (accessibility)
 - SEO: 0 (seo)
 - Agentic Browsing: n/a (agentic-browsing)
-### Audit Summary
+### Audit summary
 Passed: 10
 Failed: 1
-Total Timing: 1000ms
+Total timing: 1000ms
 ### Reports
 - /tmp/report.json
 - /tmp/report.html
@@ -1417,11 +1452,23 @@ exports[`lighthouse > rounds category scores and shows unscored categories as n/
         "total": 1000
       }
     },
+    "failedAudits": [],
     "reports": [
       "/tmp/report.json",
       "/tmp/report.html"
     ]
   }
+}
+`;
+
+exports[`third-party developer tools > lists no third-party developer tools if there are none 1`] = `
+## Third-party developer tools
+No third-party developer tools available.
+`;
+
+exports[`third-party developer tools > lists no third-party developer tools if there are none 2`] = `
+{
+  "thirdPartyDeveloperTools": []
 }
 `;
 
@@ -1459,7 +1506,7 @@ exports[`third-party developer tools > lists third-party developer tools 2`] = `
 
 exports[`webmcp > includes webmcp tools in list_pages response 1`] = `
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1470,7 +1517,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1491,7 +1538,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
 exports[`webmcp > includes webmcp tools in navigate_page response 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1503,7 +1550,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1523,7 +1570,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
 
 exports[`webmcp > includes webmcp tools in select_page response 1`] = `
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1534,7 +1581,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1555,7 +1602,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 `;
 
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
@@ -1565,7 +1612,7 @@ exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ]

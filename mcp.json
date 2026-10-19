@@ -7,7 +7,7 @@
       "args": [
         "--prefix",
         "${PLUGIN_DATA}",
-        "chrome-devtools-mcp@1.10.1"
+        "chrome-devtools-mcp@1.11.0"
       ]
     }
   }

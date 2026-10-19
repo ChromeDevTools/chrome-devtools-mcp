@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Node 22 has no global URLPattern. The CLI bundle exports Puppeteer's
+// polyfill, so this module does not need the full third-party bundle.
+import {URLPattern} from '../third_party/cli.js';
+
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'ws:', 'wss:']);
 const IPV4_LOOPBACK_REGEX = /^127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/;
 
@@ -122,21 +126,58 @@ function hasNamedGroup(component: string): boolean {
 }
 
 /**
- * Finds the first pattern that Chrome can't enforce on redirects or subresources:
- * - Any pattern containing a regexp group (for example `(foo|bar)`).
- * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/*`).
+ * Checks whether a URLPattern string has a partial IPv4 wildcard in the
+ * hostname (for example `127.0.0.*`, `*.0.0.1`, `*1*`, or `{127.0.0.*}`),
+ * which Chrome cannot enforce on redirects or subresources.
+ */
+function hasPartialIpv4Hostname(pattern: string): boolean {
+  const authority = /:\/\/([^/?#]+)/.exec(pattern)?.[1] ?? '';
+  const hostPort = authority.slice(authority.lastIndexOf('@') + 1);
+  if (hostPort.startsWith('[')) {
+    return false;
+  }
+  const hostname = hostPort.replace(/:.*$/, '');
+  if (!hostname.includes('*')) {
+    return false;
+  }
+  const stripped = hostname.replaceAll(/[{}*\\]/g, '').replace(/\.+$/, '');
+  const lastLabel = stripped.split('.').at(-1) ?? '';
+  return /^(?:\d+|0[xX][0-9a-fA-F]*)$/.test(lastLabel);
+}
+
+/**
+ * Validates that every pattern can be enforced by Chrome on redirects and subresources:
+ * - Rejects patterns with a partial IPv4 wildcard in the hostname (for example `127.0.0.*`).
+ * - Rejects patterns containing a regexp group (for example `(foo|bar)`).
+ * - Rejects patterns containing a named group (`:name`, for example `*://127.0.0.1::port/path`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
- * @returns The first unenforceable pattern, or undefined if all are valid.
- * @throws Error if a pattern's syntax is invalid (via `new URLPattern`).
+ * @param flagName The CLI flag name used in error messages.
+ * @throws Error if a pattern's syntax is invalid (via `new URLPattern`) or uses an unenforceable construct.
  */
-export function findUnenforceablePattern(
+export function validateUrlPatterns(
   patterns: string[],
-): string | undefined {
+  flagName: string,
+): void {
   for (const raw of patterns) {
-    const parsed = new URLPattern(raw);
+    if (hasPartialIpv4Hostname(raw)) {
+      throw new Error(
+        `Invalid ${flagName} "${raw}": a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact IPv4 address or a "*" wildcard instead.`,
+      );
+    }
+    let parsed: URLPattern;
+    try {
+      parsed = new URLPattern(raw);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid ${flagName} "${raw}": ${message}`, {
+        cause: error,
+      });
+    }
     if (parsed.hasRegExpGroups) {
-      return raw;
+      throw new Error(
+        `Invalid ${flagName} "${raw}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+      );
     }
     const components = [
       parsed.protocol,
@@ -149,10 +190,11 @@ export function findUnenforceablePattern(
       parsed.hash,
     ];
     if (components.some(hasNamedGroup)) {
-      return raw;
+      throw new Error(
+        `Invalid ${flagName} "${raw}": a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+      );
     }
   }
-  return undefined;
 }
 
 /**
