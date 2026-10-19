@@ -12,11 +12,7 @@ import sinon from 'sinon';
 import type {McpPage} from '../../src/McpPage.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
-import {
-  createHandlerMocks,
-  createMockMcpPage,
-  createMockWebMCPTool,
-} from '../mocks.js';
+import {createHandlerMocks, createMockWebMCPTool} from '../mocks.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('webmcp', () => {
@@ -38,7 +34,7 @@ describe('webmcp', () => {
         context,
       );
 
-      sinon.assert.called(response.setListWebMcpTools);
+      sinon.assert.calledOnceWithExactly(response.setListWebMcpTools);
     });
 
     it('list webmcp tools in list_pages response', async () => {
@@ -46,18 +42,16 @@ describe('webmcp', () => {
 
       await listPages(args).handler({params: {}}, response, context);
 
-      sinon.assert.called(response.setListWebMcpTools);
+      sinon.assert.calledOnceWithExactly(response.setListWebMcpTools);
     });
 
     it('list webmcp tools in select_page response', async () => {
-      const {context, response, args} = createHandlerMocks();
-      const mockPage = createMockMcpPage();
-      mockPage.init.resolves();
-      context.getPageById.returns(mockPage);
+      const {context, response, args, page} = createHandlerMocks();
+      context.getPageById.returns(page);
 
       await selectPage(args).handler({params: {pageId: 1}}, response, context);
 
-      sinon.assert.called(response.setListWebMcpTools);
+      sinon.assert.calledOnceWithExactly(response.setListWebMcpTools);
     });
   });
 
