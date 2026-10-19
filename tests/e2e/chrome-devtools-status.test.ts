@@ -12,20 +12,18 @@ import {
   assertDaemonIsNotRunning,
   assertDaemonIsRunning,
   runCli,
+  stopDaemonForCleanup,
 } from '../utils.js';
 
 describe('chrome-devtools', () => {
   let sessionId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
+    await stopDaemonForCleanup(sessionId);
   });
 
   it('reports daemon status correctly', async () => {
@@ -60,9 +58,6 @@ describe('chrome-devtools', () => {
       0,
       `status command failed: ${statusResult.stderr}`,
     );
-    assert(
-      !statusResult.stdout.includes('--viewport'),
-      `daemon was started with unexpected --viewport flag: ${statusResult.stdout}`,
-    );
+    assert.match(statusResult.stdout, /args=\["--viaCli"\]/);
   });
 });

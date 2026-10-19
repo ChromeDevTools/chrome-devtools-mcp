@@ -4,58 +4,50 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Argv} from 'yargs';
-import type {YargsOptions, InferredOptionTypes} from '../third_party/index.js';
-
-import {yargs, hideBin} from '../third_party/index.js';
-
 import {readFileSync} from 'node:fs';
 
+import type {Argv} from 'yargs';
+
+import type {YargsOptions, InferredOptionTypes} from '../third_party/cli.js';
+import {yargs, hideBin} from '../third_party/cli.js';
+import {getErrorMessage} from '../utils/errorHandling.js';
+
+import {ConfigLocator} from './ConfigLocator.js';
 import {
   mcpOptions,
-  getMcpOptionsForViaCli,
   CLI_EXAMPLES,
-  CONFLICTING_ARGS,
-  IMPLICATIONS,
-  DEFAULT_FILESYSTEM_ROOT,
+  stripYargsPositionalArgs,
   withoutDefaults,
 } from './mcp-options.js';
-import {ConfigLocator} from './ConfigLocator.js';
+import type {ParsedArguments} from './ServerConfig.js';
+import {ServerConfig} from './ServerConfig.js';
+
+export type {ParsedArguments} from './ServerConfig.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
-  parsed: T,
-): Omit<T, '_' | '$0'> {
-  const copy = {...parsed};
-  delete copy._;
-  delete copy.$0;
-  return copy;
-}
-
-export type ParsedArguments = InferredOptionTypes<typeof mcpOptions>;
-
 export class ConfigParser {
   #configPath?: string;
+  #usageStatisticsNoticeShown = false;
   readonly configLocator: ConfigLocator;
 
-  /**
-   * @param configLocator Finds the config file when `--config` is not passed.
-   * Config file discovery is off without it, for example in tests.
-   */
   constructor(
     private version: string,
     private argv = process.argv,
     private env = process.env,
     private exitProcess = true,
+    configLocator?: ConfigLocator,
   ) {
-    this.configLocator = new ConfigLocator();
+    this.configLocator = configLocator ?? new ConfigLocator();
+  }
+
+  /**
+   * The config file resolved by the last `parse()` call, if any.
+   */
+  get configPath(): string | undefined {
+    return this.#configPath;
   }
 
   buildCliParser(
@@ -128,122 +120,15 @@ export class ConfigParser {
   }
 
   /**
-   * Step 4: rejects mutually exclusive inputs. Only explicit inputs are checked,
-   * so defaults never conflict.
+   * Parses CLI arguments and the config file into a layered
+   * {@link ServerConfig}.
    */
-  validateConflicts(explicitArgs: Partial<ParsedArguments>): void {
-    const activeArgs = new Set<string>();
-    for (const [key, val] of Object.entries(explicitArgs)) {
-      if (val !== undefined && val !== false) {
-        activeArgs.add(key);
-      }
-    }
-    for (const group of CONFLICTING_ARGS) {
-      const activeInGroup = group.filter(arg => activeArgs.has(arg));
-      if (activeInGroup.length > 1) {
-        const [arg1, arg2] = activeInGroup;
-        throw new Error(
-          `Arguments ${String(arg1)} and ${String(arg2)} are mutually exclusive`,
-        );
-      }
-    }
-  }
-
-  validateImplications(explicitArgs: Partial<ParsedArguments>): void {
-    for (const [key, implied] of IMPLICATIONS) {
-      const isKeySet =
-        explicitArgs[key] !== undefined && explicitArgs[key] !== false;
-      const isImpliedSet =
-        explicitArgs[implied] !== undefined && explicitArgs[implied] !== false;
-      if (isKeySet && !isImpliedSet) {
-        throw new Error(
-          `Implications failed:\n  ${String(key)} -> ${String(implied)}`,
-        );
-      }
-    }
-  }
-
-  /**
-   * Step 5: fills in defaults for everything that was not set explicitly.
-   * `viaCli` is an explicit input like any other; it selects which defaults
-   * apply.
-   */
-  applyDefaults(explicitArgs: Partial<ParsedArguments>): ParsedArguments {
-    const isViaCli = explicitArgs.viaCli === true;
-    const baseOptions = isViaCli ? getMcpOptionsForViaCli() : mcpOptions;
-    const resolvedArgs = {...explicitArgs};
-    // `channel` only applies when Chrome is launched by channel. Leaving it
-    // unset otherwise keeps it out of telemetry (computeFlagUsage).
-    const launchesByChannel =
-      !resolvedArgs.browserUrl &&
-      !resolvedArgs.wsEndpoint &&
-      !resolvedArgs.executablePath;
-
-    for (const [key, option] of Object.entries(baseOptions)) {
-      if (key === 'channel' && !launchesByChannel) {
-        continue;
-      }
-      if (
-        resolvedArgs[key as keyof ParsedArguments] === undefined &&
-        'default' in option
-      ) {
-        resolvedArgs[key as keyof ParsedArguments] = option.default;
-      }
-    }
-
-    if (isViaCli) {
-      if (
-        resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
-        explicitArgs.allowUnrestrictedPaths !== false
-      ) {
-        resolvedArgs.allowUnrestrictedPaths = true;
-        resolvedArgs.filesystemRoot = undefined;
-      }
-      const connectsToExistingBrowser =
-        resolvedArgs.autoConnect ||
-        resolvedArgs.browserUrl ||
-        resolvedArgs.wsEndpoint;
-      if (
-        explicitArgs.isolated === undefined &&
-        resolvedArgs.userDataDir === undefined &&
-        !connectsToExistingBrowser
-      ) {
-        resolvedArgs.isolated = true;
-      }
-      if (
-        resolvedArgs.categoryExtensions === undefined &&
-        !connectsToExistingBrowser
-      ) {
-        resolvedArgs.categoryExtensions = true;
-      }
-    }
-
-    if (this.env['CI'] || this.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS']) {
-      console.error(
-        "turning off usage statistics. process.env['CI'] || process.env['CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS'] is set.",
-      );
-      resolvedArgs.usageStatistics = false;
-    }
-
-    if (
-      resolvedArgs.categoryExperimentalThirdParty === undefined &&
-      this.env['CHROME_DEVTOOLS_MCP_CATEGORY_EXPERIMENTAL_THIRD_PARTY']
-    ) {
-      resolvedArgs.categoryExperimentalThirdParty = true;
-    }
-
-    // The merge and the default loop lose the static type that yargs infers from
-    // `mcpOptions`. Every value was produced by the same option definitions (CLI
-    // parser, strict config-file parser, option defaults), so the shape matches.
-    return resolvedArgs as unknown as ParsedArguments;
-  }
-
-  parse(): ParsedArguments {
+  parseConfig(): ServerConfig {
     try {
       const cliArgs = this.parseCliArgs();
-      this.#configPath = cliArgs.config ?? this.configLocator?.locate(this.env);
+      this.#configPath = cliArgs.config ?? this.configLocator.locate(this.env);
       this.warnUnknownArgs(cliArgs);
-      return this.#resolve(cliArgs);
+      return this.#resolveConfig(cliArgs);
     } catch (error) {
       if (this.exitProcess) {
         console.error(getErrorMessage(error));
@@ -253,26 +138,40 @@ export class ConfigParser {
     }
   }
 
+  parse(): ParsedArguments {
+    return this.parseConfig().resolved;
+  }
+
+  /**
+   * Re-reads the config file resolved by `parse()` and merges it with the CLI
+   * arguments again into a new {@link ServerConfig}. Unlike `parseConfig()`, it
+   * does not discover a new config file and throws on invalid configuration
+   * instead of exiting the process.
+   */
+  reloadConfig(): ServerConfig {
+    return this.#resolveConfig(this.parseCliArgs());
+  }
+
   /**
    * Re-reads the config file resolved by `parse()` and merges it with the CLI
    * arguments again. Unlike `parse()`, it does not discover a new config file
    * and throws on invalid configuration instead of exiting the process.
    */
   reload(): ParsedArguments {
-    return this.#resolve(this.parseCliArgs());
+    return this.reloadConfig().resolved;
   }
 
-  #resolve(cliArgs: Partial<ParsedArguments>): ParsedArguments {
+  #resolveConfig(cliArgs: Partial<ParsedArguments>): ServerConfig {
     const configPath = this.#configPath;
-    const configFileArgs = configPath ? this.parseConfigFile(configPath) : {};
-    // Step 3: merges the explicit inputs. The CLI wins over the config file.
-    const explicitArgs = {
-      ...configFileArgs,
-      ...cliArgs,
-      ...(configPath ? {config: configPath} : {}),
-    };
-    this.validateConflicts(explicitArgs);
-    this.validateImplications(explicitArgs);
-    return this.applyDefaults(explicitArgs);
+    const fileArgs = configPath ? this.parseConfigFile(configPath) : {};
+    const config = ServerConfig.create({
+      cliArgs,
+      fileArgs,
+      configPath,
+      env: this.env,
+      suppressUsageStatisticsNotice: this.#usageStatisticsNoticeShown,
+    });
+    this.#usageStatisticsNoticeShown = true;
+    return config;
   }
 }

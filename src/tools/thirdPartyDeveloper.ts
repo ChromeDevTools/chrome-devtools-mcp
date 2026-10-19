@@ -101,7 +101,7 @@ export const executeThirdPartyDeveloperTool = definePageTool(() => ({
       }
     }
 
-    const toolGroups = request.page.getThirdPartyDeveloperTools();
+    const toolGroups = await request.page.discoverThirdPartyDeveloperTools();
     let tool;
     if (toolGroups) {
       for (const group of toolGroups) {

@@ -8,8 +8,22 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {parseTraceEventsFromBuffer} from '../../src/processors/ChunkedTraceParser.js';
+import type {DevTools} from '../../src/third_party/index.js';
 
 import {loadTraceAsBuffer} from './fixtures/load.js';
+
+function getArgsDataUrl(
+  event: DevTools.TraceEngine.Types.Events.Event | undefined,
+): unknown {
+  const args: unknown = event?.args;
+  if (args && typeof args === 'object' && 'data' in args) {
+    const data: unknown = args.data;
+    if (data && typeof data === 'object' && 'url' in data) {
+      return data.url;
+    }
+  }
+  return undefined;
+}
 
 describe('ChunkedTraceParser', () => {
   const encoder = new TextEncoder();
@@ -108,7 +122,7 @@ describe('ChunkedTraceParser', () => {
     assert.strictEqual(result.events.length, 1);
     assert.strictEqual(result.events[0]?.name, 'event-{with-braces}');
     assert.strictEqual(
-      result.events[0]?.args?.data?.url,
+      getArgsDataUrl(result.events[0]),
       'https://example.com/hello?q=} { [bracket] "escaped" \\\\ backslash',
     );
     assert.strictEqual(result.metadata?.title, 'nested } braces { inside');
@@ -132,10 +146,7 @@ describe('ChunkedTraceParser', () => {
 
     assert.strictEqual(result.events.length, 1);
     assert.strictEqual(result.events[0]?.name, 'deep');
-    assert.strictEqual(
-      result.events[0]?.args?.data?.url,
-      'https://example.com',
-    );
+    assert.strictEqual(getArgsDataUrl(result.events[0]), 'https://example.com');
   });
 
   it('batches events correctly according to eventsPerBatch', () => {
@@ -249,17 +260,17 @@ describe('ChunkedTraceParser', () => {
     assert.strictEqual(result.events.length, 3);
     assert.strictEqual(result.events[0]?.name, '日本語テスト-1');
     assert.strictEqual(
-      result.events[0]?.args?.data?.url,
+      getArgsDataUrl(result.events[0]),
       'https://example.com/こんにちは世界-🚀',
     );
     assert.strictEqual(result.events[1]?.name, 'emoji-🎉-2');
     assert.strictEqual(
-      result.events[1]?.args?.data?.url,
+      getArgsDataUrl(result.events[1]),
       'https://example.com/€100-and-50¢',
     );
     assert.strictEqual(result.events[2]?.name, 'umlaut-äöü-3');
     assert.strictEqual(
-      result.events[2]?.args?.data?.url,
+      getArgsDataUrl(result.events[2]),
       'https://example.com/Deutsch-äöü',
     );
   });
