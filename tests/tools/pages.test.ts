@@ -1522,6 +1522,24 @@ describe('pages', () => {
       sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
     });
 
+    it('does not append a size line when the actual page size is unknown', async () => {
+      const {page, response, context, args} = createHandlerMocks();
+      page.resize.resolves(undefined);
+
+      await resizePage(args).handler(
+        {
+          params: {width: 700, height: 500},
+          page,
+        },
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.resize, 700, 500);
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+    });
+
     it('resize when window state is normal', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

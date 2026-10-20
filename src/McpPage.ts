@@ -1352,9 +1352,6 @@ export class McpPage implements ContextPage {
     const metrics: Protocol.Page.GetLayoutMetricsResponse = await client.send(
       'Page.getLayoutMetrics',
     );
-    if (!metrics?.cssLayoutViewport) {
-      return undefined;
-    }
     return {
       width: metrics.cssLayoutViewport.clientWidth,
       height: metrics.cssLayoutViewport.clientHeight,

@@ -1823,6 +1823,24 @@ describe('McpPage', () => {
       });
       assert.deepStrictEqual(actualSize, {width: 700, height: 500});
     });
+
+    it('returns undefined without reading layout metrics when a dialog is open', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.windowId.rejects(new Error('Window APIs not supported'));
+      pptrPage.emit('dialog', createMockDialog());
+
+      const actualSize = await mcpPage.resize(700, 500);
+
+      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
+        contentWidth: 700,
+        contentHeight: 500,
+      });
+      sinon.assert.neverCalledWith(
+        pptrPage.cdpSession.send,
+        'Page.getLayoutMetrics',
+      );
+      assert.strictEqual(actualSize, undefined);
+    });
   });
 
   describe('dialogs', () => {
