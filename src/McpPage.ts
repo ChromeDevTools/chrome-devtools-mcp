@@ -1417,7 +1417,7 @@ export class McpPage implements ContextPage {
           .setTimeout(0)
           .wait({signal: controller.signal})
           .then(finish, error => {
-            if (error instanceof Error && error.name === 'AbortError') {
+            if (controller.signal.aborted) {
               return;
             }
             logger?.('Failed to wait for text in an attached frame', error);
