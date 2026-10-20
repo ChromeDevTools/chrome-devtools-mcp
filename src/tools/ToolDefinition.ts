@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {categoryToFlagName} from '../config/category-options.js';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 import type {
   HeapSnapshotAggregateData,
@@ -91,6 +92,11 @@ export type MergeSchema<Schema extends zod.ZodRawShape> = {
     : zod.ZodOptional<ExtractSchemaField<Schema, K>>;
 };
 
+export interface CapabilityGate {
+  category?: ToolCategory;
+  conditions?: Array<keyof ParsedArguments>;
+}
+
 export interface BaseToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > {
@@ -112,6 +118,13 @@ export interface BaseToolDefinition<
   };
   schema: Schema;
   blockedByDialog: boolean;
+  /**
+   * When true, the handler runs without the server tool lock, so other tool
+   * calls proceed while this handler waits. Page lookup before the handler
+   * and response formatting after it still run under the lock. Only set
+   * this for tools that wait for external events.
+   */
+  yieldsToolLock?: boolean;
   verifyFilesSchema: Partial<
     Record<keyof MergeSchema<Schema>, FileVerificationOption>
   >;
@@ -329,7 +342,6 @@ export type Context = Readonly<{
     extension: Extension,
   ): Promise<`${string}${Extension}`>;
   isRunningPerformanceTrace(): boolean;
-  setIsRunningPerformanceTrace(x: boolean): void;
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
@@ -465,6 +477,7 @@ export type ContextPage = Readonly<{
   throwIfDialogOpen(): void;
   getScreenRecorder(): ScreenRecorderData | null;
   setScreenRecorder(data: ScreenRecorderData | null): void;
+  setIsRunningPerformanceTrace(x: boolean): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
@@ -523,11 +536,6 @@ export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
   Omit<PageToolDefinition<Schema>, 'schema'> & {
     schema: Schema & Partial<typeof pageIdSchema>;
     pageScoped: true;
-    handler(
-      request: Request<Schema> & {page: ContextPage},
-      response: Response,
-      context: Context,
-    ): Promise<void>;
   };
 
 export function definePageTool<Schema extends zod.ZodRawShape>(
@@ -601,13 +609,31 @@ export const pageIdSchema = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
+export function zodTransform<Input, Output>(
+  transform: (arg: Input) => Output,
+): (arg: Input, ctx: zod.RefinementCtx) => Output {
+  return (arg: Input, ctx: zod.RefinementCtx): Output => {
+    try {
+      return transform(arg);
+    } catch (error) {
+      ctx.addIssue({
+        code: 'custom',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return zod.NEVER;
+    }
+  };
+}
+
 export const timeoutSchema = {
   timeout: zod
     .number()
     .int()
-    .transform(value => {
-      return value <= 0 ? undefined : value;
-    })
+    .transform(
+      zodTransform(value => {
+        return value <= 0 ? undefined : value;
+      }),
+    )
     .optional()
     .describe(
       `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
@@ -725,12 +751,32 @@ export function isSlimTool(
 }
 
 /**
- * Slim mode replaces the regular tools with the slim tools. `--slim` requires
- * a restart, so the mode never changes while the server is running.
+ * Slim mode replaces the regular tools with the slim tools.
  */
 export function isAvailableInMode(
   tool: Pick<BaseToolDefinition, 'annotations'>,
   serverArgs: Pick<ParsedArguments, 'slim'>,
 ): boolean {
   return isSlimTool(tool) === Boolean(serverArgs.slim);
+}
+
+/**
+ * Returns whether a capability gate is enabled under the given arguments.
+ */
+export function isCapabilityEnabled(
+  gate: CapabilityGate,
+  serverArgs: ParsedArguments,
+): boolean {
+  if (Boolean(gate.conditions?.includes('slim')) !== Boolean(serverArgs.slim)) {
+    return false;
+  }
+  if (gate.category && !serverArgs[categoryToFlagName(gate.category)]) {
+    return false;
+  }
+  for (const condition of gate.conditions ?? []) {
+    if (!serverArgs[condition]) {
+      return false;
+    }
+  }
+  return true;
 }

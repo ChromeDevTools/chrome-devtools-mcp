@@ -243,9 +243,32 @@ const performEvaluation = async (
       [],
       () => (...args: unknown[]) => unknown
     >(`(\n${functionSource}\n)`);
+    // Normalize non-Error values inside the page callback (serialized by Puppeteer) so CDP preserves the message.
     result = await evaluatable.evaluate(
       async (fn, ...args) => {
-        return JSON.stringify(await fn(...args));
+        try {
+          return JSON.stringify(await fn(...args));
+        } catch (err) {
+          if (
+            err instanceof Error ||
+            (typeof err === 'object' &&
+              err !== null &&
+              'message' in err &&
+              typeof err.message === 'string')
+          ) {
+            throw err;
+          }
+          let message: string;
+          try {
+            message =
+              typeof err === 'object' && err !== null
+                ? JSON.stringify(err)
+                : String(err);
+          } catch {
+            message = String(err);
+          }
+          throw new Error(message);
+        }
       },
       fn,
       ...args,

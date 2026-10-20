@@ -17,7 +17,12 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
-import {zod, Mutex} from '../src/third_party/index.js';
+import {
+  Mutex,
+  ProtocolError,
+  ProtocolErrorCode,
+  zod,
+} from '../src/third_party/index.js';
 import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
 import {
@@ -35,15 +40,18 @@ import {getMockBrowser} from './utils.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {
-    sinon.restore();
     ClearcutLogger.resetForTesting();
   });
 
+  function parseConfig(argv: string[] = []) {
+    return new ConfigParser('1.0.0', ['node', 'script.js', ...argv], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parseConfig();
+  }
+
   it('calls getPageById for page scoped tools when pageId is provided', async () => {
     let handlerCalled = false;
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
     const tool = definePageTool(() => ({
       name: 'page_tool',
       description: 'A page scoped tool',
@@ -57,7 +65,7 @@ describe('ToolHandler', () => {
       handler: async () => {
         handlerCalled = true;
       },
-    }))(serverArgs);
+    }))(config.resolved);
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -69,7 +77,7 @@ describe('ToolHandler', () => {
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -85,11 +93,7 @@ describe('ToolHandler', () => {
 
   it('calls getSelectedMcpPage for page scoped tools when pageIdRouting is disabled', async () => {
     let handlerCalled = false;
-    const serverArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--no-page-id-routing'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
+    const config = parseConfig(['--no-page-id-routing']);
     const tool = definePageTool(() => ({
       name: 'page_tool',
       description: 'A page scoped tool',
@@ -103,7 +107,7 @@ describe('ToolHandler', () => {
       handler: async () => {
         handlerCalled = true;
       },
-    }))(serverArgs);
+    }))(config.resolved);
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -115,7 +119,7 @@ describe('ToolHandler', () => {
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -151,13 +155,11 @@ describe('ToolHandler', () => {
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -171,6 +173,182 @@ describe('ToolHandler', () => {
     assert.strictEqual(mockContext.getPageById.called, false);
     assert.strictEqual(handlerCalled, true);
     assert.strictEqual(result.isError, undefined);
+  });
+
+  describe('yieldsToolLock', () => {
+    function createGlobalTool(
+      handler: ToolDefinition['handler'],
+      options: {name?: string; yieldsToolLock?: boolean} = {},
+    ): ToolDefinition {
+      return {
+        name: options.name ?? 'global_tool',
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        yieldsToolLock: options.yieldsToolLock,
+        verifyFilesSchema: {},
+        handler,
+      };
+    }
+
+    function createHandler(tool: ToolDefinition, toolMutex: Mutex) {
+      const mockContext = sinon.createStubInstance(McpContext);
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({process: mockProcess}),
+      );
+      return new ToolHandler(
+        tool,
+        parseConfig(),
+        async () => mockContext,
+        toolMutex,
+        sinon.spy(),
+      );
+    }
+
+    it('lets another tool run while a yielding tool waits', async () => {
+      const toolMutex = new Mutex();
+      const events: string[] = [];
+      const {promise: release, resolve: finishWait} =
+        Promise.withResolvers<void>();
+
+      const waitingTool = createGlobalTool(
+        async () => {
+          events.push('waiting:start');
+          await release;
+          events.push('waiting:end');
+        },
+        {name: 'waiting_tool', yieldsToolLock: true},
+      );
+      const otherTool = createGlobalTool(
+        async () => {
+          events.push('other:run');
+        },
+        {name: 'other_tool'},
+      );
+
+      const waitingHandler = createHandler(waitingTool, toolMutex);
+      const otherHandler = createHandler(otherTool, toolMutex);
+
+      const waitingResult = waitingHandler.handle({});
+      // Let the waiting tool enter its handler before the other tool is
+      // called.
+      await new Promise(resolve => setImmediate(resolve));
+      const otherResult = await otherHandler.handle({});
+      finishWait();
+      await waitingResult;
+
+      assert.deepStrictEqual(events, [
+        'waiting:start',
+        'other:run',
+        'waiting:end',
+      ]);
+      assert.strictEqual(otherResult.isError, undefined);
+    });
+
+    it('holds the lock for tools that do not yield', async () => {
+      const toolMutex = new Mutex();
+      const events: string[] = [];
+      const {promise: release, resolve: finishWait} =
+        Promise.withResolvers<void>();
+
+      const blockingTool = createGlobalTool(
+        async () => {
+          events.push('blocking:start');
+          await release;
+          events.push('blocking:end');
+        },
+        {name: 'blocking_tool'},
+      );
+      const otherTool = createGlobalTool(
+        async () => {
+          events.push('other:run');
+        },
+        {name: 'other_tool'},
+      );
+
+      const blockingHandler = createHandler(blockingTool, toolMutex);
+      const otherHandler = createHandler(otherTool, toolMutex);
+
+      const blockingResult = blockingHandler.handle({});
+      await new Promise(resolve => setImmediate(resolve));
+      const otherResult = otherHandler.handle({});
+      await new Promise(resolve => setImmediate(resolve));
+      finishWait();
+      await Promise.all([blockingResult, otherResult]);
+
+      assert.deepStrictEqual(events, [
+        'blocking:start',
+        'blocking:end',
+        'other:run',
+      ]);
+    });
+
+    it('builds the response only after a queued tool releases the lock', async () => {
+      const toolMutex = new Mutex();
+      const events: string[] = [];
+      const {promise: otherBlocked, resolve: unblockOther} =
+        Promise.withResolvers<void>();
+
+      const waitingTool = createGlobalTool(
+        async () => {
+          await new Promise(resolve => setImmediate(resolve));
+          events.push('waiting:handler-done');
+        },
+        {name: 'waiting_tool', yieldsToolLock: true},
+      );
+      const otherTool = createGlobalTool(
+        async () => {
+          events.push('other:start');
+          await otherBlocked;
+          events.push('other:end');
+        },
+        {name: 'other_tool'},
+      );
+
+      const waitingHandler = createHandler(waitingTool, toolMutex);
+      const otherHandler = createHandler(otherTool, toolMutex);
+
+      const waitingResult = waitingHandler.handle({}).then(result => {
+        events.push('waiting:result');
+        return result;
+      });
+      await new Promise(resolve => setImmediate(resolve));
+      const otherResult = otherHandler.handle({});
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+      unblockOther();
+      await Promise.all([waitingResult, otherResult]);
+
+      assert.deepStrictEqual(events, [
+        'other:start',
+        'waiting:handler-done',
+        'other:end',
+        'waiting:result',
+      ]);
+    });
+
+    it('re-acquires the lock when a yielding handler throws', async () => {
+      const toolMutex = new Mutex();
+      const tool = createGlobalTool(
+        async () => {
+          throw new Error('handler failed');
+        },
+        {yieldsToolLock: true},
+      );
+      const handler = createHandler(tool, toolMutex);
+
+      const result = await handler.handle({});
+
+      assert.strictEqual(result.isError, true);
+      // The lock is free again: a plain acquire must resolve.
+      const guard = await toolMutex.acquire();
+      guard[Symbol.dispose]();
+    });
   });
 
   const dataFormatCases: Array<{argv: string[]; expected: DataFormat}> = [
@@ -209,15 +387,11 @@ describe('ToolHandler', () => {
       const handleStub = sinon
         .stub(McpResponse.prototype, 'handle')
         .resolves({content: [], structuredContent: {}});
-      const serverArgs = new ConfigParser(
-        '1.0.0',
-        ['node', 'script.js', ...argv],
-        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-      ).parse();
+      const config = parseConfig(argv);
 
       await new ToolHandler(
         tool,
-        serverArgs,
+        config,
         async () => mockContext,
         new Mutex(),
         sinon.spy(),
@@ -243,9 +417,7 @@ describe('ToolHandler', () => {
       },
     };
 
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig(['--no-page-id-routing']);
 
     const testCases: Array<{
       tool: ToolDefinition | DefinedPageTool;
@@ -256,7 +428,7 @@ describe('ToolHandler', () => {
         tool: definePageTool(() => ({
           ...baseTool,
           name: 'page_tool',
-        }))(serverArgs),
+        }))(config.resolved),
         devToolsData: {cdpBackendNodeId: 1},
         pageUrl: 'http://localhost:9222/',
       },
@@ -295,7 +467,7 @@ describe('ToolHandler', () => {
 
       const toolHandler = new ToolHandler(
         testCase.tool,
-        serverArgs,
+        config,
         async () => mockContext,
         toolMutex,
         sinon.spy(),
@@ -337,13 +509,11 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -390,15 +560,11 @@ describe('ToolHandler', () => {
 
     const mockContext = sinon.createStubInstance(McpContext);
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--categoryEmulation=false'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
+    const config = parseConfig(['--categoryEmulation=false']);
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -419,10 +585,8 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     const toolMutex = new Mutex();
 
-    const defaultServerArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
-    const defaultTool = createTools(defaultServerArgs).find(
+    const defaultConfig = parseConfig();
+    const defaultTool = createTools(defaultConfig.resolved).find(
       t => t.name === 'evaluate_script',
     );
     if (!defaultTool) {
@@ -430,19 +594,15 @@ describe('ToolHandler', () => {
     }
     const defaultHandler = new ToolHandler(
       defaultTool,
-      defaultServerArgs,
+      defaultConfig,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(defaultHandler.disabled, false);
 
-    const disabledServerArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--no-javascript-evaluation'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
-    const disabledTool = createTools(disabledServerArgs).find(
+    const disabledConfig = parseConfig(['--no-javascript-evaluation']);
+    const disabledTool = createTools(disabledConfig.resolved).find(
       t => t.name === 'evaluate_script',
     );
     if (!disabledTool) {
@@ -450,7 +610,7 @@ describe('ToolHandler', () => {
     }
     const disabledHandler = new ToolHandler(
       disabledTool,
-      disabledServerArgs,
+      disabledConfig,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -466,12 +626,8 @@ describe('ToolHandler', () => {
       /Tool evaluate_script requires flag --javascriptEvaluation and is currently disabled/,
     );
 
-    const cliServerArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--no-javascript-evaluation', '--viaCli'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
-    const cliTool = createTools(cliServerArgs).find(
+    const cliConfig = parseConfig(['--no-javascript-evaluation', '--viaCli']);
+    const cliTool = createTools(cliConfig.resolved).find(
       t => t.name === 'evaluate_script',
     );
     if (!cliTool) {
@@ -479,7 +635,7 @@ describe('ToolHandler', () => {
     }
     const cliHandler = new ToolHandler(
       cliTool,
-      cliServerArgs,
+      cliConfig,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -497,12 +653,8 @@ describe('ToolHandler', () => {
     const mockContext = sinon.createStubInstance(McpContext);
     const toolMutex = new Mutex();
 
-    const defaultServerArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--slim'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
-    const defaultTool = createTools(defaultServerArgs).find(
+    const defaultConfig = parseConfig(['--slim']);
+    const defaultTool = createTools(defaultConfig.resolved).find(
       t => t.name === 'evaluate',
     );
     if (!defaultTool) {
@@ -510,19 +662,18 @@ describe('ToolHandler', () => {
     }
     const defaultHandler = new ToolHandler(
       defaultTool,
-      defaultServerArgs,
+      defaultConfig,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(defaultHandler.disabled, false);
 
-    const disabledServerArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--slim', '--javascriptEvaluation=false'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
-    const disabledTool = createTools(disabledServerArgs).find(
+    const disabledConfig = parseConfig([
+      '--slim',
+      '--javascriptEvaluation=false',
+    ]);
+    const disabledTool = createTools(disabledConfig.resolved).find(
       t => t.name === 'evaluate',
     );
     if (!disabledTool) {
@@ -530,7 +681,7 @@ describe('ToolHandler', () => {
     }
     const disabledHandler = new ToolHandler(
       disabledTool,
-      disabledServerArgs,
+      disabledConfig,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -540,18 +691,14 @@ describe('ToolHandler', () => {
 
   describe('slim mode', () => {
     function createHandler(toolName: string, argv: string[]) {
-      const serverArgs = new ConfigParser(
-        '1.0.0',
-        ['node', 'script.js', ...argv],
-        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-      ).parse();
-      const tool = createTools(serverArgs).find(t => t.name === toolName);
+      const config = parseConfig(argv);
+      const tool = createTools(config.resolved).find(t => t.name === toolName);
       if (!tool) {
         assert.fail(`${toolName} not found`);
       }
       return new ToolHandler(
         tool,
-        serverArgs,
+        config,
         async () => sinon.createStubInstance(McpContext),
         new Mutex(),
         sinon.spy(),
@@ -636,13 +783,11 @@ describe('ToolHandler', () => {
     });
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -713,13 +858,11 @@ describe('ToolHandler', () => {
     );
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -738,10 +881,8 @@ describe('ToolHandler', () => {
   });
 
   it('validates evaluate_script sourcePath before reading the file', async () => {
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
-    const tool = evaluateScript(serverArgs);
+    const config = parseConfig();
+    const tool = evaluateScript(config.resolved);
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
@@ -751,14 +892,14 @@ describe('ToolHandler', () => {
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       new Mutex(),
       sinon.spy(),
     );
     const sourcePath = path.resolve('/outside/workspace/script.js');
 
-    const result = await toolHandler.handle({sourcePath});
+    const result = await toolHandler.handle({sourcePath, pageId: 1});
 
     assert.strictEqual(result.isError, true);
     assert.match(
@@ -802,13 +943,11 @@ describe('ToolHandler', () => {
     mockContext.validatePath.resolves(canonicalPath);
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -862,13 +1001,11 @@ describe('ToolHandler', () => {
     mockContext.validatePath.resolves(canonicalBundlePath);
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -925,13 +1062,11 @@ describe('ToolHandler', () => {
     );
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -976,13 +1111,11 @@ describe('ToolHandler', () => {
     mockContext.ensureBrowser.resolves(getMockBrowser());
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1026,13 +1159,11 @@ describe('ToolHandler', () => {
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1077,13 +1208,11 @@ describe('ToolHandler', () => {
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1139,13 +1268,11 @@ describe('ToolHandler', () => {
     mockContext.validatePath.resolves(canonicalOutputPath);
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1201,13 +1328,11 @@ describe('ToolHandler', () => {
     );
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1249,9 +1374,7 @@ describe('ToolHandler', () => {
     };
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     // Remote browser: should validate
     const mockRemoteContext = sinon.createStubInstance(McpContext);
@@ -1264,7 +1387,7 @@ describe('ToolHandler', () => {
 
     const remoteToolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockRemoteContext,
       toolMutex,
       sinon.spy(),
@@ -1286,7 +1409,7 @@ describe('ToolHandler', () => {
 
     const localToolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockLocalContext,
       toolMutex,
       sinon.spy(),
@@ -1298,9 +1421,7 @@ describe('ToolHandler', () => {
 
   it('rewrites file paths in params for page scoped tools', async () => {
     let receivedParams: Record<string, unknown> | undefined;
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig(['--no-page-id-routing']);
     const tool = definePageTool(() => ({
       name: 'page_file_tool',
       description: 'A page scoped tool with file verification',
@@ -1318,7 +1439,7 @@ describe('ToolHandler', () => {
       handler: async request => {
         receivedParams = request.params;
       },
-    }))(serverArgs);
+    }))(config.resolved);
 
     const mockContext = sinon.createStubInstance(McpContext);
     const mockProcess = sinon.createStubInstance(ChildProcess);
@@ -1343,7 +1464,7 @@ describe('ToolHandler', () => {
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1389,13 +1510,11 @@ describe('ToolHandler', () => {
 
     const mockContext = createMockMcpContext();
     mockContext.ensureBrowser.resolves(getMockBrowser());
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       new Mutex(),
       sinon.spy(),
@@ -1440,13 +1559,11 @@ describe('ToolHandler', () => {
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       sinon.spy(),
@@ -1494,13 +1611,11 @@ describe('ToolHandler', () => {
     const abandonPendingBrowserAttemptSpy = sinon.spy();
 
     const toolMutex = new Mutex();
-    const serverArgs = new ConfigParser('1.0.0', ['node', 'script.js'], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parse();
+    const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
-      serverArgs,
+      config,
       async () => mockContext,
       toolMutex,
       abandonPendingBrowserAttemptSpy,
@@ -1540,13 +1655,7 @@ describe('ToolHandler', () => {
         blockedByDialog: false,
         verifyFilesSchema: {filePath: true},
         handler,
-      }))(createServerArgs());
-    }
-
-    function createServerArgs() {
-      return new ConfigParser('1.0.0', ['node', 'script.js'], {
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-      }).parse();
+      }))(parseConfig().resolved);
     }
 
     it('runs without establishing a browser connection', async () => {
@@ -1559,7 +1668,7 @@ describe('ToolHandler', () => {
 
       const result = await new ToolHandler(
         createBrowserlessTool(handler),
-        createServerArgs(),
+        parseConfig(),
         async () => mockContext,
         new Mutex(),
         sinon.spy(),
@@ -1580,6 +1689,256 @@ describe('ToolHandler', () => {
         mockContext,
       );
       sinon.assert.calledOnceWithExactly(handleStub, mockContext, 'default');
+    });
+  });
+
+  describe('update', () => {
+    function createGlobalTool(
+      schema: zod.ZodRawShape,
+      handler: ToolDefinition['handler'],
+      options: {
+        description?: string;
+        annotations?: ToolDefinition['annotations'];
+      } = {},
+    ): ToolDefinition {
+      return {
+        name: 'global_tool',
+        description: options.description ?? 'A global tool',
+        annotations: options.annotations ?? {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema,
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler,
+      };
+    }
+
+    it('applies to calls that wait for the mutex', async () => {
+      const config = parseConfig();
+      const handler = sinon.stub().resolves();
+      const tool = createGlobalTool({}, handler);
+      const toolMutex = new Mutex();
+      const toolHandler = new ToolHandler(
+        tool,
+        config,
+        async () => createMockMcpContext(),
+        toolMutex,
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({});
+      config.commit(parseConfig(['--no-category-navigation']));
+      toolHandler.update(tool);
+      toolMutex.release();
+      const result = await call;
+
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0]?.type === 'text' ? result.content[0].text : '',
+        /is currently disabled/,
+      );
+      sinon.assert.notCalled(handler);
+    });
+
+    it('validates waiting calls against the updated schema', async () => {
+      const config = parseConfig();
+      const handler = sinon.stub().resolves();
+      const toolMutex = new Mutex();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        config,
+        async () => createMockMcpContext(),
+        toolMutex,
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({a: 'value'});
+      const listingChanged = toolHandler.update(
+        createGlobalTool(
+          {a: zod.string().optional(), b: zod.string()},
+          handler,
+        ),
+      );
+      toolMutex.release();
+      const result = await call;
+
+      assert.strictEqual(listingChanged, true);
+      assert.strictEqual(result.isError, true);
+      assert.match(
+        result.content[0]?.type === 'text' ? result.content[0].text : '',
+        /^Input validation error: Invalid arguments for tool global_tool: b:/,
+      );
+      sinon.assert.notCalled(handler);
+    });
+
+    it('runs waiting calls with the updated tool handler and schema', async () => {
+      const config = parseConfig();
+      const initialHandler = sinon.stub().resolves();
+      const updatedHandler = sinon.stub().resolves();
+      const toolMutex = new Mutex();
+      const mockContext = createMockMcpContext();
+      mockContext.ensureBrowser.resolves(getMockBrowser());
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string()}, initialHandler),
+        config,
+        async () => mockContext,
+        toolMutex,
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({a: 'value', b: 'extra'});
+      const listingChanged = toolHandler.update(
+        createGlobalTool({a: zod.string(), b: zod.string()}, updatedHandler),
+      );
+      toolMutex.release();
+      const result = await call;
+
+      assert.strictEqual(listingChanged, true);
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.notCalled(initialHandler);
+      sinon.assert.calledOnceWithExactly(
+        updatedHandler,
+        {params: {a: 'value', b: 'extra'}},
+        sinon.match.instanceOf(McpResponse),
+        mockContext,
+      );
+    });
+
+    it('throws ProtocolError when a waiting MCP call becomes disabled', async () => {
+      const config = parseConfig();
+      const handler = sinon.stub().resolves();
+      const tool = createGlobalTool({}, handler);
+      const toolMutex = new Mutex();
+      const toolHandler = new ToolHandler(
+        tool,
+        config,
+        async () => createMockMcpContext(),
+        toolMutex,
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({}, {viaMcp: true});
+      config.commit(parseConfig(['--no-category-navigation']));
+      toolHandler.update(tool);
+      toolMutex.release();
+
+      await assert.rejects(call, (error: unknown) => {
+        assert.ok(error instanceof ProtocolError);
+        assert.strictEqual(error.code, ProtocolErrorCode.InvalidParams);
+        assert.strictEqual(error.message, 'Tool global_tool disabled');
+        return true;
+      });
+      sinon.assert.notCalled(handler);
+    });
+
+    it('runs waiting calls when the schema is unchanged', async () => {
+      const config = parseConfig();
+      const initialHandler = sinon.stub().resolves();
+      const updatedHandler = sinon.stub().resolves();
+      const toolMutex = new Mutex();
+      const mockContext = createMockMcpContext();
+      mockContext.ensureBrowser.resolves(getMockBrowser());
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, initialHandler),
+        config,
+        async () => mockContext,
+        toolMutex,
+        sinon.spy(),
+      );
+
+      await toolMutex.acquire();
+      const call = toolHandler.handle({a: 'value'});
+      config.commit(parseConfig(['--redact-network-headers']));
+      const listingChanged = toolHandler.update(
+        createGlobalTool({a: zod.string().optional()}, updatedHandler),
+      );
+      toolMutex.release();
+      await call;
+
+      assert.strictEqual(listingChanged, false);
+      sinon.assert.notCalled(initialHandler);
+      sinon.assert.calledOnceWithExactly(
+        updatedHandler,
+        {params: {a: 'value'}},
+        sinon.match.instanceOf(McpResponse),
+        mockContext,
+      );
+    });
+
+    it('updates the disabled state and reports listing change', () => {
+      const config = parseConfig();
+      const tool = createGlobalTool({}, sinon.stub().resolves());
+      const toolHandler = new ToolHandler(
+        tool,
+        config,
+        async () => createMockMcpContext(),
+        new Mutex(),
+        sinon.spy(),
+      );
+
+      config.commit(parseConfig(['--no-category-navigation']));
+      const listingChanged = toolHandler.update(tool);
+
+      assert.strictEqual(listingChanged, true);
+      assert.strictEqual(toolHandler.disabled, true);
+    });
+
+    it('reports listing change when description or annotations change', () => {
+      const config = parseConfig();
+      const handler = sinon.stub().resolves();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({}, handler),
+        config,
+        async () => createMockMcpContext(),
+        new Mutex(),
+        sinon.spy(),
+      );
+
+      assert.strictEqual(
+        toolHandler.update(
+          createGlobalTool({}, handler, {description: 'Updated description'}),
+        ),
+        true,
+      );
+      assert.strictEqual(
+        toolHandler.update(
+          createGlobalTool({}, handler, {
+            description: 'Updated description',
+            annotations: {
+              category: ToolCategory.NAVIGATION,
+              readOnlyHint: false,
+            },
+          }),
+        ),
+        true,
+      );
+    });
+
+    it('does not report listing change when a disabled tool remains disabled', () => {
+      const config = parseConfig(['--no-category-navigation']);
+      const handler = sinon.stub().resolves();
+      const toolHandler = new ToolHandler(
+        createGlobalTool({a: zod.string().optional()}, handler),
+        config,
+        async () => createMockMcpContext(),
+        new Mutex(),
+        sinon.spy(),
+      );
+
+      const listingChanged = toolHandler.update(
+        createGlobalTool({a: zod.string(), b: zod.number()}, handler, {
+          description: 'Updated description',
+        }),
+      );
+
+      assert.strictEqual(listingChanged, false);
+      assert.strictEqual(toolHandler.disabled, true);
     });
   });
 });

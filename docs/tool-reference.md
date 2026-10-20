@@ -369,7 +369,7 @@
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **includePreservedRequests** (boolean) _(optional)_: Set to true to return the preserved requests over the last 3 navigations.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of requests to return. When omitted, returns all requests.
 - **resourceTypes** (array) _(optional)_: Filter requests to only return requests of the specified resource types. When omitted or empty, returns all requests.
 
@@ -447,7 +447,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **includePreservedMessages** (boolean) _(optional)_: Set to true to return the preserved messages over the last 3 navigations.
 - **includeStackTraces** (boolean) _(optional)_: Set to true to include the stack trace for each message when available. Increases the response size.
-- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page.
+- **pageIdx** (integer) _(optional)_: Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.
 - **pageSize** (integer) _(optional)_: Maximum number of messages to return. When omitted, returns all messages.
 - **serviceWorkerId** (string) _(optional)_: Filter messages by the service worker ID shown by [`list_pages`](#list_pages) (sw-N).
 - **types** (array) _(optional)_: Filter messages to only return messages of the specified resource types. When omitted or empty, returns all messages.

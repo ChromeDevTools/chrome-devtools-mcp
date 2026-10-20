@@ -27,7 +27,8 @@ await checkForUpdates(
 );
 
 const configParser = new ConfigParser(VERSION);
-export const args = configParser.parse();
+const serverConfig = configParser.parseConfig();
+const args = serverConfig.resolved;
 
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 
@@ -36,10 +37,11 @@ setupUnhandledRejectionHandler(() => {
 });
 
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
+// BrowserManager only reads non-reloadable launch and connection options.
 const browserManager = new BrowserManager(args, {
   logFile,
 });
-const serverPromise = McpServer.from(args, {
+const serverPromise = McpServer.from(serverConfig, {
   browserManager,
 });
 

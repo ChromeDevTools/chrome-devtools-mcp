@@ -17,6 +17,7 @@ import {
   definePageTool,
   geolocationTransform,
   viewportTransform,
+  zodTransform,
 } from './ToolDefinition.js';
 
 function headerStringTransform(
@@ -72,7 +73,7 @@ export const emulate = definePageTool(() => ({
       ),
     geolocation: zod
       .string()
-      .transform(geolocationTransform)
+      .transform(zodTransform(geolocationTransform))
       .optional()
       .describe(
         'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
@@ -109,14 +110,14 @@ export const emulate = definePageTool(() => ({
       ),
     viewport: zod
       .string()
-      .transform(viewportTransform)
+      .transform(zodTransform(viewportTransform))
       .optional()
       .describe(
         `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode. Omit to clear the viewport override.`,
       ),
     extraHttpHeaders: zod
       .string()
-      .transform(headerStringTransform)
+      .transform(zodTransform(headerStringTransform))
       .optional()
       .describe(
         'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',

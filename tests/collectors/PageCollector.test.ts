@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {beforeEach, describe, it} from 'node:test';
 
 import type {
   ConsoleMessage,
@@ -35,8 +35,6 @@ function createMockConsoleMessage(text: string): ConsoleMessage {
 }
 
 describe('PageCollector', () => {
-  afterEach(() => sinon.restore());
-
   it('applies resource and navigation limits independently', () => {
     const pptrPage = createMockPuppeteerPage();
     const collector = new PageCollector<Error>(
@@ -221,8 +219,6 @@ describe('PageCollector', () => {
 });
 
 describe('NetworkCollector', () => {
-  afterEach(() => sinon.restore());
-
   it('applies both limits while retaining navigation requests', () => {
     const pptrPage = createMockPuppeteerPage();
     const collector = new NetworkCollector(pptrPage, {
@@ -518,10 +514,6 @@ describe('ConsoleCollector', () => {
         },
       },
     };
-  });
-
-  afterEach(() => {
-    sinon.restore();
   });
 
   for (const maxResourcesPerNavigation of [undefined, 2]) {

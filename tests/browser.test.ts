@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import {executablePath} from 'puppeteer';
 import sinon from 'sinon';
@@ -58,10 +58,6 @@ async function runWithRetry(fn: () => Promise<void>) {
 }
 
 describe('browser', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('detects display does not crash', () => {
     BrowserManager.detectDisplay();
   });
@@ -148,6 +144,22 @@ describe('browser', () => {
       sinon.assert.calledOnceWithMatch(launchStub, {
         channel: undefined,
         executablePath: '/path/to/chrome',
+      });
+    });
+
+    it('disables Puppeteer signal handlers so close() can shut the browser down gracefully', async () => {
+      const pptrBrowser = createMockPuppeteerBrowser();
+      const launchStub = sinon.stub(puppeteer, 'launch').resolves(pptrBrowser);
+      const manager = new BrowserManager(
+        createMockParsedArguments({isolated: true}),
+      );
+
+      await manager.ensureBrowser();
+
+      sinon.assert.calledOnceWithMatch(launchStub, {
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false,
       });
     });
 

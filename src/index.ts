@@ -9,7 +9,9 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
-import {type ParsedArguments} from './config/ConfigParser.js';
+import type {ParsedArguments} from './config/ConfigParser.js';
+import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
+import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
@@ -18,6 +20,8 @@ import {FilePersistence} from './telemetry/persistence.js';
 import {
   type CallToolResult,
   McpServer as SdkMcpServer,
+  ProtocolError,
+  ProtocolErrorCode,
   type RegisteredTool,
   type Root,
   type Transport,
@@ -27,6 +31,7 @@ import {
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
+import {logCruxDisclaimer} from './utils/disclaimers.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
 
@@ -54,7 +59,7 @@ interface ToolEntry {
 
 export class McpServer {
   readonly server: SdkMcpServer;
-  #serverArgs: ParsedArguments;
+  #config: ServerConfig;
   #browserManager: BrowserManager;
   #context: McpContext;
   #heapSnapshotManager = new HeapSnapshotManager();
@@ -62,7 +67,7 @@ export class McpServer {
   /**
    * Client roots stay valid across browser reconnects and only the client can
    * invalidate them through a `roots/list_changed` notification. CLI-configured
-   * roots are read from `#serverArgs` when combining roots.
+   * roots are read from `#config` when combining roots.
    */
   #lastClientRoots?: Root[];
   /**
@@ -73,19 +78,19 @@ export class McpServer {
   #toolMutex = new Mutex();
   #tools = new Map<string, ToolEntry>();
 
-  private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
-    this.#serverArgs = serverArgs;
+  private constructor(config: ServerConfig, options: McpServerOptions) {
+    this.#config = config;
     this.#browserManager = options.browserManager;
+    const serverArgs = this.#config.resolved;
 
-    if (this.#serverArgs.usageStatistics) {
+    if (serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
         persistence: new FilePersistence(),
-        logFile: this.#serverArgs.logFile,
+        logFile: serverArgs.logFile,
         appVersion: VERSION,
-        clearcutEndpoint: this.#serverArgs.clearcutEndpoint,
-        clearcutForceFlushIntervalMs:
-          this.#serverArgs.clearcutForceFlushIntervalMs,
-        clearcutIncludePidHeader: this.#serverArgs.clearcutIncludePidHeader,
+        clearcutEndpoint: serverArgs.clearcutEndpoint,
+        clearcutForceFlushIntervalMs: serverArgs.clearcutForceFlushIntervalMs,
+        clearcutIncludePidHeader: serverArgs.clearcutIncludePidHeader,
       });
     }
 
@@ -103,28 +108,9 @@ export class McpServer {
     );
 
     this.#context = McpContext.create(logger, {
-      experimentalDevToolsDebugging:
-        this.#serverArgs.experimentalDevtools ?? false,
-      experimentalIncludeAllPages: this.#serverArgs.experimentalIncludeAllPages,
-      performanceCrux: this.#serverArgs.performanceCrux,
-      sourceMaps: this.#serverArgs.sourceMaps,
-      maxNavigationSaved: this.#serverArgs.maxNavigationSaved,
-      allowlist: this.#serverArgs.allowedUrlPattern,
-      blocklist: this.#serverArgs.blockedUrlPattern,
-      allowUnrestrictedPaths: this.#serverArgs.allowUnrestrictedPaths,
-      categoryExtensions: this.#serverArgs.categoryExtensions,
+      config: this.#config,
       heapSnapshotManager: this.#heapSnapshotManager,
       getBrowser: () => this.#browserManager.ensureBrowser(),
-      onNotification: (message: string) => {
-        void this.server
-          .sendLoggingMessage({
-            level: 'info',
-            data: message,
-          })
-          .catch(e => {
-            logger?.('Failed to send MCP notification', e);
-          });
-      },
     });
     this.#context.setRoots(this.#combinedRoots());
 
@@ -146,8 +132,9 @@ export class McpServer {
           },
         );
       } else if (
-        !this.#serverArgs.allowUnrestrictedPaths &&
-        (this.#serverArgs.filesystemRoot ?? []).length === 0
+        !this.#config.resolved.allowUnrestrictedPaths &&
+        ((this.#config.resolved.filesystemRoot ?? []).length === 0 ||
+          this.#config.resolved.filesystemRoot === DEFAULT_FILESYSTEM_ROOT)
       ) {
         console.warn(
           '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
@@ -179,25 +166,52 @@ export class McpServer {
         isError: true,
       };
     }
-    const parseResult =
-      await toolHandler.registeredInputSchema.safeParseAsync(args);
-    if (!parseResult.success) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Input validation error: Invalid arguments for tool ${name}: ${parseResult.error.issues
-              .map(
-                issue =>
-                  `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
-              )
-              .join(', ')}`,
-          },
-        ],
-        isError: true,
-      };
+    return await toolHandler.handle(args);
+  }
+
+  /**
+   * Applies a new config to the running server. Only reloadable options are
+   * applied, all other options keep the value the server was started with.
+   * Tools are updated in place and only tools whose listing changed notify
+   * the client, which results in at most one `tools/list_changed`
+   * notification.
+   */
+  async applyConfig(config: ServerConfig): Promise<void> {
+    using guard = await this.#toolMutex.acquire();
+    const previousArgs = this.#config.resolved;
+    const nextConfig = this.#config.mergeReloadable(config);
+    const nextArgs = nextConfig.resolved;
+    // Build everything before committing so that a throwing tool factory
+    // leaves the server untouched.
+    const updates: Array<{
+      entry: ToolEntry;
+      tool: AnyToolDefinition;
+    }> = [];
+    for (const tool of createTools(nextArgs)) {
+      const entry = this.#tools.get(tool.name);
+      if (entry) {
+        updates.push({entry, tool});
+      }
     }
-    return await toolHandler.handle(parseResult.data);
+
+    this.#config.commit(nextConfig);
+    for (const {entry, tool} of updates) {
+      if (entry.handler.update(tool)) {
+        entry.registeredTool.update({
+          description: tool.description,
+          paramsSchema: entry.handler.registeredInputSchema,
+          annotations: tool.annotations,
+          enabled: !entry.handler.disabled,
+        });
+      }
+    }
+
+    if (!previousArgs.performanceCrux || previousArgs.slim) {
+      logCruxDisclaimer(nextArgs);
+    }
+
+    this.#context.setRoots(this.#combinedRoots());
+    await this.#context.onConfigChanged(previousArgs);
   }
 
   /**
@@ -227,26 +241,27 @@ export class McpServer {
   }
 
   static async from(
-    serverArgs: ParsedArguments,
+    config: ServerConfig,
     options: McpServerOptions,
   ): Promise<McpServer> {
-    const server = new McpServer(serverArgs, options);
+    const server = new McpServer(config, options);
     await server.#init();
     return server;
   }
 
   async #init(): Promise<void> {
-    for (const tool of createTools(this.#serverArgs)) {
+    // Tool definitions take a ParsedArguments snapshot; reload recreates them.
+    for (const tool of createTools(this.#config.resolved)) {
       this.#registerTool(tool);
     }
+    this.#setToolCallRequestHandler();
     await loadIssueDescriptions();
   }
 
   #combinedRoots(): Root[] | undefined {
+    const serverArgs = this.#config.resolved;
     const configuredRoots = (
-      this.#serverArgs.allowUnrestrictedPaths
-        ? []
-        : (this.#serverArgs.filesystemRoot ?? [])
+      serverArgs.allowUnrestrictedPaths ? [] : (serverArgs.filesystemRoot ?? [])
     ).map(root => {
       const rootPath = path.resolve(root);
       return {
@@ -295,11 +310,31 @@ export class McpServer {
   #createToolHandler(tool: AnyToolDefinition): ToolHandler {
     return new ToolHandler(
       tool,
-      this.#serverArgs,
+      this.#config,
       () => this.#getContext(),
       this.#toolMutex,
       () => this.#browserManager.abandonPendingAttempt(),
     );
+  }
+
+  /**
+   * Overrides the SDK's `tools/call` handler so enabled and input-schema
+   * checks run inside `ToolHandler.handle()` after acquiring `#toolMutex`.
+   */
+  #setToolCallRequestHandler(): void {
+    this.server.server.setRequestHandler('tools/call', async request => {
+      const entry = this.#tools.get(request.params.name);
+      if (!entry) {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          `Tool ${request.params.name} not found`,
+        );
+      }
+      const result = await entry.handler.handle(request.params.arguments, {
+        viaMcp: true,
+      });
+      return this.server.server.projectCallToolResult(result, undefined);
+    });
   }
 
   #registerTool(tool: AnyToolDefinition): void {
@@ -312,7 +347,7 @@ export class McpServer {
         inputSchema: handler.registeredInputSchema,
         annotations: tool.annotations,
       },
-      handler.handle,
+      args => handler.handle(args),
     );
 
     if (handler.disabled) {
@@ -328,7 +363,7 @@ export class McpServer {
  *
  * Maintained as a public API for backwards compatibility because external
  * consumers and integrations rely on `createMcpServer()`. For new code,
- * prefer using `McpServer.from(serverArgs, options)`.
+ * prefer using `McpServer.from(config, options)`.
  */
 export async function createMcpServer(
   serverArgs: ParsedArguments,
@@ -336,12 +371,24 @@ export async function createMcpServer(
     logFile?: fs.WriteStream;
   },
 ): Promise<{server: SdkMcpServer}> {
+  // BrowserManager only reads non-reloadable browser launch and connection
+  // options.
   const browserManager = new BrowserManager(serverArgs, {
     logFile: options.logFile,
   });
-  const server = await McpServer.from(serverArgs, {
-    browserManager,
-    ...options,
-  });
+  // createMcpServer takes a flat ParsedArguments snapshot and only returns
+  // SdkMcpServer, so instances created here are never reloaded.
+  const server = await McpServer.from(
+    new ServerConfig({
+      cliArgs: {},
+      fileArgs: {},
+      configPath: undefined,
+      resolved: serverArgs,
+    }),
+    {
+      browserManager,
+      ...options,
+    },
+  );
   return {server: server.server};
 }

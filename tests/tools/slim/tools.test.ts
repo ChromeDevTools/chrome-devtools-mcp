@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -18,10 +18,6 @@ import {screenshots} from '../../snapshot.js';
 import {withMcpContext} from '../../utils.js';
 
 describe('slim', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('evaluates', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const script = '2 * 5';

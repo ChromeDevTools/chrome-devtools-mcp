@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -87,10 +87,6 @@ async function startWatcher(
 }
 
 describe('ConfigWatcher', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('calls onChange once for several quick writes', async () => {
     using dir = createTempDir('cd4a-watcher-');
     const configPath = writeConfig(dir.path);

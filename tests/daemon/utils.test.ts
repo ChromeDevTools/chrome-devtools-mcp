@@ -301,7 +301,6 @@ describe('daemon pid handling', () => {
   });
 
   afterEach(() => {
-    sinon.restore();
     if (savedXdgRuntimeDir === undefined) {
       delete process.env['XDG_RUNTIME_DIR'];
     } else {

@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -21,10 +21,6 @@ import {createHandlerMocks} from '../mocks.js';
 import {getTextContent, withMcpContext} from '../utils.js';
 
 describe('thirdPartyDeveloperTools', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('list_3p_developer_tools', () => {
     it('lists tools', async () => {
       await withMcpContext(

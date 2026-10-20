@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -37,10 +37,6 @@ function createScreencastMocks() {
 }
 
 describe('screencast', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('screencast_start', () => {
     it('starts an mp4 recording with filePath', async () => {
       const {page, context, response, mockRecording, args} =

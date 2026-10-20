@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
@@ -18,7 +18,7 @@ import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 import {escapeForLog} from '../src/utils/logger.js';
 
-import {createMockPuppeteerBrowser} from './mocks.js';
+import {createMockPuppeteerBrowser, createMockServerConfig} from './mocks.js';
 import {
   createConnectedMcpContext,
   createTempDir,
@@ -169,14 +169,13 @@ function stubMissingPaths(...missingPaths: string[]) {
 }
 
 describe('McpContext path validation escaping', () => {
-  afterEach(() => sinon.restore());
-
   async function createContext(): Promise<McpContext> {
     const browser = createMockPuppeteerBrowser();
     browser.targets.returns([]);
     return await createConnectedMcpContext(browser, {
-      experimentalDevToolsDebugging: false,
-      performanceCrux: false,
+      config: createMockServerConfig({
+        performanceCrux: false,
+      }),
       heapSnapshotManager: new HeapSnapshotManager(),
     });
   }

@@ -40,12 +40,17 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {
-  BrowserlessContext,
-  Context,
-  DevToolsData,
-  SupportedExtensions,
+import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import {ToolCategory} from './tools/categories.js';
+import {
+  CLOSE_PAGE_ERROR,
+  isCapabilityEnabled,
+  type BrowserlessContext,
+  type CapabilityGate,
+  type Context,
+  type DevToolsData,
+  type SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
@@ -53,39 +58,41 @@ import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
+
 export interface McpContextOptions {
-  // Whether the DevTools windows are exposed as pages for debugging of DevTools.
-  experimentalDevToolsDebugging: boolean;
-  // Whether all page-like targets are exposed as pages.
-  experimentalIncludeAllPages?: boolean;
-  // Whether CrUX data should be fetched.
-  performanceCrux: boolean;
-  // Whether source maps are enabled in DevTools.
-  sourceMaps?: boolean;
-  // The allow list of URL patterns to allow loading resources.
-  allowlist?: string[];
-  // The block list of URL patterns to block loading resources.
-  blocklist?: string[];
-  // Whether to skip path validation when the client did not negotiate the roots
-  // capability. When false (default), tools that read or write local files are
-  // restricted to the OS temp directory. When true, the previous permissive
-  // behavior is restored.
-  allowUnrestrictedPaths?: boolean;
+  config: ReadonlyServerConfig;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
-  // Number of navigations (including the current one) for which network
-  // requests and console messages are retained per page.
-  maxNavigationSaved?: number;
-  // Whether extension tools and targets are enabled.
-  categoryExtensions?: boolean;
-  // Callback when a notification should be emitted to MCP client.
-  onNotification?: (message: string) => void;
   // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
   heapSnapshotManager: HeapSnapshotManager;
   // Returns the browser to use. Called by ensureBrowser(), so the browser
   // connection is only established once a tool needs it.
   getBrowser: () => Promise<Browser>;
 }
+
+interface FeatureController {
+  gate: CapabilityGate;
+  onDisable(context: McpContext): Promise<void> | void;
+}
+
+const FEATURE_CONTROLLERS: readonly FeatureController[] = [
+  {
+    gate: {category: ToolCategory.DEBUGGING},
+    onDisable: context => context.releaseScreencasts(),
+  },
+  {
+    gate: {category: ToolCategory.MEMORY, conditions: ['memoryDebugging']},
+    onDisable: context => context.releaseHeapSnapshots(),
+  },
+  {
+    gate: {category: ToolCategory.PERFORMANCE},
+    onDisable: context => context.releasePerformanceTrace(),
+  },
+  {
+    gate: {category: ToolCategory.DEBUGGING, conditions: ['devtoolsComments']},
+    onDisable: context => context.releaseDevToolsComments(),
+  },
+];
 
 // Page ids are handed out from a process-wide counter so they stay unique
 // across all contexts, in particular across browser reconnects. An id issued
@@ -120,17 +127,15 @@ export class McpContext implements Context, BrowserlessContext {
 
   #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
 
-  #isRunningTrace = false;
-
   #reconnectNotice = false;
 
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
+  #config: ReadonlyServerConfig;
   #options: McpContextOptions;
   #heapSnapshotManager: HeapSnapshotManager;
   #roots: Root[] | undefined = undefined;
-  #allowUnrestrictedPaths: boolean;
 
   private constructor(
     logger: Logger,
@@ -145,9 +150,9 @@ export class McpContext implements Context, BrowserlessContext {
 
     this.logger = logger;
     this.#locatorClass = locatorClass;
+    this.#config = options.config;
     this.#options = options;
     this.#heapSnapshotManager = options.heapSnapshotManager;
-    this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
   }
 
   /**
@@ -167,6 +172,100 @@ export class McpContext implements Context, BrowserlessContext {
       pages.add(this.#selectedPage);
     }
     return pages;
+  }
+
+  /**
+   * Synchronizes browser/page state and releases state of capabilities that
+   * transitioned from enabled to disabled after a config reload.
+   */
+  async onConfigChanged(previousArgs: ParsedArguments): Promise<void> {
+    const nextArgs = this.#config.resolved;
+    if (nextArgs.sourceMaps !== previousArgs.sourceMaps) {
+      for (const mcpPage of this.#allMcpPages()) {
+        mcpPage.syncSourceMaps();
+      }
+    }
+    if (
+      nextArgs.experimentalIncludeAllPages !==
+      previousArgs.experimentalIncludeAllPages
+    ) {
+      await this.createPagesSnapshot();
+    }
+    for (const controller of FEATURE_CONTROLLERS) {
+      if (
+        isCapabilityEnabled(controller.gate, previousArgs) &&
+        !isCapabilityEnabled(controller.gate, nextArgs)
+      ) {
+        await controller.onDisable(this);
+      }
+    }
+  }
+
+  /**
+   * Stops and saves active screencast recordings across all pages when
+   * screencast tools are disabled.
+   */
+  async releaseScreencasts(): Promise<void> {
+    for (const mcpPage of this.#allMcpPages()) {
+      const screenRecorderData = mcpPage.getScreenRecorder();
+      if (!screenRecorderData) {
+        continue;
+      }
+      const {recorder, filePath} = screenRecorderData;
+      mcpPage.setScreenRecorder(null);
+      try {
+        await recorder.stop();
+        this.logger?.(
+          `The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`,
+        );
+      } catch (err) {
+        this.logger?.('Failed to stop the screencast recording', err);
+      }
+    }
+  }
+
+  /**
+   * Closes all loaded heap snapshots when memory tools are disabled.
+   */
+  releaseHeapSnapshots(): void {
+    if (this.#heapSnapshotManager.hasSnapshots()) {
+      this.#heapSnapshotManager.dispose();
+      this.logger?.(
+        'Loaded heap snapshots were closed because memory tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Discards recorded performance traces and stops any running trace when
+   * performance tools are disabled.
+   */
+  async releasePerformanceTrace(): Promise<void> {
+    this.#traceResults = [];
+    for (const mcpPage of this.#allMcpPages()) {
+      if (!mcpPage.isRunningPerformanceTrace()) {
+        continue;
+      }
+      mcpPage.setIsRunningPerformanceTrace(false);
+      try {
+        await mcpPage.pptrPage.tracing.stop();
+      } catch (err) {
+        this.logger?.('Failed to stop the performance trace', err);
+      }
+      this.logger?.(
+        'The running performance trace was discarded because performance tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Disposes DevTools comment bridges across all pages when DevTools comment
+   * tools are disabled.
+   */
+  releaseDevToolsComments(): void {
+    for (const mcpPage of this.#allMcpPages()) {
+      mcpPage.disposeCommentBridge();
+    }
   }
 
   /**
@@ -242,7 +341,6 @@ export class McpContext implements Context, BrowserlessContext {
     this.#selectedPage = undefined;
     this.#selectedPageFallback = undefined;
     this.#selectedPageFallbackRead = false;
-    this.#isRunningTrace = false;
     this.#traceResults = [];
     this.#serviceWorkerConsoleCollector = undefined;
     this.#browser = undefined;
@@ -338,7 +436,10 @@ export class McpContext implements Context, BrowserlessContext {
     // If the client never negotiated roots and the operator has explicitly
     // opted into unrestricted access via --allow-unrestricted-paths, restore
     // the previous permissive behavior and skip validation.
-    if (this.#roots === undefined && this.#allowUnrestrictedPaths) {
+    if (
+      this.#roots === undefined &&
+      this.#config.resolved.allowUnrestrictedPaths
+    ) {
       // Canonical path might not exist yet so we fallback to
       // path.resolve(filePath). Consumers should not follow symlinks.
       return canonicalPath || path.resolve(filePath);
@@ -434,10 +535,6 @@ export class McpContext implements Context, BrowserlessContext {
     await page.close();
   }
 
-  get #hasNetworkBlockOrAllowlist(): boolean {
-    return !!(this.#options.allowlist || this.#options.blocklist);
-  }
-
   async installPWA(options: InstallPWAOptions): Promise<string> {
     try {
       return await this.browser.installPWA(options);
@@ -474,16 +571,17 @@ export class McpContext implements Context, BrowserlessContext {
     return this.browser.getPWAState(options);
   }
 
-  setIsRunningPerformanceTrace(x: boolean): void {
-    this.#isRunningTrace = x;
-  }
-
   isRunningPerformanceTrace(): boolean {
-    return this.#isRunningTrace;
+    for (const mcpPage of this.#allMcpPages()) {
+      if (mcpPage.isRunningPerformanceTrace()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   isCruxEnabled(): boolean {
-    return this.#options.performanceCrux;
+    return this.#config.resolved.performanceCrux;
   }
 
   getPages(): McpPage[] {
@@ -677,15 +775,12 @@ export class McpContext implements Context, BrowserlessContext {
       (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     if (!mcpPage) {
       mcpPage = new McpPage(target, nextPageId++, {
+        config: this.#config,
         locatorClass: this.#locatorClass,
-        hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           target.browserContext(),
         ),
         navigationTimeout: this.#options.navigationTimeout,
-        sourceMaps: this.#options.sourceMaps,
-        maxNavigationSaved: this.#options.maxNavigationSaved,
-        onNotification: this.#options.onNotification,
       });
     }
     this.#mcpPages.set(target, mcpPage);
@@ -693,6 +788,9 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   async createPagesSnapshot(): Promise<McpPage[]> {
+    if (!this.#browser) {
+      return [];
+    }
     const allTargets = this.#fetchPageTargets();
 
     for (const target of allTargets) {
@@ -712,22 +810,37 @@ export class McpContext implements Context, BrowserlessContext {
 
     const pages = Array.from(this.#mcpPages.values());
 
-    // Only fall back when the selected page is actually gone. Gating on
-    // `isClosed()` instead of `pages` membership avoids silently swapping a
-    // live page that is momentarily missing from the snapshot.
+    // Only fall back when the selected page is actually gone or no longer
+    // counts as a page, e.g. a background page after
+    // experimentalIncludeAllPages was turned off. Gating on `isClosed()`
+    // instead of `pages` membership avoids silently swapping a live page that
+    // is momentarily missing from the snapshot.
     if (this.#selectedPageFallbackRead) {
       this.#selectedPageFallback = undefined;
       this.#selectedPageFallbackRead = false;
     }
-    if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
-      // Record the automatic change so the response can surface it. Skipped on
-      // first connect, when there was no prior selection to replace.
-      if (this.#selectedPage) {
-        this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.isClosed(),
-        };
+    if (
+      !this.#selectedPage ||
+      this.#selectedPage.isClosed() ||
+      !this.#isPageTarget(this.#selectedPage.target)
+    ) {
+      if (pages[0]) {
+        // Record the automatic change so the response can surface it. Skipped on
+        // first connect, when there was no prior selection to replace.
+        if (this.#selectedPage) {
+          this.#selectedPageFallback = {
+            wasClosed: this.#selectedPage.isClosed(),
+          };
+        }
+        this.#selectPage(pages[0]);
+      } else if (this.#selectedPage) {
+        const wasClosed = Boolean(this.#selectedPage.isClosed());
+        if (!wasClosed) {
+          this.#selectedPage.dispose();
+        }
+        this.#selectedPage = undefined;
+        this.#selectedPageFallback = {wasClosed};
       }
-      this.#selectPage(pages[0]);
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {
@@ -743,14 +856,14 @@ export class McpContext implements Context, BrowserlessContext {
       (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     const url = existingMcpPage ? existingMcpPage.url() : target.url();
     if (
-      !this.#options.experimentalDevToolsDebugging &&
+      !this.#config.resolved.experimentalDevtools &&
       url.startsWith('devtools://')
     ) {
       return false;
     }
     if (
       !isAllowedUrl(url, {
-        categoryExtensions: this.#options.categoryExtensions,
+        categoryExtensions: this.#config.resolved.categoryExtensions,
       })
     ) {
       return false;
@@ -760,13 +873,13 @@ export class McpContext implements Context, BrowserlessContext {
       return true;
     }
     if (
-      this.#options.experimentalIncludeAllPages &&
+      this.#config.resolved.experimentalIncludeAllPages &&
       (type === 'background_page' || type === 'webview')
     ) {
       return true;
     }
     if (
-      this.#options.experimentalDevToolsDebugging &&
+      this.#config.resolved.experimentalDevtools &&
       type === 'other' &&
       url.startsWith('devtools://')
     ) {
@@ -1002,10 +1115,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   #validateUrlNotBlocked(url: URL): void {
-    if (!this.#options.blocklist) {
+    const blocklist = this.#config.resolved.blockedUrlPattern;
+    if (!blocklist) {
       return;
     }
-    for (const block of this.#options.blocklist) {
+    for (const block of blocklist) {
       const pattern = new URLPattern(block);
       if (pattern.test(url)) {
         throw new Error(`Blocked by blocklist: ${url}`);
@@ -1014,10 +1128,11 @@ export class McpContext implements Context, BrowserlessContext {
   }
 
   #validateUrlAllowed(url: URL): void {
-    if (!this.#options.allowlist) {
+    const allowlist = this.#config.resolved.allowedUrlPattern;
+    if (!allowlist) {
       return;
     }
-    for (const allow of this.#options.allowlist) {
+    for (const allow of allowlist) {
       const pattern = new URLPattern(allow);
       if (pattern.test(url)) {
         return;

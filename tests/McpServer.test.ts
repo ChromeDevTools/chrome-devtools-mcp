@@ -8,6 +8,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import {afterEach, describe, it} from 'node:test';
+import {pathToFileURL} from 'node:url';
 
 import {Client, InMemoryTransport} from '@modelcontextprotocol/client';
 import sinon from 'sinon';
@@ -23,12 +24,18 @@ import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 
 import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
+import {createTempFile} from './utils.js';
 
 describe('McpServer', () => {
   afterEach(() => {
-    sinon.restore();
     ClearcutLogger.resetForTesting();
   });
+
+  function parseConfig(argv: string[] = []) {
+    return new ConfigParser('1.0.0', ['node', 'script.js', ...argv], {
+      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+    }).parseConfig();
+  }
 
   async function createTestServer(
     extraArgs: string[] = [],
@@ -45,21 +52,39 @@ describe('McpServer', () => {
       sinon.stub(McpContext, 'create').returns(context);
     }
 
-    const serverArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', ...extraArgs],
-      {
-        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-      },
-    ).parse();
-    const server = await McpServer.from(serverArgs, {browserManager});
-    return {server, browserManager, context};
+    const config = parseConfig(extraArgs);
+    const server = await McpServer.from(config, {browserManager});
+    return {server, browserManager, context, config};
+  }
+
+  async function connectClient(server: McpServer): Promise<Client> {
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({name: 'test', version: '1.0.0'});
+    await client.connect(clientTransport);
+    return client;
+  }
+
+  async function listServerTools(server: McpServer) {
+    const client = await connectClient(server);
+    try {
+      const {tools} = await client.listTools();
+      return tools;
+    } finally {
+      await client.close();
+    }
+  }
+
+  async function listServerToolNames(server: McpServer): Promise<string[]> {
+    const tools = await listServerTools(server);
+    return tools.map(tool => tool.name);
   }
 
   it('passes the navigation limit to the lazily connected context', async () => {
     const context = createMockMcpContext();
     const createContext = sinon.stub(McpContext, 'create').returns(context);
-    const {server, browserManager} = await createTestServer(
+    const {server, browserManager, config} = await createTestServer(
       ['--maxNavigationSaved=5'],
       {mockContext: false},
     );
@@ -67,8 +92,9 @@ describe('McpServer', () => {
     sinon.assert.calledOnceWithExactly(
       createContext,
       sinon.match.any,
-      sinon.match({maxNavigationSaved: 5}),
+      sinon.match({config: sinon.match.same(config)}),
     );
+    assert.strictEqual(config.resolved.maxNavigationSaved, 5);
     sinon.assert.notCalled(browserManager.ensureBrowser);
     await server.close();
   });
@@ -102,6 +128,35 @@ describe('McpServer', () => {
         firstBlock.text,
         /^Input validation error: Invalid arguments for tool navigate_page:/,
       );
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+    });
+
+    it('returns a validation error when transform validation fails', async () => {
+      const {server, browserManager} = await createTestServer();
+      const cases: Array<[Record<string, unknown>, RegExp]> = [
+        [
+          {pageId: 1, geolocation: '0x0'},
+          /^Input validation error: Invalid arguments for tool emulate: geolocation: Invalid geolocation "0x0"\. Expected '<latitude>,<longitude>'\.$/,
+        ],
+        [
+          {pageId: 1, viewport: '0x0'},
+          /^Input validation error: Invalid arguments for tool emulate: viewport: Invalid viewport width "0"\./,
+        ],
+        [
+          {pageId: 1, extraHttpHeaders: 'notjson'},
+          /^Input validation error: Invalid arguments for tool emulate: extraHttpHeaders: Invalid JSON for headers:/,
+        ],
+      ];
+
+      for (const [args, expectedPattern] of cases) {
+        const result = await server.callTool('emulate', args);
+
+        assert.strictEqual(result.isError, true);
+        assert.strictEqual(result.content.length, 1);
+        const firstBlock = result.content[0];
+        assert.strictEqual(firstBlock.type, 'text');
+        assert.match(firstBlock.text, expectedPattern);
+      }
       sinon.assert.notCalled(browserManager.ensureBrowser);
     });
 
@@ -160,19 +215,84 @@ describe('McpServer', () => {
     });
   });
 
+  describe('oninitialized', () => {
+    const tempDirectoryWarning =
+      '[chrome-devtools-mcp] The connecting client did not negotiate the MCP roots ' +
+      'capability. Tools that read or write local files will be restricted to the OS temp directory. ' +
+      'To restore the previous unrestricted behavior, start the server with ' +
+      '--allow-unrestricted-paths.';
+
+    async function warnOnInitialized(
+      extraArgs: string[] = [],
+      clientHasRoots = false,
+    ) {
+      const {server} = await createTestServer(extraArgs);
+      const protocol = server.server.server;
+      sinon
+        .stub(protocol, 'getClientCapabilities')
+        .returns(clientHasRoots ? {roots: {}} : {});
+      sinon.stub(protocol, 'getClientVersion').returns(undefined);
+      if (clientHasRoots) {
+        sinon.stub(protocol, 'request').resolves({roots: []});
+      }
+      const warnStub = sinon.stub(console, 'warn');
+      const oninitialized = protocol.oninitialized;
+      assert.ok(oninitialized);
+      oninitialized();
+      await Promise.resolve();
+      return warnStub;
+    }
+
+    it('warns when default flags meet a client without roots', async () => {
+      const warnStub = await warnOnInitialized();
+
+      sinon.assert.calledOnceWithExactly(warnStub, tempDirectoryWarning);
+    });
+
+    it('warns when filesystem roots are explicitly empty', async () => {
+      using configFile = createTempFile(
+        JSON.stringify({filesystemRoot: []}),
+        'cd4a.test.config.empty-filesystem-root.json',
+      );
+
+      const warnStub = await warnOnInitialized(['--config', configFile.path]);
+
+      sinon.assert.calledOnceWithExactly(warnStub, tempDirectoryWarning);
+    });
+
+    it('does not warn for an explicit workspace', async () => {
+      const warnStub = await warnOnInitialized([
+        '--workspace=/tmp/explicit-workspace',
+      ]);
+
+      sinon.assert.notCalled(warnStub);
+    });
+
+    it('does not warn when unrestricted paths are allowed', async () => {
+      const warnStub = await warnOnInitialized(['--allow-unrestricted-paths']);
+
+      sinon.assert.notCalled(warnStub);
+    });
+
+    it('does not warn when started via the CLI', async () => {
+      const warnStub = await warnOnInitialized(['--viaCli']);
+
+      sinon.assert.notCalled(warnStub);
+    });
+
+    it('does not warn when the client negotiates roots', async () => {
+      const warnStub = await warnOnInitialized([], true);
+
+      sinon.assert.notCalled(warnStub);
+    });
+  });
+
   describe('tool list', () => {
     async function listToolNames(extraArgs: string[] = []): Promise<string[]> {
       const {server} = await createTestServer(extraArgs);
-      const [clientTransport, serverTransport] =
-        InMemoryTransport.createLinkedPair();
-      await server.connect(serverTransport);
-      const client = new Client({name: 'test', version: '1.0.0'});
-      await client.connect(clientTransport);
       try {
-        const {tools} = await client.listTools();
-        return tools.map(tool => tool.name).sort();
+        return (await listServerToolNames(server)).sort();
       } finally {
-        await client.close();
         await server.close();
       }
     }
@@ -229,6 +349,213 @@ describe('McpServer', () => {
     it('can disable javascript evaluation tools', async () => {
       const names = await listToolNames(['--no-javascript-evaluation']);
       assert.ok(!names.includes('evaluate_script'));
+    });
+  });
+
+  describe('applyConfig', () => {
+    it('keeps maxNavigationSaved unchanged when configuration is reloaded', async () => {
+      const {server, config, browserManager} = await createTestServer([
+        '--maxNavigationSaved=5',
+      ]);
+
+      await server.applyConfig(parseConfig(['--maxNavigationSaved=10']));
+
+      assert.strictEqual(config.resolved.maxNavigationSaved, 5);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
+    });
+
+    it('enables tools that were disabled', async () => {
+      const {server} = await createTestServer();
+      assert.ok(
+        !(await listServerToolNames(server)).includes(
+          'get_heapsnapshot_summary',
+        ),
+      );
+
+      await server.applyConfig(parseConfig(['--memoryDebugging']));
+
+      assert.ok(
+        (await listServerToolNames(server)).includes(
+          'get_heapsnapshot_summary',
+        ),
+      );
+    });
+
+    it('toggles slim mode', async () => {
+      const {server} = await createTestServer();
+
+      await server.applyConfig(parseConfig(['--slim']));
+
+      const slimToolNames = await listServerToolNames(server);
+      assert.ok(!slimToolNames.includes('navigate_page'));
+      assert.ok(slimToolNames.includes('navigate'));
+    });
+
+    it('disables tools that were enabled', async () => {
+      const {server} = await createTestServer();
+
+      await server.applyConfig(parseConfig(['--no-category-network']));
+
+      assert.ok(
+        !(await listServerToolNames(server)).includes('list_network_requests'),
+      );
+    });
+
+    it('updates the listed tool schema when options change', async () => {
+      const {server} = await createTestServer();
+
+      await server.applyConfig(parseConfig(['--no-page-id-routing']));
+
+      const tools = await listServerTools(server);
+      const consoleTool = tools.find(
+        tool => tool.name === 'list_console_messages',
+      );
+      assert.ok(consoleTool);
+      assert.ok(!('pageId' in (consoleTool.inputSchema.properties ?? {})));
+    });
+
+    it('uses the new arguments for tool calls', async () => {
+      const {server, browserManager} = await createTestServer();
+
+      await server.applyConfig(parseConfig(['--no-javascript-evaluation']));
+      const result = await server.callTool('evaluate_script', {
+        function: '() => 1',
+        pageId: 1,
+      });
+
+      assert.strictEqual(result.isError, true);
+      const firstBlock = result.content[0];
+      assert.strictEqual(firstBlock.type, 'text');
+      assert.match(firstBlock.text, /requires flag --javascriptEvaluation/);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+    });
+
+    it('validates MCP tool calls queued behind applyConfig against the updated config', async () => {
+      const {server, context} = await createTestServer();
+      const client = await connectClient(server);
+
+      try {
+        const {promise: firstBrowser, resolve: releaseFirstCall} =
+          Promise.withResolvers<
+            ReturnType<typeof createMockPuppeteerBrowser>
+          >();
+        const {promise: firstCallEntered, resolve: markFirstCallEntered} =
+          Promise.withResolvers<void>();
+        context.ensureBrowser.onFirstCall().callsFake(async () => {
+          markFirstCallEntered();
+          return await firstBrowser;
+        });
+
+        const firstCall = client.callTool({name: 'list_pages', arguments: {}});
+        await firstCallEntered;
+
+        const applyPromise = server.applyConfig(
+          parseConfig(['--no-page-id-routing']),
+        );
+        const secondCall = client.callTool({
+          name: 'list_console_messages',
+          arguments: {pageId: 1},
+        });
+
+        releaseFirstCall(createMockPuppeteerBrowser());
+        await firstCall;
+        await applyPromise;
+        const secondResult = await secondCall;
+
+        assert.strictEqual(secondResult.isError, true);
+        const content = secondResult.content;
+        assert.ok(Array.isArray(content));
+        const firstBlock = content[0];
+        assert.strictEqual(firstBlock.type, 'text');
+        assert.match(
+          firstBlock.text,
+          /^Input validation error: Invalid arguments for tool list_console_messages: .*pageId/,
+        );
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('commits the shared config, updates roots, and notifies the context with previous args', async () => {
+      const {server, context, config} = await createTestServer([
+        '--blockedUrlPattern',
+        'https://example.com/*',
+      ]);
+      const previousArgs = config.resolved;
+      let cruxWhenNotified: boolean | undefined;
+      context.onConfigChanged.callsFake(async () => {
+        cruxWhenNotified = config.resolved.performanceCrux;
+      });
+      const rootPath = path.resolve('/tmp/reloaded-workspace');
+
+      await server.applyConfig(
+        parseConfig(['--no-performance-crux', `--workspace=${rootPath}`]),
+      );
+
+      sinon.assert.calledWithExactly(context.setRoots.secondCall, [
+        {
+          uri: pathToFileURL(rootPath).href,
+          name: 'reloaded-workspace',
+        },
+      ]);
+      sinon.assert.calledOnceWithExactly(context.onConfigChanged, previousArgs);
+      assert.strictEqual(cruxWhenNotified, false);
+      assert.deepStrictEqual(config.resolved.blockedUrlPattern, [
+        'https://example.com/*',
+      ]);
+    });
+
+    it('logs the CrUX disclaimer only when CrUX becomes active', async () => {
+      const {server} = await createTestServer(['--no-performance-crux']);
+      const defaultConfig = parseConfig();
+      const errorStub = sinon.stub(console, 'error');
+
+      await server.applyConfig(defaultConfig);
+
+      sinon.assert.calledOnceWithExactly(
+        errorStub,
+        'Performance tools may send trace URLs to the Google CrUX API to fetch real-user experience data. To disable, run with --no-performance-crux.',
+      );
+
+      await server.applyConfig(defaultConfig);
+
+      sinon.assert.calledOnce(errorStub);
+    });
+
+    it('keeps restart-required options the server was started with', async () => {
+      const {server} = await createTestServer();
+
+      await server.applyConfig(parseConfig(['--categoryExtensions']));
+
+      assert.ok(
+        !(await listServerToolNames(server)).includes('install_extension'),
+      );
+    });
+
+    it('notifies the client only when a tool changed', async () => {
+      const {server} = await createTestServer();
+      const sendToolListChanged = sinon.spy(
+        server.server,
+        'sendToolListChanged',
+      );
+
+      await server.applyConfig(parseConfig());
+      sinon.assert.notCalled(sendToolListChanged);
+
+      await server.applyConfig(parseConfig(['--memoryDebugging']));
+      sinon.assert.called(sendToolListChanged);
+    });
+
+    it('does not connect a browser when experimentalIncludeAllPages changes before a browser connects', async () => {
+      const {server, browserManager} = await createTestServer([], {
+        mockContext: false,
+      });
+
+      await server.applyConfig(parseConfig(['--experimentalIncludeAllPages']));
+
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
     });
   });
 });

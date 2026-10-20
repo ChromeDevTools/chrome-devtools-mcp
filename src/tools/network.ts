@@ -55,7 +55,7 @@ export const listNetworkRequests = definePageTool((args: ParsedArguments) => ({
       .min(0)
       .optional()
       .describe(
-        'Page number to return (0-based). When omitted, returns the first page.',
+        'Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.',
       ),
     resourceTypes: zod
       .array(zod.enum(FILTERABLE_RESOURCE_TYPES))

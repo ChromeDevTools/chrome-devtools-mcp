@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it, beforeEach} from 'node:test';
 import zlib from 'node:zlib';
 
 import sinon from 'sinon';
@@ -26,10 +26,6 @@ import {loadTraceAsBuffer} from '../trace-processing/fixtures/load.js';
 import {withMcpContext} from '../utils.js';
 
 describe('performance', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   beforeEach(() => {
     sinon.stub(globalThis, 'fetch').callsFake(async url => {
       const cruxEndpoint =
@@ -47,7 +43,7 @@ describe('performance', () => {
   describe('performance_start_trace', () => {
     it('starts a trace recording', async () => {
       await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(false);
+        context.getSelectedMcpPage().setIsRunningPerformanceTrace(false);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         sinon
           .stub(selectedPage, 'url')
@@ -169,6 +165,10 @@ describe('performance', () => {
         context,
       );
 
+      sinon.assert.calledOnceWithExactly(
+        page.setIsRunningPerformanceTrace,
+        true,
+      );
       sinon.assert.notCalled(page.pptrPage.setCacheEnabled);
     });
 
@@ -236,7 +236,7 @@ describe('performance', () => {
         response.appendResponseLine,
         'Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.',
       );
-      sinon.assert.notCalled(context.setIsRunningPerformanceTrace);
+      sinon.assert.notCalled(page.setIsRunningPerformanceTrace);
       sinon.assert.notCalled(page.pptrPage.goto);
     });
 
@@ -399,7 +399,7 @@ describe('performance', () => {
 
       await stopTrace(args).handler({params: {}, page}, response, context);
 
-      sinon.assert.notCalled(context.setIsRunningPerformanceTrace);
+      sinon.assert.notCalled(page.setIsRunningPerformanceTrace);
       sinon.assert.notCalled(context.storeTraceRecording);
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
@@ -410,7 +410,7 @@ describe('performance', () => {
     it('will stop the trace and return trace info when a trace is running', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(true);
+        context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         const stopTracingStub = sinon
           .stub(selectedPage.tracing, 'stop')
@@ -434,7 +434,7 @@ describe('performance', () => {
 
     it('throws an error if parsing the trace buffer fails', async () => {
       await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(true);
+        context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         sinon
           .stub(selectedPage.tracing, 'stop')
@@ -455,7 +455,7 @@ describe('performance', () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       await withMcpContext(async (response, context, args) => {
         const filePath = 'test-trace.json';
-        context.setIsRunningPerformanceTrace(true);
+        context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         const stopTracingStub = sinon
           .stub(selectedPage.tracing, 'stop')
@@ -485,7 +485,7 @@ describe('performance', () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       await withMcpContext(
         async (response, context, args) => {
-          context.setIsRunningPerformanceTrace(true);
+          context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
           const selectedPage = context.getSelectedMcpPage().pptrPage;
           sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
 
@@ -513,7 +513,7 @@ describe('performance', () => {
     it('fetches CrUX data for desktop and includes it in the summary', async () => {
       const rawData = loadTraceAsBuffer('web-dev-with-commit.json.gz');
       await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(true);
+        context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         sinon.stub(selectedPage.tracing, 'stop').resolves(rawData);
 
@@ -566,7 +566,7 @@ describe('performance', () => {
       const modifiedData = new TextEncoder().encode(modifiedJsonString);
 
       await withMcpContext(async (response, context, args) => {
-        context.setIsRunningPerformanceTrace(true);
+        context.getSelectedMcpPage().setIsRunningPerformanceTrace(true);
         const selectedPage = context.getSelectedMcpPage().pptrPage;
         sinon.stub(selectedPage.tracing, 'stop').resolves(modifiedData);
 

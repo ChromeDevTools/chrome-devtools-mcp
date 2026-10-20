@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {after, afterEach, describe, it} from 'node:test';
+import {after, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -35,6 +35,7 @@ import {serverHooks} from './server.js';
 import {loadTraceAsBuffer} from './trace-processing/fixtures/load.js';
 import {
   createHandlerMocks,
+  createMockConsoleMessage,
   createMockHeapSnapshotAggregate,
   createMockCSSMatchedStyles,
   createMockCSSProperty,
@@ -91,8 +92,28 @@ after(() => {
 });
 
 describe('McpResponse', () => {
-  afterEach(() => {
-    sinon.restore();
+  it('truncates a long page title without splitting a surrogate pair', async () => {
+    // The 50 code unit limit leaves 47 for the title; the emoji sits at 46-47.
+    const title = 'A'.repeat(46) + '\u{1F600}' + 'B'.repeat(10);
+    const page = createMockMcpPage();
+    Object.defineProperty(page, 'id', {value: 1});
+    page.url.returns('https://example.com/emoji');
+    page.getTitle.returns(title);
+    const context = createMockMcpContext({selectedPage: page});
+    context.getPages.returns([page]);
+    context.isPageSelected.returns(true);
+    const response = new McpResponse(createMockParsedArguments());
+    response.setIncludePages(true);
+
+    const result = await response.handle(context);
+
+    assert.ok(
+      getTextContent(result.content[0]).includes(
+        `1: ${'A'.repeat(46)}... (https://example.com/emoji)`,
+      ),
+      getTextContent(result.content[0]),
+    );
+    assert.doesNotMatch(JSON.stringify(result), /\\ud83d/i);
   });
 
   it('reports only pages opened by the attached action', async () => {
@@ -697,6 +718,58 @@ describe('McpResponse', () => {
 });
 
 describe('McpResponse network request filtering', () => {
+  const server = serverHooks();
+
+  it('filters CORS preflights and prefetches by their own types', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addRoute('/data?prefetch', (_req, res) => {
+        res.writeHead(200, {'Content-Type': 'text/plain'});
+        res.end('prefetched');
+      });
+      server.addRoute('/data?cors', (_req, res) => {
+        res.writeHead(200, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'PUT',
+          'Access-Control-Allow-Headers': 'x-custom',
+          'Content-Type': 'text/plain',
+        });
+        res.end('cors');
+      });
+      // localhost vs 127.0.0.1 makes the PUT cross-origin, so it is preflighted.
+      const crossOrigin = server
+        .getRoute('/data?cors')
+        .replace('127.0.0.1', 'localhost');
+      server.addHtmlRoute(
+        '/types.html',
+        `<!doctype html><link rel="prefetch" href="/data?prefetch"><script>fetch(${JSON.stringify(crossOrigin)}, {method: 'PUT', headers: {'x-custom': '1'}});</script>`,
+      );
+      const page = context.getSelectedMcpPage().pptrPage;
+      const done = Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/data?prefetch')),
+        page.waitForResponse(
+          r => r.url() === crossOrigin && r.request().method() === 'PUT',
+        ),
+      ]);
+      await page.goto(server.getRoute('/types.html'));
+      await done;
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['preflight']});
+      let text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /OPTIONS \S+\/data\?cors/, text);
+      assert.doesNotMatch(text, /PUT|prefetch/, text);
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['prefetch']});
+      text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /GET \S+\/data\?prefetch/, text);
+      assert.doesNotMatch(text, /OPTIONS|PUT/, text);
+
+      response.setIncludeNetworkRequests(true, {resourceTypes: ['fetch']});
+      text = getTextContent((await response.handle(context)).content[0]);
+      assert.match(text, /PUT \S+\/data\?cors/, text);
+      assert.doesNotMatch(text, /OPTIONS|prefetch/, text);
+    });
+  });
+
   it('filters network requests by resource type', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludeNetworkRequests(true, {
@@ -844,19 +917,32 @@ describe('McpResponse network pagination', () => {
     });
   });
 
-  it('paginates the first page when pageIdx is 0 without pageSize', async () => {
+  it('returns all items when pageIdx is 0 without pageSize', async () => {
     await withMcpContext(async (response, context) => {
       const requests = Array.from({length: 30}, (_, idx) =>
         getMockRequest({method: `GET-${idx}`}),
       );
       context.getSelectedMcpPage().getNetworkRequests = () => requests;
-      // pageIdx 0 is a valid page, not "no pagination" — it must apply the
-      // default page size like any other page.
       response.setIncludeNetworkRequests(true, {pageIdx: 0});
       const {content} = await response.handle(context);
       const text = getTextContent(content[0]);
-      assert.ok(text.includes('Showing 1-20 of 30 (Page 1 of 2).'));
-      assert.ok(text.includes('Next page: 1'));
+      assert.ok(text.includes('Showing 1-30 of 30 (Page 1 of 1).'));
+      assert.ok(!text.includes('Next page:'));
+      assert.ok(!text.includes('Previous page:'));
+    });
+  });
+
+  it('returns all console messages when pageIdx is 0 without pageSize', async () => {
+    await withMcpContext(async (response, context) => {
+      const messages = Array.from({length: 30}, (_, idx) =>
+        createMockConsoleMessage({text: `msg-${idx}`}),
+      );
+      context.getSelectedMcpPage().getConsoleData = () => messages;
+      response.setIncludeConsoleData(true, {pageIdx: 0});
+      const {content} = await response.handle(context);
+      const text = getTextContent(content[0]);
+      assert.ok(text.includes('Showing 1-30 of 30 (Page 1 of 1).'));
+      assert.ok(!text.includes('Next page:'));
       assert.ok(!text.includes('Previous page:'));
     });
   });
@@ -921,6 +1007,13 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
+        const typedStructuredContent = structuredContent as {
+          traceInsight?: string;
+        };
+        assert.ok(
+          typedStructuredContent.traceInsight,
+          'Expected traceInsight in structuredContent',
+        );
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
@@ -940,6 +1033,13 @@ describe('McpResponse network pagination', () => {
         const {content, structuredContent} = await response.handle(context);
 
         t.assert.snapshot(getTextContent(content[0]));
+        const typedStructuredContent = structuredContent as {
+          error?: string;
+        };
+        assert.ok(
+          typedStructuredContent.error,
+          'Expected error in structuredContent',
+        );
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       });
     });
@@ -1118,10 +1218,6 @@ describe('lighthouse', () => {
 });
 
 describe('third-party developer tools', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('lists third-party developer tools', async t => {
     const args = createMockParsedArguments({
       categoryExperimentalThirdParty: true,
@@ -1294,10 +1390,6 @@ describe('third-party developer tools', () => {
 });
 
 describe('webmcp', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   async function testIncludesWebmcpTools(
     t: it.TestContext,
     parseArguments: Partial<ParsedArguments>,

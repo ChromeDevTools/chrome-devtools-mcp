@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {describe, it, after, afterEach, before} from 'node:test';
+import {describe, it, after, before} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -13,10 +13,6 @@ import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 
 describe('HeapSnapshotManager', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('rejects when a file without .heapsnapshot or .heaptimeline extension is passed', async () => {
     const manager = new HeapSnapshotManager();
 

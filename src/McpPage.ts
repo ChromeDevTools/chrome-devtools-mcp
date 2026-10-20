@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
@@ -174,42 +175,43 @@ export class McpPage implements ContextPage {
   // Screencast
   #screenRecorder: ScreenRecorderData | null = null;
 
+  // Performance trace
+  #isRunningPerformanceTrace = false;
+
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
-  #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
-  #sourceMaps: boolean;
-  #maxNavigationSaved?: number;
+  #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
-  #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
     id: number,
     options: {
-      hasNetworkBlockOrAllowlist: boolean;
+      config: ReadonlyServerConfig;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
       navigationTimeout?: number;
-      sourceMaps?: boolean;
-      maxNavigationSaved?: number;
-      onNotification?: (message: string) => void;
     },
   ) {
-    this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
+    this.#config = options.config;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
-    this.#sourceMaps = options.sourceMaps ?? true;
-    this.#maxNavigationSaved = options.maxNavigationSaved;
-    this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+  }
+
+  get #hasNetworkBlockOrAllowlist(): boolean {
+    return Boolean(
+      this.#config.resolved.allowedUrlPattern ||
+      this.#config.resolved.blockedUrlPattern,
+    );
   }
 
   get pptrPage(): Page {
@@ -319,7 +321,7 @@ export class McpPage implements ContextPage {
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
-        maxNavigationSaved: this.#maxNavigationSaved,
+        maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
       });
       this.#consoleCollector = new ConsoleCollector(
         page,
@@ -336,7 +338,7 @@ export class McpPage implements ContextPage {
             },
           };
         },
-        {maxNavigationSaved: this.#maxNavigationSaved},
+        {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       );
     }
     this.updateTimeouts();
@@ -363,11 +365,24 @@ export class McpPage implements ContextPage {
     try {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session, {
-        sourceMaps: this.#sourceMaps,
+        sourceMaps: this.#config.resolved.sourceMaps,
       });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
+  }
+
+  syncSourceMaps(): void {
+    if (!this.#devtoolsUniverse) {
+      return;
+    }
+    const sourceMaps = this.#config.resolved.sourceMaps;
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
   }
 
   get devtoolsUniverse(): TargetUniverse | undefined {
@@ -375,6 +390,9 @@ export class McpPage implements ContextPage {
   }
 
   getDialog(): Dialog | undefined {
+    if (this.#dialog?.handled) {
+      this.#dialog = undefined;
+    }
     return this.#dialog;
   }
 
@@ -390,10 +408,19 @@ export class McpPage implements ContextPage {
     this.#screenRecorder = data;
   }
 
+  isRunningPerformanceTrace(): boolean {
+    return this.#isRunningPerformanceTrace;
+  }
+
+  setIsRunningPerformanceTrace(x: boolean): void {
+    this.#isRunningPerformanceTrace = x;
+  }
+
   throwIfDialogOpen(): void {
-    if (this.#dialog && !this.#dialog.handled) {
+    const dialog = this.getDialog();
+    if (dialog) {
       throw new Error(
-        `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
+        `A dialog is open (${dialog.type()}: ${dialog.message()}).`,
       );
     }
   }
@@ -556,6 +583,11 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  disposeCommentBridge(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
+  }
+
   /**
    * Returns the comment bridge attached to the DevTools page, or undefined if
    * the DevTools page does not support DevTools comments.
@@ -564,9 +596,7 @@ export class McpPage implements ContextPage {
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
-      this.#commentBridge = new DevToolsCommentBridge({
-        onNotification: this.#onNotification,
-      });
+      this.#commentBridge = new DevToolsCommentBridge();
     }
     const attached = await this.#commentBridge.attach(devtoolsPage);
     return attached ? this.#commentBridge : undefined;
@@ -588,7 +618,9 @@ export class McpPage implements ContextPage {
 
   async openDevTools(): Promise<Page | undefined> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    if (this.#config.resolved.devtoolsComments) {
+      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    }
     return devtoolsPage;
   }
 
@@ -671,8 +703,8 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.#disposed = true;
-    this.#commentBridge?.dispose();
-    this.#commentBridge = undefined;
+    this.#isRunningPerformanceTrace = false;
+    this.disposeCommentBridge();
     if (this.#screenRecorder) {
       const {recorder} = this.#screenRecorder;
       this.#screenRecorder = null;
@@ -1084,7 +1116,9 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+      if (this.#config.resolved.devtoolsComments) {
+        await this.ensureDevToolsCommentBridge(devtoolsPage);
+      }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
           // @ts-expect-error no types
@@ -1336,7 +1370,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      {maxNavigationSaved: this.#maxNavigationSaved},
+      {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       collect => {
         return {
           request: req => {

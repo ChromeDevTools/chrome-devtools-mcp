@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -16,10 +16,6 @@ import {
 import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 
 describe('network', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('list_network_requests', () => {
     it('describes the default preserved navigation history', () => {
       const tool = listNetworkRequests(createMockParsedArguments());

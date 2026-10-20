@@ -64,6 +64,14 @@ describe('HeapSnapshotFormatter', () => {
       assert.strictEqual(formatName(longName, {}), expected);
     });
 
+    it('does not split a surrogate pair at the truncation point', () => {
+      const name = 'a'.repeat(MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
+      assert.strictEqual(
+        formatName(name, {}),
+        'a'.repeat(MAX_NAME_LENGTH - 1) + '...',
+      );
+    });
+
     it('escapes newlines in name', () => {
       assert.strictEqual(
         formatName('first\r\nsecond\nthird\rfourth', {}),

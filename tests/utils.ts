@@ -41,7 +41,9 @@ import {stableIdSymbol} from '../src/utils/id.js';
 import {
   createMockParsedArguments,
   createMockPuppeteerPage,
+  createMockServerConfig,
   mockListener,
+  stripUndefined,
 } from './mocks.js';
 
 export function assertNoServiceWorkerReported(targets: Target[], id: string) {
@@ -212,6 +214,16 @@ export async function withMcpContext(
     McpContext.resetPageIdsForTesting();
     McpContext.resetWorkerIdsForTesting();
     const parsedArgs = createMockParsedArguments(args);
+    const serverConfig = createMockServerConfig({
+      ...args,
+      ...stripUndefined({
+        performanceCrux: options.performanceCrux,
+        sourceMaps: options.sourceMaps,
+        allowedUrlPattern: options.allowedUrlPattern,
+        blockedUrlPattern: options.blockedUrlPattern,
+        allowUnrestrictedPaths: options.allowUnrestrictedPaths,
+      }),
+    });
     const response = new McpResponse(parsedArgs);
     const heapSnapshotManager = new HeapSnapshotManager();
     if (context) {
@@ -220,16 +232,10 @@ export async function withMcpContext(
     context = await createConnectedMcpContext(
       browser,
       {
-        experimentalDevToolsDebugging: false,
-        performanceCrux: options.performanceCrux ?? true,
-        sourceMaps: options.sourceMaps ?? true,
-        allowlist: options.allowedUrlPattern,
-        blocklist: options.blockedUrlPattern,
-        allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
+        config: serverConfig,
         navigationTimeout:
           options.navigationTimeout ??
           (process.platform === 'win32' ? 20000 : undefined),
-        categoryExtensions: parsedArgs.categoryExtensions,
         heapSnapshotManager,
       },
       Locator,

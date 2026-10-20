@@ -73,6 +73,8 @@ import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
+import {getFilterableResourceType} from './utils/resourceType.js';
+import {truncateText} from './utils/text.js';
 import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -234,7 +236,7 @@ export class McpResponse implements Response {
     this.#networkRequestsOptions = {
       include: value,
       pagination:
-        options?.pageSize !== undefined || options?.pageIdx !== undefined
+        options?.pageSize !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -263,7 +265,7 @@ export class McpResponse implements Response {
     this.#consoleDataOptions = {
       include: value,
       pagination:
-        options?.pageSize !== undefined || options?.pageIdx !== undefined
+        options?.pageSize !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -726,8 +728,7 @@ export class McpResponse implements Response {
         this.#networkRequestsOptions.resourceTypes,
       );
       requests = requests.filter(request => {
-        const type = request.resourceType();
-        return normalizedTypes.has(type);
+        return normalizedTypes.has(getFilterableResourceType(request));
       });
     }
 
@@ -893,6 +894,8 @@ export class McpResponse implements Response {
         insightName: string;
         insightKey: string | undefined;
       }>;
+      traceInsight?: string;
+      error?: string;
       lighthouseResult?: object;
       extensions?: object[];
       thirdPartyDeveloperTools?: object[];
@@ -1232,8 +1235,10 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       );
       if ('error' in insightOutput) {
         response.push(insightOutput.error);
+        structuredContent.error = insightOutput.error;
       } else {
         response.push(insightOutput.output);
+        structuredContent.traceInsight = insightOutput.output;
       }
     }
 
@@ -1867,10 +1872,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
   }
 }
 function truncateTitle(title: string, maxLength = 50): string {
-  if (title.length <= maxLength) {
-    return title;
-  }
-  return title.slice(0, maxLength - 3) + '...';
+  return truncateText(title, maxLength, {includeEllipsisInLength: true});
 }
 
 const collapseWhitespace = (value: string): string => {

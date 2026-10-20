@@ -64,9 +64,9 @@ export const startTrace = definePageTool(() => ({
       );
       return;
     }
-    context.setIsRunningPerformanceTrace(true);
-
     const page = request.page;
+    page.setIsRunningPerformanceTrace(true);
+
     const pageUrlForTracing = page.pptrPage.url();
 
     try {
@@ -134,7 +134,7 @@ export const startTrace = definePageTool(() => ({
         } catch {
           // Tracing may not have started yet; ignore.
         }
-        context.setIsRunningPerformanceTrace(false);
+        page.setIsRunningPerformanceTrace(false);
       }
       throw error;
     }
@@ -259,7 +259,7 @@ async function stopTracingAndAppendOutput(
       );
     }
   } finally {
-    context.setIsRunningPerformanceTrace(false);
+    page.setIsRunningPerformanceTrace(false);
   }
 }
 
