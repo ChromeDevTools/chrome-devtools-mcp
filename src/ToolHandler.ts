@@ -529,8 +529,21 @@ export class ToolHandler {
     } catch (err) {
       logger?.(`${tool.name} error:`, err, err?.stack);
       let errorText = err && 'message' in err ? err.message : String(err);
-      if ('cause' in err && err.cause) {
-        errorText += `\nCause: ${err.cause.message}`;
+      let cause: unknown =
+        err && typeof err === 'object' && 'cause' in err
+          ? err.cause
+          : undefined;
+      const seenCauses = new Set<unknown>([err]);
+      while (
+        cause &&
+        typeof cause === 'object' &&
+        !seenCauses.has(cause) &&
+        'message' in cause &&
+        typeof cause.message === 'string'
+      ) {
+        seenCauses.add(cause);
+        errorText += `\nCause: ${cause.message}`;
+        cause = 'cause' in cause ? cause.cause : undefined;
       }
       return errorResult(errorText);
     } finally {

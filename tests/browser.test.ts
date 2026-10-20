@@ -654,6 +654,37 @@ describe('browser', () => {
         sinon.assert.calledTwice(launchStub);
       });
     });
+
+    it('includes remote debugging hint and preserves cause when autoConnect fails without userDataDir', async () => {
+      const enoentError = Object.assign(
+        new Error(
+          "ENOENT: no such file or directory, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+        ),
+        {code: 'ENOENT'},
+      );
+      const puppeteerError = new Error(
+        'Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+        {cause: enoentError},
+      );
+      sinon.stub(puppeteer, 'connect').rejects(puppeteerError);
+
+      const manager = new BrowserManager(
+        createMockServerConfig({
+          autoConnect: true,
+          channel: 'stable',
+        }),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+        );
+        assert.strictEqual(err.cause, puppeteerError);
+        return true;
+      });
+    });
   });
 
   describe('rootSandboxLaunchError', () => {

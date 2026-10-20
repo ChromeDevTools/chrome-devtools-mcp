@@ -2358,4 +2358,59 @@ describe('ToolHandler', () => {
       assert.deepStrictEqual(result.structuredContent, {message: 'done'});
     });
   });
+
+  it('includes nested error causes in error output', async () => {
+    const config = parseConfig();
+    const tool: ToolDefinition = {
+      name: 'failing_connect_tool',
+      description: 'A tool whose ensureBrowser() fails with nested causes',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {},
+      handler: async () => undefined,
+    };
+
+    const rootCause = Object.assign(
+      new Error(
+        "EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+      ),
+      {code: 'EPERM'},
+    );
+    const puppeteerError = new Error(
+      'Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+      {cause: rootCause},
+    );
+    const connectError = new Error(
+      'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+      {cause: puppeteerError},
+    );
+
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.rejects(connectError);
+
+    const toolHandler = new ToolHandler(
+      tool,
+      config,
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({});
+    assert.strictEqual(result.isError, true);
+    const text =
+      result.content[0].type === 'text' ? result.content[0].text : '';
+    assert.strictEqual(
+      text,
+      [
+        'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+        'Cause: Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+        "Cause: EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+      ].join('\n'),
+    );
+  });
 });
