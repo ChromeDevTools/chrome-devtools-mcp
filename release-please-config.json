@@ -57,6 +57,16 @@
         },
         {
           "type": "json",
+          "path": ".kimi-code-plugin/plugin.json",
+          "jsonpath": "version"
+        },
+        {
+          "type": "json",
+          "path": ".kimi-code-plugin/plugin.json",
+          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
+        },
+        {
+          "type": "json",
           "path": "gemini-extension.json",
           "jsonpath": "version"
         },

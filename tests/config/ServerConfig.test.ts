@@ -155,6 +155,19 @@ describe('ServerConfig', () => {
       assert.strictEqual(args.categoryExtensions, undefined);
     });
 
+    it('locks slim=false and pageIdRouting=true for viaCli even when set in explicitArgs', () => {
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          slim: true,
+          pageIdRouting: false,
+        },
+        {env: {}},
+      );
+      assert.strictEqual(args.slim, false);
+      assert.strictEqual(args.pageIdRouting, true);
+    });
+
     it('turns off usage statistics in CI', () => {
       sinon.stub(console, 'error');
       const args = ServerConfig.applyDefaults(
@@ -226,6 +239,7 @@ describe('ServerConfig', () => {
           '--memoryDebugging',
           '--no-category-network',
           '--no-file-navigations',
+          '--blockedUrlPattern=https://example.com/*',
           '--slim',
         ]),
       ).resolved;
@@ -233,20 +247,41 @@ describe('ServerConfig', () => {
       assert.strictEqual(merged.memoryDebugging, true);
       assert.strictEqual(merged.categoryNetwork, false);
       assert.strictEqual(merged.fileNavigations, false);
+      assert.deepStrictEqual(merged.blockedUrlPattern, [
+        'https://example.com/*',
+      ]);
       assert.strictEqual(merged.slim, true);
+    });
+
+    it('switches between blockedUrlPattern and allowedUrlPattern across reloads', () => {
+      const withBlocked = parseConfig().mergeReloadable(
+        parseConfig(['--blockedUrlPattern=https://blocked.example.com/*']),
+      );
+      assert.deepStrictEqual(withBlocked.resolved.blockedUrlPattern, [
+        'https://blocked.example.com/*',
+      ]);
+      assert.strictEqual(withBlocked.resolved.allowedUrlPattern, undefined);
+
+      const withAllowed = withBlocked.mergeReloadable(
+        parseConfig(['--allowedUrlPattern=https://allowed.example.com/*']),
+      );
+      assert.strictEqual(withAllowed.resolved.blockedUrlPattern, undefined);
+      assert.deepStrictEqual(withAllowed.resolved.allowedUrlPattern, [
+        'https://allowed.example.com/*',
+      ]);
     });
 
     it('keeps restart-required options', () => {
       const merged = parseConfig().mergeReloadable(
         parseConfig([
           '--categoryExtensions',
-          '--blockedUrlPattern=https://example.com/*',
+          '--headless',
           '--experimentalDevtools',
         ]),
       ).resolved;
 
       assert.strictEqual(merged.categoryExtensions, undefined);
-      assert.strictEqual(merged.blockedUrlPattern, undefined);
+      assert.strictEqual(merged.headless, false);
       assert.strictEqual(merged.experimentalDevtools, false);
     });
 
@@ -348,6 +383,81 @@ describe('ServerConfig', () => {
       assert.strictEqual(readonlyView.resolved.slim, true);
       assert.strictEqual(readonlyView.resolved.memoryDebugging, true);
       assert.strictEqual(readonlyView.resolved.headless, true);
+    });
+  });
+
+  describe('ServerConfig.withFileArgs()', () => {
+    it('creates a new ServerConfig with updated fileArgs and preserved cliArgs', () => {
+      const initial = ServerConfig.create({
+        cliArgs: {headless: true},
+        fileArgs: {memoryDebugging: false},
+        configPath: '/tmp/cd4a.config.json',
+        env: {CI: 'true'},
+        suppressUsageStatisticsNotice: true,
+      });
+
+      const updated = initial.withFileArgs({memoryDebugging: true});
+
+      assert.strictEqual(updated.resolved.headless, true);
+      assert.strictEqual(updated.resolved.memoryDebugging, true);
+      assert.strictEqual(updated.resolved.usageStatistics, false);
+      assert.strictEqual(updated.configPath, '/tmp/cd4a.config.json');
+    });
+  });
+
+  describe('getRestartRequiredChanges', () => {
+    it('ignores reloadable option changes', () => {
+      const previous = parseConfig();
+      const next = parseConfig([
+        '--memoryDebugging',
+        '--no-category-network',
+        '--slim',
+      ]);
+
+      assert.deepStrictEqual(previous.getRestartRequiredChanges(next), []);
+    });
+
+    it('returns restart-required options that changed', () => {
+      const previous = parseConfig();
+      const next = parseConfig([
+        '--headless',
+        '--categoryExtensions',
+        '--memoryDebugging',
+      ]);
+
+      assert.deepStrictEqual(previous.getRestartRequiredChanges(next), [
+        'categoryExtensions',
+        'headless',
+      ]);
+    });
+
+    it('compares restart-required array and object options by value', () => {
+      const previous = parseConfig(['--chromeArg=--foo']);
+      const same = parseConfig(['--chromeArg=--foo']);
+      const changed = parseConfig(['--chromeArg=--bar']);
+
+      assert.deepStrictEqual(previous.getRestartRequiredChanges(same), []);
+      assert.deepStrictEqual(previous.getRestartRequiredChanges(changed), [
+        'chromeArg',
+      ]);
+    });
+
+    it('ignores restart-required options whose defaults are derived from other options', () => {
+      const previous = parseConfig(['--viaCli']);
+      const next = parseConfig([
+        '--viaCli',
+        '--browserUrl=http://127.0.0.1:9222',
+      ]);
+
+      assert.strictEqual(previous.resolved.categoryExtensions, true);
+      assert.strictEqual(next.resolved.categoryExtensions, undefined);
+      assert.strictEqual(previous.resolved.isolated, true);
+      assert.strictEqual(next.resolved.isolated, false);
+      assert.strictEqual(previous.resolved.channel, 'stable');
+      assert.strictEqual(next.resolved.channel, undefined);
+      assert.deepStrictEqual(previous.getRestartRequiredChanges(next), [
+        'browserUrl',
+      ]);
     });
   });
 });

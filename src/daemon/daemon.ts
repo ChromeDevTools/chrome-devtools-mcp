@@ -141,15 +141,19 @@ let server: Server | null = null;
 async function setupMCPServer(): Promise<void> {
   logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
   const configParser = new ConfigParser(VERSION);
-  const args = configParser.parse();
+  const serverConfig = configParser.parseConfig();
+  const args = serverConfig.resolved;
   const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
-  const browserManager = new BrowserManager(args, {
+  const browserManager = new BrowserManager(serverConfig, {
     logFile,
   });
-  mcpServer = await McpServer.from(args, {
+  mcpServer = await McpServer.from(serverConfig, {
     browserManager,
     logFile,
   });
+  if (args.watchConfig) {
+    mcpServer.watchConfig();
+  }
   ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
   void ClearcutLogger.get()?.logDailyActiveIfNeeded();
   void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));

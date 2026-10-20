@@ -15,10 +15,11 @@ import sinon from 'sinon';
 
 import type {McpContext} from '../src/McpContext.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
+import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 import {escapeForLog} from '../src/utils/logger.js';
 
-import {createMockPuppeteerBrowser} from './mocks.js';
+import {createMockPuppeteerBrowser, createMockServerConfig} from './mocks.js';
 import {
   createConnectedMcpContext,
   createTempDir,
@@ -173,9 +174,10 @@ describe('McpContext path validation escaping', () => {
     const browser = createMockPuppeteerBrowser();
     browser.targets.returns([]);
     return await createConnectedMcpContext(browser, {
-      experimentalDevToolsDebugging: false,
-      performanceCrux: false,
-      heapSnapshotManager: new HeapSnapshotManager(),
+      config: createMockServerConfig({
+        performanceCrux: false,
+      }),
+      heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
     });
   }
 

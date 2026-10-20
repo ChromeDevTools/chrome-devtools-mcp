@@ -58,6 +58,7 @@ third-party developer tools with additional functionality.`,
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (_request, response) => {
     response.setListThirdPartyDeveloperTools();
@@ -79,6 +80,7 @@ export const executeThirdPartyDeveloperTool = definePageTool(() => ({
       .describe('The JSON-stringified parameters to pass to the tool'),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const toolName = request.params.toolName;

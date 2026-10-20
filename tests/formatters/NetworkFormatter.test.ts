@@ -9,6 +9,8 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
 import type {HTTPRequest} from '../../src/third_party/index.js';
 import {createTempDir, getMockRequest, getMockResponse} from '../utils.js';
@@ -137,6 +139,23 @@ describe('NetworkFormatter', () => {
       );
       // The structured data keeps the full URL.
       assert.equal(formatter.toJSON().url, longUrl);
+    });
+
+    it('does not split a surrogate pair when truncating a url', async () => {
+      // 254 characters, then an emoji straddling the 255 code unit mark.
+      const prefix = `http://example.com/${'a'.repeat(235)}`;
+      const url = `${prefix}\u{1F600}${'b'.repeat(20)}`;
+      const request = getMockRequest({url});
+      const formatter = await NetworkFormatter.from(request, {
+        requestId: 1,
+        saveFile: async () => ({filename: ''}),
+        redactNetworkHeaders: false,
+      });
+
+      assert.equal(
+        formatter.toString(),
+        `reqid=1 GET ${prefix}... <truncated> [pending]`,
+      );
     });
 
     it('truncates data: urls', async () => {
@@ -447,6 +466,67 @@ describe('NetworkFormatter', () => {
       const result = formatter.toStringDetailed();
       assert.ok(result.includes(`Saved to ${reqPath}.`));
       assert.ok(result.includes(`Saved to ${resPath}.`));
+    });
+
+    it('stops waiting for a response body that never finishes loading', async () => {
+      const request = {
+        method: () => 'GET',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => false,
+        response: () => ({
+          status: () => 500,
+          headers: () => ({}),
+          buffer: () => new Promise<Buffer>(() => {}),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+      } as unknown as HTTPRequest;
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        responseBodyTimeout: 10,
+        redactNetworkHeaders: false,
+      });
+
+      assert.strictEqual(
+        formatter.toJSONDetailed().responseBody,
+        '<Response body not available: the response did not finish loading within 10 ms>',
+      );
+    });
+
+    it('does not save a response body that never finishes loading', async () => {
+      const request = {
+        method: () => 'GET',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => false,
+        response: () => ({
+          status: () => 500,
+          headers: () => ({}),
+          buffer: () => new Promise<Buffer>(() => {}),
+        }),
+        failure: () => null,
+        redirectChain: () => [],
+      } as unknown as HTTPRequest;
+      const resPath = '/tmp/never-written';
+      const saveFile = sinon.stub().resolves({filename: resPath});
+
+      const formatter = await NetworkFormatter.from(request, {
+        fetchData: true,
+        responseFilePath: resPath,
+        responseBodyTimeout: 10,
+        saveFile,
+        redactNetworkHeaders: false,
+      });
+
+      const json = formatter.toJSONDetailed();
+      sinon.assert.notCalled(saveFile);
+      assert.strictEqual(json.responseBodyFilePath, undefined);
+      assert.strictEqual(
+        json.responseBody,
+        '<Response body not available: the response did not finish loading within 10 ms>',
+      );
     });
 
     it('handles missing bodies with filepath', async () => {

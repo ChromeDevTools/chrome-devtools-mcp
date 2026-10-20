@@ -88,6 +88,7 @@ export const startScreencast = definePageTool((args: ParsedArguments) => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -175,6 +176,7 @@ export const stopScreencast = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

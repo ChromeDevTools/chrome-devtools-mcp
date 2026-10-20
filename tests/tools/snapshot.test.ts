@@ -44,11 +44,10 @@ describe('snapshot', () => {
         response,
         context,
       );
-      sinon.assert.calledOnceWithExactly(
-        page.waitForTextOnPage,
-        ['Hello'],
-        undefined,
-      );
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, ['Hello'], {
+        timeout: undefined,
+        visible: undefined,
+      });
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Element matching one of ["Hello"] found.',
@@ -66,13 +65,26 @@ describe('snapshot', () => {
       sinon.assert.calledOnceWithExactly(
         page.waitForTextOnPage,
         ['Complete', 'Error'],
-        5000,
+        {timeout: 5000, visible: undefined},
       );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Element matching one of ["Complete","Error"] found.',
       );
       sinon.assert.calledOnceWithExactly(response.includeSnapshot);
+    });
+
+    it('forwards visible:true to the page matcher', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await waitFor(args).handler(
+        {params: {text: ['Saved'], timeout: 2000, visible: true}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, ['Saved'], {
+        timeout: 2000,
+        visible: true,
+      });
     });
   });
 });
