@@ -334,7 +334,10 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getPageById(pageId: number): ContextPage;
-  newPage(background?: boolean, isolatedContextName?: string): Promise<McpPage>;
+  newPage(
+    background?: boolean,
+    isolatedContextName?: string,
+  ): Promise<ContextPage>;
   closePage(pageId: number): Promise<void>;
   selectPage(page: ContextPage): void;
   saveTemporaryFile(
@@ -439,6 +442,7 @@ export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
  * Only add methods used by tools/*.
  */
 export type ContextPage = Readonly<{
+  readonly id: number;
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
@@ -460,6 +464,7 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  isClosed(): boolean;
   getScreenRecorder(): ScreenRecorderData | null;
   setScreenRecorder(data: ScreenRecorderData | null): void;
   waitForEventsAfterAction(

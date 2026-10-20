@@ -5,7 +5,6 @@
  */
 
 import type {ParsedArguments} from '../config/ConfigParser.js';
-import type {McpPage} from '../McpPage.js';
 import type {CdpPage} from '../third_party/index.js';
 import {zod} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
@@ -18,6 +17,7 @@ import {
   defineTool,
   timeoutSchema,
 } from './ToolDefinition.js';
+import type {ContextPage} from './ToolDefinition.js';
 
 export const listPages = defineTool((args: ParsedArguments) => {
   return {
@@ -135,7 +135,7 @@ export const newPage = defineTool((args: ParsedArguments) => {
         fileNavigations: args?.fileNavigations,
       });
 
-      let previousPage: McpPage | undefined;
+      let previousPage: ContextPage | undefined;
       try {
         previousPage = context.getSelectedMcpPage();
       } catch {
