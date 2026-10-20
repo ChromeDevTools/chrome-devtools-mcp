@@ -12,6 +12,7 @@ import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
 
+import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
@@ -44,9 +45,17 @@ describe('ToolHandler', () => {
   });
 
   function parseConfig(argv: string[] = []) {
-    return new ConfigParser('1.0.0', ['node', 'script.js', ...argv], {
-      CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
-    }).parseConfig();
+    const locator = new ConfigLocator();
+    sinon.stub(locator, 'locate').returns(undefined);
+    return new ConfigParser(
+      '1.0.0',
+      ['node', 'script.js', ...argv],
+      {
+        CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true',
+      },
+      false,
+      locator,
+    ).parseConfig();
   }
 
   it('calls getPageById for page scoped tools when pageId is provided', async () => {

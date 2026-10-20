@@ -11,7 +11,6 @@ import {describe, it} from 'node:test';
 import type {Dialog} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {ConfigParser} from '../../src/config/ConfigParser.js';
 import {
   listPages,
   newPage,
@@ -1204,11 +1203,9 @@ describe('pages', () => {
       const defaultTool = navigatePage(createMockParsedArguments());
       assert.strictEqual('initScript' in defaultTool.schema, true);
 
-      const disabledArgs = new ConfigParser(
-        '1.0.0',
-        ['node', 'script.js', '--no-javascript-evaluation'],
-        {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-      ).parse();
+      const disabledArgs = createMockParsedArguments({
+        javascriptEvaluation: false,
+      });
       const disabledTool = navigatePage(disabledArgs);
       assert.strictEqual('initScript' in disabledTool.schema, false);
     });
