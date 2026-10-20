@@ -182,6 +182,10 @@ export async function createTargetUniverse(
   );
   skipAllPausesSetting.set(true);
 
+  // Route resource loads through host bindings so URL allowlist and blocklist
+  // rules are enforced.
+  universe.pageResourceLoader.getLoadThroughTargetSetting().set(false);
+
   // @ts-expect-error devtools-frontend has diffrent types.
   const connection = new DevTools.PuppeteerDevToolsConnection(session);
 
