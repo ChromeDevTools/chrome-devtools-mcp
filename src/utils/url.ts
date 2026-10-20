@@ -257,10 +257,11 @@ export function validateUrl(url: string, options: ValidateUrlOptions): URL {
     );
   }
 
-  if (
-    parsed.protocol === 'devtools:' ||
-    !isAllowedUrl(url, {categoryExtensions})
-  ) {
+  if (parsed.protocol === 'devtools:') {
+    throw new Error(`Navigating to devtools: URLs is not allowed.`);
+  }
+
+  if (!isAllowedUrl(url, {categoryExtensions})) {
     if (parsed.protocol === 'chrome-extension:') {
       throw new Error(
         `Navigating to chrome-extension: URLs is not allowed without --categoryExtensions.`,
