@@ -91,6 +91,19 @@ describe('mcp-options steps', () => {
         /Header "Authorization" must have a string value/,
       );
     });
+
+    it('rejects config, help, and version keys inside a config file', () => {
+      for (const forbiddenKey of ['config', 'help', 'version']) {
+        using configFile = createTempFile(
+          JSON.stringify({[forbiddenKey]: true}),
+          `cd4a.forbidden.${forbiddenKey}.json`,
+        );
+        assert.throws(
+          () => parser.parseConfigFile(configFile.path),
+          new RegExp(`Invalid JSON config file: .*${forbiddenKey}`),
+        );
+      }
+    });
   });
 
   describe('config discovery', () => {

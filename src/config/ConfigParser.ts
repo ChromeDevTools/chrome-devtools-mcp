@@ -96,12 +96,16 @@ export class ConfigParser {
       if (!isPlainObject(fileContent)) {
         throw new Error('Config must be a JSON object');
       }
+      const configOptions = withoutDefaults(mcpOptions);
+      delete configOptions.config;
       const parsed = yargs([])
         .parserConfiguration({
           'strip-aliased': true,
           'camel-case-expansion': false,
         })
-        .options(withoutDefaults(mcpOptions))
+        .options(configOptions)
+        .help(false)
+        .version(false)
         .config(fileContent)
         .strict()
         .fail(false)
