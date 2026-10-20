@@ -163,7 +163,7 @@ Example with arguments: \`(el) => el.innerText\`
         cliArgs.pageIdRouting && request.params.pageId
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
-      await mcpPage.init();
+      await mcpPage.init({emulateFocus: true});
       // evaluate_script is not page-scoped, so ToolHandler does not run the
       // blockedByDialog check for it. Without this, an evaluation started
       // while a dialog is open waits until the protocol timeout.

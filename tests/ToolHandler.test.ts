@@ -87,7 +87,7 @@ describe('ToolHandler', () => {
     await toolHandler.handle({pageId: 1});
 
     sinon.assert.calledOnceWithExactly(mockContext.getPageById, 1);
-    sinon.assert.calledOnceWithExactly(mockPage.init);
+    sinon.assert.calledOnceWithExactly(mockPage.init, {emulateFocus: true});
     assert.strictEqual(handlerCalled, true);
   });
 
@@ -129,7 +129,7 @@ describe('ToolHandler', () => {
     await toolHandler.handle({});
 
     sinon.assert.calledOnceWithExactly(mockContext.getSelectedMcpPage);
-    sinon.assert.calledOnceWithExactly(mockPage.init);
+    sinon.assert.calledOnceWithExactly(mockPage.init, {emulateFocus: true});
     assert.strictEqual(handlerCalled, true);
   });
 

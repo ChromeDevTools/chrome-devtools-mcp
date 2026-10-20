@@ -462,24 +462,28 @@ describe('McpPage', () => {
       sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
     });
 
-    it('allows initialization when the focus request fails', async () => {
+    it('retries a failed focus request and retains successful emulation', async () => {
       const {mcpPage, pptrPage} = createPage();
-      pptrPage.emulateFocusedPage.rejects(new Error('Target closed'));
+      pptrPage.emulateFocusedPage
+        .onFirstCall()
+        .rejects(new Error('Target closed'));
 
+      await mcpPage.init();
       await mcpPage.init();
       await mcpPage.init();
 
       assert.strictEqual(mcpPage.pptrPage, pptrPage);
-      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      sinon.assert.calledTwice(pptrPage.emulateFocusedPage);
+      sinon.assert.alwaysCalledWithExactly(pptrPage.emulateFocusedPage, true);
     });
 
-    it('does not wait for a pending focus request', async () => {
+    it('does not wait for or duplicate a pending focus request', async () => {
       const {mcpPage, pptrPage} = createPage();
       const focus = Promise.withResolvers<void>();
       pptrPage.emulateFocusedPage.returns(focus.promise);
 
       try {
-        await mcpPage.init();
+        await Promise.all([mcpPage.init(), mcpPage.init()]);
         sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
       } finally {
         focus.resolve();

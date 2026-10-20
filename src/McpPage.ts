@@ -309,6 +309,7 @@ export class McpPage implements ContextPage {
       !this.#disposed &&
       !this.#focusEmulationRequested
     ) {
+      // Prevent duplicate requests while pending and after success.
       this.#focusEmulationRequested = true;
       this.#initFocusEmulationNoThrow();
     }
@@ -352,6 +353,8 @@ export class McpPage implements ContextPage {
   #initFocusEmulationNoThrow(): void {
     // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      // Allow the next page operation to retry a transient failure.
+      this.#focusEmulationRequested = false;
       logger?.('Error turning on focused page emulation', error);
     });
   }

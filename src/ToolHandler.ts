@@ -387,7 +387,7 @@ export class ToolHandler {
           serverArgs.pageIdRouting && pageId !== undefined && !isSlimTool(tool)
             ? context.getPageById(pageId)
             : context.getSelectedMcpPage();
-        await page?.init();
+        await page?.init({emulateFocus: true});
         response.setPage(page);
         if (tool.blockedByDialog) {
           page.throwIfDialogOpen();

@@ -771,7 +771,7 @@ describe('pages', () => {
 
       await selectPage(args).handler({params: {pageId: 1}}, response, context);
 
-      sinon.assert.calledOnceWithExactly(page.init);
+      sinon.assert.calledOnceWithExactly(page.init, {emulateFocus: true});
       sinon.assert.calledOnceWithExactly(context.selectPage, page);
       sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
       sinon.assert.calledOnceWithExactly(
