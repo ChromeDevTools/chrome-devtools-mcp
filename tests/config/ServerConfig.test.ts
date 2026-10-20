@@ -155,6 +155,19 @@ describe('ServerConfig', () => {
       assert.strictEqual(args.categoryExtensions, undefined);
     });
 
+    it('locks slim=false and pageIdRouting=true for viaCli even when set in explicitArgs', () => {
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          slim: true,
+          pageIdRouting: false,
+        },
+        {env: {}},
+      );
+      assert.strictEqual(args.slim, false);
+      assert.strictEqual(args.pageIdRouting, true);
+    });
+
     it('turns off usage statistics in CI', () => {
       sinon.stub(console, 'error');
       const args = ServerConfig.applyDefaults(

@@ -202,6 +202,8 @@ export class ServerConfig implements ReadonlyServerConfig {
     }
 
     if (isViaCli) {
+      resolvedArgs.slim = false;
+      resolvedArgs.pageIdRouting = true;
       if (
         resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
         explicitArgs.allowUnrestrictedPaths !== false
