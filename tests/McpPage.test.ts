@@ -689,7 +689,7 @@ describe('McpPage', () => {
       });
     });
 
-    it('calls setGeolocation with (0, 0) when geolocation is omitted', async () => {
+    it('clears the geolocation override when geolocation is omitted', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         geolocation: {latitude: 48.137154, longitude: 11.576124},
@@ -697,10 +697,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.geolocation, null);
       sinon.assert.calledTwice(pptrPage.setGeolocation);
-      sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, {
-        latitude: 0,
-        longitude: 0,
-      });
+      sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, null);
     });
 
     it('calls setUserAgent with the given user agent', async () => {

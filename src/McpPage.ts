@@ -1240,7 +1240,7 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
+      await page.setGeolocation(null);
       delete newSettings.geolocation;
     } else {
       await page.setGeolocation(options.geolocation);
