@@ -368,6 +368,7 @@ export type Context = Readonly<{
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
   getPageById(pageId: number): ContextPage;
+  getPages(): ContextPage[];
   newPage(
     background?: boolean,
     isolatedContextName?: string,
@@ -501,6 +502,7 @@ export type ContextPage = Readonly<{
   isClosed(): boolean;
   getScreenRecorder(): ScreenRecorderData | null;
   setScreenRecorder(data: ScreenRecorderData | null): void;
+  isRunningPerformanceTrace(): boolean;
   setIsRunningPerformanceTrace(x: boolean): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,

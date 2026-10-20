@@ -550,6 +550,7 @@ export function createMockMcpContext(
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
+  context.getPages.returns([page]);
   context.getTargetInfos.resolves(new Map());
   // Real queues, so handler tests observe the real scheduling.
   const taskRunner = options.taskRunner ?? new TaskRunner();
