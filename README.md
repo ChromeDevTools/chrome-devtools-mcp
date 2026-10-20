@@ -8,7 +8,7 @@ control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
 Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
 A [CLI][cli] is also provided for use without MCP.
 
-[Tool reference][tool-reference] | [Changelog][changelog] | [Contributing][contributing] | [Troubleshooting][troubleshooting] | [Design Principles][design-principles]
+[Tool reference][tool-reference] | [CLI][cli] | [Changelog][changelog] | [Contributing][contributing] | [Troubleshooting][troubleshooting] | [Design Principles][design-principles]
 
 ## Key features
 
@@ -83,21 +83,6 @@ Add the following config to your MCP client:
 > [!NOTE]
 > Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
-If you are interested in doing only basic browser tasks, use the `--slim` mode:
-
-```json
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--slim", "--headless"]
-    }
-  }
-}
-```
-
-See [Slim tool reference][slim-tool-reference].
-
 ### MCP Client configuration
 
 For setup instructions specific to your editor or agent (e.g. Antigravity, Claude Code, Cursor, VS Code), please see our [Client Configurations Guide][client-configurations-guide].
@@ -115,6 +100,19 @@ Your MCP client should open the browser and record a performance trace.
 > [!NOTE]
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
 
+## CLI
+
+The package also includes the `chrome-devtools` CLI. Use it to control the browser from your terminal without MCP:
+
+```sh
+npm i chrome-devtools-mcp@latest -g
+chrome-devtools navigate_page 1 --url "https://developers.chrome.com"
+chrome-devtools take_screenshot 1 --filePath screenshot.png
+chrome-devtools stop
+```
+
+See the [CLI guide][cli] for all commands and options.
+
 ## Tools
 
 If you run into any issues, checkout our [troubleshooting guide][troubleshooting].
@@ -123,6 +121,8 @@ See the full [Tool Reference][tool-reference] for a complete list of all support
 ## Configuration
 
 Find the complete list of server parameters (e.g., `--headless`, `--isolated`, `--slim`) and how to configure WebSocket connections in the [Configuration Guide][configuration-guide].
+
+For basic browser tasks only, the `--slim` flag exposes a reduced set of tools. See the [Slim tool reference][slim-tool-reference].
 
 ## Advanced Usage
 
