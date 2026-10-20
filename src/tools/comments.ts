@@ -69,8 +69,9 @@ export const getDevtoolsComments = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
-  // The handler waits for comment events. Other tools run during the wait.
-  yieldsToolLock: true,
+  // The handler only reads page state and waits for comment events, so it
+  // runs outside the task runner and other tools run during the wait.
+  concurrency: 'none',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

@@ -35,6 +35,7 @@ import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {McpWorker, type WorkerType} from '../src/McpWorker.js';
+import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
 import type {
   DuplicateStringGroup,
   HeapSnapshotAggregate,
@@ -435,12 +436,16 @@ export function createMockPuppeteerTarget(
 
 export function createMockMcpPage(
   options: {
+    id?: number;
     pptrPage?: MockPuppeteerPage;
     target?: sinon.SinonStubbedInstance<MockTarget>;
   } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   page.emulationSettings = {};
+  if (options.id !== undefined) {
+    Object.defineProperty(page, 'id', {value: options.id});
+  }
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
@@ -539,12 +544,25 @@ export function createMockMcpWorker(
 }
 
 export function createMockMcpContext(
-  options: {selectedPage?: MockMcpPage} = {},
+  options: {selectedPage?: MockMcpPage; taskRunner?: TaskRunner} = {},
 ): MockMcpContext {
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
   context.getTargetInfos.resolves(new Map());
+  // Real queues, so handler tests observe the real scheduling.
+  const taskRunner = options.taskRunner ?? new TaskRunner();
+  const taskQueue = taskRunner.createQueue();
+  Object.defineProperty(context, 'taskQueue', {value: taskQueue});
+  const pageTaskQueues = new Map<number, TaskQueue>();
+  context.pageTaskQueue.callsFake(pageId => {
+    let queue = pageTaskQueues.get(pageId);
+    if (!queue) {
+      queue = taskRunner.createQueue(taskQueue);
+      pageTaskQueues.set(pageId, queue);
+    }
+    return queue;
+  });
 
   return context;
 }

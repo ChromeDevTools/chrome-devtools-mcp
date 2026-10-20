@@ -34,6 +34,7 @@ import {isDaemonRunning} from '../src/daemon/utils.js';
 import {McpContext, type McpContextOptions} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
+import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {DevTools} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
@@ -177,12 +178,18 @@ export async function withBrowser(
  */
 export async function createConnectedMcpContext(
   browser: Browser,
-  options: Omit<McpContextOptions, 'getBrowser'>,
+  options: Omit<McpContextOptions, 'getBrowser' | 'taskRunner'> & {
+    taskRunner?: TaskRunner;
+  },
   locatorClass?: typeof Locator,
 ): Promise<McpContext> {
   const context = McpContext.create(
     undefined,
-    {...options, getBrowser: async () => browser},
+    {
+      taskRunner: new TaskRunner(),
+      ...options,
+      getBrowser: async () => browser,
+    },
     locatorClass,
   );
   await context.ensureBrowser();
@@ -225,7 +232,7 @@ export async function withMcpContext(
       }),
     });
     const response = new McpResponse(parsedArgs);
-    const heapSnapshotManager = new HeapSnapshotManager();
+    const heapSnapshotManager = new HeapSnapshotManager(new TaskRunner());
     if (context) {
       context.dispose();
     }

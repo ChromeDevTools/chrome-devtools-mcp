@@ -78,6 +78,24 @@ export type FileVerificationOption =
 
 type AllKeys<T> = T extends unknown ? keyof T : never;
 
+/**
+ * Which task queue `ToolHandler` runs a tool call on. A task on a queue
+ * waits for tasks on the same queue, on its parent, and on its children.
+ *
+ * - `'exclusive'`: the context queue, for the whole call. No other browser
+ *   tool runs at the same time. This is the default.
+ * - `'page'`: the queue of the page named by `pageId`, a child of the
+ *   context queue. Tools on different pages run at the same time; tools on
+ *   one page and `'exclusive'` tools wait. Without page id routing the call
+ *   runs on the context queue. Only for page-scoped tools whose handler
+ *   touches the target page and no browser-global state.
+ * - `'none'`: no queue. The tool runs at the same time as any other tool.
+ *   For browserless tools, whose data guards itself (see
+ *   `HeapSnapshotManager`), and for page tools that only read page state
+ *   and wait for external events.
+ */
+export type ToolConcurrency = 'exclusive' | 'page' | 'none';
+
 type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
   ? K extends keyof Schema
     ? Exclude<Schema[K], undefined>
@@ -119,12 +137,10 @@ export interface BaseToolDefinition<
   schema: Schema;
   blockedByDialog: boolean;
   /**
-   * When true, the handler runs without the server tool lock, so other tool
-   * calls proceed while this handler waits. Page lookup before the handler
-   * and response formatting after it still run under the lock. Only set
-   * this for tools that wait for external events.
+   * Which queues the server holds while the tool runs. Defaults to
+   * `'exclusive'`. See {@link ToolConcurrency}.
    */
-  yieldsToolLock?: boolean;
+  concurrency?: ToolConcurrency;
   verifyFilesSchema: Partial<
     Record<keyof MergeSchema<Schema>, FileVerificationOption>
   >;
@@ -139,6 +155,11 @@ export interface ToolDefinition<
    * non-page tool must handle dialogs itself.
    */
   blockedByDialog: false;
+  /**
+   * A non-page tool has no target page, so it cannot take the page queue. It
+   * touches browser state, so it always runs in a queue.
+   */
+  concurrency?: Exclude<ToolConcurrency, 'page' | 'none'>;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -525,6 +546,11 @@ export function defineTool<Schema extends zod.ZodRawShape>(
 interface PageToolDefinition<
   Schema extends zod.ZodRawShape = zod.ZodRawShape,
 > extends BaseToolDefinition<Schema> {
+  /**
+   * A page tool with `'none'` must only read page state. Its page lookup and
+   * response formatting run at the same time as other tools on the page.
+   */
+  concurrency?: ToolConcurrency;
   handler(
     request: Request<Schema> & {page: ContextPage},
     response: Response,
@@ -563,6 +589,10 @@ export interface BrowserlessToolDefinition<
    * dialogs.
    */
   blockedByDialog: false;
+  /**
+   * A browserless tool has no page.
+   */
+  concurrency?: Exclude<ToolConcurrency, 'page'>;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -573,6 +603,8 @@ export interface BrowserlessToolDefinition<
 /**
  * Defines a tool that does not need a browser connection, e.g. a tool that only
  * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ * Such a tool runs without the context queue (`concurrency: 'none'`) unless
+ * the definition sets another value.
  */
 export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
   definition: (
@@ -581,6 +613,7 @@ export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
 ): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
   return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
     return {
+      concurrency: 'none',
       ...definition(args),
       browserless: true,
     };

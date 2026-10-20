@@ -13,12 +13,11 @@ import {pathToFileURL} from 'node:url';
 import sinon from 'sinon';
 
 import {ConfigParser} from '../src/config/ConfigParser.js';
-import {McpContext} from '../src/McpContext.js';
+import type {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import {
-  Mutex,
   ProtocolError,
   ProtocolErrorCode,
   zod,
@@ -28,6 +27,7 @@ import {ToolCategory} from '../src/tools/categories.js';
 import {
   defineBrowserlessTool,
   definePageTool,
+  type AnyToolDefinition,
   type BrowserlessToolDefinition,
   type DefinedPageTool,
   type DevToolsData,
@@ -35,10 +35,16 @@ import {
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
-import {createMockMcpContext} from './mocks.js';
+import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
+import {createMockMcpContext, createMockMcpPage} from './mocks.js';
 import {getMockBrowser, withMcpContext} from './utils.js';
 
 describe('ToolHandler', () => {
+  /** Runs `fn` as a task on `queue`. */
+  async function runOn(queue: TaskQueue, fn: () => Promise<void>) {
+    using guard = await queue.scheduleTask();
+    await fn();
+  }
   afterEach(() => {
     ClearcutLogger.resetForTesting();
   });
@@ -67,19 +73,16 @@ describe('ToolHandler', () => {
       },
     }))(config.resolved);
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getPageById.returns(mockPage);
 
-    const toolMutex = new Mutex();
-
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -109,19 +112,16 @@ describe('ToolHandler', () => {
       },
     }))(config.resolved);
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     const mockPage = sinon.createStubInstance(McpPage);
     mockContext.getSelectedMcpPage.returns(mockPage);
 
-    const toolMutex = new Mutex();
-
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -150,18 +150,16 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -175,10 +173,13 @@ describe('ToolHandler', () => {
     assert.strictEqual(result.isError, undefined);
   });
 
-  describe('yieldsToolLock', () => {
+  describe("concurrency: 'exclusive'", () => {
     function createGlobalTool(
       handler: ToolDefinition['handler'],
-      options: {name?: string; yieldsToolLock?: boolean} = {},
+      options: {
+        name?: string;
+        concurrency?: ToolDefinition['concurrency'];
+      } = {},
     ): ToolDefinition {
       return {
         name: options.name ?? 'global_tool',
@@ -189,69 +190,32 @@ describe('ToolHandler', () => {
         },
         schema: {},
         blockedByDialog: false,
-        yieldsToolLock: options.yieldsToolLock,
+        concurrency: options.concurrency,
         verifyFilesSchema: {},
         handler,
       };
     }
 
-    function createHandler(tool: ToolDefinition, toolMutex: Mutex) {
-      const mockContext = sinon.createStubInstance(McpContext);
+    function createContext() {
+      const mockContext = createMockMcpContext();
       const mockProcess = sinon.createStubInstance(ChildProcess);
       mockContext.ensureBrowser.resolves(
         getMockBrowser({process: mockProcess}),
       );
+      return mockContext;
+    }
+
+    function createHandler(tool: AnyToolDefinition, mockContext: McpContext) {
       return new ToolHandler(
         tool,
         parseConfig(),
         async () => mockContext,
-        toolMutex,
         sinon.spy(),
       );
     }
 
-    it('lets another tool run while a yielding tool waits', async () => {
-      const toolMutex = new Mutex();
-      const events: string[] = [];
-      const {promise: release, resolve: finishWait} =
-        Promise.withResolvers<void>();
-
-      const waitingTool = createGlobalTool(
-        async () => {
-          events.push('waiting:start');
-          await release;
-          events.push('waiting:end');
-        },
-        {name: 'waiting_tool', yieldsToolLock: true},
-      );
-      const otherTool = createGlobalTool(
-        async () => {
-          events.push('other:run');
-        },
-        {name: 'other_tool'},
-      );
-
-      const waitingHandler = createHandler(waitingTool, toolMutex);
-      const otherHandler = createHandler(otherTool, toolMutex);
-
-      const waitingResult = waitingHandler.handle({});
-      // Let the waiting tool enter its handler before the other tool is
-      // called.
-      await new Promise(resolve => setImmediate(resolve));
-      const otherResult = await otherHandler.handle({});
-      finishWait();
-      await waitingResult;
-
-      assert.deepStrictEqual(events, [
-        'waiting:start',
-        'other:run',
-        'waiting:end',
-      ]);
-      assert.strictEqual(otherResult.isError, undefined);
-    });
-
-    it('holds the lock for tools that do not yield', async () => {
-      const toolMutex = new Mutex();
+    it('serializes exclusive tools', async () => {
+      const mockContext = createContext();
       const events: string[] = [];
       const {promise: release, resolve: finishWait} =
         Promise.withResolvers<void>();
@@ -271,8 +235,8 @@ describe('ToolHandler', () => {
         {name: 'other_tool'},
       );
 
-      const blockingHandler = createHandler(blockingTool, toolMutex);
-      const otherHandler = createHandler(otherTool, toolMutex);
+      const blockingHandler = createHandler(blockingTool, mockContext);
+      const otherHandler = createHandler(otherTool, mockContext);
 
       const blockingResult = blockingHandler.handle({});
       await new Promise(resolve => setImmediate(resolve));
@@ -288,66 +252,408 @@ describe('ToolHandler', () => {
       ]);
     });
 
-    it('builds the response only after a queued tool releases the lock', async () => {
-      const toolMutex = new Mutex();
+    it('runs a none page tool while an exclusive tool holds the context queue', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createContext();
       const events: string[] = [];
-      const {promise: otherBlocked, resolve: unblockOther} =
+      const {promise: release, resolve: finishBlocking} =
         Promise.withResolvers<void>();
 
-      const waitingTool = createGlobalTool(
+      const blockingTool = createGlobalTool(
         async () => {
-          await new Promise(resolve => setImmediate(resolve));
-          events.push('waiting:handler-done');
+          events.push('blocking:start');
+          await release;
+          events.push('blocking:end');
         },
-        {name: 'waiting_tool', yieldsToolLock: true},
+        {name: 'blocking_tool'},
       );
-      const otherTool = createGlobalTool(
-        async () => {
-          events.push('other:start');
-          await otherBlocked;
-          events.push('other:end');
+      const waitingTool = definePageTool(() => ({
+        name: 'waiting_tool',
+        description: 'A page tool that waits for events',
+        annotations: {
+          category: ToolCategory.DEBUGGING,
+          readOnlyHint: true,
         },
-        {name: 'other_tool'},
+        schema: {},
+        blockedByDialog: false,
+        concurrency: 'none',
+        verifyFilesSchema: {},
+        handler: async () => {
+          events.push('waiting:run');
+        },
+      }))(parseConfig().resolved);
+
+      const blockingResult = createHandler(blockingTool, mockContext).handle(
+        {},
       );
+      await new Promise(resolve => setImmediate(resolve));
+      const waitingResult = await createHandler(
+        waitingTool,
+        mockContext,
+      ).handle({pageId: 1});
+      finishBlocking();
+      await blockingResult;
 
-      const waitingHandler = createHandler(waitingTool, toolMutex);
-      const otherHandler = createHandler(otherTool, toolMutex);
+      assert.strictEqual(waitingResult.isError, undefined);
+      assert.deepStrictEqual(events, [
+        'blocking:start',
+        'waiting:run',
+        'blocking:end',
+      ]);
+    });
+  });
 
-      const waitingResult = waitingHandler.handle({}).then(result => {
-        events.push('waiting:result');
-        return result;
+  describe("concurrency: 'page'", () => {
+    function createPageTool(
+      name: string,
+      handler: () => Promise<void>,
+      options: {
+        concurrency?: DefinedPageTool['concurrency'];
+        argv?: string[];
+      } = {},
+    ): DefinedPageTool {
+      return definePageTool(() => ({
+        name,
+        description: 'A page tool',
+        annotations: {
+          category: ToolCategory.INPUT,
+          readOnlyHint: false,
+        },
+        schema: {},
+        blockedByDialog: false,
+        concurrency: options.concurrency ?? 'page',
+        verifyFilesSchema: {},
+        handler,
+      }))(parseConfig(options.argv).resolved);
+    }
+
+    function createExclusiveTool(
+      name: string,
+      handler: () => Promise<void>,
+    ): ToolDefinition {
+      return {
+        name,
+        description: 'A global tool',
+        annotations: {
+          category: ToolCategory.NAVIGATION,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler,
+      };
+    }
+
+    function createPages(ids: number[]) {
+      const mockContext = createMockMcpContext();
+      const mockProcess = sinon.createStubInstance(ChildProcess);
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({process: mockProcess}),
+      );
+      const pages = new Map(ids.map(id => [id, createMockMcpPage({id})]));
+      mockContext.getPageById.callsFake(id => {
+        const page = pages.get(id);
+        assert.ok(page);
+        return page;
       });
+      return mockContext;
+    }
+
+    function createHandler(tool: AnyToolDefinition, mockContext: McpContext) {
+      return new ToolHandler(
+        tool,
+        parseConfig(),
+        async () => mockContext,
+        sinon.spy(),
+      );
+    }
+
+    async function settle() {
       await new Promise(resolve => setImmediate(resolve));
-      const otherResult = otherHandler.handle({});
-      await new Promise(resolve => setImmediate(resolve));
-      await new Promise(resolve => setImmediate(resolve));
-      unblockOther();
-      await Promise.all([waitingResult, otherResult]);
+    }
+
+    it('runs page tools on different pages at the same time', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([1, 2]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
+
+      const first = createHandler(
+        createPageTool('first', async () => {
+          events.push('first:start');
+          await release;
+          events.push('first:end');
+        }),
+        mockContext,
+      );
+      const second = createHandler(
+        createPageTool('second', async () => {
+          events.push('second:run');
+        }),
+        mockContext,
+      );
+
+      const firstResult = first.handle({pageId: 1});
+      await settle();
+      await second.handle({pageId: 2});
+      finishFirst();
+      await firstResult;
 
       assert.deepStrictEqual(events, [
-        'other:start',
-        'waiting:handler-done',
-        'other:end',
-        'waiting:result',
+        'first:start',
+        'second:run',
+        'first:end',
       ]);
     });
 
-    it('re-acquires the lock when a yielding handler throws', async () => {
-      const toolMutex = new Mutex();
-      const tool = createGlobalTool(
-        async () => {
-          throw new Error('handler failed');
-        },
-        {yieldsToolLock: true},
-      );
-      const handler = createHandler(tool, toolMutex);
+    it('serializes page tools on the same page', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([1]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
 
-      const result = await handler.handle({});
+      const first = createHandler(
+        createPageTool('first', async () => {
+          events.push('first:start');
+          await release;
+          events.push('first:end');
+        }),
+        mockContext,
+      );
+      const second = createHandler(
+        createPageTool('second', async () => {
+          events.push('second:run');
+        }),
+        mockContext,
+      );
+
+      const firstResult = first.handle({pageId: 1});
+      await settle();
+      const secondResult = second.handle({pageId: 1});
+      await settle();
+      assert.deepStrictEqual(events, ['first:start']);
+
+      finishFirst();
+      await Promise.all([firstResult, secondResult]);
+      assert.deepStrictEqual(events, [
+        'first:start',
+        'first:end',
+        'second:run',
+      ]);
+    });
+
+    it('queues an exclusive tool behind running page tools in FIFO order', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([1, 2]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
+
+      const pageTool = createHandler(
+        createPageTool('page_tool', async () => {
+          events.push('page:start');
+          await release;
+          events.push('page:end');
+        }),
+        mockContext,
+      );
+      const exclusiveTool = createHandler(
+        createExclusiveTool('exclusive_tool', async () => {
+          events.push('exclusive:run');
+        }),
+        mockContext,
+      );
+      const latePageTool = createHandler(
+        createPageTool('late_page_tool', async () => {
+          events.push('late:run');
+        }),
+        mockContext,
+      );
+
+      const pageResult = pageTool.handle({pageId: 1});
+      await settle();
+      const exclusiveResult = exclusiveTool.handle({});
+      await settle();
+      // Targets another page, but waits behind the queued exclusive tool.
+      const lateResult = latePageTool.handle({pageId: 2});
+      await settle();
+      assert.deepStrictEqual(events, ['page:start']);
+
+      finishFirst();
+      await Promise.all([pageResult, exclusiveResult, lateResult]);
+      assert.deepStrictEqual(events, [
+        'page:start',
+        'page:end',
+        'exclusive:run',
+        'late:run',
+      ]);
+    });
+
+    it('holds the page queue until the response is built', async () => {
+      const {promise: responseReady, resolve: finishResponse} =
+        Promise.withResolvers<void>();
+      const handleStub = sinon.stub(McpResponse.prototype, 'handle');
+      handleStub.onFirstCall().callsFake(async () => {
+        await responseReady;
+        return {content: [], structuredContent: {}};
+      });
+      handleStub.resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([1]);
+      const events: string[] = [];
+
+      const first = createHandler(
+        createPageTool('first', async () => {
+          events.push('first:run');
+        }),
+        mockContext,
+      );
+      const second = createHandler(
+        createPageTool('second', async () => {
+          events.push('second:run');
+        }),
+        mockContext,
+      );
+
+      const firstResult = first.handle({pageId: 1});
+      await settle();
+      const secondResult = second.handle({pageId: 1});
+      await settle();
+      assert.deepStrictEqual(events, ['first:run']);
+
+      finishResponse();
+      await Promise.all([firstResult, secondResult]);
+      assert.deepStrictEqual(events, ['first:run', 'second:run']);
+    });
+
+    it('runs the call on the page queue', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([7]);
+      const events: string[] = [];
+      const {promise: release, resolve: finishHandler} =
+        Promise.withResolvers<void>();
+
+      const result = createHandler(
+        createPageTool('page_tool', async () => {
+          events.push('handler:start');
+          await release;
+          events.push('handler:end');
+        }),
+        mockContext,
+      ).handle({pageId: 7});
+      await settle();
+      const pageTask = runOn(mockContext.pageTaskQueue(7), async () => {
+        events.push('page-task');
+      });
+      const contextTask = runOn(mockContext.taskQueue, async () => {
+        events.push('context-task');
+      });
+      await settle();
+      assert.deepStrictEqual(events, ['handler:start']);
+
+      finishHandler();
+      await Promise.all([result, pageTask, contextTask]);
+      assert.deepStrictEqual(events, [
+        'handler:start',
+        'handler:end',
+        'page-task',
+        'context-task',
+      ]);
+    });
+
+    it('runs a page tool without pageId on the context queue', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const argv = ['--no-page-id-routing'];
+      const mockContext = createPages([]);
+      const {promise: release, resolve: finishHandler} =
+        Promise.withResolvers<void>();
+
+      const result = new ToolHandler(
+        createPageTool(
+          'page_tool',
+          async () => {
+            await release;
+          },
+          {argv},
+        ),
+        parseConfig(argv),
+        async () => mockContext,
+        sinon.spy(),
+      ).handle({});
+      await settle();
+      let contextTaskRan = false;
+      const contextTask = runOn(mockContext.taskQueue, async () => {
+        contextTaskRan = true;
+      });
+      await settle();
+      assert.strictEqual(contextTaskRan, false);
+      sinon.assert.notCalled(mockContext.pageTaskQueue);
+
+      finishHandler();
+      await Promise.all([result, contextTask]);
+      assert.strictEqual(contextTaskRan, true);
+    });
+
+    it('releases the page queue when the handler throws', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([1]);
+
+      const result = await createHandler(
+        createPageTool('failing', async () => {
+          throw new Error('handler failed');
+        }),
+        mockContext,
+      ).handle({pageId: 1});
 
       assert.strictEqual(result.isError, true);
-      // The lock is free again: a plain acquire must resolve.
-      const guard = await toolMutex.acquire();
-      guard[Symbol.dispose]();
+      await runOn(mockContext.pageTaskQueue(1), async () => {});
+    });
+
+    it('fails a waiting page tool when the page queue is disposed', async () => {
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const mockContext = createPages([1]);
+      const handler = sinon.stub<[], Promise<void>>().resolves();
+      const {promise: release, resolve: finishFirst} =
+        Promise.withResolvers<void>();
+
+      const first = createHandler(
+        createPageTool('first', async () => {
+          await release;
+        }),
+        mockContext,
+      ).handle({pageId: 1});
+      await settle();
+      const second = createHandler(
+        createPageTool('second', handler),
+        mockContext,
+      ).handle({pageId: 1});
+      await settle();
+      mockContext.pageTaskQueue(1).dispose(new Error('Page 1 is closed.'));
+      finishFirst();
+
+      const [, result] = await Promise.all([first, second]);
+      assert.strictEqual(result.isError, true);
+      assert.ok(result.content[0].type === 'text');
+      assert.match(result.content[0].text, /Page 1 is closed\./);
+      sinon.assert.notCalled(handler);
     });
   });
 
@@ -378,7 +684,7 @@ describe('ToolHandler', () => {
         verifyFilesSchema: {},
         handler: async () => undefined,
       };
-      const mockContext = sinon.createStubInstance(McpContext);
+      const mockContext = createMockMcpContext();
       mockContext.ensureBrowser.resolves(
         getMockBrowser({
           process: sinon.createStubInstance(ChildProcess),
@@ -393,7 +699,6 @@ describe('ToolHandler', () => {
         tool,
         config,
         async () => mockContext,
-        new Mutex(),
         sinon.spy(),
       ).handle({});
 
@@ -448,7 +753,7 @@ describe('ToolHandler', () => {
         handlerCalled = true;
       };
 
-      const mockContext = sinon.createStubInstance(McpContext);
+      const mockContext = createMockMcpContext();
       const mockProcess = sinon.createStubInstance(ChildProcess);
       mockContext.ensureBrowser.resolves(
         getMockBrowser({process: mockProcess}),
@@ -463,13 +768,10 @@ describe('ToolHandler', () => {
         logToolInvocation: logSpy,
       } as unknown as ClearcutLogger);
 
-      const toolMutex = new Mutex();
-
       const toolHandler = new ToolHandler(
         testCase.tool,
         config,
         async () => mockContext,
-        toolMutex,
         sinon.spy(),
       );
 
@@ -506,16 +808,14 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -558,15 +858,13 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const mockContext = createMockMcpContext();
     const config = parseConfig(['--categoryEmulation=false']);
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -582,8 +880,7 @@ describe('ToolHandler', () => {
   });
 
   it('registers evaluate_script by default and disables it when javascriptEvaluation is false', async () => {
-    const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const mockContext = createMockMcpContext();
 
     const defaultConfig = parseConfig();
     const defaultTool = createTools(defaultConfig.resolved).find(
@@ -596,7 +893,6 @@ describe('ToolHandler', () => {
       defaultTool,
       defaultConfig,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(defaultHandler.disabled, false);
@@ -612,7 +908,6 @@ describe('ToolHandler', () => {
       disabledTool,
       disabledConfig,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(disabledHandler.disabled, true);
@@ -637,7 +932,6 @@ describe('ToolHandler', () => {
       cliTool,
       cliConfig,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(cliHandler.disabled, false);
@@ -650,8 +944,7 @@ describe('ToolHandler', () => {
   });
 
   it('disables slim evaluate tool when javascriptEvaluation is false', async () => {
-    const mockContext = sinon.createStubInstance(McpContext);
-    const toolMutex = new Mutex();
+    const mockContext = createMockMcpContext();
 
     const defaultConfig = parseConfig(['--slim']);
     const defaultTool = createTools(defaultConfig.resolved).find(
@@ -664,7 +957,6 @@ describe('ToolHandler', () => {
       defaultTool,
       defaultConfig,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(defaultHandler.disabled, false);
@@ -683,7 +975,6 @@ describe('ToolHandler', () => {
       disabledTool,
       disabledConfig,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
     assert.strictEqual(disabledHandler.disabled, true);
@@ -699,8 +990,7 @@ describe('ToolHandler', () => {
       return new ToolHandler(
         tool,
         config,
-        async () => sinon.createStubInstance(McpContext),
-        new Mutex(),
+        async () => createMockMcpContext(),
         sinon.spy(),
       );
     }
@@ -769,7 +1059,7 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.callsFake(async p => {
@@ -782,14 +1072,12 @@ describe('ToolHandler', () => {
       );
     });
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -850,21 +1138,19 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.rejects(
       new Error('Access denied: path is outside roots'),
     );
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -883,7 +1169,7 @@ describe('ToolHandler', () => {
   it('validates evaluate_script sourcePath before reading the file', async () => {
     const config = parseConfig();
     const tool = evaluateScript(config.resolved);
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.rejects(
@@ -894,7 +1180,6 @@ describe('ToolHandler', () => {
       tool,
       config,
       async () => mockContext,
-      new Mutex(),
       sinon.spy(),
     );
     const sourcePath = path.resolve('/outside/workspace/script.js');
@@ -936,20 +1221,18 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     const canonicalPath = path.resolve('/canonical/workspace/upload.png');
     mockContext.validatePath.resolves(canonicalPath);
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -991,7 +1274,7 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     mockContext.ensureBrowser.resolves(
       getMockBrowser({
         wsEndpoint: 'ws://127.0.0.1:9222/devtools/browser/test',
@@ -1000,14 +1283,12 @@ describe('ToolHandler', () => {
     const canonicalBundlePath = path.resolve('/canonical/workspace/app.swbn');
     mockContext.validatePath.resolves(canonicalBundlePath);
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1054,21 +1335,19 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     mockContext.ensureBrowser.resolves(
       getMockBrowser({
         wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
       }),
     );
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1107,17 +1386,15 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     mockContext.ensureBrowser.resolves(getMockBrowser());
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1154,18 +1431,16 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1203,18 +1478,16 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1258,7 +1531,7 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     mockContext.ensureBrowser.resolves(
       getMockBrowser({
         wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
@@ -1267,14 +1540,12 @@ describe('ToolHandler', () => {
     const canonicalOutputPath = path.resolve('/canonical/output.json');
     mockContext.validatePath.resolves(canonicalOutputPath);
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1320,21 +1591,19 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.validatePath.rejects(
       new Error('Path is outside configured roots'),
     );
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1373,11 +1642,10 @@ describe('ToolHandler', () => {
       },
     };
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     // Remote browser: should validate
-    const mockRemoteContext = sinon.createStubInstance(McpContext);
+    const mockRemoteContext = createMockMcpContext();
     mockRemoteContext.ensureBrowser.resolves(
       getMockBrowser({
         wsEndpoint: 'ws://remote-host.com:9222/devtools/browser/test',
@@ -1389,7 +1657,6 @@ describe('ToolHandler', () => {
       tool,
       config,
       async () => mockRemoteContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1401,7 +1668,7 @@ describe('ToolHandler', () => {
     );
 
     // Local browser: should skip
-    const mockLocalContext = sinon.createStubInstance(McpContext);
+    const mockLocalContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockLocalContext.ensureBrowser.resolves(
       getMockBrowser({process: mockProcess}),
@@ -1411,7 +1678,6 @@ describe('ToolHandler', () => {
       tool,
       config,
       async () => mockLocalContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1441,7 +1707,7 @@ describe('ToolHandler', () => {
       },
     }))(config.resolved);
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.getDevToolsData.resolves({});
@@ -1460,13 +1726,10 @@ describe('ToolHandler', () => {
     const canonicalFilePath = path.resolve('/canonical/output.png');
     mockContext.validatePath.resolves(canonicalFilePath);
 
-    const toolMutex = new Mutex();
-
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1516,7 +1779,6 @@ describe('ToolHandler', () => {
       tool,
       config,
       async () => mockContext,
-      new Mutex(),
       sinon.spy(),
     );
 
@@ -1554,18 +1816,16 @@ describe('ToolHandler', () => {
       },
     };
 
-    const mockContext = sinon.createStubInstance(McpContext);
+    const mockContext = createMockMcpContext();
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       sinon.spy(),
     );
 
@@ -1611,14 +1871,12 @@ describe('ToolHandler', () => {
     );
     const abandonPendingBrowserAttemptSpy = sinon.spy();
 
-    const toolMutex = new Mutex();
     const config = parseConfig();
 
     const toolHandler = new ToolHandler(
       tool,
       config,
       async () => mockContext,
-      toolMutex,
       abandonPendingBrowserAttemptSpy,
     );
 
@@ -1665,7 +1923,6 @@ describe('ToolHandler', () => {
         tool,
         config,
         async () => context,
-        new Mutex(),
         sinon.spy(),
       );
 
@@ -1707,7 +1964,6 @@ describe('ToolHandler', () => {
         createBrowserlessTool(handler),
         parseConfig(),
         async () => mockContext,
-        new Mutex(),
         sinon.spy(),
       ).handle({filePath: 'file.heapsnapshot'});
 
@@ -1726,6 +1982,56 @@ describe('ToolHandler', () => {
         mockContext,
       );
       sinon.assert.calledOnceWithExactly(handleStub, mockContext, 'default');
+    });
+
+    it('defaults to concurrency none', () => {
+      const tool = createBrowserlessTool(sinon.stub().resolves());
+      assert.strictEqual(tool.concurrency, 'none');
+    });
+
+    it('does not enter the context queue', async () => {
+      const mockContext = createMockMcpContext();
+      mockContext.validatePath.resolves('/canonical/file.heapsnapshot');
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const scheduleTask = sinon.stub(mockContext.taskQueue, 'scheduleTask');
+
+      const result = await new ToolHandler(
+        createBrowserlessTool(sinon.stub().resolves()),
+        parseConfig(),
+        async () => mockContext,
+        sinon.spy(),
+      ).handle({filePath: 'file.heapsnapshot'});
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.notCalled(scheduleTask);
+    });
+
+    it('runs while another tool holds the context queue', async () => {
+      const mockContext = createMockMcpContext();
+      mockContext.validatePath.resolves('/canonical/file.heapsnapshot');
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const handler = sinon.stub().resolves();
+      const {promise: release, resolve: finishExclusive} =
+        Promise.withResolvers<void>();
+
+      const exclusive = runOn(mockContext.taskQueue, async () => {
+        await release;
+      });
+      const result = await new ToolHandler(
+        createBrowserlessTool(handler),
+        parseConfig(),
+        async () => mockContext,
+        sinon.spy(),
+      ).handle({filePath: 'file.heapsnapshot'});
+      finishExclusive();
+      await exclusive;
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.calledOnce(handler);
     });
   });
 
@@ -1752,24 +2058,24 @@ describe('ToolHandler', () => {
       };
     }
 
-    it('applies to calls that wait for the mutex', async () => {
+    it('applies to calls that wait for the queue', async () => {
       const config = parseConfig();
       const handler = sinon.stub().resolves();
       const tool = createGlobalTool({}, handler);
-      const toolMutex = new Mutex();
+      const taskRunner = new TaskRunner();
+      const mockContext = createMockMcpContext({taskRunner});
       const toolHandler = new ToolHandler(
         tool,
         config,
-        async () => createMockMcpContext(),
-        toolMutex,
+        async () => mockContext,
         sinon.spy(),
       );
 
-      await toolMutex.acquire();
+      const guard = await taskRunner.pause();
       const call = toolHandler.handle({});
       config.commit(parseConfig(['--no-category-navigation']));
       toolHandler.update(tool);
-      toolMutex.release();
+      guard[Symbol.dispose]();
       const result = await call;
 
       assert.strictEqual(result.isError, true);
@@ -1783,16 +2089,16 @@ describe('ToolHandler', () => {
     it('validates waiting calls against the updated schema', async () => {
       const config = parseConfig();
       const handler = sinon.stub().resolves();
-      const toolMutex = new Mutex();
+      const taskRunner = new TaskRunner();
+      const mockContext = createMockMcpContext({taskRunner});
       const toolHandler = new ToolHandler(
         createGlobalTool({a: zod.string().optional()}, handler),
         config,
-        async () => createMockMcpContext(),
-        toolMutex,
+        async () => mockContext,
         sinon.spy(),
       );
 
-      await toolMutex.acquire();
+      const guard = await taskRunner.pause();
       const call = toolHandler.handle({a: 'value'});
       const listingChanged = toolHandler.update(
         createGlobalTool(
@@ -1800,7 +2106,7 @@ describe('ToolHandler', () => {
           handler,
         ),
       );
-      toolMutex.release();
+      guard[Symbol.dispose]();
       const result = await call;
 
       assert.strictEqual(listingChanged, true);
@@ -1816,23 +2122,22 @@ describe('ToolHandler', () => {
       const config = parseConfig();
       const initialHandler = sinon.stub().resolves();
       const updatedHandler = sinon.stub().resolves();
-      const toolMutex = new Mutex();
-      const mockContext = createMockMcpContext();
+      const taskRunner = new TaskRunner();
+      const mockContext = createMockMcpContext({taskRunner});
       mockContext.ensureBrowser.resolves(getMockBrowser());
       const toolHandler = new ToolHandler(
         createGlobalTool({a: zod.string()}, initialHandler),
         config,
         async () => mockContext,
-        toolMutex,
         sinon.spy(),
       );
 
-      await toolMutex.acquire();
+      const guard = await taskRunner.pause();
       const call = toolHandler.handle({a: 'value', b: 'extra'});
       const listingChanged = toolHandler.update(
         createGlobalTool({a: zod.string(), b: zod.string()}, updatedHandler),
       );
-      toolMutex.release();
+      guard[Symbol.dispose]();
       const result = await call;
 
       assert.strictEqual(listingChanged, true);
@@ -1850,20 +2155,20 @@ describe('ToolHandler', () => {
       const config = parseConfig();
       const handler = sinon.stub().resolves();
       const tool = createGlobalTool({}, handler);
-      const toolMutex = new Mutex();
+      const taskRunner = new TaskRunner();
+      const mockContext = createMockMcpContext({taskRunner});
       const toolHandler = new ToolHandler(
         tool,
         config,
-        async () => createMockMcpContext(),
-        toolMutex,
+        async () => mockContext,
         sinon.spy(),
       );
 
-      await toolMutex.acquire();
+      const guard = await taskRunner.pause();
       const call = toolHandler.handle({}, {viaMcp: true});
       config.commit(parseConfig(['--no-category-navigation']));
       toolHandler.update(tool);
-      toolMutex.release();
+      guard[Symbol.dispose]();
 
       await assert.rejects(call, (error: unknown) => {
         assert.ok(error instanceof ProtocolError);
@@ -1878,24 +2183,23 @@ describe('ToolHandler', () => {
       const config = parseConfig();
       const initialHandler = sinon.stub().resolves();
       const updatedHandler = sinon.stub().resolves();
-      const toolMutex = new Mutex();
-      const mockContext = createMockMcpContext();
+      const taskRunner = new TaskRunner();
+      const mockContext = createMockMcpContext({taskRunner});
       mockContext.ensureBrowser.resolves(getMockBrowser());
       const toolHandler = new ToolHandler(
         createGlobalTool({a: zod.string().optional()}, initialHandler),
         config,
         async () => mockContext,
-        toolMutex,
         sinon.spy(),
       );
 
-      await toolMutex.acquire();
+      const guard = await taskRunner.pause();
       const call = toolHandler.handle({a: 'value'});
       config.commit(parseConfig(['--redact-network-headers']));
       const listingChanged = toolHandler.update(
         createGlobalTool({a: zod.string().optional()}, updatedHandler),
       );
-      toolMutex.release();
+      guard[Symbol.dispose]();
       await call;
 
       assert.strictEqual(listingChanged, false);
@@ -1915,7 +2219,6 @@ describe('ToolHandler', () => {
         tool,
         config,
         async () => createMockMcpContext(),
-        new Mutex(),
         sinon.spy(),
       );
 
@@ -1933,7 +2236,6 @@ describe('ToolHandler', () => {
         createGlobalTool({}, handler),
         config,
         async () => createMockMcpContext(),
-        new Mutex(),
         sinon.spy(),
       );
 
@@ -1964,7 +2266,6 @@ describe('ToolHandler', () => {
         createGlobalTool({a: zod.string().optional()}, handler),
         config,
         async () => createMockMcpContext(),
-        new Mutex(),
         sinon.spy(),
       );
 

@@ -26,7 +26,6 @@ import {
   type RegisteredTool,
   type Root,
   type Transport,
-  Mutex,
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
@@ -35,15 +34,16 @@ import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
 import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
+import {TaskRunner} from './utils/TaskRunner.js';
 import {VERSION} from './version.js';
 
 puppeteer.setFollowSymlinks(false);
 
 /**
  * Timeout for a `roots/list` that a tool call is waiting on, matching the 5s
- * default used for page operations. `getContext()` awaits it while
- * `ToolHandler` holds the tool mutex, so leaving it unbounded lets a client
- * that negotiates `roots` but does not answer block every tool for the SDK's
+ * default used for page operations. `getContext()` awaits it before
+ * `ToolHandler` enters the task runner, so leaving it unbounded lets a client
+ * that negotiates `roots` but does not answer delay every tool for the SDK's
  * default of 60s. Background refreshes are not bounded by this, so roots a
  * slow client sends late still land.
  */
@@ -64,7 +64,9 @@ export class McpServer {
   #config: ServerConfig;
   #browserManager: BrowserManager;
   #context: McpContext;
-  #heapSnapshotManager = new HeapSnapshotManager();
+  /** Runs every tool call and config reload. */
+  #taskRunner = new TaskRunner();
+  #heapSnapshotManager = new HeapSnapshotManager(this.#taskRunner);
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
@@ -73,11 +75,11 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   /**
-   * Whether a tool call already waited for the initial `roots/list`, so a
-   * client that negotiates roots but never answers only delays the first call.
+   * The bounded initial `roots/list` request. Every tool call that starts
+   * before the client answered waits on the same request, so a client that
+   * negotiates roots but never answers only delays the first calls.
    */
-  #awaitedInitialRoots = false;
-  #toolMutex = new Mutex();
+  #initialRoots?: Promise<void>;
   #configWatcher?: ConfigWatcher;
   #tools = new Map<string, ToolEntry>();
 
@@ -113,6 +115,7 @@ export class McpServer {
     this.#context = McpContext.create(logger, {
       config: this.#config,
       heapSnapshotManager: this.#heapSnapshotManager,
+      taskRunner: this.#taskRunner,
       getBrowser: () => this.#browserManager.ensureBrowser(),
     });
     this.#context.setRoots(this.#combinedRoots());
@@ -180,7 +183,9 @@ export class McpServer {
    * notification.
    */
   async applyConfig(config: ServerConfig): Promise<void> {
-    using guard = await this.#toolMutex.acquire();
+    // Goes ahead of waiting tool calls and waits for running ones, so every
+    // waiting call runs with the new config.
+    using guard = await this.#taskRunner.pause();
     await this.#applyConfigLocked(this.#config.mergeReloadable(config));
   }
 
@@ -253,7 +258,7 @@ export class McpServer {
     configPath: string,
     reload: () => ServerConfig,
   ): Promise<void> {
-    using guard = await this.#toolMutex.acquire();
+    using guard = await this.#taskRunner.pause();
     if (this.#configWatcher !== watcher) {
       return;
     }
@@ -364,11 +369,11 @@ export class McpServer {
   }
 
   async #getContext(): Promise<McpContext> {
-    if (this.#lastClientRoots === undefined && !this.#awaitedInitialRoots) {
-      this.#awaitedInitialRoots = true;
-      // Nothing listed yet, so this call has to wait – bounded, since it is
-      // holding the tool mutex, and a later background refresh still lands
-      await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
+    if (this.#lastClientRoots === undefined) {
+      // Nothing listed yet, so this call has to wait – bounded, since every
+      // tool call waits on it, and a later background refresh still lands
+      this.#initialRoots ??= this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
+      await this.#initialRoots;
     }
     return this.#context;
   }
@@ -378,14 +383,13 @@ export class McpServer {
       tool,
       this.#config,
       () => this.#getContext(),
-      this.#toolMutex,
       () => this.#browserManager.abandonPendingAttempt(),
     );
   }
 
   /**
    * Overrides the SDK's `tools/call` handler so enabled and input-schema
-   * checks run inside `ToolHandler.handle()` after acquiring `#toolMutex`.
+   * checks run inside `ToolHandler.handle()` inside the task runner.
    */
   #setToolCallRequestHandler(): void {
     this.server.server.setRequestHandler('tools/call', async request => {

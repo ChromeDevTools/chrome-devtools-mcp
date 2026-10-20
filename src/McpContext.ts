@@ -24,6 +24,7 @@ import {type UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
+  Mutex,
   type Browser,
   type BrowserContext,
   type Connection,
@@ -57,6 +58,7 @@ import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
+import type {TaskQueue, TaskRunner} from './utils/TaskRunner.js';
 import {isAllowedUrl} from './utils/url.js';
 
 export interface McpContextOptions {
@@ -65,6 +67,8 @@ export interface McpContextOptions {
   navigationTimeout?: number;
   // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
   heapSnapshotManager: HeapSnapshotManager;
+  // Creates the context queue and the page queues.
+  taskRunner: TaskRunner;
   // Returns the browser to use. Called by ensureBrowser(), so the browser
   // connection is only established once a tool needs it.
   getBrowser: () => Promise<Browser>;
@@ -121,6 +125,19 @@ export class McpContext implements Context, BrowserlessContext {
   #workers = new Map<Target, McpWorker>();
 
   #mcpPages = new Map<Target, McpPage>();
+  /**
+   * Queue for the browser-wide state (page list, selected page, trace
+   * state). Every page queue is a child of it, so a task on it waits for
+   * every page task and blocks later page tasks.
+   */
+  readonly taskQueue: TaskQueue;
+  #taskRunner: TaskRunner;
+  #pageTaskQueues = new Map<number, TaskQueue>();
+  /**
+   * Serializes `createPagesSnapshot()`. Two tasks on different page queues
+   * can call it at the same time.
+   */
+  #pagesSnapshotMutex = new Mutex();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
   #selectedPageFallbackRead = false;
@@ -150,6 +167,8 @@ export class McpContext implements Context, BrowserlessContext {
 
     this.logger = logger;
     this.#locatorClass = locatorClass;
+    this.#taskRunner = options.taskRunner;
+    this.taskQueue = options.taskRunner.createQueue();
     this.#config = options.config;
     this.#options = options;
     this.#heapSnapshotManager = options.heapSnapshotManager;
@@ -329,7 +348,7 @@ export class McpContext implements Context, BrowserlessContext {
 
     this.#serviceWorkerConsoleCollector?.dispose();
     for (const mcpPage of this.#allMcpPages()) {
-      mcpPage.dispose();
+      this.#disposeMcpPage(mcpPage);
     }
     this.#mcpPages.clear();
     this.#workers.clear();
@@ -366,7 +385,7 @@ export class McpContext implements Context, BrowserlessContext {
     try {
       const mcpPage = this.#mcpPages.get(target);
       if (mcpPage) {
-        mcpPage.dispose();
+        this.#disposeMcpPage(mcpPage);
         this.#mcpPages.delete(target);
       }
       this.#workers.delete(target);
@@ -672,6 +691,28 @@ export class McpContext implements Context, BrowserlessContext {
     return page;
   }
 
+  /**
+   * The queue for tasks on page `pageId`. The queue exists before the page
+   * does, so a tool call can enter it before the browser connects. It is a
+   * child of {@link taskQueue}.
+   */
+  pageTaskQueue(pageId: number): TaskQueue {
+    let queue = this.#pageTaskQueues.get(pageId);
+    if (!queue) {
+      queue = this.#taskRunner.createQueue(this.taskQueue);
+      this.#pageTaskQueues.set(pageId, queue);
+    }
+    return queue;
+  }
+
+  #disposeMcpPage(mcpPage: McpPage): void {
+    mcpPage.dispose();
+    this.#pageTaskQueues
+      .get(mcpPage.id)
+      ?.dispose(new Error(`Page ${mcpPage.id} is closed.`));
+    this.#pageTaskQueues.delete(mcpPage.id);
+  }
+
   isPageSelected(page: McpPage): boolean {
     return this.#selectedPage === page;
   }
@@ -688,7 +729,7 @@ export class McpContext implements Context, BrowserlessContext {
       this.#selectedPage !== newPage &&
       !this.#mcpPages.has(this.#selectedPage.target)
     ) {
-      this.#selectedPage.dispose();
+      this.#disposeMcpPage(this.#selectedPage);
     }
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
@@ -791,6 +832,7 @@ export class McpContext implements Context, BrowserlessContext {
     if (!this.#browser) {
       return [];
     }
+    using guard = await this.#pagesSnapshotMutex.acquire();
     const allTargets = this.#fetchPageTargets();
 
     for (const target of allTargets) {
@@ -802,7 +844,7 @@ export class McpContext implements Context, BrowserlessContext {
     for (const [target, mcpPage] of this.#mcpPages) {
       if (!currentTargets.has(target)) {
         if (mcpPage !== this.#selectedPage || mcpPage.isClosed()) {
-          mcpPage.dispose();
+          this.#disposeMcpPage(mcpPage);
         }
         this.#mcpPages.delete(target);
       }
@@ -836,7 +878,7 @@ export class McpContext implements Context, BrowserlessContext {
       } else if (this.#selectedPage) {
         const wasClosed = Boolean(this.#selectedPage.isClosed());
         if (!wasClosed) {
-          this.#selectedPage.dispose();
+          this.#disposeMcpPage(this.#selectedPage);
         }
         this.#selectedPage = undefined;
         this.#selectedPageFallback = {wasClosed};
