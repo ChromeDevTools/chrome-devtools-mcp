@@ -81,6 +81,7 @@ export class McpServer {
    */
   #initialRoots?: Promise<void>;
   #configWatcher?: ConfigWatcher;
+  #closing?: Promise<void>;
   #tools = new Map<string, ToolEntry>();
 
   private constructor(config: ServerConfig, options: McpServerOptions) {
@@ -156,6 +157,13 @@ export class McpServer {
     if (this.#config.resolved.watchConfig) {
       this.watchConfig();
     }
+    const prevServerOnClose = this.server.server.onclose;
+    this.server.server.onclose = () => {
+      prevServerOnClose?.();
+      void this.close().catch(err => {
+        logger?.('Failed to close McpServer on transport close', err);
+      });
+    };
     return await this.server.connect(transport);
   }
 
@@ -289,18 +297,24 @@ export class McpServer {
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
-    this.#configWatcher?.dispose();
-    this.#configWatcher = undefined;
-    try {
-      this.#context.dispose();
-    } catch (err) {
-      logger?.('Failed to dispose context', err);
+    if (this.#closing) {
+      return await this.#closing;
     }
-    this.#heapSnapshotManager.dispose();
-    await Promise.allSettled([
-      this.#browserManager.close(),
-      this.server.close(),
-    ]);
+    this.#closing = (async () => {
+      this.#configWatcher?.dispose();
+      this.#configWatcher = undefined;
+      try {
+        this.#context.dispose();
+      } catch (err) {
+        logger?.('Failed to dispose context', err);
+      }
+      this.#heapSnapshotManager.dispose();
+      await Promise.allSettled([
+        this.#browserManager.close(),
+        this.server.close(),
+      ]);
+    })();
+    return await this.#closing;
   }
 
   [Symbol.dispose](): void {

@@ -819,6 +819,28 @@ describe('McpServer', () => {
       sinon.assert.notCalled(watched.logStream.write);
     });
   });
+
+  describe('connect', () => {
+    it('closes the browser when an MCP client closes the transport', async () => {
+      const {server, browserManager} = await createTestServer();
+      const client = await connectClient(server);
+
+      sinon.assert.notCalled(browserManager.close);
+      await client.close();
+
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+    });
+  });
+
+  describe('close', () => {
+    it('awaits a single in-flight close when called concurrently', async () => {
+      const {server, browserManager} = await createTestServer();
+
+      await Promise.all([server.close(), server.close()]);
+
+      sinon.assert.calledOnceWithExactly(browserManager.close);
+    });
+  });
 });
 
 async function getToolsWithFilteredCategories(
