@@ -43,6 +43,7 @@ describe('cli args parsing', () => {
     categoryNetwork: true,
     categoryDebugging: true,
     categoryMemory: true,
+    categoryLogpoints: true,
     autoConnect: false,
     headless: false,
     isolated: false,

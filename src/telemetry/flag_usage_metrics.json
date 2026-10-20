@@ -478,5 +478,13 @@
   {
     "name": "watch_config",
     "flagType": "boolean"
+  },
+  {
+    "name": "category_logpoints_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "category_logpoints",
+    "flagType": "boolean"
   }
 ]

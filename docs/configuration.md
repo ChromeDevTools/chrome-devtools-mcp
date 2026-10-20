@@ -59,6 +59,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--categoryLogpoints`/ `--category-logpoints`**
+  Set to false to exclude tools related to logpoints.
+  - **Type:** boolean
+  - **Default:** `true`
+
 - **`--autoConnect`/ `--auto-connect`**
   If specified, automatically connects to a browser (Chrome 144+) running locally from the user data directory identified by the channel param (default channel is stable). Requires the remote debugging server to be started in the Chrome instance via chrome://inspect/#remote-debugging.
   - **Type:** boolean

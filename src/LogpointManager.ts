@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -53,7 +53,24 @@ export interface Logpoint {
   generatedLocations: GeneratedLocation[];
 }
 
+/**
+ * Thrown by {@link LogpointManager.setLogpoints} when some locations could
+ * not be bound. The other logpoints were applied; `logpoints` holds the
+ * resulting state.
+ */
+export class LogpointError extends Error {
+  readonly logpoints: Logpoint[];
+
+  constructor(message: string, logpoints: Logpoint[]) {
+    super(message);
+    this.name = 'LogpointError';
+    this.logpoints = logpoints;
+  }
+}
+
+type Universe = DevTools.Foundation.Universe.Universe;
 type Breakpoint = Breakpoints.BreakpointManager.Breakpoint;
+type UserCondition = Breakpoints.BreakpointManager.UserCondition;
 type UISourceCode = Workspace.UISourceCode.UISourceCode;
 
 interface LogpointRecord {
@@ -65,16 +82,6 @@ interface ResolvedLogpoint {
   options: LogpointOptions;
   uiSourceCode: UISourceCode;
   key: string;
-}
-
-/**
- * DevTools uses branded string types for breakpoint conditions. The brand is
- * purely nominal, so a plain string can be used as a user condition.
- */
-function toUserCondition(
-  expression: string,
-): Breakpoints.BreakpointManager.UserCondition {
-  return expression as Breakpoints.BreakpointManager.UserCondition;
 }
 
 export const LOGPOINT_FORMAT =
@@ -126,6 +133,27 @@ export function validateExpression(expression: string): void {
 }
 
 /**
+ * DevTools brands breakpoint conditions nominally; any string is a valid
+ * user condition.
+ */
+function toUserCondition(expression: string): UserCondition;
+function toUserCondition(expression: string): string {
+  return expression;
+}
+
+function locationKey(
+  url: string,
+  lineNumber: number,
+  columnNumber: number | undefined,
+): string {
+  return `${url}:${lineNumber}${columnNumber === undefined ? '' : `:${columnNumber}`}`;
+}
+
+function baseName(url: string): string {
+  return url.slice(url.lastIndexOf('/') + 1).toLowerCase();
+}
+
+/**
  * Source maps are loaded lazily in the DevTools universe. Loading the source
  * maps of all parsed scripts makes their original sources available in the
  * workspace, so that logpoints can be set on original source files.
@@ -145,21 +173,9 @@ async function loadSourceMaps(model: DevTools.DebuggerModel): Promise<void> {
   );
 }
 
-function locationKey(
-  url: string,
-  lineNumber: number,
-  columnNumber: number | undefined,
-): string {
-  return `${url}:${lineNumber}${columnNumber === undefined ? '' : `:${columnNumber}`}`;
-}
-
-function baseName(url: string): string {
-  return url.slice(url.lastIndexOf('/') + 1).toLowerCase();
-}
-
 /**
- * Manages logpoints for a single page on top of the DevTools
- * `BreakpointManager` of the page's DevTools universe.
+ * Manages logpoints for a single page on top of the `BreakpointManager` of
+ * the page's DevTools universe.
  *
  * A logpoint is a DevTools breakpoint with `isLogpoint` set: its condition
  * logs the expression and never pauses. The breakpoint manager resolves the
@@ -169,27 +185,22 @@ function baseName(url: string): string {
  * onto workspace source codes.
  */
 export class LogpointManager {
-  readonly #devTools: TargetUniverse;
+  readonly #universe: Universe;
+  readonly #target: DevTools.Target;
   /** Keyed by the resolved source URL and position. */
   readonly #records = new Map<string, LogpointRecord>();
-  #scriptListener?: () => void;
 
   constructor(devTools: TargetUniverse) {
-    this.#devTools = devTools;
+    this.#universe = devTools.universe;
+    this.#target = devTools.target;
   }
 
   get #debuggerModel(): DevTools.DebuggerModel {
-    const model = this.#devTools.target.model(DevTools.DebuggerModel);
+    const model = this.#target.model(DevTools.DebuggerModel);
     if (!model) {
       throw new Error('The DevTools debugger model is not available.');
     }
     return model;
-  }
-
-  get #workspace(): Workspace.Workspace.WorkspaceImpl {
-    return this.#devTools.universe.context.get(
-      Workspace.Workspace.WorkspaceImpl,
-    );
   }
 
   /**
@@ -197,6 +208,8 @@ export class LogpointManager {
    * logpoints not in the list are removed, new ones are added and the
    * expression of an existing logpoint at the same location is replaced.
    * Expressions and locations are validated before anything is changed.
+   * Throws a {@link LogpointError} when a location has no executable code;
+   * the other logpoints are applied regardless.
    */
   async setLogpoints(desired: LogpointOptions[]): Promise<Logpoint[]> {
     for (const options of desired) {
@@ -223,19 +236,18 @@ export class LogpointManager {
 
     const unbound: string[] = [];
     for (const {options, uiSourceCode, key} of resolved.values()) {
-      const breakpoint =
-        await this.#devTools.universe.breakpointManager.setBreakpoint(
-          uiSourceCode,
-          // The tool API is 1-based like the DevTools UI; the model is 0-based.
-          options.lineNumber - 1,
-          options.columnNumber === undefined
-            ? undefined
-            : options.columnNumber - 1,
-          toUserCondition(options.expression),
-          /* enabled */ true,
-          /* isLogpoint */ true,
-          Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
-        );
+      const breakpoint = await this.#universe.breakpointManager.setBreakpoint(
+        uiSourceCode,
+        // The tool API is 1-based like the DevTools UI; the model is 0-based.
+        options.lineNumber - 1,
+        options.columnNumber === undefined
+          ? undefined
+          : options.columnNumber - 1,
+        toUserCondition(options.expression),
+        /* enabled */ true,
+        /* isLogpoint */ true,
+        Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
+      );
       if (!breakpoint) {
         unbound.push(key);
         continue;
@@ -269,39 +281,35 @@ export class LogpointManager {
       });
     }
 
-    if (this.#records.size === 0) {
-      this.#stopLoadingSourceMapsOnParse();
-    } else {
-      this.#ensureSourceMapsLoadOnParse();
-    }
+    this.#setLazySourceMapLoading(this.#records.size === 0);
 
+    const logpoints = this.#currentLogpoints();
     if (unbound.length) {
-      throw new Error(
+      throw new LogpointError(
         `No executable code at ${unbound.join(', ')} (for example a comment, type annotation or empty line, or a line not mapped to the generated script). Pick lines containing executable code. The other logpoints were applied.`,
+        logpoints,
       );
     }
-    return this.getLogpoints();
-  }
-
-  getLogpoints(): Logpoint[] {
-    return [...this.#records.values()].map(record => this.#snapshot(record));
-  }
-
-  dispose(): void {
-    this.#stopLoadingSourceMapsOnParse();
-    for (const record of this.#records.values()) {
-      void record.breakpoint
-        .remove(/* keepInStorage */ false)
-        .catch((error: unknown) => {
-          logger?.('Failed to remove logpoint', error);
-        });
-    }
-    this.#records.clear();
+    return logpoints;
   }
 
   /**
-   * Reads the current state of the breakpoint into the logpoint, so that
-   * listing reflects re-binding done by the breakpoint manager after reloads.
+   * Releases the records. The breakpoints are not removed from the backend:
+   * the universe is being disposed and its session detaches, which removes
+   * them along with the page.
+   */
+  dispose(): void {
+    this.#records.clear();
+  }
+
+  #currentLogpoints(): Logpoint[] {
+    return [...this.#records.values()].map(record => this.#snapshot(record));
+  }
+
+  /**
+   * Reads the current state of the breakpoint into a copy of the logpoint,
+   * so that the result reflects re-binding done by the breakpoint manager
+   * after reloads.
    */
   #snapshot(record: LogpointRecord): Logpoint {
     const modelBreakpoint = record.breakpoint.modelBreakpoint(
@@ -317,8 +325,20 @@ export class LogpointManager {
         });
       }
     }
-    record.logpoint.generatedLocations = generatedLocations;
-    return {...record.logpoint, generatedLocations: [...generatedLocations]};
+    return {...record.logpoint, generatedLocations};
+  }
+
+  /**
+   * Source maps load lazily by default, so after a reload the original
+   * sources of a rebuilt bundle would not re-appear in the workspace and a
+   * logpoint on an original source file could not be re-bound to the new
+   * generated location. While logpoints exist, source maps are loaded
+   * eagerly instead, like DevTools does with the Sources panel open.
+   */
+  #setLazySourceMapLoading(lazy: boolean): void {
+    this.#universe.settings
+      .resolve(DevTools.SourceMapManager.lazyLoadingSettingDescriptor)
+      .set(lazy);
   }
 
   /**
@@ -338,7 +358,8 @@ export class LogpointManager {
       return match;
     }
     const name = baseName(url);
-    const similar = [...this.#sourceUrls()]
+    const similar = [...this.#pageSourceCodes()]
+      .map(uiSourceCode => uiSourceCode.url())
       .filter(candidate => baseName(candidate) === name)
       .slice(0, 5);
     throw new Error(
@@ -346,14 +367,15 @@ export class LogpointManager {
     );
   }
 
-  *#sourceUrls(): Iterable<string> {
-    for (const uiSourceCode of this.#workspace.uiSourceCodes()) {
+  /** The scripts and source-map sources of the page in the workspace. */
+  *#pageSourceCodes(): Iterable<UISourceCode> {
+    for (const uiSourceCode of this.#universe.workspace.uiSourceCodes()) {
       const projectType = uiSourceCode.project().type();
       if (
         projectType === Workspace.Workspace.projectTypes.Network ||
         projectType === Workspace.Workspace.projectTypes.ContentScripts
       ) {
-        yield uiSourceCode.url();
+        yield uiSourceCode;
       }
     }
   }
@@ -366,14 +388,7 @@ export class LogpointManager {
    */
   #matchUISourceCode(url: string): UISourceCode | null {
     const candidates = new Map<string, UISourceCode>();
-    for (const uiSourceCode of this.#workspace.uiSourceCodes()) {
-      const projectType = uiSourceCode.project().type();
-      if (
-        projectType !== Workspace.Workspace.projectTypes.Network &&
-        projectType !== Workspace.Workspace.projectTypes.ContentScripts
-      ) {
-        continue;
-      }
+    for (const uiSourceCode of this.#pageSourceCodes()) {
       const candidateUrl = uiSourceCode.url();
       if (candidateUrl === url) {
         return uiSourceCode;
@@ -388,51 +403,5 @@ export class LogpointManager {
       );
     }
     return candidates.values().next().value ?? null;
-  }
-
-  /**
-   * Source maps load lazily, so after a reload the original sources of a
-   * rebuilt bundle would not re-appear in the workspace and a logpoint on an
-   * original source file could not be re-bound to the new generated
-   * location. While logpoints exist, the source maps of newly parsed scripts
-   * are loaded eagerly instead, like DevTools does with a Sources panel open.
-   */
-  #ensureSourceMapsLoadOnParse(): void {
-    if (this.#scriptListener) {
-      return;
-    }
-    const model = this.#debuggerModel;
-    const onParsed = (
-      event: Parameters<
-        Parameters<DevTools.DebuggerModel['addEventListener']>[1]
-      >[0],
-    ): void => {
-      const script = event.data;
-      // Only ParsedScriptSource events are subscribed to; their data is the
-      // parsed script.
-      if (script instanceof DevTools.DebuggerModel || !script.sourceMapURL) {
-        return;
-      }
-      // The debugger model registers the source map with the source map
-      // manager right after dispatching this event, so defer the load.
-      void Promise.resolve()
-        .then(() => model.sourceMapManager().sourceMapForClientPromise(script))
-        .catch((error: unknown) => {
-          logger?.('Failed to load source map for', script.sourceURL, error);
-        });
-    };
-    // The event enum is not exported through the DevTools mcp entrypoint.
-    const parsedScriptSource = 'ParsedScriptSource' as Parameters<
-      DevTools.DebuggerModel['addEventListener']
-    >[0];
-    model.addEventListener(parsedScriptSource, onParsed);
-    this.#scriptListener = () => {
-      model.removeEventListener(parsedScriptSource, onParsed);
-    };
-  }
-
-  #stopLoadingSourceMapsOnParse(): void {
-    this.#scriptListener?.();
-    this.#scriptListener = undefined;
   }
 }

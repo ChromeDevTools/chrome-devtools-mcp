@@ -395,33 +395,25 @@ export class McpPage implements ContextPage {
     return this.#devtoolsUniverse;
   }
 
-  #requireDevToolsUniverse(): TargetUniverse {
-    if (!this.#devtoolsUniverse) {
-      throw new Error(
-        `DevTools universe is not available for page ${this.id ?? '?'}.`,
-      );
-    }
-    return this.#devtoolsUniverse;
-  }
-
-  get #logpoints(): LogpointManager {
-    if (!this.#logpointManager) {
-      this.#logpointManager = new LogpointManager(
-        this.#requireDevToolsUniverse(),
-      );
-    }
-    return this.#logpointManager;
-  }
-
+  /**
+   * Makes the given logpoints the complete set of logpoints on the page, see
+   * {@link LogpointManager.setLogpoints}. The manager is created on first
+   * use, so an empty list on a page without logpoints is a no-op.
+   */
   setLogpoints(logpoints: LogpointOptions[]): Promise<Logpoint[]> {
-    if (!this.#logpointManager && logpoints.length === 0) {
-      return Promise.resolve([]);
+    if (!this.#logpointManager) {
+      if (logpoints.length === 0) {
+        return Promise.resolve([]);
+      }
+      const devtoolsUniverse = this.devtoolsUniverse;
+      if (!devtoolsUniverse) {
+        throw new Error(
+          `DevTools universe is not available for page ${this.id ?? '?'}.`,
+        );
+      }
+      this.#logpointManager = new LogpointManager(devtoolsUniverse);
     }
-    return this.#logpoints.setLogpoints(logpoints);
-  }
-
-  getLogpoints(): Logpoint[] {
-    return this.#logpointManager?.getLogpoints() ?? [];
+    return this.#logpointManager.setLogpoints(logpoints);
   }
 
   getDialog(): Dialog | undefined {

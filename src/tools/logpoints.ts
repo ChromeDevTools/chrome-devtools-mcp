@@ -1,24 +1,28 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {LogpointFormatter} from '../formatters/LogpointFormatter.js';
-import {LOGPOINT_FORMAT, parseLogpoint} from '../LogpointManager.js';
+import {
+  LOGPOINT_FORMAT,
+  LogpointError,
+  parseLogpoint,
+} from '../LogpointManager.js';
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {LIST_CONSOLE_MESSAGES_TOOL_NAME} from './console.js';
 import {definePageTool} from './ToolDefinition.js';
+import {LIST_CONSOLE_MESSAGES_TOOL_NAME} from './toolNames.js';
 
 const SET_LOGPOINTS_TOOL_NAME = 'set_logpoints';
 
 export const setLogpoints = definePageTool(() => ({
   name: SET_LOGPOINTS_TOOL_NAME,
-  description: `Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. The logged output appears as regular console messages that can be read with ${LIST_CONSOLE_MESSAGES_TOOL_NAME}. Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.`,
+  description: `Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. Original source locations require source maps, which --no-source-maps turns off. Only scripts of the page's main frame are supported: scripts in workers and in out-of-process iframes do not match. The logged output appears as regular console messages that can be read with ${LIST_CONSOLE_MESSAGES_TOOL_NAME}. Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.`,
   annotations: {
-    category: ToolCategory.DEBUGGING,
+    category: ToolCategory.LOGPOINTS,
     readOnlyHint: false,
   },
   schema: {
@@ -31,9 +35,20 @@ export const setLogpoints = definePageTool(() => ({
   blockedByDialog: false,
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const logpoints = await request.page.setLogpoints(
-      request.params.logpoints.map(parseLogpoint),
-    );
+    let logpoints;
+    try {
+      logpoints = await request.page.setLogpoints(
+        request.params.logpoints.map(parseLogpoint),
+      );
+    } catch (error) {
+      if (error instanceof LogpointError) {
+        // The other logpoints were applied; report the resulting state.
+        response.appendResponseLine(
+          new LogpointFormatter(error.logpoints).toString(),
+        );
+      }
+      throw error;
+    }
     response.appendResponseLine(new LogpointFormatter(logpoints).toString());
     if (logpoints.length === 0) {
       return;

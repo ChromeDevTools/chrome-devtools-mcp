@@ -37,6 +37,7 @@ const categoryOverrides: Record<
   [ToolCategory.PERFORMANCE]: {},
   [ToolCategory.NETWORK]: {},
   [ToolCategory.DEBUGGING]: {},
+  [ToolCategory.LOGPOINTS]: {},
   [ToolCategory.MEMORY]: {},
   [ToolCategory.WEBMCP]: {
     describe:

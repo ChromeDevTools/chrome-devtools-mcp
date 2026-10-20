@@ -30,7 +30,7 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (10 tools)
+- **[Debugging](#debugging)** (9 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
@@ -38,7 +38,6 @@
   - [`list_console_messages`](#list_console_messages)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
-  - [`set_logpoints`](#set_logpoints)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 - **[Memory](#memory)** (14 tools)
@@ -56,6 +55,8 @@
   - [`get_heapsnapshot_retaining_paths`](#get_heapsnapshot_retaining_paths)
   - [`get_heapsnapshot_summary`](#get_heapsnapshot_summary)
   - [`query_heapsnapshot_objects`](#query_heapsnapshot_objects)
+- **[Logpoints](#logpoints)** (1 tools)
+  - [`set_logpoints`](#set_logpoints)
 - **[Extensions](#extensions)** (5 tools)
   - [`install_extension`](#install_extension)
   - [`list_extensions`](#list_extensions)
@@ -476,17 +477,6 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ---
 
-### `set_logpoints`
-
-**Description:** Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. The logged output appears as regular console messages that can be read with [`list_console_messages`](#list_console_messages). Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.
-
-**Parameters:**
-
-- **logpoints** (array) **(required)**: The complete set of logpoints for the page, each formatted as &lt;url&gt;:&lt;lineNumber&gt;[:&lt;columnNumber&gt;] &lt;expression&gt;. The url is the URL of a script as served to the browser or the path of an original source file resolvable through source maps, matched exactly or as a path suffix (e.g. "src/app.ts"). lineNumber and the optional columnNumber are 1-based in the coordinates of the url; a line without executable code moves the logpoint to the next possible location. The expression is formatted like the arguments of console.log() and is evaluated in the scope of the location, so local variables are accessible (for source-mapped locations by their original names). Example: "src/cart.ts:42 'cart total:', cart.total, cart.items.length". Pass an empty array to remove all logpoints.
-- **pageId** (number) **(required)**: Targets a specific page by ID.
-
----
-
 ### `take_screenshot`
 
 **Description:** Take a screenshot of the page or element.
@@ -711,6 +701,19 @@ in the DevTools Elements panel (if any).
 - **retainedSize** (string) _(optional)_: Inclusive retained size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **selfSize** (string) _(optional)_: Inclusive self size range (e.g. "1MB-2MB", "-1MB", or "1MB-"). A single value is treated as a minimum.
 - **sortBy** (enum: "retainedSize", "selfSize", "id") _(optional)_: Sort order for results. Default is retainedSize.
+
+---
+
+## Logpoints
+
+### `set_logpoints`
+
+**Description:** Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. Original source locations require source maps, which --no-source-maps turns off. Only scripts of the page's main frame are supported: scripts in workers and in out-of-process iframes do not match. The logged output appears as regular console messages that can be read with [`list_console_messages`](#list_console_messages). Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.
+
+**Parameters:**
+
+- **logpoints** (array) **(required)**: The complete set of logpoints for the page, each formatted as &lt;url&gt;:&lt;lineNumber&gt;[:&lt;columnNumber&gt;] &lt;expression&gt;. The url is the URL of a script as served to the browser or the path of an original source file resolvable through source maps, matched exactly or as a path suffix (e.g. "src/app.ts"). lineNumber and the optional columnNumber are 1-based in the coordinates of the url; a line without executable code moves the logpoint to the next possible location. The expression is formatted like the arguments of console.log() and is evaluated in the scope of the location, so local variables are accessible (for source-mapped locations by their original names). Example: "src/cart.ts:42 'cart total:', cart.total, cart.items.length". Pass an empty array to remove all logpoints.
+- **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---
 

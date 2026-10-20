@@ -137,9 +137,9 @@ export async function generateReport(
 
 export * as DevTools from '../../third_party/devtools-frontend/mcp/mcp.js';
 
-// TODO: export these modules from devtools-frontend/mcp/mcp.ts and drop the
-// direct imports. They are needed for logpoints (BreakpointManager with
-// isLogpoint) and for looking up workspace source codes by URL.
+// TODO: switch to DevTools.BreakpointManager and DevTools.Workspace once the
+// submodule includes https://crrev.com/c/8608769, which exports them from
+// mcp.ts, and drop these direct imports.
 // eslint-disable-next-line no-restricted-imports
 export * as Breakpoints from '../../third_party/devtools-frontend/front_end/models/breakpoints/breakpoints.js';
 // eslint-disable-next-line no-restricted-imports

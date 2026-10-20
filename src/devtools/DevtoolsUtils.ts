@@ -127,6 +127,15 @@ export function overrideDevToolsGlobals({
     entrypointURL: import.meta
       .resolve('../third_party/devtools-formatter-worker.js'),
   });
+
+  // BreakpointManager.setBreakpoint() reveals a moved breakpoint location in
+  // the Sources panel. There is no UI here, so a no-op revealer keeps that
+  // from rejecting. TODO: drop once the reveal moves out of the model.
+  DevTools.Common.Revealer.RevealerRegistry.removeInstance();
+  DevTools.Common.Revealer.registerRevealer({
+    contextTypes: () => [Workspace.UISourceCode.UILocation],
+    loadRevealer: () => Promise.resolve({reveal: () => Promise.resolve()}),
+  });
 }
 
 export interface TargetUniverse {
@@ -135,24 +144,6 @@ export interface TargetUniverse {
   universe: DevTools.Foundation.Universe.Universe;
   /** The secondary session created for this page */
   session: CDPSession;
-}
-
-let uiLocationRevealerRegistered = false;
-
-/**
- * The breakpoint manager reveals a breakpoint location in the Sources panel
- * when it had to be moved. There is no UI here, so a no-op revealer is
- * registered once to keep that from failing.
- */
-function registerUILocationRevealer(): void {
-  if (uiLocationRevealerRegistered) {
-    return;
-  }
-  uiLocationRevealerRegistered = true;
-  DevTools.Common.Revealer.registerRevealer({
-    contextTypes: () => [Workspace.UISourceCode.UILocation],
-    loadRevealer: () => Promise.resolve({reveal: () => Promise.resolve()}),
-  });
 }
 
 export interface CreateTargetUniverseOptions {
@@ -219,10 +210,6 @@ export async function createTargetUniverse(
     undefined,
     connection,
   );
-
-  // Logpoints use the universe's breakpoint manager, which may reveal
-  // locations.
-  registerUILocationRevealer();
 
   return {target, universe, session};
 }

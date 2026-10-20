@@ -56,10 +56,6 @@ export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
 
   const tools: AnyToolDefinition[] = [];
   for (const tool of rawTools) {
-    // Tool modules may also export constants such as tool names.
-    if (typeof tool !== 'function') {
-      continue;
-    }
     tools.push(tool(args));
   }
 

@@ -11,6 +11,7 @@ import sinon from 'sinon';
 
 import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
+import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
 import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
@@ -2047,5 +2048,68 @@ describe('McpPage', () => {
       assert.strictEqual(mcpPage.getDialog(), undefined);
       assert.doesNotThrow(() => mcpPage.throwIfDialogOpen());
     });
+  });
+});
+
+describe('McpPage logpoints', () => {
+  async function createMcpPageWithUniverse() {
+    const pptrPage = createMockPuppeteerPage();
+    pptrPage.emulateFocusedPage.resolves();
+    const target = createMockPuppeteerTarget({page: pptrPage});
+    const mcpPage = new McpPage(target, 1, {
+      config: createMockServerConfig(),
+      locatorClass: Locator,
+    });
+    const universe = sinon.createStubInstance(
+      DevTools.Foundation.Universe.Universe,
+    );
+    sinon.stub(mcpPage, 'devtoolsUniverse').get((): TargetUniverse => ({
+      universe,
+      target: sinon.createStubInstance(DevTools.Target),
+      session: createMockCDPSession(),
+    }));
+    await mcpPage.init();
+    return mcpPage;
+  }
+
+  it('setLogpoints with an empty list creates no LogpointManager', async () => {
+    const setLogpoints = sinon.stub(LogpointManager.prototype, 'setLogpoints');
+    const mcpPage = await createMcpPageWithUniverse();
+
+    assert.deepStrictEqual(await mcpPage.setLogpoints([]), []);
+
+    sinon.assert.notCalled(setLogpoints);
+  });
+
+  it('setLogpoints creates one LogpointManager and forwards the list', async () => {
+    const setLogpoints = sinon
+      .stub(LogpointManager.prototype, 'setLogpoints')
+      .resolves([]);
+    const mcpPage = await createMcpPageWithUniverse();
+    const logpoints = [{url: 'app.js', lineNumber: 2, expression: `'x'`}];
+
+    await mcpPage.setLogpoints(logpoints);
+    await mcpPage.setLogpoints([]);
+
+    sinon.assert.calledTwice(setLogpoints);
+    sinon.assert.calledWithExactly(setLogpoints.firstCall, logpoints);
+    sinon.assert.calledWithExactly(setLogpoints.secondCall, []);
+    assert.strictEqual(
+      setLogpoints.firstCall.thisValue,
+      setLogpoints.secondCall.thisValue,
+    );
+  });
+
+  it('dispose releases the LogpointManager', async () => {
+    sinon.stub(LogpointManager.prototype, 'setLogpoints').resolves([]);
+    const dispose = sinon.stub(LogpointManager.prototype, 'dispose');
+    const mcpPage = await createMcpPageWithUniverse();
+    await mcpPage.setLogpoints([
+      {url: 'app.js', lineNumber: 2, expression: `'x'`},
+    ]);
+
+    mcpPage.dispose();
+
+    sinon.assert.calledOnce(dispose);
   });
 });
