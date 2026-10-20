@@ -214,6 +214,31 @@ function formatValidationError(toolName: string, error: zod.ZodError): string {
   return `Input validation error: Invalid arguments for tool ${toolName}: ${details}`;
 }
 
+function errorResult(text: string): CallToolResult {
+  return {
+    content: [{type: 'text', text}],
+    isError: true,
+  };
+}
+
+/**
+ * The page id a page tool call targets, or `undefined` when the call targets
+ * the selected page.
+ */
+function routedPageId(
+  tool: AnyToolDefinition,
+  serverArgs: ParsedArguments,
+  args: Record<string, unknown>,
+): number | undefined {
+  if (!serverArgs.pageIdRouting || isSlimTool(tool)) {
+    return undefined;
+  }
+  const {pageId} = args;
+  return typeof pageId === 'number' && Number.isInteger(pageId)
+    ? pageId
+    : undefined;
+}
+
 export class ToolHandler {
   #tool: AnyToolDefinition;
   #config: ReadonlyServerConfig;
@@ -381,10 +406,9 @@ export class ToolHandler {
     try {
       await validateToolFiles(tool, params, context, isLocalBrowser(browser));
       if (isPageScopedTool(tool)) {
-        const pageId =
-          typeof params.pageId === 'number' ? params.pageId : undefined;
+        const pageId = routedPageId(tool, serverArgs, params);
         page =
-          serverArgs.pageIdRouting && pageId !== undefined && !isSlimTool(tool)
+          pageId !== undefined
             ? context.getPageById(pageId)
             : context.getSelectedMcpPage();
         await page?.init({emulateFocus: true});
@@ -437,30 +461,14 @@ export class ToolHandler {
       }
 
       if (this.#disabledReason) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: this.#disabledReason,
-            },
-          ],
-          isError: true,
-        };
+        return errorResult(this.#disabledReason);
       }
 
       const tool = this.#tool;
       const serverArgs = this.#config.resolved;
       const parseResult = this.#registeredInputSchema.safeParse(rawArgs);
       if (!parseResult.success) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: formatValidationError(tool.name, parseResult.error),
-            },
-          ],
-          isError: true,
-        };
+        return errorResult(formatValidationError(tool.name, parseResult.error));
       }
       const params = parseResult.data;
 
@@ -532,15 +540,7 @@ export class ToolHandler {
         if ('cause' in err && err.cause) {
           errorText += `\nCause: ${err.cause.message}`;
         }
-        return {
-          content: [
-            {
-              type: 'text',
-              text: errorText,
-            },
-          ],
-          isError: true,
-        };
+        return errorResult(errorText);
       } finally {
         void ClearcutLogger.get()?.logToolInvocation({
           toolName: tool.name,
