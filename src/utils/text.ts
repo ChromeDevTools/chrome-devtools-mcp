@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DevTools} from '../third_party/index.js';
+
+const {StringUtilities} = DevTools.Platform;
+
 const VALID_PLACEHOLDER_MATCH_PATTERN =
   /\{(PLACEHOLDER_[a-zA-Z][a-zA-Z0-9_]*)\}/g;
 
@@ -23,13 +27,10 @@ export function substitutePlaceholders(
   );
 }
 
-const graphemeSegmenter = new Intl.Segmenter(undefined, {
-  granularity: 'grapheme',
-});
-
 /**
  * Truncates `text` to at most `maxLength` UTF-16 code units and appends
- * `ellipsis` when anything was cut off. The cut moves back to the last
+ * `ellipsis` when anything was cut off. The cut uses devtools-frontend's
+ * `StringUtilities.truncateToCodeUnitLength`, which moves back to the last
  * grapheme boundary at or before the limit, so surrogate pairs and emoji
  * sequences stay whole and the result never contains a lone surrogate, which
  * `JSON.stringify` serializes as an escape like `\ud83d` that strict JSON
@@ -51,12 +52,5 @@ export function truncateText(
   const keep = includeEllipsisInLength
     ? Math.max(0, maxLength - ellipsis.length)
     : maxLength;
-  let cut = 0;
-  for (const {index} of graphemeSegmenter.segment(text)) {
-    if (index > keep) {
-      break;
-    }
-    cut = index;
-  }
-  return text.slice(0, cut) + ellipsis;
+  return StringUtilities.truncateToCodeUnitLength(text, keep) + ellipsis;
 }
