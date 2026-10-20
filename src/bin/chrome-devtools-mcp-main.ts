@@ -37,8 +37,7 @@ setupUnhandledRejectionHandler(() => {
 });
 
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-// BrowserManager only reads non-reloadable launch and connection options.
-const browserManager = new BrowserManager(args, {
+const browserManager = new BrowserManager(serverConfig, {
   logFile,
 });
 const serverPromise = McpServer.from(serverConfig, {

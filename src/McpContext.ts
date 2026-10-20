@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
 import type {
@@ -74,12 +75,39 @@ export interface McpContextOptions {
   getBrowser: () => Promise<Browser>;
 }
 
-interface FeatureController {
-  gate: CapabilityGate;
-  onDisable(context: McpContext): Promise<void> | void;
+interface OptionGate {
+  options: ReadonlyArray<keyof ParsedArguments>;
+}
+
+type FeatureController =
+  | {
+      gate: OptionGate;
+      onChange(context: McpContext): Promise<unknown> | void;
+    }
+  | {
+      gate: CapabilityGate;
+      onDisable(context: McpContext): Promise<void> | void;
+    };
+
+function hasOptionChanged(
+  gate: OptionGate,
+  previousArgs: ParsedArguments,
+  nextArgs: ParsedArguments,
+): boolean {
+  return gate.options.some(
+    option => !isDeepStrictEqual(nextArgs[option], previousArgs[option]),
+  );
 }
 
 const FEATURE_CONTROLLERS: readonly FeatureController[] = [
+  {
+    gate: {options: ['sourceMaps']},
+    onChange: context => context.syncSourceMaps(),
+  },
+  {
+    gate: {options: ['experimentalIncludeAllPages']},
+    onChange: context => context.createPagesSnapshot(),
+  },
   {
     gate: {category: ToolCategory.DEBUGGING},
     onDisable: context => context.releaseScreencasts(),
@@ -199,24 +227,26 @@ export class McpContext implements Context, BrowserlessContext {
    */
   async onConfigChanged(previousArgs: ParsedArguments): Promise<void> {
     const nextArgs = this.#config.resolved;
-    if (nextArgs.sourceMaps !== previousArgs.sourceMaps) {
-      for (const mcpPage of this.#allMcpPages()) {
-        mcpPage.syncSourceMaps();
-      }
-    }
-    if (
-      nextArgs.experimentalIncludeAllPages !==
-      previousArgs.experimentalIncludeAllPages
-    ) {
-      await this.createPagesSnapshot();
-    }
     for (const controller of FEATURE_CONTROLLERS) {
-      if (
+      if ('onChange' in controller) {
+        if (hasOptionChanged(controller.gate, previousArgs, nextArgs)) {
+          await controller.onChange(this);
+        }
+      } else if (
         isCapabilityEnabled(controller.gate, previousArgs) &&
         !isCapabilityEnabled(controller.gate, nextArgs)
       ) {
         await controller.onDisable(this);
       }
+    }
+  }
+
+  /**
+   * Synchronizes the DevTools source maps setting across all pages.
+   */
+  syncSourceMaps(): void {
+    for (const mcpPage of this.#allMcpPages()) {
+      mcpPage.syncSourceMaps();
     }
   }
 
