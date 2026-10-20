@@ -75,8 +75,6 @@ _Pass the element's `uid` from the snapshot as an argument to `evaluate_script`.
 
 To verify color contrast ratios, use the **"Check Color Contrast" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md) with `evaluate_script`.
 
-`list_console_messages` with `types: ["issue"]` can show contrast issues that Chrome has emitted, but it does not request a contrast check. The absence of a "Low Contrast" issue is not evidence that text has sufficient contrast.
-
 ### 8. Global Page Checks
 
 Verify document-level accessibility settings often missed in component testing using the **"Global Page Checks" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).
