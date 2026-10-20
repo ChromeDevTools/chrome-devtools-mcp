@@ -20,6 +20,7 @@ import {NetworkFormatter} from '../src/formatters/NetworkFormatter.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
+import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import {
   type Browser,
@@ -69,6 +70,32 @@ const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
 );
 
 describe('McpContext', () => {
+  it('preserves real focus during page listing and automatic fallback', async () => {
+    const focusStates: boolean[] = [];
+    await withMcpContext(async (_response, context) => {
+      const initialPage = context.getSelectedMcpPage().pptrPage;
+      const fallbackPage = await context.browser.newPage();
+      const foregroundPage = await context.browser.newPage();
+      await foregroundPage.bringToFront();
+
+      focusStates.push(await initialPage.evaluate(() => document.hasFocus()));
+      await context.createPagesSnapshot();
+      focusStates.push(await initialPage.evaluate(() => document.hasFocus()));
+
+      await initialPage.close();
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedMcpPage().pptrPage, fallbackPage);
+      focusStates.push(await fallbackPage.evaluate(() => document.hasFocus()));
+
+      const createdPage = await context.newPage(true);
+      focusStates.push(
+        await createdPage.pptrPage.evaluate(() => document.hasFocus()),
+        await fallbackPage.evaluate(() => document.hasFocus()),
+      );
+    });
+    assert.deepStrictEqual(focusStates, [false, false, false, true, false]);
+  });
+
   function createPageTarget() {
     const page = createMockPuppeteerPage();
     page.emulateFocusedPage.resolves();
@@ -91,7 +118,8 @@ describe('McpContext', () => {
       {
         config: options?.config ?? createMockServerConfig(),
         heapSnapshotManager:
-          options?.heapSnapshotManager ?? new HeapSnapshotManager(),
+          options?.heapSnapshotManager ??
+          new HeapSnapshotManager(new TaskRunner()),
       },
       Locator,
     );
@@ -107,7 +135,7 @@ describe('McpContext', () => {
           config: createMockServerConfig({
             performanceCrux: false,
           }),
-          heapSnapshotManager: new HeapSnapshotManager(),
+          heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
         },
         Locator,
       );
@@ -154,7 +182,7 @@ describe('McpContext', () => {
             config: createMockServerConfig({
               performanceCrux: false,
             }),
-            heapSnapshotManager: new HeapSnapshotManager(),
+            heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
           },
           Locator,
         );
@@ -741,7 +769,7 @@ describe('McpContext', () => {
         config: createMockServerConfig({
           performanceCrux: false,
         }),
-        heapSnapshotManager: new HeapSnapshotManager(),
+        heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
       };
       const first = await createConnectedMcpContext(browser, options, Locator);
       const idBeforeReconnect = (await first.newPage()).id;
@@ -781,13 +809,15 @@ describe('McpContext', () => {
 
   describe('lazy browser connection', () => {
     function createLazyContext(getBrowser: () => Promise<Browser>) {
+      const taskRunner = new TaskRunner();
       return McpContext.create(
         undefined,
         {
           config: createMockServerConfig({
             performanceCrux: false,
           }),
-          heapSnapshotManager: new HeapSnapshotManager(),
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
           getBrowser,
         },
         Locator,
@@ -799,6 +829,59 @@ describe('McpContext', () => {
       browser.targets.returns([]);
       return browser;
     }
+
+    it('serializes concurrent createPagesSnapshot() calls', async () => {
+      const browser = createBrowser();
+      browser.targets.returns([createMockPuppeteerTarget()]);
+      const {promise: initDone, resolve: finishInit} =
+        Promise.withResolvers<void>();
+      const init = sinon.stub(McpPage.prototype, 'init').resolves();
+      init.onSecondCall().returns(initDone);
+      const context = createLazyContext(async () => browser);
+      await context.ensureBrowser();
+      sinon.assert.calledOnce(init);
+
+      const first = context.createPagesSnapshot();
+      const second = context.createPagesSnapshot();
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledTwice(init);
+
+      finishInit();
+      await Promise.all([first, second]);
+      sinon.assert.calledThrice(init);
+      context.dispose();
+    });
+
+    it('returns one page task queue per page id', async () => {
+      const context = createLazyContext(async () => createBrowser());
+      const queue = context.pageTaskQueue(1);
+      assert.strictEqual(context.pageTaskQueue(1), queue);
+      assert.notStrictEqual(context.pageTaskQueue(2), queue);
+      assert.strictEqual(queue.parent, context.taskQueue);
+      context.dispose();
+    });
+
+    it('disposes the page task queue with the page', async () => {
+      const browser = createBrowser();
+      browser.targets.returns([createMockPuppeteerTarget()]);
+      sinon.stub(McpPage.prototype, 'init').resolves();
+      const context = createLazyContext(async () => browser);
+      await context.ensureBrowser();
+      const page = context.getSelectedMcpPage();
+      const {promise: release, resolve: finishRunning} =
+        Promise.withResolvers<void>();
+      const running = (async () => {
+        using guard = await context.pageTaskQueue(page.id).scheduleTask();
+        await release;
+      })();
+      const waiting = context.pageTaskQueue(page.id).scheduleTask();
+
+      context.dispose();
+
+      await assert.rejects(waiting, new RegExp(`Page ${page.id} is closed\\.`));
+      finishRunning();
+      await running;
+    });
 
     it('does not connect until ensureBrowser() is called', async () => {
       const browser = createBrowser();
@@ -1312,7 +1395,7 @@ describe('McpContext', () => {
               allowedUrlPattern: options.allowlist,
               blockedUrlPattern: options.blocklist,
             }),
-            heapSnapshotManager: new HeapSnapshotManager(),
+            heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
           },
           Locator,
         );
@@ -1647,6 +1730,116 @@ describe('McpContext', () => {
       sinon.assert.calledOnceWithExactly(syncSourceMapsSpy);
     });
 
+    it('updates browser network restrictions only when blockedUrlPattern or allowedUrlPattern changes', async () => {
+      const browser = createMockPuppeteerBrowser();
+      const config = createMockServerConfig();
+      const context = await createMockContext({browser, config});
+      const mcpPage = context.getSelectedMcpPage();
+      const clearNetworkConditionsSpy = sinon.spy(
+        mcpPage,
+        'clearNetworkConditions',
+      );
+
+      await updateConfig(config, context, {performanceCrux: false});
+      sinon.assert.notCalled(browser.restrictNetwork);
+      sinon.assert.notCalled(clearNetworkConditionsSpy);
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://blocked.example.com/*'],
+      });
+      sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
+        blocklist: ['https://blocked.example.com/*'],
+        allowlist: undefined,
+      });
+      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
+
+      browser.restrictNetwork.resetHistory();
+      clearNetworkConditionsSpy.resetHistory();
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://blocked.example.com/*'],
+      });
+      sinon.assert.notCalled(browser.restrictNetwork);
+      sinon.assert.notCalled(clearNetworkConditionsSpy);
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: undefined,
+        allowedUrlPattern: ['https://allowed.example.com/*'],
+      });
+      sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
+        blocklist: undefined,
+        allowlist: ['https://allowed.example.com/*'],
+      });
+      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
+
+      browser.restrictNetwork.resetHistory();
+      clearNetworkConditionsSpy.resetHistory();
+      await updateConfig(config, context, {
+        allowedUrlPattern: undefined,
+      });
+      sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
+        blocklist: undefined,
+        allowlist: undefined,
+      });
+      sinon.assert.notCalled(clearNetworkConditionsSpy);
+    });
+
+    it('does not connect a browser when network restrictions change before ensureBrowser() is called', async () => {
+      const config = createMockServerConfig();
+      const getBrowser = sinon
+        .stub<[], Promise<Browser>>()
+        .resolves(createMockPuppeteerBrowser());
+      const taskRunner = new TaskRunner();
+      const context = McpContext.create(
+        undefined,
+        {
+          config,
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
+          getBrowser,
+        },
+        Locator,
+      );
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://blocked.example.com/*'],
+      });
+
+      sinon.assert.notCalled(getBrowser);
+      context.dispose();
+    });
+
+    it('reads updated blockedUrlPattern and allowedUrlPattern in loadResource', async () => {
+      sinon.stub(globalThis, 'fetch').callsFake(async () => new Response('ok'));
+      const config = createMockServerConfig();
+      const context = await createMockContext({config});
+
+      assert.strictEqual(
+        await context.loadResource('https://example.com/resource.map'),
+        'ok',
+      );
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://example.com/*'],
+      });
+      await assert.rejects(
+        context.loadResource('https://example.com/resource.map'),
+        /Blocked by blocklist/,
+      );
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: undefined,
+        allowedUrlPattern: ['https://allowed.example.com/*'],
+      });
+      await assert.rejects(
+        context.loadResource('https://example.com/resource.map'),
+        /Not allowed by allowlist/,
+      );
+      assert.strictEqual(
+        await context.loadResource('https://allowed.example.com/resource.map'),
+        'ok',
+      );
+    });
+
     it('refreshes the pages when experimentalIncludeAllPages changes', async () => {
       const config = createMockServerConfig({
         experimentalIncludeAllPages: false,
@@ -1773,7 +1966,7 @@ describe('McpContext', () => {
     });
 
     it('disposes loaded heap snapshots', async () => {
-      const heapSnapshotManager = new HeapSnapshotManager();
+      const heapSnapshotManager = new HeapSnapshotManager(new TaskRunner());
       const context = await createMockContext({
         heapSnapshotManager,
       });
@@ -1787,7 +1980,7 @@ describe('McpContext', () => {
     });
 
     it('does not dispose heapSnapshotManager when no snapshots are loaded', async () => {
-      const heapSnapshotManager = new HeapSnapshotManager();
+      const heapSnapshotManager = new HeapSnapshotManager(new TaskRunner());
       const disposeSpy = sinon.spy(heapSnapshotManager, 'dispose');
       const context = await createMockContext({heapSnapshotManager});
 

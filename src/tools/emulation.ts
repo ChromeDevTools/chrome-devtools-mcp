@@ -124,6 +124,7 @@ export const emulate = definePageTool(() => ({
       ),
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

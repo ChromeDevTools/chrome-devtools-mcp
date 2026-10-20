@@ -22,6 +22,7 @@ import {
   PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
+  type Frame,
   type Viewport,
   type WebMCPTool,
   type Protocol,
@@ -153,6 +154,7 @@ export class McpPage implements ContextPage {
 
   #pptrPage?: Page;
   #initPromise?: Promise<void>;
+  #focusEmulationRequested = false;
   #disposed = false;
   #closed = false;
 
@@ -291,19 +293,26 @@ export class McpPage implements ContextPage {
     await page?.close({runBeforeUnload: false});
   }
 
-  async init(): Promise<void> {
+  async init(options?: {emulateFocus?: boolean}): Promise<void> {
     if (this.#disposed) {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
-    if (this.#initPromise) {
-      return await this.#initPromise;
+    if (!this.#initPromise) {
+      this.#initPromise = this.#doInit().catch(err => {
+        this.#initPromise = undefined;
+        throw err;
+      });
     }
-    this.#initPromise = this.#doInit();
-    try {
-      await this.#initPromise;
-    } catch (err) {
-      this.#initPromise = undefined;
-      throw err;
+    await this.#initPromise;
+    // Discovery skips focus emulation, but a later page tool still needs it.
+    if (
+      options?.emulateFocus !== false &&
+      !this.#disposed &&
+      !this.#focusEmulationRequested
+    ) {
+      // Prevent duplicate requests while pending and after success.
+      this.#focusEmulationRequested = true;
+      this.#initFocusEmulationNoThrow();
     }
   }
 
@@ -342,18 +351,17 @@ export class McpPage implements ContextPage {
       );
     }
     this.updateTimeouts();
-    await Promise.allSettled([
-      this.#initDevToolsUniverseNoThrow(),
-      this.#initFocusEmulationNoThrow(),
-    ]);
+    await this.#initDevToolsUniverseNoThrow();
     if (this.#disposed) {
       this.dispose();
     }
   }
 
-  async #initFocusEmulationNoThrow(): Promise<void> {
-    // We emulate a focused page for all pages to support multi-agent workflows.
+  #initFocusEmulationNoThrow(): void {
+    // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      // Allow the next page operation to retry a transient failure.
+      this.#focusEmulationRequested = false;
       logger?.('Error turning on focused page emulation', error);
     });
   }
@@ -1239,7 +1247,7 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
+      await page.setGeolocation(null);
       delete newSettings.geolocation;
     } else {
       await page.setGeolocation(options.geolocation);
@@ -1325,6 +1333,14 @@ export class McpPage implements ContextPage {
     }
   }
 
+  clearNetworkConditions(): void {
+    if (!this.emulationSettings.networkConditions) {
+      return;
+    }
+    delete this.emulationSettings.networkConditions;
+    this.updateTimeouts();
+  }
+
   updateTimeouts(): void {
     if (!this.#pptrPage) {
       return;
@@ -1344,23 +1360,79 @@ export class McpPage implements ContextPage {
     );
   }
 
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
-    const frames = this.pptrPage.frames();
+  waitForTextOnPage(
+    text: string[],
+    options: {timeout?: number; visible?: boolean} = {},
+  ): Promise<Element> {
+    const {timeout, visible} = options;
+    const page = this.pptrPage;
+    const initialFrames = page.frames();
+    const observedFrames = new Set(initialFrames);
+    const controller = new AbortController();
 
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => [
-          frame.locator(`aria/${value}`),
-          frame.locator(`text/${value}`),
-        ]),
-      ),
-    );
+    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
+      this.#locatorClass.race(
+        frames.flatMap(frame =>
+          text.flatMap(value => {
+            const locators = [
+              frame.locator(`aria/${value}`),
+              frame.locator(`text/${value}`),
+            ];
+            return visible
+              ? locators.map(locator => locator.setVisibility('visible'))
+              : locators;
+          }),
+        ),
+      );
 
+    let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {
-      locator = locator.setTimeout(timeout);
+      initialLocator = initialLocator.setTimeout(timeout);
     }
 
-    return locator.wait();
+    return new Promise<Element>((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): boolean => {
+        if (settled) {
+          return false;
+        }
+        settled = true;
+        page.off('frameattached', onFrameAttached);
+        controller.abort();
+        return true;
+      };
+      const finish = (element: Element): void => {
+        if (cleanup()) {
+          resolve(element);
+        }
+      };
+      const fail = (error: unknown): void => {
+        if (cleanup()) {
+          reject(error);
+        }
+      };
+      const onFrameAttached = (frame: Frame): void => {
+        if (observedFrames.has(frame)) {
+          return;
+        }
+        observedFrames.add(frame);
+        // The initial locator race does not include frames added later.
+        // Watch each new frame until the initial race resolves or times out.
+        // A timeout of 0 disables the frame timer; controller.abort() stops it.
+        void locatorForFrames([frame])
+          .setTimeout(0)
+          .wait({signal: controller.signal})
+          .then(finish, error => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            logger?.('Failed to wait for text in an attached frame', error);
+          });
+      };
+
+      page.on('frameattached', onFrameAttached);
+      void initialLocator.wait({signal: controller.signal}).then(finish, fail);
+    });
   }
 
   /**

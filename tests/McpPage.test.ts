@@ -13,7 +13,12 @@ import {UncaughtError} from '../src/collectors/PageCollector.js';
 import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
+import {
+  DevTools,
+  Frame,
+  Locator,
+  ScreenRecorder,
+} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
@@ -458,6 +463,114 @@ describe('McpPage', () => {
     });
   });
 
+  describe('focus emulation', () => {
+    function createPage() {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const mcpPage = new McpPage(target, 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      return {mcpPage, pptrPage, target};
+    }
+
+    it('requests focus once on default initialization', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+
+      await mcpPage.init();
+      await mcpPage.init();
+      await mcpPage.init({emulateFocus: false});
+
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      sinon.assert.calledOnceWithExactly(target.page);
+    });
+
+    it('initializes without focus until a tool requests it', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+
+      await mcpPage.init({emulateFocus: false});
+      await mcpPage.init({emulateFocus: false});
+
+      assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+
+      await mcpPage.init();
+      await mcpPage.init();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      sinon.assert.calledOnceWithExactly(target.page);
+    });
+
+    it('shares initialization and requests focus once for concurrent callers', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+
+      await Promise.all([
+        mcpPage.init({emulateFocus: false}),
+        mcpPage.init(),
+        mcpPage.init(),
+      ]);
+
+      sinon.assert.calledOnceWithExactly(target.page);
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+
+    it('retries a failed focus request and retains successful emulation', async () => {
+      const {mcpPage, pptrPage} = createPage();
+      pptrPage.emulateFocusedPage
+        .onFirstCall()
+        .rejects(new Error('Target closed'));
+
+      await mcpPage.init();
+      await mcpPage.init();
+      await mcpPage.init();
+
+      assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      sinon.assert.calledTwice(pptrPage.emulateFocusedPage);
+      sinon.assert.alwaysCalledWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+
+    it('does not wait for or duplicate a pending focus request', async () => {
+      const {mcpPage, pptrPage} = createPage();
+      const focus = Promise.withResolvers<void>();
+      pptrPage.emulateFocusedPage.returns(focus.promise);
+
+      try {
+        await Promise.all([mcpPage.init(), mcpPage.init()]);
+        sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      } finally {
+        focus.resolve();
+      }
+    });
+
+    it('skips focus when disposed during initialization', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+      const page = Promise.withResolvers<typeof pptrPage>();
+      target.page.returns(page.promise);
+
+      const initialization = mcpPage.init();
+      mcpPage.dispose();
+      page.resolve(pptrPage);
+      await initialization;
+
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+      await assert.rejects(mcpPage.init(), /already been disposed/);
+    });
+
+    it('retries base initialization after a failure before requesting focus', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+      target.page.onFirstCall().rejects(new Error('Target unavailable'));
+
+      await assert.rejects(mcpPage.init(), /Target unavailable/);
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+
+      await mcpPage.init();
+
+      sinon.assert.calledTwice(target.page);
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+  });
+
   describe('getTitle()', () => {
     function createPage(url: string, title: string): McpPage {
       const target = createMockPuppeteerTarget({url, title});
@@ -629,7 +742,7 @@ describe('McpPage', () => {
       });
     });
 
-    it('calls setGeolocation with (0, 0) when geolocation is omitted', async () => {
+    it('clears the geolocation override when geolocation is omitted', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({
         geolocation: {latitude: 48.137154, longitude: 11.576124},
@@ -637,10 +750,7 @@ describe('McpPage', () => {
       await mcpPage.emulate({});
       assert.strictEqual(mcpPage.geolocation, null);
       sinon.assert.calledTwice(pptrPage.setGeolocation);
-      sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, {
-        latitude: 0,
-        longitude: 0,
-      });
+      sinon.assert.calledWithExactly(pptrPage.setGeolocation.secondCall, null);
     });
 
     it('calls setUserAgent with the given user agent', async () => {
@@ -897,6 +1007,46 @@ describe('McpPage', () => {
     });
   });
 
+  describe('clearNetworkConditions()', () => {
+    it('clears networkConditions and updates timeouts while keeping other emulation settings', async () => {
+      const config = createMockServerConfig();
+      const {mcpPage, pptrPage} = await createMcpPage({config});
+      await mcpPage.emulate({
+        networkConditions: 'Slow 3G',
+        cpuThrottlingRate: 2,
+      });
+      pptrPage.setDefaultTimeout.resetHistory();
+      pptrPage.setDefaultNavigationTimeout.resetHistory();
+      config.commit(
+        createMockServerConfig({
+          blockedUrlPattern: ['https://example.com/*'],
+        }),
+      );
+
+      mcpPage.clearNetworkConditions();
+
+      assert.strictEqual(mcpPage.networkConditions, null);
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 2);
+      sinon.assert.calledOnceWithExactly(pptrPage.setDefaultTimeout, 10_000);
+      sinon.assert.calledOnceWithExactly(
+        pptrPage.setDefaultNavigationTimeout,
+        20_000,
+      );
+      await mcpPage.restoreEmulation();
+    });
+
+    it('does nothing when networkConditions is not set', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.setDefaultTimeout.resetHistory();
+      pptrPage.setDefaultNavigationTimeout.resetHistory();
+
+      mcpPage.clearNetworkConditions();
+
+      sinon.assert.notCalled(pptrPage.setDefaultTimeout);
+      sinon.assert.notCalled(pptrPage.setDefaultNavigationTimeout);
+    });
+  });
+
   describe('getNetworkRequests', () => {
     it('delegates to networkCollector.getData with includePreservedRequests', async () => {
       const {mcpPage} = await createMcpPage();
@@ -1056,6 +1206,152 @@ describe('McpPage', () => {
         const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
         assert.ok(element);
       });
+    });
+
+    it('preserves default matching for hidden DOM text', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          '<p style="display:none">Saved successfully</p>',
+        );
+
+        const element = await mcpPage.waitForTextOnPage(
+          ['Saved successfully'],
+          {timeout: 500},
+        );
+        assert.ok(element);
+      });
+    });
+
+    it('waits for hidden text to become visible when requested', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent(
+          '<p id="saved" style="display:none">Saved successfully</p>',
+        );
+
+        await page.evaluate(() => {
+          setTimeout(() => {
+            document.getElementById('saved')!.style.display = 'block';
+          }, 250);
+        });
+        const element = await mcpPage.waitForTextOnPage(
+          ['Saved successfully'],
+          {timeout: 1500, visible: true},
+        );
+        assert.ok(element);
+      });
+    });
+
+    it('times out when visible text never appears', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          '<p style="display:none">Saved successfully</p>',
+        );
+
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Saved successfully'], {
+            timeout: 300,
+            visible: true,
+          }),
+          /Timed out/,
+        );
+      });
+    });
+
+    it('visible text remains immediately matchable when requested', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent('<p>Visible from the start</p>');
+        assert.ok(
+          await mcpPage.waitForTextOnPage(['Visible from the start'], {
+            timeout: 500,
+            visible: true,
+          }),
+        );
+      });
+    });
+
+    it('finds text in an iframe attached while waiting', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>Waiting for the frame</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        const waitPromise = mcpPage.waitForTextOnPage(
+          ['Arrived in a late iframe'],
+          {timeout: 1500},
+        );
+        await page.evaluate(() => {
+          const frame = document.createElement('iframe');
+          frame.srcdoc = '<p>Arrived in a late iframe</p>';
+          document.body.appendChild(frame);
+        });
+
+        const element = await waitPromise;
+        assert.ok(element);
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('cleans the frame listener after a timed out wait', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>No matching text</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Text that never appears'], {
+            timeout: 250,
+          }),
+        );
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('applies visible matching to frames attached while waiting', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.frames.returns([]);
+      const initialRace = Locator.race([]);
+      sinon.stub(initialRace, 'wait').returns(new Promise(() => {}));
+      const lateRace = Locator.race([]);
+      const lateRaceSetTimeout = sinon
+        .stub(lateRace, 'setTimeout')
+        .returns(lateRace);
+      sinon.stub(lateRace, 'wait').resolves();
+      const race = sinon.stub(Locator, 'race');
+      race.onFirstCall().returns(initialRace);
+      race.onSecondCall().returns(lateRace);
+      const frameLocator = sinon.createStubInstance<Locator<Element>>(Locator);
+      frameLocator.setVisibility.returns(frameLocator);
+      const lateFrame = sinon.createStubInstance(Frame);
+      lateFrame.locator.returns(frameLocator);
+
+      const waitPromise = mcpPage.waitForTextOnPage(['Saved'], {visible: true});
+      pptrPage.emit('frameattached', lateFrame);
+      await waitPromise;
+
+      sinon.assert.calledWithExactly(lateFrame.locator.firstCall, 'aria/Saved');
+      sinon.assert.calledWithExactly(
+        lateFrame.locator.secondCall,
+        'text/Saved',
+      );
+      sinon.assert.calledTwice(frameLocator.setVisibility);
+      sinon.assert.alwaysCalledWithExactly(
+        frameLocator.setVisibility,
+        'visible',
+      );
+      sinon.assert.calledOnceWithExactly(lateRaceSetTimeout, 0);
     });
   });
 

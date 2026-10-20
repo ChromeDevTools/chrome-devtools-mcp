@@ -59,19 +59,30 @@ export const browserOptions = {
     type: 'string',
     description:
       'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    coerce: (val: string | undefined) => {
+    coerce: (val: unknown) => {
       if (!val) {
         return;
       }
       try {
-        const parsed = JSON.parse(val);
-        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        const parsed: unknown = typeof val === 'string' ? JSON.parse(val) : val;
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
           throw new Error('Headers must be a JSON object');
         }
-        return parsed as Record<string, string>;
+        const headers: Record<string, string> = {};
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value !== 'string') {
+            throw new Error(`Header "${key}" must have a string value`);
+          }
+          headers[key] = value;
+        }
+        return headers;
       } catch (error) {
         throw new Error(
-          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
+          `Invalid JSON for wsHeaders: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     },

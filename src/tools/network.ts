@@ -72,6 +72,7 @@ export const listNetworkRequests = definePageTool((args: ParsedArguments) => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const data = await request.page.getDevToolsData();
@@ -117,6 +118,7 @@ export const getNetworkRequest = definePageTool(() => ({
       ),
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {
     requestFilePath: true,
     responseFilePath: true,

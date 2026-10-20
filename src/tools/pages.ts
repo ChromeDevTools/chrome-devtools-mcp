@@ -17,6 +17,7 @@ import {
   defineTool,
   timeoutSchema,
 } from './ToolDefinition.js';
+import type {ContextPage} from './ToolDefinition.js';
 
 export const listPages = defineTool((args: ParsedArguments) => {
   return {
@@ -28,6 +29,7 @@ export const listPages = defineTool((args: ParsedArguments) => {
     },
     schema: {},
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {},
     handler: async (_request, response) => {
       response.setIncludePages(true);
@@ -56,10 +58,11 @@ export const selectPage = defineTool((args: ParsedArguments) => ({
       .describe('Whether to focus the page and bring it to the top.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
-    await page.init();
+    await page.init({emulateFocus: true});
     context.selectPage(page);
     response.setIncludePages(true);
     response.setListThirdPartyDeveloperTools();
@@ -83,6 +86,7 @@ export const closePage = defineTool(() => ({
       .describe('The ID of the page to close. Call list_pages to list pages.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     try {
@@ -126,6 +130,7 @@ export const newPage = defineTool((args: ParsedArguments) => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {},
     handler: async (request, response, context) => {
       validateUrl(request.params.url, {
@@ -134,19 +139,48 @@ export const newPage = defineTool((args: ParsedArguments) => {
         fileNavigations: args?.fileNavigations,
       });
 
+      let previousPage: ContextPage | undefined;
+      try {
+        previousPage = context.getSelectedMcpPage();
+      } catch {
+        // Nothing is selected, so there is no selection to restore on failure.
+      }
       const page = await context.newPage(
         request.params.background,
         request.params.isolatedContext,
       );
 
-      await page.waitForEventsAfterAction(
-        async () => {
-          await page.pptrPage.goto(request.params.url, {
-            timeout: request.params.timeout,
-          });
-        },
-        {timeout: request.params.timeout},
-      );
+      try {
+        await page.waitForEventsAfterAction(
+          async () => {
+            await page.pptrPage.goto(request.params.url, {
+              timeout: request.params.timeout,
+            });
+          },
+          {timeout: request.params.timeout},
+        );
+      } catch (error) {
+        // A dialog-blocked load stays open for handle_dialog. Otherwise cleanup is
+        // best-effort: the navigation error is always what gets rethrown.
+        if (page.getDialog()) {
+          response.setIncludePages(true);
+        } else {
+          try {
+            if (previousPage && !previousPage.isClosed()) {
+              context.selectPage(previousPage);
+            }
+          } catch {
+            // Keep the new tab selected.
+          }
+          try {
+            await context.closePage(page.id);
+          } catch {
+            // The tab survived, so list pages to tell the caller its pageId.
+            response.setIncludePages(true);
+          }
+        }
+        throw error;
+      }
 
       response.setIncludePages(true);
       response.setListThirdPartyDeveloperTools();
@@ -193,6 +227,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
       const page = request.page;
@@ -327,6 +362,7 @@ export const resizePage = definePageTool(() => ({
     height: zod.number().int().positive().describe('Page height'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -373,6 +409,7 @@ export const handleDialog = definePageTool(() => ({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -419,6 +456,7 @@ export const getTabId = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

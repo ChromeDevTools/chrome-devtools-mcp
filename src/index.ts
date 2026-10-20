@@ -9,7 +9,8 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
-import type {ParsedArguments} from './config/ConfigParser.js';
+import {ConfigParser, type ParsedArguments} from './config/ConfigParser.js';
+import {ConfigWatcher} from './config/ConfigWatcher.js';
 import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
@@ -25,23 +26,24 @@ import {
   type RegisteredTool,
   type Root,
   type Transport,
-  Mutex,
   puppeteer,
 } from './third_party/index.js';
 import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
+import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
+import {TaskRunner} from './utils/TaskRunner.js';
 import {VERSION} from './version.js';
 
 puppeteer.setFollowSymlinks(false);
 
 /**
  * Timeout for a `roots/list` that a tool call is waiting on, matching the 5s
- * default used for page operations. `getContext()` awaits it while
- * `ToolHandler` holds the tool mutex, so leaving it unbounded lets a client
- * that negotiates `roots` but does not answer block every tool for the SDK's
+ * default used for page operations. `getContext()` awaits it before
+ * `ToolHandler` enters the task runner, so leaving it unbounded lets a client
+ * that negotiates `roots` but does not answer delay every tool for the SDK's
  * default of 60s. Background refreshes are not bounded by this, so roots a
  * slow client sends late still land.
  */
@@ -62,7 +64,9 @@ export class McpServer {
   #config: ServerConfig;
   #browserManager: BrowserManager;
   #context: McpContext;
-  #heapSnapshotManager = new HeapSnapshotManager();
+  /** Runs every tool call and config reload. */
+  #taskRunner = new TaskRunner();
+  #heapSnapshotManager = new HeapSnapshotManager(this.#taskRunner);
 
   /**
    * Client roots stay valid across browser reconnects and only the client can
@@ -71,11 +75,12 @@ export class McpServer {
    */
   #lastClientRoots?: Root[];
   /**
-   * Whether a tool call already waited for the initial `roots/list`, so a
-   * client that negotiates roots but never answers only delays the first call.
+   * The bounded initial `roots/list` request. Every tool call that starts
+   * before the client answered waits on the same request, so a client that
+   * negotiates roots but never answers only delays the first calls.
    */
-  #awaitedInitialRoots = false;
-  #toolMutex = new Mutex();
+  #initialRoots?: Promise<void>;
+  #configWatcher?: ConfigWatcher;
   #tools = new Map<string, ToolEntry>();
 
   private constructor(config: ServerConfig, options: McpServerOptions) {
@@ -110,6 +115,7 @@ export class McpServer {
     this.#context = McpContext.create(logger, {
       config: this.#config,
       heapSnapshotManager: this.#heapSnapshotManager,
+      taskRunner: this.#taskRunner,
       getBrowser: () => this.#browserManager.ensureBrowser(),
     });
     this.#context.setRoots(this.#combinedRoots());
@@ -147,6 +153,9 @@ export class McpServer {
   }
 
   async connect(transport: Transport): Promise<void> {
+    if (this.#config.resolved.watchConfig) {
+      this.watchConfig();
+    }
     return await this.server.connect(transport);
   }
 
@@ -177,9 +186,14 @@ export class McpServer {
    * notification.
    */
   async applyConfig(config: ServerConfig): Promise<void> {
-    using guard = await this.#toolMutex.acquire();
+    // Goes ahead of waiting tool calls and waits for running ones, so every
+    // waiting call runs with the new config.
+    using guard = await this.#taskRunner.pause();
+    await this.#applyConfigLocked(this.#config.mergeReloadable(config));
+  }
+
+  async #applyConfigLocked(nextConfig: ServerConfig): Promise<void> {
     const previousArgs = this.#config.resolved;
-    const nextConfig = this.#config.mergeReloadable(config);
     const nextArgs = nextConfig.resolved;
     // Build everything before committing so that a throwing tool factory
     // leaves the server untouched.
@@ -215,9 +229,68 @@ export class McpServer {
   }
 
   /**
+   * Watches the config file and applies its changes to the running server.
+   */
+  watchConfig(): void {
+    const configPath = this.#config.configPath;
+    if (!configPath) {
+      console.error(
+        '--watchConfig has no effect because no config file was found.',
+      );
+      return;
+    }
+    this.#configWatcher?.dispose();
+    this.#configWatcher = undefined;
+    const watcher = new ConfigWatcher(configPath, content =>
+      this.#reloadConfig(watcher, configPath, content),
+    );
+    try {
+      watcher.start();
+    } catch (err) {
+      watcher.dispose();
+      console.error(`Failed to watch ${configPath}: ${getErrorMessage(err)}`);
+      return;
+    }
+    this.#configWatcher = watcher;
+  }
+
+  async #reloadConfig(
+    watcher: ConfigWatcher,
+    configPath: string,
+    content: string,
+  ): Promise<void> {
+    using guard = await this.#taskRunner.pause();
+    if (this.#configWatcher !== watcher) {
+      return;
+    }
+    let config: ServerConfig;
+    let nextConfig: ServerConfig;
+    try {
+      const fileArgs = ConfigParser.parseConfigFile(configPath, content);
+      config = this.#config.withFileArgs(fileArgs);
+      nextConfig = this.#config.mergeReloadable(config);
+    } catch (err) {
+      const message = `Keeping the previous configuration, failed to reload ${configPath}: ${getErrorMessage(err)}`;
+      logger?.(message);
+      console.error(message);
+      return;
+    }
+    await this.#applyConfigLocked(nextConfig);
+    const restartRequired = this.#config.getRestartRequiredChanges(config);
+    logger?.(`Applied config changes from ${configPath}`);
+    if (restartRequired.length > 0) {
+      const message = `Restart chrome-devtools-mcp to fully apply changes to ${restartRequired.map(name => `--${name}`).join(', ')} from ${configPath}.`;
+      logger?.(message);
+      console.error(message);
+    }
+  }
+
+  /**
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
+    this.#configWatcher?.dispose();
+    this.#configWatcher = undefined;
     try {
       this.#context.dispose();
     } catch (err) {
@@ -298,11 +371,11 @@ export class McpServer {
   }
 
   async #getContext(): Promise<McpContext> {
-    if (this.#lastClientRoots === undefined && !this.#awaitedInitialRoots) {
-      this.#awaitedInitialRoots = true;
-      // Nothing listed yet, so this call has to wait – bounded, since it is
-      // holding the tool mutex, and a later background refresh still lands
-      await this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
+    if (this.#lastClientRoots === undefined) {
+      // Nothing listed yet, so this call has to wait – bounded, since every
+      // tool call waits on it, and a later background refresh still lands
+      this.#initialRoots ??= this.#updateRoots(ROOTS_REQUEST_TIMEOUT);
+      await this.#initialRoots;
     }
     return this.#context;
   }
@@ -312,14 +385,13 @@ export class McpServer {
       tool,
       this.#config,
       () => this.#getContext(),
-      this.#toolMutex,
       () => this.#browserManager.abandonPendingAttempt(),
     );
   }
 
   /**
    * Overrides the SDK's `tools/call` handler so enabled and input-schema
-   * checks run inside `ToolHandler.handle()` after acquiring `#toolMutex`.
+   * checks run inside `ToolHandler.handle()` inside the task runner.
    */
   #setToolCallRequestHandler(): void {
     this.server.server.setRequestHandler('tools/call', async request => {
@@ -371,24 +443,20 @@ export async function createMcpServer(
     logFile?: fs.WriteStream;
   },
 ): Promise<{server: SdkMcpServer}> {
-  // BrowserManager only reads non-reloadable browser launch and connection
-  // options.
-  const browserManager = new BrowserManager(serverArgs, {
-    logFile: options.logFile,
-  });
   // createMcpServer takes a flat ParsedArguments snapshot and only returns
   // SdkMcpServer, so instances created here are never reloaded.
-  const server = await McpServer.from(
-    new ServerConfig({
-      cliArgs: {},
-      fileArgs: {},
-      configPath: undefined,
-      resolved: serverArgs,
-    }),
-    {
-      browserManager,
-      ...options,
-    },
-  );
+  const serverConfig = new ServerConfig({
+    cliArgs: {},
+    fileArgs: {},
+    configPath: undefined,
+    resolved: serverArgs,
+  });
+  const browserManager = new BrowserManager(serverConfig, {
+    logFile: options.logFile,
+  });
+  const server = await McpServer.from(serverConfig, {
+    browserManager,
+    ...options,
+  });
   return {server: server.server};
 }

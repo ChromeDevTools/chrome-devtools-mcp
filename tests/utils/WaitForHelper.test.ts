@@ -66,7 +66,7 @@ describe('WaitForHelper', () => {
       // The action opens a dialog asynchronously and passes no handleDialog.
       // The dialog leaves the renderer paused; without the fix,
       // waitForStableDom's setup evaluation would hang until protocolTimeout
-      // (~180s) while the tool mutex is held, freezing the session.
+      // (~180s) while the context lock is held, freezing the session.
       try {
         const result = await Promise.race([
           mcpPage.waitForEventsAfterAction(async () => {

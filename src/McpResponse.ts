@@ -6,7 +6,7 @@
 
 import type {WebMCPTool} from 'puppeteer-core';
 
-import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {
   CommentFormatter,
   type StructuredCommentThread,
@@ -149,9 +149,8 @@ export class McpResponse implements Response {
   #listWebMcpTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
-  #args: ParsedArguments;
+  #config: ReadonlyServerConfig;
   #page?: McpPage;
-  #redactNetworkHeaders = true;
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
@@ -161,16 +160,12 @@ export class McpResponse implements Response {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
   }
 
-  constructor(args: ParsedArguments) {
-    this.#args = args;
+  constructor(config: ReadonlyServerConfig) {
+    this.#config = config;
   }
 
   setPage(page: McpPage): void {
     this.#page = page;
-  }
-
-  setRedactNetworkHeaders(value: boolean): void {
-    this.#redactNetworkHeaders = value;
   }
 
   /**
@@ -192,7 +187,7 @@ export class McpResponse implements Response {
   setIncludePages(value: boolean): void {
     this.#includePages = value;
 
-    if (this.#args.categoryExtensions) {
+    if (this.#config.resolved.categoryExtensions) {
       this.#includeExtensionServiceWorkers = value;
       this.#includeExtensionPages = value;
     }
@@ -577,7 +572,7 @@ export class McpResponse implements Response {
       responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
       saveFile: (data, filename, extension) =>
         context.saveFile(data, filename, extension),
-      redactNetworkHeaders: this.#redactNetworkHeaders,
+      redactNetworkHeaders: this.#config.resolved.redactNetworkHeaders,
     });
   }
 
@@ -622,7 +617,7 @@ export class McpResponse implements Response {
 
   async #handleThirdPartyDeveloperTools(): Promise<ToolGroups | undefined> {
     if (
-      this.#args.categoryExperimentalThirdParty &&
+      this.#config.resolved.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
       this.#page
     ) {
@@ -633,7 +628,7 @@ export class McpResponse implements Response {
 
   async #handleWebMCP(): Promise<WebMCPTool[] | undefined> {
     if (
-      this.#args.categoryExperimentalWebmcp &&
+      this.#config.resolved.categoryExperimentalWebmcp &&
       this.#listWebMcpTools &&
       this.#page
     ) {
@@ -742,7 +737,7 @@ export class McpResponse implements Response {
           fetchData: false,
           saveFile: (data, filename, extension) =>
             context.saveFile(data, filename, extension),
-          redactNetworkHeaders: this.#redactNetworkHeaders,
+          redactNetworkHeaders: this.#config.resolved.redactNetworkHeaders,
         }),
       ),
     );
@@ -979,7 +974,7 @@ export class McpResponse implements Response {
     if (this.#reconnectNotice) {
       structuredContent.reconnected = true;
       response.push(
-        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#args).name} to see open pages.`,
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#config.resolved).name} to see open pages.`,
       );
     }
     if (this.#textResponseLines.length) {
@@ -1089,7 +1084,7 @@ export class McpResponse implements Response {
           : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog(this.#args).name} to handle it before continuing.`);
+Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.`);
       structuredContent.dialog = {
         type: dialog.type(),
         message: dialog.message(),

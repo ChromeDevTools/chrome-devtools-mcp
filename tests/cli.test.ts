@@ -8,7 +8,10 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {DEFAULT_MAX_NAVIGATION_SAVED} from '../src/collectors/constants.js';
+import {ConfigLocator} from '../src/config/ConfigLocator.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {
   getCliOptions,
@@ -28,11 +31,14 @@ import {puppeteerOptions} from '../src/config/puppeteer-options.js';
 import {createTempFile} from './utils.js';
 
 function parseConfig(argv: string[], env: NodeJS.ProcessEnv = {}) {
+  const locator = new ConfigLocator();
+  sinon.stub(locator, 'locate').returns(undefined);
   return new ConfigParser(
     '0.0.0',
     ['node', 'main.js', ...argv],
     env,
     false,
+    locator,
   ).parse();
 }
 
@@ -72,6 +78,7 @@ describe('cli args parsing', () => {
     slim: false,
     viaCli: false,
     devtoolsComments: false,
+    watchConfig: false,
   };
 
   it('parses with default args', async () => {
