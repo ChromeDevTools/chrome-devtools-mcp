@@ -50,6 +50,7 @@ export const installPwa = defineTool(() => ({
     displayMode: displayModeSchema,
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   // We do not validate file paths for remote browser instances
   // because they are on the remote host and not accessed by the MCP server.
   verifyFilesSchema: {
@@ -90,6 +91,7 @@ export const uninstallPwa = defineTool(() => ({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
@@ -121,6 +123,7 @@ export const launchPwa = defineTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
@@ -145,6 +148,7 @@ export const getOsAppState = defineTool(() => ({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;

@@ -67,6 +67,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
@@ -106,6 +107,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
@@ -144,6 +146,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
@@ -190,7 +193,7 @@ describe('ToolHandler', () => {
         },
         schema: {},
         blockedByDialog: false,
-        concurrency: options.concurrency,
+        concurrency: options.concurrency ?? 'exclusive',
         verifyFilesSchema: {},
         handler,
       };
@@ -342,6 +345,7 @@ describe('ToolHandler', () => {
         },
         schema: {},
         blockedByDialog: false,
+        concurrency: 'exclusive',
         verifyFilesSchema: {},
         handler,
       };
@@ -681,6 +685,7 @@ describe('ToolHandler', () => {
         },
         schema: {},
         blockedByDialog: false,
+        concurrency: 'exclusive',
         verifyFilesSchema: {},
         handler: async () => undefined,
       };
@@ -716,6 +721,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         return;
@@ -802,6 +808,7 @@ describe('ToolHandler', () => {
         url: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         return;
@@ -852,6 +859,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         handlerCalled = true;
@@ -1047,6 +1055,7 @@ describe('ToolHandler', () => {
         fileList: zod.array(zod.string()),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePath: true,
         // allowUrl lets a remote URL pass through unchanged (file/plain paths
@@ -1130,6 +1139,7 @@ describe('ToolHandler', () => {
         filePath: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePath: true,
       },
@@ -1209,6 +1219,7 @@ describe('ToolHandler', () => {
         filePaths: zod.array(zod.string()),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePaths: {
           local: true,
@@ -1263,6 +1274,7 @@ describe('ToolHandler', () => {
         installUrlOrBundleUrl: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         installUrlOrBundleUrl: {
           local: true,
@@ -1323,6 +1335,7 @@ describe('ToolHandler', () => {
         filePaths: zod.array(zod.string()),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePaths: {
           local: true,
@@ -1376,6 +1389,7 @@ describe('ToolHandler', () => {
         filePaths: zod.array(zod.string()),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePaths: {
           local: true,
@@ -1420,6 +1434,7 @@ describe('ToolHandler', () => {
         installUrlOrBundleUrl: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         installUrlOrBundleUrl: {
           local: true,
@@ -1467,6 +1482,7 @@ describe('ToolHandler', () => {
         filePaths: zod.array(zod.string()),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePaths: {
           local: true,
@@ -1518,6 +1534,7 @@ describe('ToolHandler', () => {
         inputFile: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         outputFile: true,
         inputFile: {
@@ -1580,6 +1597,7 @@ describe('ToolHandler', () => {
         filePaths: zod.array(zod.string()),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePaths: {
           local: true,
@@ -1631,6 +1649,7 @@ describe('ToolHandler', () => {
         remoteFile: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         remoteFile: {
           local: false,
@@ -1699,6 +1718,7 @@ describe('ToolHandler', () => {
         filePath: zod.string(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePath: true,
       },
@@ -1762,6 +1782,7 @@ describe('ToolHandler', () => {
         filePaths: zod.array(zod.string()).optional(),
       },
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {
         filePath: true,
         filePaths: true,
@@ -1805,6 +1826,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async (_request, response) => {
         // Simulates valid slow work, e.g. wait_for with a long timeout or
@@ -1856,6 +1878,7 @@ describe('ToolHandler', () => {
       },
       schema: {},
       blockedByDialog: false,
+      concurrency: 'exclusive',
       verifyFilesSchema: {},
       handler: async () => {
         // Never reached: the timeout fires while still awaiting ensureBrowser().
@@ -1912,6 +1935,7 @@ describe('ToolHandler', () => {
         annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
         schema: {},
         blockedByDialog: false,
+        concurrency: 'exclusive',
         verifyFilesSchema: {},
         handler: async ({page}) => {
           focusStates.push(
@@ -2053,6 +2077,7 @@ describe('ToolHandler', () => {
         },
         schema,
         blockedByDialog: false,
+        concurrency: 'exclusive',
         verifyFilesSchema: {},
         handler,
       };

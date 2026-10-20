@@ -27,6 +27,7 @@ export const openDevtools = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: [],
   handler: async (request, response) => {
     const page = request.page;
@@ -139,6 +140,7 @@ export const resolveDevtoolsComment = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -209,6 +211,7 @@ export const revealInDevtools = definePageTool(() => ({
       .describe('Optional network request ID to reveal in the Network panel.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

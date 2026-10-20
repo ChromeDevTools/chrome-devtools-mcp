@@ -191,6 +191,7 @@ export const screenshot = definePageTool((args: ParsedArguments) => {
         ),
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {
       filePath: true,
     },

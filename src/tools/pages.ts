@@ -28,6 +28,7 @@ export const listPages = defineTool((args: ParsedArguments) => {
     },
     schema: {},
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {},
     handler: async (_request, response) => {
       response.setIncludePages(true);
@@ -56,6 +57,7 @@ export const selectPage = defineTool((args: ParsedArguments) => ({
       .describe('Whether to focus the page and bring it to the top.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = context.getPageById(request.params.pageId);
@@ -83,6 +85,7 @@ export const closePage = defineTool(() => ({
       .describe('The ID of the page to close. Call list_pages to list pages.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     try {
@@ -126,6 +129,7 @@ export const newPage = defineTool((args: ParsedArguments) => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {},
     handler: async (request, response, context) => {
       validateUrl(request.params.url, {
@@ -193,6 +197,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
       ...timeoutSchema,
     },
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
       const page = request.page;
@@ -327,6 +332,7 @@ export const resizePage = definePageTool(() => ({
     height: zod.number().int().positive().describe('Page height'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -373,6 +379,7 @@ export const handleDialog = definePageTool(() => ({
       .describe('Optional prompt text to enter into the dialog.'),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -419,6 +426,7 @@ export const getTabId = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

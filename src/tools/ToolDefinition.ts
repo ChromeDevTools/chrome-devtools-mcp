@@ -83,7 +83,8 @@ type AllKeys<T> = T extends unknown ? keyof T : never;
  * waits for tasks on the same queue, on its parent, and on its children.
  *
  * - `'exclusive'`: the context queue, for the whole call. No other browser
- *   tool runs at the same time. This is the default.
+ *   tool runs at the same time. For every tool that touches browser-global
+ *   state or that is not reviewed for page-only access.
  * - `'page'`: the queue of the page named by `pageId`, a child of the
  *   context queue. Tools on different pages run at the same time; tools on
  *   one page and `'exclusive'` tools wait. Without page id routing the call
@@ -137,10 +138,10 @@ export interface BaseToolDefinition<
   schema: Schema;
   blockedByDialog: boolean;
   /**
-   * Which queues the server holds while the tool runs. Defaults to
-   * `'exclusive'`. See {@link ToolConcurrency}.
+   * Which task queue the server holds while the tool runs. See
+   * {@link ToolConcurrency}.
    */
-  concurrency?: ToolConcurrency;
+  concurrency: ToolConcurrency;
   verifyFilesSchema: Partial<
     Record<keyof MergeSchema<Schema>, FileVerificationOption>
   >;
@@ -159,7 +160,7 @@ export interface ToolDefinition<
    * A non-page tool has no target page, so it cannot take the page queue. It
    * touches browser state, so it always runs in a queue.
    */
-  concurrency?: Exclude<ToolConcurrency, 'page' | 'none'>;
+  concurrency: Exclude<ToolConcurrency, 'page' | 'none'>;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -550,7 +551,7 @@ interface PageToolDefinition<
    * A page tool with `'none'` must only read page state. Its page lookup and
    * response formatting run at the same time as other tools on the page.
    */
-  concurrency?: ToolConcurrency;
+  concurrency: ToolConcurrency;
   handler(
     request: Request<Schema> & {page: ContextPage},
     response: Response,
@@ -590,9 +591,9 @@ export interface BrowserlessToolDefinition<
    */
   blockedByDialog: false;
   /**
-   * A browserless tool has no page.
+   * A browserless tool has no page. `defineBrowserlessTool` sets `'none'`.
    */
-  concurrency?: Exclude<ToolConcurrency, 'page'>;
+  concurrency: Exclude<ToolConcurrency, 'page'>;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -609,7 +610,8 @@ export interface BrowserlessToolDefinition<
 export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
   definition: (
     args: ParsedArguments,
-  ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless'>,
+  ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless' | 'concurrency'> &
+    Partial<Pick<BrowserlessToolDefinition<Schema>, 'concurrency'>>,
 ): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
   return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
     return {

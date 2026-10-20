@@ -22,6 +22,7 @@ export const installExtension = defineTool(() => ({
       .describe('Absolute path to the unpacked extension folder.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     path: {local: true},
   },
@@ -43,6 +44,7 @@ export const uninstallExtension = defineTool(() => ({
     id: zod.string().describe('ID of the extension to uninstall.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {id} = request.params;
@@ -61,6 +63,7 @@ export const listExtensions = defineTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (_request, response) => {
     response.setListExtensions();
@@ -78,6 +81,7 @@ export const reloadExtension = defineTool(() => ({
     id: zod.string().describe('ID of the extension to reload.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {id} = request.params;
@@ -101,6 +105,7 @@ export const triggerExtensionAction = defineTool(() => ({
     id: zod.string().describe('ID of the extension to trigger the action for.'),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {id} = request.params;
