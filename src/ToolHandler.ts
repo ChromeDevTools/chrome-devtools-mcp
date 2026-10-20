@@ -29,6 +29,7 @@ import {
   isPageScopedTool,
   isSlimTool,
 } from './tools/ToolDefinition.js';
+import {toError} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
@@ -370,7 +371,7 @@ export class ToolHandler {
       lock.releaseIfYielding();
       await tool.handler({params}, response, context);
     } catch (err) {
-      response.setError(err);
+      response.setError(toError(err));
     } finally {
       await lock.reacquire();
     }
@@ -436,7 +437,7 @@ export class ToolHandler {
         );
       }
     } catch (err) {
-      response.setError(err);
+      response.setError(toError(err));
     } finally {
       await lock.reacquire();
     }
@@ -536,8 +537,10 @@ export class ToolHandler {
         return result;
       } catch (err) {
         logger?.(`${tool.name} error:`, err, err?.stack);
-        let errorText = err && 'message' in err ? err.message : String(err);
-        if ('cause' in err && err.cause) {
+        const isObject = err instanceof Object;
+        let errorText =
+          isObject && 'message' in err ? err.message : String(err);
+        if (isObject && 'cause' in err && err.cause) {
           errorText += `\nCause: ${err.cause.message}`;
         }
         return errorResult(errorText);
