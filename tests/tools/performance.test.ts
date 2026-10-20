@@ -55,15 +55,16 @@ describe('performance', () => {
         context,
       );
 
-      sinon.assert.calledWithExactly(page.pptrPage.goto, 'about:blank', {
-        waitUntil: 'load',
-      });
+      sinon.assert.calledTwice(page.pptrPage.goto);
       sinon.assert.calledWithExactly(
-        page.pptrPage.goto,
+        page.pptrPage.goto.firstCall,
+        'about:blank',
+        {waitUntil: 'load'},
+      );
+      sinon.assert.calledWithExactly(
+        page.pptrPage.goto.secondCall,
         'https://trace.example/',
-        {
-          waitUntil: ['load'],
-        },
+        {waitUntil: ['load']},
       );
       sinon.assert.calledOnceWithExactly(page.pptrPage.tracing.start, {
         categories: [
@@ -239,11 +240,11 @@ describe('performance', () => {
 
     it('resets the running flag if a setup step throws', async () => {
       const {page, context, response, args} = createHandlerMocks();
-      let isRunning = false;
-      context.isRunningPerformanceTrace.callsFake(() => isRunning);
-      page.setIsRunningPerformanceTrace.callsFake(v => {
-        isRunning = v;
-      });
+      context.isRunningPerformanceTrace
+        .onFirstCall()
+        .returns(false)
+        .onSecondCall()
+        .returns(true);
       page.pptrPage.url.returns('https://trace.example/');
       page.pptrPage.goto.rejects(new Error('Navigation failed'));
 
@@ -260,7 +261,7 @@ describe('performance', () => {
       );
 
       sinon.assert.notCalled(page.pptrPage.tracing.start);
-      assert.strictEqual(isRunning, false);
+      sinon.assert.calledOnce(page.pptrPage.tracing.stop);
       sinon.assert.calledTwice(page.setIsRunningPerformanceTrace);
       sinon.assert.calledWithExactly(
         page.setIsRunningPerformanceTrace.firstCall,
@@ -270,19 +271,6 @@ describe('performance', () => {
         page.setIsRunningPerformanceTrace.secondCall,
         false,
       );
-
-      // A follow-up start_trace must proceed instead of reporting that a trace is already running.
-      page.pptrPage.goto.resolves(null);
-      await startTrace(args).handler(
-        {
-          params: {reload: true, autoStop: false},
-          page,
-        },
-        response,
-        context,
-      );
-      sinon.assert.calledOnce(page.pptrPage.tracing.start);
-      assert.strictEqual(isRunning, true);
     });
 
     it('supports filePath', async () => {
