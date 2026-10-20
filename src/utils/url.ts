@@ -10,6 +10,7 @@ import {URLPattern} from '../third_party/cli.js';
 
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'ws:', 'wss:']);
 const IPV4_LOOPBACK_REGEX = /^127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/;
+const IPV4_MAPPED_LOOPBACK_REGEX = /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/;
 
 /**
  * Determines whether a given URL string points to a localhost / loopback address.
@@ -47,6 +48,12 @@ export function isLocalhost(url?: string): boolean {
 
   // 3. Check IPv4 loopback (127.0.0.0/8)
   if (IPV4_LOOPBACK_REGEX.test(hostname)) {
+    return true;
+  }
+
+  // 4. Check IPv4-mapped IPv6 loopback. URL serializes [::ffff:127.0.0.1]
+  // as [::ffff:7f00:1].
+  if (IPV4_MAPPED_LOOPBACK_REGEX.test(hostname)) {
     return true;
   }
 
