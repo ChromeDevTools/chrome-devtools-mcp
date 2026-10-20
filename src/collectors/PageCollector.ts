@@ -63,7 +63,6 @@ export class PageCollector<T> {
   #listeners?: ListenerMap<PageEvents>;
   #pendingSameDocumentNavigation = false;
   #frameNavigatedWithinDocumentTarget?: Frame;
-  static readonly MAX_NAVIGATION_SAVED = DEFAULT_MAX_NAVIGATION_SAVED;
   protected readonly maxNavigationSaved: number;
 
   /**
@@ -78,7 +77,7 @@ export class PageCollector<T> {
     listeners: (collector: (item: T) => void) => ListenerMap<PageEvents>,
     {
       maxResourcesPerNavigation,
-      maxNavigationSaved = PageCollector.MAX_NAVIGATION_SAVED,
+      maxNavigationSaved = DEFAULT_MAX_NAVIGATION_SAVED,
     }: PageCollectorOptions = {},
   ) {
     this.pptrPage = page;

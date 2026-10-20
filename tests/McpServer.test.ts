@@ -21,7 +21,6 @@ import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
-import {logger} from '../src/utils/logger.js';
 
 import {createMockMcpContext, createMockPuppeteerBrowser} from './mocks.js';
 
@@ -67,7 +66,7 @@ describe('McpServer', () => {
 
     sinon.assert.calledOnceWithExactly(
       createContext,
-      logger,
+      sinon.match.any,
       sinon.match({maxNavigationSaved: 5}),
     );
     sinon.assert.notCalled(browserManager.ensureBrowser);

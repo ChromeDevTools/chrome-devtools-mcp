@@ -410,6 +410,7 @@ async function generateToolDocumentation(): Promise<void> {
     const tools = createTools({
       pageIdRouting: true,
       categoryExtensions: true,
+      maxNavigationSaved: mcpOptions.maxNavigationSaved.default,
     } as ParsedArguments);
 
     {

@@ -8,7 +8,7 @@ import assert from 'node:assert';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {PageCollector} from '../src/collectors/PageCollector.js';
+import {DEFAULT_MAX_NAVIGATION_SAVED} from '../src/collectors/constants.js';
 import {ConfigParser} from '../src/config/ConfigParser.js';
 import {
   getCliOptions,
@@ -702,7 +702,7 @@ describe('cli args parsing', () => {
     assert.strictEqual(defaultParsed.maxNavigationSaved, 3);
     assert.strictEqual(
       defaultParsed.maxNavigationSaved,
-      PageCollector.MAX_NAVIGATION_SAVED,
+      DEFAULT_MAX_NAVIGATION_SAVED,
     );
 
     const camelCaseArgs = parseConfig(['--maxNavigationSaved', '5']);
