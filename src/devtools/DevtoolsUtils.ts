@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools, Workspace} from '../third_party/index.js';
+import {DevTools} from '../third_party/index.js';
 import type {
   CDPSession,
   ConsoleMessage,
@@ -133,7 +133,7 @@ export function overrideDevToolsGlobals({
   // from rejecting. TODO: drop once the reveal moves out of the model.
   DevTools.Common.Revealer.RevealerRegistry.removeInstance();
   DevTools.Common.Revealer.registerRevealer({
-    contextTypes: () => [Workspace.UISourceCode.UILocation],
+    contextTypes: () => [DevTools.Workspace.UISourceCode.UILocation],
     loadRevealer: () => Promise.resolve({reveal: () => Promise.resolve()}),
   });
 }

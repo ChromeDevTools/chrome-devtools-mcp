@@ -7,7 +7,7 @@
 import {Script} from 'node:vm';
 
 import type {TargetUniverse} from './devtools/DevtoolsUtils.js';
-import {Breakpoints, DevTools, Workspace} from './third_party/index.js';
+import {DevTools} from './third_party/index.js';
 import {logger} from './utils/logger.js';
 
 export interface LogpointOptions {
@@ -69,9 +69,9 @@ export class LogpointError extends Error {
 }
 
 type Universe = DevTools.Foundation.Universe.Universe;
-type Breakpoint = Breakpoints.BreakpointManager.Breakpoint;
-type UserCondition = Breakpoints.BreakpointManager.UserCondition;
-type UISourceCode = Workspace.UISourceCode.UISourceCode;
+type Breakpoint = DevTools.BreakpointManager.Breakpoint;
+type UserCondition = DevTools.BreakpointManager.UserCondition;
+type UISourceCode = DevTools.Workspace.UISourceCode.UISourceCode;
 
 interface LogpointRecord {
   logpoint: Logpoint;
@@ -246,7 +246,7 @@ export class LogpointManager {
         toUserCondition(options.expression),
         /* enabled */ true,
         /* isLogpoint */ true,
-        Breakpoints.BreakpointManager.BreakpointOrigin.USER_ACTION,
+        DevTools.BreakpointManager.BreakpointOrigin.USER_ACTION,
       );
       if (!breakpoint) {
         unbound.push(key);
@@ -372,8 +372,8 @@ export class LogpointManager {
     for (const uiSourceCode of this.#universe.workspace.uiSourceCodes()) {
       const projectType = uiSourceCode.project().type();
       if (
-        projectType === Workspace.Workspace.projectTypes.Network ||
-        projectType === Workspace.Workspace.projectTypes.ContentScripts
+        projectType === DevTools.Workspace.Workspace.projectTypes.Network ||
+        projectType === DevTools.Workspace.Workspace.projectTypes.ContentScripts
       ) {
         yield uiSourceCode;
       }
