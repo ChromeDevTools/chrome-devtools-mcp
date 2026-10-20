@@ -43,6 +43,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
       ),
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const matchedStyles = await request.page.getMatchedStylesForUid(

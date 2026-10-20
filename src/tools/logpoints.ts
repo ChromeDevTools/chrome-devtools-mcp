@@ -33,6 +33,7 @@ export const setLogpoints = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     let logpoints;

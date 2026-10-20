@@ -10,11 +10,12 @@ import {describe, it, after, before} from 'node:test';
 import sinon from 'sinon';
 
 import {HeapSnapshotManager} from '../../src/processors/HeapSnapshotManager.js';
+import {TaskRunner} from '../../src/utils/TaskRunner.js';
 import {DevTools} from '../../src/third_party/index.js';
 
 describe('HeapSnapshotManager', () => {
   it('rejects when a file without .heapsnapshot or .heaptimeline extension is passed', async () => {
-    const manager = new HeapSnapshotManager();
+    const manager = new HeapSnapshotManager(new TaskRunner());
 
     await assert.rejects(
       manager.getSnapshot('tests/fixtures/snapshot_diffs.js'),
@@ -29,7 +30,7 @@ describe('HeapSnapshotManager', () => {
       'dispose',
     );
 
-    const manager = new HeapSnapshotManager();
+    const manager = new HeapSnapshotManager(new TaskRunner());
 
     // A path that passes into #loadSnapshot but fails on read. The worker is
     // created before the read, so a failed load must still dispose it,
@@ -51,7 +52,7 @@ describe('HeapSnapshotManager', () => {
     let manager: HeapSnapshotManager;
 
     before(() => {
-      manager = new HeapSnapshotManager();
+      manager = new HeapSnapshotManager(new TaskRunner());
     });
 
     after(() => {
@@ -108,7 +109,7 @@ describe('HeapSnapshotManager', () => {
     let manager: HeapSnapshotManager;
 
     before(() => {
-      manager = new HeapSnapshotManager();
+      manager = new HeapSnapshotManager(new TaskRunner());
     });
 
     after(() => {
@@ -124,7 +125,7 @@ describe('HeapSnapshotManager', () => {
     });
 
     it('resolves class IDs in getNodesById without calling getAggregates first', async () => {
-      const freshManager = new HeapSnapshotManager();
+      const freshManager = new HeapSnapshotManager(new TaskRunner());
       try {
         const {aggregates} = await manager.getAggregates(filePath);
         const functionAggregate = aggregates.find(
@@ -150,7 +151,7 @@ describe('HeapSnapshotManager', () => {
     });
 
     it('assigns deterministic class IDs even when getAggregates is called with a filter first', async () => {
-      const filteredFirstManager = new HeapSnapshotManager();
+      const filteredFirstManager = new HeapSnapshotManager(new TaskRunner());
       try {
         const unfilteredFirst = await manager.getAggregates(filePath);
         const unfilteredById = new Map(
@@ -182,7 +183,7 @@ describe('HeapSnapshotManager', () => {
   });
 
   it('gets stats and staticData, and disposes snapshot', async () => {
-    const manager = new HeapSnapshotManager();
+    const manager = new HeapSnapshotManager(new TaskRunner());
     try {
       const filePath = 'tests/fixtures/example.heapsnapshot';
       const stats = await manager.getStats(filePath);
@@ -196,6 +197,29 @@ describe('HeapSnapshotManager', () => {
       assert.strictEqual(manager.hasSnapshots(), true);
       assert.strictEqual(await manager.disposeSnapshot(filePath), true);
       assert.strictEqual(await manager.disposeSnapshot(filePath), false);
+      assert.strictEqual(manager.hasSnapshots(), false);
+    } finally {
+      manager.dispose();
+    }
+  });
+
+  it('makes disposeSnapshot wait for an in-flight read of the same file', async () => {
+    const manager = new HeapSnapshotManager(new TaskRunner());
+    try {
+      const filePath = 'tests/fixtures/example.heapsnapshot';
+      const order: string[] = [];
+      const read = manager.getStats(filePath).then(stats => {
+        order.push('read');
+        return stats;
+      });
+      const dispose = manager.disposeSnapshot(filePath).then(disposed => {
+        order.push('dispose');
+        return disposed;
+      });
+      const [stats, disposed] = await Promise.all([read, dispose]);
+      assert.ok(stats.total > 0);
+      assert.strictEqual(disposed, true);
+      assert.deepStrictEqual(order, ['read', 'dispose']);
       assert.strictEqual(manager.hasSnapshots(), false);
     } finally {
       manager.dispose();

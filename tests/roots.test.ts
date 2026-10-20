@@ -15,6 +15,7 @@ import sinon from 'sinon';
 
 import type {McpContext} from '../src/McpContext.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
+import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 import {escapeForLog} from '../src/utils/logger.js';
 
@@ -176,7 +177,7 @@ describe('McpContext path validation escaping', () => {
       config: createMockServerConfig({
         performanceCrux: false,
       }),
-      heapSnapshotManager: new HeapSnapshotManager(),
+      heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
     });
   }
 

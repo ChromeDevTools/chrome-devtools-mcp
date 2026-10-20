@@ -202,6 +202,8 @@ export class ServerConfig implements ReadonlyServerConfig {
     }
 
     if (isViaCli) {
+      resolvedArgs.slim = false;
+      resolvedArgs.pageIdRouting = true;
       if (
         resolvedArgs.filesystemRoot === DEFAULT_FILESYSTEM_ROOT &&
         explicitArgs.allowUnrestrictedPaths !== false
@@ -286,6 +288,20 @@ export class ServerConfig implements ReadonlyServerConfig {
 
   get resolved(): Readonly<ParsedArguments> {
     return this.#resolved;
+  }
+
+  /**
+   * Produces a new {@link ServerConfig} with updated config-file arguments,
+   * preserving this config's CLI arguments, config path, and environment.
+   */
+  withFileArgs(fileArgs: Partial<ParsedArguments>): ServerConfig {
+    return ServerConfig.create({
+      cliArgs: {...this.#cliArgs},
+      fileArgs,
+      configPath: this.#configPath,
+      env: this.#env,
+      suppressUsageStatisticsNotice: true,
+    });
   }
 
   /**

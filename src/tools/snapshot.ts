@@ -34,6 +34,7 @@ in the DevTools Elements panel (if any).`,
       ),
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -62,6 +63,7 @@ export const waitFor = definePageTool(() => ({
     ...timeoutSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

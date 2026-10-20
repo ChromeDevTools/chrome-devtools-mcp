@@ -22,6 +22,7 @@ import {
 } from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
+import {TaskRunner} from '../../src/utils/TaskRunner.js';
 import {createMockContextAnalysisResult} from '../mocks.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -500,7 +501,7 @@ describe('HeapSnapshotFormatter', () => {
     const heap3Path = join(process.cwd(), 'tests/fixtures/heap-3.heapsnapshot');
 
     before(() => {
-      manager = new HeapSnapshotManager();
+      manager = new HeapSnapshotManager(new TaskRunner());
     });
 
     after(() => {

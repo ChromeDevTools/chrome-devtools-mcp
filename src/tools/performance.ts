@@ -54,6 +54,7 @@ export const startTrace = definePageTool(() => ({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -153,6 +154,7 @@ export const stopTrace = definePageTool(() => ({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -194,6 +196,7 @@ export const analyzeInsight = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);

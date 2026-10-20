@@ -101,6 +101,7 @@ Example with arguments: \`(el) => el.innerText\`
         : {}),
     },
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {
       filePath: true,
       // sourcePath may be an http(s): URL the server fetches, so allow URLs

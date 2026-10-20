@@ -155,6 +155,19 @@ describe('ServerConfig', () => {
       assert.strictEqual(args.categoryExtensions, undefined);
     });
 
+    it('locks slim=false and pageIdRouting=true for viaCli even when set in explicitArgs', () => {
+      const args = ServerConfig.applyDefaults(
+        {
+          viaCli: true,
+          slim: true,
+          pageIdRouting: false,
+        },
+        {env: {}},
+      );
+      assert.strictEqual(args.slim, false);
+      assert.strictEqual(args.pageIdRouting, true);
+    });
+
     it('turns off usage statistics in CI', () => {
       sinon.stub(console, 'error');
       const args = ServerConfig.applyDefaults(
@@ -348,6 +361,25 @@ describe('ServerConfig', () => {
       assert.strictEqual(readonlyView.resolved.slim, true);
       assert.strictEqual(readonlyView.resolved.memoryDebugging, true);
       assert.strictEqual(readonlyView.resolved.headless, true);
+    });
+  });
+
+  describe('ServerConfig.withFileArgs()', () => {
+    it('creates a new ServerConfig with updated fileArgs and preserved cliArgs', () => {
+      const initial = ServerConfig.create({
+        cliArgs: {headless: true},
+        fileArgs: {memoryDebugging: false},
+        configPath: '/tmp/cd4a.config.json',
+        env: {CI: 'true'},
+        suppressUsageStatisticsNotice: true,
+      });
+
+      const updated = initial.withFileArgs({memoryDebugging: true});
+
+      assert.strictEqual(updated.resolved.headless, true);
+      assert.strictEqual(updated.resolved.memoryDebugging, true);
+      assert.strictEqual(updated.resolved.usageStatistics, false);
+      assert.strictEqual(updated.configPath, '/tmp/cd4a.config.json');
     });
   });
 

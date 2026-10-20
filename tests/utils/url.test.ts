@@ -55,6 +55,14 @@ describe('isLocalhost', () => {
     assert.strictEqual(isLocalhost('http://[0:0:0:0:0:0:0:1]:8080'), true);
   });
 
+  it('should return true for IPv4-mapped IPv6 loopback', () => {
+    assert.strictEqual(isLocalhost('ws://[::ffff:127.0.0.1]:9222'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:127.1.2.3]'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:7f00:1]:8080'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:128.0.0.1]'), false);
+    assert.strictEqual(isLocalhost('http://[::ffff:192.168.1.1]'), false);
+  });
+
   it('should return true for URLs with user credentials', () => {
     assert.strictEqual(isLocalhost('http://user:pass@localhost:8080'), true);
   });

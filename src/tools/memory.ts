@@ -61,6 +61,7 @@ export const takeHeapSnapshot = definePageTool(() => ({
       .describe('A path to a .heapsnapshot file to save the heapsnapshot to.'),
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
