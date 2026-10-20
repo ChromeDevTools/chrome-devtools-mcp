@@ -33,6 +33,9 @@ cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/
 
 See [Skills](../README.md#skills) for all skills and installation options.
 
+> [!NOTE]
+> Copy the skill again each time you update the CLI. See [Keep skills up to date](../README.md#keep-skills-up-to-date).
+
 ## How it works
 
 The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).

@@ -151,6 +151,19 @@ cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/
 > [!IMPORTANT]
 > The `chrome-devtools-cli` skill requires the CLI. Install the package globally before you use the skill.
 
+### Keep skills up to date
+
+Skills describe the tools of a specific version. Update the skills each time you update the MCP server or the CLI. Outdated skills can tell your agent to use tools or parameters that changed.
+
+- **Plugins:** Use the update command of the plugin manager of your agent. The Gemini CLI command above enables automatic updates with `--auto-update`.
+- **Manual installs:** Update the package, then copy the skill folders again:
+
+```sh
+npm i chrome-devtools-mcp@latest -g
+mkdir -p ~/.claude/skills
+cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/skills/
+```
+
 ## Tools
 
 If you run into any issues, checkout our [troubleshooting guide][troubleshooting].
