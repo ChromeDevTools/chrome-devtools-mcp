@@ -153,6 +153,7 @@ export class McpPage implements ContextPage {
 
   #pptrPage?: Page;
   #initPromise?: Promise<void>;
+  #focusEmulationRequested = false;
   #disposed = false;
   #closed = false;
 
@@ -291,19 +292,26 @@ export class McpPage implements ContextPage {
     await page?.close({runBeforeUnload: false});
   }
 
-  async init(): Promise<void> {
+  async init(options?: {emulateFocus?: boolean}): Promise<void> {
     if (this.#disposed) {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
-    if (this.#initPromise) {
-      return await this.#initPromise;
+    if (!this.#initPromise) {
+      this.#initPromise = this.#doInit().catch(err => {
+        this.#initPromise = undefined;
+        throw err;
+      });
     }
-    this.#initPromise = this.#doInit();
-    try {
-      await this.#initPromise;
-    } catch (err) {
-      this.#initPromise = undefined;
-      throw err;
+    await this.#initPromise;
+    // Discovery skips focus emulation, but a later page tool still needs it.
+    if (
+      options?.emulateFocus !== false &&
+      !this.#disposed &&
+      !this.#focusEmulationRequested
+    ) {
+      // Prevent duplicate requests while pending and after success.
+      this.#focusEmulationRequested = true;
+      this.#initFocusEmulationNoThrow();
     }
   }
 
@@ -336,18 +344,17 @@ export class McpPage implements ContextPage {
       });
     }
     this.updateTimeouts();
-    await Promise.allSettled([
-      this.#initDevToolsUniverseNoThrow(),
-      this.#initFocusEmulationNoThrow(),
-    ]);
+    await this.#initDevToolsUniverseNoThrow();
     if (this.#disposed) {
       this.dispose();
     }
   }
 
-  async #initFocusEmulationNoThrow(): Promise<void> {
-    // We emulate a focused page for all pages to support multi-agent workflows.
+  #initFocusEmulationNoThrow(): void {
+    // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      // Allow the next page operation to retry a transient failure.
+      this.#focusEmulationRequested = false;
       logger?.('Error turning on focused page emulation', error);
     });
   }

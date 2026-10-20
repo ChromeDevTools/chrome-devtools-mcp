@@ -69,6 +69,32 @@ const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
 );
 
 describe('McpContext', () => {
+  it('preserves real focus during page listing and automatic fallback', async () => {
+    const focusStates: boolean[] = [];
+    await withMcpContext(async (_response, context) => {
+      const initialPage = context.getSelectedMcpPage().pptrPage;
+      const fallbackPage = await context.browser.newPage();
+      const foregroundPage = await context.browser.newPage();
+      await foregroundPage.bringToFront();
+
+      focusStates.push(await initialPage.evaluate(() => document.hasFocus()));
+      await context.createPagesSnapshot();
+      focusStates.push(await initialPage.evaluate(() => document.hasFocus()));
+
+      await initialPage.close();
+      await context.createPagesSnapshot();
+      assert.strictEqual(context.getSelectedMcpPage().pptrPage, fallbackPage);
+      focusStates.push(await fallbackPage.evaluate(() => document.hasFocus()));
+
+      const createdPage = await context.newPage(true);
+      focusStates.push(
+        await createdPage.pptrPage.evaluate(() => document.hasFocus()),
+        await fallbackPage.evaluate(() => document.hasFocus()),
+      );
+    });
+    assert.deepStrictEqual(focusStates, [false, false, false, true, false]);
+  });
+
   function createPageTarget() {
     const page = createMockPuppeteerPage();
     page.emulateFocusedPage.resolves();

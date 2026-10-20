@@ -69,6 +69,7 @@ describe('cli args parsing', () => {
     slim: false,
     viaCli: false,
     devtoolsComments: false,
+    watchConfig: false,
   };
 
   it('parses with default args', async () => {

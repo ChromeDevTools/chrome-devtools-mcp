@@ -410,6 +410,114 @@ describe('McpPage', () => {
     });
   });
 
+  describe('focus emulation', () => {
+    function createPage() {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      const target = createMockPuppeteerTarget({page: pptrPage});
+      const mcpPage = new McpPage(target, 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      return {mcpPage, pptrPage, target};
+    }
+
+    it('requests focus once on default initialization', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+
+      await mcpPage.init();
+      await mcpPage.init();
+      await mcpPage.init({emulateFocus: false});
+
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      sinon.assert.calledOnceWithExactly(target.page);
+    });
+
+    it('initializes without focus until a tool requests it', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+
+      await mcpPage.init({emulateFocus: false});
+      await mcpPage.init({emulateFocus: false});
+
+      assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+
+      await mcpPage.init();
+      await mcpPage.init();
+
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      sinon.assert.calledOnceWithExactly(target.page);
+    });
+
+    it('shares initialization and requests focus once for concurrent callers', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+
+      await Promise.all([
+        mcpPage.init({emulateFocus: false}),
+        mcpPage.init(),
+        mcpPage.init(),
+      ]);
+
+      sinon.assert.calledOnceWithExactly(target.page);
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+
+    it('retries a failed focus request and retains successful emulation', async () => {
+      const {mcpPage, pptrPage} = createPage();
+      pptrPage.emulateFocusedPage
+        .onFirstCall()
+        .rejects(new Error('Target closed'));
+
+      await mcpPage.init();
+      await mcpPage.init();
+      await mcpPage.init();
+
+      assert.strictEqual(mcpPage.pptrPage, pptrPage);
+      sinon.assert.calledTwice(pptrPage.emulateFocusedPage);
+      sinon.assert.alwaysCalledWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+
+    it('does not wait for or duplicate a pending focus request', async () => {
+      const {mcpPage, pptrPage} = createPage();
+      const focus = Promise.withResolvers<void>();
+      pptrPage.emulateFocusedPage.returns(focus.promise);
+
+      try {
+        await Promise.all([mcpPage.init(), mcpPage.init()]);
+        sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+      } finally {
+        focus.resolve();
+      }
+    });
+
+    it('skips focus when disposed during initialization', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+      const page = Promise.withResolvers<typeof pptrPage>();
+      target.page.returns(page.promise);
+
+      const initialization = mcpPage.init();
+      mcpPage.dispose();
+      page.resolve(pptrPage);
+      await initialization;
+
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+      await assert.rejects(mcpPage.init(), /already been disposed/);
+    });
+
+    it('retries base initialization after a failure before requesting focus', async () => {
+      const {mcpPage, pptrPage, target} = createPage();
+      target.page.onFirstCall().rejects(new Error('Target unavailable'));
+
+      await assert.rejects(mcpPage.init(), /Target unavailable/);
+      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+
+      await mcpPage.init();
+
+      sinon.assert.calledTwice(target.page);
+      sinon.assert.calledOnceWithExactly(pptrPage.emulateFocusedPage, true);
+    });
+  });
+
   describe('getTitle()', () => {
     function createPage(url: string, title: string): McpPage {
       const target = createMockPuppeteerTarget({url, title});

@@ -36,7 +36,7 @@ import {
 import {evaluateScript} from '../src/tools/script.js';
 import {createTools} from '../src/tools/tools.js';
 import {createMockMcpContext} from './mocks.js';
-import {getMockBrowser} from './utils.js';
+import {getMockBrowser, withMcpContext} from './utils.js';
 
 describe('ToolHandler', () => {
   afterEach(() => {
@@ -87,7 +87,7 @@ describe('ToolHandler', () => {
     await toolHandler.handle({pageId: 1});
 
     sinon.assert.calledOnceWithExactly(mockContext.getPageById, 1);
-    sinon.assert.calledOnceWithExactly(mockPage.init);
+    sinon.assert.calledOnceWithExactly(mockPage.init, {emulateFocus: true});
     assert.strictEqual(handlerCalled, true);
   });
 
@@ -129,7 +129,7 @@ describe('ToolHandler', () => {
     await toolHandler.handle({});
 
     sinon.assert.calledOnceWithExactly(mockContext.getSelectedMcpPage);
-    sinon.assert.calledOnceWithExactly(mockPage.init);
+    sinon.assert.calledOnceWithExactly(mockPage.init, {emulateFocus: true});
     assert.strictEqual(handlerCalled, true);
   });
 
@@ -1569,7 +1569,8 @@ describe('ToolHandler', () => {
       sinon.spy(),
     );
 
-    const clock = sinon.useFakeTimers();
+    // Keep the test runner's clocks real while advancing the tool timeout.
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     try {
       const resultPromise = toolHandler.handle({});
       await clock.tickAsync(TOOL_CALL_TIMEOUT_MS * 2);
@@ -1621,7 +1622,7 @@ describe('ToolHandler', () => {
       abandonPendingBrowserAttemptSpy,
     );
 
-    const clock = sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     try {
       const resultPromise = toolHandler.handle({});
       await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
@@ -1636,6 +1637,42 @@ describe('ToolHandler', () => {
     } finally {
       clock.restore();
     }
+  });
+
+  it('emulates focus before a page tool acts on an untouched background page', async () => {
+    const focusStates: boolean[] = [];
+    const config = parseConfig();
+    await withMcpContext(async (_response, context) => {
+      const page = context.getSelectedMcpPage();
+      const foregroundPage = await context.browser.newPage();
+      await foregroundPage.bringToFront();
+      focusStates.push(await page.pptrPage.evaluate(() => document.hasFocus()));
+
+      const tool = definePageTool(() => ({
+        name: 'page_tool',
+        description: 'A page scoped tool',
+        annotations: {category: ToolCategory.INPUT, readOnlyHint: true},
+        schema: {},
+        blockedByDialog: false,
+        verifyFilesSchema: {},
+        handler: async ({page}) => {
+          focusStates.push(
+            await page.pptrPage.evaluate(() => document.hasFocus()),
+          );
+        },
+      }))(config.resolved);
+      const handler = new ToolHandler(
+        tool,
+        config,
+        async () => context,
+        new Mutex(),
+        sinon.spy(),
+      );
+
+      const result = await handler.handle({pageId: page.id});
+      assert.notStrictEqual(result.isError, true);
+    });
+    assert.deepStrictEqual(focusStates, [false, true]);
   });
 
   describe('browserless tools', () => {

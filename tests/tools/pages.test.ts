@@ -771,7 +771,7 @@ describe('pages', () => {
 
       await selectPage(args).handler({params: {pageId: 1}}, response, context);
 
-      sinon.assert.calledOnceWithExactly(page.init);
+      sinon.assert.calledOnceWithExactly(page.init, {emulateFocus: true});
       sinon.assert.calledOnceWithExactly(context.selectPage, page);
       sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
       sinon.assert.calledOnceWithExactly(
@@ -800,6 +800,7 @@ describe('pages', () => {
     });
     it('selects a page and keeps it focused in the background', async () => {
       await withMcpContext(async (response, context, args) => {
+        await context.getPageById(1).init();
         await context.newPage();
         assert.strictEqual(
           context.getPageById(2),

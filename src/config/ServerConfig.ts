@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {isDeepStrictEqual} from 'node:util';
+
 import type {InferredOptionTypes} from '../third_party/cli.js';
 import {yargs} from '../third_party/cli.js';
 
@@ -304,6 +306,26 @@ export class ServerConfig implements ReadonlyServerConfig {
       env: options?.env ?? this.#env,
       suppressUsageStatisticsNotice: true,
     });
+  }
+
+  /**
+   * Returns the restart-required options whose resolved values differ between
+   * this config and `next`.
+   */
+  getRestartRequiredChanges(next: ServerConfig): Array<keyof ParsedArguments> {
+    const changed: Array<keyof ParsedArguments> = [];
+    for (const name of Object.keys(mcpOptions)) {
+      if (
+        isMcpOptionKey(name) &&
+        !isReloadableOption(name) &&
+        (!isDeepStrictEqual(this.#fileArgs[name], next.#fileArgs[name]) ||
+          !isDeepStrictEqual(this.#cliArgs[name], next.#cliArgs[name])) &&
+        !isDeepStrictEqual(this.#resolved[name], next.#resolved[name])
+      ) {
+        changed.push(name);
+      }
+    }
+    return changed;
   }
 
   /**
