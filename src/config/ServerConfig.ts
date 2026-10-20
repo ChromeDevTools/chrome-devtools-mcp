@@ -291,6 +291,20 @@ export class ServerConfig implements ReadonlyServerConfig {
   }
 
   /**
+   * Produces a new {@link ServerConfig} with updated config-file arguments,
+   * preserving this config's CLI arguments, config path, and environment.
+   */
+  withFileArgs(fileArgs: Partial<ParsedArguments>): ServerConfig {
+    return ServerConfig.create({
+      cliArgs: {...this.#cliArgs},
+      fileArgs,
+      configPath: this.#configPath,
+      env: this.#env,
+      suppressUsageStatisticsNotice: true,
+    });
+  }
+
+  /**
    * Produces a new {@link ServerConfig} that takes reloadable options from
    * `next` and keeps restart-required options from this config, preserving
    * `CLI > config file > defaults` precedence.

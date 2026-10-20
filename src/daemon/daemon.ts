@@ -152,7 +152,7 @@ async function setupMCPServer(): Promise<void> {
     logFile,
   });
   if (args.watchConfig) {
-    mcpServer.watchConfig(() => configParser.reloadConfig());
+    mcpServer.watchConfig();
   }
   ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
   void ClearcutLogger.get()?.logDailyActiveIfNeeded();

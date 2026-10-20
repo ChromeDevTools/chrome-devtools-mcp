@@ -571,11 +571,11 @@ describe('McpServer', () => {
       const clock = sinon.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout'],
       });
-      const {server, context, config, configParser} = await createTestServer([
+      const {server, context, config} = await createTestServer([
         '--config',
         configPath,
       ]);
-      server.watchConfig(() => configParser.reloadConfig());
+      server.watchConfig();
       logStream.write.resetHistory();
 
       async function updateConfigFile(content: string) {
@@ -597,12 +597,39 @@ describe('McpServer', () => {
       };
     }
 
+    it('starts watching on connect only when watchConfig is enabled', async () => {
+      using configFile = createTempFile('{}', 'cd4a.watch.connect.json');
+      const watchConfigSpy = sinon.spy(McpServer.prototype, 'watchConfig');
+      const startStub = sinon.stub(ConfigWatcher.prototype, 'start');
+      sinon.stub(ConfigWatcher.prototype, 'dispose');
+
+      const {server: disabledServer} = await createTestServer(
+        ['--config', configFile.path],
+        {mockContext: false},
+      );
+      const [, disabledTransport] = InMemoryTransport.createLinkedPair();
+      await disabledServer.connect(disabledTransport);
+      sinon.assert.notCalled(watchConfigSpy);
+      sinon.assert.notCalled(startStub);
+      await disabledServer.close();
+
+      const {server: enabledServer} = await createTestServer(
+        ['--config', configFile.path, '--watchConfig'],
+        {mockContext: false},
+      );
+      const [, enabledTransport] = InMemoryTransport.createLinkedPair();
+      await enabledServer.connect(enabledTransport);
+      sinon.assert.calledOnceWithExactly(watchConfigSpy);
+      sinon.assert.calledOnceWithExactly(startStub);
+      await enabledServer.close();
+    });
+
     it('does not start a watcher when no config file was resolved', async () => {
       const startStub = sinon.stub(ConfigWatcher.prototype, 'start');
-      const {server, configParser} = await createTestServer();
+      const {server} = await createTestServer();
       const consoleError = sinon.stub(console, 'error');
 
-      server.watchConfig(() => configParser.reloadConfig());
+      server.watchConfig();
 
       sinon.assert.notCalled(startStub);
       sinon.assert.calledOnceWithExactly(
@@ -617,13 +644,10 @@ describe('McpServer', () => {
         .stub(ConfigWatcher.prototype, 'start')
         .throws(new Error('watch limit reached'));
       const disposeStub = sinon.stub(ConfigWatcher.prototype, 'dispose');
-      const {server, configParser} = await createTestServer([
-        '--config',
-        configFile.path,
-      ]);
+      const {server} = await createTestServer(['--config', configFile.path]);
       const consoleError = sinon.stub(console, 'error');
 
-      server.watchConfig(() => configParser.reloadConfig());
+      server.watchConfig();
 
       sinon.assert.calledOnceWithExactly(disposeStub);
       sinon.assert.calledOnceWithExactly(
@@ -636,16 +660,13 @@ describe('McpServer', () => {
       using configFile = createTempFile('{}', 'cd4a.watch.lifecycle.json');
       const startStub = sinon.stub(ConfigWatcher.prototype, 'start');
       const disposeStub = sinon.stub(ConfigWatcher.prototype, 'dispose');
-      const {server, configParser} = await createTestServer([
-        '--config',
-        configFile.path,
-      ]);
+      const {server} = await createTestServer(['--config', configFile.path]);
 
-      server.watchConfig(() => configParser.reloadConfig());
+      server.watchConfig();
       sinon.assert.calledOnceWithExactly(startStub);
       sinon.assert.notCalled(disposeStub);
 
-      server.watchConfig(() => configParser.reloadConfig());
+      server.watchConfig();
       sinon.assert.calledTwice(startStub);
       sinon.assert.calledOnceWithExactly(disposeStub);
 

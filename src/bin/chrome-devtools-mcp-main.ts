@@ -85,9 +85,6 @@ process.on('SIGHUP', () => {
 });
 
 const server = await serverPromise;
-if (args.watchConfig) {
-  server.watchConfig(() => configParser.reloadConfig());
-}
 const transport = new StdioServerTransport();
 await server.connect(transport);
 logger?.('Chrome DevTools MCP Server connected');

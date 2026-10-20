@@ -9,7 +9,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
-import type {ParsedArguments} from './config/ConfigParser.js';
+import {ConfigParser, type ParsedArguments} from './config/ConfigParser.js';
 import {ConfigWatcher} from './config/ConfigWatcher.js';
 import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
@@ -153,6 +153,9 @@ export class McpServer {
   }
 
   async connect(transport: Transport): Promise<void> {
+    if (this.#config.resolved.watchConfig) {
+      this.watchConfig();
+    }
     return await this.server.connect(transport);
   }
 
@@ -227,10 +230,8 @@ export class McpServer {
 
   /**
    * Watches the config file and applies its changes to the running server.
-   *
-   * @param reload Re-reads the config file and returns the new configuration.
    */
-  watchConfig(reload: () => ServerConfig): void {
+  watchConfig(): void {
     const configPath = this.#config.configPath;
     if (!configPath) {
       console.error(
@@ -240,8 +241,8 @@ export class McpServer {
     }
     this.#configWatcher?.dispose();
     this.#configWatcher = undefined;
-    const watcher = new ConfigWatcher(configPath, () =>
-      this.#reloadConfig(watcher, configPath, reload),
+    const watcher = new ConfigWatcher(configPath, content =>
+      this.#reloadConfig(watcher, configPath, content),
     );
     try {
       watcher.start();
@@ -256,7 +257,7 @@ export class McpServer {
   async #reloadConfig(
     watcher: ConfigWatcher,
     configPath: string,
-    reload: () => ServerConfig,
+    content: string,
   ): Promise<void> {
     using guard = await this.#taskRunner.pause();
     if (this.#configWatcher !== watcher) {
@@ -265,7 +266,8 @@ export class McpServer {
     let config: ServerConfig;
     let nextConfig: ServerConfig;
     try {
-      config = reload();
+      const fileArgs = ConfigParser.parseConfigFile(configPath, content);
+      config = this.#config.withFileArgs(fileArgs);
       nextConfig = this.#config.mergeReloadable(config);
     } catch (err) {
       const message = `Keeping the previous configuration, failed to reload ${configPath}: ${getErrorMessage(err)}`;

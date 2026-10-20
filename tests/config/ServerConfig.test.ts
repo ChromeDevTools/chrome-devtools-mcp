@@ -364,6 +364,25 @@ describe('ServerConfig', () => {
     });
   });
 
+  describe('ServerConfig.withFileArgs()', () => {
+    it('creates a new ServerConfig with updated fileArgs and preserved cliArgs', () => {
+      const initial = ServerConfig.create({
+        cliArgs: {headless: true},
+        fileArgs: {memoryDebugging: false},
+        configPath: '/tmp/cd4a.config.json',
+        env: {CI: 'true'},
+        suppressUsageStatisticsNotice: true,
+      });
+
+      const updated = initial.withFileArgs({memoryDebugging: true});
+
+      assert.strictEqual(updated.resolved.headless, true);
+      assert.strictEqual(updated.resolved.memoryDebugging, true);
+      assert.strictEqual(updated.resolved.usageStatistics, false);
+      assert.strictEqual(updated.configPath, '/tmp/cd4a.config.json');
+    });
+  });
+
   describe('getRestartRequiredChanges', () => {
     it('ignores reloadable option changes', () => {
       const previous = parseConfig();

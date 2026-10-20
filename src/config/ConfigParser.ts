@@ -30,6 +30,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 export class ConfigParser {
   #configPath?: string;
+  #cliArgs?: Partial<ParsedArguments>;
   #usageStatisticsNoticeShown = false;
   readonly configLocator: ConfigLocator;
 
@@ -84,10 +85,13 @@ export class ConfigParser {
    * Step 2: reads the JSON config file and runs it through yargs to reject
    * unknown keys and apply coercions, without applying defaults.
    */
-  parseConfigFile(configPath: string): Partial<ParsedArguments> {
+  static parseConfigFile(
+    configPath: string,
+    rawContent?: string,
+  ): Partial<ParsedArguments> {
     try {
       const fileContent: unknown = JSON.parse(
-        readFileSync(configPath, 'utf-8'),
+        rawContent ?? readFileSync(configPath, 'utf-8'),
       );
       if (!isPlainObject(fileContent)) {
         throw new Error('Config must be a JSON object');
@@ -109,6 +113,13 @@ export class ConfigParser {
     }
   }
 
+  parseConfigFile(
+    configPath: string,
+    rawContent?: string,
+  ): Partial<ParsedArguments> {
+    return ConfigParser.parseConfigFile(configPath, rawContent);
+  }
+
   warnUnknownArgs(cliArgs: Partial<ParsedArguments>): void {
     const allowedArgs = new Set(Object.keys(mcpOptions));
     const unknownArgs = Object.keys(cliArgs).filter(
@@ -126,6 +137,7 @@ export class ConfigParser {
   parseConfig(): ServerConfig {
     try {
       const cliArgs = this.parseCliArgs();
+      this.#cliArgs = cliArgs;
       this.#configPath = cliArgs.config ?? this.configLocator.locate(this.env);
       this.warnUnknownArgs(cliArgs);
       return this.#resolveConfig(cliArgs);
@@ -149,7 +161,8 @@ export class ConfigParser {
    * instead of exiting the process.
    */
   reloadConfig(): ServerConfig {
-    return this.#resolveConfig(this.parseCliArgs());
+    this.#cliArgs ??= this.parseCliArgs();
+    return this.#resolveConfig(this.#cliArgs);
   }
 
   /**
