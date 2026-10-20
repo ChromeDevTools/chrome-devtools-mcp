@@ -21,6 +21,18 @@ cannot be combined with `--workspace`.
 chrome-devtools start --workspace=/path/to/project --workspace=/path/to/output
 ```
 
+## Agent skill
+
+The [`chrome-devtools-cli`](../skills/chrome-devtools-cli) skill teaches your agent how to use the CLI. Plugin installs include this skill. To install it manually, copy the skill folder into the skills directory of your agent:
+
+```sh
+# Example for Claude Code. Use the skills directory of your agent.
+mkdir -p ~/.claude/skills
+cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/skills/
+```
+
+See [Skills](../README.md#skills) for all skills and installation options.
+
 ## How it works
 
 The CLI acts as a client to a background `chrome-devtools-mcp` daemon (uses Unix sockets on Linux/Mac and named pipes on Windows).

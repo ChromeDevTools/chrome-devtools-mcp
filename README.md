@@ -8,7 +8,7 @@ Model-Context-Protocol (MCP) server and as a [CLI][cli]. Both give your AI
 coding assistant access to the full power of Chrome DevTools for reliable
 automation, in-depth debugging, and performance analysis.
 
-[Tool reference][tool-reference] | [CLI][cli] | [Changelog][changelog] | [Contributing][contributing] | [Troubleshooting][troubleshooting] | [Design Principles][design-principles]
+[Tool reference][tool-reference] | [CLI][cli] | [Skills][skills] | [Changelog][changelog] | [Contributing][contributing] | [Troubleshooting][troubleshooting] | [Design Principles][design-principles]
 
 ## Key features
 
@@ -113,6 +113,44 @@ chrome-devtools stop
 
 See the [CLI guide][cli] for all commands and options.
 
+## Skills
+
+The package includes [skills](./skills) that teach your agent how to use Chrome DevTools:
+
+| Skill                                                     | Use it to                                       |
+| --------------------------------------------------------- | ----------------------------------------------- |
+| [`chrome-devtools`](./skills/chrome-devtools)             | Debug and automate pages with the MCP tools.    |
+| [`chrome-devtools-cli`](./skills/chrome-devtools-cli)     | Run the CLI and write shell scripts with it.    |
+| [`a11y-debugging`](./skills/a11y-debugging)               | Audit and fix accessibility issues.             |
+| [`cookie-debugging`](./skills/cookie-debugging)           | Debug cookies, sessions, and authentication.    |
+| [`debug-optimize-lcp`](./skills/debug-optimize-lcp)       | Debug and improve Largest Contentful Paint.     |
+| [`memory-leak-debugging`](./skills/memory-leak-debugging) | Find and fix memory leaks.                      |
+| [`troubleshooting`](./skills/troubleshooting)             | Fix connection problems between MCP and Chrome. |
+
+### Install skills as a plugin
+
+A plugin installs the MCP server and all skills, including the CLI skill:
+
+- **Claude Code:** Run `/plugin marketplace add ChromeDevTools/chrome-devtools-mcp`, then `/plugin install chrome-devtools-mcp@chrome-devtools-plugins`.
+- **Copilot / VS Code:** Run **Chat: Install Plugin From Source** and enter `ChromeDevTools/chrome-devtools-mcp`.
+- **Gemini CLI:** Run `gemini extensions install --auto-update https://github.com/ChromeDevTools/chrome-devtools-mcp`.
+
+See the [Client Configurations Guide][client-configurations-guide] for more information.
+
+### Install skills manually
+
+If your agent does not support plugins, copy the skill folders into the skills directory of your agent. The npm package contains the skills:
+
+```sh
+npm i chrome-devtools-mcp@latest -g
+# Example for Claude Code. Use the skills directory of your agent.
+mkdir -p ~/.claude/skills
+cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/skills/
+```
+
+> [!IMPORTANT]
+> The `chrome-devtools-cli` skill requires the CLI. Install the package globally before you use the skill.
+
 ## Tools
 
 If you run into any issues, checkout our [troubleshooting guide][troubleshooting].
@@ -141,6 +179,7 @@ For a reference implementation, see the [Gemini CLI browser agent documentation]
 [configuration-guide]: ./docs/configuration.md
 [contributing]: ./CONTRIBUTING.md
 [design-principles]: ./docs/design-principles.md
+[skills]: #skills
 [slim-tool-reference]: ./docs/slim-tool-reference.md
 [tool-reference]: ./docs/tool-reference.md
 [troubleshooting]: ./docs/troubleshooting.md
