@@ -101,6 +101,10 @@ function hasOptionChanged(
 
 const FEATURE_CONTROLLERS: readonly FeatureController[] = [
   {
+    gate: {options: ['blockedUrlPattern', 'allowedUrlPattern']},
+    onChange: context => context.syncNetworkRestrictions(),
+  },
+  {
     gate: {options: ['sourceMaps']},
     onChange: context => context.syncSourceMaps(),
   },
@@ -237,6 +241,25 @@ export class McpContext implements Context, BrowserlessContext {
         !isCapabilityEnabled(controller.gate, nextArgs)
       ) {
         await controller.onDisable(this);
+      }
+    }
+  }
+
+  /**
+   * Applies updated URL allowlist/blocklist rules to the connected browser and
+   * clears incompatible page network throttling state.
+   */
+  async syncNetworkRestrictions(): Promise<void> {
+    const {blockedUrlPattern, allowedUrlPattern} = this.#config.resolved;
+    if (this.#browser) {
+      await this.#browser.restrictNetwork({
+        blocklist: blockedUrlPattern,
+        allowlist: allowedUrlPattern,
+      });
+    }
+    if (blockedUrlPattern || allowedUrlPattern) {
+      for (const mcpPage of this.#allMcpPages()) {
+        mcpPage.clearNetworkConditions();
       }
     }
   }

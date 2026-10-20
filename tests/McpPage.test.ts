@@ -957,6 +957,46 @@ describe('McpPage', () => {
     });
   });
 
+  describe('clearNetworkConditions()', () => {
+    it('clears networkConditions and updates timeouts while keeping other emulation settings', async () => {
+      const config = createMockServerConfig();
+      const {mcpPage, pptrPage} = await createMcpPage({config});
+      await mcpPage.emulate({
+        networkConditions: 'Slow 3G',
+        cpuThrottlingRate: 2,
+      });
+      pptrPage.setDefaultTimeout.resetHistory();
+      pptrPage.setDefaultNavigationTimeout.resetHistory();
+      config.commit(
+        createMockServerConfig({
+          blockedUrlPattern: ['https://example.com/*'],
+        }),
+      );
+
+      mcpPage.clearNetworkConditions();
+
+      assert.strictEqual(mcpPage.networkConditions, null);
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 2);
+      sinon.assert.calledOnceWithExactly(pptrPage.setDefaultTimeout, 10_000);
+      sinon.assert.calledOnceWithExactly(
+        pptrPage.setDefaultNavigationTimeout,
+        20_000,
+      );
+      await mcpPage.restoreEmulation();
+    });
+
+    it('does nothing when networkConditions is not set', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.setDefaultTimeout.resetHistory();
+      pptrPage.setDefaultNavigationTimeout.resetHistory();
+
+      mcpPage.clearNetworkConditions();
+
+      sinon.assert.notCalled(pptrPage.setDefaultTimeout);
+      sinon.assert.notCalled(pptrPage.setDefaultNavigationTimeout);
+    });
+  });
+
   describe('getNetworkRequests', () => {
     it('delegates to networkCollector.getData with includePreservedRequests', async () => {
       const {mcpPage} = await createMcpPage();

@@ -465,8 +465,7 @@ describe('McpServer', () => {
 
     it('commits the shared config, updates roots, and notifies the context with previous args', async () => {
       const {server, context, config} = await createTestServer([
-        '--blockedUrlPattern',
-        'https://example.com/*',
+        '--chromeArg=--foo',
       ]);
       const previousArgs = config.resolved;
       let cruxWhenNotified: boolean | undefined;
@@ -487,9 +486,7 @@ describe('McpServer', () => {
       ]);
       sinon.assert.calledOnceWithExactly(context.onConfigChanged, previousArgs);
       assert.strictEqual(cruxWhenNotified, false);
-      assert.deepStrictEqual(config.resolved.blockedUrlPattern, [
-        'https://example.com/*',
-      ]);
+      assert.deepStrictEqual(config.resolved.chromeArg, ['--foo']);
     });
 
     it('logs the CrUX disclaimer only when CrUX becomes active', async () => {

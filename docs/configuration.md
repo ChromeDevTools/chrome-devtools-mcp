@@ -309,11 +309,12 @@ available tools, and notifies the MCP client with
 `notifications/tools/list_changed`. If the new file is invalid, the server logs
 the error to stderr and keeps the previous configuration.
 
-Tool categories (except `categoryExtensions`) and tool-specific options apply
-immediately. Options that configure the browser, such as `headless`, `channel`,
-`viewport`, `blockedUrlPattern`, or `categoryExtensions`, only apply after
-restarting chrome-devtools-mcp. The server logs a message to stderr when a
-change requires a restart.
+Tool categories (except `categoryExtensions`), network URL restrictions
+(`blockedUrlPattern`, `allowedUrlPattern`), and tool-specific options apply
+immediately. Options that launch or connect to the browser, such as `headless`,
+`channel`, `viewport`, or `categoryExtensions`, only apply after restarting
+chrome-devtools-mcp. The server logs a message to stderr when a change requires
+a restart.
 
 ### Locking down the configuration file from agent access
 

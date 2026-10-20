@@ -198,6 +198,7 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   sinon.stub(browser, 'connected').get(() => true);
   browser.close.resolves();
   browser.disconnect.resolves();
+  browser.restrictNetwork.resolves();
   browser.pages.resolves([]);
   browser.targets.returns([]);
   browser.browserContexts.returns([]);

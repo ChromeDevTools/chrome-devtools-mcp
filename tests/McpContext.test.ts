@@ -1730,6 +1730,116 @@ describe('McpContext', () => {
       sinon.assert.calledOnceWithExactly(syncSourceMapsSpy);
     });
 
+    it('updates browser network restrictions only when blockedUrlPattern or allowedUrlPattern changes', async () => {
+      const browser = createMockPuppeteerBrowser();
+      const config = createMockServerConfig();
+      const context = await createMockContext({browser, config});
+      const mcpPage = context.getSelectedMcpPage();
+      const clearNetworkConditionsSpy = sinon.spy(
+        mcpPage,
+        'clearNetworkConditions',
+      );
+
+      await updateConfig(config, context, {performanceCrux: false});
+      sinon.assert.notCalled(browser.restrictNetwork);
+      sinon.assert.notCalled(clearNetworkConditionsSpy);
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://blocked.example.com/*'],
+      });
+      sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
+        blocklist: ['https://blocked.example.com/*'],
+        allowlist: undefined,
+      });
+      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
+
+      browser.restrictNetwork.resetHistory();
+      clearNetworkConditionsSpy.resetHistory();
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://blocked.example.com/*'],
+      });
+      sinon.assert.notCalled(browser.restrictNetwork);
+      sinon.assert.notCalled(clearNetworkConditionsSpy);
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: undefined,
+        allowedUrlPattern: ['https://allowed.example.com/*'],
+      });
+      sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
+        blocklist: undefined,
+        allowlist: ['https://allowed.example.com/*'],
+      });
+      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
+
+      browser.restrictNetwork.resetHistory();
+      clearNetworkConditionsSpy.resetHistory();
+      await updateConfig(config, context, {
+        allowedUrlPattern: undefined,
+      });
+      sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
+        blocklist: undefined,
+        allowlist: undefined,
+      });
+      sinon.assert.notCalled(clearNetworkConditionsSpy);
+    });
+
+    it('does not connect a browser when network restrictions change before ensureBrowser() is called', async () => {
+      const config = createMockServerConfig();
+      const getBrowser = sinon
+        .stub<[], Promise<Browser>>()
+        .resolves(createMockPuppeteerBrowser());
+      const taskRunner = new TaskRunner();
+      const context = McpContext.create(
+        undefined,
+        {
+          config,
+          heapSnapshotManager: new HeapSnapshotManager(taskRunner),
+          taskRunner,
+          getBrowser,
+        },
+        Locator,
+      );
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://blocked.example.com/*'],
+      });
+
+      sinon.assert.notCalled(getBrowser);
+      context.dispose();
+    });
+
+    it('reads updated blockedUrlPattern and allowedUrlPattern in loadResource', async () => {
+      sinon.stub(globalThis, 'fetch').callsFake(async () => new Response('ok'));
+      const config = createMockServerConfig();
+      const context = await createMockContext({config});
+
+      assert.strictEqual(
+        await context.loadResource('https://example.com/resource.map'),
+        'ok',
+      );
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: ['https://example.com/*'],
+      });
+      await assert.rejects(
+        context.loadResource('https://example.com/resource.map'),
+        /Blocked by blocklist/,
+      );
+
+      await updateConfig(config, context, {
+        blockedUrlPattern: undefined,
+        allowedUrlPattern: ['https://allowed.example.com/*'],
+      });
+      await assert.rejects(
+        context.loadResource('https://example.com/resource.map'),
+        /Not allowed by allowlist/,
+      );
+      assert.strictEqual(
+        await context.loadResource('https://allowed.example.com/resource.map'),
+        'ok',
+      );
+    });
+
     it('refreshes the pages when experimentalIncludeAllPages changes', async () => {
       const config = createMockServerConfig({
         experimentalIncludeAllPages: false,
