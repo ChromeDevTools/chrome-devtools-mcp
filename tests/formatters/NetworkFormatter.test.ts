@@ -9,6 +9,8 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {NetworkFormatter} from '../../src/formatters/NetworkFormatter.js';
 import type {HTTPRequest} from '../../src/third_party/index.js';
 import {createTempDir, getMockRequest, getMockResponse} from '../utils.js';
@@ -471,7 +473,7 @@ describe('NetworkFormatter', () => {
       });
 
       assert.strictEqual(
-        (formatter.toJSONDetailed() as {responseBody: string}).responseBody,
+        formatter.toJSONDetailed().responseBody,
         '<Response body not available: the response did not finish loading within 10 ms>',
       );
     });
@@ -490,28 +492,23 @@ describe('NetworkFormatter', () => {
         failure: () => null,
         redirectChain: () => [],
       } as unknown as HTTPRequest;
-      let saved = false;
+      const resPath = '/tmp/never-written';
+      const saveFile = sinon.stub().resolves({filename: resPath});
 
       const formatter = await NetworkFormatter.from(request, {
         fetchData: true,
-        responseFilePath: '/tmp/never-written',
+        responseFilePath: resPath,
         responseBodyTimeout: 10,
-        saveFile: async filename => {
-          saved = true;
-          return {filename: String(filename)};
-        },
+        saveFile,
         redactNetworkHeaders: false,
       });
 
-      const json = formatter.toJSONDetailed() as {
-        responseBody?: string;
-        responseBodyFilePath?: string;
-      };
-      assert.strictEqual(saved, false);
+      const json = formatter.toJSONDetailed();
+      sinon.assert.notCalled(saveFile);
       assert.strictEqual(json.responseBodyFilePath, undefined);
-      assert.match(
-        json.responseBody ?? '',
-        /did not finish loading within 10 ms/,
+      assert.strictEqual(
+        json.responseBody,
+        '<Response body not available: the response did not finish loading within 10 ms>',
       );
     });
 
