@@ -1569,7 +1569,8 @@ describe('ToolHandler', () => {
       sinon.spy(),
     );
 
-    const clock = sinon.useFakeTimers();
+    // Keep the test runner's clocks real while advancing the tool timeout.
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     try {
       const resultPromise = toolHandler.handle({});
       await clock.tickAsync(TOOL_CALL_TIMEOUT_MS * 2);
@@ -1621,7 +1622,7 @@ describe('ToolHandler', () => {
       abandonPendingBrowserAttemptSpy,
     );
 
-    const clock = sinon.useFakeTimers();
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
     try {
       const resultPromise = toolHandler.handle({});
       await clock.tickAsync(TOOL_CALL_TIMEOUT_MS);
