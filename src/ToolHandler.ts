@@ -353,7 +353,6 @@ export class ToolHandler {
    */
   async #runBrowserlessTool(
     tool: BrowserlessToolDefinition,
-    serverArgs: ParsedArguments,
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
@@ -364,12 +363,14 @@ export class ToolHandler {
     } catch (err) {
       response.setError(err);
     }
-    return await response.handle(context, this.#dataFormat(serverArgs));
+    return await response.handle(
+      context,
+      this.#dataFormat(this.#config.resolved),
+    );
   }
 
   async #runBrowserTool(
     tool: ToolDefinition | DefinedPageTool,
-    serverArgs: ParsedArguments,
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
@@ -395,7 +396,7 @@ export class ToolHandler {
     try {
       await validateToolFiles(tool, params, context, isLocalBrowser(browser));
       if (isPageScopedTool(tool)) {
-        const pageId = routedPageId(tool, serverArgs, params);
+        const pageId = routedPageId(tool, this.#config.resolved, params);
         page =
           pageId !== undefined
             ? context.getPageById(pageId)
@@ -429,7 +430,10 @@ export class ToolHandler {
       await context.getDevToolsData(page),
       context.getSelectedMcpPageUrl(page),
     );
-    return await response.handle(context, this.#dataFormat(serverArgs));
+    return await response.handle(
+      context,
+      this.#dataFormat(this.#config.resolved),
+    );
   }
 
   /**
@@ -482,7 +486,6 @@ export class ToolHandler {
     }
 
     const tool = this.#tool;
-    const serverArgs = this.#config.resolved;
     const parseResult = this.#registeredInputSchema.safeParse(rawArgs);
     if (!parseResult.success) {
       return errorResult(formatValidationError(tool.name, parseResult.error));
@@ -496,20 +499,12 @@ export class ToolHandler {
     try {
       logger?.(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
       const response = isSlimTool(tool)
-        ? new SlimMcpResponse(serverArgs)
-        : new McpResponse(serverArgs);
-      response.setRedactNetworkHeaders(serverArgs.redactNetworkHeaders);
+        ? new SlimMcpResponse(this.#config)
+        : new McpResponse(this.#config);
       const {content, structuredContent} = isBrowserlessTool(tool)
-        ? await this.#runBrowserlessTool(
-            tool,
-            serverArgs,
-            params,
-            response,
-            context,
-          )
+        ? await this.#runBrowserlessTool(tool, params, response, context)
         : await this.#runBrowserTool(
             tool,
-            serverArgs,
             params,
             response,
             context,
@@ -527,7 +522,7 @@ export class ToolHandler {
         result.isError = true;
       }
       success = true;
-      if (serverArgs.experimentalStructuredContent) {
+      if (this.#config.resolved.experimentalStructuredContent) {
         result.structuredContent = structuredContent as Record<string, unknown>;
       }
       return result;

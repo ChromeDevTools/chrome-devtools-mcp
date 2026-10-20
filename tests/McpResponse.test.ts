@@ -57,6 +57,7 @@ import {
   createMockObjectInfo,
   createMockParsedArguments,
   createMockPuppeteerTarget,
+  createMockServerConfig,
   createMockWebMCPTool,
   type MockMcpPage,
 } from './mocks.js';
@@ -102,7 +103,7 @@ describe('McpResponse', () => {
     const context = createMockMcpContext({selectedPage: page});
     context.getPages.returns([page]);
     context.isPageSelected.returns(true);
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     response.setIncludePages(true);
 
     const result = await response.handle(context);
@@ -137,7 +138,7 @@ describe('McpResponse', () => {
     );
     context.getPages.returns([openedPage, unrelatedPage]);
     context.isPageSelected.returns(false);
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     response.attachWaitForResult({
       openedPages: new Set([openedPage.target]),
     });
@@ -574,7 +575,7 @@ describe('McpResponse', () => {
     page.emulationSettings = {};
     page.getNetworkRequests.returns([]);
 
-    const responseWithPreserved = new McpResponse(createMockParsedArguments());
+    const responseWithPreserved = new McpResponse(createMockServerConfig());
     responseWithPreserved.setPage(page);
     responseWithPreserved.setIncludeNetworkRequests(true, {
       includePreservedRequests: true,
@@ -583,7 +584,7 @@ describe('McpResponse', () => {
 
     sinon.assert.calledOnceWithExactly(page.getNetworkRequests, true);
 
-    const responseDefault = new McpResponse(createMockParsedArguments());
+    const responseDefault = new McpResponse(createMockServerConfig());
     responseDefault.setPage(page);
     responseDefault.setIncludeNetworkRequests(true);
     await responseDefault.handle(context);
@@ -1242,7 +1243,7 @@ describe('third-party developer tools', () => {
       },
     ]);
     const context = createMockMcpContext({selectedPage: page});
-    const response = new McpResponse(args);
+    const response = new McpResponse(createMockServerConfig(args));
     response.setPage(page);
     response.setListThirdPartyDeveloperTools();
 
@@ -1258,7 +1259,7 @@ describe('third-party developer tools', () => {
 
   it('lists no third-party developer tools if there are none', async t => {
     const response = new McpResponse(
-      createMockParsedArguments({categoryExperimentalThirdParty: true}),
+      createMockServerConfig({categoryExperimentalThirdParty: true}),
     );
     const page = createMockMcpPage();
     page.discoverThirdPartyDeveloperTools.resolves([]);
@@ -1308,7 +1309,7 @@ describe('third-party developer tools', () => {
     context.getPages.returns([page]);
     context.getPageById.withArgs(1).returns(page);
     context.newPage.resolves(page);
-    const response = new McpResponse(args);
+    const response = new McpResponse(createMockServerConfig(args));
 
     await handlerAction(response, context, args, page);
 
@@ -1420,7 +1421,7 @@ describe('webmcp', () => {
     context.getPages.returns([page]);
     context.isPageSelected.returns(true);
     context.getPageById.withArgs(1).returns(page);
-    const response = new McpResponse(args);
+    const response = new McpResponse(createMockServerConfig(args));
 
     await handlerAction(response, context, args, page);
 
@@ -1478,7 +1479,7 @@ describe('webmcp', () => {
     });
     const page = createMockMcpPage();
     const context = createMockMcpContext({selectedPage: page});
-    const response = new McpResponse(args);
+    const response = new McpResponse(createMockServerConfig(args));
     response.setPage(page);
     response.setListWebMcpTools();
 
@@ -1543,7 +1544,7 @@ describe('McpResponse heap snapshot formatting', () => {
   DevTools.I18n.i18n.registerLocaleDataForTest('en-US', {});
 
   it('formats stats, staticData, nativeContextSizes, and retainedByContextSummary', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const stats = createMockHeapSnapshotStats();
     const staticData = createMockHeapSnapshotStaticData();
     const nativeContextSizes = {
@@ -1602,7 +1603,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats aggregate data with shallow size and pagination summaries', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const aggregates = {
       aggregates: [
         createMockHeapSnapshotAggregate({
@@ -1653,7 +1654,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('sorts nodes descending by retainedSize and formats pagination summaries', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const nodeSmall = createMockHeapSnapshotNode({
       id: 1,
       name: 'SmallNode',
@@ -1704,7 +1705,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats edge nodes correctly', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const edge = createMockHeapSnapshotEdge({
       name: 'myProp',
       type: 'property',
@@ -1726,7 +1727,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats retaining paths with truncation note when limits are reached', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const retainingPaths = {
       paths: [
         {
@@ -1764,7 +1765,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats empty retaining paths with no paths message', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     response.setHeapSnapshotRetainingPaths({
       paths: [],
       limitsReached: {depth: false, nodes: false, siblings: false},
@@ -1778,7 +1779,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats dominator chain and handles empty dominators', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const dominators = [
       {
         nodeId: 10,
@@ -1797,7 +1798,7 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(text.includes('### Dominator Chain'));
     assert.ok(text.includes('10,DomClass'));
 
-    const emptyResponse = new McpResponse(createMockParsedArguments());
+    const emptyResponse = new McpResponse(createMockServerConfig());
     emptyResponse.setHeapSnapshotDominators([]);
     const emptyResult = await emptyResponse.handle(context);
     const emptyText = getTextContent(emptyResult.content[0]);
@@ -1806,7 +1807,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats class diff summary and detailed diff headers', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     response.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff());
 
     const context = createMockMcpContext();
@@ -1816,7 +1817,7 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(text.includes('### Heap Snapshot Diff'));
     assert.ok(text.includes('TestClass'));
 
-    const detailedResponse = new McpResponse(createMockParsedArguments());
+    const detailedResponse = new McpResponse(createMockServerConfig());
     const detailedDiff = createMockDetailedClassDiff();
     detailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff);
 
@@ -1827,7 +1828,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('paginates detailed class diff objects below the class header', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const objects = [
       createMockDiffObject({id: 101, change: 'added'}),
       createMockDiffObject({id: 102, change: 'added'}),
@@ -1855,7 +1856,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('paginates class diff summary and keeps global indices', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const classDiffs = [
       createMockClassDiff({index: 0, className: 'ClassA'}),
       createMockClassDiff({index: 1, className: 'ClassB'}),
@@ -1888,7 +1889,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
   it('truncates class diff names in compact format', async () => {
     const context = createMockMcpContext();
-    const toonDiffResponse = new McpResponse(createMockParsedArguments());
+    const toonDiffResponse = new McpResponse(createMockServerConfig());
     toonDiffResponse.setHeapSnapshotClassDiffs(createMockHeapSnapshotDiff(), {
       maxNameLength: 4,
     });
@@ -1897,7 +1898,7 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(toonDiffText.includes('Test...'));
 
     const detailedDiff = createMockDetailedClassDiff();
-    const toonDetailedResponse = new McpResponse(createMockParsedArguments());
+    const toonDetailedResponse = new McpResponse(createMockServerConfig());
     toonDetailedResponse.setHeapSnapshotDetailedClassDiff(detailedDiff, {
       maxNameLength: 4,
     });
@@ -1910,7 +1911,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('formats duplicate strings with pagination and object details', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     const duplicateStrings = [
       {
         value: 'duplicated-string-value',
@@ -1936,7 +1937,7 @@ describe('McpResponse heap snapshot formatting', () => {
     assert.ok(text.includes('duplicated-string-value'));
     assert.ok(text.includes('Showing 1-1 of 1 (Page 1 of 1).'));
 
-    const objectInfoResponse = new McpResponse(createMockParsedArguments());
+    const objectInfoResponse = new McpResponse(createMockServerConfig());
     const objectInfo = createMockObjectInfo();
     objectInfoResponse.setHeapSnapshotObjectDetails(objectInfo);
 
@@ -1949,7 +1950,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
   it('truncates object details name in compact format', async () => {
     const context = createMockMcpContext();
-    const toonResponse = new McpResponse(createMockParsedArguments());
+    const toonResponse = new McpResponse(createMockServerConfig());
     const longNameObjectInfo = {
       ...createMockObjectInfo(),
       name: 'Object_' + 'x'.repeat(150),
@@ -1965,7 +1966,7 @@ describe('McpResponse heap snapshot formatting', () => {
   });
 
   it('renders the context field usage section for the filtered contexts', async () => {
-    const response = new McpResponse(createMockParsedArguments());
+    const response = new McpResponse(createMockServerConfig());
     response.setHeapSnapshotContextAnalysis(createMockContextAnalysisResult(), {
       retainedSize: parseByteSizeRange('1000'),
     });
@@ -1984,7 +1985,7 @@ describe('McpResponse heap snapshot formatting', () => {
 
   describe('extension service workers', () => {
     it('lists only service workers, excluding dedicated and shared workers', async () => {
-      const response = new McpResponse(createMockParsedArguments());
+      const response = new McpResponse(createMockServerConfig());
       response.setIncludeExtensionServiceWorkers(true);
 
       const context = createMockMcpContext();
@@ -2050,7 +2051,7 @@ describe('McpResponse heap snapshot formatting', () => {
     }
 
     it('includes note when DevTools comments regenerate a standard text snapshot', async () => {
-      const response = new McpResponse(createMockParsedArguments());
+      const response = new McpResponse(createMockServerConfig());
       const page = createMockMcpPage();
       page.textSnapshot = null;
       const standardSnapshot = createSnapshotWithNodes(
@@ -2086,7 +2087,7 @@ describe('McpResponse heap snapshot formatting', () => {
     });
 
     it('includes note when DevTools comments regenerate a verbose text snapshot', async () => {
-      const response = new McpResponse(createMockParsedArguments());
+      const response = new McpResponse(createMockServerConfig());
       const page = createMockMcpPage();
       page.textSnapshot = null;
       const verboseSnapshot = createSnapshotWithNodes(
@@ -2122,7 +2123,7 @@ describe('McpResponse heap snapshot formatting', () => {
     });
 
     it('does not include note when DevTools comments do not regenerate the snapshot', async () => {
-      const response = new McpResponse(createMockParsedArguments());
+      const response = new McpResponse(createMockServerConfig());
       const page = createMockMcpPage();
       const existingSnapshot = createSnapshotWithNodes(
         [{id: '1_1', backendNodeId: 42}],
@@ -2151,7 +2152,7 @@ describe('McpResponse heap snapshot formatting', () => {
     });
 
     it('does not include note when comments have no associated nodes', async () => {
-      const response = new McpResponse(createMockParsedArguments());
+      const response = new McpResponse(createMockServerConfig());
       const page = createMockMcpPage();
       page.textSnapshot = null;
       response.setPage(page);

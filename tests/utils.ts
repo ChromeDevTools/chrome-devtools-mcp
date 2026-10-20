@@ -231,7 +231,7 @@ export async function withMcpContext(
         allowUnrestrictedPaths: options.allowUnrestrictedPaths,
       }),
     });
-    const response = new McpResponse(parsedArgs);
+    const response = new McpResponse(serverConfig);
     const heapSnapshotManager = new HeapSnapshotManager(new TaskRunner());
     if (context) {
       context.dispose();

@@ -2287,5 +2287,50 @@ describe('ToolHandler', () => {
       assert.strictEqual(listingChanged, false);
       assert.strictEqual(toolHandler.disabled, true);
     });
+
+    it('uses reloaded config options when building response for an unqueued tool', async () => {
+      const config = parseConfig();
+      const {promise: unblockTool, resolve: finishTool} =
+        Promise.withResolvers<void>();
+      const {promise: started, resolve: markStarted} =
+        Promise.withResolvers<void>();
+
+      const unqueuedTool: BrowserlessToolDefinition = defineBrowserlessTool(
+        () => ({
+          name: 'unqueued_tool',
+          description: 'Runs outside the task runner',
+          annotations: {
+            category: ToolCategory.NAVIGATION,
+            readOnlyHint: true,
+          },
+          schema: {},
+          blockedByDialog: false,
+          verifyFilesSchema: {},
+          concurrency: 'none',
+          handler: async (_request, response) => {
+            markStarted();
+            await unblockTool;
+            response.appendResponseLine('done');
+          },
+        }),
+      )(config.resolved);
+
+      const toolHandler = new ToolHandler(
+        unqueuedTool,
+        config,
+        async () => createMockMcpContext(),
+        sinon.spy(),
+      );
+
+      const callPromise = toolHandler.handle({});
+      await started;
+
+      config.commit(parseConfig(['--experimental-structured-content']));
+
+      finishTool();
+      const result = await callPromise;
+
+      assert.deepStrictEqual(result.structuredContent, {message: 'done'});
+    });
   });
 });
