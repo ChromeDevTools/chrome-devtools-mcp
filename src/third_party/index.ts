@@ -53,6 +53,7 @@ export {
   ConsoleMessage,
   Dialog,
   ElementHandle,
+  Frame,
   Locator,
   PredefinedNetworkConditions,
   KnownDevices,

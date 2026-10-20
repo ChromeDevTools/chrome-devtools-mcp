@@ -12,7 +12,12 @@ import sinon from 'sinon';
 import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
+import {
+  DevTools,
+  Frame,
+  Locator,
+  ScreenRecorder,
+} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
@@ -1264,6 +1269,41 @@ describe('McpPage', () => {
           listenersBefore,
         );
       });
+    });
+
+    it('applies visible matching to frames attached while waiting', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.frames.returns([]);
+      const initialRace = Locator.race([]);
+      sinon.stub(initialRace, 'wait').returns(new Promise(() => {}));
+      const lateRace = Locator.race([]);
+      const lateRaceSetTimeout = sinon
+        .stub(lateRace, 'setTimeout')
+        .returns(lateRace);
+      sinon.stub(lateRace, 'wait').resolves();
+      const race = sinon.stub(Locator, 'race');
+      race.onFirstCall().returns(initialRace);
+      race.onSecondCall().returns(lateRace);
+      const frameLocator = sinon.createStubInstance<Locator<Element>>(Locator);
+      frameLocator.setVisibility.returns(frameLocator);
+      const lateFrame = sinon.createStubInstance(Frame);
+      lateFrame.locator.returns(frameLocator);
+
+      const waitPromise = mcpPage.waitForTextOnPage(['Saved'], {visible: true});
+      pptrPage.emit('frameattached', lateFrame);
+      await waitPromise;
+
+      sinon.assert.calledWithExactly(lateFrame.locator.firstCall, 'aria/Saved');
+      sinon.assert.calledWithExactly(
+        lateFrame.locator.secondCall,
+        'text/Saved',
+      );
+      sinon.assert.calledTwice(frameLocator.setVisibility);
+      sinon.assert.alwaysCalledWithExactly(
+        frameLocator.setVisibility,
+        'visible',
+      );
+      sinon.assert.calledOnceWithExactly(lateRaceSetTimeout, 0);
     });
   });
 
