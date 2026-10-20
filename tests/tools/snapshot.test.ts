@@ -48,12 +48,10 @@ describe('snapshot', () => {
         response,
         context,
       );
-      sinon.assert.calledOnceWithExactly(
-        page.waitForTextOnPage,
-        ['Hello'],
-        undefined,
-        undefined,
-      );
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, ['Hello'], {
+        timeout: undefined,
+        visible: undefined,
+      });
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Element matching one of ["Hello"] found.',
@@ -71,8 +69,7 @@ describe('snapshot', () => {
       sinon.assert.calledOnceWithExactly(
         page.waitForTextOnPage,
         ['Complete', 'Error'],
-        5000,
-        undefined,
+        {timeout: 5000, visible: undefined},
       );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
@@ -88,12 +85,10 @@ describe('snapshot', () => {
         response,
         context,
       );
-      sinon.assert.calledOnceWithExactly(
-        page.waitForTextOnPage,
-        ['Saved'],
-        2000,
-        true,
-      );
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, ['Saved'], {
+        timeout: 2000,
+        visible: true,
+      });
     });
   });
 });

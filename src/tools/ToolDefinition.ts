@@ -497,8 +497,7 @@ export type ContextPage = Readonly<{
   }): Promise<void>;
   waitForTextOnPage(
     text: string[],
-    timeout?: number,
-    visible?: boolean,
+    options?: {timeout?: number; visible?: boolean},
   ): Promise<Element>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;

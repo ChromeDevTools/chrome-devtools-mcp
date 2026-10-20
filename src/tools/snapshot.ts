@@ -62,6 +62,7 @@ export const waitFor = definePageTool(() => ({
     ...timeoutSchema,
     visible: zod
       .boolean()
+      .default(false)
       .optional()
       .describe(
         'If true, wait until the matching text is visible. By default, hidden text also counts.',
@@ -71,11 +72,10 @@ export const waitFor = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    await page.waitForTextOnPage(
-      request.params.text,
-      request.params.timeout,
-      request.params.visible,
-    );
+    await page.waitForTextOnPage(request.params.text, {
+      timeout: request.params.timeout,
+      visible: request.params.visible,
+    });
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,

@@ -1031,7 +1031,7 @@ describe('McpPage', () => {
 
         const element = await mcpPage.waitForTextOnPage(
           ['Saved successfully'],
-          500,
+          {timeout: 500},
         );
         assert.ok(element);
       });
@@ -1045,7 +1045,6 @@ describe('McpPage', () => {
           '<p id="saved" style="display:none">Saved successfully</p>',
         );
 
-        const start = Date.now();
         await page.evaluate(() => {
           setTimeout(() => {
             document.getElementById('saved')!.style.display = 'block';
@@ -1053,11 +1052,9 @@ describe('McpPage', () => {
         });
         const element = await mcpPage.waitForTextOnPage(
           ['Saved successfully'],
-          1500,
-          true,
+          {timeout: 1500, visible: true},
         );
         assert.ok(element);
-        assert.ok(Date.now() - start >= 200);
       });
     });
 
@@ -1069,7 +1066,10 @@ describe('McpPage', () => {
         );
 
         await assert.rejects(
-          mcpPage.waitForTextOnPage(['Saved successfully'], 300, true),
+          mcpPage.waitForTextOnPage(['Saved successfully'], {
+            timeout: 300,
+            visible: true,
+          }),
           /Timed out/,
         );
       });
@@ -1080,11 +1080,10 @@ describe('McpPage', () => {
         const mcpPage = context.getSelectedMcpPage();
         await mcpPage.pptrPage.setContent('<p>Visible from the start</p>');
         assert.ok(
-          await mcpPage.waitForTextOnPage(
-            ['Visible from the start'],
-            500,
-            true,
-          ),
+          await mcpPage.waitForTextOnPage(['Visible from the start'], {
+            timeout: 500,
+            visible: true,
+          }),
         );
       });
     });

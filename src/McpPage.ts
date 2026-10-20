@@ -1303,9 +1303,9 @@ export class McpPage implements ContextPage {
 
   waitForTextOnPage(
     text: string[],
-    timeout?: number,
-    visible?: boolean,
+    options: {timeout?: number; visible?: boolean} = {},
   ): Promise<Element> {
+    const {timeout, visible} = options;
     const frames = this.pptrPage.frames();
 
     let locator = this.#locatorClass.race(
