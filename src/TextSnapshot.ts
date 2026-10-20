@@ -13,6 +13,9 @@ import type {
 import type {DevToolsData} from './tools/ToolDefinition.js';
 import type {TextSnapshotNode} from './types.js';
 import {logger} from './utils/logger.js';
+import {withTimeout} from './utils/timeout.js';
+
+const ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS = 10_000;
 
 /**
  * InlineTextBox nodes are layout line fragments of a StaticText node. They
@@ -62,10 +65,16 @@ export class TextSnapshot {
     } = {},
   ): Promise<TextSnapshot> {
     const verbose = options.verbose ?? false;
-    const rootNode = await page.pptrPage.accessibility.snapshot({
-      includeIframes: true,
-      interestingOnly: !verbose,
-    });
+    const rootNode = await withTimeout(
+      page.pptrPage.accessibility.snapshot({
+        includeIframes: true,
+        interestingOnly: !verbose,
+      }),
+      {
+        timeout: ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS,
+        message: `Timed out after ${ACCESSIBILITY_SNAPSHOT_TIMEOUT_MS}ms waiting for the accessibility tree. The page may have a pending navigation or a crashed renderer. Navigate or reload the page, or select another page.`,
+      },
+    );
     if (!rootNode) {
       throw new Error('Failed to create accessibility snapshot');
     }

@@ -81,6 +81,7 @@ export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
 export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {Deferred} from 'puppeteer-core/internal/util/Deferred.js';
 export {
   DisposableStack,
   AsyncDisposableStack,
