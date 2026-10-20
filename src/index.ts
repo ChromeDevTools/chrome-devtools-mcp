@@ -10,6 +10,7 @@ import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
 import type {ParsedArguments} from './config/ConfigParser.js';
+import {ConfigWatcher} from './config/ConfigWatcher.js';
 import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
@@ -32,6 +33,7 @@ import {ToolHandler} from './ToolHandler.js';
 import type {AnyToolDefinition} from './tools/ToolDefinition.js';
 import {createTools} from './tools/tools.js';
 import {logCruxDisclaimer} from './utils/disclaimers.js';
+import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
 import {VERSION} from './version.js';
 
@@ -76,6 +78,7 @@ export class McpServer {
    */
   #awaitedInitialRoots = false;
   #toolMutex = new Mutex();
+  #configWatcher?: ConfigWatcher;
   #tools = new Map<string, ToolEntry>();
 
   private constructor(config: ServerConfig, options: McpServerOptions) {
@@ -178,8 +181,11 @@ export class McpServer {
    */
   async applyConfig(config: ServerConfig): Promise<void> {
     using guard = await this.#toolMutex.acquire();
+    await this.#applyConfigLocked(this.#config.mergeReloadable(config));
+  }
+
+  async #applyConfigLocked(nextConfig: ServerConfig): Promise<void> {
     const previousArgs = this.#config.resolved;
-    const nextConfig = this.#config.mergeReloadable(config);
     const nextArgs = nextConfig.resolved;
     // Build everything before committing so that a throwing tool factory
     // leaves the server untouched.
@@ -215,9 +221,69 @@ export class McpServer {
   }
 
   /**
+   * Watches the config file and applies its changes to the running server.
+   *
+   * @param reload Re-reads the config file and returns the new configuration.
+   */
+  watchConfig(reload: () => ServerConfig): void {
+    const configPath = this.#config.configPath;
+    if (!configPath) {
+      console.error(
+        '--watchConfig has no effect because no config file was found.',
+      );
+      return;
+    }
+    this.#configWatcher?.dispose();
+    this.#configWatcher = undefined;
+    const watcher = new ConfigWatcher(configPath, () =>
+      this.#reloadConfig(watcher, configPath, reload),
+    );
+    try {
+      watcher.start();
+    } catch (err) {
+      watcher.dispose();
+      console.error(`Failed to watch ${configPath}: ${getErrorMessage(err)}`);
+      return;
+    }
+    this.#configWatcher = watcher;
+  }
+
+  async #reloadConfig(
+    watcher: ConfigWatcher,
+    configPath: string,
+    reload: () => ServerConfig,
+  ): Promise<void> {
+    using guard = await this.#toolMutex.acquire();
+    if (this.#configWatcher !== watcher) {
+      return;
+    }
+    let config: ServerConfig;
+    let nextConfig: ServerConfig;
+    try {
+      config = reload();
+      nextConfig = this.#config.mergeReloadable(config);
+    } catch (err) {
+      const message = `Keeping the previous configuration, failed to reload ${configPath}: ${getErrorMessage(err)}`;
+      logger?.(message);
+      console.error(message);
+      return;
+    }
+    await this.#applyConfigLocked(nextConfig);
+    const restartRequired = this.#config.getRestartRequiredChanges(config);
+    logger?.(`Applied config changes from ${configPath}`);
+    if (restartRequired.length > 0) {
+      const message = `Restart chrome-devtools-mcp to fully apply changes to ${restartRequired.map(name => `--${name}`).join(', ')} from ${configPath}.`;
+      logger?.(message);
+      console.error(message);
+    }
+  }
+
+  /**
    * Closes the MCP connection and disposes internal context/listeners.
    */
   async close(): Promise<void> {
+    this.#configWatcher?.dispose();
+    this.#configWatcher = undefined;
     try {
       this.#context.dispose();
     } catch (err) {
