@@ -17,7 +17,7 @@ describe('HeapSnapshotManager', () => {
     const manager = new HeapSnapshotManager();
 
     await assert.rejects(
-      manager.getSnapshot('tests/fixtures/snapshot_diffs.js'),
+      manager.getStats('tests/fixtures/snapshot_diffs.js'),
       /must have a \.heapsnapshot or \.heaptimeline extension/,
     );
   });
@@ -36,7 +36,7 @@ describe('HeapSnapshotManager', () => {
     // otherwise it leaks for the life of the process (it is never added to the
     // #snapshots map, so dispose()/disposeAll() cannot reach it).
     await assert.rejects(
-      manager.getSnapshot('/nonexistent/does-not-exist.heapsnapshot'),
+      manager.getStats('/nonexistent/does-not-exist.heapsnapshot'),
     );
 
     sinon.assert.calledOnce(disposeSpy);
