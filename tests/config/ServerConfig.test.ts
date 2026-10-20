@@ -232,6 +232,40 @@ describe('ServerConfig', () => {
     });
   });
 
+  describe('create', () => {
+    it('lets CLI arguments clear conflicting and invalidated implied keys from fileArgs', () => {
+      const config = ServerConfig.create({
+        cliArgs: {browserUrl: 'http://localhost:9222'},
+        fileArgs: {
+          wsEndpoint: 'ws://localhost:9222',
+          wsHeaders: {Authorization: 'Bearer token'},
+        },
+        env: {},
+        suppressUsageStatisticsNotice: true,
+      });
+
+      assert.strictEqual(config.resolved.browserUrl, 'http://localhost:9222');
+      assert.strictEqual(config.resolved.wsEndpoint, undefined);
+      assert.strictEqual(config.resolved.wsHeaders, undefined);
+    });
+
+    it('rejects conflicting arguments within fileArgs even when cliArgs overrides the group', () => {
+      assert.throws(
+        () =>
+          ServerConfig.create({
+            cliArgs: {executablePath: '/bin/chrome'},
+            fileArgs: {
+              browserUrl: 'http://localhost:9222',
+              channel: 'canary',
+            },
+            env: {},
+            suppressUsageStatisticsNotice: true,
+          }),
+        /Arguments channel and browserUrl are mutually exclusive/,
+      );
+    });
+  });
+
   describe('mergeReloadable', () => {
     it('applies reloadable options', () => {
       const merged = parseConfig().mergeReloadable(
