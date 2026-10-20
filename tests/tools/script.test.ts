@@ -118,6 +118,40 @@ describe('script', () => {
         );
       });
     });
+    it('surfaces non-Error values when script throws or rejects', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const cases = [
+          {fn: "() => { throw 'str-thrown'; }", expected: 'str-thrown'},
+          {fn: "async () => { throw 'async-str'; }", expected: 'async-str'},
+          {fn: '() => Promise.reject(42)', expected: '42'},
+          {fn: '() => { throw {code: 42}; }', expected: '{"code":42}'},
+          {
+            fn: "() => { throw new Error('err-thrown'); }",
+            expected: 'err-thrown',
+          },
+        ];
+        for (const testCase of cases) {
+          let caught: unknown;
+          try {
+            await evaluateScript(args).handler(
+              {params: {function: testCase.fn}},
+              response,
+              context,
+            );
+          } catch (err) {
+            caught = err;
+          }
+          assert.ok(
+            caught instanceof Error,
+            `Expected Error for ${testCase.fn}`,
+          );
+          assert.ok(
+            caught.message.includes(testCase.expected),
+            `Expected "${caught.message}" to include "${testCase.expected}"`,
+          );
+        }
+      });
+    });
     it('serializes script results inside the browser', async () => {
       await withMcpContext(async (response, context, args) => {
         await evaluateScript(args).handler(
@@ -239,6 +273,7 @@ describe('script', () => {
         ),
         {message: 'A dialog is open (alert: hello).'},
       );
+      sinon.assert.calledOnceWithExactly(page.init, {emulateFocus: true});
       sinon.assert.calledOnceWithExactly(page.throwIfDialogOpen);
       sinon.assert.callOrder(page.init, page.throwIfDialogOpen);
       sinon.assert.notCalled(page.waitForEventsAfterAction);

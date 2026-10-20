@@ -190,6 +190,7 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
       .describe('Directory for reports. If omitted, uses temporary files.'),
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     outputDirPath: true,
   },

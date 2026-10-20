@@ -125,6 +125,7 @@ export const click = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
@@ -183,6 +184,7 @@ export const clickAt = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -219,6 +221,7 @@ export const hover = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const uid = request.params.uid;
@@ -411,6 +414,7 @@ export const fill = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const {result} = await fillFormElements(
@@ -443,6 +447,7 @@ export const typeText = definePageTool(() => ({
     submitKey: submitKeySchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
@@ -474,6 +479,7 @@ export const drag = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     using fromHandle = await request.page.getElementByUid(
@@ -521,6 +527,7 @@ export const fillForm = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const {result, interruptedUid} = await fillFormElements(
@@ -571,6 +578,7 @@ export const uploadFile = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   // We do not validate file paths for remote browser instances
   // because they are on the remote host and not accessed by the MCP server.
   verifyFilesSchema: {
@@ -633,6 +641,7 @@ export const pressKey = definePageTool(() => ({
     includeSnapshot: includeSnapshotSchema,
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

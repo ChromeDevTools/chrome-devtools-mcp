@@ -101,6 +101,7 @@ Example with arguments: \`(el) => el.innerText\`
         : {}),
     },
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {
       filePath: true,
       // sourcePath may be an http(s): URL the server fetches, so allow URLs
@@ -163,7 +164,7 @@ Example with arguments: \`(el) => el.innerText\`
         cliArgs.pageIdRouting && request.params.pageId
           ? context.getPageById(request.params.pageId)
           : context.getSelectedMcpPage();
-      await mcpPage.init();
+      await mcpPage.init({emulateFocus: true});
       // evaluate_script is not page-scoped, so ToolHandler does not run the
       // blockedByDialog check for it. Without this, an evaluation started
       // while a dialog is open waits until the protocol timeout.
@@ -243,9 +244,32 @@ const performEvaluation = async (
       [],
       () => (...args: unknown[]) => unknown
     >(`(\n${functionSource}\n)`);
+    // Normalize non-Error values inside the page callback (serialized by Puppeteer) so CDP preserves the message.
     result = await evaluatable.evaluate(
       async (fn, ...args) => {
-        return JSON.stringify(await fn(...args));
+        try {
+          return JSON.stringify(await fn(...args));
+        } catch (err) {
+          if (
+            err instanceof Error ||
+            (typeof err === 'object' &&
+              err !== null &&
+              'message' in err &&
+              typeof err.message === 'string')
+          ) {
+            throw err;
+          }
+          let message: string;
+          try {
+            message =
+              typeof err === 'object' && err !== null
+                ? JSON.stringify(err)
+                : String(err);
+          } catch {
+            message = String(err);
+          }
+          throw new Error(message);
+        }
       },
       fn,
       ...args,

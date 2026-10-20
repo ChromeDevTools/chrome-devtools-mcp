@@ -8,11 +8,11 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {SlimMcpResponse} from '../src/SlimMcpResponse.js';
-import {createMockMcpContext, createMockParsedArguments} from './mocks.js';
+import {createMockMcpContext, createMockServerConfig} from './mocks.js';
 
 describe('SlimMcpResponse', () => {
   it('preserves response lines when there is no error', async () => {
-    const response = new SlimMcpResponse(createMockParsedArguments());
+    const response = new SlimMcpResponse(createMockServerConfig());
     response.appendResponseLine('Navigation complete');
 
     const {content} = await response.handle(createMockMcpContext());
@@ -22,7 +22,7 @@ describe('SlimMcpResponse', () => {
   });
 
   it('includes stored errors in the response text', async () => {
-    const response = new SlimMcpResponse(createMockParsedArguments());
+    const response = new SlimMcpResponse(createMockServerConfig());
     response.appendResponseLine('Navigation started');
     response.setError(new Error('Navigation failed'));
 

@@ -7,6 +7,8 @@
 import assert from 'node:assert';
 import {afterEach, describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 
@@ -16,6 +18,19 @@ import {html, withMcpContext} from './utils.js';
 describe('TextSnapshot', () => {
   afterEach(() => {
     TextSnapshot.resetCounter();
+  });
+
+  it('rejects when the accessibility tree does not arrive within the timeout', async () => {
+    const clock = sinon.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+    const page = createMockMcpPage();
+    page.pptrPage.accessibility.snapshot.returns(new Promise(() => {}));
+
+    const assertion = assert.rejects(
+      TextSnapshot.create(page),
+      /Timed out after 10000ms waiting for the accessibility tree/,
+    );
+    await clock.tickAsync(10_000);
+    await assertion;
   });
 
   it('does not assign uids to nodes without backendNodeId', async () => {

@@ -54,6 +54,7 @@ export const startTrace = definePageTool(() => ({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -64,9 +65,9 @@ export const startTrace = definePageTool(() => ({
       );
       return;
     }
-    context.setIsRunningPerformanceTrace(true);
-
     const page = request.page;
+    page.setIsRunningPerformanceTrace(true);
+
     const pageUrlForTracing = page.pptrPage.url();
 
     try {
@@ -134,7 +135,7 @@ export const startTrace = definePageTool(() => ({
         } catch {
           // Tracing may not have started yet; ignore.
         }
-        context.setIsRunningPerformanceTrace(false);
+        page.setIsRunningPerformanceTrace(false);
       }
       throw error;
     }
@@ -153,6 +154,7 @@ export const stopTrace = definePageTool(() => ({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -194,6 +196,7 @@ export const analyzeInsight = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
@@ -259,7 +262,7 @@ async function stopTracingAndAppendOutput(
       );
     }
   } finally {
-    context.setIsRunningPerformanceTrace(false);
+    page.setIsRunningPerformanceTrace(false);
   }
 }
 

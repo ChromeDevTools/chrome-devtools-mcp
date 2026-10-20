@@ -12,7 +12,7 @@ import {
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
 import {mcpOptions} from '../build/src/config/mcp-options.js';
-import {ConfigParser} from '../build/src/config/ConfigParser.js';
+import {ServerConfig} from '../build/src/config/ServerConfig.js';
 import {zod} from '../build/src/third_party/index.js';
 import {labels, ToolCategory} from '../build/src/tools/categories.js';
 import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
@@ -78,7 +78,10 @@ function schemaToCLIOptions(toolName: string, schema: JsonSchema): CliOption[] {
 
 async function generateCli() {
   const tools = createTools(
-    new ConfigParser('0.0.0', ['', '', '--viaCli']).parse(),
+    ServerConfig.applyDefaults(
+      {viaCli: true},
+      {suppressUsageStatisticsNotice: true},
+    ),
   );
 
   // Sort tools by name

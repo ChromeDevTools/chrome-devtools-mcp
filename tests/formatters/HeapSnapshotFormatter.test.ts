@@ -22,6 +22,7 @@ import {
 } from '../../src/processors/HeapSnapshotManager.js';
 import {DevTools} from '../../src/third_party/index.js';
 import {parseByteSizeRange} from '../../src/utils/bytes.js';
+import {TaskRunner} from '../../src/utils/TaskRunner.js';
 import {createMockContextAnalysisResult} from '../mocks.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -62,6 +63,14 @@ describe('HeapSnapshotFormatter', () => {
       const longName = 'a'.repeat(150);
       const expected = 'a'.repeat(MAX_NAME_LENGTH) + '...';
       assert.strictEqual(formatName(longName, {}), expected);
+    });
+
+    it('does not split a surrogate pair at the truncation point', () => {
+      const name = 'a'.repeat(MAX_NAME_LENGTH - 1) + '\u{1F600}' + 'b';
+      assert.strictEqual(
+        formatName(name, {}),
+        'a'.repeat(MAX_NAME_LENGTH - 1) + '...',
+      );
     });
 
     it('escapes newlines in name', () => {
@@ -492,7 +501,7 @@ describe('HeapSnapshotFormatter', () => {
     const heap3Path = join(process.cwd(), 'tests/fixtures/heap-3.heapsnapshot');
 
     before(() => {
-      manager = new HeapSnapshotManager();
+      manager = new HeapSnapshotManager(new TaskRunner());
     });
 
     after(() => {

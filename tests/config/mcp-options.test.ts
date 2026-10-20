@@ -67,6 +67,43 @@ describe('mcp-options steps', () => {
         /Invalid JSON config file: Config must be a JSON object/,
       );
     });
+
+    it('accepts wsHeaders as a JSON object and validates string values', () => {
+      using validFile = createTempFile(
+        JSON.stringify({
+          wsEndpoint: 'ws://localhost:9222',
+          wsHeaders: {Authorization: 'Bearer token'},
+        }),
+        'cd4a.wsheaders.valid.json',
+      );
+      const args = parser.parseConfigFile(validFile.path);
+      assert.deepStrictEqual(args.wsHeaders, {Authorization: 'Bearer token'});
+
+      using invalidFile = createTempFile(
+        JSON.stringify({
+          wsEndpoint: 'ws://localhost:9222',
+          wsHeaders: {Authorization: 123},
+        }),
+        'cd4a.wsheaders.invalid.json',
+      );
+      assert.throws(
+        () => parser.parseConfigFile(invalidFile.path),
+        /Header "Authorization" must have a string value/,
+      );
+    });
+
+    it('rejects config, help, and version keys inside a config file', () => {
+      for (const forbiddenKey of ['config', 'help', 'version']) {
+        using configFile = createTempFile(
+          JSON.stringify({[forbiddenKey]: true}),
+          `cd4a.forbidden.${forbiddenKey}.json`,
+        );
+        assert.throws(
+          () => parser.parseConfigFile(configFile.path),
+          new RegExp(`Invalid JSON config file: .*${forbiddenKey}`),
+        );
+      }
+    });
   });
 
   describe('config discovery', () => {

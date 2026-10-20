@@ -26,6 +26,7 @@ import {
   createHandlerMocks,
   createMockDialog,
   createMockElementHandle,
+  createMockServerConfig,
 } from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
@@ -942,7 +943,7 @@ describe('input', () => {
         );
 
         // Fill email
-        const response1 = new McpResponse(args);
+        const response1 = new McpResponse(createMockServerConfig(args));
         await fill(args).handler(
           {
             params: {
@@ -960,7 +961,7 @@ describe('input', () => {
         );
 
         // Fill password
-        const response2 = new McpResponse(args);
+        const response2 = new McpResponse(createMockServerConfig(args));
         await fill(args).handler(
           {
             params: {
@@ -1045,7 +1046,7 @@ describe('input', () => {
             },
             page: context.getSelectedMcpPage(),
           },
-          new McpResponse(args),
+          new McpResponse(createMockServerConfig(args)),
           context,
         );
 
@@ -1103,7 +1104,7 @@ describe('input', () => {
             },
             page: context.getSelectedMcpPage(),
           },
-          new McpResponse(args),
+          new McpResponse(createMockServerConfig(args)),
           context,
         );
 

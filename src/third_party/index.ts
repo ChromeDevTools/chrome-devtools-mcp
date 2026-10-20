@@ -18,7 +18,12 @@ export type {Flags, Result, RunnerResult, OutputMode};
 
 export type {YargsOptions, InferredOptionTypes} from './cli.js';
 export {yargs, hideBin, semver, PipeTransport} from './cli.js';
-export {McpServer, type RegisteredTool} from '@modelcontextprotocol/server';
+export {
+  McpServer,
+  ProtocolError,
+  ProtocolErrorCode,
+  type RegisteredTool,
+} from '@modelcontextprotocol/server';
 export {
   StdioServerTransport,
   serveStdio,
@@ -45,8 +50,10 @@ export type ShapeOutput<T extends zod.ZodRawShape> = zod.output<
 export {default as ajv} from 'ajv';
 export {
   Accessibility,
+  ConsoleMessage,
   Dialog,
   ElementHandle,
+  Frame,
   Locator,
   PredefinedNetworkConditions,
   KnownDevices,
@@ -75,6 +82,7 @@ export type {Realm} from 'puppeteer-core/internal/api/Realm.js';
 export {FrameEvent} from 'puppeteer-core/internal/api/Frame.js';
 export type {JSONSchema7, JSONSchema7Definition} from 'json-schema';
 export {Mutex} from 'puppeteer-core/internal/util/Mutex.js';
+export {Deferred} from 'puppeteer-core/internal/util/Deferred.js';
 export {
   DisposableStack,
   AsyncDisposableStack,

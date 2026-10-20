@@ -238,6 +238,12 @@ export const mcpOptions = {
       return path.resolve(configPath);
     },
   },
+  watchConfig: {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Watch the config file for changes and apply them without restarting. Tools (except --categoryExtensions) are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.',
+  },
 } satisfies Record<string, McpOption>;
 
 export const mcpOptionsForViaCli = {
@@ -277,8 +283,9 @@ export function getCliOptions(): Partial<
   // Missing CLI serialization.
   delete options.viewport;
 
-  // The CLI is generated for the full mode, not slim mode.
+  // The CLI is generated for the full mode with pageId routing, not slim mode.
   delete options.slim;
+  delete options.pageIdRouting;
 
   // Change the defaults for the CLI.
   delete options.experimentalStructuredContent;

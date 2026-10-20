@@ -11,9 +11,30 @@ import {
   type HTTPRequest,
   type HTTPResponse,
 } from '../third_party/index.js';
+import {truncateText} from '../utils/text.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
 const URL_CONTEXT_SIZE_LIMIT = 255;
+/**
+ * How long to wait for a response body. Puppeteer reads a body only after the
+ * response finished loading, with no timeout of its own, and a response that
+ * never finishes (e.g. a `Cache-Control: no-store` response the page did not
+ * read) would otherwise hold the tool mutex forever.
+ */
+export const RESPONSE_BODY_TIMEOUT_MS = 5000;
+
+class ResponseBodyTimeoutError extends Error {
+  readonly timeout: number;
+
+  constructor(timeout: number) {
+    super(`Response body timed out after ${timeout} ms`);
+    this.timeout = timeout;
+  }
+}
+
+function responseBodyTimeoutMessage(error: ResponseBodyTimeoutError): string {
+  return `<Response body not available: the response did not finish loading within ${error.timeout} ms>`;
+}
 
 export interface NetworkFormatterOptions {
   requestId?: number | string;
@@ -28,6 +49,8 @@ export interface NetworkFormatterOptions {
     extension: '.network-request' | '.network-response',
   ) => Promise<{filename: string}>;
   redactNetworkHeaders: boolean;
+  /** Defaults to `RESPONSE_BODY_TIMEOUT_MS`. */
+  responseBodyTimeout?: number;
 }
 
 interface NetworkRequestConcise {
@@ -116,9 +139,12 @@ export class NetworkFormatter {
       if (this.#options.responseFilePath) {
         let buffer: Uint8Array | undefined;
         try {
-          buffer = await response.buffer();
-        } catch {
-          // Response body is not available anymore
+          buffer = await this.#readResponseBody(response);
+        } catch (error) {
+          this.#responseBody =
+            error instanceof ResponseBodyTimeoutError
+              ? responseBodyTimeoutMessage(error)
+              : responseBodyNotAvailableMessage;
         }
 
         if (buffer) {
@@ -133,8 +159,6 @@ export class NetworkFormatter {
             '.network-response',
           );
           this.#responseBodyFilePath = result.filename;
-        } else {
-          this.#responseBody = responseBodyNotAvailableMessage;
         }
       } else {
         this.#responseBody = await this.#getFormattedResponseBody(
@@ -238,7 +262,7 @@ export class NetworkFormatter {
     sizeLimit = BODY_CONTEXT_SIZE_LIMIT,
   ): Promise<string | undefined> {
     try {
-      const responseBuffer = await httpResponse.buffer();
+      const responseBuffer = await this.#readResponseBody(httpResponse);
 
       if (isUtf8(responseBuffer)) {
         const responseAsTest = responseBuffer.toString('utf-8');
@@ -251,17 +275,35 @@ export class NetworkFormatter {
       }
 
       return '<binary data>';
-    } catch {
+    } catch (error) {
+      if (error instanceof ResponseBodyTimeoutError) {
+        return responseBodyTimeoutMessage(error);
+      }
       return '<not available anymore>';
+    }
+  }
+
+  async #readResponseBody(httpResponse: HTTPResponse): Promise<Buffer> {
+    const timeout =
+      this.#options.responseBodyTimeout ?? RESPONSE_BODY_TIMEOUT_MS;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        httpResponse.buffer(),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new ResponseBodyTimeoutError(timeout));
+          }, timeout);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
 
 function getSizeLimitedString(text: string, sizeLimit: number): string {
-  if (text.length > sizeLimit) {
-    return text.substring(0, sizeLimit) + '... <truncated>';
-  }
-  return text;
+  return truncateText(text, sizeLimit, {ellipsis: '... <truncated>'});
 }
 
 function convertNetworkRequestConciseToString(
