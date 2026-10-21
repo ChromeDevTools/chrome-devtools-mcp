@@ -251,7 +251,8 @@ export const commands: Commands = {
     },
   },
   drag: {
-    description: 'Drag an element onto another element',
+    description:
+      'Drag the element identified by from_uid onto the element identified by to_uid, using uids from the latest page content snapshot. Returns a page snapshot when includeSnapshot is true.',
     category: 'Input automation',
     args: {
       pageId: {
@@ -1126,7 +1127,8 @@ export const commands: Commands = {
     },
   },
   hover: {
-    description: 'Hover over the provided element',
+    description:
+      'Move the pointer over the element identified by a uid from the latest page content snapshot without clicking it. Returns a page snapshot when includeSnapshot is true.',
     category: 'Input automation',
     args: {
       pageId: {
@@ -2014,7 +2016,8 @@ export const commands: Commands = {
     },
   },
   upload_file: {
-    description: 'Upload a file through a provided element.',
+    description:
+      'Upload files through the element identified by a uid from the latest page content snapshot. Returns a page snapshot when includeSnapshot is true.',
     category: 'Input automation',
     args: {
       pageId: {

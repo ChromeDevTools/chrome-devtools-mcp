@@ -90,7 +90,7 @@
 
 ### `drag`
 
-**Description:** [`Drag`](#drag) an element onto another element
+**Description:** [`Drag`](#drag) the element identified by from_uid onto the element identified by to_uid, using uids from the latest page content snapshot. Returns a page snapshot when includeSnapshot is true.
 
 **Parameters:**
 
@@ -140,7 +140,7 @@
 
 ### `hover`
 
-**Description:** [`Hover`](#hover) over the provided element
+**Description:** Move the pointer over the element identified by a uid from the latest page content snapshot without clicking it. Returns a page snapshot when includeSnapshot is true.
 
 **Parameters:**
 
@@ -176,7 +176,7 @@
 
 ### `upload_file`
 
-**Description:** Upload a file through a provided element.
+**Description:** Upload files through the element identified by a uid from the latest page content snapshot. Returns a page snapshot when includeSnapshot is true.
 
 **Parameters:**
 
