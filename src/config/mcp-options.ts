@@ -86,7 +86,10 @@ export const mcpOptions: McpOptions = {
   authHelper: {
     type: 'string',
     describe:
-      'Command for an external authentication helper that populates a cookie jar before navigation.',
+      'Command template for an external authentication helper containing ' +
+      '{cookieJar} and {url} placeholders. The helper must write a JSON ' +
+      'array of {URL, Cookies: [{Name, Value, Domain, Path, Secure, ' +
+      'HttpOnly}]} entries to {cookieJar}.',
     hidden: true,
     reloadable: true,
     coerce: (value: string | undefined) => {

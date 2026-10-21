@@ -404,7 +404,7 @@ describe('McpPage', () => {
       sinon.assert.notCalled(unconfiguredPptrPage.browserContext);
 
       const config = createMockServerConfig({
-        authHelper: 'my-auth-helper',
+        authHelper: 'my-auth-helper {cookieJar} {url}',
       });
       const {mcpPage, pptrPage} = await createMcpPage({config});
       await mcpPage.authenticate('http://localhost:8080');

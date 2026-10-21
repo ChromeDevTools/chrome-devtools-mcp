@@ -38,94 +38,18 @@ const defaultExecFileAsync: ExecFileFn = async (file, args, options) => {
 };
 
 /**
- * Split a command string into arguments.
- * Supports single quotes, double quotes, and backslash escapes.
- */
-export function tokenizeCommand(command: string): string[] {
-  const tokens: string[] = [];
-  let currentToken = '';
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let hasToken = false;
-
-  for (let index = 0; index < command.length; index++) {
-    const char = command[index];
-    if (inSingleQuote) {
-      if (char === "'") {
-        inSingleQuote = false;
-      } else {
-        currentToken += char;
-      }
-    } else if (inDoubleQuote) {
-      if (char === '\\') {
-        if (index + 1 < command.length) {
-          index++;
-          const nextChar = command[index];
-          if (nextChar === '"' || nextChar === '\\') {
-            currentToken += nextChar;
-          } else {
-            currentToken += '\\' + nextChar;
-          }
-        } else {
-          throw new Error('Invalid --auth-helper command: trailing backslash.');
-        }
-      } else if (char === '"') {
-        inDoubleQuote = false;
-      } else {
-        currentToken += char;
-      }
-    } else if (char === "'") {
-      inSingleQuote = true;
-      hasToken = true;
-    } else if (char === '"') {
-      inDoubleQuote = true;
-      hasToken = true;
-    } else if (char === '\\') {
-      if (index + 1 < command.length) {
-        index++;
-        currentToken += command[index];
-        hasToken = true;
-      } else {
-        throw new Error('Invalid --auth-helper command: trailing backslash.');
-      }
-    } else if (/\s/.test(char)) {
-      if (hasToken) {
-        tokens.push(currentToken);
-        currentToken = '';
-        hasToken = false;
-      }
-    } else {
-      currentToken += char;
-      hasToken = true;
-    }
-  }
-
-  if (inSingleQuote || inDoubleQuote) {
-    throw new Error('Invalid --auth-helper command: unclosed quote.');
-  }
-
-  if (hasToken) {
-    tokens.push(currentToken);
-  }
-
-  return tokens;
-}
-
-/**
- * Validate that an auth helper command specifies an executable.
+ * Validate that an auth helper command contains required placeholders.
  */
 export function validateAuthHelperCommand(command: string): string {
   const trimmed = command.trim();
-  if (trimmed.length === 0) {
+  if (!trimmed) {
     throw new Error('--auth-helper command must not be empty.');
   }
-
-  const tokens = tokenizeCommand(trimmed);
-  const executable = tokens[0];
-  if (executable === undefined || executable.length === 0) {
-    throw new Error('--auth-helper command must specify an executable.');
+  if (!trimmed.includes('{cookieJar}') || !trimmed.includes('{url}')) {
+    throw new Error(
+      '--auth-helper command must include {cookieJar} and {url} placeholders.',
+    );
   }
-
   return trimmed;
 }
 
@@ -137,239 +61,83 @@ export function buildAuthHelperArgs(
   cookieJarPath: string,
   url: string,
 ): {executable: string; args: string[]} {
-  const tokens = tokenizeCommand(command);
+  const tokens = validateAuthHelperCommand(command).split(/\s+/);
   const executable = tokens[0];
-  if (executable === undefined || executable.length === 0) {
+  if (!executable) {
     throw new Error('--auth-helper command must specify an executable.');
   }
 
-  const rawArgs = tokens.slice(1);
-  let hasCookieJarPlaceholder = false;
-  let hasUrlPlaceholder = false;
-  const args: string[] = [];
-
-  for (const rawArg of rawArgs) {
-    let replaced = rawArg;
-    if (replaced.includes('{cookieJar}')) {
-      hasCookieJarPlaceholder = true;
-      replaced = replaced.replaceAll('{cookieJar}', cookieJarPath);
-    }
-    if (replaced.includes('{url}')) {
-      hasUrlPlaceholder = true;
-      replaced = replaced.replaceAll('{url}', url);
-    }
-    args.push(replaced);
-  }
-
-  if (!hasCookieJarPlaceholder) {
-    args.push('-cookie-jar', cookieJarPath);
-  }
-  if (!hasUrlPlaceholder) {
-    args.push('-url', url);
-  }
+  const args = tokens
+    .slice(1)
+    .map(arg =>
+      arg.replaceAll('{cookieJar}', cookieJarPath).replaceAll('{url}', url),
+    );
 
   return {executable, args};
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /**
- * Parse cookies from cookie jar JSON content.
+ * Parse cookies from cookie jar JSON content written by the auth helper.
+ *
+ * The cookie jar file must contain a JSON array of URL entries:
+ * ```json
+ * [
+ *   {
+ *     "URL": "https://login.example.com",
+ *     "Cookies": [
+ *       {
+ *         "Name": "SESSION",
+ *         "Value": "token-value",
+ *         "Domain": "example.com",
+ *         "Path": "/",
+ *         "Secure": true,
+ *         "HttpOnly": true
+ *       }
+ *     ]
+ *   }
+ * ]
+ * ```
+ * If a cookie omits `Domain`, the hostname from the parent `URL` is used.
+ * If a cookie omits `Path`, `/` is used.
  */
 export function parseCookieJar(rawContent: string): CookieData[] {
-  const trimmed = rawContent.trim();
-  if (trimmed.length === 0) {
-    return [];
-  }
-
-  let parsed: unknown;
+  let entries: unknown;
   try {
-    parsed = JSON.parse(trimmed);
+    entries = JSON.parse(rawContent);
   } catch {
     return [];
   }
-
-  if (!Array.isArray(parsed)) {
+  if (!Array.isArray(entries)) {
     return [];
   }
 
   const cookies: CookieData[] = [];
-
-  for (const item of parsed) {
-    if (!isRecord(item)) {
-      continue;
-    }
-
-    // Format 1: URL-keyed entries with Cookies array.
-    if (typeof item['URL'] === 'string' && Array.isArray(item['Cookies'])) {
-      const entryUrl = item['URL'];
-      let fallbackDomain: string | undefined;
+  for (const entry of entries) {
+    let fallbackDomain = '';
+    if (typeof entry?.URL === 'string') {
       try {
-        fallbackDomain = new URL(entryUrl).hostname;
+        fallbackDomain = new URL(entry.URL).hostname;
       } catch {
-        fallbackDomain = undefined;
+        fallbackDomain = '';
       }
-
-      for (const rawCookie of item['Cookies']) {
-        if (!isRecord(rawCookie)) {
-          continue;
-        }
-
-        if (
-          typeof rawCookie['Name'] !== 'string' ||
-          rawCookie['Name'].length === 0 ||
-          typeof rawCookie['Value'] !== 'string'
-        ) {
-          continue;
-        }
-
-        if (
-          typeof rawCookie['MaxAge'] === 'number' &&
-          rawCookie['MaxAge'] < 0
-        ) {
-          continue;
-        }
-
-        let expires: number | undefined;
-        if (
-          typeof rawCookie['Expires'] === 'string' &&
-          rawCookie['Expires'].length > 0 &&
-          rawCookie['Expires'] !== '0001-01-01T00:00:00Z'
-        ) {
-          const expiresMs = Date.parse(rawCookie['Expires']);
-          if (!Number.isNaN(expiresMs)) {
-            if (expiresMs <= Date.now()) {
-              continue;
-            }
-            expires = Math.floor(expiresMs / 1000);
-          }
-        }
-
-        let domain: string | undefined;
-        if (
-          typeof rawCookie['Domain'] === 'string' &&
-          rawCookie['Domain'].length > 0
-        ) {
-          domain = rawCookie['Domain'];
-        } else {
-          domain = fallbackDomain;
-        }
-
-        if (domain === undefined || domain.length === 0) {
-          continue;
-        }
-
-        const path =
-          typeof rawCookie['Path'] === 'string' && rawCookie['Path'].length > 0
-            ? rawCookie['Path']
-            : '/';
-
-        const cookie: CookieData = {
-          name: rawCookie['Name'],
-          value: rawCookie['Value'],
-          domain,
-          path,
-        };
-
-        if (expires !== undefined) {
-          cookie.expires = expires;
-        }
-        if (typeof rawCookie['Secure'] === 'boolean') {
-          cookie.secure = rawCookie['Secure'];
-        }
-        if (typeof rawCookie['HttpOnly'] === 'boolean') {
-          cookie.httpOnly = rawCookie['HttpOnly'];
-        }
-
-        if (typeof rawCookie['SameSite'] === 'number') {
-          if (rawCookie['SameSite'] === 2) {
-            cookie.sameSite = 'Lax';
-          } else if (rawCookie['SameSite'] === 3) {
-            cookie.sameSite = 'Strict';
-          } else if (rawCookie['SameSite'] === 4) {
-            cookie.sameSite = 'None';
-          }
-        } else if (typeof rawCookie['SameSite'] === 'string') {
-          const sameSiteLower = rawCookie['SameSite'].toLowerCase();
-          if (sameSiteLower === 'lax') {
-            cookie.sameSite = 'Lax';
-          } else if (sameSiteLower === 'strict') {
-            cookie.sameSite = 'Strict';
-          } else if (sameSiteLower === 'none') {
-            cookie.sameSite = 'None';
-          }
-        }
-
-        cookies.push(cookie);
-      }
+    }
+    if (!Array.isArray(entry?.Cookies)) {
       continue;
     }
-
-    // Format 2: Flat cookie entries.
-    if (
-      typeof item['name'] === 'string' &&
-      item['name'].length > 0 &&
-      typeof item['value'] === 'string'
-    ) {
-      let domain: string | undefined;
-      if (typeof item['domain'] === 'string' && item['domain'].length > 0) {
-        domain = item['domain'];
-      } else if (typeof item['url'] === 'string' && item['url'].length > 0) {
-        try {
-          domain = new URL(item['url']).hostname;
-        } catch {
-          domain = undefined;
-        }
-      }
-
-      if (domain === undefined || domain.length === 0) {
+    for (const cookie of entry.Cookies) {
+      const domain = cookie?.Domain || fallbackDomain;
+      if (!cookie?.Name || typeof cookie?.Value !== 'string' || !domain) {
         continue;
       }
-
-      let expires: number | undefined;
-      if (typeof item['expires'] === 'number') {
-        if (item['expires'] * 1000 <= Date.now()) {
-          continue;
-        }
-        expires = item['expires'];
-      }
-
-      const path =
-        typeof item['path'] === 'string' && item['path'].length > 0
-          ? item['path']
-          : '/';
-
-      const cookie: CookieData = {
-        name: item['name'],
-        value: item['value'],
-        domain,
-        path,
-      };
-
-      if (expires !== undefined) {
-        cookie.expires = expires;
-      }
-      if (typeof item['secure'] === 'boolean') {
-        cookie.secure = item['secure'];
-      }
-      if (typeof item['httpOnly'] === 'boolean') {
-        cookie.httpOnly = item['httpOnly'];
-      }
-
-      if (typeof item['sameSite'] === 'string') {
-        const sameSiteLower = item['sameSite'].toLowerCase();
-        if (sameSiteLower === 'lax') {
-          cookie.sameSite = 'Lax';
-        } else if (sameSiteLower === 'strict') {
-          cookie.sameSite = 'Strict';
-        } else if (sameSiteLower === 'none') {
-          cookie.sameSite = 'None';
-        }
-      }
-
-      cookies.push(cookie);
+      cookies.push({
+        name: String(cookie.Name),
+        value: cookie.Value,
+        domain: String(domain),
+        path: cookie.Path ? String(cookie.Path) : '/',
+        secure: typeof cookie.Secure === 'boolean' ? cookie.Secure : undefined,
+        httpOnly:
+          typeof cookie.HttpOnly === 'boolean' ? cookie.HttpOnly : undefined,
+      });
     }
   }
 
