@@ -5,8 +5,7 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod} from '../third_party/index.js';
-import type {ConsoleMessageType} from '../third_party/index.js';
+import {zod, type ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';

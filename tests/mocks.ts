@@ -64,19 +64,17 @@ import {
   WebWorker,
   WebMCP,
   WebMCPTool,
-} from '../src/third_party/index.js';
-import type {
-  Browser,
-  BrowserContext,
-  ConsoleMessageLocation,
-  ConsoleMessageType,
-  Extension,
-  JSHandle,
-  Page,
-  Protocol,
-  Realm,
-  Result,
-  RunnerResult,
+  type Browser,
+  type BrowserContext,
+  type ConsoleMessageLocation,
+  type ConsoleMessageType,
+  type Extension,
+  type JSHandle,
+  type Page,
+  type Protocol,
+  type Realm,
+  type Result,
+  type RunnerResult,
 } from '../src/third_party/index.js';
 
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {

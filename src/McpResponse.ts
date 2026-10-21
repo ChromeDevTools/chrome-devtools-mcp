@@ -43,15 +43,17 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
-import type {
-  ConsoleMessage,
-  ImageContent,
-  ResourceType,
-  TextContent,
-  Extension,
-  HTTPRequest,
-  Protocol,
+import {
+  DevTools,
+  getToonEncode,
+  getGcfEncode,
+  type ConsoleMessage,
+  type ImageContent,
+  type ResourceType,
+  type TextContent,
+  type Extension,
+  type HTTPRequest,
+  type Protocol,
 } from './third_party/index.js';
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -70,8 +72,7 @@ import {
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
 import type {CD4ACommentThread, PaginationOptions} from './types.js';
-import type {WithSymbolId} from './utils/id.js';
-import {stableIdSymbol} from './utils/id.js';
+import {stableIdSymbol, type WithSymbolId} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import {getFilterableResourceType} from './utils/resourceType.js';
 import {truncateText} from './utils/text.js';

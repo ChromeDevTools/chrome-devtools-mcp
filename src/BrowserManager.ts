@@ -10,12 +10,13 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
-import type {
-  Browser,
-  ChromeReleaseChannel,
-  LaunchOptions,
+import {
+  Mutex,
+  puppeteer,
+  type Browser,
+  type ChromeReleaseChannel,
+  type LaunchOptions,
 } from './third_party/index.js';
-import {Mutex, puppeteer} from './third_party/index.js';
 import {
   logger,
   puppeteerLogger,

@@ -15,8 +15,11 @@ import {Client} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {TestServer} from '../build/tests/server.js';
 
-import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
-import {Result} from './eval_result.js';
+import {
+  Result,
+  type CapturedFunctionCall,
+  type TestScenario,
+} from './eval_result.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');

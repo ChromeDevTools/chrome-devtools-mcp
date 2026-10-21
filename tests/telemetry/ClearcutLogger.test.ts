@@ -12,8 +12,10 @@ import sinon from 'sinon';
 import {DAEMON_CLIENT_NAME} from '../../src/daemon/utils.js';
 import {ClearcutLogger} from '../../src/telemetry/ClearcutLogger.js';
 import {ErrorCode} from '../../src/telemetry/errors.js';
-import type {Persistence} from '../../src/telemetry/persistence.js';
-import {FilePersistence} from '../../src/telemetry/persistence.js';
+import {
+  FilePersistence,
+  type Persistence,
+} from '../../src/telemetry/persistence.js';
 import {McpClient, WatchdogMessageType} from '../../src/telemetry/types.js';
 import {WatchdogClient} from '../../src/telemetry/WatchdogClient.js';
 import {zod} from '../../src/third_party/index.js';

@@ -8,8 +8,12 @@ import {readFileSync} from 'node:fs';
 
 import type {Argv} from 'yargs';
 
-import type {YargsOptions, InferredOptionTypes} from '../third_party/cli.js';
-import {yargs, hideBin} from '../third_party/cli.js';
+import {
+  yargs,
+  hideBin,
+  type YargsOptions,
+  type InferredOptionTypes,
+} from '../third_party/cli.js';
 import {getErrorMessage} from '../utils/errorHandling.js';
 
 import {ConfigLocator} from './ConfigLocator.js';

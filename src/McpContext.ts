@@ -21,7 +21,7 @@ import type {
   HeapQueryOptions,
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import {type UncaughtError} from './collectors/PageCollector.js';
+import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,

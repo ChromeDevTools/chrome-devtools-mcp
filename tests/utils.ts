@@ -17,7 +17,6 @@ import type {TestContext} from 'node:test';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
 
-import type {CallToolResult} from '../src/third_party/index.js';
 import type {
   Frame,
   HTTPRequest,
@@ -36,7 +35,7 @@ import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools} from '../src/third_party/index.js';
+import {DevTools, type CallToolResult} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
 import {

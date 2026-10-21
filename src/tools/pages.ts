@@ -5,8 +5,7 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import type {CdpPage} from '../third_party/index.js';
-import {zod} from '../third_party/index.js';
+import {zod, type CdpPage} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 import {validateUrl} from '../utils/url.js';
 

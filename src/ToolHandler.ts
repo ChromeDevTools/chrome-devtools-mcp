@@ -11,23 +11,26 @@ import type {McpPage} from './McpPage.js';
 import {McpResponse, type DataFormat} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import type {Browser, CallToolResult} from './third_party/index.js';
-import {ProtocolError, ProtocolErrorCode, zod} from './third_party/index.js';
+import {
+  ProtocolError,
+  ProtocolErrorCode,
+  zod,
+  type Browser,
+  type CallToolResult,
+} from './third_party/index.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
-import type {
-  AnyToolDefinition,
-  BrowserlessToolDefinition,
-  DefinedPageTool,
-  DevToolsData,
-  FileVerificationOption,
-  ToolDefinition,
-} from './tools/ToolDefinition.js';
 import {
   isAvailableInMode,
   isBrowserlessTool,
   isPageScopedTool,
   isSlimTool,
+  type AnyToolDefinition,
+  type BrowserlessToolDefinition,
+  type DefinedPageTool,
+  type DevToolsData,
+  type FileVerificationOption,
+  type ToolDefinition,
 } from './tools/ToolDefinition.js';
 import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';

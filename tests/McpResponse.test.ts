@@ -25,10 +25,10 @@ import {
   newPage,
   selectPage,
 } from '../src/tools/pages.js';
-import type {InsightName} from '../src/processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
+  type InsightName,
 } from '../src/processors/PerformanceTrace.js';
 
 import {serverHooks} from './server.js';

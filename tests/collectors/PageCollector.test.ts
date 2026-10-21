@@ -15,11 +15,11 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ListenerMap} from '../../src/collectors/PageCollector.js';
 import {
   ConsoleCollector,
   NetworkCollector,
   PageCollector,
+  type ListenerMap,
 } from '../../src/collectors/PageCollector.js';
 import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 

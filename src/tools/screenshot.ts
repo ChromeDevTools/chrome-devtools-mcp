@@ -5,12 +5,12 @@
  */
 
 import type {ParsedArguments} from '../config/mcp-options.js';
-import {zod} from '../third_party/index.js';
-import type {
-  BoundingBox,
-  ElementHandle,
-  Page,
-  ScreenshotClip,
+import {
+  zod,
+  type BoundingBox,
+  type ElementHandle,
+  type Page,
+  type ScreenshotClip,
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';

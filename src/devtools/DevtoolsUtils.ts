@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
-import type {
-  CDPSession,
-  ConsoleMessage,
-  Protocol,
+import {
+  DevTools,
+  type CDPSession,
+  type ConsoleMessage,
+  type Protocol,
 } from '../third_party/index.js';
 
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
