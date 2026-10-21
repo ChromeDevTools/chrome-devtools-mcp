@@ -1115,7 +1115,7 @@ describe('ToolHandler', () => {
 
     assert.strictEqual(result.isError, undefined);
     assert.strictEqual(handlerCalled, true);
-    assert.strictEqual(mockContext.validatePath.callCount, 3);
+    sinon.assert.callCount(mockContext.validatePath, 3);
     assert.strictEqual(mockContext.validatePath.calledWith(testFile), true);
     assert.strictEqual(
       mockContext.validatePath.calledWith(testListFile1),

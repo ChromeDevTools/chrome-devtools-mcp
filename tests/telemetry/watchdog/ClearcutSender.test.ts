@@ -54,7 +54,7 @@ describe('ClearcutSender', () => {
     await clock.tickAsync(FLUSH_INTERVAL_MS);
     sender.stopForTesting();
 
-    assert.strictEqual(fetchStub.callCount, 1);
+    sinon.assert.callCount(fetchStub, 1);
     const requestBody = JSON.parse(
       fetchStub.firstCall.args[1].body,
     ) as LogRequest;
@@ -80,7 +80,7 @@ describe('ClearcutSender', () => {
     });
 
     assert.strictEqual(sender.bufferSizeForTesting, 2);
-    assert.strictEqual(fetchStub.callCount, 0);
+    sinon.assert.callCount(fetchStub, 0);
 
     sender.stopForTesting();
   });
@@ -198,7 +198,7 @@ describe('ClearcutSender', () => {
 
     await sender.sendShutdownEvent();
 
-    assert.strictEqual(fetchStub.callCount, 1);
+    sinon.assert.callCount(fetchStub, 1);
     const requestBody = JSON.parse(
       fetchStub.firstCall.args[1].body,
     ) as LogRequest;
@@ -292,7 +292,7 @@ describe('ClearcutSender', () => {
     resolveFirstRequest!(new Response(JSON.stringify({}), {status: 200}));
     await shutdownPromise;
 
-    assert.strictEqual(fetchStub.callCount, 2);
+    sinon.assert.callCount(fetchStub, 2);
     const firstBody = JSON.parse(fetchStub.args[0][1].body) as LogRequest;
     const secondBody = JSON.parse(fetchStub.args[1][1].body) as LogRequest;
 

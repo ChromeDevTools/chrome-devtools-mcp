@@ -40,10 +40,10 @@ describe('checkForUpdates', () => {
 
     await checkForUpdates('Run `npm update` to update.');
 
-    assert.ok(warnStub.notCalled);
-    assert.ok(spawnStub.notCalled);
-    assert.ok(readFileStub.notCalled);
-    assert.ok(statStub.notCalled);
+    sinon.assert.notCalled(warnStub);
+    sinon.assert.notCalled(spawnStub);
+    sinon.assert.notCalled(readFileStub);
+    sinon.assert.notCalled(statStub);
 
     delete process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS'];
   });
@@ -64,12 +64,11 @@ describe('checkForUpdates', () => {
 
     await checkForUpdates('Run `npm update` to update.');
 
-    assert.ok(
-      warnStub.calledWith(
-        sinon.match('Update available: ' + VERSION + ' -> 99.9.9'),
-      ),
+    sinon.assert.calledWith(
+      warnStub,
+      sinon.match('Update available: ' + VERSION + ' -> 99.9.9'),
     );
-    assert.ok(spawnStub.notCalled);
+    sinon.assert.notCalled(spawnStub);
   });
 
   it('does not notify if incoming version is older than current version', async () => {
@@ -88,8 +87,8 @@ describe('checkForUpdates', () => {
 
     await checkForUpdates('Run `npm update` to update.');
 
-    assert.ok(warnStub.notCalled);
-    assert.ok(spawnStub.notCalled);
+    sinon.assert.notCalled(warnStub);
+    sinon.assert.notCalled(spawnStub);
   });
 
   it('does not spawn fetch process if cache is fresh', async () => {
@@ -107,7 +106,7 @@ describe('checkForUpdates', () => {
 
     await checkForUpdates('Run `npm update` to update.');
 
-    assert.ok(spawnStub.notCalled);
+    sinon.assert.notCalled(spawnStub);
   });
 
   it('spawns detached process if cache is stale', async () => {
@@ -131,7 +130,7 @@ describe('checkForUpdates', () => {
 
     await checkForUpdates('Run `npm update` to update.');
 
-    assert.ok(spawnStub.calledOnce);
+    sinon.assert.calledOnce(spawnStub);
     assert.strictEqual(spawnStub.firstCall.args[0], process.execPath);
     assert.ok(
       spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'),
@@ -139,7 +138,7 @@ describe('checkForUpdates', () => {
     assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
     assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
     assert.strictEqual(spawnStub.firstCall.args[2]?.windowsHide, true);
-    assert.ok(unrefSpy.calledOnce);
+    sinon.assert.calledOnce(unrefSpy);
   });
 
   it('spawns detached process if cache is missing', async () => {
@@ -156,7 +155,7 @@ describe('checkForUpdates', () => {
 
     await checkForUpdates('Run `npm update` to update.');
 
-    assert.ok(spawnStub.calledOnce);
+    sinon.assert.calledOnce(spawnStub);
     assert.strictEqual(spawnStub.firstCall.args[0], process.execPath);
     assert.ok(
       spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'),
@@ -164,6 +163,6 @@ describe('checkForUpdates', () => {
     assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
     assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
     assert.strictEqual(spawnStub.firstCall.args[2]?.windowsHide, true);
-    assert.ok(unrefSpy.calledOnce);
+    sinon.assert.calledOnce(unrefSpy);
   });
 });
