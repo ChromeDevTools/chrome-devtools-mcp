@@ -79,6 +79,23 @@ describe('McpContext Roots', () => {
     });
   });
 
+  it('should allow paths below a workspace root that is the filesystem root', async () => {
+    const outsidePath = path.resolve(
+      os.homedir(),
+      'a_very_unlikely_path_name_filesystem_root',
+    );
+    // Use the root of the same drive so the test also holds on Windows,
+    // where the checkout and the home directory can be on different drives.
+    const filesystemRoot = path.parse(outsidePath).root;
+    await withMcpContext(async (_response, context) => {
+      context.setRoots([
+        {uri: pathToFileURL(filesystemRoot).href, name: 'filesystem root'},
+      ]);
+      const resolved = await context.validatePath(outsidePath);
+      assert.strictEqual(resolved, await resolveCanonicalPath(outsidePath));
+    });
+  });
+
   it('should enforce extensions and validate the output path', async () => {
     using workspace = createTempDir('workspace-root-');
     await withMcpContext(async (_response, context) => {

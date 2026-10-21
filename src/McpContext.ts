@@ -537,9 +537,14 @@ export class McpContext implements Context, BrowserlessContext {
 
       if (result.status === 'fulfilled') {
         const canonicalRoot = result.value;
+        // A filesystem root such as `/` or `C:\` already ends with the
+        // separator; appending another one would match no path below it.
+        const rootPrefix = canonicalRoot.endsWith(path.sep)
+          ? canonicalRoot
+          : canonicalRoot + path.sep;
         if (
           canonicalPath === canonicalRoot ||
-          canonicalPath.startsWith(canonicalRoot + path.sep)
+          canonicalPath.startsWith(rootPrefix)
         ) {
           allowed = true;
           break;
