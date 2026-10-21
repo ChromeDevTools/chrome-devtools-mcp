@@ -35,7 +35,11 @@ export interface GeneratedLocation {
 }
 
 export interface Logpoint {
-  /** The full URL of the script or original source the logpoint was set in. */
+  /**
+   * The full URL of the script or original source the logpoint was set in.
+   * DevTools normalizes locations, so this can be the original source file
+   * of a location that was given in a generated script.
+   */
   url: string;
   lineNumber: number;
   columnNumber?: number;
@@ -72,11 +76,6 @@ type Universe = DevTools.Foundation.Universe.Universe;
 type Breakpoint = DevTools.BreakpointManager.Breakpoint;
 type UserCondition = DevTools.BreakpointManager.UserCondition;
 type UISourceCode = DevTools.Workspace.UISourceCode.UISourceCode;
-
-interface LogpointRecord {
-  logpoint: Logpoint;
-  breakpoint: Breakpoint;
-}
 
 interface ResolvedLogpoint {
   options: LogpointOptions;
@@ -187,8 +186,13 @@ async function loadSourceMaps(model: DevTools.DebuggerModel): Promise<void> {
 export class LogpointManager {
   readonly #universe: Universe;
   readonly #target: DevTools.Target;
-  /** Keyed by the resolved source URL and position. */
-  readonly #records = new Map<string, LogpointRecord>();
+  /**
+   * The breakpoints that are logpoints of this page, each with whether it
+   * was set in an original source file. The breakpoint manager keeps one
+   * `Breakpoint` per normalized location, so two requested locations can
+   * share one entry.
+   */
+  readonly #records = new Map<Breakpoint, boolean>();
 
   constructor(devTools: TargetUniverse) {
     this.#universe = devTools.universe;
@@ -227,13 +231,7 @@ export class LogpointManager {
       resolved.set(key, {options, uiSourceCode, key});
     }
 
-    for (const [key, record] of [...this.#records]) {
-      if (!resolved.has(key)) {
-        this.#records.delete(key);
-        await record.breakpoint.remove(/* keepInStorage */ false);
-      }
-    }
-
+    const kept = new Set<Breakpoint>();
     const unbound: string[] = [];
     for (const {options, uiSourceCode, key} of resolved.values()) {
       const breakpoint = await this.#universe.breakpointManager.setBreakpoint(
@@ -256,29 +254,23 @@ export class LogpointManager {
       // reports whether the location resolved.
       await breakpoint.updateBreakpoint();
 
-      const existing = this.#records.get(key);
-      if (existing) {
-        // DevTools keeps one breakpoint per location, so the expression of
-        // the existing logpoint was replaced.
-        existing.logpoint.expression = options.expression;
-        continue;
-      }
-      if (!breakpoint.bound()) {
+      if (!this.#records.has(breakpoint) && !breakpoint.bound()) {
         await breakpoint.remove(/* keepInStorage */ false);
         unbound.push(key);
         continue;
       }
-      this.#records.set(key, {
-        logpoint: {
-          url: uiSourceCode.url(),
-          lineNumber: options.lineNumber,
-          columnNumber: options.columnNumber,
-          expression: options.expression,
-          sourceMapped: uiSourceCode.contentType().isFromSourceMap(),
-          generatedLocations: [],
-        },
+      this.#records.set(
         breakpoint,
-      });
+        uiSourceCode.contentType().isFromSourceMap(),
+      );
+      kept.add(breakpoint);
+    }
+
+    for (const breakpoint of [...this.#records.keys()]) {
+      if (!kept.has(breakpoint)) {
+        this.#records.delete(breakpoint);
+        await breakpoint.remove(/* keepInStorage */ false);
+      }
     }
 
     this.#setLazySourceMapLoading(this.#records.size === 0);
@@ -303,20 +295,20 @@ export class LogpointManager {
   }
 
   #currentLogpoints(): Logpoint[] {
-    return [...this.#records.values()].map(record => this.#snapshot(record));
+    return [...this.#records].map(([breakpoint, sourceMapped]) => {
+      return this.#snapshot(breakpoint, sourceMapped);
+    });
   }
 
   /**
-   * Reads the current state of the breakpoint into a copy of the logpoint,
-   * so that the result reflects re-binding done by the breakpoint manager
-   * after reloads.
+   * Reads the current state of a breakpoint, so that the result reflects
+   * the normalized location and the re-binding done by the breakpoint
+   * manager after reloads.
    */
-  #snapshot(record: LogpointRecord): Logpoint {
-    const modelBreakpoint = record.breakpoint.modelBreakpoint(
-      this.#debuggerModel,
-    );
+  #snapshot(breakpoint: Breakpoint, sourceMapped: boolean): Logpoint {
+    const modelBreakpoint = breakpoint.modelBreakpoint(this.#debuggerModel);
     const generatedLocations: GeneratedLocation[] = [];
-    if (record.breakpoint.bound()) {
+    if (breakpoint.bound()) {
       for (const position of modelBreakpoint?.currentState ?? []) {
         generatedLocations.push({
           url: position.url,
@@ -325,7 +317,15 @@ export class LogpointManager {
         });
       }
     }
-    return {...record.logpoint, generatedLocations};
+    const columnNumber = breakpoint.columnNumber();
+    return {
+      url: breakpoint.url(),
+      lineNumber: breakpoint.lineNumber() + 1,
+      columnNumber: columnNumber === undefined ? undefined : columnNumber + 1,
+      expression: breakpoint.condition(),
+      sourceMapped,
+      generatedLocations,
+    };
   }
 
   /**

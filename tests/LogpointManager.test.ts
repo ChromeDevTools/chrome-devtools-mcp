@@ -206,7 +206,8 @@ describe('LogpointManager', () => {
       assertLogpoint(logpoints[0], {
         url,
         lineNumber: 2,
-        columnNumber: undefined,
+        // DevTools normalizes a missing column to the first column.
+        columnNumber: 1,
         expression: `'greeting for', name`,
         sourceMapped: false,
         generatedUrl: url,
@@ -365,6 +366,52 @@ describe('LogpointManager', () => {
         ).length,
         1,
       );
+    });
+  });
+
+  it('merges locations that normalize to the same breakpoint', async () => {
+    await withMcpContext(async (response, context) => {
+      setupBundleRoutes();
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.goto(server.getRoute('/sm'));
+      const messages = collectConsole(page);
+      const authored: LogpointOptions = {
+        url: 'app.ts',
+        lineNumber: 2,
+        expression: `'authored', name`,
+      };
+
+      const [first] = await page.setLogpoints([authored]);
+      const [generated] = first.generatedLocations;
+
+      // The generated location normalizes to the authored one, so both
+      // requests end up as one breakpoint whose expression is the last one.
+      const merged = await page.setLogpoints([
+        authored,
+        {
+          url: generated.url,
+          lineNumber: generated.lineNumber,
+          columnNumber: generated.columnNumber,
+          expression: `'generated', name`,
+        },
+      ]);
+      assert.strictEqual(merged.length, 1);
+      assert.strictEqual(merged[0].url, first.url);
+      assert.strictEqual(merged[0].expression, `'generated', name`);
+
+      await page.pptrPage.evaluate(`tsGreet('One')`);
+      await waitForMessage(messages, 'generated One');
+      assert.ok(
+        !messages.includes('authored One'),
+        `Logged twice: ${messages}`,
+      );
+
+      // Dropping both keys removes the shared breakpoint.
+      assert.deepStrictEqual(await page.setLogpoints([]), []);
+      await page.pptrPage.evaluate(`tsGreet('Two')`);
+      await page.pptrPage.evaluate(`console.log('sentinel')`);
+      await waitForMessage(messages, 'sentinel');
+      assert.ok(!messages.includes('generated Two'), `Still logs: ${messages}`);
     });
   });
 });

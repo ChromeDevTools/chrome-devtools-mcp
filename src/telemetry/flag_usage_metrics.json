@@ -485,10 +485,12 @@
   },
   {
     "name": "category_logpoints_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "category_logpoints",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   }
 ]
