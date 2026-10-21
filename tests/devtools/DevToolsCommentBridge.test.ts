@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {beforeEach, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -17,10 +17,6 @@ describe('DevToolsCommentBridge', () => {
 
   beforeEach(() => {
     clock = sinon.useFakeTimers();
-  });
-
-  afterEach(() => {
-    clock.restore();
   });
 
   it('attaches to DevTools page and registers function and evaluation', async () => {

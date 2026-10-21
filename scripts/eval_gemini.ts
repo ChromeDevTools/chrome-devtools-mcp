@@ -264,7 +264,7 @@ async function main() {
           console.error(e);
           failureCount++;
         } finally {
-          server.restore();
+          server.reset();
         }
       }
     }

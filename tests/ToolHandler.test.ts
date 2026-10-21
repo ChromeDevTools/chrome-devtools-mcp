@@ -779,7 +779,7 @@ describe('ToolHandler', () => {
       }
 
       const logSpy = sinon.spy();
-      sinon.stub(ClearcutLogger, 'get').returns({
+      const getLoggerStub = sinon.stub(ClearcutLogger, 'get').returns({
         logToolInvocation: logSpy,
       } as unknown as ClearcutLogger);
 
@@ -800,7 +800,7 @@ describe('ToolHandler', () => {
       assert.strictEqual(logSpy.firstCall.args[0].pageUrl, testCase.pageUrl);
       assert.strictEqual(handlerCalled, true);
 
-      sinon.restore();
+      getLoggerStub.restore();
       ClearcutLogger.resetForTesting();
     }
   });

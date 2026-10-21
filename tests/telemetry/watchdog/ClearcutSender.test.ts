@@ -6,7 +6,7 @@
 
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it, beforeEach} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -17,7 +17,6 @@ import {ClearcutSender} from '../../../src/telemetry/watchdog/ClearcutSender.js'
 const FLUSH_INTERVAL_MS = 15 * 1000;
 
 describe('ClearcutSender', () => {
-  let randomUUIDStub: sinon.SinonStub;
   let fetchStub: sinon.SinonStub;
   let clock: sinon.SinonFakeTimers;
 
@@ -28,17 +27,11 @@ describe('ClearcutSender', () => {
     });
 
     let uuidCounter = 0;
-    randomUUIDStub = sinon.stub(crypto, 'randomUUID').callsFake(() => {
+    sinon.stub(crypto, 'randomUUID').callsFake(() => {
       return `uuid-${++uuidCounter}` as ReturnType<typeof crypto.randomUUID>;
     });
     fetchStub = sinon.stub(global, 'fetch');
     fetchStub.resolves(new Response(JSON.stringify({}), {status: 200}));
-  });
-
-  afterEach(() => {
-    randomUUIDStub.restore();
-    fetchStub.restore();
-    clock.restore();
   });
 
   it('enriches events with app version, os type, and session id', async () => {
