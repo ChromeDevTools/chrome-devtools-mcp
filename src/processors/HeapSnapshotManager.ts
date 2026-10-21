@@ -8,22 +8,31 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 
 import {DevTools} from '../third_party/index.js';
-import {
-  createIdGenerator,
-  stableIdSymbol,
-  type WithSymbolId,
-} from '../utils/id.js';
+import {createIdGenerator} from '../utils/id.js';
+import type {TaskQueue, TaskRunner} from '../utils/TaskRunner.js';
 
-export type AggregatedInfoWithId =
-  WithSymbolId<DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo>;
+export interface HeapSnapshotAggregate {
+  id: number;
+  className: string;
+  count: number;
+  selfSize: number;
+  retainedSize: number;
+}
 
 export interface HeapSnapshotAggregateData {
-  aggregates: Record<string, AggregatedInfoWithId>;
+  aggregates: HeapSnapshotAggregate[];
   objectCount: number;
   totalSelfSize: number;
 }
 
+export interface HeapSnapshotDiff {
+  classDiffs: HeapSnapshotClassDiff[];
+  totals: HeapSnapshotClassDiffTotals;
+}
+
 export interface HeapSnapshotClassDiff {
+  /** Position in the full sorted diff list. Use as `classIndex`. */
+  index: number;
   className: string;
   addedCount: number;
   removedCount: number;
@@ -33,11 +42,24 @@ export interface HeapSnapshotClassDiff {
   sizeDelta: number;
 }
 
-export interface HeapSnapshotDetailedClassDiff extends HeapSnapshotClassDiff {
-  addedIds: number[];
-  addedSelfSizes: number[];
-  deletedIds: number[];
-  deletedSelfSizes: number[];
+export interface HeapSnapshotDetailedClassDiff {
+  classDiff: HeapSnapshotClassDiff;
+  objects: readonly HeapSnapshotDiffObject[];
+}
+
+export interface HeapSnapshotDiffObject {
+  id: number;
+  selfSize: number;
+  change: 'added' | 'deleted';
+}
+
+export interface HeapSnapshotClassDiffTotals {
+  addedCount: number;
+  removedCount: number;
+  countDelta: number;
+  addedSize: number;
+  removedSize: number;
+  sizeDelta: number;
 }
 
 export type DuplicateStringGroup =
@@ -48,6 +70,22 @@ export type HeapQueryOptions =
 
 export type HeapEdgesQueryOptions =
   DevTools.HeapSnapshotModel.HeapSnapshotModel.HeapEdgesQueryOptions;
+
+function toClassDiff(
+  index: number,
+  rawDiff: DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff,
+): HeapSnapshotClassDiff {
+  return {
+    index,
+    className: rawDiff.name,
+    addedCount: rawDiff.addedCount,
+    removedCount: rawDiff.removedCount,
+    countDelta: rawDiff.countDelta,
+    addedSize: rawDiff.addedSize,
+    removedSize: rawDiff.removedSize,
+    sizeDelta: rawDiff.sizeDelta,
+  };
+}
 
 export class HeapSnapshot {
   proxy: DevTools.HeapSnapshotModel.HeapSnapshotProxy.HeapSnapshotProxy;
@@ -92,6 +130,38 @@ function hasValidHeapSnapshotExtension(filePath: string): boolean {
 export class HeapSnapshotManager {
   #snapshotIdGenerator = createIdGenerator();
   #snapshots = new Map<string, Promise<HeapSnapshot>>();
+  /**
+   * Queue for all heap snapshot work, with one child queue per absolute file
+   * path. A read of one file holds the file queue, so reads of different
+   * files run at the same time. A read of several files holds this queue.
+   * `disposeSnapshot()` holds the file queue, so it waits for in-flight
+   * reads of the file, and a read that starts after it loads the file again.
+   */
+  #taskQueue: TaskQueue;
+  #taskRunner: TaskRunner;
+  #fileTaskQueues = new Map<string, TaskQueue>();
+
+  constructor(taskRunner: TaskRunner) {
+    this.#taskRunner = taskRunner;
+    this.#taskQueue = taskRunner.createQueue();
+  }
+
+  /**
+   * Holds the queue of `filePath`, or the heap queue without a path, until
+   * the guard is disposed.
+   */
+  async #scheduleTask(filePath?: string): Promise<Disposable> {
+    if (filePath === undefined) {
+      return await this.#taskQueue.scheduleTask();
+    }
+    const absolutePath = path.resolve(filePath);
+    let queue = this.#fileTaskQueues.get(absolutePath);
+    if (!queue) {
+      queue = this.#taskRunner.createQueue(this.#taskQueue);
+      this.#fileTaskQueues.set(absolutePath, queue);
+    }
+    return await queue.scheduleTask();
+  }
 
   async getSnapshot(filePath: string): Promise<HeapSnapshot> {
     if (!hasValidHeapSnapshotExtension(filePath)) {
@@ -137,21 +207,33 @@ export class HeapSnapshotManager {
     filterName?: string,
     objectId?: number,
   ): Promise<HeapSnapshotAggregateData> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
     await this.#applyNodeFilter(snapshot.proxy, filter, filterName, objectId);
-    const aggregates: Record<string, AggregatedInfoWithId> =
-      await snapshot.proxy.aggregatesWithFilter(filter);
+    const rawAggregates = await snapshot.proxy.aggregatesWithFilter(filter);
     let objectCount = 0;
     let totalSelfSize = 0;
+    const aggregates: HeapSnapshotAggregate[] = [];
 
-    for (const [key, aggregate] of Object.entries(aggregates)) {
+    for (const [key, aggregate] of Object.entries(rawAggregates)) {
       const id = snapshot.resolveIdFromClassKey(key);
-      aggregate[stableIdSymbol] = id;
+      if (id === undefined) {
+        throw new Error(`No class ID found for class key ${key}`);
+      }
       objectCount += aggregate.count;
       totalSelfSize += aggregate.self;
+      aggregates.push({
+        id,
+        className: aggregate.name,
+        count: aggregate.count,
+        selfSize: aggregate.self,
+        retainedSize: aggregate.maxRet,
+      });
     }
+
+    aggregates.sort((a, b) => b.retainedSize - a.retainedSize);
 
     return {
       aggregates,
@@ -163,6 +245,7 @@ export class HeapSnapshotManager {
   async getStats(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getStatistics();
   }
@@ -170,6 +253,7 @@ export class HeapSnapshotManager {
   async getStaticData(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return snapshot.proxy.staticData;
   }
@@ -177,6 +261,7 @@ export class HeapSnapshotManager {
   async getNativeContextSizes(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getNativeContextSizes();
   }
@@ -184,6 +269,7 @@ export class HeapSnapshotManager {
   async getRetainedByContextSummary(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getRetainedByContextSummary();
   }
@@ -194,6 +280,7 @@ export class HeapSnapshotManager {
     filterName?: string,
     objectId?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const filter =
       new DevTools.HeapSnapshotModel.HeapSnapshotModel.NodeFilter();
@@ -214,6 +301,7 @@ export class HeapSnapshotManager {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -227,6 +315,7 @@ export class HeapSnapshotManager {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -238,6 +327,7 @@ export class HeapSnapshotManager {
   async analyzeContexts(
     filePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.analyzeContexts();
   }
@@ -249,6 +339,7 @@ export class HeapSnapshotManager {
     maxNodes?: number,
     maxSiblings?: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -266,6 +357,7 @@ export class HeapSnapshotManager {
     filePath: string,
     nodeId: number,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -279,6 +371,7 @@ export class HeapSnapshotManager {
     nodeId: number,
     options?: HeapEdgesQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const nodeIndex = await snapshot.proxy.nodeIndexForId(nodeId);
     if (nodeIndex === undefined) {
@@ -291,20 +384,30 @@ export class HeapSnapshotManager {
   async getClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]> {
+  ): Promise<HeapSnapshotDiff> {
     const rawDiffs = await this.#getSortedRawClassDiffs(
       baseFilePath,
       currentFilePath,
     );
-    return rawDiffs.map(rawDiff => ({
-      className: rawDiff.name,
-      addedCount: rawDiff.addedCount,
-      removedCount: rawDiff.removedCount,
-      countDelta: rawDiff.countDelta,
-      addedSize: rawDiff.addedSize,
-      removedSize: rawDiff.removedSize,
-      sizeDelta: rawDiff.sizeDelta,
-    }));
+    const classDiffs: HeapSnapshotClassDiff[] = [];
+    const totals: HeapSnapshotClassDiffTotals = {
+      addedCount: 0,
+      removedCount: 0,
+      countDelta: 0,
+      addedSize: 0,
+      removedSize: 0,
+      sizeDelta: 0,
+    };
+    for (const [index, rawDiff] of rawDiffs.entries()) {
+      classDiffs.push(toClassDiff(index, rawDiff));
+      totals.addedCount += rawDiff.addedCount;
+      totals.removedCount += rawDiff.removedCount;
+      totals.countDelta += rawDiff.countDelta;
+      totals.addedSize += rawDiff.addedSize;
+      totals.removedSize += rawDiff.removedSize;
+      totals.sizeDelta += rawDiff.sizeDelta;
+    }
+    return {classDiffs, totals};
   }
 
   async getDetailedClassDiff(
@@ -322,25 +425,28 @@ export class HeapSnapshotManager {
         `Invalid classIndex: ${classIndex}. Total classes with changes: ${classDiffs.length}`,
       );
     }
-    return {
-      className: rawDiff.name,
-      addedCount: rawDiff.addedCount,
-      removedCount: rawDiff.removedCount,
-      countDelta: rawDiff.countDelta,
-      addedSize: rawDiff.addedSize,
-      removedSize: rawDiff.removedSize,
-      sizeDelta: rawDiff.sizeDelta,
-      addedIds: rawDiff.addedIds ?? [],
-      addedSelfSizes: rawDiff.addedSelfSizes ?? [],
-      deletedIds: rawDiff.deletedIds ?? [],
-      deletedSelfSizes: rawDiff.deletedSelfSizes ?? [],
-    };
+    const objects: HeapSnapshotDiffObject[] = [];
+    const addedIds = rawDiff.addedIds ?? [];
+    const addedSelfSizes = rawDiff.addedSelfSizes ?? [];
+    for (const [i, id] of addedIds.entries()) {
+      objects.push({id, selfSize: addedSelfSizes[i], change: 'added'});
+    }
+    const deletedIds = rawDiff.deletedIds ?? [];
+    const deletedSelfSizes = rawDiff.deletedSelfSizes ?? [];
+    for (const [i, id] of deletedIds.entries()) {
+      objects.push({id, selfSize: deletedSelfSizes[i], change: 'deleted'});
+    }
+    // Largest objects first so that the first page of paginated output shows
+    // the most significant changes.
+    objects.sort((a, b) => b.selfSize - a.selfSize);
+    return {classDiff: toClassDiff(classIndex, rawDiff), objects};
   }
 
   async #getSortedRawClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Diff[]> {
+    using guard = await this.#scheduleTask();
     const [baseSnapshot, currentSnapshot] = await Promise.all([
       this.getSnapshot(baseFilePath),
       this.getSnapshot(currentFilePath),
@@ -420,6 +526,7 @@ export class HeapSnapshotManager {
   }
 
   async getDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     return await snapshot.proxy.getDuplicateStrings();
   }
@@ -428,6 +535,7 @@ export class HeapSnapshotManager {
     filePath: string,
     options: HeapQueryOptions,
   ): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange> {
+    using guard = await this.#scheduleTask(filePath);
     const snapshot = await this.getSnapshot(filePath);
     const provider = snapshot.proxy.queryObjects(options);
     return await provider.serializeItemsRange(0, Infinity);
@@ -438,6 +546,7 @@ export class HeapSnapshotManager {
   }
 
   async disposeSnapshot(filePath: string): Promise<boolean> {
+    using guard = await this.#scheduleTask(filePath);
     const absolutePath = path.resolve(filePath);
     const cached = this.#snapshots.get(absolutePath);
     if (cached) {

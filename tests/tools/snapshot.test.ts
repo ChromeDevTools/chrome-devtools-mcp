@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -12,10 +12,6 @@ import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
 import {createHandlerMocks} from '../mocks.js';
 
 describe('snapshot', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('take_snapshot', () => {
     it('includes a snapshot', async () => {
       const {page, context, response, args} = createHandlerMocks();
@@ -48,11 +44,10 @@ describe('snapshot', () => {
         response,
         context,
       );
-      sinon.assert.calledOnceWithExactly(
-        page.waitForTextOnPage,
-        ['Hello'],
-        undefined,
-      );
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, ['Hello'], {
+        timeout: undefined,
+        visible: undefined,
+      });
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Element matching one of ["Hello"] found.',
@@ -70,13 +65,26 @@ describe('snapshot', () => {
       sinon.assert.calledOnceWithExactly(
         page.waitForTextOnPage,
         ['Complete', 'Error'],
-        5000,
+        {timeout: 5000, visible: undefined},
       );
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         'Element matching one of ["Complete","Error"] found.',
       );
       sinon.assert.calledOnceWithExactly(response.includeSnapshot);
+    });
+
+    it('forwards visible:true to the page matcher', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await waitFor(args).handler(
+        {params: {text: ['Saved'], timeout: 2000, visible: true}, page},
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, ['Saved'], {
+        timeout: 2000,
+        visible: true,
+      });
     });
   });
 });

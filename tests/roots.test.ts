@@ -8,17 +8,23 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 import {pathToFileURL} from 'node:url';
 
 import sinon from 'sinon';
 
-import {McpContext} from '../src/McpContext.js';
+import type {McpContext} from '../src/McpContext.js';
+import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
+import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {resolveCanonicalPath} from '../src/utils/files.js';
 import {escapeForLog} from '../src/utils/logger.js';
 
-import {createMockPuppeteerBrowser} from './mocks.js';
-import {createTempDir, withMcpContext} from './utils.js';
+import {createMockPuppeteerBrowser, createMockServerConfig} from './mocks.js';
+import {
+  createConnectedMcpContext,
+  createTempDir,
+  withMcpContext,
+} from './utils.js';
 
 describe('McpContext Roots', () => {
   it('should allow access to os.tmpdir() even if roots are empty', async () => {
@@ -164,14 +170,14 @@ function stubMissingPaths(...missingPaths: string[]) {
 }
 
 describe('McpContext path validation escaping', () => {
-  afterEach(() => sinon.restore());
-
   async function createContext(): Promise<McpContext> {
     const browser = createMockPuppeteerBrowser();
     browser.targets.returns([]);
-    return await McpContext.from(browser, undefined, {
-      experimentalDevToolsDebugging: false,
-      performanceCrux: false,
+    return await createConnectedMcpContext(browser, {
+      config: createMockServerConfig({
+        performanceCrux: false,
+      }),
+      heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
     });
   }
 

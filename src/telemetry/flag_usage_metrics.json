@@ -400,7 +400,8 @@
   },
   {
     "name": "experimental_screencast_fps_present",
-    "flagType": "boolean"
+    "flagType": "boolean",
+    "isDeprecated": true
   },
   {
     "name": "filesystem_root_present",
@@ -464,6 +465,22 @@
   },
   {
     "name": "file_navigations",
+    "flagType": "boolean"
+  },
+  {
+    "name": "screencast_fps_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "watch_config_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "watch_config",
+    "flagType": "boolean"
+  },
+  {
+    "name": "max_navigation_saved_present",
     "flagType": "boolean"
   }
 ]

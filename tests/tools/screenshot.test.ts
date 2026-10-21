@@ -7,12 +7,13 @@
 import assert from 'node:assert';
 import {stat, chmod, writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
-import {describe, it, afterEach} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {zod} from '../../src/third_party/index.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {createHandlerMocks, createMockElementHandle} from '../mocks.js';
@@ -36,10 +37,6 @@ function pngHeight(data: Buffer): number {
 }
 
 describe('screenshot', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   describe('downscale clip', () => {
     for (const viewport of [{width: 800, height: 600}, null]) {
       const mode = viewport ? 'emulated viewport' : 'native viewport';
@@ -231,57 +228,97 @@ describe('screenshot', () => {
       });
     });
     it('ignores quality', async () => {
-      await withMcpContext(async (response, context) => {
-        const fixture = screenshots.basic;
-        const page = context.getSelectedMcpPage().pptrPage;
-        await page.setContent(fixture.html);
-        await screenshotTool.handler(
-          {
-            params: {format: 'png', quality: 0},
-            page: context.getSelectedMcpPage(),
-          },
-          response,
-          context,
-        );
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/png');
-        assert.equal(
-          response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
-        );
+      await screenshot(args).handler(
+        {params: {format: 'png', quality: 0}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.pptrPage.screenshot, {
+        type: 'png',
+        fullPage: false,
+        quality: undefined,
+        optimizeForSpeed: true,
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        "Took a screenshot of the current page's viewport.",
+      );
+      sinon.assert.calledOnceWithExactly(response.attachImage, {
+        mimeType: 'image/png',
+        data: 'AQID',
       });
     });
     it('with jpeg', async () => {
-      await withMcpContext(async (response, context) => {
-        await screenshotTool.handler(
-          {params: {format: 'jpeg'}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/jpeg');
-        assert.equal(
-          response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
-        );
+      await screenshot(args).handler(
+        {params: {format: 'jpeg'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.pptrPage.screenshot, {
+        type: 'jpeg',
+        fullPage: false,
+        quality: undefined,
+        optimizeForSpeed: true,
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        "Took a screenshot of the current page's viewport.",
+      );
+      sinon.assert.calledOnceWithExactly(response.attachImage, {
+        mimeType: 'image/jpeg',
+        data: 'AQID',
+      });
+    });
+    it('forwards the requested quality for jpeg', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      page.pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
+
+      await screenshot(args).handler(
+        {params: {format: 'jpeg', quality: 50}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.pptrPage.screenshot, {
+        type: 'jpeg',
+        fullPage: false,
+        quality: 50,
+        optimizeForSpeed: true,
       });
     });
     it('with webp', async () => {
-      await withMcpContext(async (response, context) => {
-        await screenshotTool.handler(
-          {params: {format: 'webp'}, page: context.getSelectedMcpPage()},
-          response,
-          context,
-        );
+      const {page, context, response, args} = createHandlerMocks({
+        screenshotQuality: 80,
+      });
+      page.pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/webp');
-        assert.equal(
-          response.responseLines.at(0),
-          "Took a screenshot of the current page's viewport.",
-        );
+      await screenshot(args).handler(
+        {params: {format: 'webp'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(page.pptrPage.screenshot, {
+        type: 'webp',
+        fullPage: false,
+        quality: 80,
+        optimizeForSpeed: true,
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        "Took a screenshot of the current page's viewport.",
+      );
+      sinon.assert.calledOnceWithExactly(response.attachImage, {
+        mimeType: 'image/webp',
+        data: 'AQID',
       });
     });
     it('with full page', async () => {
@@ -375,53 +412,45 @@ describe('screenshot', () => {
     });
 
     it('disposes the element handle after an element screenshot', async () => {
-      await withMcpContext(async (response, context) => {
-        const fixture = screenshots.button;
-        const mcpPage = context.getSelectedMcpPage();
-        await mcpPage.pptrPage.setContent(fixture.html);
-        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
-        const handle = await mcpPage.getElementByUid('1_1');
-        const disposeSpy = sinon.spy(handle, 'dispose');
-        sinon.stub(mcpPage, 'getElementByUid').resolves(handle);
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      handle.screenshot.resolves(new Uint8Array());
 
-        await screenshotTool.handler(
-          {
-            params: {format: 'png', uid: '1_1'},
-            page: mcpPage,
-          },
-          response,
-          context,
-        );
+      await screenshot(args).handler(
+        {params: {format: 'png', uid: '1_1'}, page},
+        response,
+        context,
+      );
 
-        sinon.assert.calledOnce(disposeSpy);
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(handle.screenshot, {
+        type: 'png',
+        quality: undefined,
+        optimizeForSpeed: true,
       });
+      sinon.assert.notCalled(page.pptrPage.screenshot);
+      sinon.assert.calledOnceWithExactly(handle.dispose);
     });
 
     it('disposes the element handle when the capture fails', async () => {
-      await withMcpContext(async (response, context) => {
-        const fixture = screenshots.button;
-        const mcpPage = context.getSelectedMcpPage();
-        await mcpPage.pptrPage.setContent(fixture.html);
-        mcpPage.textSnapshot = await TextSnapshot.create(mcpPage);
-        const handle = await mcpPage.getElementByUid('1_1');
-        const disposeSpy = sinon.spy(handle, 'dispose');
-        sinon.stub(handle, 'screenshot').rejects(new Error('Capture failed'));
-        sinon.stub(mcpPage, 'getElementByUid').resolves(handle);
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      handle.screenshot.rejects(new Error('Capture failed'));
 
-        await assert.rejects(
-          screenshotTool.handler(
-            {
-              params: {format: 'png', uid: '1_1'},
-              page: mcpPage,
-            },
-            response,
-            context,
-          ),
-          /Capture failed/,
-        );
+      await assert.rejects(
+        screenshot(args).handler(
+          {params: {format: 'png', uid: '1_1'}, page},
+          response,
+          context,
+        ),
+        /Capture failed/,
+      );
 
-        sinon.assert.calledOnce(disposeSpy);
-      });
+      sinon.assert.notCalled(page.pptrPage.screenshot);
+      sinon.assert.calledOnceWithExactly(handle.dispose);
+      sinon.assert.notCalled(response.attachImage);
     });
 
     it('with filePath', async () => {
@@ -526,7 +555,7 @@ describe('screenshot', () => {
         // No explicit format passed: zod should apply the CLI-driven default.
         await tool.handler(
           {
-            params: {format: tool.schema.format.parse(undefined)},
+            params: {format: zod.object(tool.schema).parse({}).format},
             page: context.getSelectedMcpPage(),
           },
           response,
@@ -540,7 +569,7 @@ describe('screenshot', () => {
 
     it('keeps "png" as default format when no CLI override is set', async () => {
       const tool = screenshot({} as ParsedArguments);
-      assert.equal(tool.schema.format.parse(undefined), 'png');
+      assert.equal(zod.object(tool.schema).parse({}).format, 'png');
     });
 
     it('downscales viewport screenshot when screenshotMaxWidth is set', async () => {

@@ -178,6 +178,15 @@ export const ExperimentName = {
     fs.copyFileSync(src, dest);
   }
 
+  // Copy lighthouse bundle that tsc ignores due to lighthouse-devtools-mcp-bundle.d.ts
+  const lighthouseBundle = 'src/third_party/lighthouse-devtools-mcp-bundle.js';
+  const lighthouseBundleDest = path.join(BUILD_DIR, lighthouseBundle);
+  fs.mkdirSync(path.dirname(lighthouseBundleDest), {recursive: true});
+  fs.copyFileSync(
+    path.join(process.cwd(), lighthouseBundle),
+    lighthouseBundleDest,
+  );
+
   copyDevToolsDescriptionFiles();
 }
 

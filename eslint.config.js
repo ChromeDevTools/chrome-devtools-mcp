@@ -519,6 +519,7 @@ export default defineConfig([
           allowIIFEs: true,
         },
       ],
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@local/no-direct-third-party-imports': 'error',
       'no-restricted-imports': [
         'error',
@@ -623,6 +624,7 @@ export default defineConfig([
       // promises, but we don't need to await them.
       '@typescript-eslint/no-floating-promises': 'off',
       '@local/enforce-using': 'error',
+      '@local/no-sinon-restore-in-hooks': 'error',
     },
   },
   {

@@ -17,7 +17,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: @formatjs/icu-messageformat-parser
-URL: https://github.com/formatjs/formatjs.git
+URL: https://github.com/formatjs/formatjs
 Version: 2.6.2
 License: MIT
 
@@ -35,7 +35,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: @formatjs/icu-skeleton-parser
-URL: https://github.com/formatjs/formatjs.git
+URL: https://github.com/formatjs/formatjs
 Version: 1.6.2
 License: MIT
 
@@ -118,9 +118,39 @@ SOFTWARE.
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
+Name: ajv-formats
+URL: https://github.com/ajv-validator/ajv-formats#readme
+Version: 3.0.1
+License: MIT
+
+MIT License
+
+Copyright (c) 2020 Evgeny Poberezkin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+-------------------- DEPENDENCY DIVIDER --------------------
+
 Name: axe-core
 URL: https://www.deque.com/axe/
-Version: 4.12.1
+Version: 4.13.0
 License: MPL-2.0
 
 Mozilla Public License, version 2.0
@@ -700,7 +730,7 @@ License: Apache-2.0
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: debug
-URL: git://github.com/debug-js/debug.git
+URL: https://github.com/debug-js/debug
 Version: 4.3.4
 License: MIT
 
@@ -817,13 +847,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: legacy-javascript
 URL: https://github.com/GoogleChrome/lighthouse#readme
-Version: 0.0.1
+Version: 0.0.3
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: lighthouse-logger
-URL: https://github.com/GoogleChrome/lighthouse.git
+URL: https://github.com/GoogleChrome/lighthouse
 Version: 2.0.2
 License: Apache-2.0
 
@@ -1525,7 +1555,7 @@ APPENDIX: How to apply the Apache License to your work
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: ms
-URL: zeit/ms
+URL: https://github.com/zeit/ms
 Version: 2.1.2
 License: MIT
 
@@ -1556,7 +1586,7 @@ SOFTWARE.
 
 Name: puppeteer-core
 URL: https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-core
-Version: 25.3.0
+Version: 25.9.0
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
@@ -1592,8 +1622,8 @@ THE SOFTWARE.
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: third-party-web
-URL: https://github.com/patrickhulce/third-party-web.git
-Version: 0.26.2
+URL: https://github.com/patrickhulce/third-party-web
+Version: 0.30.0
 License: MIT
 
 The MIT License (MIT)
@@ -1622,7 +1652,7 @@ SOFTWARE.
 
 Name: tldts-core
 URL: https://github.com/remusao/tldts#readme
-Version: 7.4.9
+Version: 7.4.13
 License: MIT
 
 Copyright (c) 2017 Thomas Parisot, 2018 Rémi Berson
@@ -1644,7 +1674,7 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTH
 
 Name: tldts-icann
 URL: https://github.com/remusao/tldts#readme
-Version: 7.4.9
+Version: 7.4.13
 License: MIT
 
 Copyright (c) 2017 Thomas Parisot, 2018 Rémi Berson

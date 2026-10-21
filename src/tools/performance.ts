@@ -15,7 +15,12 @@ import {
 import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response, ContextPage} from './ToolDefinition.js';
+import type {
+  Context,
+  Response,
+  ContextPage,
+  PageToolFactory,
+} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const filePathSchema = zod
@@ -25,7 +30,7 @@ const filePathSchema = zod
     'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
   );
 
-export const startTrace = definePageTool(() => ({
+export const startTrace: PageToolFactory = definePageTool(() => ({
   name: 'performance_start_trace',
   description: `Start a performance trace on the target webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.`,
   annotations: {
@@ -54,6 +59,7 @@ export const startTrace = definePageTool(() => ({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
@@ -64,9 +70,9 @@ export const startTrace = definePageTool(() => ({
       );
       return;
     }
-    context.setIsRunningPerformanceTrace(true);
-
     const page = request.page;
+    page.setIsRunningPerformanceTrace(true);
+
     const pageUrlForTracing = page.pptrPage.url();
 
     try {
@@ -134,14 +140,14 @@ export const startTrace = definePageTool(() => ({
         } catch {
           // Tracing may not have started yet; ignore.
         }
-        context.setIsRunningPerformanceTrace(false);
+        page.setIsRunningPerformanceTrace(false);
       }
       throw error;
     }
   },
 }));
 
-export const stopTrace = definePageTool(() => ({
+export const stopTrace: PageToolFactory = definePageTool(() => ({
   name: 'performance_stop_trace',
   description:
     'Stop the active performance trace recording on the target webpage.',
@@ -153,11 +159,15 @@ export const stopTrace = definePageTool(() => ({
     filePath: filePathSchema,
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {
     filePath: true,
   },
   handler: async (request, response, context) => {
     if (!context.isRunningPerformanceTrace()) {
+      response.appendResponseLine(
+        'Error: no active performance trace recording to stop.',
+      );
       return;
     }
     const page = request.page;
@@ -170,7 +180,7 @@ export const stopTrace = definePageTool(() => ({
   },
 }));
 
-export const analyzeInsight = definePageTool(() => ({
+export const analyzeInsight: PageToolFactory = definePageTool(() => ({
   name: 'performance_analyze_insight',
   description:
     'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',
@@ -191,6 +201,7 @@ export const analyzeInsight = definePageTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const lastRecording = context.recordedTraces().at(-1);
@@ -256,7 +267,7 @@ async function stopTracingAndAppendOutput(
       );
     }
   } finally {
-    context.setIsRunningPerformanceTrace(false);
+    page.setIsRunningPerformanceTrace(false);
   }
 }
 

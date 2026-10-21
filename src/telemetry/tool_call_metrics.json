@@ -708,6 +708,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "visible",
+        "argType": "boolean"
       }
     ]
   },
@@ -885,6 +889,10 @@
       },
       {
         "name": "object_id",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -1082,6 +1090,18 @@
       },
       {
         "name": "class_index",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
         "argType": "number"
       }
     ]
@@ -1292,6 +1312,10 @@
     "args": [
       {
         "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "timeout",
         "argType": "number"
       }
     ]

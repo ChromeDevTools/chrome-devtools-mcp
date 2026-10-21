@@ -18,7 +18,7 @@ export const browserOptions = {
     description:
       'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.',
     alias: 'u',
-    coerce: (url: string | undefined) => {
+    coerce: (url: string | undefined): string | undefined => {
       if (!url) {
         return;
       }
@@ -35,7 +35,7 @@ export const browserOptions = {
     description:
       'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
     alias: 'w',
-    coerce: (url: string | undefined) => {
+    coerce: (url: string | undefined): string | undefined => {
       if (!url) {
         return;
       }
@@ -59,19 +59,30 @@ export const browserOptions = {
     type: 'string',
     description:
       'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    coerce: (val: string | undefined) => {
+    coerce: (val: unknown): Record<string, string> | undefined => {
       if (!val) {
         return;
       }
       try {
-        const parsed = JSON.parse(val);
-        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        const parsed: unknown = typeof val === 'string' ? JSON.parse(val) : val;
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
           throw new Error('Headers must be a JSON object');
         }
-        return parsed as Record<string, string>;
+        const headers: Record<string, string> = {};
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value !== 'string') {
+            throw new Error(`Header "${key}" must have a string value`);
+          }
+          headers[key] = value;
+        }
+        return headers;
       } catch (error) {
         throw new Error(
-          `Invalid JSON for wsHeaders: ${(error as Error).message}`,
+          `Invalid JSON for wsHeaders: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     },

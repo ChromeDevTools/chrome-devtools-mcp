@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
 import {
   createTargetUniverse,
@@ -21,6 +22,7 @@ import {
   PredefinedNetworkConditions,
   type Dialog,
   type ElementHandle,
+  type Frame,
   type Viewport,
   type WebMCPTool,
   type Protocol,
@@ -29,7 +31,11 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
+  type Flags,
   type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  type RunnerResult,
 } from './third_party/index.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
@@ -37,6 +43,7 @@ import type {
   DevToolsData,
   MatchedStyles,
   Response,
+  ScreenRecorderData,
 } from './tools/ToolDefinition.js';
 import type {
   EmulationSettings,
@@ -118,6 +125,19 @@ function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
 
+/**
+ * Chrome reports a URL-derived placeholder as the target title until the
+ * document provides one. The placeholder omits the `http://` / `https://`
+ * scheme and the trailing slash of a bare hostname.
+ */
+function isPlaceholderTitle(title: string, url: string): boolean {
+  if (title === url) {
+    return true;
+  }
+  const withoutScheme = url.replace(/^https?:\/\//, '');
+  return title === withoutScheme || title === withoutScheme.replace(/\/$/, '');
+}
+
 function isBackendNodeId(
   id: unknown,
 ): id is DevTools.Protocol.DOM.BackendNodeId {
@@ -138,12 +158,13 @@ export class McpPage implements ContextPage {
 
   #pptrPage?: Page;
   #initPromise?: Promise<void>;
+  #focusEmulationRequested = false;
   #disposed = false;
   #closed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
-  uniqueBackendNodeIdToMcpId = new Map<string, string>();
+  uniqueBackendNodeIdToMcpId: Map<string, string> = new Map<string, string>();
   extraHandles: ElementHandle[] = [];
 
   // Emulation
@@ -157,41 +178,46 @@ export class McpPage implements ContextPage {
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  eventBasedThirdPartyTools: ToolGroups = [];
+  // Screencast
+  #screenRecorder: ScreenRecorderData | null = null;
+
+  // Performance trace
+  #isRunningPerformanceTrace = false;
 
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
-  #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
-  #sourceMaps: boolean;
+  #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
-  #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
     id: number,
     options: {
-      hasNetworkBlockOrAllowlist: boolean;
+      config: ReadonlyServerConfig;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
       navigationTimeout?: number;
-      sourceMaps?: boolean;
-      onNotification?: (message: string) => void;
     },
   ) {
-    this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
+    this.#config = options.config;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
-    this.#sourceMaps = options.sourceMaps ?? true;
-    this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+  }
+
+  get #hasNetworkBlockOrAllowlist(): boolean {
+    return Boolean(
+      this.#config.resolved.allowedUrlPattern ||
+      this.#config.resolved.blockedUrlPattern,
+    );
   }
 
   get pptrPage(): Page {
@@ -226,13 +252,29 @@ export class McpPage implements ContextPage {
   }
 
   url(): string {
-    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+    return this.#pptrPage?.url() ?? this.target.url();
   }
 
-  getTitle(): string {
+  get targetId(): string {
     // @ts-expect-error internal types
-    const info = this.target._getTargetInfo();
-    return info.title !== this.target.url() ? info.title : '';
+    const info: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    return info.targetId;
+  }
+
+  /**
+   * Returns the page title or an empty string if the target only has Chrome's
+   * URL-based placeholder title.
+   *
+   * Puppeteer's cached target info is only refreshed by
+   * `Target.targetInfoChanged`, which Chrome emits on navigation commit (before
+   * the document title is known) but not on title changes. Callers should pass
+   * fresh target info (e.g., from `Target.getTargets`) when available.
+   */
+  getTitle(freshTargetInfo?: Protocol.Target.TargetInfo): string {
+    // @ts-expect-error internal types
+    const cachedInfo: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    const info = freshTargetInfo ?? cachedInfo;
+    return isPlaceholderTitle(info.title, info.url) ? '' : info.title;
   }
 
   isClosed(): boolean {
@@ -255,19 +297,26 @@ export class McpPage implements ContextPage {
     await page?.close({runBeforeUnload: false});
   }
 
-  async init(): Promise<void> {
+  async init(options?: {emulateFocus?: boolean}): Promise<void> {
     if (this.#disposed) {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
-    if (this.#initPromise) {
-      return await this.#initPromise;
+    if (!this.#initPromise) {
+      this.#initPromise = this.#doInit().catch(err => {
+        this.#initPromise = undefined;
+        throw err;
+      });
     }
-    this.#initPromise = this.#doInit();
-    try {
-      await this.#initPromise;
-    } catch (err) {
-      this.#initPromise = undefined;
-      throw err;
+    await this.#initPromise;
+    // Discovery skips focus emulation, but a later page tool still needs it.
+    if (
+      options?.emulateFocus !== false &&
+      !this.#disposed &&
+      !this.#focusEmulationRequested
+    ) {
+      // Prevent duplicate requests while pending and after success.
+      this.#focusEmulationRequested = true;
+      this.#initFocusEmulationNoThrow();
     }
   }
 
@@ -284,34 +333,39 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(page);
-      this.#consoleCollector = new ConsoleCollector(page, collect => {
-        return {
-          console: event => {
-            collect(event);
-          },
-          uncaughtError: event => {
-            collect(event);
-          },
-          devtoolsAggregatedIssue: event => {
-            collect(event);
-          },
-        };
+      this.#networkCollector = new NetworkCollector(page, {
+        maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
       });
+      this.#consoleCollector = new ConsoleCollector(
+        page,
+        collect => {
+          return {
+            console: event => {
+              collect(event);
+            },
+            uncaughtError: event => {
+              collect(event);
+            },
+            devtoolsAggregatedIssue: event => {
+              collect(event);
+            },
+          };
+        },
+        {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
+      );
     }
     this.updateTimeouts();
-    await Promise.allSettled([
-      this.#initDevToolsUniverseNoThrow(),
-      this.#initFocusEmulationNoThrow(),
-    ]);
+    await this.#initDevToolsUniverseNoThrow();
     if (this.#disposed) {
       this.dispose();
     }
   }
 
-  async #initFocusEmulationNoThrow(): Promise<void> {
-    // We emulate a focused page for all pages to support multi-agent workflows.
+  #initFocusEmulationNoThrow(): void {
+    // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      // Allow the next page operation to retry a transient failure.
+      this.#focusEmulationRequested = false;
       logger?.('Error turning on focused page emulation', error);
     });
   }
@@ -323,11 +377,24 @@ export class McpPage implements ContextPage {
     try {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session, {
-        sourceMaps: this.#sourceMaps,
+        sourceMaps: this.#config.resolved.sourceMaps,
       });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
+  }
+
+  syncSourceMaps(): void {
+    if (!this.#devtoolsUniverse) {
+      return;
+    }
+    const sourceMaps = this.#config.resolved.sourceMaps;
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
   }
 
   get devtoolsUniverse(): TargetUniverse | undefined {
@@ -335,6 +402,9 @@ export class McpPage implements ContextPage {
   }
 
   getDialog(): Dialog | undefined {
+    if (this.#dialog?.handled) {
+      this.#dialog = undefined;
+    }
     return this.#dialog;
   }
 
@@ -342,19 +412,33 @@ export class McpPage implements ContextPage {
     this.#dialog = undefined;
   }
 
+  getScreenRecorder(): ScreenRecorderData | null {
+    return this.#screenRecorder;
+  }
+
+  setScreenRecorder(data: ScreenRecorderData | null): void {
+    this.#screenRecorder = data;
+  }
+
+  isRunningPerformanceTrace(): boolean {
+    return this.#isRunningPerformanceTrace;
+  }
+
+  setIsRunningPerformanceTrace(x: boolean): void {
+    this.#isRunningPerformanceTrace = x;
+  }
+
   throwIfDialogOpen(): void {
-    if (this.#dialog && !this.#dialog.handled) {
+    const dialog = this.getDialog();
+    if (dialog) {
       throw new Error(
-        `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
+        `A dialog is open (${dialog.type()}: ${dialog.message()}).`,
       );
     }
   }
 
   #getDebuggingWebMcpToolGroups(): ToolGroups {
-    if (!this.#pptrPage) {
-      return [];
-    }
-    const webmcpTools = this.#pptrPage.webmcp
+    const webmcpTools = this.pptrPage.webmcp
       .tools()
       .filter(isDebuggingWebMcpTool);
     if (webmcpTools.length === 0) {
@@ -373,14 +457,7 @@ export class McpPage implements ContextPage {
     ];
   }
 
-  getThirdPartyDeveloperTools(): ToolGroups {
-    return [
-      ...this.#getDebuggingWebMcpToolGroups(),
-      ...this.eventBasedThirdPartyTools,
-    ];
-  }
-
-  async getToolGroups(): Promise<ToolGroups> {
+  async discoverThirdPartyDeveloperTools(): Promise<ToolGroups> {
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
@@ -390,8 +467,7 @@ export class McpPage implements ContextPage {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      this.eventBasedThirdPartyTools = [];
-      return this.getThirdPartyDeveloperTools();
+      return this.#getDebuggingWebMcpToolGroups();
     }
 
     const eventToolGroups = await this.pptrPage.evaluate(() => {
@@ -477,9 +553,7 @@ export class McpPage implements ContextPage {
       }
     }
 
-    this.eventBasedThirdPartyTools = eventToolGroups;
-
-    return this.getThirdPartyDeveloperTools();
+    return [...this.#getDebuggingWebMcpToolGroups(), ...eventToolGroups];
   }
 
   getWebMcpTools(): WebMCPTool[] {
@@ -521,6 +595,11 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  disposeCommentBridge(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
+  }
+
   /**
    * Returns the comment bridge attached to the DevTools page, or undefined if
    * the DevTools page does not support DevTools comments.
@@ -529,9 +608,7 @@ export class McpPage implements ContextPage {
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
-      this.#commentBridge = new DevToolsCommentBridge({
-        onNotification: this.#onNotification,
-      });
+      this.#commentBridge = new DevToolsCommentBridge();
     }
     const attached = await this.#commentBridge.attach(devtoolsPage);
     return attached ? this.#commentBridge : undefined;
@@ -553,7 +630,9 @@ export class McpPage implements ContextPage {
 
   async openDevTools(): Promise<Page | undefined> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    if (this.#config.resolved.devtoolsComments) {
+      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    }
     return devtoolsPage;
   }
 
@@ -636,8 +715,15 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.#disposed = true;
-    this.#commentBridge?.dispose();
-    this.#commentBridge = undefined;
+    this.#isRunningPerformanceTrace = false;
+    this.disposeCommentBridge();
+    if (this.#screenRecorder) {
+      const {recorder} = this.#screenRecorder;
+      this.#screenRecorder = null;
+      void recorder.stop().catch(e => {
+        logger?.('Failed to stop screencast recording on dispose', e);
+      });
+    }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
@@ -658,9 +744,13 @@ export class McpPage implements ContextPage {
       .tools()
       .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
     if (webmcpTool) {
-      const {status, output, errorText} = await webmcpTool.execute(params);
+      const {status, output, errorText, exception} =
+        await webmcpTool.execute(params);
       if (status !== 'Completed') {
-        throw new Error(errorText || `Tool execution failed: ${status}`);
+        const error = exception?.description ?? exception?.value ?? errorText;
+        throw new Error(
+          error ? String(error) : `Tool execution failed: ${status}`,
+        );
       }
       if (output !== undefined) {
         response.appendResponseLine(JSON.stringify(output, null, 2));
@@ -1038,10 +1128,11 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+      if (this.#config.resolved.devtoolsComments) {
+        await this.ensureDevToolsCommentBridge(devtoolsPage);
+      }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
-          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
@@ -1067,6 +1158,19 @@ export class McpPage implements ContextPage {
 
   async restoreEmulation(): Promise<void> {
     const currentSetting = this.emulationSettings;
+    const {viewport} = currentSetting;
+    if (viewport) {
+      // Lighthouse's CDP session replaces the device metrics override and
+      // clears it on detach, and Chrome ignores an override identical to the
+      // last one this session sent. A different width first makes the real
+      // call take effect without a reload (`isMobile` and `hasTouch` stay the
+      // same). This also runs after snapshot audits and fires a resize event,
+      // so do not remove it as redundant.
+      await this.pptrPage.setViewport({
+        ...viewport,
+        width: Math.max(1, viewport.width - 1),
+      });
+    }
     await this.emulate(currentSetting);
   }
 
@@ -1147,7 +1251,7 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
+      await page.setGeolocation(null);
       delete newSettings.geolocation;
     } else {
       await page.setGeolocation(options.geolocation);
@@ -1211,13 +1315,34 @@ export class McpPage implements ContextPage {
       }
     }
 
+    const previousViewport = this.emulationSettings.viewport;
     this.emulationSettings = Object.keys(newSettings).length ? newSettings : {};
 
     this.updateTimeouts();
 
     // This should happen after updating the page timeouts.
     // Setting the viewport can trigger a reload which we don't want to timeout.
-    await page.setViewport(newSettings.viewport ?? null);
+    try {
+      await page.setViewport(newSettings.viewport ?? null);
+    } catch (error) {
+      if (previousViewport) {
+        newSettings.viewport = previousViewport;
+      } else {
+        delete newSettings.viewport;
+      }
+      this.emulationSettings = Object.keys(newSettings).length
+        ? newSettings
+        : {};
+      throw error;
+    }
+  }
+
+  clearNetworkConditions(): void {
+    if (!this.emulationSettings.networkConditions) {
+      return;
+    }
+    delete this.emulationSettings.networkConditions;
+    this.updateTimeouts();
   }
 
   updateTimeouts(): void {
@@ -1227,35 +1352,142 @@ export class McpPage implements ContextPage {
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.#pptrPage.setDefaultNavigationTimeout(
+    this.pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }
 
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
-    const frames = this.pptrPage.frames();
+  waitForTextOnPage(
+    text: string[],
+    options: {timeout?: number; visible?: boolean} = {},
+  ): Promise<Element> {
+    const {timeout, visible} = options;
+    const page = this.pptrPage;
+    const initialFrames = page.frames();
+    const observedFrames = new Set(initialFrames);
+    const controller = new AbortController();
 
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => [
-          frame.locator(`aria/${value}`),
-          frame.locator(`text/${value}`),
-        ]),
-      ),
-    );
+    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
+      this.#locatorClass.race(
+        frames.flatMap(frame =>
+          text.flatMap(value => {
+            const locators = [
+              frame.locator(`aria/${value}`),
+              frame.locator(`text/${value}`),
+            ];
+            return visible
+              ? locators.map(locator => locator.setVisibility('visible'))
+              : locators;
+          }),
+        ),
+      );
 
+    let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {
-      locator = locator.setTimeout(timeout);
+      initialLocator = initialLocator.setTimeout(timeout);
     }
 
-    return locator.wait();
+    return new Promise<Element>((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): boolean => {
+        if (settled) {
+          return false;
+        }
+        settled = true;
+        page.off('frameattached', onFrameAttached);
+        controller.abort();
+        return true;
+      };
+      const finish = (element: Element): void => {
+        if (cleanup()) {
+          resolve(element);
+        }
+      };
+      const fail = (error: unknown): void => {
+        if (cleanup()) {
+          reject(error);
+        }
+      };
+      const onFrameAttached = (frame: Frame): void => {
+        if (observedFrames.has(frame)) {
+          return;
+        }
+        observedFrames.add(frame);
+        // The initial locator race does not include frames added later.
+        // Watch each new frame until the initial race resolves or times out.
+        // A timeout of 0 disables the frame timer; controller.abort() stops it.
+        void locatorForFrames([frame])
+          .setTimeout(0)
+          .wait({signal: controller.signal})
+          .then(finish, error => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            logger?.('Failed to wait for text in an attached frame', error);
+          });
+      };
+
+      page.on('frameattached', onFrameAttached);
+      void initialLocator.wait({signal: controller.signal}).then(finish, fail);
+    });
+  }
+
+  async resize(
+    width: number,
+    height: number,
+  ): Promise<{width: number; height: number} | undefined> {
+    try {
+      const browser = this.pptrPage.browser();
+      const windowId = await this.pptrPage.windowId();
+      const bounds = await browser.getWindowBounds(windowId);
+
+      if (bounds.windowState === 'fullscreen') {
+        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      } else if (bounds.windowState !== 'normal') {
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      }
+    } catch {
+      // Window APIs are not supported on all platforms
+    }
+    await this.pptrPage.resize({
+      contentWidth: width,
+      contentHeight: height,
+    });
+
+    if (this.getDialog()) {
+      return undefined;
+    }
+
+    // @ts-expect-error internal API
+    const client = this.pptrPage._client();
+    const metrics: Protocol.Page.GetLayoutMetricsResponse = await client.send(
+      'Page.getLayoutMetrics',
+    );
+    return {
+      width: metrics.cssLayoutViewport.clientWidth,
+      height: metrics.cssLayoutViewport.clientHeight,
+    };
+  }
+
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseNavigation(this.pptrPage, this.pptrPage.url(), {
+      flags,
+    });
+  }
+
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseSnapshot(this.pptrPage, {
+      flags,
+    });
   }
 
   /**
@@ -1265,7 +1497,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      undefined,
+      {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       collect => {
         return {
           request: req => {

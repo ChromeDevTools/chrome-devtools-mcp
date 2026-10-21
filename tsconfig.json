@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "module": "esnext",
     "target": "es2023",
     "lib": [
       "ES2023",
@@ -23,6 +24,7 @@
     "incremental": true,
     "sourceMap": true,
     "allowJs": true,
+    "preserveConstEnums": true,
     "useUnknownInCatchVariables": false
   },
   "include": [

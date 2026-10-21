@@ -42,7 +42,7 @@ export function sanitizeClientName(clientName: string): string {
   return REDACTED_CLIENT_NAME;
 }
 
-export const PARAM_BLOCKLIST = new Set(['uid', 'reqid', 'msgid']);
+export const PARAM_BLOCKLIST: Set<string> = new Set(['uid', 'reqid', 'msgid']);
 
 const SUPPORTED_ZOD_TYPES = [
   'ZodString',

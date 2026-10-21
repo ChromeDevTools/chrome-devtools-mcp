@@ -2,7 +2,7 @@ exports[`McpResponse > add network request when attached 1`] = `
 ## Request http://example.com
 Status: pending
 ### Request Headers
-- content-size:<redacted>
+- content-size:10
 ## Network requests
 Showing 1-1 of 1 (Page 1 of 1).
 reqid=1 GET http://example.com [pending]
@@ -16,7 +16,7 @@ exports[`McpResponse > add network request when attached 2`] = `
     "url": "http://example.com",
     "status": "pending",
     "requestHeaders": {
-      "content-size": "<redacted>"
+      "content-size": "10"
     }
   },
   "pagination": {
@@ -44,7 +44,7 @@ exports[`McpResponse > add network request when attached with POST data 1`] = `
 ## Request http://example.com
 Status: 200
 ### Request Headers
-- content-size:<redacted>
+- content-size:10
 ### Request Body
 {"request":"body"}
 ### Response Headers
@@ -64,7 +64,7 @@ exports[`McpResponse > add network request when attached with POST data 2`] = `
     "url": "http://example.com",
     "status": "200",
     "requestHeaders": {
-      "content-size": "<redacted>"
+      "content-size": "10"
     },
     "requestBody": "{\\"request\\":\\"body\\"}",
     "responseHeaders": {
@@ -405,7 +405,6 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          uid=1_5 InlineTextBox "test"
 
 `;
 
@@ -432,14 +431,7 @@ exports[`McpResponse > returns verbose snapshot and structured content 2`] = `
                   {
                     "id": "1_4",
                     "role": "StaticText",
-                    "name": "test",
-                    "children": [
-                      {
-                        "id": "1_5",
-                        "role": "InlineTextBox",
-                        "name": "test"
-                      }
-                    ]
+                    "name": "test"
                   }
                 ]
               }
@@ -468,7 +460,6 @@ uid=1_0 RootWebArea "My test page" url="about:blank"
     uid=1_2 ignored
       uid=1_3 complementary
         uid=1_4 "test"
-          uid=1_5 InlineTextBox "test"
 
 `;
 
@@ -730,7 +721,9 @@ No Performance Insights for the given insight set id. Only use ids given in the 
 `;
 
 exports[`McpResponse network pagination > trace insights > includes error if insight not found 2`] = `
-{}
+{
+  "error": "No Performance Insights for the given insight set id. Only use ids given in the \\"Available insight sets\\" list."
+}
 `;
 
 exports[`McpResponse network pagination > trace insights > includes the trace insight output 1`] = `
@@ -779,7 +772,9 @@ We can break this time down into the 4 subparts that combine to make the LCP tim
 `;
 
 exports[`McpResponse network pagination > trace insights > includes the trace insight output 2`] = `
-{}
+{
+  "traceInsight": "## Insight Title: LCP breakdown\\n\\n## Insight Summary:\\nThis insight is used to analyze the time spent that contributed to the final LCP time and identify which of the 4 subparts (or 2 if there was no LCP resource) are contributing most to the delay in rendering the LCP element.\\n\\n## Detailed analysis:\\nThe Largest Contentful Paint (LCP) time for this navigation was 129 ms.\\nThe LCP element is an image fetched from https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg (eventKey: s-1314, ts: 122411037986).\\n## LCP resource network request: https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg\\neventKey: s-1314\\nTimings:\\n- Queued at: 41 ms\\n- Request sent at: 47 ms\\n- Download complete at: 56 ms\\n- Main thread processing completed at: 58 ms\\nDurations:\\n- Download time: 0.3 ms\\n- Main thread processing time: 2 ms\\n- Total duration: 17 ms\\nRedirects: no redirects\\nStatus code: 200\\nMIME Type: image/svg+xml\\nProtocol: unknown\\nPriority: VeryHigh\\nRender-blocking: No\\nFrom a service worker: No\\nInitiators (root request to the request that directly loaded this one): none\\n\\n\\nWe can break this time down into the 4 subparts that combine to make the LCP time:\\n\\n- Time to first byte: 8 ms (6.1% of total LCP time)\\n- Resource load delay: 33 ms (25.7% of total LCP time)\\n- Resource load duration: 15 ms (11.4% of total LCP time)\\n- Element render delay: 73 ms (56.8% of total LCP time)\\n\\n## Estimated savings: none\\n\\n## External resources:\\n- https://developer.chrome.com/docs/performance/insights/lcp-breakdown\\n- https://web.dev/articles/lcp\\n- https://web.dev/articles/optimize-lcp"
+}
 `;
 
 exports[`McpResponse network pagination > trace summaries > includes the trace summary text and structured data 1`] = `
@@ -1322,16 +1317,24 @@ exports[`extensions > lists extensions 2`] = `
 `;
 
 exports[`lighthouse > includes lighthouse report paths 1`] = `
-## Lighthouse Audit Results
+## Lighthouse audit results
 Mode: navigation
 Device: desktop
 URL: https://example.com
-### Category Scores
+### Category scores
 - Performance: 90 (performance)
-### Audit Summary
+### Audit summary
 Passed: 10
 Failed: 1
-Total Timing: 1000ms
+Total timing: 1000ms
+### Failed audits
+- color-contrast [accessibility]: Background and foreground colors do not have a sufficient contrast ratio. (score: 0)
+  Low-contrast text is difficult to read.
+  Nodes (12, showing 2):
+  - selector="body > p" label="Hello" snippet="<p class=\\"faint\\">"
+    Fix any of the following: Element has insufficient color contrast
+  - selector="a[title=\\"Say \\\\\\"hi\\\\\\"\\"]" label="Say \\"hi\\" now" snippet="<a title=\\"Say &quot;hi&quot;\\">"
+- document-title [accessibility, seo]: Document does not have a \`<title>\` element (score: 0)
 ### Reports
 - /tmp/report.json
 - /tmp/report.html
@@ -1359,6 +1362,42 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
         "total": 1000
       }
     },
+    "failedAudits": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "description": "Low-contrast text is difficult to read.",
+        "score": 0,
+        "categories": [
+          "accessibility"
+        ],
+        "nodes": [
+          {
+            "selector": "body > p",
+            "snippet": "<p class=\\"faint\\">",
+            "nodeLabel": "Hello",
+            "explanation": "Fix any of the following:\\n  Element has insufficient color contrast"
+          },
+          {
+            "selector": "a[title=\\"Say \\\\\\"hi\\\\\\"\\"]",
+            "snippet": "<a title=\\"Say &quot;hi&quot;\\">",
+            "nodeLabel": "Say \\"hi\\"\\nnow"
+          }
+        ],
+        "totalNodes": 12
+      },
+      {
+        "id": "document-title",
+        "title": "Document does not have a \`<title>\` element",
+        "score": 0,
+        "categories": [
+          "accessibility",
+          "seo"
+        ],
+        "nodes": [],
+        "totalNodes": 0
+      }
+    ],
     "reports": [
       "/tmp/report.json",
       "/tmp/report.html"
@@ -1368,18 +1407,18 @@ exports[`lighthouse > includes lighthouse report paths 2`] = `
 `;
 
 exports[`lighthouse > rounds category scores and shows unscored categories as n/a 1`] = `
-## Lighthouse Audit Results
+## Lighthouse audit results
 Mode: navigation
 Device: desktop
 URL: https://example.com
-### Category Scores
+### Category scores
 - Accessibility: 57 (accessibility)
 - SEO: 0 (seo)
 - Agentic Browsing: n/a (agentic-browsing)
-### Audit Summary
+### Audit summary
 Passed: 10
 Failed: 1
-Total Timing: 1000ms
+Total timing: 1000ms
 ### Reports
 - /tmp/report.json
 - /tmp/report.html
@@ -1417,11 +1456,23 @@ exports[`lighthouse > rounds category scores and shows unscored categories as n/
         "total": 1000
       }
     },
+    "failedAudits": [],
     "reports": [
       "/tmp/report.json",
       "/tmp/report.html"
     ]
   }
+}
+`;
+
+exports[`third-party developer tools > lists no third-party developer tools if there are none 1`] = `
+## Third-party developer tools
+No third-party developer tools available.
+`;
+
+exports[`third-party developer tools > lists no third-party developer tools if there are none 2`] = `
+{
+  "thirdPartyDeveloperTools": []
 }
 `;
 
@@ -1459,7 +1510,7 @@ exports[`third-party developer tools > lists third-party developer tools 2`] = `
 
 exports[`webmcp > includes webmcp tools in list_pages response 1`] = `
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1470,7 +1521,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1491,7 +1542,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
 exports[`webmcp > includes webmcp tools in navigate_page response 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1503,7 +1554,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1523,7 +1574,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
 
 exports[`webmcp > includes webmcp tools in select_page response 1`] = `
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
 `;
@@ -1534,7 +1585,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ],
@@ -1555,7 +1606,7 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
 Successfully navigated to about:blank.
 ## Pages
-1: about:blank [selected]
+1: My test page (about:blank) [selected]
 `;
 
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
@@ -1565,7 +1616,7 @@ exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
     {
       "id": 1,
       "url": "about:blank",
-      "title": "",
+      "title": "My test page",
       "selected": true
     }
   ]

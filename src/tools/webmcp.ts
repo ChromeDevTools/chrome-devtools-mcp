@@ -7,9 +7,9 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
-export const listWebMcpTools = definePageTool(() => ({
+export const listWebMcpTools: PageToolFactory = definePageTool(() => ({
   name: 'list_webmcp_tools',
   description: `Lists all WebMCP tools the page exposes (excluding debugging tools, which are exposed via 'list_3p_developer_tools').`,
   annotations: {
@@ -18,13 +18,14 @@ export const listWebMcpTools = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (_request, response) => {
     response.setListWebMcpTools();
   },
 }));
 
-export const executeWebMcpTool = definePageTool(() => ({
+export const executeWebMcpTool: PageToolFactory = definePageTool(() => ({
   name: 'execute_webmcp_tool',
   description: `Executes a WebMCP tool exposed by the page (for debugging tools, use 'execute_3p_developer_tool').`,
   annotations: {
@@ -39,6 +40,7 @@ export const executeWebMcpTool = definePageTool(() => ({
       .describe('The JSON-stringified parameters to pass to the WebMCP tool'),
   },
   blockedByDialog: false,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const toolName = request.params.toolName;
@@ -68,9 +70,10 @@ export const executeWebMcpTool = definePageTool(() => ({
       throw new Error(`Tool ${toolName} not found`);
     }
 
-    const {status, output, errorText} = await tool.execute(input);
+    const {status, output, errorText, exception} = await tool.execute(input);
+    const error = exception?.description ?? exception?.value ?? errorText;
     response.appendResponseLine(
-      JSON.stringify({status, output, errorText}, null, 2),
+      JSON.stringify({status, output, error}, null, 2),
     );
   },
 }));

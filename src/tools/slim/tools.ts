@@ -8,10 +8,10 @@ import type {ParsedArguments} from '../../config/ConfigParser.js';
 import type {Dialog} from '../../third_party/index.js';
 import {zod} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
-import {definePageTool} from '../ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from '../ToolDefinition.js';
 import {validateUrl} from '../../utils/url.js';
 
-export const screenshot = definePageTool(() => ({
+export const screenshot: PageToolFactory = definePageTool(() => ({
   name: 'screenshot',
   description: `Takes a screenshot`,
   annotations: {
@@ -22,6 +22,7 @@ export const screenshot = definePageTool(() => ({
   },
   schema: {},
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const page = request.page;
@@ -37,55 +38,58 @@ export const screenshot = definePageTool(() => ({
   },
 }));
 
-export const navigate = definePageTool((args: ParsedArguments) => {
-  return {
-    name: 'navigate',
-    description: `Loads a URL`,
-    annotations: {
-      category: ToolCategory.NAVIGATION,
-      readOnlyHint: false,
-      conditions: ['slim'],
-    },
-    schema: {
-      url: zod.string().describe('URL to navigate to'),
-    },
-    blockedByDialog: false,
-    verifyFilesSchema: {},
-    handler: async (request, response) => {
-      validateUrl(request.params.url, {
-        javascriptEvaluation: args?.javascriptEvaluation,
-        categoryExtensions: args?.categoryExtensions,
-        fileNavigations: args?.fileNavigations,
-      });
+export const navigate: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => {
+    return {
+      name: 'navigate',
+      description: `Loads a URL`,
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: false,
+        conditions: ['slim'],
+      },
+      schema: {
+        url: zod.string().describe('URL to navigate to'),
+      },
+      blockedByDialog: false,
+      concurrency: 'page',
+      verifyFilesSchema: {},
+      handler: async (request, response) => {
+        validateUrl(request.params.url, {
+          javascriptEvaluation: args?.javascriptEvaluation,
+          categoryExtensions: args?.categoryExtensions,
+          fileNavigations: args?.fileNavigations,
+        });
 
-      const page = request.page;
+        const page = request.page;
 
-      const options = {
-        timeout: 30_000,
-      };
+        const options = {
+          timeout: 30_000,
+        };
 
-      const dialogHandler = (dialog: Dialog): void => {
-        if (dialog.type() === 'beforeunload') {
-          response.appendResponseLine(`Accepted a beforeunload dialog.`);
-          void dialog.accept();
-          // We are not going to report the dialog like regular dialogs.
-          page.clearDialog();
+        const dialogHandler = (dialog: Dialog): void => {
+          if (dialog.type() === 'beforeunload') {
+            response.appendResponseLine(`Accepted a beforeunload dialog.`);
+            void dialog.accept();
+            // We are not going to report the dialog like regular dialogs.
+            page.clearDialog();
+          }
+        };
+
+        page.pptrPage.on('dialog', dialogHandler);
+
+        try {
+          await page.pptrPage.goto(request.params.url, options);
+          response.appendResponseLine(`Navigated to ${page.pptrPage.url()}.`);
+        } finally {
+          page.pptrPage.off('dialog', dialogHandler);
         }
-      };
+      },
+    };
+  },
+);
 
-      page.pptrPage.on('dialog', dialogHandler);
-
-      try {
-        await page.pptrPage.goto(request.params.url, options);
-        response.appendResponseLine(`Navigated to ${page.pptrPage.url()}.`);
-      } finally {
-        page.pptrPage.off('dialog', dialogHandler);
-      }
-    },
-  };
-});
-
-export const evaluate = definePageTool(() => ({
+export const evaluate: PageToolFactory = definePageTool(() => ({
   name: 'evaluate',
   description: `Evaluates a JavaScript script`,
   annotations: {
@@ -97,14 +101,11 @@ export const evaluate = definePageTool(() => ({
     script: zod.string().describe(`JS script to run on the page`),
   },
   blockedByDialog: true,
+  concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    try {
-      const result = await page.pptrPage.evaluate(request.params.script);
-      response.appendResponseLine(JSON.stringify(result));
-    } catch (err) {
-      response.appendResponseLine(String(err.message));
-    }
+    const result = await page.pptrPage.evaluate(request.params.script);
+    response.appendResponseLine(JSON.stringify(result));
   },
 }));

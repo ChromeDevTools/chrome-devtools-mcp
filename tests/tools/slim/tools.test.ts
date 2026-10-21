@@ -7,21 +7,16 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {ConfigParser} from '../../../src/config/ConfigParser.js';
 import {evaluate, navigate, screenshot} from '../../../src/tools/slim/tools.js';
-import {createHandlerMocks} from '../../mocks.js';
+import {createHandlerMocks, createMockParsedArguments} from '../../mocks.js';
 import {screenshots} from '../../snapshot.js';
 import {withMcpContext} from '../../utils.js';
 
 describe('slim', () => {
-  afterEach(() => {
-    sinon.restore();
-  });
-
   it('evaluates', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const script = '2 * 5';
@@ -33,18 +28,18 @@ describe('slim', () => {
     sinon.assert.calledOnceWithExactly(response.appendResponseLine, '10');
   });
 
-  it('handles errors', async () => {
+  it('propagates evaluation errors for response handling', async () => {
     const {page, context, response, args} = createHandlerMocks();
     const script = "throw new Error('test error')";
     page.pptrPage.evaluate.rejects(new Error('test error'));
 
-    await evaluate(args).handler({params: {script}, page}, response, context);
+    await assert.rejects(
+      evaluate(args).handler({params: {script}, page}, response, context),
+      {message: 'test error'},
+    );
 
     sinon.assert.calledOnceWithExactly(page.pptrPage.evaluate, script);
-    sinon.assert.calledOnceWithExactly(
-      response.appendResponseLine,
-      'test error',
-    );
+    sinon.assert.notCalled(response.appendResponseLine);
   });
 
   it('navigates to correct page', async t => {
@@ -89,11 +84,10 @@ describe('slim', () => {
 
   it('disallows javascript, data, and vbscript URLs when javascriptEvaluation is false', async () => {
     const {page, context, response} = createHandlerMocks();
-    const disabledArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--slim', '--no-javascript-evaluation'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
+    const disabledArgs = createMockParsedArguments({
+      slim: true,
+      javascriptEvaluation: false,
+    });
     const tool = navigate(disabledArgs);
     await assert.rejects(
       async () => {
@@ -140,11 +134,10 @@ describe('slim', () => {
 
   it('disallows file URLs when fileNavigations is false', async () => {
     const {page, context, response} = createHandlerMocks();
-    const disabledArgs = new ConfigParser(
-      '1.0.0',
-      ['node', 'script.js', '--slim', '--no-file-navigations'],
-      {CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS: 'true'},
-    ).parse();
+    const disabledArgs = createMockParsedArguments({
+      slim: true,
+      fileNavigations: false,
+    });
     const tool = navigate(disabledArgs);
     await assert.rejects(
       async () => {

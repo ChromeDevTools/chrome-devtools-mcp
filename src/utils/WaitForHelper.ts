@@ -5,6 +5,7 @@
  */
 
 import type {
+  Target,
   Page,
   Protocol,
   CdpPage,
@@ -18,6 +19,7 @@ export type DialogAction = 'accept' | 'dismiss' | string;
 export class WaitForHelper {
   #abortController = new AbortController();
   #page: CdpPage;
+  #publicPage: Page;
   #stableDomTimeout: number;
   #stableDomFor: number;
   #expectNavigationIn: number;
@@ -27,6 +29,7 @@ export class WaitForHelper {
   /** Track all dialogs as they pause the renderer. */
   #dialogDetected = false;
   #initialUrl: string;
+  #openedPages = new Set<Target>();
 
   constructor(
     page: Page,
@@ -38,6 +41,7 @@ export class WaitForHelper {
     this.#expectNavigationIn = 100 * cpuTimeoutMultiplier;
     this.#navigationTimeout = 3000 * networkTimeoutMultiplier;
     this.#page = page as unknown as CdpPage;
+    this.#publicPage = page;
     this.#initialUrl = page.url();
   }
 
@@ -49,7 +53,7 @@ export class WaitForHelper {
   async waitForStableDom(): Promise<void> {
     // Bound the setup evaluation against the stable-DOM timeout. Without this
     // cap a paused renderer (e.g. an open dialog) would make evaluateHandle
-    // hang until protocolTimeout (default 180s) while the tool mutex is held.
+    // hang until protocolTimeout (default 180s) inside the context queue.
     using stableDomObserver = await Promise.race([
       this.#page.evaluateHandle(timeout => {
         let timeoutId: ReturnType<typeof setTimeout>;
@@ -161,6 +165,16 @@ export class WaitForHelper {
     this.#page.on('dialog', dialogHandler);
     this.#abortController.signal.addEventListener('abort', () => {
       this.#page.off('dialog', dialogHandler);
+    });
+
+    const popupHandler = (page: Page | null): void => {
+      if (page) {
+        this.#openedPages.add(page.target());
+      }
+    };
+    this.#publicPage.on('popup', popupHandler);
+    this.#abortController.signal.addEventListener('abort', () => {
+      this.#publicPage.off('popup', popupHandler);
     });
 
     // A scoped AbortController used to clean up navigation probe listeners.
@@ -292,6 +306,7 @@ export class WaitForHelper {
         ? {navigatedToUrl: urlAfterAction}
         : {}),
       dialogHandled: this.#dialogHandled,
+      ...(this.#openedPages.size ? {openedPages: this.#openedPages} : {}),
     };
   }
 }
@@ -306,6 +321,7 @@ export interface WaitForEventsResult {
    * Whether a dialog was automatically handled during the action.
    */
   dialogHandled?: boolean;
+  openedPages?: Set<Target>;
 }
 
 export function getNetworkMultiplierFromString(

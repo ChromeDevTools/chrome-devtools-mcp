@@ -40,7 +40,7 @@ function isFile(filePath: string): boolean {
  * `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable is set.
  */
 export class ConfigLocator {
-  getSearchPaths(env = process.env): string[] {
+  getSearchPaths(env: NodeJS.ProcessEnv = process.env): string[] {
     const searchPaths: string[] = [];
     const pluginData = env['PLUGIN_DATA'];
     if (pluginData) {
@@ -51,9 +51,9 @@ export class ConfigLocator {
   }
 
   getGlobalConfigPath(
-    env = process.env,
-    platform = process.platform,
-    homedir = os.homedir(),
+    env: NodeJS.ProcessEnv = process.env,
+    platform: NodeJS.Platform = process.platform,
+    homedir: string = os.homedir(),
   ): string {
     if (platform === 'win32') {
       const localAppData = env['LOCALAPPDATA'];
@@ -70,7 +70,10 @@ export class ConfigLocator {
     return path.join(homedir, '.config', 'cd4a', 'config.json');
   }
 
-  locate(env = process.env, checkIsFile = isFile): string | undefined {
+  locate(
+    env: NodeJS.ProcessEnv = process.env,
+    checkIsFile: (filePath: string) => boolean = isFile,
+  ): string | undefined {
     if (env[NO_CONFIG_DISCOVERY_ENV]) {
       return undefined;
     }

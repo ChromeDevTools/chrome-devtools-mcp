@@ -9,10 +9,14 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
+import {PipeTransport} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
-import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
-import {logger, puppeteerLogger} from '../utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactDaemonArgsForLogging,
+} from '../utils/logger.js';
 
 import type {
   DaemonMessage,
@@ -133,7 +137,7 @@ export async function startDaemon(
     fs.unlinkSync(pidFilePath);
   }
 
-  logger?.('Starting daemon...', ...mcpArgs);
+  logger?.('Starting daemon...', ...redactDaemonArgsForLogging(mcpArgs));
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',
@@ -155,7 +159,7 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
-  timeout = SEND_COMMAND_TIMEOUT,
+  timeout: number = SEND_COMMAND_TIMEOUT,
 ): Promise<DaemonResponse> {
   // Before connecting and sending, verify the daemon is still alive.
   if (!isDaemonRunning(sessionId)) {

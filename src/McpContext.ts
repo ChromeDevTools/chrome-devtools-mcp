@@ -8,12 +8,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
-import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import type {
+  HeapSnapshotManager,
   HeapSnapshotAggregateData,
-  HeapSnapshotClassDiff,
+  HeapSnapshotDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
@@ -24,61 +25,110 @@ import {type UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
+  Mutex,
   type Browser,
   type BrowserContext,
+  type Connection,
   type ConsoleMessage,
   type GetPWAStateOptions,
   type InstallPWAOptions,
   type LaunchPWAOptions,
   type Page,
+  type Protocol,
   type PWAState,
-  type ScreenRecorder,
   type Target,
   type UninstallPWAOptions,
   type Extension,
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import {CLOSE_PAGE_ERROR} from './tools/ToolDefinition.js';
-import type {
-  Context,
-  DevToolsData,
-  SupportedExtensions,
+import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import {ToolCategory} from './tools/categories.js';
+import {
+  CLOSE_PAGE_ERROR,
+  isCapabilityEnabled,
+  type BrowserlessContext,
+  type CapabilityGate,
+  type Context,
+  type DevToolsData,
+  type SupportedExtensions,
 } from './tools/ToolDefinition.js';
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
+import type {TaskQueue, TaskRunner} from './utils/TaskRunner.js';
 import {isAllowedUrl} from './utils/url.js';
-interface McpContextOptions {
-  // Whether the DevTools windows are exposed as pages for debugging of DevTools.
-  experimentalDevToolsDebugging: boolean;
-  // Whether all page-like targets are exposed as pages.
-  experimentalIncludeAllPages?: boolean;
-  // Whether CrUX data should be fetched.
-  performanceCrux: boolean;
-  // Whether source maps are enabled in DevTools.
-  sourceMaps?: boolean;
-  // The allow list of URL patterns to allow loading resources.
-  allowlist?: string[];
-  // The block list of URL patterns to block loading resources.
-  blocklist?: string[];
-  // Whether to skip path validation when the client did not negotiate the roots
-  // capability. When false (default), tools that read or write local files are
-  // restricted to the OS temp directory. When true, the previous permissive
-  // behavior is restored.
-  allowUnrestrictedPaths?: boolean;
-  // Whether this context replaces a previous one after a browser reconnect.
-  // Surfaces a one-time note in the next response.
-  reconnected?: boolean;
+
+export interface McpContextOptions {
+  config: ReadonlyServerConfig;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
-  // Whether extension tools and targets are enabled.
-  categoryExtensions?: boolean;
-  // Callback when a notification should be emitted to MCP client.
-  onNotification?: (message: string) => void;
+  // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
+  heapSnapshotManager: HeapSnapshotManager;
+  // Creates the context queue and the page queues.
+  taskRunner: TaskRunner;
+  // Returns the browser to use. Called by ensureBrowser(), so the browser
+  // connection is only established once a tool needs it.
+  getBrowser: () => Promise<Browser>;
 }
+
+interface OptionGate {
+  options: ReadonlyArray<keyof ParsedArguments>;
+}
+
+type FeatureController =
+  | {
+      gate: OptionGate;
+      onChange(context: McpContext): Promise<unknown> | void;
+    }
+  | {
+      gate: CapabilityGate;
+      onDisable(context: McpContext): Promise<void> | void;
+    };
+
+function hasOptionChanged(
+  gate: OptionGate,
+  previousArgs: ParsedArguments,
+  nextArgs: ParsedArguments,
+): boolean {
+  return gate.options.some(
+    option => !isDeepStrictEqual(nextArgs[option], previousArgs[option]),
+  );
+}
+
+const FEATURE_CONTROLLERS: readonly FeatureController[] = [
+  {
+    gate: {options: ['blockedUrlPattern', 'allowedUrlPattern']},
+    onChange: context => context.syncNetworkRestrictions(),
+  },
+  {
+    gate: {options: ['sourceMaps']},
+    onChange: context => context.syncSourceMaps(),
+  },
+  {
+    gate: {options: ['experimentalIncludeAllPages']},
+    onChange: context => context.createPagesSnapshot(),
+  },
+  {
+    gate: {category: ToolCategory.DEBUGGING},
+    onDisable: context => context.releaseScreencasts(),
+  },
+  {
+    gate: {category: ToolCategory.MEMORY, conditions: ['memoryDebugging']},
+    onDisable: context => context.releaseHeapSnapshots(),
+  },
+  {
+    gate: {category: ToolCategory.PERFORMANCE},
+    onDisable: context => context.releasePerformanceTrace(),
+  },
+  {
+    gate: {category: ToolCategory.DEBUGGING, conditions: ['devtoolsComments']},
+    onDisable: context => context.releaseDevToolsComments(),
+  },
+];
 
 // Page ids are handed out from a process-wide counter so they stay unique
 // across all contexts, in particular across browser reconnects. An id issued
@@ -86,9 +136,16 @@ interface McpContextOptions {
 // page of the reconnected browser.
 let nextPageId = 1;
 
-export class McpContext implements Context {
-  browser: Browser;
+export class McpContext implements Context, BrowserlessContext {
   logger: Logger;
+
+  #browser?: Browser;
+  // Initialization of #browser, settles once its browser-dependent state is
+  // ready.
+  #browserReady?: Promise<void>;
+  // Whether a browser connection was established before, so that switching to
+  // a new browser surfaces a reconnect notice.
+  #hasConnected = false;
 
   // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
   #isolatedContexts = new Map<string, BrowserContext>();
@@ -100,27 +157,36 @@ export class McpContext implements Context {
   #workers = new Map<Target, McpWorker>();
 
   #mcpPages = new Map<Target, McpPage>();
+  /**
+   * Queue for the browser-wide state (page list, selected page, trace
+   * state). Every page queue is a child of it, so a task on it waits for
+   * every page task and blocks later page tasks.
+   */
+  readonly taskQueue: TaskQueue;
+  #taskRunner: TaskRunner;
+  #pageTaskQueues = new Map<number, TaskQueue>();
+  /**
+   * Serializes `createPagesSnapshot()`. Two tasks on different page queues
+   * can call it at the same time.
+   */
+  #pagesSnapshotMutex = new Mutex();
   #selectedPage?: McpPage;
   #selectedPageFallback?: {wasClosed: boolean};
+  #selectedPageFallbackRead = false;
 
-  #serviceWorkerConsoleCollector: ServiceWorkerConsoleCollector;
-
-  #isRunningTrace = false;
-  #screenRecorderData: {recorder: ScreenRecorder; filePath: string} | null =
-    null;
+  #serviceWorkerConsoleCollector?: ServiceWorkerConsoleCollector;
 
   #reconnectNotice = false;
 
   #traceResults: TraceResult[] = [];
 
   #locatorClass: typeof Locator;
+  #config: ReadonlyServerConfig;
   #options: McpContextOptions;
-  #heapSnapshotManager = new HeapSnapshotManager();
+  #heapSnapshotManager: HeapSnapshotManager;
   #roots: Root[] | undefined = undefined;
-  #allowUnrestrictedPaths: boolean;
 
   private constructor(
-    browser: Browser,
     logger: Logger,
     options: McpContextOptions,
     locatorClass: typeof Locator,
@@ -131,43 +197,230 @@ export class McpContext implements Context {
       },
     });
 
-    this.browser = browser;
     this.logger = logger;
     this.#locatorClass = locatorClass;
+    this.#taskRunner = options.taskRunner;
+    this.taskQueue = options.taskRunner.createQueue();
+    this.#config = options.config;
     this.#options = options;
-    this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
-    this.#reconnectNotice = options.reconnected ?? false;
-
-    this.#serviceWorkerConsoleCollector = new ServiceWorkerConsoleCollector(
-      this.browser,
-    );
+    this.#heapSnapshotManager = options.heapSnapshotManager;
   }
 
-  async #init(): Promise<void> {
-    await this.createPagesSnapshot();
-    const workers = this.createWorkersSnapshot();
-
-    await this.#serviceWorkerConsoleCollector.init(workers);
-    this.browser.on('targetcreated', this.#onTargetCreated);
-    this.browser.on('targetdestroyed', this.#onTargetDestroyed);
-  }
-
-  dispose(): void {
-    this.browser.off('targetcreated', this.#onTargetCreated);
-    this.browser.off('targetdestroyed', this.#onTargetDestroyed);
-
-    this.#serviceWorkerConsoleCollector.dispose();
-    this.#heapSnapshotManager.dispose();
-    for (const mcpPage of this.#mcpPages.values()) {
-      mcpPage.dispose();
+  /**
+   * The browser of the current connection. Throws if no browser connection was
+   * established yet, see {@link McpContext.ensureBrowser}.
+   */
+  get browser(): Browser {
+    if (!this.#browser) {
+      throw new Error('Not connected to a browser.');
     }
-    this.#selectedPage?.dispose();
+    return this.#browser;
+  }
+
+  #allMcpPages(): Set<McpPage> {
+    const pages = new Set(this.#mcpPages.values());
+    if (this.#selectedPage) {
+      pages.add(this.#selectedPage);
+    }
+    return pages;
+  }
+
+  /**
+   * Synchronizes browser/page state and releases state of capabilities that
+   * transitioned from enabled to disabled after a config reload.
+   */
+  async onConfigChanged(previousArgs: ParsedArguments): Promise<void> {
+    const nextArgs = this.#config.resolved;
+    for (const controller of FEATURE_CONTROLLERS) {
+      if ('onChange' in controller) {
+        if (hasOptionChanged(controller.gate, previousArgs, nextArgs)) {
+          await controller.onChange(this);
+        }
+      } else if (
+        isCapabilityEnabled(controller.gate, previousArgs) &&
+        !isCapabilityEnabled(controller.gate, nextArgs)
+      ) {
+        await controller.onDisable(this);
+      }
+    }
+  }
+
+  /**
+   * Applies updated URL allowlist/blocklist rules to the connected browser and
+   * clears incompatible page network throttling state.
+   */
+  async syncNetworkRestrictions(): Promise<void> {
+    const {blockedUrlPattern, allowedUrlPattern} = this.#config.resolved;
+    if (this.#browser) {
+      await this.#browser.restrictNetwork({
+        blocklist: blockedUrlPattern,
+        allowlist: allowedUrlPattern,
+      });
+    }
+    if (blockedUrlPattern || allowedUrlPattern) {
+      for (const mcpPage of this.#allMcpPages()) {
+        mcpPage.clearNetworkConditions();
+      }
+    }
+  }
+
+  /**
+   * Synchronizes the DevTools source maps setting across all pages.
+   */
+  syncSourceMaps(): void {
+    for (const mcpPage of this.#allMcpPages()) {
+      mcpPage.syncSourceMaps();
+    }
+  }
+
+  /**
+   * Stops and saves active screencast recordings across all pages when
+   * screencast tools are disabled.
+   */
+  async releaseScreencasts(): Promise<void> {
+    for (const mcpPage of this.#allMcpPages()) {
+      const screenRecorderData = mcpPage.getScreenRecorder();
+      if (!screenRecorderData) {
+        continue;
+      }
+      const {recorder, filePath} = screenRecorderData;
+      mcpPage.setScreenRecorder(null);
+      try {
+        await recorder.stop();
+        this.logger?.(
+          `The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`,
+        );
+      } catch (err) {
+        this.logger?.('Failed to stop the screencast recording', err);
+      }
+    }
+  }
+
+  /**
+   * Closes all loaded heap snapshots when memory tools are disabled.
+   */
+  releaseHeapSnapshots(): void {
+    if (this.#heapSnapshotManager.hasSnapshots()) {
+      this.#heapSnapshotManager.dispose();
+      this.logger?.(
+        'Loaded heap snapshots were closed because memory tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Discards recorded performance traces and stops any running trace when
+   * performance tools are disabled.
+   */
+  async releasePerformanceTrace(): Promise<void> {
+    this.#traceResults = [];
+    for (const mcpPage of this.#allMcpPages()) {
+      if (!mcpPage.isRunningPerformanceTrace()) {
+        continue;
+      }
+      mcpPage.setIsRunningPerformanceTrace(false);
+      try {
+        await mcpPage.pptrPage.tracing.stop();
+      } catch (err) {
+        this.logger?.('Failed to stop the performance trace', err);
+      }
+      this.logger?.(
+        'The running performance trace was discarded because performance tools were disabled.',
+      );
+    }
+  }
+
+  /**
+   * Disposes DevTools comment bridges across all pages when DevTools comment
+   * tools are disabled.
+   */
+  releaseDevToolsComments(): void {
+    for (const mcpPage of this.#allMcpPages()) {
+      mcpPage.disposeCommentBridge();
+    }
+  }
+
+  /**
+   * Returns the browser, establishing the connection if needed. If the browser
+   * changed since the last call (e.g. after a reconnect), all
+   * browser-dependent state is rebuilt for the new browser.
+   */
+  async ensureBrowser(): Promise<Browser> {
+    const browser = await this.#options.getBrowser();
+    if (browser === this.#browser && this.#browserReady) {
+      // Joins a still pending initialization instead of handing out
+      // half-initialized state.
+      await this.#browserReady;
+      return browser;
+    }
+
+    this.#resetBrowserState();
+    this.#browser = browser;
+    const ready = this.#initBrowserState(browser);
+    this.#browserReady = ready;
+    try {
+      await ready;
+      return browser;
+    } catch (err) {
+      // Leave no half-initialized state behind, the next call starts over. If
+      // a later call already installed another browser, its state is left
+      // intact.
+      if (this.#browserReady === ready) {
+        this.#resetBrowserState();
+      }
+      throw err;
+    }
+  }
+
+  async #initBrowserState(browser: Browser): Promise<void> {
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    this.#serviceWorkerConsoleCollector = collector;
+    // All listeners are registered synchronously, before the first await. If
+    // this call hangs and is abandoned by the tool-call timeout, a later call
+    // that installs a different browser removes them in #resetBrowserState().
+    browser.on('targetcreated', this.#onTargetCreated);
+    browser.on('targetdestroyed', this.#onTargetDestroyed);
+    await Promise.all([
+      collector.init(this.createWorkersSnapshot()),
+      this.createPagesSnapshot(),
+    ]);
+    // The state now belongs to the browser of a later call, leave it intact.
+    if (this.#browser !== browser) {
+      throw new Error('Browser was replaced while initializing.');
+    }
+
+    if (this.#hasConnected) {
+      this.#reconnectNotice = true;
+    }
+    this.#hasConnected = true;
+  }
+
+  #resetBrowserState(): void {
+    this.#browser?.off('targetcreated', this.#onTargetCreated);
+    this.#browser?.off('targetdestroyed', this.#onTargetDestroyed);
+
+    this.#serviceWorkerConsoleCollector?.dispose();
+    for (const mcpPage of this.#allMcpPages()) {
+      this.#disposeMcpPage(mcpPage);
+    }
     this.#mcpPages.clear();
     this.#workers.clear();
     // Isolated contexts are intentionally not closed here.
     // Either the entire browser will be closed or we disconnect
     // without destroying browser state.
     this.#isolatedContexts.clear();
+    this.#nextIsolatedContextId = 1;
+    this.#selectedPage = undefined;
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
+    this.#traceResults = [];
+    this.#serviceWorkerConsoleCollector = undefined;
+    this.#browser = undefined;
+    this.#browserReady = undefined;
+  }
+
+  dispose(): void {
+    this.#resetBrowserState();
   }
 
   #onTargetCreated = (target: Target): void => {
@@ -185,7 +438,7 @@ export class McpContext implements Context {
     try {
       const mcpPage = this.#mcpPages.get(target);
       if (mcpPage) {
-        mcpPage.dispose();
+        this.#disposeMcpPage(mcpPage);
         this.#mcpPages.delete(target);
       }
       this.#workers.delete(target);
@@ -194,16 +447,13 @@ export class McpContext implements Context {
     }
   };
 
-  static async from(
-    browser: Browser,
+  static create(
     logger: Logger,
     opts: McpContextOptions,
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass: typeof Locator = Locator,
-  ): Promise<McpContext> {
-    const context = new McpContext(browser, logger, opts, locatorClass);
-    await context.#init();
-    return context;
+  ): McpContext {
+    return new McpContext(logger, opts, locatorClass);
   }
 
   static resetPageIdsForTesting(): void {
@@ -258,7 +508,10 @@ export class McpContext implements Context {
     // If the client never negotiated roots and the operator has explicitly
     // opted into unrestricted access via --allow-unrestricted-paths, restore
     // the previous permissive behavior and skip validation.
-    if (this.#roots === undefined && this.#allowUnrestrictedPaths) {
+    if (
+      this.#roots === undefined &&
+      this.#config.resolved.allowUnrestrictedPaths
+    ) {
       // Canonical path might not exist yet so we fallback to
       // path.resolve(filePath). Consumers should not follow symlinks.
       return canonicalPath || path.resolve(filePath);
@@ -340,7 +593,7 @@ export class McpContext implements Context {
       page = await this.browser.newPage({background});
     }
     const mcpPage = this.#createMcpPage(page.target());
-    await mcpPage.init();
+    await mcpPage.init({emulateFocus: true});
     this.selectPage(mcpPage);
     await this.createPagesSnapshot();
     return mcpPage;
@@ -352,10 +605,6 @@ export class McpContext implements Context {
     }
     this.#mcpPages.delete(page.target);
     await page.close();
-  }
-
-  get #hasNetworkBlockOrAllowlist(): boolean {
-    return !!(this.#options.allowlist || this.#options.blocklist);
   }
 
   async installPWA(options: InstallPWAOptions): Promise<string> {
@@ -394,30 +643,39 @@ export class McpContext implements Context {
     return this.browser.getPWAState(options);
   }
 
-  setIsRunningPerformanceTrace(x: boolean): void {
-    this.#isRunningTrace = x;
-  }
-
   isRunningPerformanceTrace(): boolean {
-    return this.#isRunningTrace;
-  }
-
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null {
-    return this.#screenRecorderData;
-  }
-
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void {
-    this.#screenRecorderData = data;
+    for (const mcpPage of this.#allMcpPages()) {
+      if (mcpPage.isRunningPerformanceTrace()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   isCruxEnabled(): boolean {
-    return this.#options.performanceCrux;
+    return this.#config.resolved.performanceCrux;
   }
 
   getPages(): McpPage[] {
     return Array.from(this.#mcpPages.values());
+  }
+
+  /**
+   * Fetches current target info for all targets from the browser, keyed by
+   * target id. Unlike Puppeteer's cached target info, this reflects title
+   * changes, which Chrome does not report via `Target.targetInfoChanged`.
+   * Returns an empty map if the browser cannot be queried.
+   */
+  async getTargetInfos(): Promise<Map<string, Protocol.Target.TargetInfo>> {
+    try {
+      // @ts-expect-error use existing browser connection (internal Puppeteer API).
+      const connection: Connection = this.browser._connection;
+      const {targetInfos} = await connection.send('Target.getTargets');
+      return new Map(targetInfos.map(info => [info.targetId, info]));
+    } catch (err) {
+      this.logger?.('Failed to fetch target infos', err);
+      return new Map();
+    }
   }
 
   getSelectedMcpPage(): McpPage {
@@ -468,9 +726,9 @@ export class McpContext implements Context {
   }
 
   /**
-   * Returns true once if this context was created by reconnecting after the
-   * previous browser connection was lost, so the next response can surface a
-   * note. Cleared on first call.
+   * Returns true once after the browser connection was re-established with a
+   * new browser, so the next response can surface a note. Cleared on first
+   * call.
    */
   consumeReconnectNotice(): boolean {
     const notice = this.#reconnectNotice;
@@ -486,17 +744,45 @@ export class McpContext implements Context {
     return page;
   }
 
+  /**
+   * The queue for tasks on page `pageId`. The queue exists before the page
+   * does, so a tool call can enter it before the browser connects. It is a
+   * child of {@link taskQueue}.
+   */
+  pageTaskQueue(pageId: number): TaskQueue {
+    let queue = this.#pageTaskQueues.get(pageId);
+    if (!queue) {
+      queue = this.#taskRunner.createQueue(this.taskQueue);
+      this.#pageTaskQueues.set(pageId, queue);
+    }
+    return queue;
+  }
+
+  #disposeMcpPage(mcpPage: McpPage): void {
+    mcpPage.dispose();
+    this.#pageTaskQueues
+      .get(mcpPage.id)
+      ?.dispose(new Error(`Page ${mcpPage.id} is closed.`));
+    this.#pageTaskQueues.delete(mcpPage.id);
+  }
+
   isPageSelected(page: McpPage): boolean {
     return this.#selectedPage === page;
   }
 
   selectPage(newPage: McpPage): void {
+    this.#selectedPageFallback = undefined;
+    this.#selectedPageFallbackRead = false;
+    this.#selectPage(newPage);
+  }
+
+  #selectPage(newPage: McpPage): void {
     if (
       this.#selectedPage &&
       this.#selectedPage !== newPage &&
       !this.#mcpPages.has(this.#selectedPage.target)
     ) {
-      this.#selectedPage.dispose();
+      this.#disposeMcpPage(this.#selectedPage);
     }
     this.#selectedPage = newPage;
     newPage.updateTimeouts();
@@ -505,10 +791,12 @@ export class McpContext implements Context {
   /**
    * Returns details about the last page snapshot automatically replacing the
    * selection because the selected page disappeared from the page list, or
-   * `undefined` if the snapshot left the selection intact. Recomputed on every
-   * createPagesSnapshot() call.
+   * `undefined` if the snapshot left the selection intact. Cleared on the next
+   * createPagesSnapshot() call after it has been read, or when selectPage() is
+   * called explicitly.
    */
   getSelectedPageFallback(): {wasClosed: boolean} | undefined {
+    this.#selectedPageFallbackRead = true;
     return this.#selectedPageFallback;
   }
 
@@ -545,9 +833,14 @@ export class McpContext implements Context {
   }
 
   getServiceWorkerConsoleData(
-    extensionId: string,
+    serviceWorkerId: string,
   ): Array<ConsoleMessage | UncaughtError> {
-    return this.#serviceWorkerConsoleCollector.getData(extensionId);
+    const worker = this.getWorkerById(serviceWorkerId);
+    if (worker?.type !== 'service_worker') {
+      throw new Error('Service worker not found.');
+    }
+    const extensionId = new URL(worker.url).hostname;
+    return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
   }
 
   #getBrowserContextToNameMap(): Map<BrowserContext, string> {
@@ -576,14 +869,12 @@ export class McpContext implements Context {
       (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     if (!mcpPage) {
       mcpPage = new McpPage(target, nextPageId++, {
+        config: this.#config,
         locatorClass: this.#locatorClass,
-        hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
         isolatedContextName: this.#getBrowserContextToNameMap().get(
           target.browserContext(),
         ),
         navigationTimeout: this.#options.navigationTimeout,
-        sourceMaps: this.#options.sourceMaps,
-        onNotification: this.#options.onNotification,
       });
     }
     this.#mcpPages.set(target, mcpPage);
@@ -591,6 +882,10 @@ export class McpContext implements Context {
   }
 
   async createPagesSnapshot(): Promise<McpPage[]> {
+    if (!this.#browser) {
+      return [];
+    }
+    using guard = await this.#pagesSnapshotMutex.acquire();
     const allTargets = this.#fetchPageTargets();
 
     for (const target of allTargets) {
@@ -602,7 +897,7 @@ export class McpContext implements Context {
     for (const [target, mcpPage] of this.#mcpPages) {
       if (!currentTargets.has(target)) {
         if (mcpPage !== this.#selectedPage || mcpPage.isClosed()) {
-          mcpPage.dispose();
+          this.#disposeMcpPage(mcpPage);
         }
         this.#mcpPages.delete(target);
       }
@@ -610,40 +905,61 @@ export class McpContext implements Context {
 
     const pages = Array.from(this.#mcpPages.values());
 
-    // Only fall back when the selected page is actually gone. Gating on
-    // `isClosed()` instead of `pages` membership avoids silently swapping a
-    // live page that is momentarily missing from the snapshot.
-    this.#selectedPageFallback = undefined;
-    if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
-      // Record the automatic change so the response can surface it. Skipped on
-      // first connect, when there was no prior selection to replace.
-      if (this.#selectedPage) {
-        this.#selectedPageFallback = {
-          wasClosed: this.#selectedPage.isClosed(),
-        };
+    // Only fall back when the selected page is actually gone or no longer
+    // counts as a page, e.g. a background page after
+    // experimentalIncludeAllPages was turned off. Gating on `isClosed()`
+    // instead of `pages` membership avoids silently swapping a live page that
+    // is momentarily missing from the snapshot.
+    if (this.#selectedPageFallbackRead) {
+      this.#selectedPageFallback = undefined;
+      this.#selectedPageFallbackRead = false;
+    }
+    if (
+      !this.#selectedPage ||
+      this.#selectedPage.isClosed() ||
+      !this.#isPageTarget(this.#selectedPage.target)
+    ) {
+      if (pages[0]) {
+        // Record the automatic change so the response can surface it. Skipped on
+        // first connect, when there was no prior selection to replace.
+        if (this.#selectedPage) {
+          this.#selectedPageFallback = {
+            wasClosed: this.#selectedPage.isClosed(),
+          };
+        }
+        this.#selectPage(pages[0]);
+      } else if (this.#selectedPage) {
+        const wasClosed = Boolean(this.#selectedPage.isClosed());
+        if (!wasClosed) {
+          this.#disposeMcpPage(this.#selectedPage);
+        }
+        this.#selectedPage = undefined;
+        this.#selectedPageFallback = {wasClosed};
       }
-      this.selectPage(pages[0]);
     }
 
     if (this.#selectedPage && !this.#selectedPage.isClosed()) {
-      await this.#selectedPage.init();
+      // Automatic page snapshots must preserve real focus on untouched tabs.
+      await this.#selectedPage.init({emulateFocus: false});
     }
 
     return pages;
   }
 
   #isPageTarget(target: Target): boolean {
-    const existingMcpPage = this.#mcpPages.get(target);
+    const existingMcpPage =
+      this.#mcpPages.get(target) ??
+      (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
     const url = existingMcpPage ? existingMcpPage.url() : target.url();
     if (
-      !this.#options.experimentalDevToolsDebugging &&
+      !this.#config.resolved.experimentalDevtools &&
       url.startsWith('devtools://')
     ) {
       return false;
     }
     if (
       !isAllowedUrl(url, {
-        categoryExtensions: this.#options.categoryExtensions,
+        categoryExtensions: this.#config.resolved.categoryExtensions,
       })
     ) {
       return false;
@@ -653,13 +969,13 @@ export class McpContext implements Context {
       return true;
     }
     if (
-      this.#options.experimentalIncludeAllPages &&
+      this.#config.resolved.experimentalIncludeAllPages &&
       (type === 'background_page' || type === 'webview')
     ) {
       return true;
     }
     if (
-      this.#options.experimentalDevToolsDebugging &&
+      this.#config.resolved.experimentalDevtools &&
       type === 'other' &&
       url.startsWith('devtools://')
     ) {
@@ -871,10 +1187,6 @@ export class McpContext implements Context {
     return await this.#heapSnapshotManager.disposeSnapshot(filePath);
   }
 
-  hasHeapSnapshots(): boolean {
-    return this.#heapSnapshotManager.hasSnapshots();
-  }
-
   async getHeapSnapshotRetainingPaths(
     filePath: string,
     nodeId: number,
@@ -899,10 +1211,11 @@ export class McpContext implements Context {
   }
 
   #validateUrlNotBlocked(url: URL): void {
-    if (!this.#options.blocklist) {
+    const blocklist = this.#config.resolved.blockedUrlPattern;
+    if (!blocklist) {
       return;
     }
-    for (const block of this.#options.blocklist) {
+    for (const block of blocklist) {
       const pattern = new URLPattern(block);
       if (pattern.test(url)) {
         throw new Error(`Blocked by blocklist: ${url}`);
@@ -911,10 +1224,11 @@ export class McpContext implements Context {
   }
 
   #validateUrlAllowed(url: URL): void {
-    if (!this.#options.allowlist) {
+    const allowlist = this.#config.resolved.allowedUrlPattern;
+    if (!allowlist) {
       return;
     }
-    for (const allow of this.#options.allowlist) {
+    for (const allow of allowlist) {
       const pattern = new URLPattern(allow);
       if (pattern.test(url)) {
         return;
@@ -988,7 +1302,7 @@ export class McpContext implements Context {
   async getHeapSnapshotClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]> {
+  ): Promise<HeapSnapshotDiff> {
     return await this.#heapSnapshotManager.getClassDiffs(
       baseFilePath,
       currentFilePath,
