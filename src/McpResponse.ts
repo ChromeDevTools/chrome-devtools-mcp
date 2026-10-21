@@ -72,6 +72,7 @@ import {
 import type {CD4ACommentThread, PaginationOptions} from './types.js';
 import type {WithSymbolId} from './utils/id.js';
 import {stableIdSymbol} from './utils/id.js';
+import {formatMwgRampSection} from './utils/mwgMapping.js';
 import {paginate} from './utils/pagination.js';
 import {getFilterableResourceType} from './utils/resourceType.js';
 import {truncateText} from './utils/text.js';
@@ -1306,6 +1307,15 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
       for (const report of reports) {
         response.push(`- ${report}`);
       }
+      const allMatchedGuides: string[] = [];
+      for (const audit of failedAudits) {
+        if (audit.modernWebGuidance?.length) {
+          allMatchedGuides.push(...audit.modernWebGuidance);
+        }
+      }
+      if (allMatchedGuides.length > 0) {
+        response.push(formatMwgRampSection(allMatchedGuides));
+      }
     }
 
     if (data.snapshot) {
@@ -1718,6 +1728,15 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
           response.push(
             'Note: stack trace line and column numbers use 1-based indexing',
           );
+        }
+        const allIssueGuides: string[] = [];
+        for (const item of paginationData.items) {
+          if (item instanceof IssueFormatter) {
+            allIssueGuides.push(...item.getModernWebGuidance());
+          }
+        }
+        if (allIssueGuides.length > 0) {
+          response.push(formatMwgRampSection(allIssueGuides));
         }
       } else {
         response.push('<no console messages found>');

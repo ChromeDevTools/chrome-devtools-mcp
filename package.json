@@ -31,6 +31,7 @@
     "sync": "npm ci && git submodule update --init",
     "verify-server-json-version": "node scripts/verify-server-json-version.ts",
     "update-lighthouse": "node scripts/update-lighthouse.ts",
+    "update-mwg-mappings": "node scripts/update-mwg-mappings.ts",
     "update-metrics": "node scripts/update_metrics.ts",
     "verify-npm-package": "node scripts/verify-npm-package.js",
     "eval": "npm run build && node scripts/eval_gemini.ts",

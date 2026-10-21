@@ -204,6 +204,10 @@ export interface LighthouseFailedAudit {
    */
   categories: string[];
   /**
+   * Matching Modern Web Guidance guide IDs for this audit, if any.
+   */
+  modernWebGuidance?: string[];
+  /**
    * DOM nodes flagged by the audit, capped to a small number.
    */
   nodes: LighthouseAuditNode[];
