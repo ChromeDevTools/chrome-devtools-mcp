@@ -95,7 +95,7 @@ export class BrowserManager {
   static rootSandboxLaunchError(
     error: Error,
     args: readonly string[],
-    uid = process.getuid?.(),
+    uid: number | undefined = process.getuid?.(),
   ): Error | undefined {
     if (uid !== 0) {
       return undefined;
@@ -377,8 +377,8 @@ export class BrowserManager {
     } else if (browserURL) {
       connectOptions.browserURL = browserURL;
     } else if (channel || userDataDir) {
+      autoConnect = true;
       if (userDataDir) {
-        autoConnect = true;
         // TODO: re-expose this logic via Puppeteer.
         const portPath = path.join(userDataDir, 'DevToolsActivePort');
         try {

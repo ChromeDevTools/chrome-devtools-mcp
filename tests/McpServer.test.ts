@@ -97,6 +97,24 @@ describe('McpServer', () => {
     return tools.map(tool => tool.name);
   }
 
+  it('passes the navigation limit to the lazily connected context', async () => {
+    const context = createMockMcpContext();
+    const createContext = sinon.stub(McpContext, 'create').returns(context);
+    const {server, browserManager, config} = await createTestServer(
+      ['--maxNavigationSaved=5'],
+      {mockContext: false},
+    );
+
+    sinon.assert.calledOnceWithExactly(
+      createContext,
+      sinon.match.any,
+      sinon.match({config: sinon.match.same(config)}),
+    );
+    assert.strictEqual(config.resolved.maxNavigationSaved, 5);
+    sinon.assert.notCalled(browserManager.ensureBrowser);
+    await server.close();
+  });
+
   describe('callTool', () => {
     it('returns an error for unknown tool names', async () => {
       const {server, browserManager} = await createTestServer();
@@ -351,6 +369,18 @@ describe('McpServer', () => {
   });
 
   describe('applyConfig', () => {
+    it('keeps maxNavigationSaved unchanged when configuration is reloaded', async () => {
+      const {server, config, browserManager} = await createTestServer([
+        '--maxNavigationSaved=5',
+      ]);
+
+      await server.applyConfig(parseConfig(['--maxNavigationSaved=10']));
+
+      assert.strictEqual(config.resolved.maxNavigationSaved, 5);
+      sinon.assert.notCalled(browserManager.ensureBrowser);
+      await server.close();
+    });
+
     it('enables tools that were disabled', async () => {
       const {server} = await createTestServer();
       assert.ok(

@@ -122,11 +122,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--blockedUrlPattern`/ `--blocked-url-pattern`**
-  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\.\d+\.\d+\.\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.
+  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\.\d+\.\d+\.\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).
   - **Type:** array
 
 - **`--allowedUrlPattern`/ `--allowed-url-pattern`**
-  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\.\d+\.\d+\.\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.
+  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\.\d+\.\d+\.\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).
   - **Type:** array
 
 - **`--screenshotFormat`/ `--screenshot-format`**
@@ -218,6 +218,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   Whether to enable source maps in DevTools. Use --no-source-maps to disable.
   - **Type:** boolean
   - **Default:** `true`
+
+- **`--maxNavigationSaved`/ `--max-navigation-saved`**
+  Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and 25. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.
+  - **Type:** number
+  - **Default:** `3`
 
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.

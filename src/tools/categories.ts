@@ -18,7 +18,7 @@ export enum ToolCategory {
   PWA = 'pwa',
 }
 
-export const labels = {
+export const labels: Record<ToolCategory, string> = {
   [ToolCategory.INPUT]: 'Input automation',
   [ToolCategory.NAVIGATION]: 'Navigation automation',
   [ToolCategory.EMULATION]: 'Emulation',

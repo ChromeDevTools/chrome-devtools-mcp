@@ -298,7 +298,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the page's window so that the page has specified dimension
+**Description:** Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.
 
 **Parameters:**
 

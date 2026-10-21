@@ -9,7 +9,7 @@ import {zod} from '../third_party/index.js';
 import type {CD4ACommentThread, CD4ARevealTarget} from '../types.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 export type CommentThreadPayload = CD4ACommentThread;
 export type RevealTargetPayload = CD4ARevealTarget;
@@ -17,7 +17,7 @@ export type RevealTargetPayload = CD4ARevealTarget;
 const DEVTOOLS_COMMENTS_UNAVAILABLE_MESSAGE =
   'DevTools comments are not working right now. Possible reasons: the connected Chrome version does not support DevTools comments, the feature is disabled, or the DevTools window has not finished loading. Try again later, or continue without DevTools comments.';
 
-export const openDevtools = definePageTool(() => ({
+export const openDevtools: PageToolFactory = definePageTool(() => ({
   name: 'open_devtools',
   description: 'Open a DevTools window for the selected page.',
   annotations: {
@@ -45,7 +45,7 @@ export const openDevtools = definePageTool(() => ({
 const DEFAULT_COMMENT_WAIT_MS = 10_000;
 const MAX_COMMENT_WAIT_MS = 30_000;
 
-export const getDevtoolsComments = definePageTool(() => ({
+export const getDevtoolsComments: PageToolFactory = definePageTool(() => ({
   name: 'get_devtools_comments',
   description:
     'Retrieve user comments from the DevTools window for the page. ' +
@@ -117,7 +117,7 @@ export const getDevtoolsComments = definePageTool(() => ({
   },
 }));
 
-export const resolveDevtoolsComment = definePageTool(() => ({
+export const resolveDevtoolsComment: PageToolFactory = definePageTool(() => ({
   name: 'resolve_devtools_comment',
   description:
     'Append an agent reply to a DevTools comment thread and mark it as resolved.',
@@ -183,7 +183,7 @@ export const resolveDevtoolsComment = definePageTool(() => ({
   },
 }));
 
-export const revealInDevtools = definePageTool(() => ({
+export const revealInDevtools: PageToolFactory = definePageTool(() => ({
   name: 'reveal_in_devtools',
   description:
     'Navigate DevTools to a specified panel and highlight a target DOM node or network request. The parameters uid and reqid are mutually exclusive.',

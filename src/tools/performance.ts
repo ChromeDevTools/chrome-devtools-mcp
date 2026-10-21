@@ -6,7 +6,6 @@
 
 import zlib from 'node:zlib';
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod, DevTools} from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import {
@@ -16,7 +15,12 @@ import {
 import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response, ContextPage} from './ToolDefinition.js';
+import type {
+  Context,
+  Response,
+  ContextPage,
+  PageToolFactory,
+} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const filePathSchema = zod
@@ -26,7 +30,7 @@ const filePathSchema = zod
     'The absolute file path, or a file path relative to the current working directory, to save the raw trace data. For example, trace.json.gz (compressed) or trace.json (uncompressed).',
   );
 
-export const startTrace = definePageTool(() => ({
+export const startTrace: PageToolFactory = definePageTool(() => ({
   name: 'performance_start_trace',
   description: `Start a performance trace on the target webpage. Use to find frontend performance issues, Core Web Vitals (LCP, INP, CLS), and improve page load speed.`,
   annotations: {
@@ -143,7 +147,7 @@ export const startTrace = definePageTool(() => ({
   },
 }));
 
-export const stopTrace = definePageTool((args: ParsedArguments) => ({
+export const stopTrace: PageToolFactory = definePageTool(args => ({
   name: 'performance_stop_trace',
   description:
     'Stop the active performance trace recording on the target webpage.',
@@ -191,7 +195,7 @@ export const stopTrace = definePageTool((args: ParsedArguments) => ({
   },
 }));
 
-export const analyzeInsight = definePageTool(() => ({
+export const analyzeInsight: PageToolFactory = definePageTool(() => ({
   name: 'performance_analyze_insight',
   description:
     'Provides more detailed information on a specific Performance Insight of an insight set that was highlighted in the results of a trace recording.',

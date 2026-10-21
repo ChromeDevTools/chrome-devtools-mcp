@@ -53,7 +53,10 @@ export function getIssueDescription(fileName: string): string | null {
   return issueDescriptions[fileName] ?? null;
 }
 
-export const ISSUE_UTILS = {
+export const ISSUE_UTILS: {
+  loadIssueDescriptions: () => Promise<void>;
+  getIssueDescription: (fileName: string) => string | null;
+} = {
   loadIssueDescriptions,
   getIssueDescription,
 };

@@ -478,5 +478,9 @@
   {
     "name": "watch_config",
     "flagType": "boolean"
+  },
+  {
+    "name": "max_navigation_saved_present",
+    "flagType": "boolean"
   }
 ]

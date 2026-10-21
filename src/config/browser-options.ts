@@ -18,7 +18,7 @@ export const browserOptions = {
     description:
       'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.',
     alias: 'u',
-    coerce: (url: string | undefined) => {
+    coerce: (url: string | undefined): string | undefined => {
       if (!url) {
         return;
       }
@@ -35,7 +35,7 @@ export const browserOptions = {
     description:
       'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
     alias: 'w',
-    coerce: (url: string | undefined) => {
+    coerce: (url: string | undefined): string | undefined => {
       if (!url) {
         return;
       }
@@ -59,7 +59,7 @@ export const browserOptions = {
     type: 'string',
     description:
       'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    coerce: (val: unknown) => {
+    coerce: (val: unknown): Record<string, string> | undefined => {
       if (!val) {
         return;
       }

@@ -12,7 +12,7 @@ import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage} from './ToolDefinition.js';
+import type {ContextPage, PageToolFactory} from './ToolDefinition.js';
 import {definePageTool} from './ToolDefinition.js';
 
 const dblClickSchema = zod
@@ -108,7 +108,7 @@ async function selectNativeSelectOption(
   return true;
 }
 
-export const click = definePageTool(() => ({
+export const click: PageToolFactory = definePageTool(() => ({
   name: 'click',
   description: `Clicks on the provided element`,
   annotations: {
@@ -169,7 +169,7 @@ export const click = definePageTool(() => ({
   },
 }));
 
-export const clickAt = definePageTool(() => ({
+export const clickAt: PageToolFactory = definePageTool(() => ({
   name: 'click_at',
   description: `Clicks at the provided coordinates`,
   annotations: {
@@ -205,7 +205,7 @@ export const clickAt = definePageTool(() => ({
   },
 }));
 
-export const hover = definePageTool(() => ({
+export const hover: PageToolFactory = definePageTool(() => ({
   name: 'hover',
   description: `Hover over the provided element`,
   annotations: {
@@ -393,7 +393,7 @@ async function fillFormElements(
   }
 }
 
-export const fill = definePageTool(() => ({
+export const fill: PageToolFactory = definePageTool(() => ({
   name: 'fill',
   description: `Type text into an input, text area or select an option from a <select> element.`,
   annotations: {
@@ -435,7 +435,7 @@ export const fill = definePageTool(() => ({
   },
 }));
 
-export const typeText = definePageTool(() => ({
+export const typeText: PageToolFactory = definePageTool(() => ({
   name: 'type_text',
   description: `Type text using keyboard into a previously focused input`,
   annotations: {
@@ -466,7 +466,7 @@ export const typeText = definePageTool(() => ({
   },
 }));
 
-export const drag = definePageTool(() => ({
+export const drag: PageToolFactory = definePageTool(() => ({
   name: 'drag',
   description: `Drag an element onto another element`,
   annotations: {
@@ -500,7 +500,7 @@ export const drag = definePageTool(() => ({
   },
 }));
 
-export const fillForm = definePageTool(() => ({
+export const fillForm: PageToolFactory = definePageTool(() => ({
   name: 'fill_form',
   description: `Fill out multiple form elements (inputs, selects, checkboxes, radios) at once. ALWAYS prefer this tool over multiple individual 'fill' or 'click' calls when interacting with forms. It is significantly faster, more reliable, and reduces turn count. Example: Fill username, password, and check "Remember Me" in one call.`,
   annotations: {
@@ -556,7 +556,7 @@ export const fillForm = definePageTool(() => ({
   },
 }));
 
-export const uploadFile = definePageTool(() => ({
+export const uploadFile: PageToolFactory = definePageTool(() => ({
   name: 'upload_file',
   description: 'Upload a file through a provided element.',
   annotations: {
@@ -625,7 +625,7 @@ export const uploadFile = definePageTool(() => ({
   },
 }));
 
-export const pressKey = definePageTool(() => ({
+export const pressKey: PageToolFactory = definePageTool(() => ({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
   annotations: {

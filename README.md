@@ -3,12 +3,12 @@
 [![npm chrome-devtools-mcp package](https://img.shields.io/npm/v/chrome-devtools-mcp.svg)](https://npmjs.org/package/chrome-devtools-mcp)
 
 Chrome DevTools for agents (`chrome-devtools-mcp`) lets your coding agent (such as Antigravity, Claude, Cursor or Copilot)
-control and inspect a live Chrome browser. It acts as a Model-Context-Protocol
-(MCP) server, giving your AI coding assistant access to the full power of
-Chrome DevTools for reliable automation, in-depth debugging, and performance analysis.
-A [CLI][cli] is also provided for use without MCP.
+control and inspect a live Chrome browser. It is available as a
+Model-Context-Protocol (MCP) server and as a [CLI][cli]. Both give your AI
+coding assistant access to the full power of Chrome DevTools for reliable
+automation, in-depth debugging, and performance analysis.
 
-[Tool reference][tool-reference] | [Changelog][changelog] | [Contributing][contributing] | [Troubleshooting][troubleshooting] | [Design Principles][design-principles]
+[Tool reference][tool-reference] | [CLI][cli] | [Skills][skills] | [Changelog][changelog] | [Contributing][contributing] | [Troubleshooting][troubleshooting] | [Design Principles][design-principles]
 
 ## Key features
 
@@ -83,21 +83,6 @@ Add the following config to your MCP client:
 > [!NOTE]
 > Using `chrome-devtools-mcp@latest` ensures that your MCP client will always use the latest version of the Chrome DevTools MCP server.
 
-If you are interested in doing only basic browser tasks, use the `--slim` mode:
-
-```json
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--slim", "--headless"]
-    }
-  }
-}
-```
-
-See [Slim tool reference][slim-tool-reference].
-
 ### MCP Client configuration
 
 For setup instructions specific to your editor or agent (e.g. Antigravity, Claude Code, Cursor, VS Code), please see our [Client Configurations Guide][client-configurations-guide].
@@ -115,6 +100,70 @@ Your MCP client should open the browser and record a performance trace.
 > [!NOTE]
 > The MCP server will start the browser automatically once the MCP client uses a tool that requires a running browser instance. Connecting to the Chrome DevTools MCP server on its own will not automatically start the browser.
 
+## CLI
+
+The package also includes the `chrome-devtools` CLI. Use it to control the browser from your terminal without MCP:
+
+```sh
+npm i chrome-devtools-mcp@latest -g
+chrome-devtools navigate_page 1 --url "https://developers.chrome.com"
+chrome-devtools take_screenshot 1 --filePath screenshot.png
+chrome-devtools stop
+```
+
+See the [CLI guide][cli] for all commands and options.
+
+## Skills
+
+The package includes [skills](./skills) that teach your agent how to use Chrome DevTools:
+
+| Skill                                                     | Use it to                                       |
+| --------------------------------------------------------- | ----------------------------------------------- |
+| [`chrome-devtools`](./skills/chrome-devtools)             | Debug and automate pages with the MCP tools.    |
+| [`chrome-devtools-cli`](./skills/chrome-devtools-cli)     | Run the CLI and write shell scripts with it.    |
+| [`a11y-debugging`](./skills/a11y-debugging)               | Audit and fix accessibility issues.             |
+| [`cookie-debugging`](./skills/cookie-debugging)           | Debug cookies, sessions, and authentication.    |
+| [`debug-optimize-lcp`](./skills/debug-optimize-lcp)       | Debug and improve Largest Contentful Paint.     |
+| [`memory-leak-debugging`](./skills/memory-leak-debugging) | Find and fix memory leaks.                      |
+| [`troubleshooting`](./skills/troubleshooting)             | Fix connection problems between MCP and Chrome. |
+
+### Install skills as a plugin
+
+A plugin installs the MCP server and all skills, including the CLI skill:
+
+- **Claude Code:** Run `/plugin marketplace add ChromeDevTools/chrome-devtools-mcp`, then `/plugin install chrome-devtools-mcp@chrome-devtools-plugins`.
+- **Copilot / VS Code:** Run **Chat: Install Plugin From Source** and enter `ChromeDevTools/chrome-devtools-mcp`.
+- **Gemini CLI:** Run `gemini extensions install --auto-update https://github.com/ChromeDevTools/chrome-devtools-mcp`.
+
+See the [Client Configurations Guide][client-configurations-guide] for more information.
+
+### Install skills manually
+
+If your agent does not support plugins, copy the skill folders into the skills directory of your agent. The npm package contains the skills:
+
+```sh
+npm i chrome-devtools-mcp@latest -g
+# Example for Claude Code. Use the skills directory of your agent.
+mkdir -p ~/.claude/skills
+cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/skills/
+```
+
+> [!IMPORTANT]
+> The `chrome-devtools-cli` skill requires the CLI. Install the package globally before you use the skill.
+
+### Keep skills up to date
+
+Skills describe the tools of a specific version. Update the skills each time you update the MCP server or the CLI. Outdated skills can tell your agent to use tools or parameters that changed.
+
+- **Plugins:** Use the update command of the plugin manager of your agent. The Gemini CLI command above enables automatic updates with `--auto-update`.
+- **Manual installs:** Update the package, then copy the skill folders again:
+
+```sh
+npm i chrome-devtools-mcp@latest -g
+mkdir -p ~/.claude/skills
+cp -R "$(npm root -g)/chrome-devtools-mcp/skills/chrome-devtools-cli" ~/.claude/skills/
+```
+
 ## Tools
 
 If you run into any issues, checkout our [troubleshooting guide][troubleshooting].
@@ -123,6 +172,8 @@ See the full [Tool Reference][tool-reference] for a complete list of all support
 ## Configuration
 
 Find the complete list of server parameters (e.g., `--headless`, `--isolated`, `--slim`) and how to configure WebSocket connections in the [Configuration Guide][configuration-guide].
+
+For basic browser tasks only, the `--slim` flag exposes a reduced set of tools. See the [Slim tool reference][slim-tool-reference].
 
 ## Advanced Usage
 
@@ -141,6 +192,7 @@ For a reference implementation, see the [Gemini CLI browser agent documentation]
 [configuration-guide]: ./docs/configuration.md
 [contributing]: ./CONTRIBUTING.md
 [design-principles]: ./docs/design-principles.md
+[skills]: #skills
 [slim-tool-reference]: ./docs/slim-tool-reference.md
 [tool-reference]: ./docs/tool-reference.md
 [troubleshooting]: ./docs/troubleshooting.md
