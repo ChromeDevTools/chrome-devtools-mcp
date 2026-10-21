@@ -11,194 +11,203 @@ import {zod} from '../third_party/index.js';
 import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response} from './ToolDefinition.js';
+import type {Context, Response, ToolFactory} from './ToolDefinition.js';
 import {defineTool, pageIdSchema} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
 
-export const evaluateScript = defineTool((cliArgs: ParsedArguments) => {
-  return {
-    name: 'evaluate_script',
-    description: `Evaluate JavaScript inside the target page${cliArgs.categoryExtensions ? ' or service worker' : ''}. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.`,
-    annotations: {
-      category: ToolCategory.DEBUGGING,
-      readOnlyHint: false,
-      conditions: ['javascriptEvaluation'],
-    },
-    schema: {
-      ...(cliArgs.pageIdRouting
-        ? cliArgs.categoryExtensions
-          ? {
-              pageId: zod
-                .number()
-                .optional()
-                .describe(
-                  'Targets a specific page by ID. Required when not evaluating in a service worker.',
-                ),
-            }
-          : pageIdSchema
-        : {}),
-      function: zod
-        .string()
-        .optional()
-        .describe(
-          `JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
+export const evaluateScript: ToolFactory = defineTool(
+  (cliArgs: ParsedArguments) => {
+    return {
+      name: 'evaluate_script',
+      description: `Evaluate JavaScript inside the target page${cliArgs.categoryExtensions ? ' or service worker' : ''}. The source can be provided inline or loaded from a local file. Returns the response as JSON, so returned values have to be JSON-serializable.`,
+      annotations: {
+        category: ToolCategory.DEBUGGING,
+        readOnlyHint: false,
+        conditions: ['javascriptEvaluation'],
+      },
+      schema: {
+        ...(cliArgs.pageIdRouting
+          ? cliArgs.categoryExtensions
+            ? {
+                pageId: zod
+                  .number()
+                  .optional()
+                  .describe(
+                    'Targets a specific page by ID. Required when not evaluating in a service worker.',
+                  ),
+              }
+            : pageIdSchema
+          : {}),
+        function: zod
+          .string()
+          .optional()
+          .describe(
+            `JavaScript source to execute in the target page. Provide either this or sourcePath, but not both. The source is interpreted according to format.
 Example without arguments: \`() => document.title\` or \`async () => await fetch("example.com")\`.
 Example with arguments: \`(el) => el.innerText\`
 `,
-        ),
-      sourcePath: zod
-        .string()
-        .optional()
-        .describe(
-          "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
-        ),
-      format: zod
-        .enum(['function', 'script'])
-        .optional()
-        .describe(
-          'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
-        ),
-      args: zod
-        .array(
-          zod
-            .string()
-            .describe(
-              'The uid of an element on the page from the page content snapshot',
-            ),
-        )
-        .optional()
-        .describe(
-          `An optional list of arguments (element uids from the page content snapshot) to pass to the function.`,
-        ),
-      filePath: zod
-        .string()
-        .optional()
-        .describe(
-          'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
-        ),
-      dialogAction: zod
-        .string()
-        .optional()
-        .describe(
-          'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
-        ),
-      waitForStableDom: zod
-        .boolean()
-        .optional()
-        .describe(
-          'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
-        ),
-      ...(cliArgs.categoryExtensions
-        ? {
-            serviceWorkerId: zod
+          ),
+        sourcePath: zod
+          .string()
+          .optional()
+          .describe(
+            "The absolute or relative path to a JavaScript file on the MCP server's local filesystem. Provide either this or function, but not both.",
+          ),
+        format: zod
+          .enum(['function', 'script'])
+          .optional()
+          .describe(
+            'How to interpret the source. "function" treats it as a function declaration and supports args. "script" evaluates it as classic JavaScript and does not support args. Defaults to "function". ECMAScript modules are not supported.',
+          ),
+        args: zod
+          .array(
+            zod
               .string()
-              .optional()
               .describe(
-                `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
+                'The uid of an element on the page from the page content snapshot',
               ),
-          }
-        : {}),
-    },
-    blockedByDialog: false,
-    concurrency: 'exclusive',
-    verifyFilesSchema: {
-      filePath: true,
-      // sourcePath may be an http(s): URL the server fetches, so allow URLs
-      // through; a file: path or plain path is still validated.
-      sourcePath: {local: true, remote: true, allowUrl: true},
-    },
-    handler: async (request, response, context) => {
-      const {
-        serviceWorkerId,
-        args: uidArgs,
-        function: fnString,
-        sourcePath,
-        format = 'function',
-        pageId,
-        dialogAction,
-        filePath,
-        waitForStableDom,
-      } = request.params;
+          )
+          .optional()
+          .describe(
+            `An optional list of arguments (element uids from the page content snapshot) to pass to the function.`,
+          ),
+        filePath: zod
+          .string()
+          .optional()
+          .describe(
+            'The absolute or relative path to a file to save the script output to. If omitted, the output is returned inline.',
+          ),
+        dialogAction: zod
+          .string()
+          .optional()
+          .describe(
+            'Handle dialogs while execution. "accept", "dismiss", or string for response of window.prompt. Defaults to accept.',
+          ),
+        waitForStableDom: zod
+          .boolean()
+          .optional()
+          .describe(
+            'Whether to wait for the DOM to settle. Pass false if the script only reads data. Defaults to true.',
+          ),
+        ...(cliArgs.categoryExtensions
+          ? {
+              serviceWorkerId: zod
+                .string()
+                .optional()
+                .describe(
+                  `The optional service worker id to evaluate the script in. If provided, 'pageId' should be omitted. Note: 'args' (element UIDs) cannot be used when evaluating in a service worker.`,
+                ),
+            }
+          : {}),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePath: true,
+        // sourcePath may be an http(s): URL the server fetches, so allow URLs
+        // through; a file: path or plain path is still validated.
+        sourcePath: {local: true, remote: true, allowUrl: true},
+      },
+      handler: async (request, response, context) => {
+        const {
+          serviceWorkerId,
+          args: uidArgs,
+          function: fnString,
+          sourcePath,
+          format = 'function',
+          pageId,
+          dialogAction,
+          filePath,
+          waitForStableDom,
+        } = request.params;
 
-      const source = await resolveScriptSource(fnString, sourcePath, context);
-      if (format === 'script' && uidArgs && uidArgs.length > 0) {
-        throw new Error('args cannot be used when format is "script".');
-      }
-
-      if (cliArgs.categoryExtensions && serviceWorkerId) {
-        if (uidArgs && uidArgs.length > 0) {
-          throw new Error(
-            'args (element uids) cannot be used when evaluating in a service worker.',
-          );
+        const source = await resolveScriptSource(fnString, sourcePath, context);
+        if (format === 'script' && uidArgs && uidArgs.length > 0) {
+          throw new Error('args cannot be used when format is "script".');
         }
-        if (pageId) {
+
+        if (cliArgs.categoryExtensions && serviceWorkerId) {
+          if (uidArgs && uidArgs.length > 0) {
+            throw new Error(
+              'args (element uids) cannot be used when evaluating in a service worker.',
+            );
+          }
+          if (pageId) {
+            throw new Error('specify either a pageId or a serviceWorkerId.');
+          }
+
+          const worker = await getWebWorker(context, serviceWorkerId);
+          const result = await context
+            .getSelectedMcpPage()
+            .waitForEventsAfterAction(
+              async () => {
+                await performEvaluation(worker, source, format, [], response, {
+                  filePath,
+                  context,
+                });
+              },
+              // Service workers cannot interact with the DOM, so never wait for it.
+              {handleDialog: dialogAction ?? 'accept', waitForStableDom: false},
+            );
+          if (result.dialogHandled) {
+            context.getSelectedMcpPage().clearDialog();
+          }
+          response.attachWaitForResult(result);
+          return;
+        }
+
+        if (cliArgs.categoryExtensions && cliArgs.pageIdRouting && !pageId) {
           throw new Error('specify either a pageId or a serviceWorkerId.');
         }
 
-        const worker = await getWebWorker(context, serviceWorkerId);
-        const result = await context
-          .getSelectedMcpPage()
-          .waitForEventsAfterAction(
-            async () => {
-              await performEvaluation(worker, source, format, [], response, {
+        const mcpPage =
+          cliArgs.pageIdRouting && request.params.pageId
+            ? context.getPageById(request.params.pageId)
+            : context.getSelectedMcpPage();
+        await mcpPage.init({emulateFocus: true});
+        // evaluate_script is not page-scoped, so ToolHandler does not run the
+        // blockedByDialog check for it. Without this, an evaluation started
+        // while a dialog is open waits until the protocol timeout.
+        // TODO: include the "# Open dialog ... Call handle_dialog" hint once
+        // Response can attach the page for non-page-scoped tools.
+        mcpPage.throwIfDialogOpen();
+        const page: Page = mcpPage.pptrPage;
+
+        const args: Array<JSHandle<unknown>> = [];
+        using stack = new DisposableStack();
+
+        const frames = new Set<Frame>();
+        for (const uid of uidArgs ?? []) {
+          const handle = await mcpPage.getElementByUid(uid);
+          frames.add(handle.frame);
+          stack.use(handle);
+          args.push(handle);
+        }
+
+        const evaluatable = await getPageOrFrame(page, frames);
+
+        const result = await mcpPage.waitForEventsAfterAction(
+          async () => {
+            await performEvaluation(
+              evaluatable,
+              source,
+              format,
+              args,
+              response,
+              {
                 filePath,
                 context,
-              });
-            },
-            // Service workers cannot interact with the DOM, so never wait for it.
-            {handleDialog: dialogAction ?? 'accept', waitForStableDom: false},
-          );
-        if (result.dialogHandled) {
-          context.getSelectedMcpPage().clearDialog();
-        }
+              },
+            );
+          },
+          {handleDialog: dialogAction ?? 'accept', waitForStableDom},
+        );
         response.attachWaitForResult(result);
-        return;
-      }
-
-      if (cliArgs.categoryExtensions && cliArgs.pageIdRouting && !pageId) {
-        throw new Error('specify either a pageId or a serviceWorkerId.');
-      }
-
-      const mcpPage =
-        cliArgs.pageIdRouting && request.params.pageId
-          ? context.getPageById(request.params.pageId)
-          : context.getSelectedMcpPage();
-      await mcpPage.init({emulateFocus: true});
-      // evaluate_script is not page-scoped, so ToolHandler does not run the
-      // blockedByDialog check for it. Without this, an evaluation started
-      // while a dialog is open waits until the protocol timeout.
-      // TODO: include the "# Open dialog ... Call handle_dialog" hint once
-      // Response can attach the page for non-page-scoped tools.
-      mcpPage.throwIfDialogOpen();
-      const page: Page = mcpPage.pptrPage;
-
-      const args: Array<JSHandle<unknown>> = [];
-      using stack = new DisposableStack();
-
-      const frames = new Set<Frame>();
-      for (const uid of uidArgs ?? []) {
-        const handle = await mcpPage.getElementByUid(uid);
-        frames.add(handle.frame);
-        stack.use(handle);
-        args.push(handle);
-      }
-
-      const evaluatable = await getPageOrFrame(page, frames);
-
-      const result = await mcpPage.waitForEventsAfterAction(
-        async () => {
-          await performEvaluation(evaluatable, source, format, args, response, {
-            filePath,
-            context,
-          });
-        },
-        {handleDialog: dialogAction ?? 'accept', waitForStableDom},
-      );
-      response.attachWaitForResult(result);
-    },
-  };
-});
+      },
+    };
+  },
+);
 
 const resolveScriptSource = async (
   inlineSource: string | undefined,

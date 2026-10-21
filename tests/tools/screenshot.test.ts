@@ -13,6 +13,7 @@ import sinon from 'sinon';
 
 import type {ParsedArguments} from '../../src/config/ConfigParser.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {zod} from '../../src/third_party/index.js';
 import {screenshot} from '../../src/tools/screenshot.js';
 import {resolveCanonicalPath} from '../../src/utils/files.js';
 import {createHandlerMocks, createMockElementHandle} from '../mocks.js';
@@ -511,7 +512,7 @@ describe('screenshot', () => {
         // No explicit format passed: zod should apply the CLI-driven default.
         await tool.handler(
           {
-            params: {format: tool.schema.format.parse(undefined)},
+            params: {format: zod.object(tool.schema).parse({}).format},
             page: context.getSelectedMcpPage(),
           },
           response,
@@ -525,7 +526,7 @@ describe('screenshot', () => {
 
     it('keeps "png" as default format when no CLI override is set', async () => {
       const tool = screenshot({} as ParsedArguments);
-      assert.equal(tool.schema.format.parse(undefined), 'png');
+      assert.equal(zod.object(tool.schema).parse({}).format, 'png');
     });
 
     it('downscales viewport screenshot when screenshotMaxWidth is set', async () => {
