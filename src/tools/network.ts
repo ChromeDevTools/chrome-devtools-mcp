@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {ParsedArguments} from '../config/ConfigParser.js';
 import {zod} from '../third_party/index.js';
 import type {ResourceType} from '../third_party/index.js';
 
@@ -32,7 +33,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [ResourceType, ...ResourceType[]] = [
   'other',
 ];
 
-export const listNetworkRequests = definePageTool(() => ({
+export const listNetworkRequests = definePageTool((args: ParsedArguments) => ({
   name: 'list_network_requests',
   description: `Lists the most recent requests for the target page since the last navigation.`,
   annotations: {
@@ -67,7 +68,7 @@ export const listNetworkRequests = definePageTool(() => ({
       .default(false)
       .optional()
       .describe(
-        'Set to true to return the preserved requests over the last 3 navigations.',
+        `Set to true to return the preserved requests over the last ${args.maxNavigationSaved} navigations.`,
       ),
   },
   blockedByDialog: false,

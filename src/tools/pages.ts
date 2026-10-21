@@ -352,7 +352,7 @@ export const navigatePage = definePageTool((args: ParsedArguments) => {
 
 export const resizePage = definePageTool(() => ({
   name: 'resize_page',
-  description: `Resizes the page's window so that the page has specified dimension`,
+  description: `Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -366,27 +366,17 @@ export const resizePage = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
+    const {width, height} = request.params;
 
-    try {
-      const browser = page.pptrPage.browser();
-      const windowId = await page.pptrPage.windowId();
-
-      const bounds = await browser.getWindowBounds(windowId);
-
-      if (bounds.windowState === 'fullscreen') {
-        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      } else if (bounds.windowState !== 'normal') {
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      }
-    } catch {
-      // Window APIs are not supported on all platforms
+    const actualSize = await page.resize(width, height);
+    if (
+      actualSize &&
+      (actualSize.width !== width || actualSize.height !== height)
+    ) {
+      response.appendResponseLine(
+        `Requested ${width}x${height}, page is ${actualSize.width}x${actualSize.height}`,
+      );
     }
-    await page.pptrPage.resize({
-      contentWidth: request.params.width,
-      contentHeight: request.params.height,
-    });
 
     response.setIncludePages(true);
   },

@@ -358,20 +358,26 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(page);
-      this.#consoleCollector = new ConsoleCollector(page, collect => {
-        return {
-          console: event => {
-            collect(event);
-          },
-          uncaughtError: event => {
-            collect(event);
-          },
-          devtoolsAggregatedIssue: event => {
-            collect(event);
-          },
-        };
+      this.#networkCollector = new NetworkCollector(page, {
+        maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
       });
+      this.#consoleCollector = new ConsoleCollector(
+        page,
+        collect => {
+          return {
+            console: event => {
+              collect(event);
+            },
+            uncaughtError: event => {
+              collect(event);
+            },
+            devtoolsAggregatedIssue: event => {
+              collect(event);
+            },
+          };
+        },
+        {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
+      );
     }
     this.updateTimeouts();
     await this.#initDevToolsUniverseNoThrow();
@@ -1545,6 +1551,45 @@ export class McpPage implements ContextPage {
     });
   }
 
+  async resize(
+    width: number,
+    height: number,
+  ): Promise<{width: number; height: number} | undefined> {
+    try {
+      const browser = this.pptrPage.browser();
+      const windowId = await this.pptrPage.windowId();
+      const bounds = await browser.getWindowBounds(windowId);
+
+      if (bounds.windowState === 'fullscreen') {
+        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      } else if (bounds.windowState !== 'normal') {
+        await browser.setWindowBounds(windowId, {windowState: 'normal'});
+      }
+    } catch {
+      // Window APIs are not supported on all platforms
+    }
+    await this.pptrPage.resize({
+      contentWidth: width,
+      contentHeight: height,
+    });
+
+    if (this.getDialog()) {
+      return undefined;
+    }
+
+    // @ts-expect-error internal API
+    const client = this.pptrPage._client();
+    const metrics: Protocol.Page.GetLayoutMetricsResponse = await client.send(
+      'Page.getLayoutMetrics',
+    );
+    return {
+      width: metrics.cssLayoutViewport.clientWidth,
+      height: metrics.cssLayoutViewport.clientHeight,
+    };
+  }
+
   /**
    * We need to ignore favicon request as they make our test flaky
    */
@@ -1552,7 +1597,7 @@ export class McpPage implements ContextPage {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      undefined,
+      {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       collect => {
         return {
           request: req => {

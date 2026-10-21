@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {DEFAULT_MAX_NAVIGATION_SAVED} from '../collectors/constants.js';
 import type {YargsOptions} from '../third_party/index.js';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,6 +23,9 @@ export interface McpOption extends YargsOptions {
 }
 
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+// Each retained navigation can hold up to 1,000 network requests and 10,000
+// console messages, so the history is capped to avoid running out of memory.
+export const MAX_NAVIGATION_SAVED_LIMIT = 25;
 
 export const mcpOptions = {
   ...getCategoryOptions(),
@@ -169,6 +173,26 @@ export const mcpOptions = {
     describe:
       'Whether to enable source maps in DevTools. Use --no-source-maps to disable.',
     reloadable: true,
+  },
+  maxNavigationSaved: {
+    type: 'number',
+    default: DEFAULT_MAX_NAVIGATION_SAVED,
+    describe: `Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.`,
+    coerce: (value: number | undefined) => {
+      if (value === undefined) {
+        return;
+      }
+      if (
+        !Number.isInteger(value) ||
+        value <= 0 ||
+        value > MAX_NAVIGATION_SAVED_LIMIT
+      ) {
+        throw new Error(
+          `Invalid maxNavigationSaved ${value}. Expected an integer between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}.`,
+        );
+      }
+      return value;
+    },
   },
   clearcutEndpoint: {
     type: 'string',

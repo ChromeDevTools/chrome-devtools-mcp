@@ -480,6 +480,10 @@
     "flagType": "boolean"
   },
   {
+    "name": "max_navigation_saved_present",
+    "flagType": "boolean"
+  },
+  {
     "name": "category_webauthn_present",
     "flagType": "boolean"
   },
