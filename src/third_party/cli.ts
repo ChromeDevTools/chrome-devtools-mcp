@@ -33,4 +33,4 @@ export {PipeTransport} from 'puppeteer-core/internal/node/PipeTransport.js';
  * Node versions. Import this instead of using the global so the import
  * also installs the polyfill.
  */
-export const URLPattern = globalThis.URLPattern;
+export const URLPattern: typeof globalThis.URLPattern = globalThis.URLPattern;

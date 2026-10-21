@@ -692,13 +692,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
-Name: marked
-URL: https://marked.js.org
-Version: <VERSION>
-License: MIT
-
--------------------- DEPENDENCY DIVIDER --------------------
-
 Name: cliui
 URL: yargs/cliui
 Version: <VERSION>
@@ -1236,8 +1229,70 @@ License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
-Name: diff
-License:
+Name: acorn
+URL: https://github.com/acornjs/acorn
+Version: <VERSION>
+License: MIT
+
+MIT License
+
+Copyright (C) 2012-2022 by various contributors (see AUTHORS)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+-------------------- DEPENDENCY DIVIDER --------------------
+
+Name: CodeMirror
+URL: https://github.com/codemirror/CodeMirror/
+Version: <VERSION>
+License: MIT
+
+MIT License
+
+Copyright (C) 2017 by Marijn Haverbeke <marijnh@gmail.com> and others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+-------------------- DEPENDENCY DIVIDER --------------------
+
+Name: diff-match-patch
+URL: https://github.com/google/diff-match-patch/tree/master/javascript
+Version: <VERSION>
+License: Apache-2.0
 
 
                                  Apache License
@@ -1445,7 +1500,9 @@ License:
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: i18n
-License:
+URL: https://github.com/GoogleChrome/lighthouse
+Version: <VERSION>
+License: Apache-2.0
 
 
                                  Apache License
@@ -1654,7 +1711,9 @@ License:
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: intl-messageformat
-License:
+URL: https://github.com/formatjs/formatjs
+Version: <VERSION>
+License: BSD-3-Clause
 
 Copyright (c) 2019, Oath Inc.
 
@@ -1694,7 +1753,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: legacy-javascript
-License:
+URL: https://github.com/GoogleChrome/lighthouse/tree/main/core/lib/legacy-javascript
+Version: <VERSION>
+License: Apache-2.0
 
 
                                  Apache License
@@ -1903,7 +1964,9 @@ License:
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: marked
-License:
+URL: https://github.com/markedjs/marked
+Version: <VERSION>
+License: BSD-3-Clause, MIT
 
 ## Marked
 
@@ -1949,7 +2012,9 @@ out of the use of this software, even if advised of the possibility of such dama
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: source-map-scopes-codec
-License:
+URL: https://github.com/ChromeDevTools/source-map-scopes-codec
+Version: <VERSION>
+License: BSD-3-Clause
 
 Copyright 2025 The Chromium Authors
 
@@ -1981,7 +2046,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: third-party-web
-License:
+URL: https://github.com/patrickhulce/third-party-web
+Version: <VERSION>
+License: MIT
 
 The MIT License (MIT)
 Copyright (c) 2019 Patrick Hulce

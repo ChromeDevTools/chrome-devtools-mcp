@@ -23,7 +23,6 @@
     "noFallthroughCasesInSwitch": true,
     "incremental": true,
     "sourceMap": true,
-    "allowJs": true,
     "preserveConstEnums": true,
     "useUnknownInCatchVariables": false
   },
@@ -102,8 +101,5 @@
     "third_party/devtools-frontend/front_end/third_party/puppeteer-legacy/**",
     "third_party/devtools-frontend/front_end/panels/recorder/**",
     "third_party/devtools-frontend/front_end/services/puppeteer/**"
-  ],
-  "files": [
-    "third_party/devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
   ]
 }
