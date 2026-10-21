@@ -570,7 +570,12 @@
   },
   {
     "name": "screenshot",
-    "args": []
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
   },
   {
     "name": "select_page",
