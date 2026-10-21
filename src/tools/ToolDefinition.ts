@@ -317,6 +317,9 @@ export interface Response {
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
   attachConsoleMessage(msgid: number): void;
+  attachWebAuthnAuthenticators(
+    authenticators: WebAuthnAuthenticatorState[],
+  ): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
@@ -523,7 +526,6 @@ export type ContextPage = Readonly<{
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
-  getWebAuthnAuthenticatorIds(): string[];
   configureWebAuthn(
     authenticators: WebAuthnAuthenticatorConfig[],
   ): Promise<WebAuthnAuthenticatorState[]>;

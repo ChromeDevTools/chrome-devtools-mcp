@@ -12,16 +12,19 @@ import sinon from 'sinon';
 
 import type {McpContext} from '../../src/McpContext.js';
 import type {McpResponse} from '../../src/McpResponse.js';
-import type {WebAuthnAuthenticatorConfig} from '../../src/tools/ToolDefinition.js';
+import type {
+  WebAuthnAuthenticatorConfig,
+  WebAuthnAuthenticatorState,
+} from '../../src/tools/ToolDefinition.js';
 import {configureWebAuthn} from '../../src/tools/webauthn.js';
 import {createHandlerMocks} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('configure_webauthn', () => {
-  it('applies the authenticators and lists them without private keys', async () => {
+  it('applies the authenticators and attaches the result', async () => {
     const {page, context, response, args} = createHandlerMocks();
-    page.configureWebAuthn.resolves([
+    const states: WebAuthnAuthenticatorState[] = [
       {
         id: 'auth-1',
         protocol: 'ctap2',
@@ -39,7 +42,8 @@ describe('configure_webauthn', () => {
           },
         ],
       },
-    ]);
+    ];
+    page.configureWebAuthn.resolves(states);
 
     const authenticators = (): WebAuthnAuthenticatorConfig[] => [
       {
@@ -63,35 +67,9 @@ describe('configure_webauthn', () => {
       page.configureWebAuthn,
       authenticators(),
     );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.firstCall,
-      '## Virtual authenticators',
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.secondCall,
-      '- auth-1: protocol=ctap2, transport=usb, hasResidentKey=true, hasUserVerification=true, isUserVerified=true',
-    );
-    sinon.assert.calledWithExactly(
-      response.appendResponseLine.thirdCall,
-      '  - credentialId=Y3JlZA==, rpId=example.com, discoverable=true, signCount=0, userName=alice',
-    );
-    sinon.assert.calledThrice(response.appendResponseLine);
-  });
-
-  it('reports when no authenticators remain', async () => {
-    const {page, context, response, args} = createHandlerMocks();
-    page.configureWebAuthn.resolves([]);
-
-    await configureWebAuthn(args).handler(
-      {params: {authenticators: []}, page},
-      response,
-      context,
-    );
-
-    sinon.assert.calledOnceWithExactly(page.configureWebAuthn, []);
     sinon.assert.calledOnceWithExactly(
-      response.appendResponseLine,
-      'No virtual authenticators on this page.',
+      response.attachWebAuthnAuthenticators,
+      states,
     );
   });
 });
@@ -144,13 +122,15 @@ async function configure(
     ReturnType<typeof configureWebAuthn>['handler']
   >[0]['params']['authenticators'],
 ): Promise<string[]> {
-  response.resetResponseLineForTesting();
   await configureWebAuthn(args).handler(
     {params: {authenticators}, page: context.getSelectedMcpPage()},
     response,
     context,
   );
-  return [...response.responseLines];
+  const {content} = await response.handle(context);
+  const text = content.find(item => item.type === 'text');
+  assert.ok(text?.type === 'text');
+  return text.text.split('\n');
 }
 
 function authenticatorIdFrom(lines: string[]): string {

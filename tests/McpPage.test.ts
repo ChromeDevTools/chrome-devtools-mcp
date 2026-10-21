@@ -2415,5 +2415,71 @@ describe('McpPage', () => {
         /rejected credentials "bad"/,
       );
     });
+
+    describe('in a browser', () => {
+      const server = serverHooks();
+
+      it('keeps a passkey the page registered and removes it with the authenticator', async () => {
+        server.addHtmlRoute(
+          '/passkey.html',
+          html`<script>
+            window.register = async () => {
+              const credential = await navigator.credentials.create({
+                publicKey: {
+                  challenge: new Uint8Array(32),
+                  rp: {name: 'Test'},
+                  user: {
+                    id: new Uint8Array([1, 2, 3, 4]),
+                    name: 'alice@example.com',
+                    displayName: 'Alice',
+                  },
+                  pubKeyCredParams: [{type: 'public-key', alg: -7}],
+                  authenticatorSelection: {residentKey: 'required'},
+                },
+              });
+              return credential.id;
+            };
+          </script>`,
+        );
+
+        await withMcpContext(async (_response, context) => {
+          const mcpPage = context.getSelectedMcpPage();
+          // WebAuthn rejects IP addresses as relying party ids.
+          await mcpPage.pptrPage.goto(
+            server
+              .getRoute('/passkey.html')
+              .replace('//127.0.0.1:', '//localhost:'),
+          );
+
+          const [created] = await mcpPage.configureWebAuthn([
+            {transport: 'usb'},
+          ]);
+          assert.ok(created);
+          assert.strictEqual(created.transport, 'usb');
+          assert.deepStrictEqual(created.credentials, []);
+          assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticatorIds(), [
+            created.id,
+          ]);
+
+          const credentialId = await mcpPage.pptrPage.evaluate(() =>
+            // @ts-expect-error defined by the test page
+            window.register(),
+          );
+          const [kept] = await mcpPage.configureWebAuthn([{id: created.id}]);
+          assert.strictEqual(kept?.id, created.id);
+          assert.strictEqual(kept.credentials.length, 1);
+          assert.strictEqual(
+            Buffer.from(kept.credentials[0]!.credentialId, 'base64').toString(
+              'base64url',
+            ),
+            credentialId,
+          );
+          assert.strictEqual(kept.credentials[0]!.rpId, 'localhost');
+
+          assert.deepStrictEqual(await mcpPage.configureWebAuthn([]), []);
+          assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticatorIds(), []);
+        });
+      });
+    });
   });
 });

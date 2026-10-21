@@ -103,34 +103,8 @@ export const configureWebAuthn = definePageTool(() => ({
   concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    const authenticators = await request.page.configureWebAuthn(
-      request.params.authenticators,
+    response.attachWebAuthnAuthenticators(
+      await request.page.configureWebAuthn(request.params.authenticators),
     );
-    if (!authenticators.length) {
-      response.appendResponseLine('No virtual authenticators on this page.');
-      return;
-    }
-    response.appendResponseLine('## Virtual authenticators');
-    for (const authenticator of authenticators) {
-      response.appendResponseLine(
-        `- ${authenticator.id}: protocol=${authenticator.protocol}, transport=${authenticator.transport}, hasResidentKey=${authenticator.hasResidentKey}, hasUserVerification=${authenticator.hasUserVerification}, isUserVerified=${authenticator.isUserVerified}`,
-      );
-      if (!authenticator.credentials.length) {
-        response.appendResponseLine('  No credentials.');
-        continue;
-      }
-      for (const credential of authenticator.credentials) {
-        const fields = [
-          `credentialId=${credential.credentialId}`,
-          `rpId=${credential.rpId ?? 'unknown'}`,
-          `discoverable=${credential.isResidentCredential}`,
-          `signCount=${credential.signCount}`,
-        ];
-        if (credential.userName) {
-          fields.push(`userName=${credential.userName}`);
-        }
-        response.appendResponseLine(`  - ${fields.join(', ')}`);
-      }
-    }
   },
 }));

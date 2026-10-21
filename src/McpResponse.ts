@@ -31,6 +31,7 @@ import {
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
+import {WebAuthnFormatter} from './formatters/WebAuthnFormatter.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -62,6 +63,7 @@ import type {
   MatchedStyles,
   Response,
   SnapshotParams,
+  WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import {
   type InsightName,
@@ -155,6 +157,7 @@ export class McpResponse implements Response {
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
+  #webAuthnAuthenticators?: WebAuthnAuthenticatorState[];
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -297,6 +300,12 @@ export class McpResponse implements Response {
 
   attachConsoleMessage(msgid: number): void {
     this.#attachedConsoleMessageId = msgid;
+  }
+
+  attachWebAuthnAuthenticators(
+    authenticators: WebAuthnAuthenticatorState[],
+  ): void {
+    this.#webAuthnAuthenticators = authenticators;
   }
 
   attachTraceSummary(result: TraceResult): void {
@@ -939,6 +948,7 @@ export class McpResponse implements Response {
       comments?: StructuredCommentThread[];
       commentsSnapshotRegenerated?: 'standard' | 'verbose';
       matchedStyles?: object;
+      webauthnAuthenticators?: WebAuthnAuthenticatorState[];
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1737,6 +1747,16 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
         structuredContent.commentsSnapshotRegenerated =
           data.commentsSnapshotRegenerated;
       }
+    }
+
+    if (this.#webAuthnAuthenticators) {
+      const formatter = new WebAuthnFormatter(this.#webAuthnAuthenticators);
+      structuredContent.webauthnAuthenticators = formatter.toJSON();
+      response.push(
+        compactEncode
+          ? compactEncode(structuredContent.webauthnAuthenticators)
+          : formatter.toString(),
+      );
     }
 
     if (this.#cssStylesData) {
