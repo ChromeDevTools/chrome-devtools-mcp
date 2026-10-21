@@ -180,7 +180,7 @@ Get a verbose snapshot to include all elements if you are interested in the sele
         }
       } else if (attr === 'url' && typeof value === 'string') {
         // Keep other URLs whole: the snapshot is their only full copy.
-        result[attr] = /^data:/i.test(value) ? truncateUrl(value) : value;
+        result[attr] = value.startsWith('data:') ? truncateUrl(value) : value;
       } else if (typeof value === 'string' || typeof value === 'number') {
         result[attr] = value;
       }
