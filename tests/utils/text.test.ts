@@ -7,7 +7,7 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
-import {truncateText} from '../../src/utils/text.js';
+import {truncateText, truncateUrl} from '../../src/utils/text.js';
 
 const EMOJI = '\u{1F600}';
 // Family emoji: four code points joined with zero-width joiners.
@@ -73,5 +73,17 @@ describe('truncateText', () => {
 
   it('returns only the ellipsis for a zero limit', () => {
     assert.strictEqual(truncateText('abc', 0), '...');
+  });
+});
+
+describe('truncateUrl', () => {
+  it('returns a URL within 255 characters unchanged', () => {
+    const url = 'https://example.com/' + 'a'.repeat(235);
+    assert.strictEqual(truncateUrl(url), url);
+  });
+
+  it('cuts a long data URL at 255 characters', () => {
+    const url = 'data:image/png;base64,' + 'A'.repeat(5000);
+    assert.strictEqual(truncateUrl(url), url.slice(0, 255) + '... <truncated>');
   });
 });

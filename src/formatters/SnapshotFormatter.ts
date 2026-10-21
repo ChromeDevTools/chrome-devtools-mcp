@@ -6,6 +6,7 @@
 
 import type {TextSnapshot} from '../TextSnapshot.js';
 import type {TextSnapshotNode} from '../types.js';
+import {truncateUrl} from '../utils/text.js';
 
 export class SnapshotFormatter {
   #snapshot: TextSnapshot;
@@ -177,6 +178,8 @@ Get a verbose snapshot to include all elements if you are interested in the sele
         if (value) {
           result[attr] = true;
         }
+      } else if (attr === 'url' && typeof value === 'string') {
+        result[attr] = truncateUrl(value);
       } else if (typeof value === 'string' || typeof value === 'number') {
         result[attr] = value;
       }
