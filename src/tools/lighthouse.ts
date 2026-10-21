@@ -23,6 +23,7 @@ import {
   definePageTool,
   type LighthouseAuditNode,
   type LighthouseFailedAudit,
+  type PageToolFactory,
 } from './ToolDefinition.js';
 
 // Kept in sync with `constants.userAgents` in Lighthouse's
@@ -165,174 +166,176 @@ const getFailedAudits = (lhr: Result): LighthouseFailedAudit[] => {
   return failedAudits;
 };
 
-export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
-  name: 'lighthouse_audit',
-  description: `Get Lighthouse scores, failing audits, and the DOM nodes they flag for accessibility, SEO, best practices, and agentic browsing. Full reports are saved to disk. This excludes performance. For performance audits, run ${startTrace(args).name}`,
-  annotations: {
-    category: ToolCategory.DEBUGGING,
-    readOnlyHint: false,
-  },
-  schema: {
-    mode: zod
-      .enum(['navigation', 'snapshot'])
-      .default('navigation')
-      .describe(
-        '"navigation" reloads & audits. "snapshot" analyzes current state.',
-      ),
-    device: zod
-      .enum(['desktop', 'mobile'])
-      .default('desktop')
-      .describe('Device to emulate.'),
-    outputDirPath: zod
-      .string()
-      .optional()
-      .describe('Directory for reports. If omitted, uses temporary files.'),
-  },
-  blockedByDialog: true,
-  concurrency: 'exclusive',
-  verifyFilesSchema: {
-    outputDirPath: true,
-  },
-  handler: async (request, response, context) => {
-    const page = request.page;
-    const categories = [
-      'accessibility',
-      'seo',
-      'best-practices',
-      'agentic-browsing',
-    ];
-    const formats: OutputMode[] = ['json', 'html'];
-    const {
-      mode = 'navigation',
-      device = 'desktop',
-      outputDirPath,
-    } = request.params;
+export const lighthouseAudit: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => ({
+    name: 'lighthouse_audit',
+    description: `Get Lighthouse scores, failing audits, and the DOM nodes they flag for accessibility, SEO, best practices, and agentic browsing. Full reports are saved to disk. This excludes performance. For performance audits, run ${startTrace(args).name}`,
+    annotations: {
+      category: ToolCategory.DEBUGGING,
+      readOnlyHint: false,
+    },
+    schema: {
+      mode: zod
+        .enum(['navigation', 'snapshot'])
+        .default('navigation')
+        .describe(
+          '"navigation" reloads & audits. "snapshot" analyzes current state.',
+        ),
+      device: zod
+        .enum(['desktop', 'mobile'])
+        .default('desktop')
+        .describe('Device to emulate.'),
+      outputDirPath: zod
+        .string()
+        .optional()
+        .describe('Directory for reports. If omitted, uses temporary files.'),
+    },
+    blockedByDialog: true,
+    concurrency: 'exclusive',
+    verifyFilesSchema: {
+      outputDirPath: true,
+    },
+    handler: async (request, response, context) => {
+      const page = request.page;
+      const categories = [
+        'accessibility',
+        'seo',
+        'best-practices',
+        'agentic-browsing',
+      ];
+      const formats: OutputMode[] = ['json', 'html'];
+      const {
+        mode = 'navigation',
+        device = 'desktop',
+        outputDirPath,
+      } = request.params;
 
-    const flags: Flags = {
-      onlyCategories: categories,
-      output: formats,
-      // Default 30 second timeout for page load.
-      maxWaitForLoad: 30_000,
-    };
-
-    if (device === 'desktop') {
-      flags.formFactor = 'desktop';
-      flags.screenEmulation = {
-        mobile: false,
-        width: 1350,
-        height: 940,
-        deviceScaleFactor: 1,
-        disabled: false,
+      const flags: Flags = {
+        onlyCategories: categories,
+        output: formats,
+        // Default 30 second timeout for page load.
+        maxWaitForLoad: 30_000,
       };
-      flags.emulatedUserAgent = DESKTOP_USER_AGENT;
-    } else {
-      flags.formFactor = 'mobile';
-      flags.screenEmulation = {
-        mobile: true,
-        width: 412,
-        height: 823,
-        deviceScaleFactor: 1.75,
-        disabled: false,
-      };
-      flags.emulatedUserAgent = MOBILE_USER_AGENT;
-    }
 
-    let result: RunnerResult | undefined;
-    try {
-      if (mode === 'navigation') {
-        try {
-          result = await page.lighthouseNavigation(flags);
-        } catch (error) {
-          if (isInvalidUrlError(error)) {
-            const url = page.pptrPage.url();
-            throw new Error(
-              `Lighthouse "navigation" mode cannot audit ${url}: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.`,
-              {cause: error},
-            );
-          }
-          throw error;
-        }
+      if (device === 'desktop') {
+        flags.formFactor = 'desktop';
+        flags.screenEmulation = {
+          mobile: false,
+          width: 1350,
+          height: 940,
+          deviceScaleFactor: 1,
+          disabled: false,
+        };
+        flags.emulatedUserAgent = DESKTOP_USER_AGENT;
       } else {
-        result = await page.lighthouseSnapshot(flags);
+        flags.formFactor = 'mobile';
+        flags.screenEmulation = {
+          mobile: true,
+          width: 412,
+          height: 823,
+          deviceScaleFactor: 1.75,
+          disabled: false,
+        };
+        flags.emulatedUserAgent = MOBILE_USER_AGENT;
       }
 
-      if (!result) {
-        throw new Error('Lighthouse audit failed.');
+      let result: RunnerResult | undefined;
+      try {
+        if (mode === 'navigation') {
+          try {
+            result = await page.lighthouseNavigation(flags);
+          } catch (error) {
+            if (isInvalidUrlError(error)) {
+              const url = page.pptrPage.url();
+              throw new Error(
+                `Lighthouse "navigation" mode cannot audit ${url}: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.`,
+                {cause: error},
+              );
+            }
+            throw error;
+          }
+        } else {
+          result = await page.lighthouseSnapshot(flags);
+        }
+
+        if (!result) {
+          throw new Error('Lighthouse audit failed.');
+        }
+      } finally {
+        await page.restoreEmulation();
       }
-    } finally {
-      await page.restoreEmulation();
-    }
 
-    const lhr = result.lhr;
-    const reportPaths: string[] = [];
+      const lhr = result.lhr;
+      const reportPaths: string[] = [];
 
-    const encoder = new TextEncoder();
-    const savePromises = formats.map(async format => {
-      const report = await generateReport(lhr, format);
-      const data = encoder.encode(report);
-      if (outputDirPath) {
-        const reportPath = path.join(outputDirPath, `report`);
-        const {filename} = await context.saveFile(
+      const encoder = new TextEncoder();
+      const savePromises = formats.map(async format => {
+        const report = await generateReport(lhr, format);
+        const data = encoder.encode(report);
+        if (outputDirPath) {
+          const reportPath = path.join(outputDirPath, `report`);
+          const {filename} = await context.saveFile(
+            data,
+            reportPath,
+            `.${format}`,
+          );
+          return filename;
+        }
+        const {filepath} = await context.saveTemporaryFile(
           data,
-          reportPath,
-          `.${format}`,
+          `report.${format}`,
         );
-        return filename;
+        return filepath;
+      });
+
+      const results = await Promise.allSettled(savePromises);
+      for (const res of results) {
+        if (res.status === 'rejected') {
+          throw res.reason;
+        }
+        reportPaths.push(res.value);
       }
-      const {filepath} = await context.saveTemporaryFile(
-        data,
-        `report.${format}`,
-      );
-      return filepath;
-    });
 
-    const results = await Promise.allSettled(savePromises);
-    for (const res of results) {
-      if (res.status === 'rejected') {
-        throw res.reason;
+      // Lighthouse sets runtimeError when it could not load the page; the categories are unscored.
+      if (lhr.runtimeError) {
+        throw new Error(
+          `Lighthouse could not audit the page (${lhr.runtimeError.code}): ${lhr.runtimeError.message} Reports: ${reportPaths.join(', ')}`,
+        );
       }
-      reportPaths.push(res.value);
-    }
 
-    // Lighthouse sets runtimeError when it could not load the page; the categories are unscored.
-    if (lhr.runtimeError) {
-      throw new Error(
-        `Lighthouse could not audit the page (${lhr.runtimeError.code}): ${lhr.runtimeError.message} Reports: ${reportPaths.join(', ')}`,
-      );
-    }
+      const categoryScores = Object.values(lhr.categories).map(c => ({
+        id: c.id,
+        title: c.title,
+        score: c.score,
+      }));
 
-    const categoryScores = Object.values(lhr.categories).map(c => ({
-      id: c.id,
-      title: c.title,
-      score: c.score,
-    }));
+      const failedAudits = getFailedAudits(lhr);
 
-    const failedAudits = getFailedAudits(lhr);
+      const passedAudits = Object.values(lhr.audits).filter(
+        a => a.score === 1,
+      ).length;
 
-    const passedAudits = Object.values(lhr.audits).filter(
-      a => a.score === 1,
-    ).length;
-
-    const output = {
-      summary: {
-        mode,
-        device,
-        // `mainDocumentUrl` is only set for navigations, whereas
-        // `finalDisplayedUrl` is populated for every gather mode.
-        url: lhr.finalDisplayedUrl,
-        scores: categoryScores,
-        audits: {
-          failed: failedAudits.length,
-          passed: passedAudits,
+      const output = {
+        summary: {
+          mode,
+          device,
+          // `mainDocumentUrl` is only set for navigations, whereas
+          // `finalDisplayedUrl` is populated for every gather mode.
+          url: lhr.finalDisplayedUrl,
+          scores: categoryScores,
+          audits: {
+            failed: failedAudits.length,
+            passed: passedAudits,
+          },
+          timing: {
+            total: lhr.timing.total,
+          },
         },
-        timing: {
-          total: lhr.timing.total,
-        },
-      },
-      failedAudits,
-      reports: reportPaths,
-    };
+        failedAudits,
+        reports: reportPaths,
+      };
 
-    response.attachLighthouseResult(output);
-  },
-}));
+      response.attachLighthouseResult(output);
+    },
+  }),
+);

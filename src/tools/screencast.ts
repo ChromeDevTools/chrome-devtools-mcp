@@ -18,7 +18,7 @@ import type {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 async function generateTempFilePath(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
@@ -70,104 +70,106 @@ async function getPagePixelSize(
   };
 }
 
-export const startScreencast = definePageTool((args: ParsedArguments) => ({
-  name: 'screencast_start',
-  description: `Starts recording a screencast (video) of the target page.`,
-  annotations: {
-    category: ToolCategory.DEBUGGING,
-    readOnlyHint: false,
-  },
-  schema: {
-    filePath: zod
-      .string()
-      .optional()
-      .describe(
-        args?.experimentalScreencast
-          ? `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`
-          : 'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.',
-      ),
-  },
-  blockedByDialog: false,
-  concurrency: 'exclusive',
-  verifyFilesSchema: {
-    filePath: true,
-  },
-  handler: async (request, response, context) => {
-    const page = request.page;
-    if (page.getScreenRecorder() !== null) {
-      response.appendResponseLine(
-        'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
-      );
-      return;
-    }
-
-    const requestedFilePath = request.params.filePath;
-    const filePath = requestedFilePath ?? (await generateTempFilePath());
-
-    // The built-in Chrome recorder (page.record) always produces mp4. The
-    // legacy ffmpeg recorder (page.screencast) also supports WebM.
-    const useLegacy = Boolean(args?.experimentalScreencast);
-    const extension = useLegacy ? getLegacyExtension(filePath) : '.mp4';
-    const resolvedPath = await context.ensureExtension(filePath, extension);
-
-    let recorder: ScreenRecorder | ScreenRecording;
-    try {
-      if (useLegacy) {
-        const format: VideoFormat = extension === '.webm' ? 'webm' : 'mp4';
-        recorder = await page.pptrPage.screencast({
-          path: resolvedPath,
-          format,
-          ffmpegPath: args?.experimentalFfmpegPath,
-          fps: args?.screencastFps,
-        });
-      } else {
-        // Without explicit limits Chrome downscales frames to a small default
-        // size. Record at the actual device pixel size of the page instead.
-        const {maxWidth, maxHeight} = await getPagePixelSize(page.pptrPage);
-        recorder = await page.pptrPage.record({
-          path: resolvedPath,
-          fps: args?.screencastFps,
-          maxWidth,
-          maxHeight,
-        });
+export const startScreencast: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => ({
+    name: 'screencast_start',
+    description: `Starts recording a screencast (video) of the target page.`,
+    annotations: {
+      category: ToolCategory.DEBUGGING,
+      readOnlyHint: false,
+    },
+    schema: {
+      filePath: zod
+        .string()
+        .optional()
+        .describe(
+          args?.experimentalScreencast
+            ? `Output file path (${supportedExtensions.join(',')} are supported). Uses mkdtemp to generate a unique path if not provided.`
+            : 'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.',
+        ),
+    },
+    blockedByDialog: false,
+    concurrency: 'exclusive',
+    verifyFilesSchema: {
+      filePath: true,
+    },
+    handler: async (request, response, context) => {
+      const page = request.page;
+      if (page.getScreenRecorder() !== null) {
+        response.appendResponseLine(
+          'Error: a screencast recording is already in progress. Use screencast_stop to stop it before starting a new one.',
+        );
+        return;
       }
-    } catch (err) {
-      // If we generated a temporary directory for this recording, remove it so
-      // a failed start (e.g. ffmpeg missing) does not leak an empty directory.
-      if (requestedFilePath === undefined) {
-        try {
-          await fs.rm(path.dirname(resolvedPath), {
-            recursive: true,
-            force: true,
+
+      const requestedFilePath = request.params.filePath;
+      const filePath = requestedFilePath ?? (await generateTempFilePath());
+
+      // The built-in Chrome recorder (page.record) always produces mp4. The
+      // legacy ffmpeg recorder (page.screencast) also supports WebM.
+      const useLegacy = Boolean(args?.experimentalScreencast);
+      const extension = useLegacy ? getLegacyExtension(filePath) : '.mp4';
+      const resolvedPath = await context.ensureExtension(filePath, extension);
+
+      let recorder: ScreenRecorder | ScreenRecording;
+      try {
+        if (useLegacy) {
+          const format: VideoFormat = extension === '.webm' ? 'webm' : 'mp4';
+          recorder = await page.pptrPage.screencast({
+            path: resolvedPath,
+            format,
+            ffmpegPath: args?.experimentalFfmpegPath,
+            fps: args?.screencastFps,
           });
-        } catch {
-          // no-op
+        } else {
+          // Without explicit limits Chrome downscales frames to a small default
+          // size. Record at the actual device pixel size of the page instead.
+          const {maxWidth, maxHeight} = await getPagePixelSize(page.pptrPage);
+          recorder = await page.pptrPage.record({
+            path: resolvedPath,
+            fps: args?.screencastFps,
+            maxWidth,
+            maxHeight,
+          });
         }
+      } catch (err) {
+        // If we generated a temporary directory for this recording, remove it so
+        // a failed start (e.g. ffmpeg missing) does not leak an empty directory.
+        if (requestedFilePath === undefined) {
+          try {
+            await fs.rm(path.dirname(resolvedPath), {
+              recursive: true,
+              force: true,
+            });
+          } catch {
+            // no-op
+          }
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('ENOENT') && message.includes('ffmpeg')) {
+          throw new Error(
+            'ffmpeg is required for screencast recording but was not found. ' +
+              'Install ffmpeg (https://ffmpeg.org/) and ensure it is available in your PATH.',
+          );
+        }
+        if (message.includes('Page.startScreenRecording')) {
+          throw new Error(
+            'The connected Chrome does not support screen recording. Update Chrome to a newer version.',
+          );
+        }
+        throw err;
       }
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes('ENOENT') && message.includes('ffmpeg')) {
-        throw new Error(
-          'ffmpeg is required for screencast recording but was not found. ' +
-            'Install ffmpeg (https://ffmpeg.org/) and ensure it is available in your PATH.',
-        );
-      }
-      if (message.includes('Page.startScreenRecording')) {
-        throw new Error(
-          'The connected Chrome does not support screen recording. Update Chrome to a newer version.',
-        );
-      }
-      throw err;
-    }
 
-    page.setScreenRecorder({recorder, filePath: resolvedPath});
+      page.setScreenRecorder({recorder, filePath: resolvedPath});
 
-    response.appendResponseLine(
-      `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast(args).name} to stop recording.`,
-    );
-  },
-}));
+      response.appendResponseLine(
+        `Screencast recording started. The recording will be saved to ${resolvedPath}. Use ${stopScreencast(args).name} to stop recording.`,
+      );
+    },
+  }),
+);
 
-export const stopScreencast = definePageTool(() => ({
+export const stopScreencast: PageToolFactory = definePageTool(() => ({
   name: 'screencast_stop',
   description: 'Stops the active screencast recording on the target page.',
   annotations: {

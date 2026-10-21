@@ -78,8 +78,6 @@ export type FileVerificationOption =
       allowUrl?: boolean;
     };
 
-type AllKeys<T> = T extends unknown ? keyof T : never;
-
 /**
  * Which task queue `ToolHandler` runs a tool call on. A task on a queue
  * waits for tasks on the same queue, on its parent, and on its children.
@@ -99,18 +97,20 @@ type AllKeys<T> = T extends unknown ? keyof T : never;
  */
 export type ToolConcurrency = 'exclusive' | 'page' | 'none';
 
-type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
+type AllKeys<T> = T extends unknown ? keyof T : never;
+
+type SchemaField<Schema, K extends PropertyKey> = Schema extends unknown
   ? K extends keyof Schema
-    ? Exclude<Schema[K], undefined>
-    : never
+    ? Schema[K]
+    : undefined
   : never;
 
-export type MergeSchema<Schema extends zod.ZodRawShape> = {
-  [K in AllKeys<Schema>]: K extends keyof Schema
-    ? undefined extends Schema[K]
-      ? zod.ZodOptional<ExtractSchemaField<Schema, K>>
-      : Schema[K]
-    : zod.ZodOptional<ExtractSchemaField<Schema, K>>;
+export type ToolSchema = Record<string, zod.ZodType>;
+
+type MergeSchema<Schema extends ToolSchema> = {
+  [K in AllKeys<Schema>]: undefined extends SchemaField<Schema, K>
+    ? zod.ZodOptional<Exclude<SchemaField<Schema, K>, undefined>>
+    : SchemaField<Schema, K>;
 };
 
 export interface CapabilityGate {
@@ -118,9 +118,7 @@ export interface CapabilityGate {
   conditions?: Array<keyof ParsedArguments>;
 }
 
-export interface BaseToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
-> {
+export interface BaseToolDefinition<Schema extends ToolSchema = ToolSchema> {
   name: string;
   description: string;
   annotations: {
@@ -144,15 +142,12 @@ export interface BaseToolDefinition<
    * {@link ToolConcurrency}.
    */
   concurrency: ToolConcurrency;
-  verifyFilesSchema: Partial<
-    Record<keyof MergeSchema<Schema>, FileVerificationOption>
-  >;
+  verifyFilesSchema: Partial<Record<AllKeys<Schema>, FileVerificationOption>>;
 }
 
 export interface ToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends ToolSchema = ToolSchema,
 > extends BaseToolDefinition<Schema> {
-  schema: Schema;
   /**
    * Only page-scoped tools are checked for open dialogs by ToolHandler, so a
    * non-page tool must handle dialogs itself.
@@ -170,12 +165,8 @@ export interface ToolDefinition<
   ): Promise<void>;
 }
 
-export type SchemaType<T extends zod.ZodRawShape> = zod.output<
-  zod.ZodObject<MergeSchema<T>>
->;
-
-export interface Request<Schema extends zod.ZodRawShape> {
-  params: SchemaType<Schema>;
+export interface Request<Schema extends ToolSchema> {
+  params: zod.output<zod.ZodObject<MergeSchema<Schema>>>;
 }
 
 export interface ImageContentData {
@@ -551,14 +542,18 @@ export type ContextPage = Readonly<{
   lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
 }>;
 
-export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: (args: ParsedArguments) => ToolDefinition<Schema>,
-): (args: ParsedArguments) => ToolDefinition<Schema> {
+export type ToolFactory<Schema extends ToolSchema = ToolSchema> = (
+  args: ParsedArguments,
+) => ToolDefinition<Schema>;
+
+export function defineTool<Schema extends ToolSchema>(
+  definition: ToolFactory<Schema>,
+): ToolFactory<Schema> {
   return definition;
 }
 
 interface PageToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends ToolSchema = ToolSchema,
 > extends BaseToolDefinition<Schema> {
   /**
    * A page tool with `'none'` must only read page state. Its page lookup and
@@ -572,15 +567,19 @@ interface PageToolDefinition<
   ): Promise<void>;
 }
 
-export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
-  Omit<PageToolDefinition<Schema>, 'schema'> & {
-    schema: Schema & Partial<typeof pageIdSchema>;
-    pageScoped: true;
-  };
+export interface DefinedPageTool<
+  Schema extends ToolSchema = ToolSchema,
+> extends PageToolDefinition<Schema> {
+  pageScoped: true;
+}
 
-export function definePageTool<Schema extends zod.ZodRawShape>(
+export type PageToolFactory<Schema extends ToolSchema = ToolSchema> = (
+  args: ParsedArguments,
+) => DefinedPageTool<Schema>;
+
+export function definePageTool<Schema extends ToolSchema>(
   definition: (args: ParsedArguments) => PageToolDefinition<Schema>,
-): (args: ParsedArguments) => DefinedPageTool<Schema> {
+): PageToolFactory<Schema> {
   return (args: ParsedArguments): DefinedPageTool<Schema> => {
     const tool = definition(args);
     return {
@@ -595,7 +594,7 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
 }
 
 export interface BrowserlessToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends ToolSchema = ToolSchema,
 > extends BaseToolDefinition<Schema> {
   browserless: true;
   /**
@@ -614,18 +613,22 @@ export interface BrowserlessToolDefinition<
   ): Promise<void>;
 }
 
+export type BrowserlessToolFactory<Schema extends ToolSchema = ToolSchema> = (
+  args: ParsedArguments,
+) => BrowserlessToolDefinition<Schema>;
+
 /**
  * Defines a tool that does not need a browser connection, e.g. a tool that only
  * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
  * Such a tool runs without the context queue (`concurrency: 'none'`) unless
  * the definition sets another value.
  */
-export function defineBrowserlessTool<Schema extends zod.ZodRawShape>(
+export function defineBrowserlessTool<Schema extends ToolSchema>(
   definition: (
     args: ParsedArguments,
   ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless' | 'concurrency'> &
     Partial<Pick<BrowserlessToolDefinition<Schema>, 'concurrency'>>,
-): (args: ParsedArguments) => BrowserlessToolDefinition<Schema> {
+): BrowserlessToolFactory<Schema> {
   return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
     return {
       concurrency: 'none',
@@ -653,7 +656,9 @@ export function isBrowserlessTool(
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
-export const pageIdSchema = {
+export const pageIdSchema: {
+  pageId: zod.ZodNumber;
+} = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
@@ -673,7 +678,9 @@ export function zodTransform<Input, Output>(
   };
 }
 
-export const timeoutSchema = {
+export const timeoutSchema: {
+  timeout: zod.ZodOptional<zod.ZodType<number | undefined>>;
+} = {
   timeout: zod
     .number()
     .int()

@@ -2070,7 +2070,7 @@ describe('ToolHandler', () => {
 
   describe('update', () => {
     function createGlobalTool(
-      schema: zod.ZodRawShape,
+      schema: ToolDefinition['schema'],
       handler: ToolDefinition['handler'],
       options: {
         description?: string;
