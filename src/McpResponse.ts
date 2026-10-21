@@ -157,7 +157,7 @@ export class McpResponse implements Response {
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
-  #webAuthnAuthenticators?: WebAuthnAuthenticatorState[];
+  #webAuthnFormatter?: WebAuthnFormatter;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -302,10 +302,10 @@ export class McpResponse implements Response {
     this.#attachedConsoleMessageId = msgid;
   }
 
-  attachWebAuthnAuthenticators(
-    authenticators: WebAuthnAuthenticatorState[],
+  attachWebAuthnAuthenticator(
+    authenticator: WebAuthnAuthenticatorState | undefined,
   ): void {
-    this.#webAuthnAuthenticators = authenticators;
+    this.#webAuthnFormatter = new WebAuthnFormatter(authenticator);
   }
 
   attachTraceSummary(result: TraceResult): void {
@@ -948,7 +948,7 @@ export class McpResponse implements Response {
       comments?: StructuredCommentThread[];
       commentsSnapshotRegenerated?: 'standard' | 'verbose';
       matchedStyles?: object;
-      webauthnAuthenticators?: WebAuthnAuthenticatorState[];
+      webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1749,13 +1749,13 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
       }
     }
 
-    if (this.#webAuthnAuthenticators) {
-      const formatter = new WebAuthnFormatter(this.#webAuthnAuthenticators);
-      structuredContent.webauthnAuthenticators = formatter.toJSON();
+    if (this.#webAuthnFormatter) {
+      structuredContent.webauthnAuthenticator =
+        this.#webAuthnFormatter.toJSON();
       response.push(
         compactEncode
-          ? compactEncode(structuredContent.webauthnAuthenticators)
-          : formatter.toString(),
+          ? compactEncode(structuredContent.webauthnAuthenticator)
+          : this.#webAuthnFormatter.toString(),
       );
     }
 
@@ -1908,8 +1908,10 @@ function formatPage(
   };
 }
 function formatWebAuthnLabel(mcpPage: McpPage): string {
-  const ids = mcpPage.getWebAuthnAuthenticatorIds();
-  return ids.length ? ` webauthnAuthenticators=${ids.join(',')}` : '';
+  const authenticator = mcpPage.getWebAuthnAuthenticator();
+  return authenticator
+    ? ` webauthn=${authenticator.protocol}/${authenticator.transport}`
+    : '';
 }
 
 function createStructuredPage(
@@ -1922,7 +1924,7 @@ function createStructuredPage(
   title: string;
   selected: boolean;
   isolatedContext?: string;
-  webauthnAuthenticators?: string[];
+  webauthn?: string;
 } {
   const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
@@ -1932,7 +1934,7 @@ function createStructuredPage(
     title: string;
     selected: boolean;
     isolatedContext?: string;
-    webauthnAuthenticators?: string[];
+    webauthn?: string;
   } = {
     id: mcpPage.id,
     url: mcpPage.url(),
@@ -1942,9 +1944,9 @@ function createStructuredPage(
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
   }
-  const webAuthnAuthenticatorIds = mcpPage.getWebAuthnAuthenticatorIds();
-  if (webAuthnAuthenticatorIds.length) {
-    entry.webauthnAuthenticators = webAuthnAuthenticatorIds;
+  const webAuthnAuthenticator = mcpPage.getWebAuthnAuthenticator();
+  if (webAuthnAuthenticator) {
+    entry.webauthn = `${webAuthnAuthenticator.protocol}/${webAuthnAuthenticator.transport}`;
   }
   return entry;
 }

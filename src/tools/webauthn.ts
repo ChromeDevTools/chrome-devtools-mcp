@@ -9,102 +9,58 @@ import {zod} from '../third_party/index.js';
 import {ToolCategory} from './categories.js';
 import {definePageTool} from './ToolDefinition.js';
 
-/* eslint-disable @local/enforce-zod-schema */
-const credentialSchema = zod.object({
-  credentialId: zod.string().describe('The credential ID, base64 encoded.'),
-  rpId: zod
-    .string()
-    .describe('The relying party ID the credential is scoped to.'),
-  privateKey: zod
-    .string()
-    .describe(
-      'The ECDSA P-256 private key in PKCS#8 format, base64 encoded. It is never included in tool output.',
-    ),
-  isResidentCredential: zod
-    .boolean()
-    .optional()
-    .describe(
-      'Whether the credential is discoverable (a passkey). Default: the authenticator hasResidentKey value.',
-    ),
-  userHandle: zod
-    .string()
-    .optional()
-    .describe(
-      'The user handle, base64 encoded. Required for discoverable credentials.',
-    ),
-  userName: zod.string().optional().describe('The user name.'),
-  signCount: zod
-    .number()
-    .int()
-    .optional()
-    .describe('The initial signature counter. Default: 0.'),
-});
-
-const authenticatorSchema = zod.object({
-  id: zod
-    .string()
-    .optional()
-    .describe(
-      'The ID of an existing authenticator to keep and update. Omit to create a new authenticator.',
-    ),
-  protocol: zod
-    .enum(['ctap2', 'u2f'])
-    .optional()
-    .describe('New authenticators only. Default: ctap2.'),
-  transport: zod
-    .enum(['internal', 'usb', 'nfc', 'ble', 'hybrid'])
-    .optional()
-    .describe(
-      'New authenticators only. "internal" emulates a platform authenticator such as Touch ID or Windows Hello; the others emulate roaming security keys. Default: internal.',
-    ),
-  hasResidentKey: zod
-    .boolean()
-    .optional()
-    .describe(
-      'New authenticators only. Whether the authenticator can store discoverable credentials (passkeys). Default: true.',
-    ),
-  hasUserVerification: zod
-    .boolean()
-    .optional()
-    .describe(
-      'New authenticators only. Whether the authenticator supports user verification (PIN or biometrics). Default: true.',
-    ),
-  isUserVerified: zod
-    .boolean()
-    .optional()
-    .describe(
-      'Whether user verification succeeds. Set to false to test a failed verification. Default: true.',
-    ),
-  credentials: zod
-    .array(credentialSchema)
-    .optional()
-    .describe(
-      'If set, replaces all credentials stored in the authenticator; [] removes them. If omitted, stored credentials are kept.',
-    ),
-});
-/* eslint-enable @local/enforce-zod-schema */
-
 export const configureWebAuthn = definePageTool(() => ({
   name: 'configure_webauthn',
   description:
-    'Sets the virtual WebAuthn authenticators of the selected page so passkey and security key flows can be tested without a physical device. ' +
-    'Pass the full list of authenticators the page should have: entries with an id keep and update that authenticator, entries without an id create a new one, and existing authenticators not in the list are removed. Pass [] to remove all of them. ' +
-    'Authenticators answer navigator.credentials.create() and get() automatically and are removed when the page closes. The response lists every authenticator with its stored credentials.',
+    'Sets up a virtual WebAuthn authenticator on the selected page so passkey and security key flows can be tested without a physical device. ' +
+    'It answers navigator.credentials.create() and get() automatically and is removed when the page closes. ' +
+    'On later calls, omitted parameters keep their current values. Changing only isUserVerified keeps the stored credentials; changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and its credentials. ' +
+    'The response shows the authenticator and its stored credentials.',
   annotations: {
     category: ToolCategory.WEBAUTHN,
     readOnlyHint: false,
   },
   schema: {
-    authenticators: zod
-      .array(authenticatorSchema)
-      .describe('The virtual authenticators the page should have.'),
+    enabled: zod
+      .boolean()
+      .describe(
+        'Whether the page has a virtual authenticator. Set to false to remove it and its credentials.',
+      ),
+    protocol: zod
+      .enum(['ctap2', 'u2f'])
+      .optional()
+      .describe('The authenticator protocol. Default: ctap2.'),
+    transport: zod
+      .enum(['internal', 'usb', 'nfc', 'ble', 'hybrid'])
+      .optional()
+      .describe(
+        '"internal" is a platform authenticator such as Touch ID or Windows Hello; the others are roaming security keys. Default: internal.',
+      ),
+    hasResidentKey: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether the authenticator can store discoverable credentials (passkeys). Default: true.',
+      ),
+    hasUserVerification: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether the authenticator supports user verification (PIN or biometrics). Default: true.',
+      ),
+    isUserVerified: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Whether user verification succeeds. Set to false to test a failed verification. Default: true.',
+      ),
   },
   blockedByDialog: false,
   concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
-    response.attachWebAuthnAuthenticators(
-      await request.page.configureWebAuthn(request.params.authenticators),
+    response.attachWebAuthnAuthenticator(
+      await request.page.configureWebAuthn(request.params),
     );
   },
 }));

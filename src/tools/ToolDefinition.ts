@@ -317,8 +317,8 @@ export interface Response {
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
   attachConsoleMessage(msgid: number): void;
-  attachWebAuthnAuthenticators(
-    authenticators: WebAuthnAuthenticatorState[],
+  attachWebAuthnAuthenticator(
+    authenticator: WebAuthnAuthenticatorState | undefined,
   ): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
@@ -478,28 +478,16 @@ export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
 export type WebAuthnProtocol = 'ctap2' | 'u2f';
 export type WebAuthnTransport = 'internal' | 'usb' | 'nfc' | 'ble' | 'hybrid';
 
-export interface WebAuthnCredentialConfig {
-  credentialId: string;
-  rpId: string;
-  privateKey: string;
-  isResidentCredential?: boolean;
-  userHandle?: string;
-  userName?: string;
-  signCount?: number;
-}
-
 export interface WebAuthnAuthenticatorConfig {
-  id?: string;
+  enabled: boolean;
   protocol?: WebAuthnProtocol;
   transport?: WebAuthnTransport;
   hasResidentKey?: boolean;
   hasUserVerification?: boolean;
   isUserVerified?: boolean;
-  credentials?: WebAuthnCredentialConfig[];
 }
 
 export interface WebAuthnAuthenticatorState {
-  id: string;
   protocol: WebAuthnProtocol;
   transport: WebAuthnTransport;
   hasResidentKey: boolean;
@@ -527,8 +515,8 @@ export type ContextPage = Readonly<{
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
   configureWebAuthn(
-    authenticators: WebAuthnAuthenticatorConfig[],
-  ): Promise<WebAuthnAuthenticatorState[]>;
+    config: WebAuthnAuthenticatorConfig,
+  ): Promise<WebAuthnAuthenticatorState | undefined>;
 
   /**
    * Returns a reqid for a cdpRequestId.

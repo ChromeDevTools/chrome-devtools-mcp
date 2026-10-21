@@ -5,7 +5,6 @@
  */
 
 import assert from 'node:assert';
-import {generateKeyPairSync} from 'node:crypto';
 import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
@@ -22,54 +21,33 @@ import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
 describe('configure_webauthn', () => {
-  it('applies the authenticators and attaches the result', async () => {
+  it('applies the parameters and attaches the result', async () => {
     const {page, context, response, args} = createHandlerMocks();
-    const states: WebAuthnAuthenticatorState[] = [
-      {
-        id: 'auth-1',
-        protocol: 'ctap2',
-        transport: 'usb',
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        credentials: [
-          {
-            credentialId: 'Y3JlZA==',
-            rpId: 'example.com',
-            isResidentCredential: true,
-            userName: 'alice',
-            signCount: 0,
-          },
-        ],
-      },
-    ];
-    page.configureWebAuthn.resolves(states);
-
-    const authenticators = (): WebAuthnAuthenticatorConfig[] => [
-      {
-        transport: 'usb',
-        credentials: [
-          {credentialId: 'Y3JlZA==', rpId: 'example.com', privateKey: 'a2V5'},
-        ],
-      },
-    ];
+    const state: WebAuthnAuthenticatorState = {
+      protocol: 'ctap2',
+      transport: 'usb',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: false,
+      credentials: [],
+    };
+    page.configureWebAuthn.resolves(state);
+    const params: WebAuthnAuthenticatorConfig = {
+      enabled: true,
+      transport: 'usb',
+      isUserVerified: false,
+    };
 
     await configureWebAuthn(args).handler(
-      {
-        params: {authenticators: authenticators()},
-        page,
-      },
+      {params: {...params}, page},
       response,
       context,
     );
 
+    sinon.assert.calledOnceWithExactly(page.configureWebAuthn, params);
     sinon.assert.calledOnceWithExactly(
-      page.configureWebAuthn,
-      authenticators(),
-    );
-    sinon.assert.calledOnceWithExactly(
-      response.attachWebAuthnAuthenticators,
-      states,
+      response.attachWebAuthnAuthenticator,
+      state,
     );
   });
 });
@@ -118,46 +96,36 @@ async function configure(
   context: McpContext,
   response: McpResponse,
   args: Parameters<typeof configureWebAuthn>[0],
-  authenticators: Parameters<
-    ReturnType<typeof configureWebAuthn>['handler']
-  >[0]['params']['authenticators'],
-): Promise<string[]> {
+  params: WebAuthnAuthenticatorConfig,
+): Promise<string> {
   await configureWebAuthn(args).handler(
-    {params: {authenticators}, page: context.getSelectedMcpPage()},
+    {params, page: context.getSelectedMcpPage()},
     response,
     context,
   );
   const {content} = await response.handle(context);
   const text = content.find(item => item.type === 'text');
   assert.ok(text?.type === 'text');
-  return text.text.split('\n');
-}
-
-function authenticatorIdFrom(lines: string[]): string {
-  const id = lines[1]?.match(/^- ([^:]+):/)?.[1];
-  assert.ok(id, `no authenticator id in ${JSON.stringify(lines)}`);
-  return id;
+  return text.text;
 }
 
 describe('configure_webauthn in a browser', () => {
   const server = serverHooks();
 
-  it('registers and signs in with a passkey', async () => {
+  it('registers and signs in with a passkey, then fails user verification', async () => {
     server.addHtmlRoute('/passkey.html', PASSKEY_PAGE);
     await withMcpContext(async (response, context, args) => {
       const page = context.getSelectedMcpPage().pptrPage;
       await page.goto(localhostRoute(server.getRoute('/passkey.html')));
-      const id = authenticatorIdFrom(
-        await configure(context, response, args, [{}]),
+      assert.match(
+        await configure(context, response, args, {enabled: true}),
+        /protocol=ctap2, transport=internal[^\n]*\nNo credentials\./,
       );
 
-      response.resetResponseLineForTesting();
       response.setIncludePages(true);
       const {content} = await response.handle(context);
       assert.ok(
-        JSON.stringify(content).includes(
-          `[selected] webauthnAuthenticators=${id}`,
-        ),
+        JSON.stringify(content).includes('[selected] webauthn=ctap2/internal'),
       );
       response.setIncludePages(false);
 
@@ -165,11 +133,6 @@ describe('configure_webauthn in a browser', () => {
         // @ts-expect-error defined by the test page
         window.register(),
       );
-      const lines = await configure(context, response, args, [{id}]);
-      assert.strictEqual(lines.length, 3);
-      assert.match(lines[2], /rpId=localhost, discoverable=true/);
-      assert.match(lines[2], /userName=alice@example\.com/);
-
       assert.strictEqual(
         await page.evaluate(() =>
           // @ts-expect-error defined by the test page
@@ -178,7 +141,14 @@ describe('configure_webauthn in a browser', () => {
         credentialId,
       );
 
-      await configure(context, response, args, [{id, isUserVerified: false}]);
+      const text = await configure(context, response, args, {
+        enabled: true,
+        isUserVerified: false,
+      });
+      assert.match(text, /isUserVerified=false/);
+      assert.match(text, /rpId=localhost, discoverable=true/);
+      assert.match(text, /userName=alice@example\.com/);
+      assert.doesNotMatch(text, /privateKey/);
       assert.strictEqual(
         await page.evaluate(() =>
           // @ts-expect-error defined by the test page
@@ -187,43 +157,9 @@ describe('configure_webauthn in a browser', () => {
         'NotAllowedError',
       );
 
-      assert.deepStrictEqual(await configure(context, response, args, []), [
-        'No virtual authenticators on this page.',
-      ]);
-    });
-  });
-
-  it('signs in with an imported passkey', async () => {
-    server.addHtmlRoute('/passkey.html', PASSKEY_PAGE);
-    await withMcpContext(async (response, context, args) => {
-      const page = context.getSelectedMcpPage().pptrPage;
-      await page.goto(localhostRoute(server.getRoute('/passkey.html')));
-      const {privateKey} = generateKeyPairSync('ec', {namedCurve: 'P-256'});
-      const credentialId = Buffer.from('imported-passkey');
-
-      const lines = await configure(context, response, args, [
-        {
-          credentials: [
-            {
-              credentialId: credentialId.toString('base64'),
-              rpId: 'localhost',
-              privateKey: privateKey
-                .export({format: 'der', type: 'pkcs8'})
-                .toString('base64'),
-              userHandle: Buffer.from([1, 2, 3, 4]).toString('base64'),
-              userName: 'bob@example.com',
-            },
-          ],
-        },
-      ]);
-      assert.doesNotMatch(lines.join('\n'), /privateKey/);
-
-      assert.strictEqual(
-        await page.evaluate(() =>
-          // @ts-expect-error defined by the test page
-          window.signIn(),
-        ),
-        credentialId.toString('base64url'),
+      assert.match(
+        await configure(context, response, args, {enabled: false}),
+        /No virtual authenticator on this page\./,
       );
     });
   });

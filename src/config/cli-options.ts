@@ -252,7 +252,7 @@ export const commands: Commands = {
   },
   configure_webauthn: {
     description:
-      'Sets the virtual WebAuthn authenticators of the selected page so passkey and security key flows can be tested without a physical device. Pass the full list of authenticators the page should have: entries with an id keep and update that authenticator, entries without an id create a new one, and existing authenticators not in the list are removed. Pass [] to remove all of them. Authenticators answer navigator.credentials.create() and get() automatically and are removed when the page closes. The response lists every authenticator with its stored credentials. (requires flag: --categoryWebauthn=true)',
+      'Sets up a virtual WebAuthn authenticator on the selected page so passkey and security key flows can be tested without a physical device. It answers navigator.credentials.create() and get() automatically and is removed when the page closes. On later calls, omitted parameters keep their current values. Changing only isUserVerified keeps the stored credentials; changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and its credentials. The response shows the authenticator and its stored credentials. (requires flag: --categoryWebauthn=true)',
     category: 'WebAuthn',
     args: {
       pageId: {
@@ -262,12 +262,54 @@ export const commands: Commands = {
         required: true,
         positional: true,
       },
-      authenticators: {
-        name: 'authenticators',
-        type: 'array',
-        description: 'The virtual authenticators the page should have.',
+      enabled: {
+        name: 'enabled',
+        type: 'boolean',
+        description:
+          'Whether the page has a virtual authenticator. Set to false to remove it and its credentials.',
         required: true,
         positional: true,
+      },
+      protocol: {
+        name: 'protocol',
+        type: 'string',
+        description: 'The authenticator protocol. Default: ctap2.',
+        required: false,
+        positional: false,
+        enum: ['ctap2', 'u2f'],
+      },
+      transport: {
+        name: 'transport',
+        type: 'string',
+        description:
+          '"internal" is a platform authenticator such as Touch ID or Windows Hello; the others are roaming security keys. Default: internal.',
+        required: false,
+        positional: false,
+        enum: ['internal', 'usb', 'nfc', 'ble', 'hybrid'],
+      },
+      hasResidentKey: {
+        name: 'hasResidentKey',
+        type: 'boolean',
+        description:
+          'Whether the authenticator can store discoverable credentials (passkeys). Default: true.',
+        required: false,
+        positional: false,
+      },
+      hasUserVerification: {
+        name: 'hasUserVerification',
+        type: 'boolean',
+        description:
+          'Whether the authenticator supports user verification (PIN or biometrics). Default: true.',
+        required: false,
+        positional: false,
+      },
+      isUserVerified: {
+        name: 'isUserVerified',
+        type: 'boolean',
+        description:
+          'Whether user verification succeeds. Set to false to test a failed verification. Default: true.',
+        required: false,
+        positional: false,
       },
     },
   },

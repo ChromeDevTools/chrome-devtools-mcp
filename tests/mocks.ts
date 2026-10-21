@@ -462,7 +462,7 @@ export function createMockMcpPage(
   });
   page.getWebMcpTools.returns([]);
   page.discoverThirdPartyDeveloperTools.resolves([]);
-  page.getWebAuthnAuthenticatorIds.returns([]);
+  page.getWebAuthnAuthenticator.returns(undefined);
   Object.defineProperty(page, 'pptrPage', {
     value: pptrPage,
     writable: true,

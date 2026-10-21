@@ -18,43 +18,42 @@ describe('WebAuthnFormatter', () => {
     });
   }
 
-  formatterTest('formats no authenticators', () => {
-    return new WebAuthnFormatter([]);
+  formatterTest('formats no authenticator', () => {
+    return new WebAuthnFormatter(undefined);
   });
 
-  formatterTest('formats authenticators with and without credentials', () => {
-    return new WebAuthnFormatter([
-      {
-        id: 'auth-1',
-        protocol: 'ctap2',
-        transport: 'usb',
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        credentials: [
-          {
-            credentialId: 'Y3JlZA==',
-            rpId: 'example.com',
-            isResidentCredential: true,
-            userName: 'alice',
-            signCount: 0,
-          },
-          {
-            credentialId: 'b3RoZXI=',
-            isResidentCredential: false,
-            signCount: 3,
-          },
-        ],
-      },
-      {
-        id: 'auth-2',
-        protocol: 'u2f',
-        transport: 'nfc',
-        hasResidentKey: false,
-        hasUserVerification: false,
-        isUserVerified: false,
-        credentials: [],
-      },
-    ]);
+  formatterTest('formats an authenticator without credentials', () => {
+    return new WebAuthnFormatter({
+      protocol: 'u2f',
+      transport: 'nfc',
+      hasResidentKey: false,
+      hasUserVerification: false,
+      isUserVerified: false,
+      credentials: [],
+    });
+  });
+
+  formatterTest('formats an authenticator with credentials', () => {
+    return new WebAuthnFormatter({
+      protocol: 'ctap2',
+      transport: 'usb',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      credentials: [
+        {
+          credentialId: 'Y3JlZA==',
+          rpId: 'example.com',
+          isResidentCredential: true,
+          userName: 'alice',
+          signCount: 0,
+        },
+        {
+          credentialId: 'b3RoZXI=',
+          isResidentCredential: false,
+          signCount: 3,
+        },
+      ],
+    });
   });
 });

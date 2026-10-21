@@ -10,12 +10,14 @@ function formatAuthenticator(
   authenticator: WebAuthnAuthenticatorState,
 ): string {
   const lines = [
-    `- ${authenticator.id}: protocol=${authenticator.protocol}, transport=${authenticator.transport}, hasResidentKey=${authenticator.hasResidentKey}, hasUserVerification=${authenticator.hasUserVerification}, isUserVerified=${authenticator.isUserVerified}`,
+    '## Virtual authenticator',
+    `protocol=${authenticator.protocol}, transport=${authenticator.transport}, hasResidentKey=${authenticator.hasResidentKey}, hasUserVerification=${authenticator.hasUserVerification}, isUserVerified=${authenticator.isUserVerified}`,
   ];
   if (!authenticator.credentials.length) {
-    lines.push('  No credentials.');
+    lines.push('No credentials.');
     return lines.join('\n');
   }
+  lines.push('### Credentials');
   for (const credential of authenticator.credentials) {
     const fields = [
       `credentialId=${credential.credentialId}`,
@@ -26,35 +28,35 @@ function formatAuthenticator(
     if (credential.userName) {
       fields.push(`userName=${credential.userName}`);
     }
-    lines.push(`  - ${fields.join(', ')}`);
+    lines.push(`- ${fields.join(', ')}`);
   }
   return lines.join('\n');
 }
 
 export class WebAuthnFormatter {
-  readonly #authenticators: readonly WebAuthnAuthenticatorState[];
+  readonly #authenticator: WebAuthnAuthenticatorState | undefined;
 
-  constructor(authenticators: readonly WebAuthnAuthenticatorState[]) {
-    this.#authenticators = authenticators;
+  constructor(authenticator: WebAuthnAuthenticatorState | undefined) {
+    this.#authenticator = authenticator;
   }
 
-  toJSON(): WebAuthnAuthenticatorState[] {
-    return this.#authenticators.map(authenticator => ({
-      ...authenticator,
-      credentials: authenticator.credentials.map(credential => ({
+  toJSON(): WebAuthnAuthenticatorState | null {
+    if (!this.#authenticator) {
+      return null;
+    }
+    return {
+      ...this.#authenticator,
+      credentials: this.#authenticator.credentials.map(credential => ({
         ...credential,
       })),
-    }));
+    };
   }
 
   toString(): string {
-    const authenticators = this.toJSON();
-    if (!authenticators.length) {
-      return 'No virtual authenticators on this page.';
+    const authenticator = this.toJSON();
+    if (!authenticator) {
+      return 'No virtual authenticator on this page.';
     }
-    return [
-      '## Virtual authenticators',
-      ...authenticators.map(formatAuthenticator),
-    ].join('\n');
+    return formatAuthenticator(authenticator);
   }
 }

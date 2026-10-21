@@ -1367,8 +1367,28 @@
         "argType": "number"
       },
       {
-        "name": "authenticators_count",
-        "argType": "number"
+        "name": "enabled",
+        "argType": "boolean"
+      },
+      {
+        "name": "protocol",
+        "argType": "string"
+      },
+      {
+        "name": "transport",
+        "argType": "string"
+      },
+      {
+        "name": "has_resident_key",
+        "argType": "boolean"
+      },
+      {
+        "name": "has_user_verification",
+        "argType": "boolean"
+      },
+      {
+        "name": "is_user_verified",
+        "argType": "boolean"
       }
     ]
   }
