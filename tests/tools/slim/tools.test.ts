@@ -53,7 +53,7 @@ describe('slim', () => {
         context,
       );
       const page = context.getSelectedMcpPage().pptrPage;
-      assert.equal(
+      assert.strictEqual(
         await page.evaluate(() => document.querySelector('div')?.textContent),
         'Hello MCP',
       );

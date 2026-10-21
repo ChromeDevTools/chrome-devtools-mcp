@@ -78,7 +78,7 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
   });
 
   it('clean up after navigation', async () => {
@@ -96,10 +96,10 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
   });
 
   it('does not clean up after same-document navigation', async () => {
@@ -117,14 +117,14 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
 
     // Simulate a same-document (SPA) navigation: Puppeteer emits
     // `FrameNavigatedWithinDocument` right before `framenavigated`.
     mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
   });
 
   it('cleans up after a cross-document navigation following a same-document one', async () => {
@@ -145,11 +145,11 @@ describe('PageCollector', () => {
     // Same-document navigation: history is kept.
     mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
 
     // A real cross-document navigation must still rotate the history.
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
   });
 
   it('does not clean up after sub frame navigation', async () => {
@@ -167,7 +167,7 @@ describe('PageCollector', () => {
     page.emit('request', request);
     page.emit('framenavigated', {} as Frame);
 
-    assert.equal(collector.getData().length, 1);
+    assert.strictEqual(collector.getData().length, 1);
   });
 
   it('clean up after navigation and be able to add data after', async () => {
@@ -185,14 +185,14 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
 
     page.emit('request', request);
 
-    assert.equal(collector.getData().length, 1);
+    assert.strictEqual(collector.getData().length, 1);
   });
 
   it('should assign ids to requests', async () => {
@@ -211,10 +211,10 @@ describe('PageCollector', () => {
     page.emit('request', request1);
     page.emit('request', request2);
 
-    assert.equal(collector.getData().length, 2);
+    assert.strictEqual(collector.getData().length, 2);
 
-    assert.equal(collector.getIdForResource(request1), 1);
-    assert.equal(collector.getIdForResource(request2), 2);
+    assert.strictEqual(collector.getIdForResource(request1), 1);
+    assert.strictEqual(collector.getIdForResource(request2), 2);
   });
 });
 
@@ -270,13 +270,13 @@ describe('NetworkCollector', () => {
     }
 
     const retainedRequests = collector.getData();
-    assert.equal(
+    assert.strictEqual(
       retainedRequests.length,
       NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
     );
     assert.deepEqual(retainedRequests, requests.slice(1));
-    assert.equal(collector.getIdForResource(retainedRequests[0]), 2);
-    assert.equal(collector.getById(2), retainedRequests[0]);
+    assert.strictEqual(collector.getIdForResource(retainedRequests[0]), 2);
+    assert.strictEqual(collector.getById(2), retainedRequests[0]);
     assert.throws(() => collector.getById(1), {
       message: 'Request not found for selected page',
     });
@@ -297,18 +297,18 @@ describe('NetworkCollector', () => {
     page.emit('request', request);
     page.emit('request', navRequest);
 
-    assert.equal(collector.getData()[0], request);
-    assert.equal(collector.getData()[1], navRequest);
+    assert.strictEqual(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[1], navRequest);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData().length, 1);
-    assert.equal(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData().length, 1);
+    assert.strictEqual(collector.getData()[0], navRequest);
 
     page.emit('request', request2);
 
-    assert.equal(collector.getData().length, 2);
-    assert.equal(collector.getData()[0], navRequest);
-    assert.equal(collector.getData()[1], request2);
+    assert.strictEqual(collector.getData().length, 2);
+    assert.strictEqual(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData()[1], request2);
   });
 
   it('correctly picks up after multiple back to back navigations', async () => {
@@ -328,23 +328,23 @@ describe('NetworkCollector', () => {
     const collector = new NetworkCollector(page);
 
     page.emit('request', navRequest);
-    assert.equal(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData()[0], navRequest);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData().length, 1);
-    assert.equal(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData().length, 1);
+    assert.strictEqual(collector.getData()[0], navRequest);
 
     page.emit('request', navRequest2);
-    assert.equal(collector.getData().length, 2);
-    assert.equal(collector.getData()[0], navRequest);
-    assert.equal(collector.getData()[1], navRequest2);
+    assert.strictEqual(collector.getData().length, 2);
+    assert.strictEqual(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData()[1], navRequest2);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData().length, 1);
-    assert.equal(collector.getData()[0], navRequest2);
+    assert.strictEqual(collector.getData().length, 1);
+    assert.strictEqual(collector.getData()[0], navRequest2);
 
     page.emit('request', request);
-    assert.equal(collector.getData().length, 2);
+    assert.strictEqual(collector.getData().length, 2);
   });
 
   it('works with previous navigations', async () => {
@@ -364,19 +364,19 @@ describe('NetworkCollector', () => {
     const collector = new NetworkCollector(page);
 
     page.emit('request', navRequest);
-    assert.equal(collector.getData(true).length, 1);
+    assert.strictEqual(collector.getData(true).length, 1);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData(true).length, 1);
+    assert.strictEqual(collector.getData(true).length, 1);
 
     page.emit('request', navRequest2);
-    assert.equal(collector.getData(true).length, 2);
+    assert.strictEqual(collector.getData(true).length, 2);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData(true).length, 2);
+    assert.strictEqual(collector.getData(true).length, 2);
 
     page.emit('request', request);
-    assert.equal(collector.getData(true).length, 3);
+    assert.strictEqual(collector.getData(true).length, 3);
   });
 
   it('should not grow beyond maxNavigationSaved', async () => {
@@ -398,7 +398,7 @@ describe('NetworkCollector', () => {
 
     // We expect 3 arrays in navigations (current + 2 saved)
     // Each navigation has 1 request, so total should be 3
-    assert.equal(collector.getData(true).length, 3);
+    assert.strictEqual(collector.getData(true).length, 3);
   });
 
   it('respects a custom maxNavigationSaved', async () => {
@@ -417,7 +417,7 @@ describe('NetworkCollector', () => {
       page.emit('framenavigated', mainFrame);
     }
 
-    assert.equal(collector.getData(true).length, 5);
+    assert.strictEqual(collector.getData(true).length, 5);
   });
 
   it('bounds retained navigation buckets with redirects and subframes', async () => {
@@ -494,8 +494,8 @@ describe('NetworkCollector', () => {
       finalResource1,
       finalResource2,
     ]);
-    assert.equal(collector.getData().length, 3);
-    assert.equal(collector.getData()[0], finalNavigation);
+    assert.strictEqual(collector.getData().length, 3);
+    assert.strictEqual(collector.getData()[0], finalNavigation);
     assert.deepEqual(collector.navigationSizes, [3, 2, 2]);
   });
 });
@@ -579,7 +579,7 @@ describe('ConsoleCollector', () => {
     page.emit('issue', issue);
     page.emit('issue', issue2);
     const data = collector.getData();
-    assert.equal(data.length, 2);
+    assert.strictEqual(data.length, 2);
   });
 
   it('silently ignores unmapped PerformanceIssue events', async () => {
@@ -606,7 +606,7 @@ describe('ConsoleCollector', () => {
 
     page.emit('issue', performanceIssue);
 
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
     sinon.assert.notCalled(warnStub);
   });
 
@@ -625,11 +625,11 @@ describe('ConsoleCollector', () => {
     page.emit('issue', issue);
     page.emit('issue', issue);
     const data = collector.getData();
-    assert.equal(data.length, 1);
+    assert.strictEqual(data.length, 1);
     const collectedIssue = data[0];
     assert(collectedIssue instanceof DevTools.AggregatedIssue);
-    assert.equal(collectedIssue.code(), 'MixedContentIssue');
-    assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);
+    assert.strictEqual(collectedIssue.code(), 'MixedContentIssue');
+    assert.strictEqual(collectedIssue.getAggregatedIssuesCount(), 1);
   });
 
   it('emits UncaughtErrors for Runtime.exceptionThrown CDP events', async () => {
@@ -689,7 +689,7 @@ describe('ConsoleCollector', () => {
     }
 
     const retained = collector.getData();
-    assert.equal(retained.length, cap);
+    assert.strictEqual(retained.length, cap);
     assert.deepEqual(retained, messages.slice(messages.length - cap));
   });
 
@@ -713,7 +713,7 @@ describe('ConsoleCollector', () => {
       page.emit('console', msg);
     }
 
-    assert.equal(
+    assert.strictEqual(
       collector.getData().length,
       ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
     );

@@ -1002,7 +1002,7 @@ describe('pages', () => {
           context,
         );
         const page = context.getSelectedMcpPage().pptrPage;
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.querySelector('div')?.textContent),
           'Hello MCP',
         );
@@ -1113,7 +1113,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.location.href),
           'about:blank',
         );
@@ -1131,7 +1131,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.querySelector('div')?.textContent),
           'Hello MCP',
         );
@@ -1148,7 +1148,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.location.href),
           'data:text/html,<div>Hello MCP</div>',
         );

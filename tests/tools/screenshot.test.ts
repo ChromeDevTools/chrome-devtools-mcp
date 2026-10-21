@@ -176,9 +176,9 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/png');
-        assert.equal(
+        assert.strictEqual(response.images.length, 1);
+        assert.strictEqual(response.images[0].mimeType, 'image/png');
+        assert.strictEqual(
           response.responseLines.at(0),
           "Took a screenshot of the current page's viewport.",
         );
@@ -292,9 +292,9 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/png');
-        assert.equal(
+        assert.strictEqual(response.images.length, 1);
+        assert.strictEqual(response.images[0].mimeType, 'image/png');
+        assert.strictEqual(
           response.responseLines.at(0),
           'Took a screenshot of the full current page.',
         );
@@ -327,8 +327,8 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 0);
-        assert.equal(
+        assert.strictEqual(response.images.length, 0);
+        assert.strictEqual(
           response.responseLines.at(0),
           'Took a screenshot of the full current page.',
         );
@@ -359,9 +359,9 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/png');
-        assert.equal(
+        assert.strictEqual(response.images.length, 1);
+        assert.strictEqual(response.images[0].mimeType, 'image/png');
+        assert.strictEqual(
           response.responseLines.at(0),
           'Took a screenshot of node with uid "1_1".',
         );
@@ -426,13 +426,13 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 0);
-        assert.equal(
+        assert.strictEqual(response.images.length, 0);
+        assert.strictEqual(
           response.responseLines.at(0),
           "Took a screenshot of the current page's viewport.",
         );
         const canonicalFilePath = await resolveCanonicalPath(filePath);
-        assert.equal(
+        assert.strictEqual(
           response.responseLines.at(1),
           `Saved screenshot to ${canonicalFilePath}.`,
         );
@@ -519,14 +519,14 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 1);
-        assert.equal(response.images[0].mimeType, 'image/jpeg');
+        assert.strictEqual(response.images.length, 1);
+        assert.strictEqual(response.images[0].mimeType, 'image/jpeg');
       });
     });
 
     it('keeps "png" as default format when no CLI override is set', async () => {
       const tool = screenshot({} as ParsedArguments);
-      assert.equal(zod.object(tool.schema).parse({}).format, 'png');
+      assert.strictEqual(zod.object(tool.schema).parse({}).format, 'png');
     });
 
     it('downscales viewport screenshot when screenshotMaxWidth is set', async () => {
@@ -546,11 +546,11 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 1);
+        assert.strictEqual(response.images.length, 1);
         const buf = Buffer.from(response.images[0].data, 'base64');
-        assert.equal(pngWidth(buf), 100);
+        assert.strictEqual(pngWidth(buf), 100);
         // Aspect ratio preserved: 800x600 -> 100x75.
-        assert.equal(pngHeight(buf), 75);
+        assert.strictEqual(pngHeight(buf), 75);
       });
     });
 
@@ -561,7 +561,7 @@ describe('screenshot', () => {
       await withMcpContext(
         async (response, context) => {
           const page = context.getSelectedMcpPage().pptrPage;
-          assert.equal(page.viewport(), null);
+          assert.strictEqual(page.viewport(), null);
           await page.setContent(
             html`<div style="width:100vw;height:100vh;background:red"></div>`,
           );
@@ -570,7 +570,7 @@ describe('screenshot', () => {
             height: window.innerHeight,
             devicePixelRatio: window.devicePixelRatio,
           }));
-          assert.equal(source.devicePixelRatio, 2);
+          assert.strictEqual(source.devicePixelRatio, 2);
 
           await tool.handler(
             {params: {format: 'png'}, page: context.getSelectedMcpPage()},
@@ -578,9 +578,9 @@ describe('screenshot', () => {
             context,
           );
 
-          assert.equal(response.images.length, 1);
+          assert.strictEqual(response.images.length, 1);
           const buf = Buffer.from(response.images[0].data, 'base64');
-          assert.equal(pngWidth(buf), 100);
+          assert.strictEqual(pngWidth(buf), 100);
           const expectedHeight = Math.round(
             source.height * (100 / source.width),
           );
@@ -602,7 +602,7 @@ describe('screenshot', () => {
         // No setViewport call here: the browser is launched and connected with
         // `defaultViewport: null`, so this is what a page looks like unless the
         // emulate tool has set a viewport.
-        assert.equal(page.viewport(), null);
+        assert.strictEqual(page.viewport(), null);
         await page.setContent(
           html`<div style="width:100vw;height:100vh;background:red"></div>`,
         );
@@ -617,9 +617,9 @@ describe('screenshot', () => {
           context,
         );
 
-        assert.equal(response.images.length, 1);
+        assert.strictEqual(response.images.length, 1);
         const buf = Buffer.from(response.images[0].data, 'base64');
-        assert.equal(pngWidth(buf), 100);
+        assert.strictEqual(pngWidth(buf), 100);
         // The window size comes from the environment rather than an emulated
         // viewport, so allow a pixel of rounding slack on the derived height.
         const expectedHeight = Math.round(source.height * (100 / source.width));
@@ -650,8 +650,8 @@ describe('screenshot', () => {
 
         const buf = Buffer.from(response.images[0].data, 'base64');
         // height bound dictates: 60/600 = 0.1 -> 80x60.
-        assert.equal(pngHeight(buf), 60);
-        assert.equal(pngWidth(buf), 80);
+        assert.strictEqual(pngHeight(buf), 60);
+        assert.strictEqual(pngWidth(buf), 80);
       });
     });
 
@@ -672,8 +672,8 @@ describe('screenshot', () => {
         );
 
         const buf = Buffer.from(response.images[0].data, 'base64');
-        assert.equal(pngWidth(buf), 800);
-        assert.equal(pngHeight(buf), 600);
+        assert.strictEqual(pngWidth(buf), 800);
+        assert.strictEqual(pngHeight(buf), 600);
       });
     });
 
@@ -704,7 +704,7 @@ describe('screenshot', () => {
         const buf = Buffer.from(response.images[0].data, 'base64');
         // Source is at least 1000x1500; scale = 200/1000 = 0.2 -> ~200x300.
         // Allow ±2px to absorb sub-pixel rasterization rounding by Chrome.
-        assert.equal(pngWidth(buf), 200);
+        assert.strictEqual(pngWidth(buf), 200);
         assert.ok(
           Math.abs(pngHeight(buf) - 300) <= 2,
           `expected height near 300, got ${pngHeight(buf)}`,

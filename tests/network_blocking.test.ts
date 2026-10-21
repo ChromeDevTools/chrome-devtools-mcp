@@ -393,7 +393,7 @@ describe('Network Blocking Integration', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           response.attachedLighthouseResult?.summary.mode,
           'navigation',
         );
