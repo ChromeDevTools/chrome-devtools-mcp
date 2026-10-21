@@ -95,7 +95,7 @@ export class BrowserManager {
   static rootSandboxLaunchError(
     error: Error,
     args: readonly string[],
-    uid = process.getuid?.(),
+    uid: number | undefined = process.getuid?.(),
   ): Error | undefined {
     if (uid !== 0) {
       return undefined;

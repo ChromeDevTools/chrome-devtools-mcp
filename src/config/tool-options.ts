@@ -27,7 +27,7 @@ export const toolOptions = {
     description:
       'Override the default compression quality (0-100) used by take_screenshot for JPEG and WebP when the caller does not specify one. Lower values mean smaller files. Ignored for PNG. Unset preserves the Puppeteer default.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -44,7 +44,7 @@ export const toolOptions = {
     description:
       'Maximum width in pixels for screenshots. If the captured image is wider, it is downscaled (preserving aspect ratio) before being returned. Reduces context size in AI conversations. Unset means no resize.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -61,7 +61,7 @@ export const toolOptions = {
     description:
       'Maximum height in pixels for screenshots. If the captured image is taller, it is downscaled (preserving aspect ratio) before being returned. Can be combined with --screenshot-max-width; the smaller scale factor wins. Unset means no resize.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
