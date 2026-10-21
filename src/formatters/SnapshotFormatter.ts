@@ -179,7 +179,8 @@ Get a verbose snapshot to include all elements if you are interested in the sele
           result[attr] = true;
         }
       } else if (attr === 'url' && typeof value === 'string') {
-        result[attr] = truncateUrl(value);
+        // Keep other URLs whole: the snapshot is their only full copy.
+        result[attr] = /^data:/i.test(value) ? truncateUrl(value) : value;
       } else if (typeof value === 'string' || typeof value === 'number') {
         result[attr] = value;
       }
