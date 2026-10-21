@@ -128,7 +128,7 @@ export const mcpOptions = {
     describe:
       'Frames per second to use for screencast recording. Lower values reduce file size and encoding load.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -178,7 +178,7 @@ export const mcpOptions = {
     type: 'number',
     default: DEFAULT_MAX_NAVIGATION_SAVED,
     describe: `Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.`,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -255,7 +255,7 @@ export const mcpOptions = {
   config: {
     type: 'string',
     describe: 'Path to JSON configuration file.',
-    coerce: (configPath: string | undefined) => {
+    coerce: (configPath: string | undefined): string | undefined => {
       if (!configPath) {
         return;
       }

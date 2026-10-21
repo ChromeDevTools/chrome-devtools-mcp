@@ -47,7 +47,10 @@ import {
   stripUndefined,
 } from './mocks.js';
 
-export function assertNoServiceWorkerReported(targets: Target[], id: string) {
+export function assertNoServiceWorkerReported(
+  targets: Target[],
+  id: string,
+): void {
   const target = targets.find(target => {
     return target.url().includes(id) && target.type() === 'service_worker';
   });
@@ -73,7 +76,7 @@ export function getImageContent(content: CallToolResult['content'][number]): {
   throw new Error(`Expected image content but got ${content.type}`);
 }
 
-export function extractExtensionId(response: McpResponse) {
+export function extractExtensionId(response: McpResponse): string {
   const responseLine = response.responseLines[0];
   assert.ok(responseLine, 'Response should not be empty');
   const match = responseLine.match(/Extension installed\. Id: (.+)/);
@@ -95,7 +98,7 @@ export async function withBrowser(
     blockedUrlPattern?: string[];
     allowedUrlPattern?: string[];
   } = {},
-) {
+): Promise<void> {
   let attempt = 1;
   while (attempt <= 3) {
     const launchOptions: LaunchOptions = {
@@ -215,7 +218,7 @@ export async function withMcpContext(
     navigationTimeout?: number;
   } = {},
   args: Partial<ParsedArguments> = {},
-) {
+): Promise<void> {
   await withBrowser(async browser => {
     TextSnapshot.resetCounter();
     McpContext.resetPageIdsForTesting();
@@ -390,7 +393,7 @@ export function stabilizeStructuredContent(content: unknown): string {
   return JSON.stringify(stabilize(content), null, 2);
 }
 
-export function stabilizeResponseOutput(text: unknown) {
+export function stabilizeResponseOutput(text: unknown): string {
   if (typeof text !== 'string') {
     throw new Error('Input must be string');
   }
@@ -467,7 +470,9 @@ export function getMockBrowser(options?: {
   } as Browser;
 }
 
-export const CLI_PATH = path.resolve('build/src/bin/chrome-devtools.js');
+export const CLI_PATH: string = path.resolve(
+  'build/src/bin/chrome-devtools.js',
+);
 
 export async function runCli(
   args: string[],
@@ -499,7 +504,9 @@ export async function runCli(
   });
 }
 
-export async function assertDaemonIsNotRunning(sessionId?: string) {
+export async function assertDaemonIsNotRunning(
+  sessionId?: string,
+): Promise<void> {
   const result = await runCli(['status'], sessionId);
   assert.strictEqual(
     result.stdout,
@@ -511,7 +518,7 @@ export async function assertDaemonIsNotRunning(sessionId?: string) {
  * Stops the daemon in-process. Use it for test cleanup: it does not spawn
  * a CLI process, which takes about a second per call.
  */
-export async function stopDaemonForCleanup(sessionId: string) {
+export async function stopDaemonForCleanup(sessionId: string): Promise<void> {
   await stopDaemon(sessionId);
   assert.ok(!isDaemonRunning(sessionId), 'daemon is still running');
 }
@@ -528,7 +535,7 @@ export function createCliSession(t: TestContext): string {
   return sessionId;
 }
 
-export async function assertDaemonIsRunning(sessionId?: string) {
+export async function assertDaemonIsRunning(sessionId?: string): Promise<void> {
   const result = await runCli(['status'], sessionId);
   assert.ok(
     result.stdout.startsWith('chrome-devtools-mcp daemon is running.\n'),
@@ -539,7 +546,7 @@ export async function assertDaemonIsRunning(sessionId?: string) {
 export async function waitExecutionFor(
   func: () => Promise<void>,
   timeout: number,
-) {
+): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < 10000) {
     try {
@@ -555,12 +562,15 @@ export async function waitExecutionFor(
 
 export function createTempDir(
   prefix = 'chrome-devtools-test-',
-  baseDir = os.tmpdir(),
-) {
+  baseDir: string = os.tmpdir(),
+): {
+  path: string;
+  [Symbol.dispose]: () => void;
+} {
   const dirPath = fs.mkdtempSync(path.join(baseDir, prefix));
   return {
     path: dirPath,
-    [Symbol.dispose]() {
+    [Symbol.dispose](): void {
       try {
         fs.rmSync(dirPath, {recursive: true, force: true});
       } catch {
@@ -573,8 +583,11 @@ export function createTempDir(
 export function createTempFile(
   content: string,
   fileName: string,
-  baseDir = os.tmpdir(),
-) {
+  baseDir: string = os.tmpdir(),
+): {
+  path: string;
+  [Symbol.dispose]: () => void;
+} {
   const dirPath = fs.mkdtempSync(
     path.join(baseDir, 'chrome-devtools-test-file-'),
   );
@@ -582,7 +595,7 @@ export function createTempFile(
   fs.writeFileSync(filePath, content);
   return {
     path: filePath,
-    [Symbol.dispose]() {
+    [Symbol.dispose](): void {
       try {
         fs.rmSync(dirPath, {recursive: true, force: true});
       } catch {

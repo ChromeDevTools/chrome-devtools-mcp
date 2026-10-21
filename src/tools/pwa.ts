@@ -7,7 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, type ToolFactory} from './ToolDefinition.js';
 
 const manifestIdSchema = zod
   .string()
@@ -28,7 +28,7 @@ const displayModeSchema = zod
       'app-window experience.',
   );
 
-export const installPwa = defineTool(() => ({
+export const installPwa: ToolFactory = defineTool(() => ({
   name: 'install_pwa',
   description:
     'Installs a Progressive Web App (PWA) identified by its manifest ID. ' +
@@ -78,7 +78,7 @@ export const installPwa = defineTool(() => ({
   },
 }));
 
-export const uninstallPwa = defineTool(() => ({
+export const uninstallPwa: ToolFactory = defineTool(() => ({
   name: 'uninstall_pwa',
   description:
     'Uninstalls a Progressive Web App identified by its manifest ID and ' +
@@ -103,7 +103,7 @@ export const uninstallPwa = defineTool(() => ({
   },
 }));
 
-export const launchPwa = defineTool(() => ({
+export const launchPwa: ToolFactory = defineTool(() => ({
   name: 'launch_pwa',
   description:
     'Launches an installed Progressive Web App using its saved display mode. ' +
@@ -135,7 +135,7 @@ export const launchPwa = defineTool(() => ({
   },
 }));
 
-export const getOsAppState = defineTool(() => ({
+export const getOsAppState: ToolFactory = defineTool(() => ({
   name: 'get_os_app_state',
   description:
     'Returns the OS integration state (badge count and registered file ' +

@@ -14,7 +14,7 @@ import type {
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
 
@@ -138,169 +138,175 @@ function computeDownscaleClip(
   };
 }
 
-export const screenshot = definePageTool((args: ParsedArguments) => {
-  const {
-    screenshotFormat,
-    screenshotQuality,
-    screenshotMaxWidth,
-    screenshotMaxHeight,
-  } = args;
+export const screenshot: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => {
+    const {
+      screenshotFormat,
+      screenshotQuality,
+      screenshotMaxWidth,
+      screenshotMaxHeight,
+    } = args;
 
-  const defaultFormat: ScreenshotFormat = screenshotFormat ?? 'png';
+    const defaultFormat: ScreenshotFormat = screenshotFormat ?? 'png';
 
-  return {
-    name: 'take_screenshot',
-    description: `Take a screenshot of the page or element.`,
-    annotations: {
-      category: ToolCategory.DEBUGGING,
-      // Not read-only due to filePath param.
-      readOnlyHint: false,
-    },
-    schema: {
-      format: zod
-        .enum(['png', 'jpeg', 'webp'])
-        .default(defaultFormat)
-        .describe(
-          `Type of format to save the screenshot as. Default is "${defaultFormat}"`,
-        ),
-      quality: zod
-        .number()
-        .min(0)
-        .max(100)
-        .optional()
-        .describe(
-          'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
-        ),
-      uid: zod
-        .string()
-        .optional()
-        .describe(
-          'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
-        ),
-      fullPage: zod
-        .boolean()
-        .optional()
-        .describe(
-          'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
-        ),
-      filePath: zod
-        .string()
-        .optional()
-        .describe(
-          'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
-        ),
-    },
-    blockedByDialog: true,
-    concurrency: 'page',
-    verifyFilesSchema: {
-      filePath: true,
-    },
-    handler: async (request, response, context) => {
-      if (request.params.uid && request.params.fullPage) {
-        throw new Error('Providing both "uid" and "fullPage" is not allowed.');
-      }
-
-      const page = request.page.pptrPage;
-      using element = request.params.uid
-        ? await request.page.getElementByUid(request.params.uid)
-        : undefined;
-
-      const format = request.params.format;
-      const quality =
-        format === 'png'
-          ? undefined
-          : (request.params.quality ?? screenshotQuality);
-      const fullPage = request.params.fullPage ?? false;
-
-      // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
-      // once the capture is done to avoid leaking a remote object for the life
-      // of the page's execution context.
-      let screenshot: Uint8Array;
-
-      // Compute a downscale clip when --screenshot-max-width or
-      // --screenshot-max-height is set and the source exceeds either bound.
-      // The smaller scale factor wins so both bounds are respected while
-      // preserving aspect ratio.
-      let clip: ScreenshotClip | undefined;
-      if (
-        screenshotMaxWidth !== undefined ||
-        screenshotMaxHeight !== undefined
-      ) {
-        const box = await getSourceBox(page, element, fullPage);
-        if (box) {
-          clip = computeDownscaleClip(
-            box,
-            screenshotMaxWidth,
-            screenshotMaxHeight,
+    return {
+      name: 'take_screenshot',
+      description: `Take a screenshot of the page or element.`,
+      annotations: {
+        category: ToolCategory.DEBUGGING,
+        // Not read-only due to filePath param.
+        readOnlyHint: false,
+      },
+      schema: {
+        format: zod
+          .enum(['png', 'jpeg', 'webp'])
+          .default(defaultFormat)
+          .describe(
+            `Type of format to save the screenshot as. Default is "${defaultFormat}"`,
+          ),
+        quality: zod
+          .number()
+          .min(0)
+          .max(100)
+          .optional()
+          .describe(
+            'Compression quality for JPEG and WebP formats (0-100). Higher values mean better quality but larger file sizes. Ignored for PNG format.',
+          ),
+        uid: zod
+          .string()
+          .optional()
+          .describe(
+            'The uid of an element on the page from the page content snapshot. If omitted, takes a page screenshot.',
+          ),
+        fullPage: zod
+          .boolean()
+          .optional()
+          .describe(
+            'If set to true takes a screenshot of the full page instead of the currently visible viewport. Incompatible with uid.',
+          ),
+        filePath: zod
+          .string()
+          .optional()
+          .describe(
+            'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
+          ),
+      },
+      blockedByDialog: true,
+      concurrency: 'page',
+      verifyFilesSchema: {
+        filePath: true,
+      },
+      handler: async (request, response, context) => {
+        if (request.params.uid && request.params.fullPage) {
+          throw new Error(
+            'Providing both "uid" and "fullPage" is not allowed.',
           );
         }
-      }
 
-      if (clip) {
-        // page.screenshot with clip lets the CDP scale param downscale the
-        // capture for viewport, full-page and element shots alike. We rely on
-        // Puppeteer's default of captureBeyondViewport=true when a clip is
-        // present so element/full-page captures below the fold still work.
-        screenshot = await page.screenshot({
-          type: format,
-          quality,
-          optimizeForSpeed: true,
-          clip,
-        });
-      } else if (element) {
-        screenshot = await element.screenshot({
-          type: format,
-          quality,
-          optimizeForSpeed: true,
-        });
-      } else {
-        screenshot = await page.screenshot({
-          type: format,
-          fullPage,
-          quality,
-          optimizeForSpeed: true,
-        });
-      }
+        const page = request.page.pptrPage;
+        using element = request.params.uid
+          ? await request.page.getElementByUid(request.params.uid)
+          : undefined;
 
-      if (request.params.uid) {
-        response.appendResponseLine(
-          `Took a screenshot of node with uid "${request.params.uid}".`,
-        );
-      } else if (fullPage) {
-        response.appendResponseLine(
-          'Took a screenshot of the full current page.',
-        );
-      } else {
-        response.appendResponseLine(
-          "Took a screenshot of the current page's viewport.",
-        );
-      }
+        const format = request.params.format;
+        const quality =
+          format === 'png'
+            ? undefined
+            : (request.params.quality ?? screenshotQuality);
+        const fullPage = request.params.fullPage ?? false;
 
-      // Narrow `format` at the point of use: in the factory form of
-      // definePageTool TS widens the Schema generic, which loses the literal
-      // union from zod.enum on request.params.format.
-      const extension: '.png' | '.jpeg' | '.webp' =
-        format === 'jpeg' ? '.jpeg' : format === 'webp' ? '.webp' : '.png';
+        // `getElementByUid` mints a fresh ElementHandle per call, so dispose it
+        // once the capture is done to avoid leaking a remote object for the life
+        // of the page's execution context.
+        let screenshot: Uint8Array;
 
-      if (request.params.filePath) {
-        const result = await context.saveFile(
-          screenshot,
-          request.params.filePath,
-          extension,
-        );
-        response.appendResponseLine(`Saved screenshot to ${result.filename}.`);
-      } else if (screenshot.length >= 2_000_000) {
-        const {filepath} = await context.saveTemporaryFile(
-          screenshot,
-          `screenshot${extension}`,
-        );
-        response.appendResponseLine(`Saved screenshot to ${filepath}.`);
-      } else {
-        response.attachImage({
-          mimeType: `image/${format}`,
-          data: Buffer.from(screenshot).toString('base64'),
-        });
-      }
-    },
-  };
-});
+        // Compute a downscale clip when --screenshot-max-width or
+        // --screenshot-max-height is set and the source exceeds either bound.
+        // The smaller scale factor wins so both bounds are respected while
+        // preserving aspect ratio.
+        let clip: ScreenshotClip | undefined;
+        if (
+          screenshotMaxWidth !== undefined ||
+          screenshotMaxHeight !== undefined
+        ) {
+          const box = await getSourceBox(page, element, fullPage);
+          if (box) {
+            clip = computeDownscaleClip(
+              box,
+              screenshotMaxWidth,
+              screenshotMaxHeight,
+            );
+          }
+        }
+
+        if (clip) {
+          // page.screenshot with clip lets the CDP scale param downscale the
+          // capture for viewport, full-page and element shots alike. We rely on
+          // Puppeteer's default of captureBeyondViewport=true when a clip is
+          // present so element/full-page captures below the fold still work.
+          screenshot = await page.screenshot({
+            type: format,
+            quality,
+            optimizeForSpeed: true,
+            clip,
+          });
+        } else if (element) {
+          screenshot = await element.screenshot({
+            type: format,
+            quality,
+            optimizeForSpeed: true,
+          });
+        } else {
+          screenshot = await page.screenshot({
+            type: format,
+            fullPage,
+            quality,
+            optimizeForSpeed: true,
+          });
+        }
+
+        if (request.params.uid) {
+          response.appendResponseLine(
+            `Took a screenshot of node with uid "${request.params.uid}".`,
+          );
+        } else if (fullPage) {
+          response.appendResponseLine(
+            'Took a screenshot of the full current page.',
+          );
+        } else {
+          response.appendResponseLine(
+            "Took a screenshot of the current page's viewport.",
+          );
+        }
+
+        // Narrow `format` at the point of use: in the factory form of
+        // definePageTool TS widens the Schema generic, which loses the literal
+        // union from zod.enum on request.params.format.
+        const extension: '.png' | '.jpeg' | '.webp' =
+          format === 'jpeg' ? '.jpeg' : format === 'webp' ? '.webp' : '.png';
+
+        if (request.params.filePath) {
+          const result = await context.saveFile(
+            screenshot,
+            request.params.filePath,
+            extension,
+          );
+          response.appendResponseLine(
+            `Saved screenshot to ${result.filename}.`,
+          );
+        } else if (screenshot.length >= 2_000_000) {
+          const {filepath} = await context.saveTemporaryFile(
+            screenshot,
+            `screenshot${extension}`,
+          );
+          response.appendResponseLine(`Saved screenshot to ${filepath}.`);
+        } else {
+          response.attachImage({
+            mimeType: `image/${format}`,
+            data: Buffer.from(screenshot).toString('base64'),
+          });
+        }
+      },
+    };
+  },
+);

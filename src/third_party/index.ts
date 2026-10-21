@@ -114,24 +114,26 @@ function loadLighthouse(): Promise<typeof LighthouseBundle> {
   return lighthouseBundle;
 }
 
-export const lighthouseRunner = {
-  async snapshot(page: Page, options: {flags?: Flags}): Promise<RunnerResult> {
-    const {snapshot} = await loadLighthouse();
-    return await snapshot(page, options);
-  },
-  async navigation(
-    page: Page,
-    url: string,
-    options: {flags?: Flags},
-  ): Promise<RunnerResult> {
-    const {navigation} = await loadLighthouse();
-    return await navigation(page, url, options);
-  },
-};
+export async function lighthouseSnapshot(
+  page: Page,
+  options: {flags?: Flags},
+): Promise<RunnerResult | undefined> {
+  const {snapshot} = await loadLighthouse();
+  return await snapshot(page, options);
+}
+
+export async function lighthouseNavigation(
+  page: Page,
+  url: string,
+  options: {flags?: Flags},
+): Promise<RunnerResult | undefined> {
+  const {navigation} = await loadLighthouse();
+  return await navigation(page, url, options);
+}
 
 export async function generateReport(
   lhr: Result,
-  format: string,
+  format: OutputMode,
 ): Promise<string> {
   const lighthouse = await loadLighthouse();
   return lighthouse.generateReport(lhr, format);
