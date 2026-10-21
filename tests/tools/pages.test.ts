@@ -1974,7 +1974,7 @@ describe('pages', () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         // @ts-expect-error _tabId is internal.
-        assert.ok(typeof page._tabId === 'string');
+        assert.strictEqual(typeof page._tabId, 'string');
         // @ts-expect-error _tabId is internal.
         page._tabId = 'test-tab-id';
         await getTabId(args).handler(

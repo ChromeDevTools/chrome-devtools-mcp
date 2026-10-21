@@ -260,7 +260,10 @@ describe('ClearcutLogger', () => {
       const msg = mockWatchdogClient.send.firstCall.args[0];
       assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
       assert.ok(msg.payload.daily_active);
-      assert.ok(msg.payload.daily_active.days_since_last_active !== undefined);
+      assert.notStrictEqual(
+        msg.payload.daily_active.days_since_last_active,
+        undefined,
+      );
 
       sinon.assert.called(mockPersistence.saveState);
     });

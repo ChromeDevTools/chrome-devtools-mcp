@@ -1692,8 +1692,8 @@ describe('McpResponse heap snapshot formatting', () => {
 
     const largeIndex = text.indexOf('LargeNode');
     const mediumIndex = text.indexOf('MediumNode');
-    assert.ok(largeIndex !== -1, 'LargeNode should be present');
-    assert.ok(mediumIndex !== -1, 'MediumNode should be present');
+    assert.notStrictEqual(largeIndex, -1, 'LargeNode should be present');
+    assert.notStrictEqual(mediumIndex, -1, 'MediumNode should be present');
     assert.ok(
       largeIndex < mediumIndex,
       'LargeNode should precede MediumNode due to descending retainedSize sorting',

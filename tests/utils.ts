@@ -54,7 +54,7 @@ export function assertNoServiceWorkerReported(
   const target = targets.find(target => {
     return target.url().includes(id) && target.type() === 'service_worker';
   });
-  assert(target === undefined);
+  assert.strictEqual(target, undefined);
 }
 
 export function getTextContent(
