@@ -18,11 +18,9 @@ import {
   CLI_EXAMPLES,
   stripYargsPositionalArgs,
   withoutDefaults,
+  type ParsedArguments,
 } from './mcp-options.js';
-import type {ParsedArguments} from './ServerConfig.js';
 import {ServerConfig} from './ServerConfig.js';
-
-export type {ParsedArguments} from './ServerConfig.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

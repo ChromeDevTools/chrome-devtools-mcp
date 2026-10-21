@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 
 export function logCruxDisclaimer(args: ParsedArguments): void {
   if (!args.slim && args.performanceCrux) {

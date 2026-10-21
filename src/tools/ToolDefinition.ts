@@ -5,7 +5,7 @@
  */
 
 import {categoryToFlagName} from '../config/category-options.js';
-import type {ParsedArguments} from '../config/ConfigParser.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotDiff,

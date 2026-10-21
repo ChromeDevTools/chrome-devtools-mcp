@@ -28,7 +28,7 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
 import {stopDaemon} from '../src/daemon/client.js';
 import {isDaemonRunning} from '../src/daemon/utils.js';
 import {McpContext, type McpContextOptions} from '../src/McpContext.js';

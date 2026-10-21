@@ -24,7 +24,9 @@
     "incremental": true,
     "sourceMap": true,
     "preserveConstEnums": true,
-    "useUnknownInCatchVariables": false
+    "useUnknownInCatchVariables": false,
+    "declaration": true,
+    "isolatedDeclarations": true
   },
   "include": [
     "src/**/*.ts",

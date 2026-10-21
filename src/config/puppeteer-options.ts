@@ -7,20 +7,36 @@
 import type {YargsOptions} from '../third_party/index.js';
 import {validateUrlPatterns} from '../utils/url.js';
 
+import type {McpOptionsFor} from './category-options.js';
+
 interface PuppeteerOption extends YargsOptions {
   reloadable?: boolean;
 }
+
+export interface PuppeteerArguments {
+  viewport?: {width: number; height: number};
+  acceptInsecureCerts: boolean;
+  blockedUrlPattern?: string[];
+  allowedUrlPattern?: string[];
+}
+
+export type PuppeteerOptions = McpOptionsFor<
+  PuppeteerArguments,
+  PuppeteerOption
+>;
 
 /**
  * Options that are applied through Puppeteer when launching or connecting to
  * the browser.
  */
-export const puppeteerOptions = {
+export const puppeteerOptions: PuppeteerOptions = {
   viewport: {
     type: 'string',
     describe:
       'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
-    coerce: (arg: string | undefined) => {
+    coerce: (
+      arg: string | undefined,
+    ): {width: number; height: number} | undefined => {
       if (arg === undefined) {
         return;
       }
@@ -52,7 +68,7 @@ export const puppeteerOptions = {
     reloadable: true,
     describe:
       "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\\.\\d+\\.\\d+\\.\\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).",
-    coerce: (arg: string[] | undefined) => {
+    coerce: (arg: string[] | undefined): string[] | undefined => {
       if (arg === undefined || arg.length === 0) {
         return undefined;
       }
@@ -66,7 +82,7 @@ export const puppeteerOptions = {
     reloadable: true,
     describe:
       "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\\.\\d+\\.\\d+\\.\\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).",
-    coerce: (arg: string[] | undefined) => {
+    coerce: (arg: string[] | undefined): string[] | undefined => {
       if (arg === undefined) {
         return undefined;
       }
@@ -79,4 +95,4 @@ export const puppeteerOptions = {
       return arg;
     },
   },
-} satisfies Record<string, PuppeteerOption>;
+};

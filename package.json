@@ -43,7 +43,8 @@
     "LICENSE",
     "skills",
     "!*.tsbuildinfo",
-    "!*.js.map"
+    "!*.js.map",
+    "!**/*.d.ts"
   ],
   "repository": "ChromeDevTools/chrome-devtools-mcp",
   "author": "Google LLC",

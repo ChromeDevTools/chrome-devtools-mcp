@@ -14,7 +14,7 @@ import {emulate} from '../src/tools/emulation.js';
 import {lighthouseAudit} from '../src/tools/lighthouse.js';
 import {navigatePage} from '../src/tools/pages.js';
 import {evaluateScript} from '../src/tools/script.js';
-import type {ParsedArguments} from '../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
 
 import {serverHooks, type TestServer} from './server.js';
 import {withMcpContext} from './utils.js';
