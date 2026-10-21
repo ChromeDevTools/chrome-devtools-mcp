@@ -152,6 +152,7 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
       );
 
       try {
+        await page.authenticate(request.params.url);
         await page.waitForEventsAfterAction(
           async () => {
             await page.pptrPage.goto(request.params.url, {
@@ -273,6 +274,7 @@ export const navigatePage: PageToolFactory = definePageTool(
                     );
                   }
                   try {
+                    await page.authenticate(request.params.url);
                     await page.pptrPage.goto(request.params.url, options);
                     response.appendResponseLine(
                       `Successfully navigated to ${request.params.url}.`,

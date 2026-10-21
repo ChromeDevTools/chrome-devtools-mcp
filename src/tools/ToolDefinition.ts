@@ -503,6 +503,7 @@ export type ContextPage = Readonly<{
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
+  authenticate(url: string): Promise<void>;
   init(options?: {emulateFocus?: boolean}): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;

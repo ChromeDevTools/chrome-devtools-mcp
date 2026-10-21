@@ -397,6 +397,20 @@ describe('McpPage', () => {
       sinon.assert.notCalled(pptrPage.title);
     });
 
+    it('authenticates only when authHelper is configured', async () => {
+      const {mcpPage: unconfiguredPage, pptrPage: unconfiguredPptrPage} =
+        await createMcpPage();
+      await unconfiguredPage.authenticate('http://localhost:8080');
+      sinon.assert.notCalled(unconfiguredPptrPage.browserContext);
+
+      const config = createMockServerConfig({
+        authHelper: 'my-auth-helper',
+      });
+      const {mcpPage, pptrPage} = await createMcpPage({config});
+      await mcpPage.authenticate('http://localhost:8080');
+      sinon.assert.calledOnce(pptrPage.browserContext);
+    });
+
     it('falls back to target.asPage() when target.page() returns null', async () => {
       const pptrPage = createMockPuppeteerPage();
       pptrPage.emulateFocusedPage.resolves();
