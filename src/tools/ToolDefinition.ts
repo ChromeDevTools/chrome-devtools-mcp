@@ -35,8 +35,10 @@ import type {
   UninstallPWAOptions,
   Viewport,
   DevTools,
+  Flags,
   Protocol,
   Page,
+  RunnerResult,
   WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
@@ -545,6 +547,8 @@ export type ContextPage = Readonly<{
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
   ): Promise<DevToolsCommentBridge | undefined>;
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
 }>;
 
 export function defineTool<Schema extends zod.ZodRawShape>(

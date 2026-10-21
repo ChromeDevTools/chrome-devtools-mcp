@@ -31,7 +31,11 @@ import {
   type ConsoleMessage,
   type HTTPRequest,
   DevTools,
+  type Flags,
   type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  type RunnerResult,
 } from './third_party/index.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
 import type {
@@ -1472,6 +1476,18 @@ export class McpPage implements ContextPage {
       width: metrics.cssLayoutViewport.clientWidth,
       height: metrics.cssLayoutViewport.clientHeight,
     };
+  }
+
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseNavigation(this.pptrPage, this.pptrPage.url(), {
+      flags,
+    });
+  }
+
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseSnapshot(this.pptrPage, {
+      flags,
+    });
   }
 
   /**

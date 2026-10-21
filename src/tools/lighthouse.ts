@@ -9,7 +9,6 @@ import path from 'node:path';
 import type {ParsedArguments} from '../config/ConfigParser.js';
 
 import {
-  lighthouseRunner,
   generateReport,
   zod,
   type Flags,
@@ -202,7 +201,7 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
       'best-practices',
       'agentic-browsing',
     ];
-    const formats = ['json', 'html'] as OutputMode[];
+    const formats: OutputMode[] = ['json', 'html'];
     const {
       mode = 'navigation',
       device = 'desktop',
@@ -241,13 +240,11 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
     let result: RunnerResult | undefined;
     try {
       if (mode === 'navigation') {
-        const url = page.pptrPage.url();
         try {
-          result = await lighthouseRunner.navigation(page.pptrPage, url, {
-            flags,
-          });
+          result = await page.lighthouseNavigation(flags);
         } catch (error) {
           if (isInvalidUrlError(error)) {
+            const url = page.pptrPage.url();
             throw new Error(
               `Lighthouse "navigation" mode cannot audit ${url}: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.`,
               {cause: error},
@@ -256,9 +253,7 @@ export const lighthouseAudit = definePageTool((args: ParsedArguments) => ({
           throw error;
         }
       } else {
-        result = await lighthouseRunner.snapshot(page.pptrPage, {
-          flags,
-        });
+        result = await page.lighthouseSnapshot(flags);
       }
 
       if (!result) {
