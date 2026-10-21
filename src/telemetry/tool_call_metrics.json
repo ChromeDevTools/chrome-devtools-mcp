@@ -708,6 +708,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "visible",
+        "argType": "boolean"
       }
     ]
   },

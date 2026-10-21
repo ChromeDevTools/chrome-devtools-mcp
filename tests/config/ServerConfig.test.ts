@@ -239,6 +239,7 @@ describe('ServerConfig', () => {
           '--memoryDebugging',
           '--no-category-network',
           '--no-file-navigations',
+          '--blockedUrlPattern=https://example.com/*',
           '--slim',
         ]),
       ).resolved;
@@ -246,20 +247,41 @@ describe('ServerConfig', () => {
       assert.strictEqual(merged.memoryDebugging, true);
       assert.strictEqual(merged.categoryNetwork, false);
       assert.strictEqual(merged.fileNavigations, false);
+      assert.deepStrictEqual(merged.blockedUrlPattern, [
+        'https://example.com/*',
+      ]);
       assert.strictEqual(merged.slim, true);
+    });
+
+    it('switches between blockedUrlPattern and allowedUrlPattern across reloads', () => {
+      const withBlocked = parseConfig().mergeReloadable(
+        parseConfig(['--blockedUrlPattern=https://blocked.example.com/*']),
+      );
+      assert.deepStrictEqual(withBlocked.resolved.blockedUrlPattern, [
+        'https://blocked.example.com/*',
+      ]);
+      assert.strictEqual(withBlocked.resolved.allowedUrlPattern, undefined);
+
+      const withAllowed = withBlocked.mergeReloadable(
+        parseConfig(['--allowedUrlPattern=https://allowed.example.com/*']),
+      );
+      assert.strictEqual(withAllowed.resolved.blockedUrlPattern, undefined);
+      assert.deepStrictEqual(withAllowed.resolved.allowedUrlPattern, [
+        'https://allowed.example.com/*',
+      ]);
     });
 
     it('keeps restart-required options', () => {
       const merged = parseConfig().mergeReloadable(
         parseConfig([
           '--categoryExtensions',
-          '--blockedUrlPattern=https://example.com/*',
+          '--headless',
           '--experimentalDevtools',
         ]),
       ).resolved;
 
       assert.strictEqual(merged.categoryExtensions, undefined);
-      assert.strictEqual(merged.blockedUrlPattern, undefined);
+      assert.strictEqual(merged.headless, false);
       assert.strictEqual(merged.experimentalDevtools, false);
     });
 
@@ -410,15 +432,13 @@ describe('ServerConfig', () => {
     });
 
     it('compares restart-required array and object options by value', () => {
-      const previous = parseConfig([
-        '--blockedUrlPattern=https://example.com/*',
-      ]);
-      const same = parseConfig(['--blockedUrlPattern=https://example.com/*']);
-      const changed = parseConfig(['--blockedUrlPattern=https://other.com/*']);
+      const previous = parseConfig(['--chromeArg=--foo']);
+      const same = parseConfig(['--chromeArg=--foo']);
+      const changed = parseConfig(['--chromeArg=--bar']);
 
       assert.deepStrictEqual(previous.getRestartRequiredChanges(same), []);
       assert.deepStrictEqual(previous.getRestartRequiredChanges(changed), [
-        'blockedUrlPattern',
+        'chromeArg',
       ]);
     });
 

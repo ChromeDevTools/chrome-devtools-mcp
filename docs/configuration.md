@@ -224,6 +224,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--maxNavigationSaved`/ `--max-navigation-saved`**
+  Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and 25. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.
+  - **Type:** number
+  - **Default:** `3`
+
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
   - **Type:** boolean
@@ -314,11 +319,12 @@ available tools, and notifies the MCP client with
 `notifications/tools/list_changed`. If the new file is invalid, the server logs
 the error to stderr and keeps the previous configuration.
 
-Tool categories (except `categoryExtensions`) and tool-specific options apply
-immediately. Options that configure the browser, such as `headless`, `channel`,
-`viewport`, `blockedUrlPattern`, or `categoryExtensions`, only apply after
-restarting chrome-devtools-mcp. The server logs a message to stderr when a
-change requires a restart.
+Tool categories (except `categoryExtensions`), network URL restrictions
+(`blockedUrlPattern`, `allowedUrlPattern`), and tool-specific options apply
+immediately. Options that launch or connect to the browser, such as `headless`,
+`channel`, `viewport`, or `categoryExtensions`, only apply after restarting
+chrome-devtools-mcp. The server logs a message to stderr when a change requires
+a restart.
 
 ### Locking down the configuration file from agent access
 

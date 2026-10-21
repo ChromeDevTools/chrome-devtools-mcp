@@ -127,15 +127,6 @@ export function overrideDevToolsGlobals({
     entrypointURL: import.meta
       .resolve('../third_party/devtools-formatter-worker.js'),
   });
-
-  // BreakpointManager.setBreakpoint() reveals a moved breakpoint location in
-  // the Sources panel. There is no UI here, so a no-op revealer keeps that
-  // from rejecting. TODO: drop once the reveal moves out of the model.
-  DevTools.Common.Revealer.RevealerRegistry.removeInstance();
-  DevTools.Common.Revealer.registerRevealer({
-    contextTypes: () => [DevTools.Workspace.UISourceCode.UILocation],
-    loadRevealer: () => Promise.resolve({reveal: () => Promise.resolve()}),
-  });
 }
 
 export interface TargetUniverse {

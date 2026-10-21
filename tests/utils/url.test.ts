@@ -318,6 +318,17 @@ describe('validateUrl', () => {
     );
   });
 
+  it('should reject devtools: URLs', () => {
+    assert.throws(
+      () =>
+        validateUrl(
+          'devtools://devtools/bundled/devtools_app.html',
+          defaultOptions,
+        ),
+      /Navigating to devtools: URLs is not allowed\./,
+    );
+  });
+
   it('should allow file URLs when fileNavigations is true or omitted', () => {
     assert.strictEqual(
       validateUrl('file:///tmp/example.txt', defaultOptions).protocol,

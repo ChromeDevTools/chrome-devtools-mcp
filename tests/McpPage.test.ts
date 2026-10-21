@@ -9,11 +9,17 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {UncaughtError} from '../src/collectors/PageCollector.js';
 import type {ReadonlyServerConfig} from '../src/config/ServerConfig.js';
 import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {LogpointManager} from '../src/LogpointManager.js';
 import {McpPage, replaceHtmlElementsWithUids} from '../src/McpPage.js';
-import {DevTools, Locator, ScreenRecorder} from '../src/third_party/index.js';
+import {
+  DevTools,
+  Frame,
+  Locator,
+  ScreenRecorder,
+} from '../src/third_party/index.js';
 import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
@@ -21,6 +27,7 @@ import {
   createMockCDPSession,
   createMockDialog,
   createMockMcpResponse,
+  createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
   createMockServerConfig,
@@ -310,6 +317,53 @@ describe('McpPage', () => {
   }
 
   describe('lazy initialization', () => {
+    for (const replaceNetworkCollector of [false, true]) {
+      it(`forwards the navigation limit to collectors (replacement: ${replaceNetworkCollector})`, async () => {
+        const pptrPage = createMockPuppeteerPage();
+        const target = createMockPuppeteerTarget({page: pptrPage});
+        const mcpPage = new McpPage(target, 1, {
+          config: createMockServerConfig({maxNavigationSaved: 5}),
+          locatorClass: Locator,
+        });
+        await mcpPage.init();
+        if (replaceNetworkCollector) {
+          await mcpPage.setUpNetworkCollectorForTesting();
+        }
+        const requests = [];
+        const errors = [];
+        for (let navigation = 0; navigation < 7; navigation++) {
+          const request = getMockRequest({
+            url: `http://example.com/nav${navigation}`,
+            navigationRequest: true,
+            frame: pptrPage.mainFrame(),
+          });
+          requests.push(request);
+          pptrPage.emit('request', request);
+          pptrPage.emit('framenavigated', pptrPage.mainFrame());
+          const error = new UncaughtError(
+            {
+              exceptionId: navigation,
+              text: `error-${navigation}`,
+              lineNumber: 0,
+              columnNumber: 0,
+            },
+            '<mock>',
+          );
+          errors.push(error);
+          pptrPage.emit('uncaughtError', error);
+        }
+        assert.deepStrictEqual(
+          mcpPage.networkCollector.getData(true),
+          requests.slice(-5),
+        );
+        assert.deepStrictEqual(
+          mcpPage.consoleCollector.getData(true),
+          errors.slice(-5),
+        );
+        mcpPage.dispose();
+      });
+    }
+
     it('does not initialize Puppeteer Page in constructor and throws if pptrPage is accessed before init()', async () => {
       const pptrPage = createMockPuppeteerPage();
       pptrPage.emulateFocusedPage.resolves();
@@ -955,6 +1009,46 @@ describe('McpPage', () => {
     });
   });
 
+  describe('clearNetworkConditions()', () => {
+    it('clears networkConditions and updates timeouts while keeping other emulation settings', async () => {
+      const config = createMockServerConfig();
+      const {mcpPage, pptrPage} = await createMcpPage({config});
+      await mcpPage.emulate({
+        networkConditions: 'Slow 3G',
+        cpuThrottlingRate: 2,
+      });
+      pptrPage.setDefaultTimeout.resetHistory();
+      pptrPage.setDefaultNavigationTimeout.resetHistory();
+      config.commit(
+        createMockServerConfig({
+          blockedUrlPattern: ['https://example.com/*'],
+        }),
+      );
+
+      mcpPage.clearNetworkConditions();
+
+      assert.strictEqual(mcpPage.networkConditions, null);
+      assert.strictEqual(mcpPage.cpuThrottlingRate, 2);
+      sinon.assert.calledOnceWithExactly(pptrPage.setDefaultTimeout, 10_000);
+      sinon.assert.calledOnceWithExactly(
+        pptrPage.setDefaultNavigationTimeout,
+        20_000,
+      );
+      await mcpPage.restoreEmulation();
+    });
+
+    it('does nothing when networkConditions is not set', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.setDefaultTimeout.resetHistory();
+      pptrPage.setDefaultNavigationTimeout.resetHistory();
+
+      mcpPage.clearNetworkConditions();
+
+      sinon.assert.notCalled(pptrPage.setDefaultTimeout);
+      sinon.assert.notCalled(pptrPage.setDefaultNavigationTimeout);
+    });
+  });
+
   describe('getNetworkRequests', () => {
     it('delegates to networkCollector.getData with includePreservedRequests', async () => {
       const {mcpPage} = await createMcpPage();
@@ -1114,6 +1208,152 @@ describe('McpPage', () => {
         const element = await mcpPage.waitForTextOnPage(['Hello iframe']);
         assert.ok(element);
       });
+    });
+
+    it('preserves default matching for hidden DOM text', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          '<p style="display:none">Saved successfully</p>',
+        );
+
+        const element = await mcpPage.waitForTextOnPage(
+          ['Saved successfully'],
+          {timeout: 500},
+        );
+        assert.ok(element);
+      });
+    });
+
+    it('waits for hidden text to become visible when requested', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent(
+          '<p id="saved" style="display:none">Saved successfully</p>',
+        );
+
+        await page.evaluate(() => {
+          setTimeout(() => {
+            document.getElementById('saved')!.style.display = 'block';
+          }, 250);
+        });
+        const element = await mcpPage.waitForTextOnPage(
+          ['Saved successfully'],
+          {timeout: 1500, visible: true},
+        );
+        assert.ok(element);
+      });
+    });
+
+    it('times out when visible text never appears', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent(
+          '<p style="display:none">Saved successfully</p>',
+        );
+
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Saved successfully'], {
+            timeout: 300,
+            visible: true,
+          }),
+          /Timed out/,
+        );
+      });
+    });
+
+    it('visible text remains immediately matchable when requested', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        await mcpPage.pptrPage.setContent('<p>Visible from the start</p>');
+        assert.ok(
+          await mcpPage.waitForTextOnPage(['Visible from the start'], {
+            timeout: 500,
+            visible: true,
+          }),
+        );
+      });
+    });
+
+    it('finds text in an iframe attached while waiting', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>Waiting for the frame</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        const waitPromise = mcpPage.waitForTextOnPage(
+          ['Arrived in a late iframe'],
+          {timeout: 1500},
+        );
+        await page.evaluate(() => {
+          const frame = document.createElement('iframe');
+          frame.srcdoc = '<p>Arrived in a late iframe</p>';
+          document.body.appendChild(frame);
+        });
+
+        const element = await waitPromise;
+        assert.ok(element);
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('cleans the frame listener after a timed out wait', async () => {
+      await withMcpContext(async (_response, context) => {
+        const mcpPage = context.getSelectedMcpPage();
+        const page = mcpPage.pptrPage;
+        await page.setContent('<main>No matching text</main>');
+
+        const listenersBefore = page.listenerCount('frameattached');
+        await assert.rejects(
+          mcpPage.waitForTextOnPage(['Text that never appears'], {
+            timeout: 250,
+          }),
+        );
+        assert.strictEqual(
+          page.listenerCount('frameattached'),
+          listenersBefore,
+        );
+      });
+    });
+
+    it('applies visible matching to frames attached while waiting', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.frames.returns([]);
+      const initialRace = Locator.race([]);
+      sinon.stub(initialRace, 'wait').returns(new Promise(() => {}));
+      const lateRace = Locator.race([]);
+      const lateRaceSetTimeout = sinon
+        .stub(lateRace, 'setTimeout')
+        .returns(lateRace);
+      sinon.stub(lateRace, 'wait').resolves();
+      const race = sinon.stub(Locator, 'race');
+      race.onFirstCall().returns(initialRace);
+      race.onSecondCall().returns(lateRace);
+      const frameLocator = sinon.createStubInstance<Locator<Element>>(Locator);
+      frameLocator.setVisibility.returns(frameLocator);
+      const lateFrame = sinon.createStubInstance(Frame);
+      lateFrame.locator.returns(frameLocator);
+
+      const waitPromise = mcpPage.waitForTextOnPage(['Saved'], {visible: true});
+      pptrPage.emit('frameattached', lateFrame);
+      await waitPromise;
+
+      sinon.assert.calledWithExactly(lateFrame.locator.firstCall, 'aria/Saved');
+      sinon.assert.calledWithExactly(
+        lateFrame.locator.secondCall,
+        'text/Saved',
+      );
+      sinon.assert.calledTwice(frameLocator.setVisibility);
+      sinon.assert.alwaysCalledWithExactly(
+        frameLocator.setVisibility,
+        'visible',
+      );
+      sinon.assert.calledOnceWithExactly(lateRaceSetTimeout, 0);
     });
   });
 
@@ -2016,6 +2256,107 @@ describe('McpPage', () => {
         nonDebuggingTool,
         unannotatedTool,
       ]);
+    });
+  });
+
+  describe('resize()', () => {
+    it('resizes the page and returns the resulting cssLayoutViewport dimensions', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const browser = createMockPuppeteerBrowser();
+      pptrPage.browser.returns(browser);
+      pptrPage.windowId.resolves('win-1');
+      browser.getWindowBounds.resolves({windowState: 'normal'});
+      pptrPage.cdpSession.send.withArgs('Page.getLayoutMetrics').resolves({
+        cssLayoutViewport: {
+          clientWidth: 500,
+          clientHeight: 232,
+          pageX: 0,
+          pageY: 0,
+        },
+      });
+
+      const actualSize = await mcpPage.resize(100, 100);
+
+      sinon.assert.notCalled(browser.setWindowBounds);
+      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
+        contentWidth: 100,
+        contentHeight: 100,
+      });
+      assert.deepStrictEqual(actualSize, {width: 500, height: 232});
+    });
+
+    it('restores normal window state from fullscreen twice before resizing', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      const browser = createMockPuppeteerBrowser();
+      pptrPage.browser.returns(browser);
+      pptrPage.windowId.resolves('win-1');
+      browser.getWindowBounds.resolves({windowState: 'fullscreen'});
+      pptrPage.cdpSession.send.withArgs('Page.getLayoutMetrics').resolves({
+        cssLayoutViewport: {
+          clientWidth: 800,
+          clientHeight: 600,
+          pageX: 0,
+          pageY: 0,
+        },
+      });
+
+      const actualSize = await mcpPage.resize(800, 600);
+
+      sinon.assert.calledTwice(browser.setWindowBounds);
+      sinon.assert.calledWithExactly(
+        browser.setWindowBounds.firstCall,
+        'win-1',
+        {windowState: 'normal'},
+      );
+      sinon.assert.calledWithExactly(
+        browser.setWindowBounds.secondCall,
+        'win-1',
+        {windowState: 'normal'},
+      );
+      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
+        contentWidth: 800,
+        contentHeight: 600,
+      });
+      assert.deepStrictEqual(actualSize, {width: 800, height: 600});
+    });
+
+    it('continues resizing when window bounds APIs are unsupported', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.windowId.rejects(new Error('Window APIs not supported'));
+      pptrPage.cdpSession.send.withArgs('Page.getLayoutMetrics').resolves({
+        cssLayoutViewport: {
+          clientWidth: 700,
+          clientHeight: 500,
+          pageX: 0,
+          pageY: 0,
+        },
+      });
+
+      const actualSize = await mcpPage.resize(700, 500);
+
+      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
+        contentWidth: 700,
+        contentHeight: 500,
+      });
+      assert.deepStrictEqual(actualSize, {width: 700, height: 500});
+    });
+
+    it('returns undefined without reading layout metrics when a dialog is open', async () => {
+      const {mcpPage, pptrPage} = await createMcpPage();
+      pptrPage.windowId.rejects(new Error('Window APIs not supported'));
+      pptrPage.emit('dialog', createMockDialog());
+
+      const actualSize = await mcpPage.resize(700, 500);
+
+      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
+        contentWidth: 700,
+        contentHeight: 500,
+      });
+      sinon.assert.neverCalledWith(
+        pptrPage.cdpSession.send,
+        'Page.getLayoutMetrics',
+      );
+      assert.strictEqual(actualSize, undefined);
     });
   });
 

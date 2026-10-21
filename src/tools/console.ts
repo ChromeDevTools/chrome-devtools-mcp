@@ -43,7 +43,7 @@ export const listConsoleMessages = definePageTool(
   (cliArgs: ParsedArguments) => {
     return {
       name: LIST_CONSOLE_MESSAGES_TOOL_NAME,
-      description: `List all console messages for the target page since the last navigation.${cliArgs?.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
+      description: `List all console messages for the target page since the last navigation.${cliArgs.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
       annotations: {
         category: ToolCategory.DEBUGGING,
         readOnlyHint: true,
@@ -76,7 +76,7 @@ export const listConsoleMessages = definePageTool(
           .default(false)
           .optional()
           .describe(
-            'Set to true to return the preserved messages over the last 3 navigations.',
+            `Set to true to return the preserved messages over the last ${cliArgs.maxNavigationSaved} navigations.`,
           ),
         includeStackTraces: zod
           .boolean()

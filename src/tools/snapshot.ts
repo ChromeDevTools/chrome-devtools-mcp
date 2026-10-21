@@ -48,7 +48,7 @@ in the DevTools Elements panel (if any).`,
 
 export const waitFor = definePageTool(() => ({
   name: 'wait_for',
-  description: `Wait for the specified text to appear on the selected page.`,
+  description: `Wait for the specified text to appear on the selected page. By default, hidden text is also matched. Set visible to true to wait until the matched text is visible.`,
   annotations: {
     category: ToolCategory.NAVIGATION,
     readOnlyHint: true,
@@ -61,13 +61,23 @@ export const waitFor = definePageTool(() => ({
         'Non-empty list of texts. Resolves when any value appears on the page.',
       ),
     ...timeoutSchema,
+    visible: zod
+      .boolean()
+      .default(false)
+      .optional()
+      .describe(
+        'If true, wait until the matching text is visible. By default, hidden text also counts.',
+      ),
   },
   blockedByDialog: true,
   concurrency: 'page',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    await page.waitForTextOnPage(request.params.text, request.params.timeout);
+    await page.waitForTextOnPage(request.params.text, {
+      timeout: request.params.timeout,
+      visible: request.params.visible,
+    });
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,

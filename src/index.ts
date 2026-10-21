@@ -443,24 +443,20 @@ export async function createMcpServer(
     logFile?: fs.WriteStream;
   },
 ): Promise<{server: SdkMcpServer}> {
-  // BrowserManager only reads non-reloadable browser launch and connection
-  // options.
-  const browserManager = new BrowserManager(serverArgs, {
-    logFile: options.logFile,
-  });
   // createMcpServer takes a flat ParsedArguments snapshot and only returns
   // SdkMcpServer, so instances created here are never reloaded.
-  const server = await McpServer.from(
-    new ServerConfig({
-      cliArgs: {},
-      fileArgs: {},
-      configPath: undefined,
-      resolved: serverArgs,
-    }),
-    {
-      browserManager,
-      ...options,
-    },
-  );
+  const serverConfig = new ServerConfig({
+    cliArgs: {},
+    fileArgs: {},
+    configPath: undefined,
+    resolved: serverArgs,
+  });
+  const browserManager = new BrowserManager(serverConfig, {
+    logFile: options.logFile,
+  });
+  const server = await McpServer.from(serverConfig, {
+    browserManager,
+    ...options,
+  });
   return {server: server.server};
 }

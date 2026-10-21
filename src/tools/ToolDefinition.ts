@@ -534,7 +534,14 @@ export type ContextPage = Readonly<{
     prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
   }): Promise<void>;
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  waitForTextOnPage(
+    text: string[],
+    options?: {timeout?: number; visible?: boolean},
+  ): Promise<Element>;
+  resize(
+    width: number,
+    height: number,
+  ): Promise<{width: number; height: number} | undefined>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(

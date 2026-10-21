@@ -144,7 +144,7 @@ async function setupMCPServer(): Promise<void> {
   const serverConfig = configParser.parseConfig();
   const args = serverConfig.resolved;
   const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
-  const browserManager = new BrowserManager(args, {
+  const browserManager = new BrowserManager(serverConfig, {
     logFile,
   });
   mcpServer = await McpServer.from(serverConfig, {
