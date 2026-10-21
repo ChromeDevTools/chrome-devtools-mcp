@@ -244,7 +244,7 @@ const performEvaluation = async (
   format: 'function' | 'script',
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options: {filePath?: string; context: Context},
+  options: {context: Context; filePath?: string},
 ): Promise<void> => {
   let result: string | undefined;
   if (format === 'function') {

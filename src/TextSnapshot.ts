@@ -44,9 +44,9 @@ export class TextSnapshot {
     root: TextSnapshotNode;
     idToNode: Map<string, TextSnapshotNode>;
     snapshotId: string;
-    selectedElementUid?: string;
     hasSelectedElement: boolean;
     verbose: boolean;
+    selectedElementUid?: string;
   }) {
     this.root = data.root;
     this.idToNode = data.idToNode;

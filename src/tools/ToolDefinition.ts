@@ -122,12 +122,12 @@ export interface BaseToolDefinition<Schema extends ToolSchema = ToolSchema> {
   name: string;
   description: string;
   annotations: {
-    title?: string;
     category: ToolCategory;
     /**
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    title?: string;
     /**
      * If `'slim'` is included, the tool is only available with `--slim`. Tools
      * without `'slim'` are only available without `--slim`, see
@@ -211,7 +211,6 @@ export interface LighthouseData {
   summary: {
     mode: string;
     device: string;
-    url?: string;
     scores: Array<{
       id: string;
       title: string;
@@ -224,6 +223,7 @@ export interface LighthouseData {
     timing: {
       total: number;
     };
+    url?: string;
   };
   failedAudits: LighthouseFailedAudit[];
   reports: string[];
