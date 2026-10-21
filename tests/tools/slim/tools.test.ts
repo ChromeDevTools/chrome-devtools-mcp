@@ -14,7 +14,7 @@ import sinon from 'sinon';
 import {evaluate, navigate, screenshot} from '../../../src/tools/slim/tools.js';
 import {createHandlerMocks, createMockParsedArguments} from '../../mocks.js';
 import {screenshots} from '../../snapshot.js';
-import {withMcpContext} from '../../utils.js';
+import {withMcpContext, createTempDir} from '../../utils.js';
 
 describe('slim', () => {
   it('evaluates', async () => {
@@ -192,6 +192,7 @@ describe('slim', () => {
       const fixture = screenshots.basic;
       const page = context.getSelectedMcpPage().pptrPage;
       await page.setContent(fixture.html);
+
       await screenshot(args).handler(
         {params: {}, page: context.getSelectedMcpPage()},
         response,
@@ -199,6 +200,26 @@ describe('slim', () => {
       );
       assert(path.isAbsolute(response.responseLines.at(0)!));
       assert(fs.existsSync(response.responseLines.at(0)!));
+    });
+  });
+
+  it('with custom file path', async () => {
+    await withMcpContext(async (response, context, args) => {
+      const fixture = screenshots.basic;
+      const page = context.getSelectedMcpPage().pptrPage;
+      await page.setContent(fixture.html);
+
+      using tmpDir = createTempDir();
+      const filePath = path.join(tmpDir.path, 'test.png');
+      await screenshot(args).handler(
+        {params: {filePath}, page: context.getSelectedMcpPage()},
+        response,
+        context,
+      );
+      const responseFilePath = response.responseLines.at(0)!;
+      assert(path.isAbsolute(responseFilePath));
+      assert(fs.existsSync(responseFilePath));
+      assert.equal(await fs.promises.realpath(filePath), responseFilePath);
     });
   });
 });
