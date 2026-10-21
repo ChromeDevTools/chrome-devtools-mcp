@@ -11,10 +11,12 @@ import sinon from 'sinon';
 
 import {
   createTargetUniverse,
+  overrideDevToolsGlobals,
   SymbolizedError,
 } from '../../src/devtools/DevtoolsUtils.js';
 import {DevTools} from '../../src/third_party/index.js';
 import type {Protocol} from '../../src/third_party/index.js';
+import {createMockCDPSession} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
 
@@ -192,6 +194,33 @@ describe('createTargetUniverse', () => {
         false,
       );
     });
+  });
+
+  it('loads HTTP resources through host bindings instead of the target', async () => {
+    const loadResource = sinon.stub().resolves('{"version":3}');
+    overrideDevToolsGlobals({loadResource});
+    try {
+      const targetUniverse = await createTargetUniverse(createMockCDPSession());
+      const loadNetworkResourceSpy = sinon.spy(
+        targetUniverse.target.networkAgent(),
+        'invoke_loadNetworkResource',
+      );
+      const url = DevTools.Platform.DevToolsPath
+        .urlString`https://example.com/app.js.map`;
+
+      const result =
+        await targetUniverse.universe.pageResourceLoader.loadResource(url, {
+          target: targetUniverse.target,
+          frameId: null,
+          initiatorUrl: null,
+        });
+
+      assert.strictEqual(result.content, '{"version":3}');
+      sinon.assert.calledOnceWithExactly(loadResource, url);
+      sinon.assert.notCalled(loadNetworkResourceSpy);
+    } finally {
+      overrideDevToolsGlobals({loadResource: async () => ''});
+    }
   });
 });
 
