@@ -847,7 +847,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Name: legacy-javascript
 URL: https://github.com/GoogleChrome/lighthouse#readme
-Version: 0.0.3
+Version: 0.0.1
 License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
@@ -1623,7 +1623,7 @@ THE SOFTWARE.
 
 Name: third-party-web
 URL: https://github.com/patrickhulce/third-party-web
-Version: 0.30.0
+Version: 0.26.2
 License: MIT
 
 The MIT License (MIT)
