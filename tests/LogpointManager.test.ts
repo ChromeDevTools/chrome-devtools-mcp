@@ -397,6 +397,7 @@ describe('LogpointManager', () => {
       ]);
       assert.strictEqual(merged.length, 1);
       assert.strictEqual(merged[0].url, first.url);
+      assert.strictEqual(merged[0].sourceMapped, true);
       assert.strictEqual(merged[0].expression, `'generated', name`);
 
       await page.pptrPage.evaluate(`tsGreet('One')`);
@@ -406,7 +407,13 @@ describe('LogpointManager', () => {
         `Logged twice: ${messages}`,
       );
 
-      // Dropping both keys removes the shared breakpoint.
+      // Keeping only one of the two locations keeps the shared breakpoint.
+      const [kept] = await page.setLogpoints([authored]);
+      assert.strictEqual(kept.expression, `'authored', name`);
+      await page.pptrPage.evaluate(`tsGreet('Kept')`);
+      await waitForMessage(messages, 'authored Kept');
+
+      // Dropping the last key removes the shared breakpoint.
       assert.deepStrictEqual(await page.setLogpoints([]), []);
       await page.pptrPage.evaluate(`tsGreet('Two')`);
       await page.pptrPage.evaluate(`console.log('sentinel')`);

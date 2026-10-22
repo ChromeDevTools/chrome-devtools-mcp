@@ -187,12 +187,11 @@ export class LogpointManager {
   readonly #universe: Universe;
   readonly #target: DevTools.Target;
   /**
-   * The breakpoints that are logpoints of this page, each with whether it
-   * was set in an original source file. The breakpoint manager keeps one
-   * `Breakpoint` per normalized location, so two requested locations can
-   * share one entry.
+   * The breakpoints that are logpoints of this page. The breakpoint manager
+   * keeps one `Breakpoint` per normalized location, so two requested
+   * locations can share one entry.
    */
-  readonly #records = new Map<Breakpoint, boolean>();
+  readonly #records = new Set<Breakpoint>();
 
   constructor(devTools: TargetUniverse) {
     this.#universe = devTools.universe;
@@ -259,14 +258,11 @@ export class LogpointManager {
         unbound.push(key);
         continue;
       }
-      this.#records.set(
-        breakpoint,
-        uiSourceCode.contentType().isFromSourceMap(),
-      );
+      this.#records.add(breakpoint);
       kept.add(breakpoint);
     }
 
-    for (const breakpoint of [...this.#records.keys()]) {
+    for (const breakpoint of [...this.#records]) {
       if (!kept.has(breakpoint)) {
         this.#records.delete(breakpoint);
         await breakpoint.remove(/* keepInStorage */ false);
@@ -295,17 +291,20 @@ export class LogpointManager {
   }
 
   #currentLogpoints(): Logpoint[] {
-    return [...this.#records].map(([breakpoint, sourceMapped]) => {
-      return this.#snapshot(breakpoint, sourceMapped);
-    });
+    return [...this.#records].map(breakpoint => this.#snapshot(breakpoint));
   }
 
   /**
    * Reads the current state of a breakpoint, so that the result reflects
    * the normalized location and the re-binding done by the breakpoint
-   * manager after reloads.
+   * manager after reloads. The breakpoint manager may have moved a
+   * generated location to its original source, so whether the logpoint is
+   * source-mapped follows from the breakpoint, not from the request.
    */
-  #snapshot(breakpoint: Breakpoint, sourceMapped: boolean): Logpoint {
+  #snapshot(breakpoint: Breakpoint): Logpoint {
+    const sourceMapped = [...breakpoint.getUiSourceCodes()].some(uiSourceCode =>
+      uiSourceCode.contentType().isFromSourceMap(),
+    );
     const modelBreakpoint = breakpoint.modelBreakpoint(this.#debuggerModel);
     const generatedLocations: GeneratedLocation[] = [];
     if (breakpoint.bound()) {
