@@ -8,6 +8,7 @@ import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod, type CdpPage} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 import {validateUrl} from '../utils/url.js';
+import {waitForNavigationWithDialog} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -153,10 +154,13 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
 
       try {
         await page.waitForEventsAfterAction(
-          async () => {
-            await page.pptrPage.goto(request.params.url, {
-              timeout: request.params.timeout,
-            });
+          async signal => {
+            await waitForNavigationWithDialog(
+              page.pptrPage.goto(request.params.url, {
+                timeout: request.params.timeout,
+              }),
+              signal,
+            );
           },
           {timeout: request.params.timeout},
         );
@@ -184,7 +188,9 @@ export const newPage: ToolFactory = defineTool((args: ParsedArguments) => {
       }
 
       response.setIncludePages(true);
-      response.setListThirdPartyDeveloperTools();
+      if (!page.getDialog()) {
+        response.setListThirdPartyDeveloperTools();
+      }
     },
   };
 });
@@ -264,7 +270,7 @@ export const navigatePage: PageToolFactory = definePageTool(
         try {
           const action = request.params.handleBeforeUnload ?? 'accept';
           const result = await page.waitForEventsAfterAction(
-            async () => {
+            async signal => {
               switch (request.params.type) {
                 case 'url':
                   if (!request.params.url) {
@@ -273,7 +279,14 @@ export const navigatePage: PageToolFactory = definePageTool(
                     );
                   }
                   try {
-                    await page.pptrPage.goto(request.params.url, options);
+                    if (
+                      !(await waitForNavigationWithDialog(
+                        page.pptrPage.goto(request.params.url, options),
+                        signal,
+                      ))
+                    ) {
+                      return;
+                    }
                     response.appendResponseLine(
                       `Successfully navigated to ${request.params.url}.`,
                     );
@@ -285,7 +298,14 @@ export const navigatePage: PageToolFactory = definePageTool(
                   break;
                 case 'back':
                   try {
-                    await page.pptrPage.goBack(options);
+                    if (
+                      !(await waitForNavigationWithDialog(
+                        page.pptrPage.goBack(options),
+                        signal,
+                      ))
+                    ) {
+                      return;
+                    }
                     response.appendResponseLine(
                       `Successfully navigated back to ${page.pptrPage.url()}.`,
                     );
@@ -297,7 +317,14 @@ export const navigatePage: PageToolFactory = definePageTool(
                   break;
                 case 'forward':
                   try {
-                    await page.pptrPage.goForward(options);
+                    if (
+                      !(await waitForNavigationWithDialog(
+                        page.pptrPage.goForward(options),
+                        signal,
+                      ))
+                    ) {
+                      return;
+                    }
                     response.appendResponseLine(
                       `Successfully navigated forward to ${page.pptrPage.url()}.`,
                     );
@@ -309,10 +336,17 @@ export const navigatePage: PageToolFactory = definePageTool(
                   break;
                 case 'reload':
                   try {
-                    await page.pptrPage.reload({
-                      ...options,
-                      ignoreCache: request.params.ignoreCache,
-                    });
+                    if (
+                      !(await waitForNavigationWithDialog(
+                        page.pptrPage.reload({
+                          ...options,
+                          ignoreCache: request.params.ignoreCache,
+                        }),
+                        signal,
+                      ))
+                    ) {
+                      return;
+                    }
                     response.appendResponseLine(
                       `Successfully reloaded the page.`,
                     );
@@ -333,20 +367,28 @@ export const navigatePage: PageToolFactory = definePageTool(
             response.appendResponseLine(
               `${action === 'dismiss' ? 'Dismissed' : 'Accepted'} a beforeunload dialog.`,
             );
-            page.clearDialog();
+            if (page.getDialog()?.type() === 'beforeunload') {
+              page.clearDialog();
+            }
           }
         } finally {
           if (initScriptId) {
-            await page.pptrPage
+            const cleanup = page.pptrPage
               .removeScriptToEvaluateOnNewDocument(initScriptId)
               .catch(error => {
                 logger?.(`Failed to remove init script`, error);
               });
+            // CDP may defer script removal until the open dialog is handled.
+            if (!page.getDialog()) {
+              await cleanup;
+            }
           }
         }
 
         response.setIncludePages(true);
-        response.setListThirdPartyDeveloperTools();
+        if (!page.getDialog()) {
+          response.setListThirdPartyDeveloperTools();
+        }
         response.setListWebMcpTools();
       },
     };
