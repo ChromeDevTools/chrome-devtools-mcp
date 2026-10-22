@@ -38,6 +38,23 @@ function removeConflictingGlobalDeclaration(): void {
   console.log('Successfully removed conflicting global declaration.');
 }
 
+const SPARSE_CHECKOUT_PATTERNS = [
+  '"/*"',
+  '"!/*/"',
+  '"/build_overrides/"',
+  '"/config/"',
+  '"/front_end/"',
+  '"!/front_end/panels/"',
+  '"!/front_end/ui/"',
+  '"/mcp/"',
+  '"/extension-api/"',
+  '"/node_modules/"',
+  '"/scripts/"',
+  '"/third_party/"',
+  '"/**/BUILD.gn"',
+  '"/**/*.gni"',
+].join(' ');
+
 function ensureSubmodule(): void {
   const devtoolsFrontendDir = resolve(
     projectRoot,
@@ -45,10 +62,30 @@ function ensureSubmodule(): void {
     'devtools-frontend',
   );
   const mcpEntry = resolve(devtoolsFrontendDir, 'mcp', 'mcp.ts');
+  const gnScriptsDir = resolve(devtoolsFrontendDir, 'scripts', 'build');
 
-  if (existsSync(mcpEntry)) {
+  if (existsSync(mcpEntry) && existsSync(gnScriptsDir)) {
     console.log('devtools-frontend submodule is ready.');
     return;
+  }
+
+  if (existsSync(mcpEntry) && !existsSync(gnScriptsDir)) {
+    console.log('Updating devtools-frontend sparse checkout patterns...');
+    try {
+      execSync(
+        `git sparse-checkout set --no-cone ${SPARSE_CHECKOUT_PATTERNS}`,
+        {
+          cwd: devtoolsFrontendDir,
+          stdio: 'inherit',
+        },
+      );
+      return;
+    } catch (error) {
+      console.warn(
+        'Failed to update sparse checkout in place, re-initializing:',
+        error,
+      );
+    }
   }
 
   console.log(
@@ -81,13 +118,10 @@ function ensureSubmodule(): void {
     );
 
     // 2. Set the sparse checkout configuration
-    execSync(
-      'git sparse-checkout set --no-cone "/*" "!/*/" "/front_end/" "!/front_end/panels/" "!/front_end/ui/" "/mcp/" "/extension-api/"',
-      {
-        cwd: devtoolsFrontendDir,
-        stdio: 'inherit',
-      },
-    );
+    execSync(`git sparse-checkout set --no-cone ${SPARSE_CHECKOUT_PATTERNS}`, {
+      cwd: devtoolsFrontendDir,
+      stdio: 'inherit',
+    });
 
     // 3. Move the submodule's .git directory to the superproject's .git/modules
     execSync('git submodule absorbgitdirs third_party/devtools-frontend', {
