@@ -30,6 +30,10 @@ export default defineConfig([
   globalIgnores([
     '**/node_modules',
     '**/build/',
+    'build/**',
+    'build_overrides/**',
+    'buildtools/**',
+    'out/**',
     'third_party/**',
     'tests/tools/fixtures/',
     'tests/fixtures/',

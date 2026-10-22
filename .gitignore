@@ -153,7 +153,14 @@ log.txt
 mcp-heap-profiles/
 
 # gclient and depot_tools
+/build
+/build_overrides
+/buildtools
 third_party/.cipd/
 third_party/.gclient*
 third_party/.gcs_entries
+third_party/cpython3
 third_party/depot_tools/
+third_party/ninja
+third_party/node
+third_party/typescript
