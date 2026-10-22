@@ -1439,45 +1439,6 @@ export class McpPage implements ContextPage {
     });
   }
 
-  async resize(
-    width: number,
-    height: number,
-  ): Promise<{width: number; height: number} | undefined> {
-    try {
-      const browser = this.pptrPage.browser();
-      const windowId = await this.pptrPage.windowId();
-      const bounds = await browser.getWindowBounds(windowId);
-
-      if (bounds.windowState === 'fullscreen') {
-        // Have to call this twice on Ubuntu when the window is in fullscreen mode.
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      } else if (bounds.windowState !== 'normal') {
-        await browser.setWindowBounds(windowId, {windowState: 'normal'});
-      }
-    } catch {
-      // Window APIs are not supported on all platforms
-    }
-    await this.pptrPage.resize({
-      contentWidth: width,
-      contentHeight: height,
-    });
-
-    if (this.getDialog()) {
-      return undefined;
-    }
-
-    // @ts-expect-error internal API
-    const client = this.pptrPage._client();
-    const metrics: Protocol.Page.GetLayoutMetricsResponse = await client.send(
-      'Page.getLayoutMetrics',
-    );
-    return {
-      width: metrics.cssLayoutViewport.clientWidth,
-      height: metrics.cssLayoutViewport.clientHeight,
-    };
-  }
-
   lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined> {
     return lighthouseNavigation(this.pptrPage, this.pptrPage.url(), {
       flags,
