@@ -27,10 +27,8 @@ import './setupDevTools.js';
 import type {Frame, Mouse, SerializedAXNode} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {
-  type ParsedArguments,
-  ServerConfig,
-} from '../src/config/ServerConfig.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
+import {ServerConfig} from '../src/config/ServerConfig.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -66,19 +64,17 @@ import {
   WebWorker,
   WebMCP,
   WebMCPTool,
-} from '../src/third_party/index.js';
-import type {
-  Browser,
-  BrowserContext,
-  ConsoleMessageLocation,
-  ConsoleMessageType,
-  Extension,
-  JSHandle,
-  Page,
-  Protocol,
-  Realm,
-  Result,
-  RunnerResult,
+  type Browser,
+  type BrowserContext,
+  type ConsoleMessageLocation,
+  type ConsoleMessageType,
+  type Extension,
+  type JSHandle,
+  type Page,
+  type Protocol,
+  type Realm,
+  type Result,
+  type RunnerResult,
 } from '../src/third_party/index.js';
 
 export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
@@ -152,13 +148,27 @@ export type MockCSSFunctionRule =
  * Puppeteer objects (Page, CDPSession, Browser) so tests can trigger events
  * synchronously without a real browser.
  */
-export function mockListener() {
+export function mockListener(): {
+  on: (
+    eventName: string | symbol | number,
+    listener: (data: unknown) => void,
+  ) => void;
+  off: (
+    eventName: string | symbol | number,
+    listener?: (data: unknown) => void,
+  ) => void;
+  emit: (eventName: string | symbol | number, data?: unknown) => void;
+  listenerCount: (eventName: string | symbol | number) => number;
+} {
   const listeners: Record<
     string | symbol | number,
     Array<(data: unknown) => void>
   > = {};
   return {
-    on(eventName: string | symbol | number, listener: (data: unknown) => void) {
+    on(
+      eventName: string | symbol | number,
+      listener: (data: unknown) => void,
+    ): void {
       const arr = listeners[eventName];
       if (arr) {
         arr.push(listener);
@@ -169,7 +179,7 @@ export function mockListener() {
     off(
       eventName: string | symbol | number,
       listener?: (data: unknown) => void,
-    ) {
+    ): void {
       const arr = listeners[eventName];
       if (!arr) {
         return;
@@ -180,12 +190,12 @@ export function mockListener() {
       }
       listeners[eventName] = arr.filter(entry => entry !== listener);
     },
-    emit(eventName: string | symbol | number, data?: unknown) {
+    emit(eventName: string | symbol | number, data?: unknown): void {
       for (const listener of listeners[eventName] ?? []) {
         listener(data);
       }
     },
-    listenerCount(eventName: string | symbol | number) {
+    listenerCount(eventName: string | symbol | number): number {
       return listeners[eventName]?.length ?? 0;
     },
   };

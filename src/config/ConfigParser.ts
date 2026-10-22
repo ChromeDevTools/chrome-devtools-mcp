@@ -8,8 +8,12 @@ import {readFileSync} from 'node:fs';
 
 import type {Argv} from 'yargs';
 
-import type {YargsOptions, InferredOptionTypes} from '../third_party/cli.js';
-import {yargs, hideBin} from '../third_party/cli.js';
+import {
+  yargs,
+  hideBin,
+  type YargsOptions,
+  type InferredOptionTypes,
+} from '../third_party/cli.js';
 import {getErrorMessage} from '../utils/errorHandling.js';
 
 import {ConfigLocator} from './ConfigLocator.js';
@@ -18,11 +22,9 @@ import {
   CLI_EXAMPLES,
   stripYargsPositionalArgs,
   withoutDefaults,
+  type ParsedArguments,
 } from './mcp-options.js';
-import type {ParsedArguments} from './ServerConfig.js';
 import {ServerConfig} from './ServerConfig.js';
-
-export type {ParsedArguments} from './ServerConfig.js';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -36,8 +38,8 @@ export class ConfigParser {
 
   constructor(
     private version: string,
-    private argv = process.argv,
-    private env = process.env,
+    private argv: string[] = process.argv,
+    private env: NodeJS.ProcessEnv = process.env,
     private exitProcess = true,
     configLocator?: ConfigLocator,
   ) {

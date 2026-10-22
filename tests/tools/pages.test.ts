@@ -1002,7 +1002,7 @@ describe('pages', () => {
           context,
         );
         const page = context.getSelectedMcpPage().pptrPage;
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.querySelector('div')?.textContent),
           'Hello MCP',
         );
@@ -1113,7 +1113,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.location.href),
           'about:blank',
         );
@@ -1131,7 +1131,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.querySelector('div')?.textContent),
           'Hello MCP',
         );
@@ -1148,7 +1148,7 @@ describe('pages', () => {
           context,
         );
 
-        assert.equal(
+        assert.strictEqual(
           await page.evaluate(() => document.location.href),
           'data:text/html,<div>Hello MCP</div>',
         );
@@ -1974,7 +1974,7 @@ describe('pages', () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
         // @ts-expect-error _tabId is internal.
-        assert.ok(typeof page._tabId === 'string');
+        assert.strictEqual(typeof page._tabId, 'string');
         // @ts-expect-error _tabId is internal.
         page._tabId = 'test-tab-id';
         await getTabId(args).handler(

@@ -9,25 +9,69 @@ import type {YargsOptions} from '../third_party/index.js';
 import os from 'node:os';
 import path from 'node:path';
 
-import {getCategoryOptions} from './category-options.js';
-import {getBrowserOptions} from './browser-options.js';
-import {puppeteerOptions} from './puppeteer-options.js';
-import {toolOptions} from './tool-options.js';
+import {
+  getCategoryOptions,
+  type CategoryArguments,
+  type McpOption,
+  type McpOptionsFor,
+} from './category-options.js';
+import {getBrowserOptions, type BrowserArguments} from './browser-options.js';
+import {
+  puppeteerOptions,
+  type PuppeteerArguments,
+} from './puppeteer-options.js';
+import {toolOptions, type ToolArguments} from './tool-options.js';
 
-export interface McpOption extends YargsOptions {
-  /**
-   * Whether changes to this option in a config file can be applied to a running
-   * server without restarting it.
-   */
-  reloadable?: boolean;
+export interface McpArguments
+  extends
+    CategoryArguments,
+    BrowserArguments,
+    PuppeteerArguments,
+    ToolArguments {
+  logFile?: string;
+  pageIdRouting: boolean;
+  devtoolsComments: boolean;
+  experimentalDevtools: boolean;
+  experimentalVision: boolean;
+  memoryDebugging: boolean;
+  experimentalStructuredContent: boolean;
+  experimentalToonFormat: boolean;
+  experimentalDataFormat?: 'default' | 'toon' | 'gcf';
+  experimentalIncludeAllPages: boolean;
+  experimentalInteropTools: boolean;
+  experimentalScreencast: boolean;
+  experimentalFfmpegPath?: string;
+  screencastFps?: number;
+  performanceCrux: boolean;
+  usageStatistics: boolean;
+  javascriptEvaluation: boolean;
+  fileNavigations: boolean;
+  sourceMaps: boolean;
+  maxNavigationSaved: number;
+  clearcutEndpoint?: string;
+  clearcutForceFlushIntervalMs?: number;
+  clearcutIncludePidHeader: boolean;
+  slim: boolean;
+  viaCli: boolean;
+  redactNetworkHeaders: boolean;
+  allowUnrestrictedPaths: boolean;
+  filesystemRoot?: string[];
+  config?: string;
+  watchConfig: boolean;
 }
 
-export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+export type ParsedArguments = {
+  [K in keyof McpArguments]: McpArguments[K];
+};
+
+export type McpOptions = McpOptionsFor<ParsedArguments, McpOption>;
+
+export const DEFAULT_FILESYSTEM_ROOT: string[] = [os.tmpdir()];
 // Each retained navigation can hold up to 1,000 network requests and 10,000
 // console messages, so the history is capped to avoid running out of memory.
 export const MAX_NAVIGATION_SAVED_LIMIT = 25;
 
-export const mcpOptions = {
+export const mcpOptions: McpOptions = {
   ...getCategoryOptions(),
   ...getBrowserOptions(),
   ...puppeteerOptions,
@@ -91,7 +135,7 @@ export const mcpOptions = {
     defaultDescription: 'default',
     describe:
       'Override format for structured data in text responses. Default uses built-in formatters. "toon" (requires @toon-format/toon) or "gcf" (requires @blackwell-systems/gcf) replace structured content with the specified encoding.',
-    choices: ['default', 'toon', 'gcf'] as const,
+    choices: ['default', 'toon', 'gcf'],
     hidden: true,
     reloadable: true,
   },
@@ -128,7 +172,7 @@ export const mcpOptions = {
     describe:
       'Frames per second to use for screencast recording. Lower values reduce file size and encoding load.',
     reloadable: true,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -178,7 +222,7 @@ export const mcpOptions = {
     type: 'number',
     default: DEFAULT_MAX_NAVIGATION_SAVED,
     describe: `Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.`,
-    coerce: (value: number | undefined) => {
+    coerce: (value: number | undefined): number | undefined => {
       if (value === undefined) {
         return;
       }
@@ -255,7 +299,7 @@ export const mcpOptions = {
   config: {
     type: 'string',
     describe: 'Path to JSON configuration file.',
-    coerce: (configPath: string | undefined) => {
+    coerce: (configPath: string | undefined): string | undefined => {
       if (!configPath) {
         return;
       }
@@ -268,9 +312,9 @@ export const mcpOptions = {
     describe:
       'Watch the config file for changes and apply them without restarting. Tools (except --categoryExtensions) are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.',
   },
-} satisfies Record<string, McpOption>;
+};
 
-export const mcpOptionsForViaCli = {
+export const mcpOptionsForViaCli: McpOptions = {
   ...mcpOptions,
   headless: {
     ...mcpOptions.headless,
@@ -296,12 +340,12 @@ export const mcpOptionsForViaCli = {
     defaultDescription:
       'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
   },
-} satisfies Record<keyof typeof mcpOptions, YargsOptions>;
+};
 
 export function getCliOptions(): Partial<
-  Record<keyof typeof mcpOptions, YargsOptions>
+  Record<keyof McpOptions, YargsOptions>
 > {
-  const options: Partial<Record<keyof typeof mcpOptions, YargsOptions>> =
+  const options: Partial<Record<keyof McpOptions, YargsOptions>> =
     withoutDefaults(mcpOptionsForViaCli);
 
   // Missing CLI serialization.
@@ -380,7 +424,7 @@ export const CLI_EXAMPLES: Array<[string, string]> = [
   ],
 ];
 
-export const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
+export const CONFLICTING_ARGS: Array<Array<keyof McpOptions>> = [
   ['channel', 'executablePath', 'browserUrl', 'wsEndpoint'],
   ['userDataDir', 'browserUrl', 'wsEndpoint'],
   ['userDataDir', 'isolated'],
@@ -392,9 +436,7 @@ export const CONFLICTING_ARGS: Array<Array<keyof typeof mcpOptions>> = [
   ['categoryPwa', 'browserUrl', 'wsEndpoint'],
 ];
 
-export const IMPLICATIONS: Array<
-  [keyof typeof mcpOptions, keyof typeof mcpOptions]
-> = [
+export const IMPLICATIONS: Array<[keyof McpOptions, keyof McpOptions]> = [
   ['wsHeaders', 'wsEndpoint'],
   ['experimentalFfmpegPath', 'experimentalScreencast'],
 ];
@@ -427,7 +469,7 @@ export function stripYargsPositionalArgs<T extends {_?: unknown; $0?: unknown}>(
   return copy;
 }
 
-export function isReloadableOption(name: keyof typeof mcpOptions): boolean {
+export function isReloadableOption(name: keyof McpOptions): boolean {
   const option: McpOption = mcpOptions[name];
   return option.reloadable === true;
 }

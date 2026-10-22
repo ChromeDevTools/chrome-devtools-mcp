@@ -18,8 +18,8 @@ import {
   Frame,
   Locator,
   ScreenRecorder,
+  type JSONSchema7Definition,
 } from '../src/third_party/index.js';
-import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {

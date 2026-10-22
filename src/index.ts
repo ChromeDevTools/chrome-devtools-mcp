@@ -9,9 +9,12 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
-import {ConfigParser, type ParsedArguments} from './config/ConfigParser.js';
+import {ConfigParser} from './config/ConfigParser.js';
 import {ConfigWatcher} from './config/ConfigWatcher.js';
-import {DEFAULT_FILESYSTEM_ROOT} from './config/mcp-options.js';
+import {
+  DEFAULT_FILESYSTEM_ROOT,
+  type ParsedArguments,
+} from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';

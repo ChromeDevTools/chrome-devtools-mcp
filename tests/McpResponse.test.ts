@@ -11,7 +11,7 @@ import {after, describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
 import type {McpContext} from '../src/McpContext.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
@@ -25,10 +25,10 @@ import {
   newPage,
   selectPage,
 } from '../src/tools/pages.js';
-import type {InsightName} from '../src/processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
+  type InsightName,
 } from '../src/processors/PerformanceTrace.js';
 
 import {serverHooks} from './server.js';
@@ -169,7 +169,7 @@ describe('McpResponse', () => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);
       const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
+      assert.strictEqual(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
@@ -206,7 +206,7 @@ describe('McpResponse', () => {
       response.appendResponseLine('Testing 1');
       response.appendResponseLine('Testing 2');
       const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
+      assert.strictEqual(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
@@ -253,7 +253,7 @@ describe('McpResponse', () => {
       await page.focus('input');
       response.includeSnapshot();
       const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
+      assert.strictEqual(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
@@ -267,7 +267,7 @@ describe('McpResponse', () => {
         verbose: true,
       });
       const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
+      assert.strictEqual(content[0].type, 'text');
       t.assert.snapshot(getTextContent(content[0]));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
@@ -284,7 +284,7 @@ describe('McpResponse', () => {
         filePath,
       });
       const {content, structuredContent} = await response.handle(context);
-      assert.equal(content[0].type, 'text');
+      assert.strictEqual(content[0].type, 'text');
       t.assert.snapshot(stabilizeResponseOutput(getTextContent(content[0])));
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
     });
@@ -433,7 +433,7 @@ describe('McpResponse', () => {
           .getSelectedMcpPage()
           .emulate({networkConditions: 'Slow 3G'});
         const {content, structuredContent} = await response.handle(context);
-        assert.equal(content[0].type, 'text');
+        assert.strictEqual(content[0].type, 'text');
         t.assert.snapshot(getTextContent(content[0]));
         t.assert.snapshot(stabilizeStructuredContent(structuredContent));
       },
@@ -454,7 +454,7 @@ describe('McpResponse', () => {
       response.attachImage({data: 'imageBase64', mimeType: 'image/png'});
       const {content, structuredContent} = await response.handle(context);
       t.assert.snapshot(getTextContent(content[0]));
-      assert.equal(content[1].type, 'image');
+      assert.strictEqual(content[1].type, 'image');
       assert.strictEqual(getImageContent(content[1]).data, 'imageBase64');
       assert.strictEqual(getImageContent(content[1]).mimeType, 'image/png');
       t.assert.snapshot(stabilizeStructuredContent(structuredContent));
@@ -1692,8 +1692,8 @@ describe('McpResponse heap snapshot formatting', () => {
 
     const largeIndex = text.indexOf('LargeNode');
     const mediumIndex = text.indexOf('MediumNode');
-    assert.ok(largeIndex !== -1, 'LargeNode should be present');
-    assert.ok(mediumIndex !== -1, 'MediumNode should be present');
+    assert.notStrictEqual(largeIndex, -1, 'LargeNode should be present');
+    assert.notStrictEqual(mediumIndex, -1, 'MediumNode should be present');
     assert.ok(
       largeIndex < mediumIndex,
       'LargeNode should precede MediumNode due to descending retainedSize sorting',

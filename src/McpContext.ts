@@ -21,7 +21,7 @@ import type {
   HeapQueryOptions,
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import {type UncaughtError} from './collectors/PageCollector.js';
+import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
@@ -42,7 +42,7 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {ToolCategory} from './tools/categories.js';
 import {

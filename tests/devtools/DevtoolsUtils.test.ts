@@ -13,8 +13,7 @@ import {
   createTargetUniverse,
   SymbolizedError,
 } from '../../src/devtools/DevtoolsUtils.js';
-import {DevTools} from '../../src/third_party/index.js';
-import type {Protocol} from '../../src/third_party/index.js';
+import {DevTools, type Protocol} from '../../src/third_party/index.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
 

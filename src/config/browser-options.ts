@@ -4,9 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {McpOptionsFor} from './category-options.js';
 
-export const browserOptions = {
+export interface BrowserArguments {
+  autoConnect: boolean;
+  browserUrl?: string;
+  wsEndpoint?: string;
+  wsHeaders?: Record<string, string>;
+  headless: boolean;
+  executablePath?: string;
+  isolated: boolean;
+  userDataDir?: string;
+  channel?: 'canary' | 'dev' | 'beta' | 'stable';
+  proxyServer?: string;
+  chromeArg?: string[];
+  ignoreDefaultChromeArg?: string[];
+}
+
+export type BrowserOptions = McpOptionsFor<BrowserArguments>;
+
+export const browserOptions: BrowserOptions = {
   autoConnect: {
     type: 'boolean',
     description:
@@ -18,7 +35,7 @@ export const browserOptions = {
     description:
       'Connect to a running, debuggable Chrome instance (e.g. `http://127.0.0.1:9222`). For more details see: https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/advanced-usage.md#connecting-to-a-running-chrome-instance.',
     alias: 'u',
-    coerce: (url: string | undefined) => {
+    coerce: (url: string | undefined): string | undefined => {
       if (!url) {
         return;
       }
@@ -35,7 +52,7 @@ export const browserOptions = {
     description:
       'WebSocket endpoint to connect to a running Chrome instance (e.g., ws://127.0.0.1:9222/devtools/browser/<id>). Alternative to --browserUrl.',
     alias: 'w',
-    coerce: (url: string | undefined) => {
+    coerce: (url: string | undefined): string | undefined => {
       if (!url) {
         return;
       }
@@ -59,7 +76,7 @@ export const browserOptions = {
     type: 'string',
     description:
       'Custom headers for WebSocket connection in JSON format (e.g., \'{"Authorization":"Bearer token"}\'). Only works with --wsEndpoint.',
-    coerce: (val: unknown) => {
+    coerce: (val: unknown): Record<string, string> | undefined => {
       if (!val) {
         return;
       }
@@ -112,8 +129,8 @@ export const browserOptions = {
     type: 'string',
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['canary', 'dev', 'beta', 'stable'] as const,
-    default: 'stable' as const,
+    choices: ['canary', 'dev', 'beta', 'stable'],
+    default: 'stable',
   },
   proxyServer: {
     type: 'string',
@@ -131,8 +148,8 @@ export const browserOptions = {
     describe:
       'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
-} satisfies Record<string, YargsOptions>;
+};
 
-export function getBrowserOptions(): typeof browserOptions {
+export function getBrowserOptions(): BrowserOptions {
   return browserOptions;
 }

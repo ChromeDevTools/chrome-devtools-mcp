@@ -726,6 +726,7 @@ describe('cli args parsing', () => {
 
   it('rejects invalid maxNavigationSaved values', async () => {
     const coerce = mcpOptions.maxNavigationSaved.coerce;
+    assert.ok(coerce);
 
     assert.strictEqual(coerce(undefined), undefined);
     assert.strictEqual(coerce(1), 1);

@@ -10,12 +10,13 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
-import type {
-  Browser,
-  ChromeReleaseChannel,
-  LaunchOptions,
+import {
+  Mutex,
+  puppeteer,
+  type Browser,
+  type ChromeReleaseChannel,
+  type LaunchOptions,
 } from './third_party/index.js';
-import {Mutex, puppeteer} from './third_party/index.js';
 import {
   logger,
   puppeteerLogger,
@@ -95,7 +96,7 @@ export class BrowserManager {
   static rootSandboxLaunchError(
     error: Error,
     args: readonly string[],
-    uid = process.getuid?.(),
+    uid: number | undefined = process.getuid?.(),
   ): Error | undefined {
     if (uid !== 0) {
       return undefined;
@@ -377,8 +378,8 @@ export class BrowserManager {
     } else if (browserURL) {
       connectOptions.browserURL = browserURL;
     } else if (channel || userDataDir) {
+      autoConnect = true;
       if (userDataDir) {
-        autoConnect = true;
         // TODO: re-expose this logic via Puppeteer.
         const portPath = path.join(userDataDir, 'DevToolsActivePort');
         try {

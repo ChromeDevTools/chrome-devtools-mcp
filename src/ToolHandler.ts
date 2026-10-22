@@ -4,30 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {McpResponse, type DataFormat} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import type {Browser, CallToolResult} from './third_party/index.js';
-import {ProtocolError, ProtocolErrorCode, zod} from './third_party/index.js';
+import {
+  ProtocolError,
+  ProtocolErrorCode,
+  zod,
+  type Browser,
+  type CallToolResult,
+} from './third_party/index.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
-import type {
-  AnyToolDefinition,
-  BrowserlessToolDefinition,
-  DefinedPageTool,
-  DevToolsData,
-  FileVerificationOption,
-  ToolDefinition,
-} from './tools/ToolDefinition.js';
 import {
   isAvailableInMode,
   isBrowserlessTool,
   isPageScopedTool,
   isSlimTool,
+  type AnyToolDefinition,
+  type BrowserlessToolDefinition,
+  type DefinedPageTool,
+  type DevToolsData,
+  type FileVerificationOption,
+  type ToolDefinition,
 } from './tools/ToolDefinition.js';
 import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
@@ -529,8 +532,21 @@ export class ToolHandler {
     } catch (err) {
       logger?.(`${tool.name} error:`, err, err?.stack);
       let errorText = err && 'message' in err ? err.message : String(err);
-      if ('cause' in err && err.cause) {
-        errorText += `\nCause: ${err.cause.message}`;
+      let cause: unknown =
+        err && typeof err === 'object' && 'cause' in err
+          ? err.cause
+          : undefined;
+      const seenCauses = new Set<unknown>([err]);
+      while (
+        cause &&
+        typeof cause === 'object' &&
+        !seenCauses.has(cause) &&
+        'message' in cause &&
+        typeof cause.message === 'string'
+      ) {
+        seenCauses.add(cause);
+        errorText += `\nCause: ${cause.message}`;
+        cause = 'cause' in cause ? cause.cause : undefined;
       }
       return errorResult(errorText);
     } finally {
