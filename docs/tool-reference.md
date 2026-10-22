@@ -868,11 +868,11 @@ third-party developer tools with additional functionality. (requires flag: --cat
 
 ### `configure_webauthn`
 
-**Description:** Sets up a virtual WebAuthn authenticator on the selected page so passkey and security key flows can be tested without a physical device. It answers navigator.credentials.create() and get() automatically and is removed when the page closes. On later calls, omitted parameters keep their current values. Changing only isUserVerified keeps the stored credentials; changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and its credentials. The response shows the authenticator and its stored credentials. (requires flag: --categoryWebauthn=true)
+**Description:** Sets up a virtual WebAuthn authenticator on the selected page so passkey and security key flows can be tested without a physical device. It answers navigator.credentials.create() and get() automatically and is removed when the page closes. On later calls, omitted parameters keep their current values. Changing only isUserVerified keeps the stored credentials; changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and its credentials. With enabled set to false, the tool ignores all other parameters and disables the virtual authenticator environment for the whole page, which also removes authenticators that other clients, such as the DevTools WebAuthn panel, added. The response shows the authenticator and its stored credentials. (requires flag: --categoryWebauthn=true)
 
 **Parameters:**
 
-- **enabled** (boolean) **(required)**: Whether the page has a virtual authenticator. Set to false to remove it and its credentials.
+- **enabled** (boolean) **(required)**: Whether the page has a virtual authenticator. Set to false to disable the virtual authenticator environment for the page and remove all its authenticators and credentials.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **hasResidentKey** (boolean) _(optional)_: Whether the authenticator can store discoverable credentials (passkeys). Default: true.
 - **hasUserVerification** (boolean) _(optional)_: Whether the authenticator supports user verification (PIN or biometrics). Default: true.

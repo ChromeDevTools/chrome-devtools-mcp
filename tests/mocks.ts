@@ -29,6 +29,7 @@ import sinon from 'sinon';
 
 import type {ParsedArguments} from '../src/config/mcp-options.js';
 import {ServerConfig} from '../src/config/ServerConfig.js';
+import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
@@ -581,9 +582,36 @@ export function createMockMcpContext(
 
 export function createMockWebAuthnModel(): sinon.SinonStubbedInstance<DevTools.WebAuthnModel.WebAuthnModel> {
   const model = sinon.createStubInstance(DevTools.WebAuthnModel.WebAuthnModel);
-  model.setVirtualAuthEnvEnabled.resolves({});
+  model.setVirtualAuthEnvEnabled.resolves();
   model.getCredentials.resolves([]);
   return model;
+}
+
+function isAuthenticatorId(
+  id: unknown,
+): id is DevTools.Protocol.WebAuthn.AuthenticatorId {
+  return typeof id === 'string';
+}
+
+export function createMockAuthenticatorId(
+  id: string,
+): DevTools.Protocol.WebAuthn.AuthenticatorId {
+  if (!isAuthenticatorId(id)) {
+    throw new Error(`Invalid authenticator id: ${id}`);
+  }
+  return id;
+}
+
+export function createMockTargetUniverse(
+  model: NonNullable<ReturnType<DevTools.Target['model']>>,
+): TargetUniverse {
+  const target = sinon.createStubInstance(DevTools.Target);
+  target.model.returns(model);
+  return {
+    target,
+    universe: sinon.createStubInstance(DevTools.Foundation.Universe.Universe),
+    session: createMockCDPSession(),
+  };
 }
 
 export function createMockMcpResponse(): MockMcpResponse {

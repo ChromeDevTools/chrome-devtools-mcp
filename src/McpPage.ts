@@ -55,6 +55,7 @@ import type {
   PrefersReducedMotion,
   TextSnapshotNode,
 } from './types.js';
+import {getErrorMessage} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
 import {
   getNetworkMultiplierFromString,
@@ -448,12 +449,34 @@ export class McpPage implements ContextPage {
     if (!model) {
       throw new Error(`WebAuthn is not available for page ${this.id}.`);
     }
-    if (!config.enabled) {
-      if (this.#webAuthnEnabled) {
-        await model.setVirtualAuthEnvEnabled(false);
-        this.#webAuthnEnabled = false;
-      }
+    try {
+      return await this.#applyWebAuthnConfig(model, config);
+    } catch (error) {
+      const orphan = this.#webAuthnAuthenticator;
+      this.#webAuthnEnabled = false;
       this.#webAuthnAuthenticator = undefined;
+      if (orphan) {
+        try {
+          await model.removeAuthenticator(orphan.id);
+        } catch {
+          // Already gone, e.g. another client disabled the environment.
+        }
+      }
+      throw new Error(
+        `Failed to configure WebAuthn for page ${this.id}: ${getErrorMessage(error)}`,
+        {cause: error},
+      );
+    }
+  }
+
+  async #applyWebAuthnConfig(
+    model: DevTools.WebAuthnModel.WebAuthnModel,
+    config: WebAuthnAuthenticatorConfig,
+  ): Promise<WebAuthnAuthenticatorState | undefined> {
+    if (!config.enabled) {
+      this.#webAuthnAuthenticator = undefined;
+      this.#webAuthnEnabled = false;
+      await model.setVirtualAuthEnvEnabled(false);
       return undefined;
     }
     if (!this.#webAuthnEnabled) {
@@ -491,9 +514,6 @@ export class McpPage implements ContextPage {
         transport: WEBAUTHN_TRANSPORTS[options.transport],
         automaticPresenceSimulation: true,
       });
-      if (!id) {
-        throw new Error('Failed to add a virtual authenticator.');
-      }
       authenticator = {id, options};
       this.#webAuthnAuthenticator = authenticator;
     } else if (

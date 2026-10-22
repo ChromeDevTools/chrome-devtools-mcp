@@ -30,6 +30,8 @@ import {
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
   createMockServerConfig,
+  createMockAuthenticatorId,
+  createMockTargetUniverse,
   createMockWebAuthnModel,
   createMockWebMCPTool,
 } from './mocks.js';
@@ -2389,11 +2391,15 @@ describe('McpPage', () => {
   });
 
   describe('configureWebAuthn()', () => {
-    function authenticatorId(
-      id: string,
-    ): DevTools.Protocol.WebAuthn.AuthenticatorId {
-      return id as DevTools.Protocol.WebAuthn.AuthenticatorId;
-    }
+    const DEFAULT_OPTIONS = {
+      protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
+      transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
+    };
+    const CDP_ERROR = 'Could not find a virtual authenticator matching the ID';
 
     async function createWebAuthnPage() {
       const pptrPage = createMockPuppeteerPage();
@@ -2404,18 +2410,30 @@ describe('McpPage', () => {
         {config: createMockServerConfig(), locatorClass: Locator},
       );
       const model = createMockWebAuthnModel();
-      sinon
-        .stub(mcpPage, 'devtoolsUniverse')
-        .get(
-          () => ({target: {model: () => model}}) as unknown as TargetUniverse,
-        );
+      let universe: TargetUniverse | undefined =
+        createMockTargetUniverse(model);
+      sinon.stub(mcpPage, 'devtoolsUniverse').get(() => universe);
       await mcpPage.init();
-      return {mcpPage, model};
+      return {
+        mcpPage,
+        model,
+        detachUniverse: () => {
+          universe = undefined;
+        },
+      };
+    }
+
+    async function assertFailsWithCdpError(
+      promise: Promise<unknown>,
+    ): Promise<void> {
+      await assert.rejects(promise, {
+        message: `Failed to configure WebAuthn for page 1: ${CDP_ERROR}`,
+      });
     }
 
     it('creates an authenticator with defaults', async () => {
       const {mcpPage, model} = await createWebAuthnPage();
-      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
 
       const result = await mcpPage.configureWebAuthn({enabled: true});
 
@@ -2424,14 +2442,14 @@ describe('McpPage', () => {
         true,
         false,
       );
-      sinon.assert.calledOnceWithExactly(model.addAuthenticator, {
-        protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
-        transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        automaticPresenceSimulation: true,
-      });
+      sinon.assert.calledOnceWithExactly(
+        model.addAuthenticator,
+        DEFAULT_OPTIONS,
+      );
+      sinon.assert.calledOnceWithExactly(
+        model.getCredentials,
+        createMockAuthenticatorId('auth-1'),
+      );
       assert.deepStrictEqual(result, {
         protocol: 'ctap2',
         transport: 'internal',
@@ -2451,7 +2469,7 @@ describe('McpPage', () => {
 
     it('updates isUserVerified in place and keeps omitted options', async () => {
       const {mcpPage, model} = await createWebAuthnPage();
-      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
       await mcpPage.configureWebAuthn({enabled: true, transport: 'usb'});
 
       const result = await mcpPage.configureWebAuthn({
@@ -2459,21 +2477,33 @@ describe('McpPage', () => {
         isUserVerified: false,
       });
 
-      sinon.assert.calledOnce(model.addAuthenticator);
+      sinon.assert.calledOnceWithExactly(
+        model.setVirtualAuthEnvEnabled,
+        true,
+        false,
+      );
+      sinon.assert.calledOnceWithExactly(model.addAuthenticator, {
+        ...DEFAULT_OPTIONS,
+        transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Usb,
+      });
       sinon.assert.notCalled(model.removeAuthenticator);
       sinon.assert.calledOnceWithExactly(
         model.setUserVerified,
-        authenticatorId('auth-1'),
+        createMockAuthenticatorId('auth-1'),
         false,
       );
       assert.strictEqual(result?.transport, 'usb');
       assert.strictEqual(result.isUserVerified, false);
     });
 
-    it('replaces the authenticator when a creation option changes', async () => {
+    it('replaces the authenticator and keeps isUserVerified when a creation option changes', async () => {
       const {mcpPage, model} = await createWebAuthnPage();
-      model.addAuthenticator.onFirstCall().resolves(authenticatorId('auth-1'));
-      model.addAuthenticator.onSecondCall().resolves(authenticatorId('auth-2'));
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(createMockAuthenticatorId('auth-1'));
+      model.addAuthenticator
+        .onSecondCall()
+        .resolves(createMockAuthenticatorId('auth-2'));
       await mcpPage.configureWebAuthn({enabled: true, isUserVerified: false});
 
       const result = await mcpPage.configureWebAuthn({
@@ -2483,23 +2513,24 @@ describe('McpPage', () => {
 
       sinon.assert.calledOnceWithExactly(
         model.removeAuthenticator,
-        authenticatorId('auth-1'),
+        createMockAuthenticatorId('auth-1'),
       );
-      sinon.assert.calledTwice(model.addAuthenticator);
-      sinon.assert.calledWithMatch(model.addAuthenticator.secondCall, {
+      sinon.assert.calledWithExactly(model.addAuthenticator.secondCall, {
+        ...DEFAULT_OPTIONS,
         protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
         isUserVerified: false,
       });
+      sinon.assert.notCalled(model.setUserVerified);
       sinon.assert.calledWithExactly(
-        model.getCredentials.lastCall,
-        authenticatorId('auth-2'),
+        model.getCredentials.secondCall,
+        createMockAuthenticatorId('auth-2'),
       );
       assert.strictEqual(result?.protocol, 'u2f');
     });
 
-    it('removes the authenticator when disabled', async () => {
+    it('disables the virtual authenticator environment', async () => {
       const {mcpPage, model} = await createWebAuthnPage();
-      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
       await mcpPage.configureWebAuthn({enabled: true});
 
       assert.strictEqual(
@@ -2508,15 +2539,25 @@ describe('McpPage', () => {
       );
 
       sinon.assert.calledWithExactly(
-        model.setVirtualAuthEnvEnabled.lastCall,
+        model.setVirtualAuthEnvEnabled.secondCall,
         false,
       );
+      sinon.assert.notCalled(model.removeAuthenticator);
       assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('disables the virtual authenticator environment that another client enabled', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+
+      await mcpPage.configureWebAuthn({enabled: false});
+
+      sinon.assert.calledOnceWithExactly(model.setVirtualAuthEnvEnabled, false);
+      sinon.assert.notCalled(model.addAuthenticator);
     });
 
     it('lists stored credentials', async () => {
       const {mcpPage, model} = await createWebAuthnPage();
-      model.addAuthenticator.resolves(authenticatorId('auth-1'));
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
       model.getCredentials.resolves([
         {
           credentialId: 'Y3JlZA==',
@@ -2542,80 +2583,107 @@ describe('McpPage', () => {
       ]);
     });
 
-    describe('in a browser', () => {
-      const server = serverHooks();
+    it('throws when the page has no WebAuthn model', async () => {
+      const {mcpPage, detachUniverse} = await createWebAuthnPage();
+      detachUniverse();
 
-      it('keeps a passkey the page registered when only isUserVerified changes', async () => {
-        server.addHtmlRoute(
-          '/passkey.html',
-          html`<script>
-            window.register = async () => {
-              const credential = await navigator.credentials.create({
-                publicKey: {
-                  challenge: new Uint8Array(32),
-                  rp: {name: 'Test'},
-                  user: {
-                    id: new Uint8Array([1, 2, 3, 4]),
-                    name: 'alice@example.com',
-                    displayName: 'Alice',
-                  },
-                  pubKeyCredParams: [{type: 'public-key', alg: -7}],
-                  authenticatorSelection: {residentKey: 'required'},
-                },
-              });
-              return credential.id;
-            };
-          </script>`,
-        );
-
-        await withMcpContext(async (_response, context) => {
-          const mcpPage = context.getSelectedMcpPage();
-          // WebAuthn rejects IP addresses as relying party ids.
-          await mcpPage.pptrPage.goto(
-            server
-              .getRoute('/passkey.html')
-              .replace('//127.0.0.1:', '//localhost:'),
-          );
-
-          const created = await mcpPage.configureWebAuthn({
-            enabled: true,
-            transport: 'usb',
-          });
-          assert.strictEqual(created?.transport, 'usb');
-          assert.deepStrictEqual(created.credentials, []);
-
-          const credentialId = await mcpPage.pptrPage.evaluate(() =>
-            // @ts-expect-error defined by the test page
-            window.register(),
-          );
-          const kept = await mcpPage.configureWebAuthn({
-            enabled: true,
-            isUserVerified: false,
-          });
-          assert.strictEqual(kept?.transport, 'usb');
-          assert.strictEqual(kept.isUserVerified, false);
-          assert.strictEqual(kept.credentials.length, 1);
-          assert.strictEqual(
-            Buffer.from(kept.credentials[0]!.credentialId, 'base64').toString(
-              'base64url',
-            ),
-            credentialId,
-          );
-          assert.strictEqual(kept.credentials[0]!.rpId, 'localhost');
-
-          const replaced = await mcpPage.configureWebAuthn({
-            enabled: true,
-            transport: 'internal',
-          });
-          assert.deepStrictEqual(replaced?.credentials, []);
-
-          assert.strictEqual(
-            await mcpPage.configureWebAuthn({enabled: false}),
-            undefined,
-          );
-          assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
-        });
+      await assert.rejects(mcpPage.configureWebAuthn({enabled: true}), {
+        message: 'WebAuthn is not available for page 1.',
       });
+    });
+
+    it('throws the CDP error when enabling the environment fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.setVirtualAuthEnvEnabled.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(mcpPage.configureWebAuthn({enabled: true}));
+
+      sinon.assert.notCalled(model.addAuthenticator);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('throws the CDP error when adding the authenticator fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(mcpPage.configureWebAuthn({enabled: true}));
+
+      sinon.assert.notCalled(model.getCredentials);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('throws the CDP error when removing the replaced authenticator fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+      model.removeAuthenticator.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(
+        mcpPage.configureWebAuthn({enabled: true, transport: 'usb'}),
+      );
+
+      sinon.assert.calledOnce(model.addAuthenticator);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('throws the CDP error when disabling the environment fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.setVirtualAuthEnvEnabled
+        .withArgs(false)
+        .rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(
+        mcpPage.configureWebAuthn({enabled: false}),
+      );
+    });
+
+    it('throws the CDP error and removes the authenticator when setting isUserVerified fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+      model.setUserVerified.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(
+        mcpPage.configureWebAuthn({enabled: true, isUserVerified: false}),
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        model.removeAuthenticator,
+        createMockAuthenticatorId('auth-1'),
+      );
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('creates a new authenticator on the call after reading credentials fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(createMockAuthenticatorId('auth-1'));
+      model.addAuthenticator
+        .onSecondCall()
+        .resolves(createMockAuthenticatorId('auth-2'));
+      model.getCredentials.onFirstCall().rejects(new Error(CDP_ERROR));
+      await assertFailsWithCdpError(mcpPage.configureWebAuthn({enabled: true}));
+
+      await mcpPage.configureWebAuthn({enabled: true});
+
+      sinon.assert.calledOnceWithExactly(
+        model.removeAuthenticator,
+        createMockAuthenticatorId('auth-1'),
+      );
+      sinon.assert.calledWithExactly(
+        model.setVirtualAuthEnvEnabled.secondCall,
+        true,
+        false,
+      );
+      sinon.assert.calledWithExactly(
+        model.addAuthenticator.secondCall,
+        DEFAULT_OPTIONS,
+      );
+      sinon.assert.calledWithExactly(
+        model.getCredentials.secondCall,
+        createMockAuthenticatorId('auth-2'),
+      );
     });
   });
 });

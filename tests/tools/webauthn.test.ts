@@ -20,6 +20,13 @@ import {createHandlerMocks} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
 
+declare global {
+  interface Window {
+    register(): Promise<string>;
+    signIn(): Promise<string>;
+  }
+}
+
 describe('configure_webauthn', () => {
   it('applies the parameters and attaches the result', async () => {
     const {page, context, response, args} = createHandlerMocks();
@@ -57,6 +64,7 @@ const PASSKEY_PAGE = html`<script>
     const credential = await navigator.credentials.create({
       publicKey: {
         challenge: new Uint8Array(32),
+        timeout: 5000,
         rp: {name: 'Test'},
         user: {
           id: new Uint8Array([1, 2, 3, 4]),
@@ -77,6 +85,7 @@ const PASSKEY_PAGE = html`<script>
       const credential = await navigator.credentials.get({
         publicKey: {
           challenge: new Uint8Array(32),
+          timeout: 5000,
           userVerification: 'required',
         },
       });
@@ -99,7 +108,7 @@ async function configure(
   params: WebAuthnAuthenticatorConfig,
 ): Promise<string> {
   await configureWebAuthn(args).handler(
-    {params, page: context.getSelectedMcpPage()},
+    {params: {...params}, page: context.getSelectedMcpPage()},
     response,
     context,
   );
@@ -112,7 +121,7 @@ async function configure(
 describe('configure_webauthn in a browser', () => {
   const server = serverHooks();
 
-  it('registers and signs in with a passkey, then fails user verification', async () => {
+  it('registers and signs in with a passkey, fails user verification, then drops the passkey on a transport change', async () => {
     server.addHtmlRoute('/passkey.html', PASSKEY_PAGE);
     await withMcpContext(async (response, context, args) => {
       const page = context.getSelectedMcpPage().pptrPage;
@@ -129,15 +138,9 @@ describe('configure_webauthn in a browser', () => {
       );
       response.setIncludePages(false);
 
-      const credentialId = await page.evaluate(() =>
-        // @ts-expect-error defined by the test page
-        window.register(),
-      );
+      const credentialId = await page.evaluate(() => window.register());
       assert.strictEqual(
-        await page.evaluate(() =>
-          // @ts-expect-error defined by the test page
-          window.signIn(),
-        ),
+        await page.evaluate(() => window.signIn()),
         credentialId,
       );
 
@@ -150,11 +153,16 @@ describe('configure_webauthn in a browser', () => {
       assert.match(text, /userName=alice@example\.com/);
       assert.doesNotMatch(text, /privateKey/);
       assert.strictEqual(
-        await page.evaluate(() =>
-          // @ts-expect-error defined by the test page
-          window.signIn(),
-        ),
+        await page.evaluate(() => window.signIn()),
         'NotAllowedError',
+      );
+
+      assert.match(
+        await configure(context, response, args, {
+          enabled: true,
+          transport: 'usb',
+        }),
+        /transport=usb[^\n]*\nNo credentials\./,
       );
 
       assert.match(

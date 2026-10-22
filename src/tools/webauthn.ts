@@ -7,14 +7,15 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {definePageTool} from './ToolDefinition.js';
+import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
-export const configureWebAuthn = definePageTool(() => ({
+export const configureWebAuthn: PageToolFactory = definePageTool(() => ({
   name: 'configure_webauthn',
   description:
     'Sets up a virtual WebAuthn authenticator on the selected page so passkey and security key flows can be tested without a physical device. ' +
     'It answers navigator.credentials.create() and get() automatically and is removed when the page closes. ' +
     'On later calls, omitted parameters keep their current values. Changing only isUserVerified keeps the stored credentials; changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and its credentials. ' +
+    'With enabled set to false, the tool ignores all other parameters and disables the virtual authenticator environment for the whole page, which also removes authenticators that other clients, such as the DevTools WebAuthn panel, added. ' +
     'The response shows the authenticator and its stored credentials.',
   annotations: {
     category: ToolCategory.WEBAUTHN,
@@ -24,7 +25,7 @@ export const configureWebAuthn = definePageTool(() => ({
     enabled: zod
       .boolean()
       .describe(
-        'Whether the page has a virtual authenticator. Set to false to remove it and its credentials.',
+        'Whether the page has a virtual authenticator. Set to false to disable the virtual authenticator environment for the page and remove all its authenticators and credentials.',
       ),
     protocol: zod
       .enum(['ctap2', 'u2f'])
