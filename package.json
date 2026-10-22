@@ -10,10 +10,10 @@
   "main": "./out/Default/gen/src/index.js",
   "scripts": {
     "cli:generate": "node scripts/generate-cli.ts",
-    "clean": "node -e \"for (const d of ['out/Default/gen/src', 'out/Default/gen/tests', 'out/Default/gen/node_modules', 'out/Default/gen/tsconfig.tsbuildinfo']) require('fs').rmSync(d, {recursive: true, force: true})\"",
+    "clean": "node -e \"for (const d of ['out/Default/gen/src', 'out/Default/gen/tests', 'out/Default/gen/tsconfig.tsbuildinfo']) require('fs').rmSync(d, {recursive: true, force: true})\" && npm run gn:gen",
     "clean:submodules": "node scripts/clean-submodules.ts",
-    "bundle": "npm run clean && npm run build && rollup -c rollup.config.js && node -e \"require('fs').rmSync('out/Default/gen/node_modules', {recursive: true, force: true})\" && node scripts/append-lighthouse-notices.ts",
-    "build": "node scripts/ninja.ts devtools_deps && tsc && node scripts/post-build.ts",
+    "bundle": "npm run clean && npm run build && rollup -c rollup.config.js",
+    "build": "node scripts/ninja.ts devtools_deps && tsc",
     "typecheck": "node scripts/ninja.ts devtools_deps && tsc --noEmit",
     "format": "eslint --cache --fix . && prettier --write --cache .",
     "check-format": "eslint --cache . && prettier --check --cache .",

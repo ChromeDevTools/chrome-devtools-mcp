@@ -1,0 +1,52 @@
+# Copyright 2026 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+
+import("//third_party/devtools-frontend/scripts/build/ninja/copy.gni")
+import(
+    "//third_party/devtools-frontend/scripts/build/typescript/typescript.gni")
+
+copy_to_gen("lighthouse_bundle") {
+  sources = [ "third_party/lighthouse-devtools-mcp-bundle.js" ]
+}
+
+action("issue_descriptions") {
+  script = "//third_party/node/node.py"
+  _src_dir = "$root_gen_dir/third_party/devtools-frontend/front_end/models/issues_manager/descriptions"
+  _dest_dir = "$target_gen_dir/third_party/issue-descriptions"
+  _stamp = "$target_gen_dir/third_party/issue-descriptions.stamp"
+
+  deps = [ "//third_party/devtools-frontend/front_end/models/issues_manager:descriptions" ]
+  outputs = [ _stamp ]
+
+  args = [
+    "-e",
+    "const fs = require('node:fs'); fs.cpSync(process.argv[1], process.argv[2], {recursive: true}); fs.writeFileSync(process.argv[3], '');",
+    rebase_path(_src_dir, root_build_dir),
+    rebase_path(_dest_dir, root_build_dir),
+    rebase_path(_stamp, root_build_dir),
+  ]
+}
+
+ts_library("third_party") {
+  runs_in = "node"
+
+  sources = [
+    "third_party/cli.ts",
+    "third_party/devtools-formatter-worker.ts",
+    "third_party/devtools-heap-snapshot-worker.ts",
+    "third_party/index.ts",
+    "third_party/lighthouse-devtools-mcp-bundle.d.ts",
+  ]
+
+  ts_deps = [
+    "//third_party/devtools-frontend/front_end/core/root:bundle",
+    "//third_party/devtools-frontend/front_end/entrypoints/formatter_worker:worker_entrypoint",
+    "//third_party/devtools-frontend/front_end/entrypoints/heap_snapshot_worker:worker_entrypoint",
+    "//third_party/devtools-frontend/mcp",
+  ]
+
+  deps = [
+    ":issue_descriptions",
+    ":lighthouse_bundle",
+  ]
+}
