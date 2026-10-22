@@ -482,15 +482,5 @@
   {
     "name": "max_navigation_saved_present",
     "flagType": "boolean"
-  },
-  {
-    "name": "category_logpoints_present",
-    "flagType": "boolean",
-    "isDeprecated": true
-  },
-  {
-    "name": "category_logpoints",
-    "flagType": "boolean",
-    "isDeprecated": true
   }
 ]
