@@ -25,7 +25,7 @@ async function spawnServer(): Promise<Server> {
   const child = spawn(
     'node',
     [
-      'build/src/bin/chrome-devtools-mcp.js',
+      'out/Default/gen/src/bin/chrome-devtools-mcp.js',
       '--headless',
       '--isolated',
       '--executable-path',

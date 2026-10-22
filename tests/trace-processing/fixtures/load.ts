@@ -19,7 +19,9 @@ export function loadTraceAsBuffer(filePath: string): Uint8Array {
     const compressedData = fs.readFileSync(
       path.join(
         import.meta.dirname,
-        // Get back up to the root directory as fixtures aren't moved ito the build/ dir.
+        // Get back up to the root directory as fixtures aren't moved into the out/Default/gen/ dir.
+        '..',
+        '..',
         '..',
         '..',
         '..',
