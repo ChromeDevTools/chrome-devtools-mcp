@@ -82,6 +82,39 @@ function parseDefaultArgs(options: McpOptions): ParsedArguments {
   };
 }
 
+function resolveCliOverrides(
+  fileArgs: Readonly<Partial<ParsedArguments>>,
+  cliArgs: Readonly<Partial<ParsedArguments>>,
+): Partial<ParsedArguments> {
+  const effectiveFileArgs: Partial<ParsedArguments> = {...fileArgs};
+  for (const group of CONFLICTING_ARGS) {
+    const cliHasActiveInGroup = group.some(
+      arg => cliArgs[arg] !== undefined && cliArgs[arg] !== false,
+    );
+    if (cliHasActiveInGroup) {
+      for (const arg of group) {
+        if (!(arg in cliArgs)) {
+          delete effectiveFileArgs[arg];
+        }
+      }
+    }
+  }
+  for (const [key, implied] of IMPLICATIONS) {
+    const impliedValue =
+      implied in cliArgs ? cliArgs[implied] : effectiveFileArgs[implied];
+    if (
+      !(key in cliArgs) &&
+      key in effectiveFileArgs &&
+      (impliedValue === undefined || impliedValue === false) &&
+      fileArgs[implied] !== undefined &&
+      fileArgs[implied] !== false
+    ) {
+      delete effectiveFileArgs[key];
+    }
+  }
+  return effectiveFileArgs;
+}
+
 export interface ReadonlyServerConfig {
   readonly resolved: Readonly<ParsedArguments>;
 }
@@ -243,8 +276,13 @@ export class ServerConfig implements ReadonlyServerConfig {
    * validates conflicts and implications, and applies defaults.
    */
   static create(options: ServerConfigCreateOptions): ServerConfig {
+    ServerConfig.validateConflicts(options.fileArgs);
+    const effectiveFileArgs = resolveCliOverrides(
+      options.fileArgs,
+      options.cliArgs,
+    );
     const explicitArgs: Partial<ParsedArguments> = {
-      ...options.fileArgs,
+      ...effectiveFileArgs,
       ...options.cliArgs,
       ...(options.configPath ? {config: options.configPath} : {}),
     };
