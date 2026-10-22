@@ -257,6 +257,31 @@ export class ClearcutLogger {
     }
   }
 
+  async logCapabilityEvent(args: {
+    action: 'enable' | 'disable' | 'call';
+    packId: string;
+    toolName?: string;
+    policyTier: 'enabled' | 'on-demand' | 'locked';
+    clientSupportsListChanged: boolean;
+    latencyMs: number;
+    success: boolean;
+  }): Promise<void> {
+    this.#watchdog.send({
+      type: WatchdogMessageType.LOG_EVENT,
+      payload: this.#addMcpClient({
+        capability_event: {
+          action: args.action,
+          pack_id: args.packId,
+          tool_name: args.toolName,
+          policy_tier: args.policyTier,
+          client_supports_list_changed: args.clientSupportsListChanged,
+          latency_ms: bucketizeLatency(args.latencyMs),
+          success: args.success,
+        },
+      }),
+    });
+  }
+
   async logServerError(args: {
     toolName?: string;
     errorCode: ErrorCode;

@@ -5,6 +5,7 @@
  */
 
 import type {ParsedArguments} from './config/ConfigParser.js';
+import type {McpServer} from './index.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {McpResponse} from './McpResponse.js';
@@ -13,7 +14,10 @@ import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import type {CallToolResult, Mutex} from './third_party/index.js';
 import {zod} from './third_party/index.js';
 import {labels} from './tools/categories.js';
-import {categoryToFlagName} from './config/category-options.js';
+import {
+  categoryToFlagName,
+  isCategoryOffByDefault,
+} from './config/category-options.js';
 import type {
   DefinedPageTool,
   DevToolsData,
@@ -57,6 +61,7 @@ function buildDisabledMessage(
 function getToolStatusInfo(
   tool: ToolDefinition | DefinedPageTool,
   serverArgs: ParsedArguments,
+  mcpServer?: McpServer,
 ): {disabled: boolean; reason?: string; unavailableInMode?: boolean} {
   if (!isAvailableInMode(tool, serverArgs)) {
     return {
@@ -68,10 +73,43 @@ function getToolStatusInfo(
     };
   }
 
+  const isMetaEnabled = Boolean(
+    mcpServer?.capabilityManager?.isMetaFeatureSystemEnabled,
+  );
+  if (mcpServer) {
+    if (isMetaEnabled && tool.name === 'manage_capabilities') {
+      return {disabled: false};
+    }
+    const policy = mcpServer.capabilityManager.getToolPolicy(tool.name);
+    if (policy === 'locked') {
+      return {
+        disabled: true,
+        reason: `Tool '${tool.name}' is locked by security policy and cannot be invoked or enabled.`,
+      };
+    }
+    if (!mcpServer.capabilityManager.isToolActive(tool.name)) {
+      return {
+        disabled: true,
+        reason: `Tool '${tool.name}' is in an on-demand capability pack and is not currently active. Enable its pack via manage_capabilities first.`,
+      };
+    }
+  }
+
+  const isDynamicallyActive =
+    isMetaEnabled &&
+    (mcpServer?.capabilityManager?.isToolActive(tool.name) ?? false);
+
   const category = tool.annotations.category;
   if (category) {
     const flag = categoryToFlagName(category);
-    if (!serverArgs[flag]) {
+    if (
+      !serverArgs[flag] &&
+      !(
+        isDynamicallyActive &&
+        isCategoryOffByDefault(category) &&
+        serverArgs[flag] !== false
+      )
+    ) {
       return {
         disabled: true,
         reason: buildDisabledMessage(tool.name, `--${flag}`, labels[category]),
@@ -80,7 +118,11 @@ function getToolStatusInfo(
   }
 
   for (const condition of tool.annotations.conditions || []) {
-    if (!serverArgs[condition]) {
+    // Allow bypassing memoryDebugging via dynamic activation
+    if (
+      !serverArgs[condition] &&
+      !(isDynamicallyActive && condition === 'memoryDebugging')
+    ) {
       return {
         disabled: true,
         reason: buildDisabledMessage(tool.name, `--${condition}`),
@@ -150,6 +192,9 @@ async function validateToolFiles(
   params: Record<string, unknown>,
   context: McpContext,
 ): Promise<void> {
+  if (Object.keys(tool.verifyFilesSchema).length === 0) {
+    return;
+  }
   const isLocal = isLocalBrowser(context);
   for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
     if (shouldValidateFile(option, isLocal)) {
@@ -176,30 +221,42 @@ async function validateToolFiles(
   }
 }
 
+function createCapabilitiesContext(mcpServer?: McpServer): McpContext {
+  return {
+    mcpServer,
+    getDevToolsData: async () => undefined,
+    getSelectedMcpPageUrl: () => undefined,
+  } as unknown as McpContext;
+}
+
 export class ToolHandler {
   readonly inputSchema: zod.ZodRawShape;
   readonly registeredInputSchema: zod.ZodObject<
     zod.ZodRawShape,
     zod.core.$strict
   >;
-  readonly disabled: boolean;
-  private readonly disabledReason?: string;
+
+  get disabled(): boolean {
+    const {disabled, unavailableInMode} = getToolStatusInfo(
+      this.tool,
+      this.serverArgs,
+      this.mcpServer,
+    );
+    return disabled && (Boolean(unavailableInMode) || !this.serverArgs.viaCli);
+  }
+
+  private get disabledReason(): string | undefined {
+    return getToolStatusInfo(this.tool, this.serverArgs, this.mcpServer).reason;
+  }
 
   constructor(
-    private readonly tool: ToolDefinition | DefinedPageTool,
+    readonly tool: ToolDefinition | DefinedPageTool,
     private readonly serverArgs: ParsedArguments,
     private readonly getContext: () => Promise<McpContext>,
     private readonly toolMutex: Mutex,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
+    private readonly mcpServer?: McpServer,
   ) {
-    const {disabled, reason, unavailableInMode} = getToolStatusInfo(
-      tool,
-      serverArgs,
-    );
-    this.disabledReason = reason;
-    this.disabled =
-      disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
-
     this.inputSchema = tool.schema;
     this.registeredInputSchema = zod.object(this.inputSchema).strict();
   }
@@ -236,7 +293,12 @@ export class ToolHandler {
 
   handle = async (params: Record<string, unknown>): Promise<CallToolResult> => {
     using guard = await this.toolMutex.acquire();
+    return await this.handleUnlocked(params);
+  };
 
+  handleUnlocked = async (
+    params: Record<string, unknown>,
+  ): Promise<CallToolResult> => {
     if (this.disabledReason) {
       return {
         content: [
@@ -263,16 +325,22 @@ export class ToolHandler {
       // discard that attempt if it succeeds later instead of handing it to a
       // subsequent caller — see BrowserManager#abandonPendingAttempt()'s doc
       // comment for the full mechanism.
-      const context = await this.#raceWithTimeout(this.getContext(), () =>
-        this.abandonPendingBrowserAttemptOnTimeout(),
-      );
+      const context =
+        this.tool.name === 'manage_capabilities'
+          ? createCapabilitiesContext(this.mcpServer)
+          : await this.#raceWithTimeout(this.getContext(), () =>
+              this.abandonPendingBrowserAttemptOnTimeout(),
+            );
       logger?.(`${this.tool.name} context: resolved`);
       const response = this.serverArgs.slim
         ? new SlimMcpResponse(this.serverArgs)
         : new McpResponse(this.serverArgs);
 
       response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
-      if (context.consumeReconnectNotice()) {
+      if (
+        this.tool.name !== 'manage_capabilities' &&
+        context.consumeReconnectNotice()
+      ) {
         response.setReconnectNotice();
       }
       let page: McpPage | undefined;
@@ -281,21 +349,22 @@ export class ToolHandler {
         if (isPageScopedTool(this.tool)) {
           const pageId =
             typeof params.pageId === 'number' ? params.pageId : undefined;
-          page =
+          const resolvedPage =
             this.serverArgs.pageIdRouting &&
             pageId !== undefined &&
             !isSlimTool(this.tool)
               ? context.getPageById(pageId)
               : context.getSelectedMcpPage();
-          await page?.init();
-          response.setPage(page);
+          page = resolvedPage;
+          await resolvedPage?.init();
+          response.setPage(resolvedPage);
           if (this.tool.blockedByDialog) {
-            page.throwIfDialogOpen();
+            resolvedPage.throwIfDialogOpen();
           }
           await this.tool.handler(
             {
               params,
-              page,
+              page: resolvedPage,
             },
             response,
             context,

@@ -1350,5 +1350,30 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "manage_capabilities",
+    "args": [
+      {
+        "name": "action",
+        "argType": "string"
+      },
+      {
+        "name": "capability_length",
+        "argType": "number"
+      },
+      {
+        "name": "capabilities_count",
+        "argType": "number"
+      },
+      {
+        "name": "tool_length",
+        "argType": "number"
+      },
+      {
+        "name": "tool_args_count",
+        "argType": "number"
+      }
+    ]
   }
 ]

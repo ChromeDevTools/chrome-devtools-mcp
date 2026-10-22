@@ -16,7 +16,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {TestServer} from '../build/tests/server.js';
 
 import type {CapturedFunctionCall, TestScenario} from './eval_result.js';
-import {Result} from './eval_result.js';
+import {hasMetaFeatureSystemFlag, Result} from './eval_result.js';
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..');
 const SCENARIOS_DIR = path.join(import.meta.dirname, 'eval_scenarios');
@@ -127,7 +127,7 @@ async function runSingleScenario(
 
     client = new Client(
       {name: 'gemini-eval-client', version: '1.0.0'},
-      {capabilities: {}},
+      {capabilities: {tools: {listChanged: true}}},
     );
 
     await client.connect(transport);
@@ -140,11 +140,12 @@ async function runSingleScenario(
       debugLog(
         `Executing tool: ${request.name} with args: ${JSON.stringify(request.arguments)}`,
       );
+      const response = await originalCallTool(request, schema);
       allCalls.push({
         name: request.name,
         args: (request.arguments as Record<string, unknown>) || {},
+        isError: Boolean(response.isError),
       });
-      const response = await originalCallTool(request, schema);
       debugLog(`Tool response: ${JSON.stringify(response)}`);
       return response;
     };
@@ -153,21 +154,70 @@ async function runSingleScenario(
 
     debugLog(`\n--- Prompt ---\n${scenario.prompt}`);
 
-    const result = await ai.models.generateContent({
-      model: modelId,
-      contents: scenario.prompt,
-      config: {
-        tools: [mcpToTool(client)],
-        automaticFunctionCalling: {
-          maximumRemoteCalls: scenario.maxTurns,
+    let finalResponseText = '';
+    if (hasMetaFeatureSystemFlag(args)) {
+      const contents: Array<Record<string, unknown>> = [
+        {role: 'user', parts: [{text: scenario.prompt}]},
+      ];
+      const maxDynamicTurns = Math.max(scenario.maxTurns + 3, 6);
+      for (let turn = 0; turn < maxDynamicTurns; turn++) {
+        const listed = await client.listTools();
+        const functionDeclarations = listed.tools.map(t => ({
+          name: t.name,
+          description: t.description ?? '',
+          parametersJsonSchema: t.inputSchema,
+        }));
+        const res = await ai.models.generateContent({
+          model: modelId,
+          contents: contents as never,
+          config: {
+            tools: [{functionDeclarations: functionDeclarations as never}],
+          },
+        });
+        const candidateContent = res.candidates?.[0]?.content;
+        if (candidateContent) {
+          contents.push(candidateContent as unknown as Record<string, unknown>);
+        }
+        const fnCalls = res.functionCalls ?? [];
+        if (fnCalls.length === 0) {
+          finalResponseText = res.text ?? '';
+          break;
+        }
+        const responseParts: Array<Record<string, unknown>> = [];
+        for (const fc of fnCalls) {
+          const toolName = fc.name ?? '';
+          const toolArgs = (fc.args as Record<string, unknown>) ?? {};
+          const toolRes = await client.callTool({
+            name: toolName,
+            arguments: toolArgs,
+          });
+          responseParts.push({
+            functionResponse: {
+              name: toolName,
+              response: {result: toolRes},
+            },
+          });
+        }
+        contents.push({role: 'user', parts: responseParts});
+      }
+    } else {
+      const result = await ai.models.generateContent({
+        model: modelId,
+        contents: scenario.prompt,
+        config: {
+          tools: [mcpToTool(client)],
+          automaticFunctionCalling: {
+            maximumRemoteCalls: scenario.maxTurns,
+          },
         },
-      },
-    });
+      });
+      finalResponseText = result.text ?? '';
+    }
 
-    debugLog(`\n--- Response ---\n${result.text}`);
+    debugLog(`\n--- Response ---\n${finalResponseText}`);
 
     debugLog('\nVerifying expectations...');
-    scenario.expectations(new Result(allCalls, args, result.text ?? ''));
+    scenario.expectations(new Result(allCalls, args, finalResponseText));
   } finally {
     try {
       await client?.close();
@@ -204,6 +254,10 @@ async function main() {
       'skill-path': {
         type: 'string',
       },
+      'meta-feature-system': {
+        type: 'boolean',
+        default: false,
+      },
       'server-args': {
         type: 'string',
       },
@@ -219,8 +273,14 @@ async function main() {
     ? path.resolve(ROOT_DIR, values['skill-path'])
     : SKILL_PATH;
   const extraServerArgs = values['server-args']
-    ? values['server-args'].split(/\s+/)
+    ? values['server-args'].split(/\s+/).filter(Boolean)
     : [];
+  if (
+    values['meta-feature-system'] &&
+    !hasMetaFeatureSystemFlag(extraServerArgs)
+  ) {
+    extraServerArgs.push('--meta-feature-system');
+  }
 
   const scenarioFiles =
     positionals.length > 0

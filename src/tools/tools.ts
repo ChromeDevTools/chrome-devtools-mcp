@@ -28,6 +28,7 @@ import * as snapshotTools from './snapshot.js';
 import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
 import type {DefinedPageTool, ToolDefinition} from './ToolDefinition.js';
 import * as webmcpTools from './webmcp.js';
+import {manageCapabilities} from './capabilities.js';
 
 export const createTools = (
   args: ParsedArguments,
@@ -52,6 +53,7 @@ export const createTools = (
     ...Object.values(snapshotTools),
     ...Object.values(thirdPartyDeveloperTools),
     ...Object.values(webmcpTools),
+    manageCapabilities,
   ];
 
   const tools: Array<ToolDefinition | DefinedPageTool> = [];

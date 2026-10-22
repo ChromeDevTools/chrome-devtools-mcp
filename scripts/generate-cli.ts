@@ -99,6 +99,11 @@ async function generateCli() {
       if (tool.name === 'wait_for') {
         return false;
       }
+      // Skipping manage_capabilities because capability packs are for MCP sessions
+      // and CLI does not handle array/JSON args well.
+      if (tool.name === 'manage_capabilities') {
+        return false;
+      }
       // Skipping get_tab_id as it is for internal integrations
       if (tool.name === 'get_tab_id') {
         return false;

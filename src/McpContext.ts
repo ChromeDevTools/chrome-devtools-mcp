@@ -52,7 +52,9 @@ import {McpWorker} from './McpWorker.js';
 import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
+import type {McpServer} from './index.js';
 interface McpContextOptions {
+  mcpServer?: McpServer;
   // Whether the DevTools windows are exposed as pages for debugging of DevTools.
   experimentalDevToolsDebugging: boolean;
   // Whether all page-like targets are exposed as pages.
@@ -90,6 +92,7 @@ interface McpContextOptions {
 let nextPageId = 1;
 
 export class McpContext implements Context {
+  mcpServer?: McpServer;
   browser: Browser;
   logger: Logger;
 
@@ -132,6 +135,7 @@ export class McpContext implements Context {
       },
     });
 
+    this.mcpServer = options.mcpServer;
     this.browser = browser;
     this.logger = logger;
     this.#locatorClass = locatorClass;

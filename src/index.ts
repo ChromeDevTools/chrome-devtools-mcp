@@ -9,6 +9,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
+import {CapabilityManager} from './capabilities/CapabilityManager.js';
 import {type ParsedArguments} from './config/ConfigParser.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
 import {McpContext} from './McpContext.js';
@@ -57,6 +58,57 @@ interface ToolEntry {
 }
 
 export class McpServer {
+  readonly capabilityManager: CapabilityManager;
+
+  get clientSupportsListChanged(): boolean {
+    const caps = this.server.server.getClientCapabilities() as
+      {tools?: {listChanged?: boolean}} | undefined;
+    return caps?.tools?.listChanged ?? false;
+  }
+
+  get telemetry(): ClearcutLogger | undefined {
+    return ClearcutLogger.get();
+  }
+
+  get isPipeConnection(): boolean {
+    return Boolean(
+      !this.#serverArgs.autoConnect &&
+      !this.#serverArgs.browserUrl &&
+      !this.#serverArgs.wsEndpoint,
+    );
+  }
+
+  notifyToolsListChanged(): void {
+    if (!this.server.isConnected()) {
+      return;
+    }
+    void this.server.server.sendToolListChanged().catch(() => {});
+  }
+
+  getRegisteredTools(): ToolEntry[] {
+    return Array.from(this.#tools.values());
+  }
+
+  updateToolCapabilities(): void {
+    for (const [name, entry] of this.#tools.entries()) {
+      if (name === 'manage_capabilities') {
+        continue;
+      }
+
+      if (entry.handler.disabled) {
+        entry.registeredTool.disable();
+        continue;
+      }
+
+      const isActive = this.capabilityManager.isToolActive(name);
+      if (isActive) {
+        entry.registeredTool.enable();
+      } else {
+        entry.registeredTool.disable();
+      }
+    }
+  }
+
   readonly server: SdkMcpServer;
   #serverArgs: ParsedArguments;
   #browserManager: BrowserManager;
@@ -75,6 +127,11 @@ export class McpServer {
   private constructor(serverArgs: ParsedArguments, options: McpServerOptions) {
     this.#serverArgs = serverArgs;
     this.#browserManager = options.browserManager;
+    this.capabilityManager = new CapabilityManager({
+      metaFeatureSystem: this.#serverArgs.metaFeatureSystem,
+      packPolicy: this.#serverArgs.packPolicy,
+      toolPolicy: this.#serverArgs.toolPolicy,
+    });
 
     if (this.#serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -100,6 +157,15 @@ export class McpServer {
         debouncedNotificationMethods: ['notifications/tools/list_changed'],
       },
     );
+    const origSendToolListChanged = this.server.sendToolListChanged.bind(
+      this.server,
+    );
+    this.server.sendToolListChanged = () => {
+      if (!this.server.isConnected()) {
+        return;
+      }
+      origSendToolListChanged();
+    };
 
     this.server.server.setRequestHandler('logging/setLevel', () => {
       return {};
@@ -139,6 +205,7 @@ export class McpServer {
   async callTool(
     name: string,
     args: Record<string, unknown> = {},
+    options?: {skipMutex?: boolean},
   ): Promise<CallToolResult> {
     const toolHandler = this.#tools.get(name)?.handler;
     if (!toolHandler) {
@@ -170,7 +237,9 @@ export class McpServer {
         isError: true,
       };
     }
-    return await toolHandler.handle(parseResult.data);
+    return options?.skipMutex
+      ? await toolHandler.handleUnlocked(parseResult.data)
+      : await toolHandler.handle(parseResult.data);
   }
 
   /**
@@ -211,7 +280,8 @@ export class McpServer {
   }
 
   async #init(): Promise<void> {
-    for (const tool of createTools(this.#serverArgs)) {
+    const allTools = createTools(this.#serverArgs);
+    for (const tool of allTools) {
       // Slim and regular tools may share names, only register the current mode.
       if (isAvailableInMode(tool, this.#serverArgs)) {
         this.#registerTool(tool);
@@ -265,6 +335,7 @@ export class McpServer {
     if (this.#context?.browser !== browser) {
       this.#context?.dispose();
       this.#context = await McpContext.from(browser, logger, {
+        mcpServer: this,
         experimentalDevToolsDebugging:
           this.#serverArgs.experimentalDevtools ?? false,
         experimentalIncludeAllPages:
@@ -310,6 +381,7 @@ export class McpServer {
       () => this.#getContext(),
       this.#toolMutex,
       () => this.#browserManager.abandonPendingAttempt(),
+      this, // Pass McpServer instance
     );
   }
 
@@ -326,7 +398,11 @@ export class McpServer {
       handler.handle,
     );
 
-    if (handler.disabled) {
+    if (
+      handler.disabled ||
+      (tool.name !== 'manage_capabilities' &&
+        !this.capabilityManager.isToolActive(tool.name))
+    ) {
       registeredTool.disable();
     }
 

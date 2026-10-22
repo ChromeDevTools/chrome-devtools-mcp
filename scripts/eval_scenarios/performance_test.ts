@@ -12,6 +12,7 @@ export const scenario: TestScenario = {
   prompt: 'Check the performance of https://developers.chrome.com',
   maxTurns: 3,
   expectations: result => {
+    result.assertCapabilityEnabled('performance');
     const pageId = result.consumePageNavigation();
     assert.ok(result.remainingCalls.length >= 1);
     result.assertNextCall(

@@ -470,5 +470,21 @@
   {
     "name": "screencast_fps_present",
     "flagType": "boolean"
+  },
+  {
+    "name": "pack_policy_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "tool_policy_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "meta_feature_system_present",
+    "flagType": "boolean"
+  },
+  {
+    "name": "meta_feature_system",
+    "flagType": "boolean"
   }
 ]

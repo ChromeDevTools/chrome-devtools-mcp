@@ -9,19 +9,82 @@ import assert from 'node:assert';
 export interface CapturedFunctionCall {
   name: string;
   args: Record<string, unknown>;
+  isError?: boolean;
+}
+
+export function hasMetaFeatureSystemFlag(serverArgs: string[]): boolean {
+  return serverArgs.some(
+    arg =>
+      arg === '--meta-feature-system' ||
+      arg === '--meta-feature-system=true' ||
+      arg === '--metaFeatureSystem' ||
+      arg === '--metaFeatureSystem=true',
+  );
 }
 
 export class Result {
   private nextCallIndex = 0;
   readonly calls: CapturedFunctionCall[];
+  readonly rawCalls: CapturedFunctionCall[];
   readonly serverArgs: string[];
   /** The model's final response text. */
   readonly text: string;
 
   constructor(calls: CapturedFunctionCall[], serverArgs: string[], text = '') {
-    this.calls = calls;
+    this.rawCalls = calls;
+    this.calls = calls.flatMap(call => {
+      if (call.isError) {
+        return [];
+      }
+      if (call.name !== 'manage_capabilities') {
+        return [call];
+      }
+      if (call.args.action === 'call' && typeof call.args.tool === 'string') {
+        return [
+          {
+            name: call.args.tool,
+            args:
+              (call.args.toolArgs as Record<string, unknown> | undefined) ?? {},
+          },
+        ];
+      }
+      return [];
+    });
     this.serverArgs = serverArgs;
     this.text = text;
+  }
+
+  get hasMetaFeatureSystem(): boolean {
+    return hasMetaFeatureSystemFlag(this.serverArgs);
+  }
+
+  get capabilityCalls(): CapturedFunctionCall[] {
+    return this.rawCalls.filter(c => c.name === 'manage_capabilities');
+  }
+
+  assertCapabilityEnabled(packId: string): void {
+    if (!this.hasMetaFeatureSystem) {
+      return;
+    }
+    const enabled = this.capabilityCalls.some(c => {
+      if (c.args.action !== 'enable') {
+        return false;
+      }
+      if (c.args.capability === packId) {
+        return true;
+      }
+      if (
+        Array.isArray(c.args.capabilities) &&
+        c.args.capabilities.includes(packId)
+      ) {
+        return true;
+      }
+      return false;
+    });
+    assert.ok(
+      enabled,
+      `Expected capability pack '${packId}' to be enabled via manage_capabilities, got capability calls: ${JSON.stringify(this.capabilityCalls)}`,
+    );
   }
 
   get hasPageIdRouting(): boolean {
@@ -40,7 +103,7 @@ export class Result {
    * - Returns the active pageId.
    */
   consumePageNavigation(): number | undefined {
-    if (this.calls[this.nextCallIndex]?.name === 'list_pages') {
+    while (this.calls[this.nextCallIndex]?.name === 'list_pages') {
       this.nextCallIndex++;
     }
 
@@ -52,7 +115,7 @@ export class Result {
     );
     this.nextCallIndex++;
 
-    if (this.calls[this.nextCallIndex]?.name === 'list_pages') {
+    while (this.calls[this.nextCallIndex]?.name === 'list_pages') {
       this.nextCallIndex++;
     }
 

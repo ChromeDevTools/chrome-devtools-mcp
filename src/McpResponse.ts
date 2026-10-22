@@ -620,9 +620,16 @@ export class McpResponse implements Response {
     return undefined;
   }
 
-  async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
+  async #handleThirdPartyDevelopeTools(
+    context: McpContext,
+  ): Promise<ToolGroups | undefined> {
     if (
-      this.#args.categoryExperimentalThirdParty &&
+      (this.#args.categoryExperimentalThirdParty ||
+        Boolean(
+          context?.mcpServer?.capabilityManager?.isToolActive(
+            'list_3p_developer_tools',
+          ),
+        )) &&
       this.#listThirdPartyDeveloperTools &&
       this.#page
     ) {
@@ -631,9 +638,14 @@ export class McpResponse implements Response {
     return undefined;
   }
 
-  async #handleWebMCP(): Promise<WebMCPTool[] | undefined> {
+  async #handleWebMCP(context: McpContext): Promise<WebMCPTool[] | undefined> {
     if (
-      this.#args.categoryExperimentalWebmcp &&
+      (this.#args.categoryExperimentalWebmcp ||
+        Boolean(
+          context?.mcpServer?.capabilityManager?.isToolActive(
+            'list_webmcp_tools',
+          ),
+        )) &&
       this.#listWebMcpTools &&
       this.#page
     ) {
@@ -803,8 +815,8 @@ export class McpResponse implements Response {
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
       this.#handleAttachedConsoleMessage(),
-      this.#handleThirdPartyDevelopeTools(),
-      this.#handleWebMCP(),
+      this.#handleThirdPartyDevelopeTools(context),
+      this.#handleWebMCP(context),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
       this.#handleComments(),

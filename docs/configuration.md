@@ -156,6 +156,19 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--packPolicy`/ `--pack-policy`**
+  Comma-separated pack=policy pairs, e.g. performance=enabled,memory=locked
+  - **Type:** string
+
+- **`--toolPolicy`/ `--tool-policy`**
+  Comma-separated tool=policy pairs, e.g. take_heapsnapshot=enabled
+  - **Type:** string
+
+- **`--metaFeatureSystem`/ `--meta-feature-system`**
+  Enable the slimmed core startup where all non-core Domain Packs default to on-demand
+  - **Type:** boolean
+  - **Default:** `false`
+
 - **`--experimentalDevtools`/ `--experimental-devtools`**
   Whether to enable automation over DevTools targets. This exposes the DevTools UI to input tools, including the Console, which can evaluate JavaScript in the inspected page. --no-javascript-evaluation does not restrict this path.
   - **Type:** boolean

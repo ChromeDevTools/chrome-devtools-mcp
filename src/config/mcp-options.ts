@@ -40,6 +40,24 @@ export const mcpOptions = {
     default: true,
     reloadable: true,
   },
+  packPolicy: {
+    type: 'string',
+    describe:
+      'Comma-separated pack=policy pairs, e.g. performance=enabled,memory=locked',
+    reloadable: true,
+  },
+  toolPolicy: {
+    type: 'string',
+    describe:
+      'Comma-separated tool=policy pairs, e.g. take_heapsnapshot=enabled',
+    reloadable: true,
+  },
+  metaFeatureSystem: {
+    type: 'boolean',
+    describe:
+      'Enable the slimmed core startup where all non-core Domain Packs default to on-demand',
+    reloadable: true,
+  },
   devtoolsComments: {
     type: 'boolean',
     describe:

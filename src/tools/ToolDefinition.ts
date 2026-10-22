@@ -57,6 +57,8 @@ import type {
 import type {ToolCategory} from './categories.js';
 import type {ToolGroups} from './thirdPartyDeveloper.js';
 
+import type {McpServer} from '../index.js';
+
 export type FileVerificationOption =
   | true
   | {
@@ -302,8 +304,8 @@ export interface ScreenRecorderData {
   recorder: ScreenRecorder | ScreenRecording;
   filePath: string;
 }
-
 export type Context = Readonly<{
+  mcpServer?: McpServer;
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
   launchPWA(options: LaunchPWAOptions): Promise<Page>;
