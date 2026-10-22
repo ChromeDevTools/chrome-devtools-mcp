@@ -1754,7 +1754,7 @@ export const commands: Commands = {
   },
   resize_page: {
     description:
-      "Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.",
+      "Resizes the page's window so that the page has specified dimension",
     category: 'Emulation',
     args: {
       pageId: {
