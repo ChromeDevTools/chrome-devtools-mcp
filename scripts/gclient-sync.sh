@@ -59,3 +59,6 @@ echo "Running gclient sync..."
     vpython3 scripts/deps/ensure_node_modules.py
   fi
 )
+
+echo "Linking DevTools DEPS into repository root..."
+node scripts/link-devtools-deps.ts
