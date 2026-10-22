@@ -1330,6 +1330,53 @@ describe('ToolHandler', () => {
     });
   });
 
+  it('validates local-only verifyFilesSchema when browser is connected to a 0.0.0.0 wsEndpoint', async () => {
+    const handler = sinon.stub().resolves();
+    const tool: ToolDefinition = {
+      name: 'upload_tool',
+      description: 'A tool with local-only file verification',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {
+        filePaths: zod.array(zod.string()),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePaths: {
+          local: true,
+          remote: false,
+        },
+      },
+      handler,
+    };
+
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://0.0.0.0:9222/devtools/browser/test',
+      }),
+    );
+    mockContext.validatePath.rejects(new Error('Access denied'));
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseConfig(),
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({
+      filePaths: ['/etc/passwd'],
+    });
+
+    assert.strictEqual(result.isError, true);
+    sinon.assert.calledOnceWithExactly(mockContext.validatePath, '/etc/passwd');
+    sinon.assert.notCalled(handler);
+  });
+
   it('skips local-only verifyFilesSchema when browser is remote', async () => {
     let handlerCalled = false;
     let receivedParams: Record<string, unknown> | undefined;
