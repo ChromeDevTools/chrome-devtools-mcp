@@ -397,6 +397,54 @@ describe('performance', () => {
       );
     });
 
+    it('rejects stopping a trace on a page that is not recording and suggests select_page by default', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        pageIdRouting: false,
+      });
+      Object.defineProperty(page, 'id', {value: 2});
+      page.isRunningPerformanceTrace.returns(false);
+
+      const {page: tracedPage} = createHandlerMocks();
+      Object.defineProperty(tracedPage, 'id', {value: 1});
+      tracedPage.isRunningPerformanceTrace.returns(true);
+
+      context.isRunningPerformanceTrace.returns(true);
+      context.getPages.returns([tracedPage, page]);
+
+      await stopTrace(args).handler({params: {}, page}, response, context);
+
+      sinon.assert.notCalled(page.pptrPage.tracing.stop);
+      sinon.assert.notCalled(tracedPage.pptrPage.tracing.stop);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Error: the active performance trace is running on page 1, not on page 2. Select page 1 with select_page first, then call performance_stop_trace.',
+      );
+    });
+
+    it('rejects stopping a trace on a page that is not recording and suggests pageId when pageIdRouting is enabled', async () => {
+      const {page, context, response, args} = createHandlerMocks({
+        pageIdRouting: true,
+      });
+      Object.defineProperty(page, 'id', {value: 2});
+      page.isRunningPerformanceTrace.returns(false);
+
+      const {page: tracedPage} = createHandlerMocks();
+      Object.defineProperty(tracedPage, 'id', {value: 1});
+      tracedPage.isRunningPerformanceTrace.returns(true);
+
+      context.isRunningPerformanceTrace.returns(true);
+      context.getPages.returns([tracedPage, page]);
+
+      await stopTrace(args).handler({params: {}, page}, response, context);
+
+      sinon.assert.notCalled(page.pptrPage.tracing.stop);
+      sinon.assert.notCalled(tracedPage.pptrPage.tracing.stop);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Error: the active performance trace is running on page 1, not on page 2. Pass pageId: 1 to performance_stop_trace to stop it.',
+      );
+    });
+
     it('will stop the trace and return trace info when a trace is running', async () => {
       const rawData = loadTraceAsBuffer('basic-trace.json.gz');
       await withMcpContext(async (response, context, args) => {
