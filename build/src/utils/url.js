@@ -3,8 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+// Node 22 has no global URLPattern. The CLI bundle exports Puppeteer's
+// polyfill, so this module does not need the full third-party bundle.
+import { URLPattern } from '../third_party/cli.js';
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'ws:', 'wss:']);
 const IPV4_LOOPBACK_REGEX = /^127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/;
+const IPV4_MAPPED_LOOPBACK_REGEX = /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/;
 /**
  * Determines whether a given URL string points to a localhost / loopback address.
  *
@@ -36,6 +40,11 @@ export function isLocalhost(url) {
     }
     // 3. Check IPv4 loopback (127.0.0.0/8)
     if (IPV4_LOOPBACK_REGEX.test(hostname)) {
+        return true;
+    }
+    // 4. Check IPv4-mapped IPv6 loopback. URL serializes [::ffff:127.0.0.1]
+    // as [::ffff:7f00:1].
+    if (IPV4_MAPPED_LOOPBACK_REGEX.test(hostname)) {
         return true;
     }
     return false;
@@ -91,19 +100,51 @@ function hasNamedGroup(component) {
     return component.replaceAll('\\\\', '').replaceAll('\\:', '').includes(':');
 }
 /**
- * Finds the first pattern that Chrome can't enforce on redirects or subresources:
- * - Any pattern containing a regexp group (for example `(foo|bar)`).
- * - Any pattern containing a named group (`:name`, for example `*://127.0.0.1::port/*`).
+ * Checks whether a URLPattern string has a partial IPv4 wildcard in the
+ * hostname (for example `127.0.0.*`, `*.0.0.1`, `*1*`, or `{127.0.0.*}`),
+ * which Chrome cannot enforce on redirects or subresources.
+ */
+function hasPartialIpv4Hostname(pattern) {
+    const authority = /:\/\/([^/?#]+)/.exec(pattern)?.[1] ?? '';
+    const hostPort = authority.slice(authority.lastIndexOf('@') + 1);
+    if (hostPort.startsWith('[')) {
+        return false;
+    }
+    const hostname = hostPort.replace(/:.*$/, '');
+    if (!hostname.includes('*')) {
+        return false;
+    }
+    const stripped = hostname.replaceAll(/[{}*\\]/g, '').replace(/\.+$/, '');
+    const lastLabel = stripped.split('.').at(-1) ?? '';
+    return /^(?:\d+|0[xX][0-9a-fA-F]*)$/.test(lastLabel);
+}
+/**
+ * Validates that every pattern can be enforced by Chrome on redirects and subresources:
+ * - Rejects patterns with a partial IPv4 wildcard in the hostname (for example `127.0.0.*`).
+ * - Rejects patterns containing a regexp group (for example `(foo|bar)`).
+ * - Rejects patterns containing a named group (`:name`, for example `*://127.0.0.1::port/path`).
  *
  * @param patterns The `--blockedUrlPattern`/`--allowedUrlPattern` values to check.
- * @returns The first unenforceable pattern, or undefined if all are valid.
- * @throws Error if a pattern's syntax is invalid (via `new URLPattern`).
+ * @param flagName The CLI flag name used in error messages.
+ * @throws Error if a pattern's syntax is invalid (via `new URLPattern`) or uses an unenforceable construct.
  */
-export function findUnenforceablePattern(patterns) {
+export function validateUrlPatterns(patterns, flagName) {
     for (const raw of patterns) {
-        const parsed = new URLPattern(raw);
+        if (hasPartialIpv4Hostname(raw)) {
+            throw new Error(`Invalid ${flagName} "${raw}": a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact IPv4 address or a "*" wildcard instead.`);
+        }
+        let parsed;
+        try {
+            parsed = new URLPattern(raw);
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`Invalid ${flagName} "${raw}": ${message}`, {
+                cause: error,
+            });
+        }
         if (parsed.hasRegExpGroups) {
-            return raw;
+            throw new Error(`Invalid ${flagName} "${raw}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`);
         }
         const components = [
             parsed.protocol,
@@ -116,10 +157,9 @@ export function findUnenforceablePattern(patterns) {
             parsed.hash,
         ];
         if (components.some(hasNamedGroup)) {
-            return raw;
+            throw new Error(`Invalid ${flagName} "${raw}": a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`);
         }
     }
-    return undefined;
 }
 /**
  * Reports whether a URL ultimately targets the `file:` scheme.
@@ -169,6 +209,9 @@ export function validateUrl(url, options) {
     }
     if (fileNavigations === false && targetsFileScheme(parsed)) {
         throw new Error(`Navigating to file: URLs is not allowed when --file-navigations is disabled.`);
+    }
+    if (parsed.protocol === 'devtools:') {
+        throw new Error(`Navigating to devtools: URLs is not allowed.`);
     }
     if (!isAllowedUrl(url, { categoryExtensions })) {
         if (parsed.protocol === 'chrome-extension:') {

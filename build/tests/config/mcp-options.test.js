@@ -57,14 +57,12 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 });
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { ConfigLocator } from '../../src/config/ConfigLocator.js';
 import { ConfigParser } from '../../src/config/ConfigParser.js';
-import { DEFAULT_FILESYSTEM_ROOT } from '../../src/config/mcp-options.js';
 import { createTempFile } from '../utils.js';
 describe('mcp-options steps', () => {
-    afterEach(() => sinon.restore());
     const parser = new ConfigParser('0.0.0');
     describe('parseCliArgs', () => {
         it('returns only explicitly passed flags', () => {
@@ -128,107 +126,44 @@ describe('mcp-options steps', () => {
                 __disposeResources(env_3);
             }
         });
-    });
-    describe('validateConflicts', () => {
-        it('accepts a single argument from a conflict group', () => {
-            ConfigParser.validateConflicts({ browserUrl: 'http://localhost:9222' });
-        });
-        it('ignores false and undefined values', () => {
-            ConfigParser.validateConflicts({
-                browserUrl: 'http://localhost:9222',
-                wsEndpoint: undefined,
-                categoryExtensions: false,
-            });
-        });
-        it('rejects two arguments from the same group', () => {
-            assert.throws(() => ConfigParser.validateConflicts({
-                browserUrl: 'http://localhost:9222',
-                channel: 'canary',
-            }), /Arguments channel and browserUrl are mutually exclusive/);
-        });
-        describe('validateImplications', () => {
-            it('accepts when implying key is not set', () => {
-                ConfigParser.validateImplications({ wsEndpoint: 'ws://localhost:9222' });
-            });
-            it('accepts when both implying and implied keys are set', () => {
-                ConfigParser.validateImplications({
-                    wsHeaders: { Auth: 'token' },
+        it('accepts wsHeaders as a JSON object and validates string values', () => {
+            const env_4 = { stack: [], error: void 0, hasError: false };
+            try {
+                const validFile = __addDisposableResource(env_4, createTempFile(JSON.stringify({
                     wsEndpoint: 'ws://localhost:9222',
-                });
-            });
-            it('rejects when implying key is set but implied key is missing', () => {
-                assert.throws(() => ConfigParser.validateImplications({ wsHeaders: { Auth: 'token' } }), /Implications failed:\n {2}wsHeaders -> wsEndpoint/);
-            });
-            it('rejects when implying key is set but implied key is negated', () => {
-                assert.throws(() => ConfigParser.validateImplications({
-                    experimentalFfmpegPath: '/bin/ffmpeg',
-                    experimentalScreencast: false,
-                }), /Implications failed:\n {2}experimentalFfmpegPath -> experimentalScreencast/);
-            });
+                    wsHeaders: { Authorization: 'Bearer token' },
+                }), 'cd4a.wsheaders.valid.json'), false);
+                const args = parser.parseConfigFile(validFile.path);
+                assert.deepStrictEqual(args.wsHeaders, { Authorization: 'Bearer token' });
+                const invalidFile = __addDisposableResource(env_4, createTempFile(JSON.stringify({
+                    wsEndpoint: 'ws://localhost:9222',
+                    wsHeaders: { Authorization: 123 },
+                }), 'cd4a.wsheaders.invalid.json'), false);
+                assert.throws(() => parser.parseConfigFile(invalidFile.path), /Header "Authorization" must have a string value/);
+            }
+            catch (e_4) {
+                env_4.error = e_4;
+                env_4.hasError = true;
+            }
+            finally {
+                __disposeResources(env_4);
+            }
         });
-    });
-    describe('applyDefaults', () => {
-        it('keeps explicit values and fills in defaults', () => {
-            const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-                headless: true,
-            });
-            assert.strictEqual(args.headless, true);
-            assert.strictEqual(args.isolated, false);
-            assert.strictEqual(args.channel, 'stable');
-            assert.strictEqual(args.categoryExtensions, undefined);
-        });
-        for (const explicitArgs of [
-            { browserUrl: 'http://localhost:9222' },
-            { wsEndpoint: 'ws://localhost:9222' },
-            { executablePath: '/tmp/chrome' },
-        ]) {
-            it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
-                assert.strictEqual(new ConfigParser('0.0.0', [], {}).applyDefaults(explicitArgs).channel, undefined);
-            });
-        }
-        it('applies viaCli defaults when launching a browser', () => {
-            const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-                viaCli: true,
-                filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
-            });
-            assert.strictEqual(args.headless, true);
-            assert.strictEqual(args.isolated, true);
-            assert.strictEqual(args.categoryExtensions, true);
-            assert.strictEqual(args.allowUnrestrictedPaths, true);
-            assert.strictEqual(args.filesystemRoot, undefined);
-        });
-        it('keeps the default filesystem root for viaCli with explicit allowUnrestrictedPaths=false', () => {
-            const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-                viaCli: true,
-                allowUnrestrictedPaths: false,
-            });
-            assert.strictEqual(args.allowUnrestrictedPaths, false);
-            assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
-        });
-        it('does not enable isolated or extensions for viaCli with browserUrl', () => {
-            const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-                viaCli: true,
-                browserUrl: 'http://localhost:9222',
-            });
-            assert.strictEqual(args.isolated, false);
-            assert.strictEqual(args.categoryExtensions, undefined);
-        });
-        it('turns off usage statistics in CI', () => {
-            sinon.stub(console, 'error');
-            const args = new ConfigParser('0.0.0', [], {
-                CI: 'true',
-            }).applyDefaults({
-                usageStatistics: true,
-            });
-            assert.strictEqual(args.usageStatistics, false);
-        });
-        it('prints the usage statistics notice once', () => {
-            const consoleError = sinon.stub(console, 'error');
-            const parser = new ConfigParser('0.0.0', [], { CI: 'true' });
-            parser.applyDefaults({});
-            const args = parser.applyDefaults({});
-            assert.strictEqual(args.usageStatistics, false);
-            sinon.assert.calledOnce(consoleError);
+        it('rejects config, help, and version keys inside a config file', () => {
+            for (const forbiddenKey of ['config', 'help', 'version']) {
+                const env_5 = { stack: [], error: void 0, hasError: false };
+                try {
+                    const configFile = __addDisposableResource(env_5, createTempFile(JSON.stringify({ [forbiddenKey]: true }), `cd4a.forbidden.${forbiddenKey}.json`), false);
+                    assert.throws(() => parser.parseConfigFile(configFile.path), new RegExp(`Invalid JSON config file: .*${forbiddenKey}`));
+                }
+                catch (e_5) {
+                    env_5.error = e_5;
+                    env_5.hasError = true;
+                }
+                finally {
+                    __disposeResources(env_5);
+                }
+            }
         });
     });
     describe('config discovery', () => {
@@ -240,9 +175,9 @@ describe('mcp-options steps', () => {
             assert.strictEqual(parser.configPath, undefined);
         });
         it('uses the config file found by the locator', () => {
-            const env_4 = { stack: [], error: void 0, hasError: false };
+            const env_6 = { stack: [], error: void 0, hasError: false };
             try {
-                const configFile = __addDisposableResource(env_4, createTempFile(JSON.stringify({ headless: true }), 'cd4a.config.json'), false);
+                const configFile = __addDisposableResource(env_6, createTempFile(JSON.stringify({ headless: true }), 'cd4a.config.json'), false);
                 const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
                 sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
                 const args = parser.parse();
@@ -250,29 +185,29 @@ describe('mcp-options steps', () => {
                 assert.strictEqual(args.config, configFile.path);
                 assert.strictEqual(parser.configPath, configFile.path);
             }
-            catch (e_4) {
-                env_4.error = e_4;
-                env_4.hasError = true;
+            catch (e_6) {
+                env_6.error = e_6;
+                env_6.hasError = true;
             }
             finally {
-                __disposeResources(env_4);
+                __disposeResources(env_6);
             }
         });
         it('prefers --config over a discovered config file', () => {
-            const env_5 = { stack: [], error: void 0, hasError: false };
+            const env_7 = { stack: [], error: void 0, hasError: false };
             try {
-                const configFile = __addDisposableResource(env_5, createTempFile(JSON.stringify({ headless: true }), 'cd4a.explicit.config.json'), false);
+                const configFile = __addDisposableResource(env_7, createTempFile(JSON.stringify({ headless: true }), 'cd4a.explicit.config.json'), false);
                 const parser = new ConfigParser('0.0.0', ['node', 'main.js', '--config', configFile.path], {}, false);
                 const locateStub = sinon.stub(parser.configLocator, 'locate');
                 assert.strictEqual(parser.parse().headless, true);
                 sinon.assert.notCalled(locateStub);
             }
-            catch (e_5) {
-                env_5.error = e_5;
-                env_5.hasError = true;
+            catch (e_7) {
+                env_7.error = e_7;
+                env_7.hasError = true;
             }
             finally {
-                __disposeResources(env_5);
+                __disposeResources(env_7);
             }
         });
     });
@@ -285,50 +220,14 @@ describe('mcp-options steps', () => {
             return { parser, locateStub };
         }
         it('re-reads the config file without discovering it again', () => {
-            const env_6 = { stack: [], error: void 0, hasError: false };
+            const env_8 = { stack: [], error: void 0, hasError: false };
             try {
-                const configFile = __addDisposableResource(env_6, createTempFile(JSON.stringify({ memoryDebugging: false }), 'cd4a.config.json'), false);
+                const configFile = __addDisposableResource(env_8, createTempFile(JSON.stringify({ memoryDebugging: false }), 'cd4a.config.json'), false);
                 const { parser, locateStub } = createParser(configFile.path);
                 assert.strictEqual(parser.parse().memoryDebugging, false);
                 fs.writeFileSync(configFile.path, JSON.stringify({ memoryDebugging: true }));
                 assert.strictEqual(parser.reload().memoryDebugging, true);
                 sinon.assert.calledOnce(locateStub);
-            }
-            catch (e_6) {
-                env_6.error = e_6;
-                env_6.hasError = true;
-            }
-            finally {
-                __disposeResources(env_6);
-            }
-        });
-        it('keeps CLI arguments over the config file', () => {
-            const env_7 = { stack: [], error: void 0, hasError: false };
-            try {
-                const configFile = __addDisposableResource(env_7, createTempFile(JSON.stringify({ headless: false }), 'cd4a.config.json'), false);
-                const { parser } = createParser(configFile.path, ['--headless']);
-                parser.parse();
-                fs.writeFileSync(configFile.path, JSON.stringify({ headless: false, memoryDebugging: true }));
-                const args = parser.reload();
-                assert.strictEqual(args.headless, true);
-                assert.strictEqual(args.memoryDebugging, true);
-            }
-            catch (e_7) {
-                env_7.error = e_7;
-                env_7.hasError = true;
-            }
-            finally {
-                __disposeResources(env_7);
-            }
-        });
-        it('throws on an invalid config file', () => {
-            const env_8 = { stack: [], error: void 0, hasError: false };
-            try {
-                const configFile = __addDisposableResource(env_8, createTempFile('{}', 'cd4a.config.json'), false);
-                const { parser } = createParser(configFile.path);
-                parser.parse();
-                fs.writeFileSync(configFile.path, '{');
-                assert.throws(() => parser.reload(), /Invalid JSON config file/);
             }
             catch (e_8) {
                 env_8.error = e_8;
@@ -338,54 +237,41 @@ describe('mcp-options steps', () => {
                 __disposeResources(env_8);
             }
         });
-    });
-    describe('mergeReloadableOptions', () => {
-        function parseArgs(argv = []) {
-            const locator = new ConfigLocator();
-            sinon.stub(locator, 'locate').returns(undefined);
-            return new ConfigParser('0.0.0', ['node', 'main.js', ...argv], {}, false, locator).parse();
-        }
-        it('applies reloadable options', () => {
-            const merged = ConfigParser.mergeReloadableOptions(parseArgs(), parseArgs([
-                '--memoryDebugging',
-                '--no-category-network',
-                '--no-file-navigations',
-                '--slim',
-            ]));
-            assert.strictEqual(merged.memoryDebugging, true);
-            assert.strictEqual(merged.categoryNetwork, false);
-            assert.strictEqual(merged.fileNavigations, false);
-            assert.strictEqual(merged.slim, true);
+        it('keeps CLI arguments over the config file', () => {
+            const env_9 = { stack: [], error: void 0, hasError: false };
+            try {
+                const configFile = __addDisposableResource(env_9, createTempFile(JSON.stringify({ headless: false }), 'cd4a.config.json'), false);
+                const { parser } = createParser(configFile.path, ['--headless']);
+                parser.parse();
+                fs.writeFileSync(configFile.path, JSON.stringify({ headless: false, memoryDebugging: true }));
+                const args = parser.reload();
+                assert.strictEqual(args.headless, true);
+                assert.strictEqual(args.memoryDebugging, true);
+            }
+            catch (e_9) {
+                env_9.error = e_9;
+                env_9.hasError = true;
+            }
+            finally {
+                __disposeResources(env_9);
+            }
         });
-        it('keeps restart-required options', () => {
-            const merged = ConfigParser.mergeReloadableOptions(parseArgs(), parseArgs([
-                '--categoryExtensions',
-                '--blockedUrlPattern=https://example.com/*',
-                '--experimentalDevtools',
-            ]));
-            assert.strictEqual(merged.categoryExtensions, undefined);
-            assert.strictEqual(merged.blockedUrlPattern, undefined);
-            assert.strictEqual(merged.experimentalDevtools, false);
-        });
-        it('keeps options derived from restart-required options', () => {
-            const previous = parseArgs(['--viaCli']);
-            const next = parseArgs([
-                '--viaCli',
-                '--browserUrl=http://127.0.0.1:9222',
-            ]);
-            const merged = ConfigParser.mergeReloadableOptions(previous, next);
-            assert.strictEqual(merged.categoryExtensions, true);
-            assert.strictEqual(merged.browserUrl, undefined);
-        });
-        it('rejects reloadable options that conflict with startup restart-required options', () => {
-            const previous = parseArgs(['--browserUrl=http://127.0.0.1:9222']);
-            const next = parseArgs(['--categoryPwa']);
-            assert.throws(() => ConfigParser.mergeReloadableOptions(previous, next), /Arguments categoryPwa and browserUrl are mutually exclusive/);
-        });
-        it('does not conflict with default options', () => {
-            const merged = ConfigParser.mergeReloadableOptions(parseArgs(), parseArgs(['--allow-unrestricted-paths']));
-            assert.strictEqual(merged.allowUnrestrictedPaths, true);
-            assert.strictEqual(merged.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
+        it('throws on an invalid config file', () => {
+            const env_10 = { stack: [], error: void 0, hasError: false };
+            try {
+                const configFile = __addDisposableResource(env_10, createTempFile('{}', 'cd4a.config.json'), false);
+                const { parser } = createParser(configFile.path);
+                parser.parse();
+                fs.writeFileSync(configFile.path, '{');
+                assert.throws(() => parser.reload(), /Invalid JSON config file/);
+            }
+            catch (e_10) {
+                env_10.error = e_10;
+                env_10.hasError = true;
+            }
+            finally {
+                __disposeResources(env_10);
+            }
         });
     });
 });

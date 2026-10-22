@@ -3,27 +3,120 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose, inner;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        var r, s = 0;
+        function next() {
+            while (r = env.stack.pop()) {
+                try {
+                    if (!r.async && s === 1) return s = 0, env.stack.push(r), Promise.resolve().then(next);
+                    if (r.dispose) {
+                        var result = r.dispose.call(r.value);
+                        if (r.async) return s |= 2, Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                    }
+                    else s |= 1;
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (s === 1) return env.hasError ? Promise.reject(env.error) : Promise.resolve();
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { overrideDevToolsGlobals } from './devtools/DevtoolsUtils.js';
 import { McpPage } from './McpPage.js';
 import { ServiceWorkerConsoleCollector } from './collectors/ServiceWorkerCollector.js';
-import { Locator, } from './third_party/index.js';
-import { CLOSE_PAGE_ERROR } from './tools/ToolDefinition.js';
+import { Locator, Mutex, } from './third_party/index.js';
+import { ToolCategory } from './tools/categories.js';
+import { CLOSE_PAGE_ERROR, isCapabilityEnabled, } from './tools/ToolDefinition.js';
 import { McpWorker } from './McpWorker.js';
 import { getTempFilePath, resolveCanonicalPath } from './utils/files.js';
 import { escapeForLog } from './utils/logger.js';
 import { isAllowedUrl } from './utils/url.js';
+function hasOptionChanged(gate, previousArgs, nextArgs) {
+    return gate.options.some(option => !isDeepStrictEqual(nextArgs[option], previousArgs[option]));
+}
+const FEATURE_CONTROLLERS = [
+    {
+        gate: { options: ['blockedUrlPattern', 'allowedUrlPattern'] },
+        onChange: context => context.syncNetworkRestrictions(),
+    },
+    {
+        gate: { options: ['sourceMaps'] },
+        onChange: context => context.syncSourceMaps(),
+    },
+    {
+        gate: { options: ['experimentalIncludeAllPages'] },
+        onChange: context => context.createPagesSnapshot(),
+    },
+    {
+        gate: { category: ToolCategory.DEBUGGING },
+        onDisable: context => context.releaseScreencasts(),
+    },
+    {
+        gate: { category: ToolCategory.MEMORY, conditions: ['memoryDebugging'] },
+        onDisable: context => context.releaseHeapSnapshots(),
+    },
+    {
+        gate: { category: ToolCategory.PERFORMANCE },
+        onDisable: context => context.releasePerformanceTrace(),
+    },
+    {
+        gate: { category: ToolCategory.DEBUGGING, conditions: ['devtoolsComments'] },
+        onDisable: context => context.releaseDevToolsComments(),
+    },
+];
 // Page ids are handed out from a process-wide counter so they stay unique
 // across all contexts, in particular across browser reconnects. An id issued
 // before a reconnect then fails to resolve instead of hitting an unrelated
 // page of the reconnected browser.
 let nextPageId = 1;
 export class McpContext {
-    browser;
     logger;
+    #browser;
+    // Initialization of #browser, settles once its browser-dependent state is
+    // ready.
+    #browserReady;
+    // Whether a browser connection was established before, so that switching to
+    // a new browser surfaces a reconnect notice.
+    #hasConnected = false;
     // Maps LLM-provided isolatedContext name → Puppeteer BrowserContext.
     #isolatedContexts = new Map();
     // Auto-generated name counter for when no name is provided.
@@ -32,53 +125,240 @@ export class McpContext {
     // referential identity holds and workers can carry per-worker state later.
     #workers = new Map();
     #mcpPages = new Map();
+    /**
+     * Queue for the browser-wide state (page list, selected page, trace
+     * state). Every page queue is a child of it, so a task on it waits for
+     * every page task and blocks later page tasks.
+     */
+    taskQueue;
+    #taskRunner;
+    #pageTaskQueues = new Map();
+    /**
+     * Serializes `createPagesSnapshot()`. Two tasks on different page queues
+     * can call it at the same time.
+     */
+    #pagesSnapshotMutex = new Mutex();
     #selectedPage;
     #selectedPageFallback;
+    #selectedPageFallbackRead = false;
     #serviceWorkerConsoleCollector;
-    #isRunningTrace = false;
     #reconnectNotice = false;
     #traceResults = [];
     #locatorClass;
+    #config;
     #options;
     #heapSnapshotManager;
     #roots = undefined;
-    #allowUnrestrictedPaths;
-    constructor(browser, logger, options, locatorClass) {
+    constructor(logger, options, locatorClass) {
         overrideDevToolsGlobals({
             loadResource: (url) => {
                 return this.loadResource(url);
             },
         });
-        this.browser = browser;
         this.logger = logger;
         this.#locatorClass = locatorClass;
+        this.#taskRunner = options.taskRunner;
+        this.taskQueue = options.taskRunner.createQueue();
+        this.#config = options.config;
         this.#options = options;
         this.#heapSnapshotManager = options.heapSnapshotManager;
-        this.#allowUnrestrictedPaths = options.allowUnrestrictedPaths ?? false;
-        this.#reconnectNotice = options.reconnected ?? false;
-        this.#serviceWorkerConsoleCollector = new ServiceWorkerConsoleCollector(this.browser);
     }
-    async #init() {
-        await this.createPagesSnapshot();
-        const workers = this.createWorkersSnapshot();
-        await this.#serviceWorkerConsoleCollector.init(workers);
-        this.browser.on('targetcreated', this.#onTargetCreated);
-        this.browser.on('targetdestroyed', this.#onTargetDestroyed);
-    }
-    dispose() {
-        this.browser.off('targetcreated', this.#onTargetCreated);
-        this.browser.off('targetdestroyed', this.#onTargetDestroyed);
-        this.#serviceWorkerConsoleCollector.dispose();
-        for (const mcpPage of this.#mcpPages.values()) {
-            mcpPage.dispose();
+    /**
+     * The browser of the current connection. Throws if no browser connection was
+     * established yet, see {@link McpContext.ensureBrowser}.
+     */
+    get browser() {
+        if (!this.#browser) {
+            throw new Error('Not connected to a browser.');
         }
-        this.#selectedPage?.dispose();
+        return this.#browser;
+    }
+    #allMcpPages() {
+        const pages = new Set(this.#mcpPages.values());
+        if (this.#selectedPage) {
+            pages.add(this.#selectedPage);
+        }
+        return pages;
+    }
+    /**
+     * Synchronizes browser/page state and releases state of capabilities that
+     * transitioned from enabled to disabled after a config reload.
+     */
+    async onConfigChanged(previousArgs) {
+        const nextArgs = this.#config.resolved;
+        for (const controller of FEATURE_CONTROLLERS) {
+            if ('onChange' in controller) {
+                if (hasOptionChanged(controller.gate, previousArgs, nextArgs)) {
+                    await controller.onChange(this);
+                }
+            }
+            else if (isCapabilityEnabled(controller.gate, previousArgs) &&
+                !isCapabilityEnabled(controller.gate, nextArgs)) {
+                await controller.onDisable(this);
+            }
+        }
+    }
+    /**
+     * Applies updated URL allowlist/blocklist rules to the connected browser and
+     * clears incompatible page network throttling state.
+     */
+    async syncNetworkRestrictions() {
+        const { blockedUrlPattern, allowedUrlPattern } = this.#config.resolved;
+        if (this.#browser) {
+            await this.#browser.restrictNetwork({
+                blocklist: blockedUrlPattern,
+                allowlist: allowedUrlPattern,
+            });
+        }
+        if (blockedUrlPattern || allowedUrlPattern) {
+            for (const mcpPage of this.#allMcpPages()) {
+                mcpPage.clearNetworkConditions();
+            }
+        }
+    }
+    /**
+     * Synchronizes the DevTools source maps setting across all pages.
+     */
+    syncSourceMaps() {
+        for (const mcpPage of this.#allMcpPages()) {
+            mcpPage.syncSourceMaps();
+        }
+    }
+    /**
+     * Stops and saves active screencast recordings across all pages when
+     * screencast tools are disabled.
+     */
+    async releaseScreencasts() {
+        for (const mcpPage of this.#allMcpPages()) {
+            const screenRecorderData = mcpPage.getScreenRecorder();
+            if (!screenRecorderData) {
+                continue;
+            }
+            const { recorder, filePath } = screenRecorderData;
+            mcpPage.setScreenRecorder(null);
+            try {
+                await recorder.stop();
+                this.logger?.(`The screencast recording was stopped and saved to ${filePath} because screencast tools were disabled.`);
+            }
+            catch (err) {
+                this.logger?.('Failed to stop the screencast recording', err);
+            }
+        }
+    }
+    /**
+     * Closes all loaded heap snapshots when memory tools are disabled.
+     */
+    releaseHeapSnapshots() {
+        if (this.#heapSnapshotManager.hasSnapshots()) {
+            this.#heapSnapshotManager.dispose();
+            this.logger?.('Loaded heap snapshots were closed because memory tools were disabled.');
+        }
+    }
+    /**
+     * Discards recorded performance traces and stops any running trace when
+     * performance tools are disabled.
+     */
+    async releasePerformanceTrace() {
+        this.#traceResults = [];
+        for (const mcpPage of this.#allMcpPages()) {
+            if (!mcpPage.isRunningPerformanceTrace()) {
+                continue;
+            }
+            mcpPage.setIsRunningPerformanceTrace(false);
+            try {
+                await mcpPage.pptrPage.tracing.stop();
+            }
+            catch (err) {
+                this.logger?.('Failed to stop the performance trace', err);
+            }
+            this.logger?.('The running performance trace was discarded because performance tools were disabled.');
+        }
+    }
+    /**
+     * Disposes DevTools comment bridges across all pages when DevTools comment
+     * tools are disabled.
+     */
+    releaseDevToolsComments() {
+        for (const mcpPage of this.#allMcpPages()) {
+            mcpPage.disposeCommentBridge();
+        }
+    }
+    /**
+     * Returns the browser, establishing the connection if needed. If the browser
+     * changed since the last call (e.g. after a reconnect), all
+     * browser-dependent state is rebuilt for the new browser.
+     */
+    async ensureBrowser() {
+        const browser = await this.#options.getBrowser();
+        if (browser === this.#browser && this.#browserReady) {
+            // Joins a still pending initialization instead of handing out
+            // half-initialized state.
+            await this.#browserReady;
+            return browser;
+        }
+        this.#resetBrowserState();
+        this.#browser = browser;
+        const ready = this.#initBrowserState(browser);
+        this.#browserReady = ready;
+        try {
+            await ready;
+            return browser;
+        }
+        catch (err) {
+            // Leave no half-initialized state behind, the next call starts over. If
+            // a later call already installed another browser, its state is left
+            // intact.
+            if (this.#browserReady === ready) {
+                this.#resetBrowserState();
+            }
+            throw err;
+        }
+    }
+    async #initBrowserState(browser) {
+        const collector = new ServiceWorkerConsoleCollector(browser);
+        this.#serviceWorkerConsoleCollector = collector;
+        // All listeners are registered synchronously, before the first await. If
+        // this call hangs and is abandoned by the tool-call timeout, a later call
+        // that installs a different browser removes them in #resetBrowserState().
+        browser.on('targetcreated', this.#onTargetCreated);
+        browser.on('targetdestroyed', this.#onTargetDestroyed);
+        await Promise.all([
+            collector.init(this.createWorkersSnapshot()),
+            this.createPagesSnapshot(),
+        ]);
+        // The state now belongs to the browser of a later call, leave it intact.
+        if (this.#browser !== browser) {
+            throw new Error('Browser was replaced while initializing.');
+        }
+        if (this.#hasConnected) {
+            this.#reconnectNotice = true;
+        }
+        this.#hasConnected = true;
+    }
+    #resetBrowserState() {
+        this.#browser?.off('targetcreated', this.#onTargetCreated);
+        this.#browser?.off('targetdestroyed', this.#onTargetDestroyed);
+        this.#serviceWorkerConsoleCollector?.dispose();
+        for (const mcpPage of this.#allMcpPages()) {
+            this.#disposeMcpPage(mcpPage);
+        }
         this.#mcpPages.clear();
         this.#workers.clear();
         // Isolated contexts are intentionally not closed here.
         // Either the entire browser will be closed or we disconnect
         // without destroying browser state.
         this.#isolatedContexts.clear();
+        this.#nextIsolatedContextId = 1;
+        this.#selectedPage = undefined;
+        this.#selectedPageFallback = undefined;
+        this.#selectedPageFallbackRead = false;
+        this.#traceResults = [];
+        this.#serviceWorkerConsoleCollector = undefined;
+        this.#browser = undefined;
+        this.#browserReady = undefined;
+    }
+    dispose() {
+        this.#resetBrowserState();
     }
     #onTargetCreated = (target) => {
         try {
@@ -95,7 +375,7 @@ export class McpContext {
         try {
             const mcpPage = this.#mcpPages.get(target);
             if (mcpPage) {
-                mcpPage.dispose();
+                this.#disposeMcpPage(mcpPage);
                 this.#mcpPages.delete(target);
             }
             this.#workers.delete(target);
@@ -104,12 +384,10 @@ export class McpContext {
             this.logger?.('Error handling targetdestroyed', err);
         }
     };
-    static async from(browser, logger, opts, 
+    static create(logger, opts, 
     /* Let tests use unbundled Locator class to avoid overly strict checks within puppeteer that fail when mixing bundled and unbundled class instances */
     locatorClass = Locator) {
-        const context = new McpContext(browser, logger, opts, locatorClass);
-        await context.#init();
-        return context;
+        return new McpContext(logger, opts, locatorClass);
     }
     static resetPageIdsForTesting() {
         nextPageId = 1;
@@ -145,7 +423,8 @@ export class McpContext {
         // If the client never negotiated roots and the operator has explicitly
         // opted into unrestricted access via --allow-unrestricted-paths, restore
         // the previous permissive behavior and skip validation.
-        if (this.#roots === undefined && this.#allowUnrestrictedPaths) {
+        if (this.#roots === undefined &&
+            this.#config.resolved.allowUnrestrictedPaths) {
             // Canonical path might not exist yet so we fallback to
             // path.resolve(filePath). Consumers should not follow symlinks.
             return canonicalPath || path.resolve(filePath);
@@ -204,7 +483,7 @@ export class McpContext {
             page = await this.browser.newPage({ background });
         }
         const mcpPage = this.#createMcpPage(page.target());
-        await mcpPage.init();
+        await mcpPage.init({ emulateFocus: true });
         this.selectPage(mcpPage);
         await this.createPagesSnapshot();
         return mcpPage;
@@ -216,9 +495,6 @@ export class McpContext {
         }
         this.#mcpPages.delete(page.target);
         await page.close();
-    }
-    get #hasNetworkBlockOrAllowlist() {
-        return !!(this.#options.allowlist || this.#options.blocklist);
     }
     async installPWA(options) {
         try {
@@ -251,14 +527,16 @@ export class McpContext {
     getPWAState(options) {
         return this.browser.getPWAState(options);
     }
-    setIsRunningPerformanceTrace(x) {
-        this.#isRunningTrace = x;
-    }
     isRunningPerformanceTrace() {
-        return this.#isRunningTrace;
+        for (const mcpPage of this.#allMcpPages()) {
+            if (mcpPage.isRunningPerformanceTrace()) {
+                return true;
+            }
+        }
+        return false;
     }
     isCruxEnabled() {
-        return this.#options.performanceCrux;
+        return this.#config.resolved.performanceCrux;
     }
     getPages() {
         return Array.from(this.#mcpPages.values());
@@ -327,9 +605,9 @@ export class McpContext {
         }
     }
     /**
-     * Returns true once if this context was created by reconnecting after the
-     * previous browser connection was lost, so the next response can surface a
-     * note. Cleared on first call.
+     * Returns true once after the browser connection was re-established with a
+     * new browser, so the next response can surface a note. Cleared on first
+     * call.
      */
     consumeReconnectNotice() {
         const notice = this.#reconnectNotice;
@@ -343,14 +621,39 @@ export class McpContext {
         }
         return page;
     }
+    /**
+     * The queue for tasks on page `pageId`. The queue exists before the page
+     * does, so a tool call can enter it before the browser connects. It is a
+     * child of {@link taskQueue}.
+     */
+    pageTaskQueue(pageId) {
+        let queue = this.#pageTaskQueues.get(pageId);
+        if (!queue) {
+            queue = this.#taskRunner.createQueue(this.taskQueue);
+            this.#pageTaskQueues.set(pageId, queue);
+        }
+        return queue;
+    }
+    #disposeMcpPage(mcpPage) {
+        mcpPage.dispose();
+        this.#pageTaskQueues
+            .get(mcpPage.id)
+            ?.dispose(new Error(`Page ${mcpPage.id} is closed.`));
+        this.#pageTaskQueues.delete(mcpPage.id);
+    }
     isPageSelected(page) {
         return this.#selectedPage === page;
     }
     selectPage(newPage) {
+        this.#selectedPageFallback = undefined;
+        this.#selectedPageFallbackRead = false;
+        this.#selectPage(newPage);
+    }
+    #selectPage(newPage) {
         if (this.#selectedPage &&
             this.#selectedPage !== newPage &&
             !this.#mcpPages.has(this.#selectedPage.target)) {
-            this.#selectedPage.dispose();
+            this.#disposeMcpPage(this.#selectedPage);
         }
         this.#selectedPage = newPage;
         newPage.updateTimeouts();
@@ -358,10 +661,12 @@ export class McpContext {
     /**
      * Returns details about the last page snapshot automatically replacing the
      * selection because the selected page disappeared from the page list, or
-     * `undefined` if the snapshot left the selection intact. Recomputed on every
-     * createPagesSnapshot() call.
+     * `undefined` if the snapshot left the selection intact. Cleared on the next
+     * createPagesSnapshot() call after it has been read, or when selectPage() is
+     * called explicitly.
      */
     getSelectedPageFallback() {
+        this.#selectedPageFallbackRead = true;
         return this.#selectedPageFallback;
     }
     /**
@@ -390,8 +695,13 @@ export class McpContext {
         }
         return Array.from(this.#workers.values());
     }
-    getServiceWorkerConsoleData(extensionId) {
-        return this.#serviceWorkerConsoleCollector.getData(extensionId);
+    getServiceWorkerConsoleData(serviceWorkerId) {
+        const worker = this.getWorkerById(serviceWorkerId);
+        if (worker?.type !== 'service_worker') {
+            throw new Error('Service worker not found.');
+        }
+        const extensionId = new URL(worker.url).hostname;
+        return this.#serviceWorkerConsoleCollector?.getData(extensionId) ?? [];
     }
     #getBrowserContextToNameMap() {
         // Build a reverse lookup from BrowserContext instance → name.
@@ -417,61 +727,92 @@ export class McpContext {
             (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
         if (!mcpPage) {
             mcpPage = new McpPage(target, nextPageId++, {
+                config: this.#config,
                 locatorClass: this.#locatorClass,
-                hasNetworkBlockOrAllowlist: this.#hasNetworkBlockOrAllowlist,
                 isolatedContextName: this.#getBrowserContextToNameMap().get(target.browserContext()),
                 navigationTimeout: this.#options.navigationTimeout,
-                sourceMaps: this.#options.sourceMaps,
-                onNotification: this.#options.onNotification,
             });
         }
         this.#mcpPages.set(target, mcpPage);
         return mcpPage;
     }
     async createPagesSnapshot() {
-        const allTargets = this.#fetchPageTargets();
-        for (const target of allTargets) {
-            this.#createMcpPage(target);
-        }
-        // Prune orphaned #mcpPages entries (targets that no longer exist).
-        const currentTargets = new Set(allTargets);
-        for (const [target, mcpPage] of this.#mcpPages) {
-            if (!currentTargets.has(target)) {
-                if (mcpPage !== this.#selectedPage || mcpPage.isClosed()) {
-                    mcpPage.dispose();
+        const env_1 = { stack: [], error: void 0, hasError: false };
+        try {
+            if (!this.#browser) {
+                return [];
+            }
+            const guard = __addDisposableResource(env_1, await this.#pagesSnapshotMutex.acquire(), false);
+            const allTargets = this.#fetchPageTargets();
+            for (const target of allTargets) {
+                this.#createMcpPage(target);
+            }
+            // Prune orphaned #mcpPages entries (targets that no longer exist).
+            const currentTargets = new Set(allTargets);
+            for (const [target, mcpPage] of this.#mcpPages) {
+                if (!currentTargets.has(target)) {
+                    if (mcpPage !== this.#selectedPage || mcpPage.isClosed()) {
+                        this.#disposeMcpPage(mcpPage);
+                    }
+                    this.#mcpPages.delete(target);
                 }
-                this.#mcpPages.delete(target);
             }
-        }
-        const pages = Array.from(this.#mcpPages.values());
-        // Only fall back when the selected page is actually gone. Gating on
-        // `isClosed()` instead of `pages` membership avoids silently swapping a
-        // live page that is momentarily missing from the snapshot.
-        this.#selectedPageFallback = undefined;
-        if ((!this.#selectedPage || this.#selectedPage.isClosed()) && pages[0]) {
-            // Record the automatic change so the response can surface it. Skipped on
-            // first connect, when there was no prior selection to replace.
-            if (this.#selectedPage) {
-                this.#selectedPageFallback = {
-                    wasClosed: this.#selectedPage.isClosed(),
-                };
+            const pages = Array.from(this.#mcpPages.values());
+            // Only fall back when the selected page is actually gone or no longer
+            // counts as a page, e.g. a background page after
+            // experimentalIncludeAllPages was turned off. Gating on `isClosed()`
+            // instead of `pages` membership avoids silently swapping a live page that
+            // is momentarily missing from the snapshot.
+            if (this.#selectedPageFallbackRead) {
+                this.#selectedPageFallback = undefined;
+                this.#selectedPageFallbackRead = false;
             }
-            this.selectPage(pages[0]);
+            if (!this.#selectedPage ||
+                this.#selectedPage.isClosed() ||
+                !this.#isPageTarget(this.#selectedPage.target)) {
+                if (pages[0]) {
+                    // Record the automatic change so the response can surface it. Skipped on
+                    // first connect, when there was no prior selection to replace.
+                    if (this.#selectedPage) {
+                        this.#selectedPageFallback = {
+                            wasClosed: this.#selectedPage.isClosed(),
+                        };
+                    }
+                    this.#selectPage(pages[0]);
+                }
+                else if (this.#selectedPage) {
+                    const wasClosed = Boolean(this.#selectedPage.isClosed());
+                    if (!wasClosed) {
+                        this.#disposeMcpPage(this.#selectedPage);
+                    }
+                    this.#selectedPage = undefined;
+                    this.#selectedPageFallback = { wasClosed };
+                }
+            }
+            if (this.#selectedPage && !this.#selectedPage.isClosed()) {
+                // Automatic page snapshots must preserve real focus on untouched tabs.
+                await this.#selectedPage.init({ emulateFocus: false });
+            }
+            return pages;
         }
-        if (this.#selectedPage && !this.#selectedPage.isClosed()) {
-            await this.#selectedPage.init();
+        catch (e_1) {
+            env_1.error = e_1;
+            env_1.hasError = true;
         }
-        return pages;
+        finally {
+            __disposeResources(env_1);
+        }
     }
     #isPageTarget(target) {
-        const existingMcpPage = this.#mcpPages.get(target);
+        const existingMcpPage = this.#mcpPages.get(target) ??
+            (this.#selectedPage?.target === target ? this.#selectedPage : undefined);
         const url = existingMcpPage ? existingMcpPage.url() : target.url();
-        if (!this.#options.experimentalDevToolsDebugging &&
+        if (!this.#config.resolved.experimentalDevtools &&
             url.startsWith('devtools://')) {
             return false;
         }
         if (!isAllowedUrl(url, {
-            categoryExtensions: this.#options.categoryExtensions,
+            categoryExtensions: this.#config.resolved.categoryExtensions,
         })) {
             return false;
         }
@@ -479,11 +820,11 @@ export class McpContext {
         if (type === 'page') {
             return true;
         }
-        if (this.#options.experimentalIncludeAllPages &&
+        if (this.#config.resolved.experimentalIncludeAllPages &&
             (type === 'background_page' || type === 'webview')) {
             return true;
         }
-        if (this.#options.experimentalDevToolsDebugging &&
+        if (this.#config.resolved.experimentalDevtools &&
             type === 'other' &&
             url.startsWith('devtools://')) {
             return true;
@@ -613,10 +954,11 @@ export class McpContext {
         return await this.#heapSnapshotManager.getDominatorsOf(filePath, nodeId);
     }
     #validateUrlNotBlocked(url) {
-        if (!this.#options.blocklist) {
+        const blocklist = this.#config.resolved.blockedUrlPattern;
+        if (!blocklist) {
             return;
         }
-        for (const block of this.#options.blocklist) {
+        for (const block of blocklist) {
             const pattern = new URLPattern(block);
             if (pattern.test(url)) {
                 throw new Error(`Blocked by blocklist: ${url}`);
@@ -624,10 +966,11 @@ export class McpContext {
         }
     }
     #validateUrlAllowed(url) {
-        if (!this.#options.allowlist) {
+        const allowlist = this.#config.resolved.allowedUrlPattern;
+        if (!allowlist) {
             return;
         }
-        for (const allow of this.#options.allowlist) {
+        for (const allow of allowlist) {
             const pattern = new URLPattern(allow);
             if (pattern.test(url)) {
                 return;

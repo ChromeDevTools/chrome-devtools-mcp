@@ -5,6 +5,14 @@ import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import { OverlayColorGenerator } from './OverlayColorGenerator.js';
 import { extendGridLinesSettingDescriptor, showGridAreasSettingDescriptor, showGridLineLabelsSettingDescriptor, showGridTrackSizesSettingDescriptor, } from './SDKSettings.js';
+export var HighlightType;
+(function (HighlightType) {
+    HighlightType["FLEX"] = "FLEX";
+    HighlightType["GRID"] = "GRID";
+    HighlightType["SCROLL_SNAP"] = "SCROLL_SNAP";
+    HighlightType["CONTAINER_QUERY"] = "CONTAINER_QUERY";
+    HighlightType["ISOLATED_ELEMENT"] = "ISOLATED_ELEMENT";
+})(HighlightType || (HighlightType = {}));
 export class OverlayPersistentHighlighter {
     #model;
     #colors = new Map();

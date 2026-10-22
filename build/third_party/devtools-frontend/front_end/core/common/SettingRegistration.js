@@ -132,6 +132,28 @@ export function maybeRemoveSettingExtension(settingName) {
     removeCategoryOrder(removed.category, removed.order);
     return true;
 }
+export var SettingCategory;
+(function (SettingCategory) {
+    SettingCategory["NONE"] = "";
+    SettingCategory["ELEMENTS"] = "ELEMENTS";
+    SettingCategory["AI"] = "AI";
+    SettingCategory["APPEARANCE"] = "APPEARANCE";
+    SettingCategory["SOURCES"] = "SOURCES";
+    SettingCategory["NETWORK"] = "NETWORK";
+    SettingCategory["PERFORMANCE"] = "PERFORMANCE";
+    SettingCategory["CONSOLE"] = "CONSOLE";
+    SettingCategory["PERSISTENCE"] = "PERSISTENCE";
+    SettingCategory["DEBUGGER"] = "DEBUGGER";
+    SettingCategory["GLOBAL"] = "GLOBAL";
+    SettingCategory["RENDERING"] = "RENDERING";
+    SettingCategory["GRID"] = "GRID";
+    SettingCategory["MOBILE"] = "MOBILE";
+    SettingCategory["EMULATION"] = "EMULATION";
+    SettingCategory["MEMORY"] = "MEMORY";
+    SettingCategory["EXTENSIONS"] = "EXTENSIONS";
+    SettingCategory["ADORNER"] = "ADORNER";
+    SettingCategory["ACCOUNT"] = "ACCOUNT";
+})(SettingCategory || (SettingCategory = {}));
 export function getLocalizedSettingsCategory(category) {
     switch (category) {
         case "ELEMENTS" /* SettingCategory.ELEMENTS */:
@@ -174,4 +196,11 @@ export function getLocalizedSettingsCategory(category) {
             return i18nString(UIStrings.account);
     }
 }
+export var SettingType;
+(function (SettingType) {
+    SettingType["ARRAY"] = "array";
+    SettingType["REGEX"] = "regex";
+    SettingType["ENUM"] = "enum";
+    SettingType["BOOLEAN"] = "boolean";
+})(SettingType || (SettingType = {}));
 //# sourceMappingURL=SettingRegistration.js.map

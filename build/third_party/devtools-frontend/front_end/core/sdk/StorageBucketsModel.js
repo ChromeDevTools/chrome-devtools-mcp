@@ -125,4 +125,10 @@ export class StorageBucketsModel extends SDKModel {
     }
 }
 SDKModel.register(StorageBucketsModel, { capabilities: 8192 /* Capability.STORAGE */, autostart: false });
+export var Events;
+(function (Events) {
+    Events["BUCKET_ADDED"] = "BucketAdded";
+    Events["BUCKET_REMOVED"] = "BucketRemoved";
+    Events["BUCKET_CHANGED"] = "BucketChanged";
+})(Events || (Events = {}));
 //# sourceMappingURL=StorageBucketsModel.js.map

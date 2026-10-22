@@ -57,14 +57,23 @@ export const browserOptions = {
                 return;
             }
             try {
-                const parsed = JSON.parse(val);
-                if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+                const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+                if (typeof parsed !== 'object' ||
+                    parsed === null ||
+                    Array.isArray(parsed)) {
                     throw new Error('Headers must be a JSON object');
                 }
-                return parsed;
+                const headers = {};
+                for (const [key, value] of Object.entries(parsed)) {
+                    if (typeof value !== 'string') {
+                        throw new Error(`Header "${key}" must have a string value`);
+                    }
+                    headers[key] = value;
+                }
+                return headers;
             }
             catch (error) {
-                throw new Error(`Invalid JSON for wsHeaders: ${error.message}`);
+                throw new Error(`Invalid JSON for wsHeaders: ${error instanceof Error ? error.message : String(error)}`);
             }
         },
     },

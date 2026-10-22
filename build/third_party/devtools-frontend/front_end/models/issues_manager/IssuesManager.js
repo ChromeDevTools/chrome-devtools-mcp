@@ -34,6 +34,7 @@ import { SRIMessageSignatureIssue } from './SRIMessageSignatureIssue.js';
 import { StylesheetLoadingIssue } from './StylesheetLoadingIssue.js';
 import { UnencodedDigestIssue } from './UnencodedDigestIssue.js';
 import { WebInstallIssue } from './WebInstallIssue.js';
+export { Events } from './IssuesManagerEvents.js';
 function createIssuesForBlockedByResponseIssue(issuesModel, inspectorIssue) {
     const blockedByResponseIssueDetails = inspectorIssue.details.blockedByResponseIssueDetails;
     if (!blockedByResponseIssueDetails) {
@@ -169,6 +170,11 @@ frameManager = SDK.FrameManager.FrameManager.instance()) {
     console.warn(`No handler registered for issue code ${inspectorIssue.code}`);
     return [];
 }
+export var IssueStatus;
+(function (IssueStatus) {
+    IssueStatus["HIDDEN"] = "Hidden";
+    IssueStatus["UNHIDDEN"] = "Unhidden";
+})(IssueStatus || (IssueStatus = {}));
 export function defaultHideIssueByCodeSetting() {
     const setting = {};
     return setting;

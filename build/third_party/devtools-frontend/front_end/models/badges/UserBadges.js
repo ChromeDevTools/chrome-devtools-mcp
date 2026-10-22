@@ -15,6 +15,16 @@ export const receiveGdpBadgesSettingDescriptor = {
     defaultValue: false,
     storageType: "Synced" /* Common.Settings.SettingStorageType.SYNCED */,
 };
+export var BadgeTriggerReason;
+(function (BadgeTriggerReason) {
+    BadgeTriggerReason["AWARD"] = "Award";
+    BadgeTriggerReason["STARTER_BADGE_SETTINGS_NUDGE"] = "StarterBadgeSettingsNudge";
+    BadgeTriggerReason["STARTER_BADGE_PROFILE_NUDGE"] = "StarterBadgeProfileNudge";
+})(BadgeTriggerReason || (BadgeTriggerReason = {}));
+export var Events;
+(function (Events) {
+    Events["BADGE_TRIGGERED"] = "BadgeTriggered";
+})(Events || (Events = {}));
 const SNOOZE_TIME_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_SNOOZE_COUNT = 3;
 const DELAY_BEFORE_TRIGGER = 1500;

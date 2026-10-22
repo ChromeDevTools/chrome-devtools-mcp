@@ -22,6 +22,20 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/CookieIssue.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
+/** The enum string values need to match the IssueExpanded enum values in UserMetrics.ts. **/
+export var CookieIssueSubCategory;
+(function (CookieIssueSubCategory) {
+    CookieIssueSubCategory["GENERIC_COOKIE"] = "GenericCookie";
+    CookieIssueSubCategory["SAME_SITE_COOKIE"] = "SameSiteCookie";
+})(CookieIssueSubCategory || (CookieIssueSubCategory = {}));
+/** Enum to show cookie status from the security panel's third-party cookie report tool **/
+export var CookieStatus;
+(function (CookieStatus) {
+    CookieStatus[CookieStatus["BLOCKED"] = 0] = "BLOCKED";
+    CookieStatus[CookieStatus["ALLOWED"] = 1] = "ALLOWED";
+    CookieStatus[CookieStatus["ALLOWED_BY_GRACE_PERIOD"] = 2] = "ALLOWED_BY_GRACE_PERIOD";
+    CookieStatus[CookieStatus["ALLOWED_BY_HEURISTICS"] = 3] = "ALLOWED_BY_HEURISTICS";
+})(CookieStatus || (CookieStatus = {}));
 export class CookieIssue extends Issue {
     #frameManager;
     constructor(code, issueDetails, issuesModel, issueId, frameManager) {

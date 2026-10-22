@@ -145,4 +145,20 @@ export class ProjectSettingsModel extends Common.ObjectWrapper.ObjectWrapper {
         return Object.freeze(devtoolsJSON);
     }
 }
+/**
+ * Events emitted by the `ProjectSettingsModel`.
+ */
+export var Events;
+(function (Events) {
+    /**
+     * Emitted whenever the `availability` property of the
+     * `ProjectSettingsModel` changes.
+     */
+    Events["AVAILABILITY_CHANGED"] = "AvailabilityChanged";
+    /**
+     * Emitted whenever the `projectSettings` property of the
+     * `ProjectSettingsModel` changes.
+     */
+    Events["PROJECT_SETTINGS_CHANGED"] = "ProjectSettingsChanged";
+})(Events || (Events = {}));
 //# sourceMappingURL=ProjectSettingsModel.js.map

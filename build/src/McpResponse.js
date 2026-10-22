@@ -12,11 +12,13 @@ import { NetworkFormatter } from './formatters/NetworkFormatter.js';
 import { SnapshotFormatter } from './formatters/SnapshotFormatter.js';
 import { UncaughtError } from './collectors/PageCollector.js';
 import { TextSnapshot } from './TextSnapshot.js';
-import { DevTools, getToonEncode, getGcfEncode } from './third_party/index.js';
+import { DevTools, getToonEncode, getGcfEncode, } from './third_party/index.js';
 import { handleDialog, listPages } from './tools/pages.js';
 import { getInsightOutput, getTraceSummary, } from './processors/PerformanceTrace.js';
 import { stableIdSymbol } from './utils/id.js';
 import { paginate } from './utils/pagination.js';
+import { getFilterableResourceType } from './utils/resourceType.js';
+import { truncateText } from './utils/text.js';
 const { formatBytesToKb } = DevTools.I18n.ByteUtilities;
 export class McpResponse {
     #includePages = false;
@@ -40,9 +42,8 @@ export class McpResponse {
     #listWebMcpTools;
     #devToolsData;
     #tabId;
-    #args;
+    #config;
     #page;
-    #redactNetworkHeaders = true;
     #error;
     #attachedWaitForResult;
     #reconnectNotice = false;
@@ -50,14 +51,11 @@ export class McpResponse {
     get #deviceScope() {
         return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
     }
-    constructor(args) {
-        this.#args = args;
+    constructor(config) {
+        this.#config = config;
     }
     setPage(page) {
         this.#page = page;
-    }
-    setRedactNetworkHeaders(value) {
-        this.#redactNetworkHeaders = value;
     }
     /**
      * Surfaces a one-time note that the browser reconnected and page ids changed.
@@ -74,7 +72,7 @@ export class McpResponse {
     }
     setIncludePages(value) {
         this.#includePages = value;
-        if (this.#args.categoryExtensions) {
+        if (this.#config.resolved.categoryExtensions) {
             this.#includeExtensionServiceWorkers = value;
             this.#includeExtensionPages = value;
         }
@@ -103,7 +101,7 @@ export class McpResponse {
         }
         this.#networkRequestsOptions = {
             include: value,
-            pagination: options?.pageSize !== undefined || options?.pageIdx !== undefined
+            pagination: options?.pageSize !== undefined
                 ? {
                     pageSize: options.pageSize,
                     pageIdx: options.pageIdx,
@@ -121,7 +119,7 @@ export class McpResponse {
         }
         this.#consoleDataOptions = {
             include: value,
-            pagination: options?.pageSize !== undefined || options?.pageIdx !== undefined
+            pagination: options?.pageSize !== undefined
                 ? {
                     pageSize: options.pageSize,
                     pageIdx: options.pageIdx,
@@ -275,6 +273,7 @@ export class McpResponse {
             ...this.#heapSnapshotOptions,
             include: true,
             detailedClassDiff,
+            pagination: options,
             formatOptions: options,
         };
     }
@@ -311,9 +310,6 @@ export class McpResponse {
         return this.#listWebMcpTools;
     }
     async #handleSnapshot(context) {
-        if (this.#includePages) {
-            await context.createPagesSnapshot();
-        }
         if (!this.#snapshotParams) {
             return undefined;
         }
@@ -346,7 +342,7 @@ export class McpResponse {
             requestFilePath: this.#attachedNetworkRequestOptions?.requestFilePath,
             responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
             saveFile: (data, filename, extension) => context.saveFile(data, filename, extension),
-            redactNetworkHeaders: this.#redactNetworkHeaders,
+            redactNetworkHeaders: this.#config.resolved.redactNetworkHeaders,
         });
     }
     async #handleAttachedConsoleMessage() {
@@ -379,16 +375,16 @@ export class McpResponse {
         }
         return undefined;
     }
-    async #handleThirdPartyDevelopeTools() {
-        if (this.#args.categoryExperimentalThirdParty &&
+    async #handleThirdPartyDeveloperTools() {
+        if (this.#config.resolved.categoryExperimentalThirdParty &&
             this.#listThirdPartyDeveloperTools &&
             this.#page) {
-            return await this.#page.getToolGroups();
+            return await this.#page.discoverThirdPartyDeveloperTools();
         }
         return undefined;
     }
     async #handleWebMCP() {
-        if (this.#args.categoryExperimentalWebmcp &&
+        if (this.#config.resolved.categoryExperimentalWebmcp &&
             this.#listWebMcpTools &&
             this.#page) {
             return this.#page.getWebMcpTools();
@@ -458,8 +454,7 @@ export class McpResponse {
         if (this.#networkRequestsOptions.resourceTypes?.length) {
             const normalizedTypes = new Set(this.#networkRequestsOptions.resourceTypes);
             requests = requests.filter(request => {
-                const type = request.resourceType();
-                return normalizedTypes.has(type);
+                return normalizedTypes.has(getFilterableResourceType(request));
             });
         }
         return await Promise.all(requests.map(request => NetworkFormatter.from(request, {
@@ -468,7 +463,7 @@ export class McpResponse {
                 this.#networkRequestsOptions?.networkRequestIdInDevToolsUI,
             fetchData: false,
             saveFile: (data, filename, extension) => context.saveFile(data, filename, extension),
-            redactNetworkHeaders: this.#redactNetworkHeaders,
+            redactNetworkHeaders: this.#config.resolved.redactNetworkHeaders,
         })));
     }
     async #handleComments() {
@@ -495,14 +490,22 @@ export class McpResponse {
         return { formatter, commentsSnapshotRegenerated };
     }
     async handle(context, dataFormat = 'default') {
-        if (this.#attachedWaitForResult?.openedPages && !this.#includePages) {
+        if (this.#includePages || this.#attachedWaitForResult?.openedPages) {
             await context.createPagesSnapshot();
+        }
+        if (this.#includePages && (!this.#page || this.#page.isClosed())) {
+            try {
+                this.#page = context.getSelectedMcpPage();
+            }
+            catch {
+                this.#page = undefined;
+            }
         }
         const [snapshot, detailedNetworkRequest, detailedConsoleMessage, thirdPartyDeveloperTools, webmcpTools, consoleMessages, networkRequests, commentsResult,] = await Promise.all([
             this.#handleSnapshot(context),
             this.#handleAttachedNetworkRequest(context),
             this.#handleAttachedConsoleMessage(),
-            this.#handleThirdPartyDevelopeTools(),
+            this.#handleThirdPartyDeveloperTools(),
             this.#handleWebMCP(),
             this.#handleConsoleList(context),
             this.#handleNetworkRequestList(context),
@@ -567,7 +570,7 @@ export class McpResponse {
         const response = [];
         if (this.#reconnectNotice) {
             structuredContent.reconnected = true;
-            response.push(`Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#args).name} to see open pages.`);
+            response.push(`Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#config.resolved).name} to see open pages.`);
         }
         if (this.#textResponseLines.length) {
             structuredContent.message = this.#textResponseLines.join('\n');
@@ -653,7 +656,7 @@ export class McpResponse {
                 : '';
             response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog(this.#args).name} to handle it before continuing.`);
+Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.`);
             structuredContent.dialog = {
                 type: dialog.type(),
                 message: dialog.message(),
@@ -760,9 +763,11 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const insightOutput = getInsightOutput(data.traceInsight.trace, data.traceInsight.insightSetId, data.traceInsight.insightName, this.#deviceScope);
             if ('error' in insightOutput) {
                 response.push(insightOutput.error);
+                structuredContent.error = insightOutput.error;
             }
             else {
                 response.push(insightOutput.output);
+                structuredContent.traceInsight = insightOutput.output;
             }
         }
         if (data.lighthouseResult) {
@@ -960,13 +965,23 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const detailedClassDiff = this.#heapSnapshotOptions.detailedClassDiff;
             if (detailedClassDiff) {
                 response.push('### Heap Snapshot Detailed Diff');
+                const { classDiff, objects } = detailedClassDiff;
+                const paginationData = this.#dataWithPagination(objects, this.#heapSnapshotOptions.pagination);
+                structuredContent.pagination = paginationData.pagination;
                 response.push(compactEncode
                     ? compactEncode({
-                        ...detailedClassDiff,
-                        className: formatName(detailedClassDiff.className, formatOptions),
+                        ...classDiff,
+                        className: formatName(classDiff.className, formatOptions),
                     })
-                    : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff, formatOptions));
-                structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
+                    : HeapSnapshotFormatter.formatDetailedClassDiffHeader(classDiff, formatOptions));
+                response.push(...paginationData.info);
+                response.push(compactEncode
+                    ? compactEncode(paginationData.items)
+                    : HeapSnapshotFormatter.formatDetailedClassDiffObjects(paginationData.items));
+                structuredContent.heapSnapshotDetailedClassDiff = {
+                    classDiff,
+                    objects: paginationData.items,
+                };
             }
             const duplicateStrings = this.#heapSnapshotOptions.duplicateStrings;
             if (duplicateStrings) {
@@ -1043,18 +1058,23 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             }
         }
         const thirdPartyDeveloperTools = data.thirdPartyDeveloperTools;
-        if (thirdPartyDeveloperTools?.length) {
+        if (this.#listThirdPartyDeveloperTools && thirdPartyDeveloperTools) {
             structuredContent.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
             response.push('## Third-party developer tools');
-            for (const toolGroup of thirdPartyDeveloperTools) {
-                response.push(`${toolGroup.name}: ${toolGroup.description}`);
-                response.push('Available tools:');
-                const toolDefinitionsMessage = toolGroup.tools
-                    .map(tool => {
-                    return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(tool.inputSchema)}`;
-                })
-                    .join('\n');
-                response.push(toolDefinitionsMessage);
+            if (thirdPartyDeveloperTools.length === 0) {
+                response.push('No third-party developer tools available.');
+            }
+            else {
+                for (const toolGroup of thirdPartyDeveloperTools) {
+                    response.push(`${toolGroup.name}: ${toolGroup.description}`);
+                    response.push('Available tools:');
+                    const toolDefinitionsMessage = toolGroup.tools
+                        .map(tool => {
+                        return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(tool.inputSchema)}`;
+                    })
+                        .join('\n');
+                    response.push(toolDefinitionsMessage);
+                }
             }
         }
         if (this.#listWebMcpTools && data.webmcpTools) {
@@ -1210,10 +1230,7 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 }
 function truncateTitle(title, maxLength = 50) {
-    if (title.length <= maxLength) {
-        return title;
-    }
-    return title.slice(0, maxLength - 3) + '...';
+    return truncateText(title, maxLength, { includeEllipsisInLength: true });
 }
 const collapseWhitespace = (value) => {
     return value.replace(/\s+/g, ' ').trim();

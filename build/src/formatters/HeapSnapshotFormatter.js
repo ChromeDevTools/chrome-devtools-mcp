@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { DevTools } from '../third_party/index.js';
+import { truncateText } from '../utils/text.js';
 const { formatBytesToKb } = DevTools.I18n.ByteUtilities;
 export const MAX_NAME_LENGTH = 100;
 /**
@@ -19,10 +20,7 @@ export function formatName(name, options) {
  * Truncates `value` to `maxLength`, appending an ellipsis if it was cut off.
  */
 function truncateValue(value, maxLength = MAX_NAME_LENGTH) {
-    if (value.length <= maxLength) {
-        return value;
-    }
-    return value.slice(0, maxLength) + '...';
+    return truncateText(value, maxLength);
 }
 /**
  * Flattens the analysis into the contexts matching `options`, ranked descending
@@ -153,21 +151,16 @@ export class HeapSnapshotFormatter {
         return lines.join('\n');
     }
     static formatDiffTotals(totals) {
-        return `Total: # new: ${totals.addedCount}, # deleted: ${totals.removedCount}, # delta: ${formatSignedCount(totals.countDelta)}, alloc size: ${formatSignedSize(totals.addedSize)}, freed size: ${formatSignedSize(totals.removedSize)}, size delta: ${formatSignedSize(totals.sizeDelta)}`;
+        return `Total: ${formatDiffCounts(totals)}`;
     }
-    static formatDiffDetails(diff, options) {
-        const lines = [];
-        lines.push(`${formatName(diff.className, options)}: # new: ${diff.addedCount}, # deleted: ${diff.removedCount}, # delta: ${formatSignedCount(diff.countDelta)}, alloc size: ${formatSignedSize(diff.addedSize)}, freed size: ${formatSignedSize(diff.removedSize)}, size delta: ${formatSignedSize(diff.sizeDelta)}`);
-        const addedIds = diff.addedIds;
-        const addedSelfSizes = diff.addedSelfSizes;
-        const deletedIds = diff.deletedIds;
-        const deletedSelfSizes = diff.deletedSelfSizes;
-        lines.push(`Objects:`);
-        for (let i = 0; i < addedIds.length; i++) {
-            lines.push(`  + @${addedIds[i]} (self_size: ${formatBytesToKb(addedSelfSizes[i])})`);
-        }
-        for (let i = 0; i < deletedIds.length; i++) {
-            lines.push(`  - @${deletedIds[i]} (self_size: ${formatBytesToKb(deletedSelfSizes[i])})`);
+    static formatDetailedClassDiffHeader(diff, options) {
+        return `${formatName(diff.className, options)}: ${formatDiffCounts(diff)}`;
+    }
+    static formatDetailedClassDiffObjects(objects) {
+        const lines = ['Objects:'];
+        for (const object of objects) {
+            const sign = object.change === 'added' ? '+' : '-';
+            lines.push(`  ${sign} @${object.id} (self_size: ${formatBytesToKb(object.selfSize)})`);
         }
         return lines.join('\n');
     }
@@ -239,5 +232,8 @@ function formatSignedCount(n) {
 function formatSignedSize(bytes) {
     const formatted = formatBytesToKb(bytes);
     return bytes > 0 ? `+${formatted}` : formatted;
+}
+function formatDiffCounts(counts) {
+    return `# new: ${counts.addedCount}, # deleted: ${counts.removedCount}, # delta: ${formatSignedCount(counts.countDelta)}, alloc size: ${formatSignedSize(counts.addedSize)}, freed size: ${formatSignedSize(counts.removedSize)}, size delta: ${formatSignedSize(counts.sizeDelta)}`;
 }
 //# sourceMappingURL=HeapSnapshotFormatter.js.map

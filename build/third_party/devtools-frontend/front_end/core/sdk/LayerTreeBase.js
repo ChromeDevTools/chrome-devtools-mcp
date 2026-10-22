@@ -2,6 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import { DOMModel } from './DOMModel.js';
+export var Layer;
+(function (Layer) {
+    let ScrollRectType;
+    (function (ScrollRectType) {
+        ScrollRectType["NON_FAST_SCROLLABLE"] = "NonFastScrollable";
+        ScrollRectType["TOUCH_EVENT_HANDLER"] = "TouchEventHandler";
+        ScrollRectType["WHEEL_EVENT_HANDLER"] = "WheelEventHandler";
+        ScrollRectType["REPAINTS_ON_SCROLL"] = "RepaintsOnScroll";
+        ScrollRectType["MAIN_THREAD_SCROLL_REASON"] = "MainThreadScrollingReason";
+    })(ScrollRectType = Layer.ScrollRectType || (Layer.ScrollRectType = {}));
+})(Layer || (Layer = {}));
 export class StickyPositionConstraint {
     #stickyBoxRect;
     #containingBlockRect;

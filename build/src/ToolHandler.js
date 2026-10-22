@@ -58,12 +58,14 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 import { McpResponse } from './McpResponse.js';
 import { SlimMcpResponse } from './SlimMcpResponse.js';
 import { ClearcutLogger } from './telemetry/ClearcutLogger.js';
-import { zod } from './third_party/index.js';
+import { ProtocolError, ProtocolErrorCode, zod, } from './third_party/index.js';
 import { labels } from './tools/categories.js';
 import { categoryToFlagName } from './config/category-options.js';
-import { isAvailableInMode, isSlimTool } from './tools/ToolDefinition.js';
+import { isAvailableInMode, isBrowserlessTool, isPageScopedTool, isSlimTool, } from './tools/ToolDefinition.js';
+import { getErrorMessage } from './utils/errorHandling.js';
 import { logger } from './utils/logger.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { isLocalhost } from './utils/url.js';
 /**
  * Upper bound on how long a tool call may wait to acquire the browser
@@ -87,62 +89,63 @@ function buildDisabledMessage(toolName, flag, categoryLabel) {
         : `requires ${flag.startsWith('--experimental') ? 'experimental feature' : 'flag'} ${flag} and`;
     return `Tool ${toolName} ${reason} is currently disabled. Enable it by running chrome-devtools start ${flag}=true. For more information check the README.`;
 }
-function getToolStatusInfo(tool, serverArgs) {
+function getDisabledReason(tool, serverArgs) {
     if (!isAvailableInMode(tool, serverArgs)) {
-        return {
-            disabled: true,
-            unavailableInMode: true,
-            reason: isSlimTool(tool)
-                ? `Tool ${tool.name} is only available with --slim.`
-                : `Tool ${tool.name} is not available with --slim.`,
-        };
+        return isSlimTool(tool)
+            ? `Tool ${tool.name} is only available with --slim.`
+            : `Tool ${tool.name} is not available with --slim.`;
     }
     const category = tool.annotations.category;
     if (category) {
         const flag = categoryToFlagName(category);
         if (!serverArgs[flag]) {
-            return {
-                disabled: true,
-                reason: buildDisabledMessage(tool.name, `--${flag}`, labels[category]),
-            };
+            return buildDisabledMessage(tool.name, `--${flag}`, labels[category]);
         }
     }
     for (const condition of tool.annotations.conditions || []) {
         if (!serverArgs[condition]) {
-            return {
-                disabled: true,
-                reason: buildDisabledMessage(tool.name, `--${condition}`),
-            };
+            return buildDisabledMessage(tool.name, `--${condition}`);
         }
     }
-    return { disabled: false };
+    return undefined;
 }
-function isPageScopedTool(tool) {
-    return 'pageScoped' in tool && tool.pageScoped === true;
-}
-async function validateAndResolvePathOrUrl(filePathOrUrl, context) {
+async function validateAndResolvePathOrUrl(filePathOrUrl, context, allowUrl) {
     if (filePathOrUrl.trim().length === 0) {
         return undefined;
     }
+    let url;
     try {
-        const url = new URL(filePathOrUrl);
+        url = new URL(filePathOrUrl);
+    }
+    catch {
+        // Not a URL; fall through and validate it as a regular file path.
+    }
+    if (url) {
         if (url.protocol === 'file:') {
             return pathToFileURL(await context.validatePath(fileURLToPath(url))).href;
         }
         if (['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) {
-            return filePathOrUrl;
+            // Only pass a remote URL through unchanged for parameters whose sink
+            // actually fetches the URL or hands it to the browser (allowUrl). For a
+            // filesystem-path parameter, a value that merely looks like an http/ws
+            // URL must still be rejected outright: `new URL()` accepts
+            // `http://x/../../etc/passwd`, and the downstream filesystem API (e.g.
+            // Puppeteer's uploadFile) path.resolve()s that non-absolute string into
+            // an absolute host path, which would bypass validatePath (workspace
+            // roots and the temp-dir fallback) if it fell through to it unchanged.
+            if (allowUrl) {
+                return filePathOrUrl;
+            }
+            throw new Error('This parameter expects a file path, not a URL.');
         }
-    }
-    catch {
-        // Suppress parsing errors for regular file paths.
     }
     return await context.validatePath(filePathOrUrl);
 }
-function isLocalBrowser(context) {
-    if (context.browser.process()) {
+function isLocalBrowser(browser) {
+    if (browser.process()) {
         return true;
     }
-    const wsEndpoint = context.browser.wsEndpoint();
+    const wsEndpoint = browser.wsEndpoint();
     if (wsEndpoint && isLocalhost(wsEndpoint)) {
         return true;
     }
@@ -160,19 +163,23 @@ function shouldValidateFile(option, isLocal) {
     }
     return false;
 }
-async function validateToolFiles(tool, params, context) {
-    const isLocal = isLocalBrowser(context);
+/**
+ * `isLocal` tells whether files are accessed on the machine the server runs on,
+ * which is always the case for browserless tools.
+ */
+async function validateToolFiles(tool, params, context, isLocal) {
     for (const [key, option] of Object.entries(tool.verifyFilesSchema)) {
         if (shouldValidateFile(option, isLocal)) {
+            const allowUrl = option !== true && option.allowUrl === true;
             const val = params[key];
             if (typeof val === 'string') {
-                params[key] = await validateAndResolvePathOrUrl(val, context);
+                params[key] = await validateAndResolvePathOrUrl(val, context, allowUrl);
             }
             else if (Array.isArray(val)) {
                 const updated = [];
                 for (const item of val) {
                     if (typeof item === 'string') {
-                        const resolved = await validateAndResolvePathOrUrl(item, context);
+                        const resolved = await validateAndResolvePathOrUrl(item, context, allowUrl);
                         if (resolved !== undefined) {
                             updated.push(resolved);
                         }
@@ -186,28 +193,89 @@ async function validateToolFiles(tool, params, context) {
         }
     }
 }
+function toInputJsonSchema(schema) {
+    return zod.toJSONSchema(schema, { io: 'input', unrepresentable: 'any' });
+}
+function formatValidationError(toolName, error) {
+    const details = error.issues
+        .map(issue => `${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`)
+        .join(', ');
+    return `Input validation error: Invalid arguments for tool ${toolName}: ${details}`;
+}
+function errorResult(text) {
+    return {
+        content: [{ type: 'text', text }],
+        isError: true,
+    };
+}
+/**
+ * The page id a page tool call targets, or `undefined` when the call targets
+ * the selected page. `args` can be the raw or the parsed arguments.
+ */
+function routedPageId(tool, serverArgs, args) {
+    if (!serverArgs.pageIdRouting || isSlimTool(tool)) {
+        return undefined;
+    }
+    const { pageId } = args;
+    return typeof pageId === 'number' && Number.isInteger(pageId)
+        ? pageId
+        : undefined;
+}
 export class ToolHandler {
-    tool;
-    serverArgs;
     getContext;
-    toolMutex;
     abandonPendingBrowserAttemptOnTimeout;
-    inputSchema;
-    registeredInputSchema;
-    disabled;
-    disabledReason;
-    constructor(tool, serverArgs, getContext, toolMutex, abandonPendingBrowserAttemptOnTimeout) {
-        this.tool = tool;
-        this.serverArgs = serverArgs;
+    #tool;
+    #config;
+    #registeredInputSchema;
+    #disabled = false;
+    #disabledReason;
+    constructor(tool, config, getContext, abandonPendingBrowserAttemptOnTimeout) {
         this.getContext = getContext;
-        this.toolMutex = toolMutex;
         this.abandonPendingBrowserAttemptOnTimeout = abandonPendingBrowserAttemptOnTimeout;
-        const { disabled, reason, unavailableInMode } = getToolStatusInfo(tool, serverArgs);
-        this.disabledReason = reason;
-        this.disabled =
-            disabled && (Boolean(unavailableInMode) || !serverArgs.viaCli);
-        this.inputSchema = tool.schema;
-        this.registeredInputSchema = zod.object(this.inputSchema).strict();
+        this.#tool = tool;
+        this.#config = config;
+        this.#registeredInputSchema = zod.object(tool.schema).strict();
+        this.#updateStatus(tool);
+    }
+    get registeredInputSchema() {
+        return this.#registeredInputSchema;
+    }
+    /**
+     * Whether the tool is hidden from the client.
+     */
+    get disabled() {
+        return this.#disabled;
+    }
+    #updateStatus(tool) {
+        const serverArgs = this.#config.resolved;
+        this.#disabledReason = getDisabledReason(tool, serverArgs);
+        this.#disabled =
+            Boolean(this.#disabledReason) &&
+                (!isAvailableInMode(tool, serverArgs) || !serverArgs.viaCli);
+    }
+    /**
+     * Replaces the tool definition and re-evaluates its status against the
+     * current server config. Callers must pause the task runner, so calls that
+     * are already waiting run with the new state. Returns true if the tool
+     * listing visible to the client changed.
+     */
+    update(tool) {
+        const previousTool = this.#tool;
+        const previousDisabled = this.#disabled;
+        const previousInputSchema = this.#registeredInputSchema;
+        const nextInputSchema = zod.object(tool.schema).strict();
+        this.#tool = tool;
+        this.#registeredInputSchema = nextInputSchema;
+        this.#updateStatus(tool);
+        if (previousDisabled !== this.#disabled) {
+            return true;
+        }
+        if (this.#disabled) {
+            return false;
+        }
+        return (previousTool.description !== tool.description ||
+            !isDeepStrictEqual(previousTool.annotations, tool.annotations) ||
+            !isDeepStrictEqual(toInputJsonSchema(previousInputSchema), toInputJsonSchema(nextInputSchema)));
     }
     /**
      * Races a promise against TOOL_CALL_TIMEOUT_MS, calling onTimeout() if the
@@ -216,7 +284,7 @@ export class ToolHandler {
      * it cannot block subsequent tool calls.
      */
     async #raceWithTimeout(promise, onTimeout) {
-        const timeoutError = new ToolCallTimeoutError(`Tool "${this.tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting for the browser connection to be established. The connection attempt will be retried automatically on the next tool call.`);
+        const timeoutError = new ToolCallTimeoutError(`Tool "${this.#tool.name}" timed out after ${TOOL_CALL_TIMEOUT_MS}ms waiting for the browser connection to be established. The connection attempt will be retried automatically on the next tool call.`);
         let timer;
         const timeout = new Promise((_, reject) => {
             timer = setTimeout(() => reject(timeoutError), TOOL_CALL_TIMEOUT_MS);
@@ -235,79 +303,130 @@ export class ToolHandler {
             clearTimeout(timer);
         }
     }
-    handle = async (params) => {
+    #dataFormat(serverArgs) {
+        // --experimentalDataFormat takes precedence over the legacy
+        // --experimentalToonFormat.
+        return (serverArgs.experimentalDataFormat ??
+            (serverArgs.experimentalToonFormat ? 'toon' : 'default'));
+    }
+    /**
+     * Browserless tools never establish a browser connection, so they also never
+     * wait for one under TOOL_CALL_TIMEOUT_MS.
+     */
+    async #runBrowserlessTool(tool, params, response, context) {
+        try {
+            await validateToolFiles(tool, params, context, true);
+            await tool.handler({ params }, response, context);
+        }
+        catch (err) {
+            response.setError(err);
+        }
+        return await response.handle(context, this.#dataFormat(this.#config.resolved));
+    }
+    async #runBrowserTool(tool, params, response, context, onTelemetryData) {
+        // ensureBrowser() has no cancellation mechanism, so this timeout only
+        // stops us from waiting — the attempt itself keeps running abandoned.
+        // abandonPendingBrowserAttemptOnTimeout() tells BrowserManager to
+        // discard that attempt if it succeeds later instead of handing it to a
+        // subsequent caller — see BrowserManager#abandonPendingAttempt()'s doc
+        // comment for the full mechanism.
+        const browser = await this.#raceWithTimeout(context.ensureBrowser(), () => this.abandonPendingBrowserAttemptOnTimeout());
+        logger?.(`${tool.name} browser: resolved`);
+        if (context.consumeReconnectNotice()) {
+            response.setReconnectNotice();
+        }
+        let page;
+        try {
+            await validateToolFiles(tool, params, context, isLocalBrowser(browser));
+            if (isPageScopedTool(tool)) {
+                const pageId = routedPageId(tool, this.#config.resolved, params);
+                page =
+                    pageId !== undefined
+                        ? context.getPageById(pageId)
+                        : context.getSelectedMcpPage();
+                await page?.init({ emulateFocus: true });
+                response.setPage(page);
+                if (tool.blockedByDialog) {
+                    page.throwIfDialogOpen();
+                }
+                await tool.handler({
+                    params,
+                    page,
+                }, response, context);
+            }
+            else {
+                await tool.handler({
+                    params,
+                }, response, context);
+            }
+        }
+        catch (err) {
+            response.setError(err);
+        }
+        onTelemetryData(await context.getDevToolsData(page), context.getSelectedMcpPageUrl(page));
+        return await response.handle(context, this.#dataFormat(this.#config.resolved));
+    }
+    /**
+     * The queue the call runs on. `'none'` tools run outside the runner.
+     * `'page'` tools run on the queue of the page named by `rawArgs.pageId`
+     * when page id routing applies; every other call runs on the context
+     * queue.
+     */
+    #queueFor(context, rawArgs) {
+        const tool = this.#tool;
+        switch (tool.concurrency) {
+            case 'none':
+                return undefined;
+            case 'page': {
+                const pageId = routedPageId(tool, this.#config.resolved, rawArgs);
+                return pageId !== undefined
+                    ? context.pageTaskQueue(pageId)
+                    : context.taskQueue;
+            }
+            default:
+                return context.taskQueue;
+        }
+    }
+    handle = async (rawArgs = {}, options) => {
         const env_1 = { stack: [], error: void 0, hasError: false };
         try {
-            const guard = __addDisposableResource(env_1, await this.toolMutex.acquire(), false);
-            if (this.disabledReason) {
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: this.disabledReason,
-                        },
-                    ],
-                    isError: true,
-                };
+            const context = await this.getContext();
+            let queueGuard;
+            try {
+                queueGuard = await this.#queueFor(context, rawArgs)?.scheduleTask();
             }
+            catch (err) {
+                // The queue was disposed while the call waited, e.g. the page closed.
+                return errorResult(getErrorMessage(err));
+            }
+            const guard = __addDisposableResource(env_1, queueGuard, false);
+            if (options?.viaMcp && this.#disabled) {
+                throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Tool ${this.#tool.name} disabled`);
+            }
+            if (this.#disabledReason) {
+                return errorResult(this.#disabledReason);
+            }
+            const tool = this.#tool;
+            const parseResult = this.#registeredInputSchema.safeParse(rawArgs);
+            if (!parseResult.success) {
+                return errorResult(formatValidationError(tool.name, parseResult.error));
+            }
+            const params = parseResult.data;
             const startTime = Date.now();
             let success = false;
             let devToolsData;
             let pageUrl;
             try {
-                logger?.(`${this.tool.name} request: ${JSON.stringify(params, null, '  ')}`);
-                // ensureBrowser() has no cancellation mechanism, so this timeout only
-                // stops us from waiting — the attempt itself keeps running abandoned.
-                // abandonPendingBrowserAttemptOnTimeout() tells BrowserManager to
-                // discard that attempt if it succeeds later instead of handing it to a
-                // subsequent caller — see BrowserManager#abandonPendingAttempt()'s doc
-                // comment for the full mechanism.
-                const context = await this.#raceWithTimeout(this.getContext(), () => this.abandonPendingBrowserAttemptOnTimeout());
-                logger?.(`${this.tool.name} context: resolved`);
-                const response = this.serverArgs.slim
-                    ? new SlimMcpResponse(this.serverArgs)
-                    : new McpResponse(this.serverArgs);
-                response.setRedactNetworkHeaders(this.serverArgs.redactNetworkHeaders);
-                if (context.consumeReconnectNotice()) {
-                    response.setReconnectNotice();
-                }
-                let page;
-                try {
-                    await validateToolFiles(this.tool, params, context);
-                    if (isPageScopedTool(this.tool)) {
-                        const pageId = typeof params.pageId === 'number' ? params.pageId : undefined;
-                        page =
-                            this.serverArgs.pageIdRouting &&
-                                pageId !== undefined &&
-                                !isSlimTool(this.tool)
-                                ? context.getPageById(pageId)
-                                : context.getSelectedMcpPage();
-                        await page?.init();
-                        response.setPage(page);
-                        if (this.tool.blockedByDialog) {
-                            page.throwIfDialogOpen();
-                        }
-                        await this.tool.handler({
-                            params,
-                            page,
-                        }, response, context);
-                    }
-                    else {
-                        await this.tool.handler({
-                            params,
-                        }, response, context);
-                    }
-                }
-                catch (err) {
-                    response.setError(err);
-                }
-                devToolsData = await context.getDevToolsData(page);
-                pageUrl = context.getSelectedMcpPageUrl(page);
-                // --experimentalDataFormat takes precedence over the legacy
-                // --experimentalToonFormat.
-                const dataFormat = this.serverArgs.experimentalDataFormat ??
-                    (this.serverArgs.experimentalToonFormat ? 'toon' : 'default');
-                const { content, structuredContent } = await response.handle(context, dataFormat);
+                logger?.(`${tool.name} request: ${JSON.stringify(params, null, '  ')}`);
+                const response = isSlimTool(tool)
+                    ? new SlimMcpResponse(this.#config)
+                    : new McpResponse(this.#config);
+                const { content, structuredContent } = isBrowserlessTool(tool)
+                    ? await this.#runBrowserlessTool(tool, params, response, context)
+                    : await this.#runBrowserTool(tool, params, response, context, (data, url) => {
+                        devToolsData = data;
+                        pageUrl = url;
+                    });
                 const result = {
                     content,
                 };
@@ -315,32 +434,34 @@ export class ToolHandler {
                     result.isError = true;
                 }
                 success = true;
-                if (this.serverArgs.experimentalStructuredContent) {
+                if (this.#config.resolved.experimentalStructuredContent) {
                     result.structuredContent = structuredContent;
                 }
                 return result;
             }
             catch (err) {
-                logger?.(`${this.tool.name} error:`, err, err?.stack);
+                logger?.(`${tool.name} error:`, err, err?.stack);
                 let errorText = err && 'message' in err ? err.message : String(err);
-                if ('cause' in err && err.cause) {
-                    errorText += `\nCause: ${err.cause.message}`;
+                let cause = err && typeof err === 'object' && 'cause' in err
+                    ? err.cause
+                    : undefined;
+                const seenCauses = new Set([err]);
+                while (cause &&
+                    typeof cause === 'object' &&
+                    !seenCauses.has(cause) &&
+                    'message' in cause &&
+                    typeof cause.message === 'string') {
+                    seenCauses.add(cause);
+                    errorText += `\nCause: ${cause.message}`;
+                    cause = 'cause' in cause ? cause.cause : undefined;
                 }
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: errorText,
-                        },
-                    ],
-                    isError: true,
-                };
+                return errorResult(errorText);
             }
             finally {
                 void ClearcutLogger.get()?.logToolInvocation({
-                    toolName: this.tool.name,
+                    toolName: tool.name,
                     params,
-                    schema: this.inputSchema,
+                    schema: tool.schema,
                     success,
                     latencyMs: Date.now() - startTime,
                     devToolsData,

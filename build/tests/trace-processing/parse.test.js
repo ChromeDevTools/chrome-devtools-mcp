@@ -3,16 +3,14 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import '../setupDevTools.js';
 import assert from 'node:assert';
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { getTraceSummary, parseRawTraceBuffer, } from '../../src/processors/PerformanceTrace.js';
 import { DevTools } from '../../src/third_party/index.js';
 import { loadTraceAsBuffer } from './fixtures/load.js';
 describe('Trace parsing', () => {
-    afterEach(() => {
-        sinon.restore();
-    });
     it('creates an isolated model instance for each parsed trace', async () => {
         const createModelSpy = sinon.spy(DevTools.TraceEngine.TraceModel.Model, 'createWithAllHandlers');
         const rawData = loadTraceAsBuffer('basic-trace.json.gz');

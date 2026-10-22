@@ -94,4 +94,8 @@ export class SymbolizedErrorObject extends Common.ObjectWrapper.ObjectWrapper {
         this.dispatchEventToListeners("UPDATED" /* Events.UPDATED */);
     }
 }
+export var Events;
+(function (Events) {
+    Events["UPDATED"] = "UPDATED";
+})(Events || (Events = {}));
 //# sourceMappingURL=SymbolizedError.js.map

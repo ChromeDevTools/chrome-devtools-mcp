@@ -57,7 +57,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 });
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { ConfigWatcher } from '../../src/config/ConfigWatcher.js';
 import { createTempDir } from '../utils.js';
@@ -124,9 +124,6 @@ async function startWatcher(watchedPath, onChange = sinon.stub().resolves()) {
     };
 }
 describe('ConfigWatcher', () => {
-    afterEach(() => {
-        sinon.restore();
-    });
     it('calls onChange once for several quick writes', async () => {
         const env_1 = { stack: [], error: void 0, hasError: false };
         try {
@@ -137,7 +134,7 @@ describe('ConfigWatcher', () => {
             fs.writeFileSync(configPath, '{"headless": true}');
             fs.writeFileSync(configPath, '{"headless": false}');
             await waitForCall(onChange);
-            sinon.assert.calledOnceWithExactly(onChange);
+            sinon.assert.calledOnceWithExactly(onChange, '{"headless": false}');
         }
         catch (e_1) {
             env_1.error = e_1;
@@ -158,7 +155,7 @@ describe('ConfigWatcher', () => {
             fs.writeFileSync(tempPath, '{"headless": true}');
             fs.renameSync(tempPath, configPath);
             await waitForCall(onChange);
-            sinon.assert.calledOnceWithExactly(onChange);
+            sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
         }
         catch (e_2) {
             env_2.error = e_2;
@@ -199,7 +196,7 @@ describe('ConfigWatcher', () => {
             const watcher = __addDisposableResource(env_4, await startWatcher(linkPath, onChange), false);
             fs.writeFileSync(configPath, '{"headless": true}');
             await waitForCall(onChange);
-            sinon.assert.calledOnceWithExactly(onChange);
+            sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
         }
         catch (e_4) {
             env_4.error = e_4;
@@ -302,13 +299,14 @@ describe('ConfigWatcher', () => {
             const watcher = __addDisposableResource(env_9, await startWatcher(configPath, onChange), false);
             fs.writeFileSync(configPath, '{"headless": true}');
             await waitForCall(onChange);
-            sinon.assert.calledOnce(onChange);
+            sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
             fs.writeFileSync(configPath, '{"headless": false}');
             await wait(SETTLE_MS);
             sinon.assert.calledOnce(onChange);
             firstCall.resolve();
             await secondCall.promise;
             sinon.assert.calledTwice(onChange);
+            sinon.assert.calledWithExactly(onChange.secondCall, '{"headless": false}');
         }
         catch (e_9) {
             env_9.error = e_9;

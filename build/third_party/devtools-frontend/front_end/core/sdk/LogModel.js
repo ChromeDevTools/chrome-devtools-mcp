@@ -31,5 +31,9 @@ export class LogModel extends SDKModel {
         void this.#logAgent.invoke_clear();
     }
 }
+export var Events;
+(function (Events) {
+    Events["ENTRY_ADDED"] = "EntryAdded";
+})(Events || (Events = {}));
 SDKModel.register(LogModel, { capabilities: 8 /* Capability.LOG */, autostart: true });
 //# sourceMappingURL=LogModel.js.map

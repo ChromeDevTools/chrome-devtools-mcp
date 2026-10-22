@@ -53,6 +53,16 @@ export class Console extends ObjectWrapper {
         return reveal(this);
     }
 }
+export var Events;
+(function (Events) {
+    Events["MESSAGE_ADDED"] = "messageAdded";
+})(Events || (Events = {}));
+export var MessageLevel;
+(function (MessageLevel) {
+    MessageLevel["INFO"] = "info";
+    MessageLevel["WARNING"] = "warning";
+    MessageLevel["ERROR"] = "error";
+})(MessageLevel || (MessageLevel = {}));
 export var FrontendMessageSource;
 (function (FrontendMessageSource) {
     FrontendMessageSource["CSS"] = "css";

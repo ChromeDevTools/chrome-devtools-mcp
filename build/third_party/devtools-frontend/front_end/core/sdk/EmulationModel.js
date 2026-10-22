@@ -6,6 +6,12 @@ import { CSSModel } from './CSSModel.js';
 import { OverlayModel } from './OverlayModel.js';
 import { SDKModel } from './SDKModel.js';
 import { avifFormatDisabledSettingDescriptor, cpuPressureSettingDescriptor, dataSaverSettingDescriptor, emulateAutoDarkModeSettingDescriptor, emulatedCSSMediaFeatureColorGamutSettingDescriptor, emulatedCSSMediaFeatureForcedColorsSettingDescriptor, emulatedCSSMediaFeaturePrefersColorSchemeSettingDescriptor, emulatedCSSMediaFeaturePrefersContrastSettingDescriptor, emulatedCSSMediaFeaturePrefersReducedDataSettingDescriptor, emulatedCSSMediaFeaturePrefersReducedMotionSettingDescriptor, emulatedCSSMediaFeaturePrefersReducedTransparencySettingDescriptor, emulatedCSSMediaSettingDescriptor, emulatedOSTextScaleSettingDescriptor, emulatedVisionDeficiencySettingDescriptor, idleDetectionSettingDescriptor, javaScriptDisabledSettingDescriptor, jpegXlFormatDisabledSettingDescriptor, localFontsDisabledSettingDescriptor, touchSettingDescriptor, webpFormatDisabledSettingDescriptor, } from './SDKSettings.js';
+export var DataSaverOverride;
+(function (DataSaverOverride) {
+    DataSaverOverride["UNSET"] = "unset";
+    DataSaverOverride["ENABLED"] = "enabled";
+    DataSaverOverride["DISABLED"] = "disabled";
+})(DataSaverOverride || (DataSaverOverride = {}));
 export class EmulationModel extends SDKModel {
     #multitargetNetworkManager;
     #emulationAgent;
@@ -435,6 +441,10 @@ export class EmulationModel extends SDKModel {
         return this.#lockedOrientation;
     }
 }
+export var EmulationModelEvents;
+(function (EmulationModelEvents) {
+    EmulationModelEvents["SCREEN_ORIENTATION_LOCK_CHANGED"] = "ScreenOrientationLockChanged";
+})(EmulationModelEvents || (EmulationModelEvents = {}));
 export class Location {
     static DEFAULT_ACCURACY = 150;
     latitude;

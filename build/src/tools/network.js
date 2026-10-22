@@ -18,7 +18,6 @@ const FILTERABLE_RESOURCE_TYPES = [
     'fetch',
     'prefetch',
     'eventsource',
-    'websocket',
     'manifest',
     'signedexchange',
     'ping',
@@ -27,7 +26,7 @@ const FILTERABLE_RESOURCE_TYPES = [
     'fedcm',
     'other',
 ];
-export const listNetworkRequests = definePageTool(() => ({
+export const listNetworkRequests = definePageTool((args) => ({
     name: 'list_network_requests',
     description: `Lists the most recent requests for the target page since the last navigation.`,
     annotations: {
@@ -46,7 +45,7 @@ export const listNetworkRequests = definePageTool(() => ({
             .int()
             .min(0)
             .optional()
-            .describe('Page number to return (0-based). When omitted, returns the first page.'),
+            .describe('Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.'),
         resourceTypes: zod
             .array(zod.enum(FILTERABLE_RESOURCE_TYPES))
             .optional()
@@ -55,9 +54,10 @@ export const listNetworkRequests = definePageTool(() => ({
             .boolean()
             .default(false)
             .optional()
-            .describe('Set to true to return the preserved requests over the last 3 navigations.'),
+            .describe(`Set to true to return the preserved requests over the last ${args.maxNavigationSaved} navigations.`),
     },
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const data = await request.page.getDevToolsData();
@@ -96,6 +96,7 @@ export const getNetworkRequest = definePageTool(() => ({
             .describe('The absolute or relative path to a .network-response file to save the response body to. If omitted, the body is returned inline.'),
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {
         requestFilePath: true,
         responseFilePath: true,

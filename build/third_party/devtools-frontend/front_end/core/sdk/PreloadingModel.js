@@ -270,6 +270,11 @@ export class PreloadingModel extends SDKModel {
     }
 }
 SDKModel.register(PreloadingModel, { capabilities: 2 /* Capability.DOM */, autostart: false });
+export var Events;
+(function (Events) {
+    Events["MODEL_UPDATED"] = "ModelUpdated";
+    Events["WARNINGS_UPDATED"] = "WarningsUpdated";
+})(Events || (Events = {}));
 class PreloadDispatcher {
     model;
     constructor(model) {
@@ -334,6 +339,31 @@ class RuleSetRegistry {
         this.map.delete(id);
     }
 }
+/**
+ * Protocol.Preload.PreloadingStatus|'NotTriggered'
+ *
+ * A renderer sends SpeculationCandidate to the browser process and the
+ * browser process checks eligibilities, and starts PreloadingAttempt.
+ *
+ * In the frontend, "NotTriggered" is used to denote that a
+ * PreloadingAttempt is waiting for at trigger event (eg:
+ * mousedown/mouseover). All PreloadingAttempts will start off as
+ * "NotTriggered", but "eager" preloading attempts (attempts not
+ * actually waiting for any trigger) will be processed by the browser
+ * immediately, and will not stay in this state for long.
+ *
+ * TODO(https://crbug.com/1384419): Add NotEligible.
+ **/
+export var PreloadingStatus;
+(function (PreloadingStatus) {
+    PreloadingStatus["NOT_TRIGGERED"] = "NotTriggered";
+    PreloadingStatus["PENDING"] = "Pending";
+    PreloadingStatus["RUNNING"] = "Running";
+    PreloadingStatus["READY"] = "Ready";
+    PreloadingStatus["SUCCESS"] = "Success";
+    PreloadingStatus["FAILURE"] = "Failure";
+    PreloadingStatus["NOT_SUPPORTED"] = "NotSupported";
+})(PreloadingStatus || (PreloadingStatus = {}));
 function convertPreloadingStatus(status) {
     switch (status) {
         case "Pending" /* Protocol.Preload.PreloadingStatus.Pending */:

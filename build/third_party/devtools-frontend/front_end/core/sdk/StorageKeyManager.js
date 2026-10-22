@@ -54,6 +54,22 @@ export function parseStorageKey(storageKeyString) {
     }
     return storageKey;
 }
+export var StorageKeyComponent;
+(function (StorageKeyComponent) {
+    StorageKeyComponent["TOP_LEVEL_SITE"] = "0";
+    StorageKeyComponent["NONCE_HIGH"] = "1";
+    StorageKeyComponent["NONCE_LOW"] = "2";
+    StorageKeyComponent["ANCESTOR_CHAIN_BIT"] = "3";
+    StorageKeyComponent["TOP_LEVEL_SITE_OPAQUE_NONCE_HIGH"] = "4";
+    StorageKeyComponent["TOP_LEVEL_SITE_OPAQUE_NONCE_LOW"] = "5";
+    StorageKeyComponent["TOP_LEVEL_SITE_OPAQUE_NONCE_PRECURSOR"] = "6";
+})(StorageKeyComponent || (StorageKeyComponent = {}));
+export var Events;
+(function (Events) {
+    Events["STORAGE_KEY_ADDED"] = "StorageKeyAdded";
+    Events["STORAGE_KEY_REMOVED"] = "StorageKeyRemoved";
+    Events["MAIN_STORAGE_KEY_CHANGED"] = "MainStorageKeyChanged";
+})(Events || (Events = {}));
 // TODO(jarhar): this is the one of the two usages of Capability.None. Do something about it!
 SDKModel.register(StorageKeyManager, { capabilities: 0 /* Capability.NONE */, autostart: false });
 //# sourceMappingURL=StorageKeyManager.js.map

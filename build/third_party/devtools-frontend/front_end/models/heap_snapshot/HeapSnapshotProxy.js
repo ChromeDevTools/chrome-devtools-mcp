@@ -159,6 +159,12 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper 
         this.worker.postMessage(message, transfer);
     }
 }
+(function (HeapSnapshotWorkerProxy) {
+    let Events;
+    (function (Events) {
+        Events["WAIT"] = "Wait";
+    })(Events = HeapSnapshotWorkerProxy.Events || (HeapSnapshotWorkerProxy.Events = {}));
+})(HeapSnapshotWorkerProxy || (HeapSnapshotWorkerProxy = {}));
 export class HeapSnapshotProxyObject {
     worker;
     objectId;

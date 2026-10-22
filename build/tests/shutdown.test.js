@@ -137,7 +137,9 @@ async function setupServerWithRetry() {
     }
     throw lastError ?? new Error('Failed without an error');
 }
-describe('shutdown', () => {
+// Each test starts its own server and Chrome, so the tests run in parallel.
+// The budget only measures the time from the signal to the process exit.
+describe('shutdown', { concurrency: true }, () => {
     it('exits within budget on stdin EOF after Chrome launch', async () => {
         const child = await setupServerWithRetry();
         child.stdin.end();

@@ -4,9 +4,118 @@
 import * as Host from '../../../core/host/host.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
-import { debugLog, isStructuredLogEnabled } from '../debug.js';
+import * as AiUtils from '../../ai-utils/ai-utils.js';
 import { dispatchAiAssistanceDoneEvent } from '../DOMHelpers.js';
+const { debugLog, isStructuredLogEnabled } = AiUtils.Debug;
 const MAX_SUGGESTION_LENGTH = 200;
+/**
+ * The types of event in the response stream that `AiConversation#run()`
+ * yields to the AI assistance panel. The same events, minus a few, are saved
+ * as the conversation history and replayed when a saved conversation opens.
+ *
+ * ## Order of events in one run
+ *
+ * ```
+ * USER_QUERY                    (AiConversation, first run of a query only)
+ * CONTEXT*                      (agent's handleContextDetails())
+ * repeated for each model request, up to MAX_STEPS:
+ *   QUERYING
+ *   one of:
+ *     ANSWER (complete: false)*, ANSWER (complete: true)   text-only reply; the run ends
+ *     ANSWER (complete: false)*, [ANSWER (complete: true)],
+ *       <tool call events>+                                one or more function calls, optionally with text
+ *     ERROR                                                the run ends
+ * ```
+ *
+ * When a model response contains several function calls,
+ * `AiAgent#runFunctionCalls()` runs them one after another, so each call's
+ * events finish before the next call's events start. A denied call does not
+ * stop the calls after it, and neither does a failed call: an unknown tool
+ * name or an error thrown by the handler becomes an error result for that
+ * call.
+ *
+ * An `ERROR` can also follow the tool call events, for example when the user
+ * aborts, the page navigates cross-origin, or the run reaches `MAX_STEPS`.
+ * The remaining calls in that model response do not run after an abort or a
+ * cross-origin navigation.
+ *
+ * ## Events for one tool call
+ *
+ * `AiAgent#callFunction()` yields these. All events for one call carry the
+ * same `callId`.
+ *
+ * ```
+ * TITLE?, THOUGHT?              from the tool's displayInfoFromArgs()
+ * if the tool needs approval:
+ *   ACTION {code}               code only, shown above the approval prompt;
+ *                               skipped if displayInfoFromArgs() has no action
+ *   SIDE_EFFECT                 the panel shows the prompt and calls confirm()
+ *   if denied: ACTION {code, output, canceled: true}, and the call ends
+ * ACTION {code, output, widgets, toolName}   result or error
+ * ```
+ *
+ * If the tool switches context instead of returning a result, there is no
+ * result `ACTION`. `AiAgent#runFunctionCalls()` yields `CONTEXT_CHANGE` and
+ * the run ends, and `AiConversation` starts a new run with the agent for the
+ * new context. The remaining calls in that model response do not run.
+ *
+ * ## Model history for function calls
+ *
+ * This is the history sent to the model, separate from the saved history
+ * below. `AiAgent#runFunctionCalls()` stores the model's explanation text and
+ * every function call in a response as one `MODEL` turn. The next request
+ * carries one `functionResponse` per call, in the same order. A denied call
+ * gets a response that says it did not run. After a context change, each call
+ * that did not run gets a "Not executed" response.
+ *
+ * ## Saved history
+ *
+ * `AiConversation` saves every event except `CONTEXT_CHANGE` and partial
+ * `ANSWER`s. `AiConversation#serialize()` removes `confirm`, images and
+ * widgets, and redacts the `ACTION` output of tools annotated with
+ * `REDACT_FROM_HISTORY`. Saved data has no version field, so new fields must
+ * be optional.
+ *
+ * ## How the panel renders events
+ *
+ * `AiAssistancePanel#consumeResponseStream()` builds one chat message per
+ * `USER_QUERY` and one step per tool call:
+ * - `QUERYING` starts a new step with a spinner. The panel shows the step only
+ *   if it is the first part of the message. Otherwise, the step stays hidden
+ *   until a tool call fills it in.
+ * - `TITLE`, `THOUGHT`, `ACTION` and `SIDE_EFFECT` update the step for their
+ *   `callId`. Events saved before `callId` existed update the current step.
+ * - `ANSWER` adds the answer text. `ERROR` sets the message error.
+ */
+export var ResponseType;
+(function (ResponseType) {
+    ResponseType["CONTEXT"] = "context";
+    ResponseType["TITLE"] = "title";
+    ResponseType["THOUGHT"] = "thought";
+    ResponseType["ACTION"] = "action";
+    ResponseType["SIDE_EFFECT"] = "side-effect";
+    ResponseType["SUGGESTIONS"] = "suggestions";
+    ResponseType["ANSWER"] = "answer";
+    ResponseType["ERROR"] = "error";
+    ResponseType["QUERYING"] = "querying";
+    ResponseType["USER_QUERY"] = "user-query";
+    ResponseType["CONTEXT_CHANGE"] = "context-change";
+})(ResponseType || (ResponseType = {}));
+export var ErrorType;
+(function (ErrorType) {
+    ErrorType["UNKNOWN"] = "unknown";
+    ErrorType["ABORT"] = "abort";
+    ErrorType["MAX_STEPS"] = "max-steps";
+    ErrorType["BLOCK"] = "block";
+    ErrorType["CROSS_ORIGIN"] = "cross-origin";
+    ErrorType["QUOTA"] = "quota";
+    ErrorType["PAYLOAD_TOO_LARGE"] = "payload-too-large";
+})(ErrorType || (ErrorType = {}));
+export var MultimodalInputType;
+(function (MultimodalInputType) {
+    MultimodalInputType["SCREENSHOT"] = "screenshot";
+    MultimodalInputType["UPLOADED_IMAGE"] = "uploaded-image";
+})(MultimodalInputType || (MultimodalInputType = {}));
 export const MAX_STEPS = 20;
 /**
  * The response sent for each function call that did not run because an
@@ -109,6 +218,7 @@ export class AiAgent {
     #functionDeclarations = new Map();
     #allowedOrigin;
     #targetManager;
+    #alwaysAllowedTools;
     /**
      * Used in the debug mode and evals.
      */
@@ -137,6 +247,7 @@ export class AiAgent {
         this.#allowedOrigin = opts.allowedOrigin;
         // eslint-disable-next-line @devtools/no-instance-of-migrated-singletons
         this.#targetManager = opts.targetManager ?? SDK.TargetManager.TargetManager.instance();
+        this.#alwaysAllowedTools = opts.alwaysAllowedTools;
     }
     async enhanceQuery(query) {
         return query;
@@ -181,9 +292,6 @@ export class AiAgent {
      */
     disableServerSideLogging() {
         this.#serverSideLoggingActive = false;
-    }
-    popPendingMultimodalInput() {
-        return undefined;
     }
     /**
      * Preamble features appended to the `client_version` in metadata.
@@ -500,14 +608,19 @@ export class AiAgent {
                         description: result.description,
                         context: result.context,
                         widgets: result.widgets,
+                        toolName: functionCall.name,
                     };
                     return { type: 'contextChanged' };
                 }
                 functionResponses.push({
                     functionResponse: {
                         name: functionCall.name,
-                        // Widgets are not sent back to the LLM
-                        response: { ...result, widgets: undefined },
+                        // Widgets and UI telemetry metadata are not sent back to the LLM.
+                        response: {
+                            ...result,
+                            widgets: undefined,
+                            ...('loadedSkills' in result ? { loadedSkills: undefined } : {}),
+                        },
                     },
                 });
             }
@@ -594,7 +707,9 @@ export class AiAgent {
         // results.
         const runHandler = async (handlerOptions) => {
             try {
-                return await call.handler(args, handlerOptions);
+                const isAlwaysAllowed = call.permissionPrompt === "allow-once-or-always" /* PermissionPrompt.ALLOW_ONCE_OR_ALWAYS */ &&
+                    this.#alwaysAllowedTools?.isAllowed(name);
+                return await call.handler(args, isAlwaysAllowed ? { ...handlerOptions, approved: true } : handlerOptions);
             }
             catch (err) {
                 debugLog(`[AiAgent] Tool '${name}' threw:`, err);
@@ -643,6 +758,9 @@ export class AiAgent {
             finally {
                 options?.signal?.removeEventListener('abort', onAbort);
             }
+            if (decision === "allow-always" /* PermissionDecision.ALLOW_ALWAYS */) {
+                this.#alwaysAllowedTools?.allow(name);
+            }
             if (decision === "reject" /* PermissionDecision.REJECT */) {
                 yield {
                     type: "action" /* ResponseType.ACTION */,
@@ -682,6 +800,7 @@ export class AiAgent {
                 widgets: result.widgets,
                 canceled: false,
                 toolName: name,
+                ...(result.loadedSkills ? { loadedSkills: result.loadedSkills } : {}),
             };
         }
         if ('error' in result) {

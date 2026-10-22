@@ -67,4 +67,45 @@ export const EventDescriptors = [
     [Events.SetUseSoftMenu, ['useSoftMenu']],
     [Events.ShowPanel, ['panelName']],
 ];
+/**
+ * Enum for recordEnumeratedHistogram
+ * Warning: There is another definition of this enum in the DevTools code
+ * base, keep them in sync:
+ * front_end/devtools_compatibility.js
+ */
+export var EnumeratedHistogram;
+(function (EnumeratedHistogram) {
+    /* eslint-disable @typescript-eslint/naming-convention -- Shadows a legacy enum */
+    // LINT.IfChange(EnumeratedHistogram)
+    EnumeratedHistogram["ActionTaken"] = "DevTools.ActionTaken";
+    EnumeratedHistogram["PanelShown"] = "DevTools.PanelShown";
+    EnumeratedHistogram["KeyboardShortcutFired"] = "DevTools.KeyboardShortcutFired";
+    EnumeratedHistogram["IssueCreated"] = "DevTools.IssueCreated";
+    EnumeratedHistogram["IssuesPanelIssueExpanded"] = "DevTools.IssuesPanelIssueExpanded";
+    EnumeratedHistogram["IssuesPanelOpenedFrom"] = "DevTools.IssuesPanelOpenedFrom";
+    EnumeratedHistogram["IssuesPanelResourceOpened"] = "DevTools.IssuesPanelResourceOpened";
+    EnumeratedHistogram["KeybindSetSettingChanged"] = "DevTools.KeybindSetSettingChanged";
+    EnumeratedHistogram["ExperimentEnabledAtLaunch"] = "DevTools.ExperimentEnabledAtLaunch";
+    EnumeratedHistogram["ExperimentDisabledAtLaunch"] = "DevTools.ExperimentDisabledAtLaunch";
+    EnumeratedHistogram["ExperimentEnabled"] = "DevTools.ExperimentEnabled";
+    EnumeratedHistogram["ExperimentDisabled"] = "DevTools.ExperimentDisabled";
+    EnumeratedHistogram["DeveloperResourceLoaded"] = "DevTools.DeveloperResourceLoaded";
+    EnumeratedHistogram["DeveloperResourceScheme"] = "DevTools.DeveloperResourceScheme";
+    EnumeratedHistogram["Language"] = "DevTools.Language";
+    EnumeratedHistogram["SyncSetting"] = "DevTools.SyncSetting";
+    EnumeratedHistogram["RecordingReplayFinished"] = "DevTools.RecordingReplayFinished";
+    EnumeratedHistogram["RecordingReplayStarted"] = "DevTools.RecordingReplayStarted";
+    EnumeratedHistogram["RecordingToggled"] = "DevTools.RecordingToggled";
+    EnumeratedHistogram["SourcesPanelFileDebugged"] = "DevTools.SourcesPanelFileDebugged";
+    EnumeratedHistogram["SourcesPanelFileOpened"] = "DevTools.SourcesPanelFileOpened";
+    EnumeratedHistogram["NetworkPanelResponsePreviewOpened"] = "DevTools.NetworkPanelResponsePreviewOpened";
+    EnumeratedHistogram["TimelineNavigationSettingState"] = "DevTools.TimelineNavigationSettingState";
+    EnumeratedHistogram["LighthouseModeRun"] = "DevTools.LighthouseModeRun";
+    EnumeratedHistogram["LighthouseCategoryUsed"] = "DevTools.LighthouseCategoryUsed";
+    EnumeratedHistogram["SwatchActivated"] = "DevTools.SwatchActivated";
+    EnumeratedHistogram["BuiltInAiAvailability"] = "DevTools.BuiltInAiAvailability";
+    EnumeratedHistogram["ResendRequest"] = "DevTools.ResendRequest";
+    EnumeratedHistogram["EditResendRequest"] = "DevTools.EditResendRequest";
+    // LINT.ThenChange(/front_end/devtools_compatibility.js:EnumeratedHistogram)
+})(EnumeratedHistogram || (EnumeratedHistogram = {}));
 //# sourceMappingURL=InspectorFrontendHostAPI.js.map

@@ -6,7 +6,7 @@
 import assert from 'node:assert';
 import { ChildProcess } from 'node:child_process';
 import { Writable } from 'node:stream';
-import { describe, it, afterEach, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'node:test';
 import sinon from 'sinon';
 import { OsType, WatchdogMessageType } from '../../src/telemetry/types.js';
 import { WatchdogClient } from '../../src/telemetry/WatchdogClient.js';
@@ -26,9 +26,6 @@ describe('WatchdogClient', () => {
             value: 12345,
             writable: true,
         });
-    });
-    afterEach(() => {
-        sinon.restore();
     });
     it('spawns watchdog process with correct arguments', () => {
         new WatchdogClient({

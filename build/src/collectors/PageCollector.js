@@ -4,15 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { FakeIssuesManager } from '../devtools/DevtoolsUtils.js';
-import { DevTools, FrameEvent } from '../third_party/index.js';
+import { DevTools, FrameEvent, } from '../third_party/index.js';
 import { createIdGenerator, stableIdSymbol, } from '../utils/id.js';
 import { logger } from '../utils/logger.js';
+import { DEFAULT_MAX_NAVIGATION_SAVED } from './constants.js';
 export class UncaughtError {
     details;
     targetId;
-    constructor(details, targetId) {
+    session;
+    constructor(details, targetId, session) {
         this.details = details;
         this.targetId = targetId;
+        this.session = session;
     }
 }
 export class PageCollector {
@@ -20,15 +23,16 @@ export class PageCollector {
     #listeners;
     #pendingSameDocumentNavigation = false;
     #frameNavigatedWithinDocumentTarget;
-    maxNavigationSaved = 3;
+    maxNavigationSaved;
     /**
      * This maps a Page to a list of navigations with a sub-list
      * of all collected resources.
      * The newer navigations come first.
      */
     storage = [[]];
-    constructor(page, listeners, maxResourcesPerNavigation) {
+    constructor(page, listeners, { maxResourcesPerNavigation, maxNavigationSaved = DEFAULT_MAX_NAVIGATION_SAVED, } = {}) {
         this.pptrPage = page;
+        this.maxNavigationSaved = maxNavigationSaved;
         this.#attachFrameNavigatedWithinDocumentListener();
         const idGenerator = createIdGenerator();
         const listenerMap = listeners(value => {
@@ -129,8 +133,8 @@ export class PageCollector {
 export class ConsoleCollector extends PageCollector {
     static MAX_MESSAGES_PER_NAVIGATION = 10_000;
     #subscriber;
-    constructor(page, listeners, maxMessagesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION) {
-        super(page, listeners, maxMessagesPerNavigation);
+    constructor(page, listeners, { maxResourcesPerNavigation = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION, maxNavigationSaved, } = {}) {
+        super(page, listeners, { maxResourcesPerNavigation, maxNavigationSaved });
         this.#subscriber = new PageEventSubscriber(this.pptrPage);
         this.#subscriber.subscribe();
     }
@@ -190,7 +194,7 @@ class PageEventSubscriber {
         this.#page.emit('devtoolsAggregatedIssue', event.data);
     };
     #onExceptionThrown = (event) => {
-        this.#page.emit('uncaughtError', new UncaughtError(event.exceptionDetails, this.#targetId));
+        this.#page.emit('uncaughtError', new UncaughtError(event.exceptionDetails, this.#targetId, this.#session));
     };
     // On navigation, we reset issue aggregation.
     #onFrameNavigated = (frame) => {
@@ -259,14 +263,14 @@ class PageEventSubscriber {
 }
 export class NetworkCollector extends PageCollector {
     static MAX_REQUESTS_PER_NAVIGATION = 1_000;
-    constructor(page, maxRequestsPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION, listeners = collect => {
+    constructor(page, { maxResourcesPerNavigation = NetworkCollector.MAX_REQUESTS_PER_NAVIGATION, maxNavigationSaved, } = {}, listeners = collect => {
         return {
             request: req => {
                 collect(req);
             },
         };
     }) {
-        super(page, listeners, maxRequestsPerNavigation);
+        super(page, listeners, { maxResourcesPerNavigation, maxNavigationSaved });
     }
     splitAfterNavigation() {
         const requests = this.storage[0];

@@ -93,7 +93,7 @@ export class SecurityOrigin {
         }
         if (rawUrl.toLowerCase().startsWith('file://')) {
             const parsed = Common.ParsedURL.ParsedURL.fromString(rawUrl);
-            if (!parsed) {
+            if (!parsed || parsed.path === '/') {
                 return SecurityOrigin.createUniqueOpaque();
             }
             const authority = parsed.host + (parsed.port ? ':' + parsed.port : '');

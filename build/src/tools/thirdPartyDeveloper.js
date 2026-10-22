@@ -21,6 +21,7 @@ third-party developer tools with additional functionality.`,
     },
     schema: {},
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (_request, response) => {
         response.setListThirdPartyDeveloperTools();
@@ -41,6 +42,7 @@ export const executeThirdPartyDeveloperTool = definePageTool(() => ({
             .describe('The JSON-stringified parameters to pass to the tool'),
     },
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const toolName = request.params.toolName;
@@ -62,7 +64,7 @@ export const executeThirdPartyDeveloperTool = definePageTool(() => ({
                 throw new Error(`Failed to parse params as JSON: ${errorMessage}`);
             }
         }
-        const toolGroups = request.page.getThirdPartyDeveloperTools();
+        const toolGroups = await request.page.discoverThirdPartyDeveloperTools();
         let tool;
         if (toolGroups) {
             for (const group of toolGroups) {

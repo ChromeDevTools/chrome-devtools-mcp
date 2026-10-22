@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { semver } from '../third_party/index.js';
+import { semver } from '../third_party/cli.js';
 import { VERSION } from '../version.js';
 /**
  * Notifies the user if an update is available.

@@ -3,13 +3,17 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { DEFAULT_MAX_NAVIGATION_SAVED } from '../collectors/constants.js';
 import os from 'node:os';
 import path from 'node:path';
-import { getCategoryOptions } from './category-options.js';
+import { getCategoryOptions, } from './category-options.js';
 import { getBrowserOptions } from './browser-options.js';
-import { puppeteerOptions } from './puppeteer-options.js';
+import { puppeteerOptions, } from './puppeteer-options.js';
 import { toolOptions } from './tool-options.js';
 export const DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()];
+// Each retained navigation can hold up to 1,000 network requests and 10,000
+// console messages, so the history is capped to avoid running out of memory.
+export const MAX_NAVIGATION_SAVED_LIMIT = 25;
 export const mcpOptions = {
     ...getCategoryOptions(),
     ...getBrowserOptions(),
@@ -139,6 +143,22 @@ export const mcpOptions = {
         describe: 'Whether to enable source maps in DevTools. Use --no-source-maps to disable.',
         reloadable: true,
     },
+    maxNavigationSaved: {
+        type: 'number',
+        default: DEFAULT_MAX_NAVIGATION_SAVED,
+        describe: `Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.`,
+        coerce: (value) => {
+            if (value === undefined) {
+                return;
+            }
+            if (!Number.isInteger(value) ||
+                value <= 0 ||
+                value > MAX_NAVIGATION_SAVED_LIMIT) {
+                throw new Error(`Invalid maxNavigationSaved ${value}. Expected an integer between 1 and ${MAX_NAVIGATION_SAVED_LIMIT}.`);
+            }
+            return value;
+        },
+    },
     clearcutEndpoint: {
         type: 'string',
         hidden: true,
@@ -202,43 +222,43 @@ export const mcpOptions = {
             return path.resolve(configPath);
         },
     },
+    watchConfig: {
+        type: 'boolean',
+        default: false,
+        describe: 'Watch the config file for changes and apply them without restarting. Tools (except --categoryExtensions) are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.',
+    },
 };
-export function getMcpOptionsForViaCli() {
-    if (!('default' in mcpOptions.headless)) {
-        throw new Error('headless cli option unexpectedly does not have a default');
-    }
-    if (!('default' in mcpOptions.experimentalStructuredContent)) {
-        throw new Error('experimentalStructuredContent cli option unexpectedly does not have a default');
-    }
-    return {
-        ...mcpOptions,
-        headless: {
-            ...mcpOptions.headless,
-            default: true,
-        },
-        memoryDebugging: {
-            ...mcpOptions.memoryDebugging,
-            default: true,
-        },
-        categoryExtensions: {
-            ...mcpOptions.categoryExtensions,
-            defaultDescription: 'true unless autoConnect, browserUrl or wsEndpoint is set',
-        },
-        experimentalStructuredContent: {
-            ...mcpOptions.experimentalStructuredContent,
-            default: true,
-        },
-        isolated: {
-            ...mcpOptions.isolated,
-            description: 'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.',
-            defaultDescription: 'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
-        },
-    };
-}
+export const mcpOptionsForViaCli = {
+    ...mcpOptions,
+    headless: {
+        ...mcpOptions.headless,
+        default: true,
+    },
+    memoryDebugging: {
+        ...mcpOptions.memoryDebugging,
+        default: true,
+    },
+    categoryExtensions: {
+        ...mcpOptions.categoryExtensions,
+        defaultDescription: 'true unless autoConnect, browserUrl or wsEndpoint is set',
+    },
+    experimentalStructuredContent: {
+        ...mcpOptions.experimentalStructuredContent,
+        default: true,
+    },
+    isolated: {
+        ...mcpOptions.isolated,
+        description: 'If specified, creates a temporary user-data-dir that is automatically cleaned up after the browser is closed. Defaults to true unless userDataDir is provided.',
+        defaultDescription: 'true unless userDataDir, autoConnect, browserUrl or wsEndpoint is set',
+    },
+};
 export function getCliOptions() {
-    const options = withoutDefaults(getMcpOptionsForViaCli());
+    const options = withoutDefaults(mcpOptionsForViaCli);
     // Missing CLI serialization.
     delete options.viewport;
+    // The CLI is generated for the full mode with pageId routing, not slim mode.
+    delete options.slim;
+    delete options.pageIdRouting;
     // Change the defaults for the CLI.
     delete options.experimentalStructuredContent;
     delete options.experimentalInteropTools;
@@ -331,6 +351,12 @@ export function withoutDefaults(options) {
         result[key] = copy;
     }
     return result;
+}
+export function stripYargsPositionalArgs(parsed) {
+    const copy = { ...parsed };
+    delete copy._;
+    delete copy.$0;
+    return copy;
 }
 export function isReloadableOption(name) {
     const option = mcpOptions[name];

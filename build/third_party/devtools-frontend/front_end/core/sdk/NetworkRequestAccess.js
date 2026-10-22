@@ -3,6 +3,27 @@
 // found in the LICENSE file.
 import * as SecurityOrigin from './SecurityOrigin.js';
 /**
+ * Specifies how a network request's response data (body and headers) can be accessed
+ * relative to the initiating context's security origin.
+ *
+ * DevTools features that inspect network requests (such as AI Assistance) must respect
+ * the browser Same-Origin Policy (SOP) and Cross-Origin Resource Sharing (CORS) rules:
+ * - Same-origin responses are fully readable by the initiating document.
+ * - Cross-origin responses with valid CORS headers (`Access-Control-Allow-Origin`) are readable.
+ * - Opaque cross-origin responses (such as `no-cors` fetches to third-party endpoints) are NOT
+ *   readable by the page and must never have their response bodies or restricted headers exposed
+ *   to unauthorized contexts (b/513821237).
+ */
+export var ResponseAccessMode;
+(function (ResponseAccessMode) {
+    /** The request target URL is same-origin with the initiator context. */
+    ResponseAccessMode["SAME_ORIGIN"] = "SAME_ORIGIN";
+    /** The request is cross-origin, but explicit CORS response headers permit access by the initiator. */
+    ResponseAccessMode["CORS_ALLOWED"] = "CORS_ALLOWED";
+    /** The request is cross-origin without CORS authorization; response body and unexposed headers are restricted. */
+    ResponseAccessMode["OPAQUE_CROSS_ORIGIN"] = "OPAQUE_CROSS_ORIGIN";
+})(ResponseAccessMode || (ResponseAccessMode = {}));
+/**
  * Standard CORS-safelisted response headers that are exposed on cross-origin requests
  * without requiring explicit `Access-Control-Expose-Headers`.
  *

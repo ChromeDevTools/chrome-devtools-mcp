@@ -1020,4 +1020,9 @@ export class PageDispatcher {
     }
 }
 SDKModel.register(ResourceTreeModel, { capabilities: 2 /* Capability.DOM */, autostart: true, early: true });
+export var PrimaryPageChangeType;
+(function (PrimaryPageChangeType) {
+    PrimaryPageChangeType["NAVIGATION"] = "Navigation";
+    PrimaryPageChangeType["ACTIVATION"] = "Activation";
+})(PrimaryPageChangeType || (PrimaryPageChangeType = {}));
 //# sourceMappingURL=ResourceTreeModel.js.map

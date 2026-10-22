@@ -450,6 +450,10 @@ export class HostConfigTracker extends Common.ObjectWrapper.ObjectWrapper {
         }
     }
 }
+export var Events;
+(function (Events) {
+    Events["AIDA_AVAILABILITY_CHANGED"] = "aidaAvailabilityChanged";
+})(Events || (Events = {}));
 export function isQuotaError(...inputs) {
     return inputs.some(input => input?.toLowerCase().includes('quota'));
 }

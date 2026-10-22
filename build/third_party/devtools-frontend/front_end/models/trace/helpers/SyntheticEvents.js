@@ -4,8 +4,10 @@
 let activeManager = null;
 export class SyntheticEventsManager {
     /**
-     * All synthetic entries created in a trace from a corresponding trace events.
-     * (ProfileCalls are excluded because they are not based on a real trace event)
+     * All synthetic entries created in a trace from
+     * corresponding trace events.
+     * (ProfileCalls and layout shift clusters are excluded
+     * because they are not based on a real trace event.)
      */
     #syntheticTraces = [];
     /**

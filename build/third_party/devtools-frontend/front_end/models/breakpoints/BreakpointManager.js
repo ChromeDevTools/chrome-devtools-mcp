@@ -255,10 +255,6 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper {
             const breakpointLocation = _a.breakpointLocationFromUiLocation(normalizedLocation);
             const breakpoint = this.#setBreakpoint(normalizedLocation.uiSourceCode, breakpointLocation.lineNumber, breakpointLocation.columnNumber, condition, enabled, isLogpoint, origin);
             if (uiSourceCode === compatibleUiSourceCode) {
-                if (normalizedLocation.id() !== uiLocation.id()) {
-                    // Only call this on the uiSourceCode that was initially selected for breakpoint setting.
-                    void Common.Revealer.reveal(normalizedLocation);
-                }
                 primaryBreakpoint = breakpoint;
             }
         }
@@ -385,6 +381,19 @@ export var Events;
     Events["BreakpointRemoved"] = "breakpoint-removed";
     /* eslint-enable @typescript-eslint/naming-convention */
 })(Events || (Events = {}));
+export var DebuggerUpdateResult;
+(function (DebuggerUpdateResult) {
+    DebuggerUpdateResult["OK"] = "OK";
+    DebuggerUpdateResult["ERROR_BREAKPOINT_CLASH"] = "ERROR_BREAKPOINT_CLASH";
+    DebuggerUpdateResult["ERROR_BACKEND"] = "ERROR_BACKEND";
+    // PENDING implies that the current update requires another re-run.
+    DebuggerUpdateResult["PENDING"] = "PENDING";
+})(DebuggerUpdateResult || (DebuggerUpdateResult = {}));
+var ResolveLocationResult;
+(function (ResolveLocationResult) {
+    ResolveLocationResult["OK"] = "OK";
+    ResolveLocationResult["ERROR"] = "ERROR";
+})(ResolveLocationResult || (ResolveLocationResult = {}));
 export class Breakpoint {
     breakpointManager;
     /** Bound locations */
@@ -985,6 +994,11 @@ export class ModelBreakpoint {
         }
     }
 }
+export var BreakpointOrigin;
+(function (BreakpointOrigin) {
+    BreakpointOrigin["USER_ACTION"] = "USER_ACTION";
+    BreakpointOrigin["OTHER"] = "RESTORED";
+})(BreakpointOrigin || (BreakpointOrigin = {}));
 (function (Breakpoint) {
     let State;
     (function (State) {

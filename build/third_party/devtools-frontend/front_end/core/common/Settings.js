@@ -4,8 +4,24 @@
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 import { ObjectWrapper } from './Object.js';
-import { getLocalizedSettingsCategory, maybeRemoveSettingExtension, registerSettingExtension, registerSettingsForTest, resetSettings, } from './SettingRegistration.js';
+import { getLocalizedSettingsCategory, maybeRemoveSettingExtension, registerSettingExtension, registerSettingsForTest, resetSettings, SettingCategory, SettingType, } from './SettingRegistration.js';
 import { VersionController } from './VersionController.js';
+export var SettingAvailability;
+(function (SettingAvailability) {
+    /**
+     * Setting is available and can be changed by the user or programmatically.
+     */
+    SettingAvailability[SettingAvailability["AVAILABLE"] = 1] = "AVAILABLE";
+    /**
+     * Setting is not available at all. Any `maybeResolve` or `resolve` call will fail.
+     * The setting should be hidden from the user.
+     */
+    SettingAvailability[SettingAvailability["UNAVAILABLE"] = 2] = "UNAVAILABLE";
+    /**
+     * Setting is available, but its value can't be read or written.
+     */
+    SettingAvailability[SettingAvailability["DISABLED"] = 3] = "DISABLED";
+})(SettingAvailability || (SettingAvailability = {}));
 export class Settings {
     syncedStorage;
     globalStorage;
@@ -480,5 +496,22 @@ export class RegExpSetting extends Setting {
         return this.#regex;
     }
 }
-export { getLocalizedSettingsCategory, maybeRemoveSettingExtension, registerSettingExtension, registerSettingsForTest, resetSettings, };
+export var SettingStorageType;
+(function (SettingStorageType) {
+    /** Persists with the active Chrome profile but also syncs the settings across devices via Chrome Sync. */
+    SettingStorageType["SYNCED"] = "Synced";
+    /**
+     * Persists with the active Chrome profile, but not synchronized to other devices.
+     * The default SettingStorageType of createSetting().
+     */
+    SettingStorageType["GLOBAL"] = "Global";
+    /** Uses Window.localStorage. Not recommended, legacy. */
+    SettingStorageType["LOCAL"] = "Local";
+    /**
+     * Session storage dies when DevTools window closes. Useful for atypical conditions that should be reverted when the
+     * user is done with their task. (eg Emulation modes, Debug overlays). These are also not carried into/out of incognito
+     */
+    SettingStorageType["SESSION"] = "Session";
+})(SettingStorageType || (SettingStorageType = {}));
+export { getLocalizedSettingsCategory, maybeRemoveSettingExtension, registerSettingExtension, registerSettingsForTest, resetSettings, SettingCategory, SettingType, };
 //# sourceMappingURL=Settings.js.map

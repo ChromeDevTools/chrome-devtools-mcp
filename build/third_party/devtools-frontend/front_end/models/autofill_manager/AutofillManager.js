@@ -80,4 +80,8 @@ export class AutofillManager extends Common.ObjectWrapper.ObjectWrapper {
         }
     }
 }
+export var Events;
+(function (Events) {
+    Events["ADDRESS_FORM_FILLED"] = "AddressFormFilled";
+})(Events || (Events = {}));
 //# sourceMappingURL=AutofillManager.js.map

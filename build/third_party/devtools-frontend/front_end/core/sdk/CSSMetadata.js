@@ -318,6 +318,16 @@ export const CubicBezierKeywordValues = new Map([
     ['ease-in-out', 'cubic-bezier(0.42, 0, 0.58, 1)'],
     ['ease-out', 'cubic-bezier(0, 0, 0.58, 1)'],
 ]);
+/** CSS-wide keywords. **/
+export var CSSWideKeyword;
+(function (CSSWideKeyword) {
+    CSSWideKeyword["INHERIT"] = "inherit";
+    CSSWideKeyword["INITIAL"] = "initial";
+    CSSWideKeyword["REVERT"] = "revert";
+    CSSWideKeyword["REVERT_LAYER"] = "revert-layer";
+    CSSWideKeyword["REVERT_RULE"] = "revert-rule";
+    CSSWideKeyword["UNSET"] = "unset";
+})(CSSWideKeyword || (CSSWideKeyword = {}));
 /**
  * Spec: https://drafts.csswg.org/css-cascade/#defaulting-keywords
  * https://drafts.csswg.org/css-cascade-5/#revert-layer
@@ -331,6 +341,15 @@ export const CSSWideKeywords = [
     "revert-rule" /* CSSWideKeyword.REVERT_RULE */,
     "unset" /* CSSWideKeyword.UNSET */,
 ];
+/** https://www.w3.org/TR/css-anchor-position-1/#typedef-try-size **/
+export var PositionTryOrderKeyword;
+(function (PositionTryOrderKeyword) {
+    PositionTryOrderKeyword["NORMAL"] = "normal";
+    PositionTryOrderKeyword["MOST_HEIGHT"] = "most-height";
+    PositionTryOrderKeyword["MOST_WIDTH"] = "most-width";
+    PositionTryOrderKeyword["MOST_BLOCK_SIZE"] = "most-block-size";
+    PositionTryOrderKeyword["MOST_INLINE_SIZE"] = "most-inline-size";
+})(PositionTryOrderKeyword || (PositionTryOrderKeyword = {}));
 export const PositionTryOrderKeywords = [
     "normal" /* PositionTryOrderKeyword.NORMAL */,
     "most-height" /* PositionTryOrderKeyword.MOST_HEIGHT */,

@@ -61,7 +61,7 @@ export class TestServer {
             res.end(html `<h1>404 - Not Found</h1><p>The requested page does not exist.</p>`);
         }
     }
-    restore() {
+    reset() {
         this.#routes = {};
     }
     async start() {
@@ -114,7 +114,7 @@ export function serverHooks() {
         await server.stop();
     });
     afterEach(() => {
-        server.restore();
+        server.reset();
     });
     return server;
 }

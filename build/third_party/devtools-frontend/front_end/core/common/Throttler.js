@@ -69,4 +69,16 @@ export class Throttler {
         return performance.now();
     }
 }
+export var Scheduling;
+(function (Scheduling) {
+    // If the throttler has run another task recently (i.e. time since the last run is less then the
+    // throttling delay), schedule the task to be run after the throttling delay. Otherwise scheule
+    // the task after the next tick.
+    Scheduling["DEFAULT"] = "Default";
+    // Schedule the task to run at the next tick, even if the throttler has run another task recently.
+    Scheduling["AS_SOON_AS_POSSIBLE"] = "AsSoonAsPossible";
+    // Schedule the task to run after the throttling delay, even if the throttler has not run any
+    // task recently.
+    Scheduling["DELAYED"] = "Delayed";
+})(Scheduling || (Scheduling = {}));
 //# sourceMappingURL=Throttler.js.map

@@ -40,6 +40,10 @@ export var PlatformFileSystemType;
      */
     PlatformFileSystemType["WORKSPACE_PROJECT"] = "workspace-project";
 })(PlatformFileSystemType || (PlatformFileSystemType = {}));
+export var Events;
+(function (Events) {
+    Events["FILE_SYSTEM_ERROR"] = "file-system-error";
+})(Events || (Events = {}));
 export class PlatformFileSystem extends Common.ObjectWrapper.ObjectWrapper {
     #path;
     #type;

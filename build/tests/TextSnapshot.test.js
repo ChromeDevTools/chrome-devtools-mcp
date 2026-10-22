@@ -7,11 +7,66 @@ import assert from 'node:assert';
 import { afterEach, describe, it } from 'node:test';
 import sinon from 'sinon';
 import { TextSnapshot } from '../src/TextSnapshot.js';
+import { createMockAXNode, createMockMcpPage } from './mocks.js';
 import { html, withMcpContext } from './utils.js';
 describe('TextSnapshot', () => {
     afterEach(() => {
-        sinon.restore();
         TextSnapshot.resetCounter();
+    });
+    it('rejects when the accessibility tree does not arrive within the timeout', async () => {
+        const clock = sinon.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        const page = createMockMcpPage();
+        page.pptrPage.accessibility.snapshot.returns(new Promise(() => { }));
+        const assertion = assert.rejects(TextSnapshot.create(page), /Timed out after 10000ms waiting for the accessibility tree/);
+        await clock.tickAsync(10_000);
+        await assertion;
+    });
+    it('does not assign uids to nodes without backendNodeId', async () => {
+        const page = createMockMcpPage();
+        page.uniqueBackendNodeIdToMcpId = new Map();
+        page.extraHandles = [];
+        const mockRoot = createMockAXNode('RootWebArea', {
+            loaderId: '1',
+            backendNodeId: 1,
+            children: [
+                createMockAXNode('paragraph', {
+                    loaderId: '1',
+                    backendNodeId: 2,
+                    children: [
+                        createMockAXNode('StaticText', {
+                            name: 'alpha',
+                            loaderId: '1',
+                        }),
+                    ],
+                }),
+                createMockAXNode('paragraph', {
+                    loaderId: '1',
+                    backendNodeId: 3,
+                    children: [
+                        createMockAXNode('StaticText', {
+                            name: 'beta',
+                            loaderId: '1',
+                        }),
+                    ],
+                }),
+            ],
+        });
+        page.pptrPage.accessibility.snapshot.resolves(mockRoot);
+        const snapshot = await TextSnapshot.create(page, { verbose: true });
+        const textNodes = [...snapshot.idToNode.values()].filter(node => node.role === 'StaticText');
+        assert.strictEqual(textNodes.length, 0);
+        const paragraph1 = snapshot.idToNode.get('1_1');
+        assert.strictEqual(paragraph1?.role, 'paragraph');
+        assert.strictEqual(paragraph1?.children[0]?.role, 'StaticText');
+        assert.strictEqual(paragraph1?.children[0]?.id, '');
+        assert.strictEqual(paragraph1?.children[0]?.name, 'alpha');
+        const paragraph2 = snapshot.idToNode.get('1_2');
+        assert.strictEqual(paragraph2?.role, 'paragraph');
+        assert.strictEqual(paragraph2?.children[0]?.role, 'StaticText');
+        assert.strictEqual(paragraph2?.children[0]?.id, '');
+        assert.strictEqual(paragraph2?.children[0]?.name, 'beta');
+        assert.strictEqual(page.uniqueBackendNodeIdToMcpId.has('1_undefined'), false);
+        assert.strictEqual(page.uniqueBackendNodeIdToMcpId.has('undefined_undefined'), false);
     });
     it('creates a snapshot', async () => {
         await withMcpContext(async (_response, context) => {
@@ -29,6 +84,23 @@ describe('TextSnapshot', () => {
                 }
             }
             assert.ok(foundButton, 'Button should be in the snapshot');
+        });
+    });
+    it('drops InlineTextBox nodes from verbose snapshots', async () => {
+        await withMcpContext(async (_response, context) => {
+            const page = context.getSelectedMcpPage();
+            await page.pptrPage.setContent(html `<p style="width: 40px">Some wrapped text content</p>`);
+            const snapshot = await TextSnapshot.create(page, { verbose: true });
+            let staticTextNode;
+            for (const node of snapshot.idToNode.values()) {
+                assert.notStrictEqual(node.role, 'InlineTextBox');
+                if (node.role === 'StaticText') {
+                    staticTextNode = node;
+                }
+            }
+            assert.ok(staticTextNode, 'StaticText node should be in the snapshot');
+            assert.strictEqual(staticTextNode.name, 'Some wrapped text content');
+            assert.deepStrictEqual(staticTextNode.children, []);
         });
     });
     it('inserts extraHandles into the snapshot correctly', async () => {

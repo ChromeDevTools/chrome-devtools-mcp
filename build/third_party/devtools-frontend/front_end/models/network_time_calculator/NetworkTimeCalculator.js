@@ -232,6 +232,10 @@ export class NetworkTimeCalculator extends Common.ObjectWrapper.ObjectWrapper {
     }
 }
 const MINIMUM_SPREAD = 0.1;
+export var Events;
+(function (Events) {
+    Events["BOUNDARIES_CHANGED"] = "BoundariesChanged";
+})(Events || (Events = {}));
 export class NetworkTransferTimeCalculator extends NetworkTimeCalculator {
     constructor() {
         super(false);

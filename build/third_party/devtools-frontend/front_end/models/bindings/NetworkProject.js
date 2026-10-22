@@ -33,6 +33,11 @@ export class NetworkProjectManager extends Common.ObjectWrapper.ObjectWrapper {
         return this.#sourceURLSynthesizedUISourceCodes.has(uiSourceCode);
     }
 }
+export var Events;
+(function (Events) {
+    Events["FRAME_ATTRIBUTION_ADDED"] = "FrameAttributionAdded";
+    Events["FRAME_ATTRIBUTION_REMOVED"] = "FrameAttributionRemoved";
+})(Events || (Events = {}));
 export class NetworkProject {
     /**
      * Records that `uiSourceCode` was synthesized from a `//# sourceURL=` annotation,

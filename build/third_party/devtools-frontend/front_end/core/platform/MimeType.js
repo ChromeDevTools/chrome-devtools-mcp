@@ -1,6 +1,19 @@
 // Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+export var MimeType;
+(function (MimeType) {
+    MimeType["HTML"] = "text/html";
+    MimeType["XML"] = "text/xml";
+    MimeType["PLAIN"] = "text/plain";
+    MimeType["XHTML"] = "application/xhtml+xml";
+    MimeType["SVG"] = "image/svg+xml";
+    MimeType["CSS"] = "text/css";
+    MimeType["XSL"] = "text/xsl";
+    MimeType["VTT"] = "text/vtt";
+    MimeType["PDF"] = "application/pdf";
+    MimeType["EVENTSTREAM"] = "text/event-stream";
+})(MimeType || (MimeType = {}));
 /**
  * MIME types other than the ones with the "text" type that have text content.
  */

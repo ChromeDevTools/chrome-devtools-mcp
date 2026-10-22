@@ -56,9 +56,9 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
 import { pathToFileURL } from 'node:url';
-import { zod } from '../third_party/index.js';
+import { zod, } from '../third_party/index.js';
 import { ToolCategory } from './categories.js';
-import { defineTool, pageIdSchema } from './ToolDefinition.js';
+import { defineTool, pageIdSchema, } from './ToolDefinition.js';
 export const evaluateScript = defineTool((cliArgs) => {
     return {
         name: 'evaluate_script',
@@ -121,10 +121,13 @@ Example with arguments: \`(el) => el.innerText\`
                 }
                 : {}),
         },
-        blockedByDialog: true,
+        blockedByDialog: false,
+        concurrency: 'exclusive',
         verifyFilesSchema: {
             filePath: true,
-            sourcePath: true,
+            // sourcePath may be an http(s): URL the server fetches, so allow URLs
+            // through; a file: path or plain path is still validated.
+            sourcePath: { local: true, remote: true, allowUrl: true },
         },
         handler: async (request, response, context) => {
             const env_1 = { stack: [], error: void 0, hasError: false };
@@ -164,7 +167,13 @@ Example with arguments: \`(el) => el.innerText\`
                 const mcpPage = cliArgs.pageIdRouting && request.params.pageId
                     ? context.getPageById(request.params.pageId)
                     : context.getSelectedMcpPage();
-                await mcpPage.init();
+                await mcpPage.init({ emulateFocus: true });
+                // evaluate_script is not page-scoped, so ToolHandler does not run the
+                // blockedByDialog check for it. Without this, an evaluation started
+                // while a dialog is open waits until the protocol timeout.
+                // TODO: include the "# Open dialog ... Call handle_dialog" hint once
+                // Response can attach the page for non-page-scoped tools.
+                mcpPage.throwIfDialogOpen();
                 const page = mcpPage.pptrPage;
                 const args = [];
                 const stack = __addDisposableResource(env_1, new DisposableStack(), false);
@@ -222,8 +231,31 @@ const performEvaluation = async (evaluatable, source, format, args, response, op
         try {
             const functionSource = source.trimEnd().replace(/;$/, '');
             const fn = __addDisposableResource(env_2, await evaluatable.evaluateHandle(`(\n${functionSource}\n)`), false);
+            // Normalize non-Error values inside the page callback (serialized by Puppeteer) so CDP preserves the message.
             result = await evaluatable.evaluate(async (fn, ...args) => {
-                return JSON.stringify(await fn(...args));
+                try {
+                    return JSON.stringify(await fn(...args));
+                }
+                catch (err) {
+                    if (err instanceof Error ||
+                        (typeof err === 'object' &&
+                            err !== null &&
+                            'message' in err &&
+                            typeof err.message === 'string')) {
+                        throw err;
+                    }
+                    let message;
+                    try {
+                        message =
+                            typeof err === 'object' && err !== null
+                                ? JSON.stringify(err)
+                                : String(err);
+                    }
+                    catch {
+                        message = String(err);
+                    }
+                    throw new Error(message);
+                }
             }, fn, ...args);
         }
         catch (e_2) {

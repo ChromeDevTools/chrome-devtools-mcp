@@ -3,6 +3,12 @@
 // found in the LICENSE file.
 import { OverlayModel } from './OverlayModel.js';
 import { SDKModel } from './SDKModel.js';
+export var ScreenshotMode;
+(function (ScreenshotMode) {
+    ScreenshotMode["FROM_VIEWPORT"] = "fromViewport";
+    ScreenshotMode["FROM_CLIP"] = "fromClip";
+    ScreenshotMode["FULLPAGE"] = "fullpage";
+})(ScreenshotMode || (ScreenshotMode = {}));
 /**
  * Manages concurrent screencast requests by queuing and prioritizing.
  *

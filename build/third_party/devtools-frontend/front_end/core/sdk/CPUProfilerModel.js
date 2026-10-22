@@ -91,6 +91,11 @@ export class CPUProfilerModel extends SDKModel {
         }
     }
 }
+export var Events;
+(function (Events) {
+    Events["CONSOLE_PROFILE_STARTED"] = "ConsoleProfileStarted";
+    Events["CONSOLE_PROFILE_FINISHED"] = "ConsoleProfileFinished";
+})(Events || (Events = {}));
 SDKModel.register(CPUProfilerModel, { capabilities: 4 /* Capability.JS */, autostart: true });
 // This class is used used as a Revealer in timeline-meta.ts
 export class ProfileFinishedData {

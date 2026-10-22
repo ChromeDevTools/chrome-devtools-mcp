@@ -54,7 +54,7 @@ export class FileFormatter {
         this.#debuggerWorkspaceBinding = debuggerWorkspaceBinding;
         this.#networkLog = networkLog;
     }
-    formatFile() {
+    formatFile(options = {}) {
         const sourceMapDetails = FileFormatter.formatSourceMapDetails(this.#file, this.#debuggerWorkspaceBinding);
         const lines = [
             `File name: ${this.#file.displayName()}`,
@@ -67,16 +67,27 @@ export class FileFormatter {
 ${formatRequestInitiatorChain(resource.request, this.#networkLog)}`);
         }
         lines.push(`File content:
-${this.#formatFileContent()}`);
+${this.#formatFileContent(options.offset ?? 0)}`);
         return lines.filter(line => line.trim() !== '').join('\n');
     }
-    #formatFileContent() {
+    /**
+     * Returns at most `MAX_FILE_SIZE` characters starting at `offset`. If the
+     * content continues past that, a notice after the code block gives the
+     * offset where the next part starts, so the model can read the rest instead
+     * of re-requesting the same part.
+     */
+    #formatFileContent(offset) {
         const contentData = this.#file.workingCopyContentData();
         const content = contentData.isTextContent ? contentData.text : '<binary data>';
-        const truncated = content.length > MAX_FILE_SIZE ? content.slice(0, MAX_FILE_SIZE) + '...' : content;
-        return `\`\`\`
-${truncated}
+        const end = Math.min(offset + MAX_FILE_SIZE, content.length);
+        const codeBlock = `\`\`\`
+${content.slice(offset, end)}
 \`\`\``;
+        if (end === content.length) {
+            return codeBlock;
+        }
+        return `${codeBlock}
+Content truncated: showing characters ${offset}-${end} of ${content.length}. The next part starts at offset ${end}.`;
     }
 }
 //# sourceMappingURL=FileFormatter.js.map

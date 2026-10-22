@@ -134,6 +134,11 @@ export function upperBound(array, needle, comparator, left, right) {
     }
     return r;
 }
+var NearestSearchStart;
+(function (NearestSearchStart) {
+    NearestSearchStart["BEGINNING"] = "BEGINNING";
+    NearestSearchStart["END"] = "END";
+})(NearestSearchStart || (NearestSearchStart = {}));
 /**
  * Obtains the first or last item in the array that satisfies the predicate function.
  * So, for example, if the array were arr = [2, 4, 6, 8, 10], and you are looking for

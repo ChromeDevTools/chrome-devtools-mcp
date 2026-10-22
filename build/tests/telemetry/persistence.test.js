@@ -80,7 +80,6 @@ describe('FilePersistence', () => {
         logServerErrorStub = sinon.stub(logger, 'logServerError');
     });
     afterEach(async () => {
-        sinon.restore();
         ClearcutLogger.resetForTesting();
     });
     describe('loadState', () => {

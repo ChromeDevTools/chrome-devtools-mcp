@@ -6,16 +6,16 @@
 import { logger } from '../utils/logger.js';
 const DEFAULT_DEBOUNCE_MS = 200;
 /**
- * Manages the bidirectional bridge between DevTools frontend comments
- * and the MCP server notification system.
+ * Manages the bridge between DevTools frontend comments and the MCP server.
+ * Comment events are debounced and delivered to callers that wait for them
+ * through `waitForCommentEvent`.
  */
 export class DevToolsCommentBridge {
-    #onNotification;
     #debounceMs;
     #commentDebounceTimer;
     #attachedPages = new Set();
+    #commentWaiters = new Set();
     constructor(options) {
-        this.#onNotification = options?.onNotification;
         this.#debounceMs = options?.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     }
     isAttached(devtoolsPage) {
@@ -90,19 +90,42 @@ export class DevToolsCommentBridge {
             return window.universe?.cd4aBridge?.getCommentThreads() ?? [];
         });
     }
+    /**
+     * Resolves `true` on the next debounced comment event, or `false` when
+     * `timeoutMs` elapses or the bridge is disposed first.
+     */
+    waitForCommentEvent(timeoutMs) {
+        return new Promise(resolve => {
+            const settle = (changed) => {
+                clearTimeout(timer);
+                this.#commentWaiters.delete(settle);
+                resolve(changed);
+            };
+            const timer = setTimeout(() => {
+                settle(false);
+            }, timeoutMs);
+            this.#commentWaiters.add(settle);
+        });
+    }
     #handleCommentEvent() {
         if (this.#commentDebounceTimer) {
             clearTimeout(this.#commentDebounceTimer);
         }
         this.#commentDebounceTimer = setTimeout(() => {
-            this.#onNotification?.('DevTools comment threads updated');
+            this.#notifyCommentWaiters(true);
         }, this.#debounceMs);
+    }
+    #notifyCommentWaiters(changed) {
+        for (const waiter of [...this.#commentWaiters]) {
+            waiter(changed);
+        }
     }
     dispose() {
         if (this.#commentDebounceTimer) {
             clearTimeout(this.#commentDebounceTimer);
             this.#commentDebounceTimer = undefined;
         }
+        this.#notifyCommentWaiters(false);
         for (const page of this.#attachedPages) {
             try {
                 const result = page.evaluate(() => {

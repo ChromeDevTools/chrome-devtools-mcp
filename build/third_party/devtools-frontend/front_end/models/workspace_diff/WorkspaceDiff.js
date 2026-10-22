@@ -149,6 +149,10 @@ export class WorkspaceDiffImpl extends Common.ObjectWrapper.ObjectWrapper {
         return this.requestOriginalContentForUISourceCode(uiSourceCode).then(callback);
     }
 }
+export var Events;
+(function (Events) {
+    Events["MODIFIED_STATUS_CHANGED"] = "ModifiedStatusChanged";
+})(Events || (Events = {}));
 export class UISourceCodeDiff extends Common.ObjectWrapper.ObjectWrapper {
     #uiSourceCode;
     #networkPersistenceManager;
@@ -239,6 +243,10 @@ export class UISourceCodeDiff extends Common.ObjectWrapper.ObjectWrapper {
         };
     }
 }
+export var UISourceCodeDiffEvents;
+(function (UISourceCodeDiffEvents) {
+    UISourceCodeDiffEvents["DIFF_CHANGED"] = "DiffChanged";
+})(UISourceCodeDiffEvents || (UISourceCodeDiffEvents = {}));
 export function workspaceDiff({ forceNew } = {}) {
     if (!Root.DevToolsContext.globalInstance().has(WorkspaceDiffImpl) || forceNew) {
         Root.DevToolsContext.globalInstance().set(WorkspaceDiffImpl, new WorkspaceDiffImpl(

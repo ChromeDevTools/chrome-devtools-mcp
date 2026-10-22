@@ -3,13 +3,10 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { CommentFormatter, } from '../../src/formatters/CommentFormatter.js';
 describe('CommentFormatter', () => {
-    afterEach(() => {
-        sinon.restore();
-    });
     function formatterTest(label, setup) {
         it(label + ' toString', async (t) => {
             const formatter = await setup(t);

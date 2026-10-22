@@ -574,6 +574,30 @@ export class SourceMapScopesInfo {
         return result;
     }
 }
+/**
+ * Describes how the generated function surrounding a generated position shows up in stack traces.
+ *
+ * Compilers tend to introduce functions (and calls to them) that don't exist in the authored code. The scopes
+ * proposal distinguishes two cases:
+ *
+ *   1) The generated function contains authored code, e.g. a block scope that was turned into a function. The
+ *      generated range is marked "hidden", but links to the original scope via its definition. We can pause
+ *      in such a function, but the frame is merged with its caller(s) in stack traces: The outlined code
+ *      logically belongs to the (authored) function that transitively calls it.
+ *
+ *   2) The generated function doesn't represent any authored code, e.g. a compiler helper. The generated range
+ *      has no definition. The scopes spec is being updated to say that such a range can be ignored in stack
+ *      traces, so we drop these frames.
+ */
+export var GeneratedFrameKind;
+(function (GeneratedFrameKind) {
+    /** A regular (possibly with inlined functions) generated function, or top-level code. */
+    GeneratedFrameKind["VISIBLE"] = "VISIBLE";
+    /** A generated function marked as "hidden" that has a definition (case 1). */
+    GeneratedFrameKind["OUTLINED"] = "OUTLINED";
+    /** A generated function without a definition (case 2). */
+    GeneratedFrameKind["HIDDEN"] = "HIDDEN";
+})(GeneratedFrameKind || (GeneratedFrameKind = {}));
 export function findExpression(range, index, line = 0, column = 0) {
     const val = range?.values[index];
     return (typeof val === 'string' ? val : val?.find(r => contains({ start: r.from, end: r.to }, line, column))?.value) ??

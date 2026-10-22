@@ -4,6 +4,7 @@
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import { PageResourceLoader } from './PageResourceLoader.js';
+import { ResourceTreeModel } from './ResourceTreeModel.js';
 import { SecurityOrigin } from './SecurityOrigin.js';
 import { parseSourceMap, SourceMap } from './SourceMap.js';
 import { SourceMapCache } from './SourceMapCache.js';
@@ -187,30 +188,47 @@ export class SourceMapManager extends Common.ObjectWrapper.ObjectWrapper {
         return Promise.all(this.#sourceMaps.keys().map(sourceMap => sourceMap.waitForScopeInfo()));
     }
 }
-function getCacheOrigin(initiator) {
+function getScriptOrigin(initiator) {
     if (!initiator.initiatorUrl) {
         return null;
     }
-    const securityOrigin = SecurityOrigin.create(initiator.initiatorUrl);
-    if (securityOrigin.isOpaque() || (securityOrigin.isFile() && securityOrigin.siteId() === 'file:///')) {
+    const origin = SecurityOrigin.create(initiator.initiatorUrl);
+    return origin.isOpaque() ? null : origin;
+}
+function getLoaderOrigin(initiator) {
+    if (!initiator.target) {
         return null;
     }
-    return securityOrigin.siteId();
+    const resourceTreeModel = initiator.target.model(ResourceTreeModel);
+    if (resourceTreeModel) {
+        if (!initiator.frameId) {
+            return null;
+        }
+        const origin = resourceTreeModel.frameForId(initiator.frameId)?.securityOrigin() ?? null;
+        return origin && !origin.isOpaque() ? origin : null;
+    }
+    const targetUrl = initiator.target.inspectedURL() || initiator.target.targetInfo()?.url;
+    if (!targetUrl) {
+        return null;
+    }
+    const origin = SecurityOrigin.create(targetUrl);
+    return origin.isOpaque() ? null : origin;
 }
 async function loadSourceMap(resourceLoader, sourceMapCache, url, debugId, initiator) {
     try {
-        const cacheOrigin = debugId ? getCacheOrigin(initiator) : null;
-        if (debugId && cacheOrigin) {
-            const cachedSourceMap = await sourceMapCache.get(debugId, cacheOrigin);
+        const scriptOrigin = debugId ? getScriptOrigin(initiator) : null;
+        const loaderOrigin = debugId ? getLoaderOrigin(initiator) : null;
+        if (debugId && scriptOrigin && loaderOrigin) {
+            const cachedSourceMap = await sourceMapCache.get(debugId, scriptOrigin, loaderOrigin);
             if (cachedSourceMap) {
                 return cachedSourceMap;
             }
         }
         const { content } = await resourceLoader.loadResource(url, initiator);
         const sourceMap = parseSourceMap(content);
-        if (debugId && cacheOrigin && 'debugId' in sourceMap && sourceMap.debugId === debugId) {
+        if (debugId && scriptOrigin && loaderOrigin && 'debugId' in sourceMap && sourceMap.debugId === debugId) {
             // In case something goes wrong with updating the cache, we still want to use the source map.
-            await sourceMapCache.set(sourceMap.debugId, cacheOrigin, sourceMap).catch();
+            await sourceMapCache.set(sourceMap.debugId, scriptOrigin, loaderOrigin, sourceMap).catch(() => { });
         }
         return sourceMap;
     }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
 import sinon from 'sinon';
 import { DevToolsCommentBridge } from '../../src/devtools/DevToolsCommentBridge.js';
 import { createMockPuppeteerPage } from '../mocks.js';
@@ -12,10 +12,6 @@ describe('DevToolsCommentBridge', () => {
     let clock;
     beforeEach(() => {
         clock = sinon.useFakeTimers();
-    });
-    afterEach(() => {
-        clock.restore();
-        sinon.restore();
     });
     it('attaches to DevTools page and registers function and evaluation', async () => {
         const devtoolsPage = createMockPuppeteerPage();
@@ -85,10 +81,9 @@ describe('DevToolsCommentBridge', () => {
         sinon.assert.calledOnce(devtoolsPage.exposeFunction);
         sinon.assert.calledTwice(devtoolsPage.evaluate);
     });
-    it('debounces comment notifications', async () => {
+    it('debounces comment events', async () => {
         const devtoolsPage = createMockPuppeteerPage();
         devtoolsPage.evaluate.resolves(true);
-        const onNotification = sinon.stub();
         let exposedCallback;
         devtoolsPage.exposeFunction.callsFake((name, fn) => {
             if (name === '__onDevToolsCommentEvent' && typeof fn === 'function') {
@@ -98,11 +93,13 @@ describe('DevToolsCommentBridge', () => {
             }
             return Promise.resolve();
         });
-        const bridge = new DevToolsCommentBridge({
-            onNotification,
-            debounceMs: 150,
-        });
+        const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
         await bridge.attach(devtoolsPage);
+        const waiting = bridge.waitForCommentEvent(10_000);
+        let settled = false;
+        void waiting.then(() => {
+            settled = true;
+        });
         assert.strictEqual(typeof exposedCallback, 'function');
         if (exposedCallback) {
             // Trigger multiple times rapidly
@@ -110,15 +107,14 @@ describe('DevToolsCommentBridge', () => {
             exposedCallback();
             exposedCallback();
         }
-        clock.tick(100);
-        sinon.assert.notCalled(onNotification);
-        clock.tick(60);
-        sinon.assert.calledOnceWithExactly(onNotification, 'DevTools comment threads updated');
+        await clock.tickAsync(100);
+        assert.strictEqual(settled, false);
+        await clock.tickAsync(60);
+        assert.strictEqual(await waiting, true);
     });
     it('clears debounce timer on dispose', async () => {
         const devtoolsPage = createMockPuppeteerPage();
         devtoolsPage.evaluate.resolves(true);
-        const onNotification = sinon.stub();
         let exposedCallback;
         devtoolsPage.exposeFunction.callsFake((name, fn) => {
             if (name === '__onDevToolsCommentEvent' && typeof fn === 'function') {
@@ -128,18 +124,16 @@ describe('DevToolsCommentBridge', () => {
             }
             return Promise.resolve();
         });
-        const bridge = new DevToolsCommentBridge({
-            onNotification,
-            debounceMs: 150,
-        });
+        const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
         await bridge.attach(devtoolsPage);
+        const waiting = bridge.waitForCommentEvent(10_000);
         assert.strictEqual(typeof exposedCallback, 'function');
         if (exposedCallback) {
             exposedCallback();
         }
         bridge.dispose();
-        clock.tick(200);
-        sinon.assert.notCalled(onNotification);
+        await clock.tickAsync(200);
+        assert.strictEqual(await waiting, false);
         sinon.assert.calledThrice(devtoolsPage.evaluate);
     });
     it('retrieves comments via getComments', async () => {
@@ -155,6 +149,64 @@ describe('DevToolsCommentBridge', () => {
         const threads = await bridge.getComments(devtoolsPage);
         sinon.assert.calledOnce(devtoolsPage.evaluate);
         assert.deepStrictEqual(threads, mockThreads);
+    });
+    describe('waitForCommentEvent', () => {
+        async function attachWithCallback(bridge) {
+            const devtoolsPage = createMockPuppeteerPage();
+            devtoolsPage.evaluate.resolves(true);
+            let exposedCallback;
+            devtoolsPage.exposeFunction.callsFake((name, fn) => {
+                if (name === '__onDevToolsCommentEvent' && typeof fn === 'function') {
+                    exposedCallback = () => {
+                        fn();
+                    };
+                }
+                return Promise.resolve();
+            });
+            await bridge.attach(devtoolsPage);
+            assert.ok(exposedCallback);
+            return exposedCallback;
+        }
+        it('resolves true after the debounced comment event', async () => {
+            const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
+            const fireEvent = await attachWithCallback(bridge);
+            const waiting = bridge.waitForCommentEvent(10_000);
+            fireEvent();
+            await clock.tickAsync(150);
+            assert.strictEqual(await waiting, true);
+        });
+        it('resolves false at timeout when no event fires', async () => {
+            const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
+            await attachWithCallback(bridge);
+            const waiting = bridge.waitForCommentEvent(1_000);
+            await clock.tickAsync(1_000);
+            assert.strictEqual(await waiting, false);
+        });
+        it('resolves false when the bridge is disposed during the wait', async () => {
+            const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
+            await attachWithCallback(bridge);
+            const waiting = bridge.waitForCommentEvent(10_000);
+            bridge.dispose();
+            assert.strictEqual(await waiting, false);
+        });
+        it('resolves all concurrent waiters on one event', async () => {
+            const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
+            const fireEvent = await attachWithCallback(bridge);
+            const first = bridge.waitForCommentEvent(10_000);
+            const second = bridge.waitForCommentEvent(10_000);
+            fireEvent();
+            await clock.tickAsync(150);
+            assert.deepStrictEqual(await Promise.all([first, second]), [true, true]);
+        });
+        it('does not resolve a later waiter with an earlier event', async () => {
+            const bridge = new DevToolsCommentBridge({ debounceMs: 150 });
+            const fireEvent = await attachWithCallback(bridge);
+            fireEvent();
+            await clock.tickAsync(150);
+            const waiting = bridge.waitForCommentEvent(1_000);
+            await clock.tickAsync(1_000);
+            assert.strictEqual(await waiting, false);
+        });
     });
 });
 //# sourceMappingURL=DevToolsCommentBridge.test.js.map

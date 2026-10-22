@@ -6,9 +6,10 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
-import { isNaturalLanguageInterfaceEnabled } from '../AiUtils.js';
+import * as AiUtils from '../../ai-utils/ai-utils.js';
 import { EvaluateAction, formatError, SideEffectError } from '../EvaluateAction.js';
 import { FREESTYLER_WORLD_CSP, FREESTYLER_WORLD_NAME } from '../injected.js';
+const { isNaturalLanguageInterfaceEnabled } = AiUtils.AiUtils;
 const lockedString = i18n.i18n.lockedString;
 /**
  * Creates or retrieves the DevTools AI Assistance isolated world for the given frame.

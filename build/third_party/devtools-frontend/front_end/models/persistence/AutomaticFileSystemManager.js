@@ -159,4 +159,20 @@ export class AutomaticFileSystemManager extends Common.ObjectWrapper.ObjectWrapp
         }
     }
 }
+/**
+ * Events emitted by the `AutomaticFileSystemManager`.
+ */
+export var Events;
+(function (Events) {
+    /**
+     * Emitted whenever the `automaticFileSystem` property of the
+     * `AutomaticFileSystemManager` changes.
+     */
+    Events["AUTOMATIC_FILE_SYSTEM_CHANGED"] = "AutomaticFileSystemChanged";
+    /**
+     * Emitted whenever the `availability` property of the
+     * `AutomaticFileSystemManager` changes.
+     */
+    Events["AVAILABILITY_CHANGED"] = "AvailabilityChanged";
+})(Events || (Events = {}));
 //# sourceMappingURL=AutomaticFileSystemManager.js.map

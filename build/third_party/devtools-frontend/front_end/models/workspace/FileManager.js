@@ -71,4 +71,8 @@ export class FileManager extends Common.ObjectWrapper.ObjectWrapper {
         this.dispatchEventToListeners("AppendedToURL" /* Events.APPENDED_TO_URL */, url);
     }
 }
+export var Events;
+(function (Events) {
+    Events["APPENDED_TO_URL"] = "AppendedToURL";
+})(Events || (Events = {}));
 //# sourceMappingURL=FileManager.js.map

@@ -15,6 +15,27 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/CorsIssue.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export var IssueCode;
+(function (IssueCode) {
+    IssueCode["INSECURE_LOCAL_NETWORK"] = "CorsIssue::InsecureLocalNetwork";
+    IssueCode["INVALID_HEADER_VALUES"] = "CorsIssue::InvalidHeaders";
+    IssueCode["WILDCARD_ORIGN_NOT_ALLOWED"] = "CorsIssue::WildcardOriginWithCredentials";
+    IssueCode["PREFLIGHT_RESPONSE_INVALID"] = "CorsIssue::PreflightResponseInvalid";
+    IssueCode["ORIGIN_MISMATCH"] = "CorsIssue::OriginMismatch";
+    IssueCode["ALLOW_CREDENTIALS_REQUIRED"] = "CorsIssue::AllowCredentialsRequired";
+    IssueCode["METHOD_DISALLOWED_BY_PREFLIGHT_RESPONSE"] = "CorsIssue::MethodDisallowedByPreflightResponse";
+    IssueCode["HEADER_DISALLOWED_BY_PREFLIGHT_RESPONSE"] = "CorsIssue::HeaderDisallowedByPreflightResponse";
+    IssueCode["REDIRECT_CONTAINS_CREDENTIALS"] = "CorsIssue::RedirectContainsCredentials";
+    IssueCode["DISALLOWED_BY_MODE"] = "CorsIssue::DisallowedByMode";
+    IssueCode["CORS_DISABLED_SCHEME"] = "CorsIssue::CorsDisabledScheme";
+    // TODO(https://crbug.com/1263483): Remove this once it's removed from CDP.
+    IssueCode["PREFLIGHT_MISSING_ALLOW_EXTERNAL"] = "CorsIssue::PreflightMissingAllowExternal";
+    // TODO(https://crbug.com/1263483): Remove this once it's removed from CDP.
+    IssueCode["PREFLIGHT_INVALID_ALLOW_EXTERNAL"] = "CorsIssue::PreflightInvalidAllowExternal";
+    IssueCode["NO_CORS_REDIRECT_MODE_NOT_FOLLOW"] = "CorsIssue::NoCorsRedirectModeNotFollow";
+    IssueCode["INVALID_LOCAL_NETWORK_ACCESS"] = "CorsIssue::InvalidLocalNetworkAccess";
+    IssueCode["LOCAL_NETWORK_ACCESS_PERMISSION_DENIED"] = "CorsIssue::LocalNetworkAccessPermissionDenied";
+})(IssueCode || (IssueCode = {}));
 function getIssueCode(details) {
     switch (details.corsErrorStatus.corsError) {
         case "InvalidAllowMethodsPreflightResponse" /* Protocol.Network.CorsError.InvalidAllowMethodsPreflightResponse */:

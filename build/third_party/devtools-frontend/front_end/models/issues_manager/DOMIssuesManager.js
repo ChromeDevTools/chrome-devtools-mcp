@@ -4,6 +4,11 @@
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+export var Events;
+(function (Events) {
+    Events["DOM_ISSUE_ADDED"] = "DOMIssueAdded";
+    Events["DOM_ISSUE_REMOVED"] = "DOMIssueRemoved";
+})(Events || (Events = {}));
 export class DOMIssuesManager extends Common.ObjectWrapper.ObjectWrapper {
     #issuesManager;
     #targetManager;

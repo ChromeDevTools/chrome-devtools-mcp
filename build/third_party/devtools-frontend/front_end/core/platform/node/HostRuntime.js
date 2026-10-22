@@ -115,6 +115,7 @@ export const HOST_RUNTIME = {
         return 1;
     },
     async saveScreenshot(_options) { },
+    async copyScreenshot(_options) { },
     revokeLastScreenshotUrl() { },
     async loadTextFile(url) {
         return await Fs.promises.readFile(Url.fileURLToPath(url), 'utf-8');

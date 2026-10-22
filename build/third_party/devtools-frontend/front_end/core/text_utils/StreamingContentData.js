@@ -77,4 +77,8 @@ export const asContentDataOrError = function (contentDataOrError) {
     }
     return contentDataOrError.content();
 };
+export var Events;
+(function (Events) {
+    Events["CHUNK_ADDED"] = "ChunkAdded";
+})(Events || (Events = {}));
 //# sourceMappingURL=StreamingContentData.js.map

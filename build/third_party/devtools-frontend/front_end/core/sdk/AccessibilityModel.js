@@ -3,6 +3,13 @@
 // found in the LICENSE file.
 import { DeferredDOMNode, DOMDocument, DOMModel, Events as DOMModelEvents } from './DOMModel.js';
 import { SDKModel } from './SDKModel.js';
+export var CoreAxPropertyName;
+(function (CoreAxPropertyName) {
+    CoreAxPropertyName["NAME"] = "name";
+    CoreAxPropertyName["DESCRIPTION"] = "description";
+    CoreAxPropertyName["VALUE"] = "value";
+    CoreAxPropertyName["ROLE"] = "role";
+})(CoreAxPropertyName || (CoreAxPropertyName = {}));
 export class AccessibilityNode {
     #accessibilityModel;
     #frameManager;
@@ -203,6 +210,10 @@ export class AccessibilityNode {
         return lines.join('');
     }
 }
+export var Events;
+(function (Events) {
+    Events["TREE_UPDATED"] = "TreeUpdated";
+})(Events || (Events = {}));
 export class AccessibilityModel extends SDKModel {
     agent;
     #axIdToAXNode = new Map();

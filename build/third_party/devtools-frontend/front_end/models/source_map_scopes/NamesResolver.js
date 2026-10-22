@@ -140,6 +140,14 @@ export const scopeIdentifiers = async function (script, scope, ancestorScopes) {
     return { boundVariables, freeVariables };
 };
 const identifierAndPunctuationRegExp = /^\s*([A-Za-z_$][A-Za-z_$0-9]*)\s*([.;,=]?)\s*$/;
+var Punctuation;
+(function (Punctuation) {
+    Punctuation["NONE"] = "none";
+    Punctuation["COMMA"] = "comma";
+    Punctuation["DOT"] = "dot";
+    Punctuation["SEMICOLON"] = "semicolon";
+    Punctuation["EQUALS"] = "equals";
+})(Punctuation || (Punctuation = {}));
 const resolveDebuggerScope = async (scope, debuggerWorkspaceBinding) => {
     if (!scope.callFrame()
         .debuggerModel.target()

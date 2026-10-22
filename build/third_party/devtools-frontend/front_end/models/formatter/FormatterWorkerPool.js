@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as Platform from '../../core/platform/platform.js';
+export { DefinitionKind, ScopeKind, } from '../../entrypoints/formatter_actions/formatter_actions.js';
 let formatterWorkerPoolInstance;
 export class FormatterWorkerPool {
     taskQueue;

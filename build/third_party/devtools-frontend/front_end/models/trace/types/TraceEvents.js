@@ -188,6 +188,62 @@ export function isAnimationFrameAsyncEnd(data) {
 export function isAnimationFramePresentation(data) {
     return data.name === Name.ANIMATION_FRAME_PRESENTATION;
 }
+var State;
+(function (State) {
+    /** The frame did not have any updates to present. **/
+    State["STATE_NO_UPDATE_DESIRED"] = "STATE_NO_UPDATE_DESIRED";
+    /**
+     * The frame presented all the desired updates (i.e. any updates requested
+     * from both the compositor thread and main-threads were handled). *
+     */
+    State["STATE_PRESENTED_ALL"] = "STATE_PRESENTED_ALL";
+    /**
+     *  The frame was presented with some updates, but also missed some updates
+     * (e.g. missed updates from the main-thread, but included updates from the
+     * compositor thread). *
+     */
+    State["STATE_PRESENTED_PARTIAL"] = "STATE_PRESENTED_PARTIAL";
+    /**
+     * The frame was dropped, i.e. some updates were desired for the frame, but
+     * was not presented. *
+     */
+    State["STATE_DROPPED"] = "STATE_DROPPED";
+})(State || (State = {}));
+var FrameDropReason;
+(function (FrameDropReason) {
+    FrameDropReason["REASON_UNSPECIFIED"] = "REASON_UNSPECIFIED";
+    /**
+     *  Frame was dropped by the display-compositor.
+     * The display-compositor may drop a frame some times (e.g. the frame missed
+     * the deadline, or was blocked on surface-sync, etc.) *
+     */
+    FrameDropReason["REASON_DISPLAY_COMPOSITOR"] = "REASON_DISPLAY_COMPOSITOR";
+    /**
+     *  Frame was dropped because of the main-thread.
+     * The main-thread may cause a frame to be dropped, e.g. if the main-thread
+     * is running expensive javascript, or doing a lot of layout updates, etc. *
+     */
+    FrameDropReason["REASON_MAIN_THREAD"] = "REASON_MAIN_THREAD";
+    /**
+     *  Frame was dropped by the client compositor.
+     * The client compositor can drop some frames too (e.g. attempting to
+     * recover latency, missing the deadline, etc.). *
+     */
+    FrameDropReason["REASON_CLIENT_COMPOSITOR"] = "REASON_CLIENT_COMPOSITOR";
+})(FrameDropReason || (FrameDropReason = {}));
+var ScrollState;
+(function (ScrollState) {
+    ScrollState["SCROLL_NONE"] = "SCROLL_NONE";
+    ScrollState["SCROLL_MAIN_THREAD"] = "SCROLL_MAIN_THREAD";
+    ScrollState["SCROLL_COMPOSITOR_THREAD"] = "SCROLL_COMPOSITOR_THREAD";
+    /** Used when it can't be determined whether a scroll is in progress or not. */
+    ScrollState["SCROLL_UNKNOWN"] = "SCROLL_UNKNOWN";
+})(ScrollState || (ScrollState = {}));
+var FrameType;
+(function (FrameType) {
+    FrameType["FORKED"] = "FORKED";
+    FrameType["BACKFILL"] = "BACKFILL";
+})(FrameType || (FrameType = {}));
 export function isPipelineReporter(event) {
     return event.name === Name.PIPELINE_REPORTER;
 }

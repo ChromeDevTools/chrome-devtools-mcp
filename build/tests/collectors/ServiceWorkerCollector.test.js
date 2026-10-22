@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { UncaughtError } from '../../src/collectors/PageCollector.js';
 import { ServiceWorkerConsoleCollector } from '../../src/collectors/ServiceWorkerCollector.js';
@@ -13,9 +13,6 @@ import { TargetType } from '../../src/third_party/index.js';
 import { stableIdSymbol } from '../../src/utils/id.js';
 import { createMockPuppeteerBrowser, createMockPuppeteerTarget, } from '../mocks.js';
 describe('ServiceWorkerConsoleCollector', () => {
-    afterEach(() => {
-        sinon.restore();
-    });
     it('limits logs to 1000 per extension', () => {
         const collector = new ServiceWorkerConsoleCollector(undefined, 10);
         const extensionId = 'test-extension';

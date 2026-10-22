@@ -198,4 +198,17 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper {
         }
     }
 }
+export var Events;
+(function (Events) {
+    // The FrameAddedToTarget event is sent whenever a frame is added to a target.
+    // This means that for OOPIFs it is sent twice: once when it's added to a
+    // parent target and a second time when it's added to its own target.
+    Events["FRAME_ADDED_TO_TARGET"] = "FrameAddedToTarget";
+    Events["FRAME_NAVIGATED"] = "FrameNavigated";
+    // The FrameRemoved event is only sent when a frame has been detached from
+    // all targets.
+    Events["FRAME_REMOVED"] = "FrameRemoved";
+    Events["RESOURCE_ADDED"] = "ResourceAdded";
+    Events["OUTERMOST_FRAME_NAVIGATED"] = "OutermostFrameNavigated";
+})(Events || (Events = {}));
 //# sourceMappingURL=FrameManager.js.map

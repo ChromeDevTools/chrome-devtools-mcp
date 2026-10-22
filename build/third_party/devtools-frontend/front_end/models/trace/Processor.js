@@ -8,6 +8,13 @@ import * as Insights from './insights/insights.js';
 import * as Lantern from './lantern/lantern.js';
 import * as LanternComputationData from './LanternComputationData.js';
 import * as Types from './types/types.js';
+var Status;
+(function (Status) {
+    Status["IDLE"] = "IDLE";
+    Status["PARSING"] = "PARSING";
+    Status["FINISHED_PARSING"] = "FINISHED_PARSING";
+    Status["ERRORED_WHILE_PARSING"] = "ERRORED_WHILE_PARSING";
+})(Status || (Status = {}));
 export class TraceParseProgressEvent extends Event {
     data;
     static eventName = 'traceparseprogress';
@@ -16,6 +23,17 @@ export class TraceParseProgressEvent extends Event {
         this.data = data;
     }
 }
+/**
+ * Parsing a trace can take time. On large traces we see a breakdown of time like so:
+ *   - handleEvent() loop:  ~25%
+ *   - finalize() loop:     ~75%
+ * The numbers below are set so we can report a progress percentage of [0...1]
+ */
+var ProgressPhase;
+(function (ProgressPhase) {
+    ProgressPhase[ProgressPhase["HANDLE_EVENT"] = 0.25] = "HANDLE_EVENT";
+    ProgressPhase[ProgressPhase["FINALIZE"] = 1] = "FINALIZE";
+})(ProgressPhase || (ProgressPhase = {}));
 function calculateProgress(value, phase) {
     // Finalize values should be [0.25...1].
     if (phase === 1 /* ProgressPhase.FINALIZE */) {

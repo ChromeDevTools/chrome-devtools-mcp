@@ -60,6 +60,11 @@ function lowerBound(array, needle, comparator, left, right) {
     }
     return r;
 }
+var NearestSearchStart;
+(function (NearestSearchStart) {
+    NearestSearchStart["BEGINNING"] = "BEGINNING";
+    NearestSearchStart["END"] = "END";
+})(NearestSearchStart || (NearestSearchStart = {}));
 function arrayDoesNotContainNullOrUndefined(arr) {
     return !arr.includes(null) && !arr.includes(undefined);
 }
@@ -170,6 +175,13 @@ async function saveScreenshot(options) {
     link.href = blobUrl;
     link.click();
 }
+async function copyScreenshot(options) {
+    const response = await fetch('data:image/png;base64,' + options.base64Png);
+    const blob = await response.blob();
+    await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob }),
+    ]);
+}
 let cssEvaluationElement = null;
 const HOST_RUNTIME$2 = {
     createWorker(url) {
@@ -192,6 +204,7 @@ const HOST_RUNTIME$2 = {
         return window.devicePixelRatio;
     },
     saveScreenshot,
+    copyScreenshot,
     revokeLastScreenshotUrl,
     async loadTextFile(url) {
         const response = await fetch(url);
@@ -348,6 +361,7 @@ const HOST_RUNTIME$1 = {
         return 1;
     },
     async saveScreenshot(_options) { },
+    async copyScreenshot(_options) { },
     revokeLastScreenshotUrl() { },
     async loadTextFile(url) {
         return await Fs.promises.readFile(Url.fileURLToPath(url), 'utf-8');
@@ -383,6 +397,20 @@ const HOST_RUNTIME = await (async () => {
     }
     throw new Error('Unknown runtime!');
 })();
+
+// Copyright 2020 The Chromium Authors
+var ArrowKey;
+(function (ArrowKey) {
+    ArrowKey["UP"] = "ArrowUp";
+    ArrowKey["DOWN"] = "ArrowDown";
+    ArrowKey["LEFT"] = "ArrowLeft";
+    ArrowKey["RIGHT"] = "ArrowRight";
+})(ArrowKey || (ArrowKey = {}));
+var PageKey;
+(function (PageKey) {
+    PageKey["UP"] = "PageUp";
+    PageKey["DOWN"] = "PageDown";
+})(PageKey || (PageKey = {}));
 
 // Copyright 2020 The Chromium Authors
 class Multimap {
@@ -442,6 +470,21 @@ class Multimap {
         this.map.clear();
     }
 }
+
+// Copyright 2023 The Chromium Authors
+var MimeType;
+(function (MimeType) {
+    MimeType["HTML"] = "text/html";
+    MimeType["XML"] = "text/xml";
+    MimeType["PLAIN"] = "text/plain";
+    MimeType["XHTML"] = "application/xhtml+xml";
+    MimeType["SVG"] = "image/svg+xml";
+    MimeType["CSS"] = "text/css";
+    MimeType["XSL"] = "text/xsl";
+    MimeType["VTT"] = "text/vtt";
+    MimeType["PDF"] = "application/pdf";
+    MimeType["EVENTSTREAM"] = "text/event-stream";
+})(MimeType || (MimeType = {}));
 
 // Copyright 2020 The Chromium Authors
 const sprintf = (fmt, ...args) => {
@@ -874,6 +917,12 @@ class Location {
         this.columnNumber = columnNumber;
     }
 }
+var DOMLinkState;
+(function (DOMLinkState) {
+    DOMLinkState[DOMLinkState["UNKNOWN"] = 0] = "UNKNOWN";
+    DOMLinkState[DOMLinkState["ATTACHED"] = 1] = "ATTACHED";
+    DOMLinkState[DOMLinkState["DETACHED"] = 2] = "DETACHED";
+})(DOMLinkState || (DOMLinkState = {}));
 
 var HeapSnapshotModel$1 = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -881,6 +930,7 @@ var HeapSnapshotModel$1 = /*#__PURE__*/Object.freeze({
     AllocationNodeCallers: AllocationNodeCallers,
     AllocationStackFrame: AllocationStackFrame,
     ComparatorConfig: ComparatorConfig,
+    get DOMLinkState () { return DOMLinkState; },
     Diff: Diff,
     Edge: Edge,
     HeapSnapshotProgressEvent: HeapSnapshotProgressEvent,
@@ -1358,6 +1408,22 @@ function getColorSpace(colorSpaceText) {
     }
     return null;
 }
+var ColorChannel;
+(function (ColorChannel) {
+    ColorChannel["A"] = "a";
+    ColorChannel["ALPHA"] = "alpha";
+    ColorChannel["B"] = "b";
+    ColorChannel["C"] = "c";
+    ColorChannel["G"] = "g";
+    ColorChannel["H"] = "h";
+    ColorChannel["L"] = "l";
+    ColorChannel["R"] = "r";
+    ColorChannel["S"] = "s";
+    ColorChannel["W"] = "w";
+    ColorChannel["X"] = "x";
+    ColorChannel["Y"] = "y";
+    ColorChannel["Z"] = "z";
+})(ColorChannel || (ColorChannel = {}));
 function mapPercentToRange(percent, range) {
     const sign = Math.sign(percent);
     const absPercent = Math.abs(percent);
@@ -1537,6 +1603,31 @@ function equals(a, b, accuracy = EPSILON) {
 function lessOrEquals(a, b, accuracy = EPSILON) {
     return a - b <= accuracy;
 }
+var Format;
+(function (Format) {
+    Format["HEX"] = "hex";
+    Format["HEXA"] = "hexa";
+    Format["RGB"] = "rgb";
+    Format["RGBA"] = "rgba";
+    Format["HSL"] = "hsl";
+    Format["HSLA"] = "hsla";
+    Format["HWB"] = "hwb";
+    Format["HWBA"] = "hwba";
+    Format["LCH"] = "lch";
+    Format["OKLCH"] = "oklch";
+    Format["LAB"] = "lab";
+    Format["OKLAB"] = "oklab";
+    Format["SRGB"] = "srgb";
+    Format["SRGB_LINEAR"] = "srgb-linear";
+    Format["DISPLAY_P3"] = "display-p3";
+    Format["DISPLAY_P3_LINEAR"] = "display-p3-linear";
+    Format["A98_RGB"] = "a98-rgb";
+    Format["PROPHOTO_RGB"] = "prophoto-rgb";
+    Format["REC_2020"] = "rec2020";
+    Format["XYZ"] = "xyz";
+    Format["XYZ_D50"] = "xyz-d50";
+    Format["XYZ_D65"] = "xyz-d65";
+})(Format || (Format = {}));
 class Lab {
     l;
     a;
@@ -4965,6 +5056,16 @@ const i18nLazyString$1 = getLazilyComputedLocalizedString.bind(undefined, str_$2
 });
 
 // Copyright 2014 The Chromium Authors
+var Events$1;
+(function (Events) {
+    Events["MESSAGE_ADDED"] = "messageAdded";
+})(Events$1 || (Events$1 = {}));
+var MessageLevel;
+(function (MessageLevel) {
+    MessageLevel["INFO"] = "info";
+    MessageLevel["WARNING"] = "warning";
+    MessageLevel["ERROR"] = "error";
+})(MessageLevel || (MessageLevel = {}));
 var FrontendMessageSource;
 (function (FrontendMessageSource) {
     FrontendMessageSource["CSS"] = "css";
@@ -5783,6 +5884,65 @@ const UIStrings = {
 };
 const str_ = registerUIStrings('core/common/SettingRegistration.ts', UIStrings);
 getLocalizedString.bind(undefined, str_);
+var SettingCategory;
+(function (SettingCategory) {
+    SettingCategory["NONE"] = "";
+    SettingCategory["ELEMENTS"] = "ELEMENTS";
+    SettingCategory["AI"] = "AI";
+    SettingCategory["APPEARANCE"] = "APPEARANCE";
+    SettingCategory["SOURCES"] = "SOURCES";
+    SettingCategory["NETWORK"] = "NETWORK";
+    SettingCategory["PERFORMANCE"] = "PERFORMANCE";
+    SettingCategory["CONSOLE"] = "CONSOLE";
+    SettingCategory["PERSISTENCE"] = "PERSISTENCE";
+    SettingCategory["DEBUGGER"] = "DEBUGGER";
+    SettingCategory["GLOBAL"] = "GLOBAL";
+    SettingCategory["RENDERING"] = "RENDERING";
+    SettingCategory["GRID"] = "GRID";
+    SettingCategory["MOBILE"] = "MOBILE";
+    SettingCategory["EMULATION"] = "EMULATION";
+    SettingCategory["MEMORY"] = "MEMORY";
+    SettingCategory["EXTENSIONS"] = "EXTENSIONS";
+    SettingCategory["ADORNER"] = "ADORNER";
+    SettingCategory["ACCOUNT"] = "ACCOUNT";
+})(SettingCategory || (SettingCategory = {}));
+var SettingType;
+(function (SettingType) {
+    SettingType["ARRAY"] = "array";
+    SettingType["REGEX"] = "regex";
+    SettingType["ENUM"] = "enum";
+    SettingType["BOOLEAN"] = "boolean";
+})(SettingType || (SettingType = {}));
+
+// Copyright 2009 The Chromium Authors
+var SettingAvailability;
+(function (SettingAvailability) {
+    SettingAvailability[SettingAvailability["AVAILABLE"] = 1] = "AVAILABLE";
+    SettingAvailability[SettingAvailability["UNAVAILABLE"] = 2] = "UNAVAILABLE";
+    SettingAvailability[SettingAvailability["DISABLED"] = 3] = "DISABLED";
+})(SettingAvailability || (SettingAvailability = {}));
+var SettingStorageType;
+(function (SettingStorageType) {
+    SettingStorageType["SYNCED"] = "Synced";
+    SettingStorageType["GLOBAL"] = "Global";
+    SettingStorageType["LOCAL"] = "Local";
+    SettingStorageType["SESSION"] = "Session";
+})(SettingStorageType || (SettingStorageType = {}));
+
+// Copyright 2026 The Chromium Authors
+var TokenType;
+(function (TokenType) {
+    TokenType[TokenType["LITERAL"] = 0] = "LITERAL";
+    TokenType[TokenType["URL"] = 1] = "URL";
+})(TokenType || (TokenType = {}));
+
+// Copyright 2014 The Chromium Authors
+var Scheduling;
+(function (Scheduling) {
+    Scheduling["DEFAULT"] = "Default";
+    Scheduling["AS_SOON_AS_POSSIBLE"] = "AsSoonAsPossible";
+    Scheduling["DELAYED"] = "Delayed";
+})(Scheduling || (Scheduling = {}));
 
 // Copyright 2011 The Chromium Authors
 class HeapSnapshotWorkerProxy extends ObjectWrapper {
@@ -5941,6 +6101,11 @@ class HeapSnapshotWorkerProxy extends ObjectWrapper {
         this.worker.postMessage(message, transfer);
     }
 }
+(function (HeapSnapshotWorkerProxy) {
+    (function (Events) {
+        Events["WAIT"] = "Wait";
+    })(HeapSnapshotWorkerProxy.Events || (HeapSnapshotWorkerProxy.Events = {}));
+})(HeapSnapshotWorkerProxy || (HeapSnapshotWorkerProxy = {}));
 class HeapSnapshotProxyObject {
     worker;
     objectId;
@@ -6164,7 +6329,7 @@ var HeapSnapshotProxy$1 = /*#__PURE__*/Object.freeze({
     HeapSnapshotProviderProxy: HeapSnapshotProviderProxy,
     HeapSnapshotProxy: HeapSnapshotProxy,
     HeapSnapshotProxyObject: HeapSnapshotProxyObject,
-    HeapSnapshotWorkerProxy: HeapSnapshotWorkerProxy
+    get HeapSnapshotWorkerProxy () { return HeapSnapshotWorkerProxy; }
 });
 
 // Copyright 2019 The Chromium Authors
@@ -11758,6 +11923,12 @@ class BalancedJSONTokenizer {
         return this.buffer;
     }
 }
+
+// Copyright 2024 The Chromium Authors
+var Events;
+(function (Events) {
+    Events["CHUNK_ADDED"] = "ChunkAdded";
+})(Events || (Events = {}));
 
 // Copyright 2012 The Chromium Authors
 class HeapSnapshotLoader {

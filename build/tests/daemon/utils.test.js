@@ -56,14 +56,15 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
 import assert from 'node:assert';
-import { spawn } from 'node:child_process';
+import childProcess, { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import { serializeArgs, assertValidSessionId, getSocketPath, getRuntimeHome, getPidFilePath, getDaemonPid, isDaemonRunning, IS_WINDOWS, } from '../../src/daemon/utils.js';
+import sinon from 'sinon';
+import { DAEMON_SCRIPT_PATH, serializeArgs, assertValidSessionId, getSocketPath, getRuntimeHome, getPidFilePath, getDaemonPid, isDaemonRunning, IS_WINDOWS, } from '../../src/daemon/utils.js';
 import { createTempDir } from '../utils.js';
 const APP_NAME = 'chrome-devtools-mcp';
 const SESSION_ID = 'aabbccdd-1122-3344-5566-77889900aabb';
@@ -138,6 +139,20 @@ describe('serializeArgs', () => {
         };
         const result = serializeArgs(options, argv);
         assert.deepStrictEqual(result, ['--foo=string', '--bar=42']);
+    });
+    it('should serialize object values as JSON', () => {
+        const options = { wsHeaders: {} };
+        const argv = {
+            wsHeaders: {
+                Authorization: 'Bearer token',
+            },
+            _: [],
+            $0: 'test',
+        };
+        const result = serializeArgs(options, argv);
+        assert.deepStrictEqual(result, [
+            '--ws-headers={"Authorization":"Bearer token"}',
+        ]);
     });
     it('should convert camelCase keys to kebab-case', () => {
         const options = {
@@ -357,13 +372,21 @@ describe('daemon pid handling', () => {
                 __disposeResources(env_6);
             }
         });
-        it('returns true when the pid file points to a live process', () => {
+        it('returns true when the pid file points to a live daemon process', () => {
             const env_7 = { stack: [], error: void 0, hasError: false };
             try {
                 const tempDir = __addDisposableResource(env_7, createTempDir('cdm-daemon-utils-test-'), false);
                 process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-                writePidFile(SESSION_ID, `${process.pid}\n`);
-                assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+                const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH], { stdio: 'ignore' });
+                child.unref();
+                assert.ok(child.pid);
+                try {
+                    writePidFile(SESSION_ID, `${child.pid}\n`);
+                    assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+                }
+                finally {
+                    child.kill();
+                }
             }
             catch (e_7) {
                 env_7.error = e_7;
@@ -373,19 +396,29 @@ describe('daemon pid handling', () => {
                 __disposeResources(env_7);
             }
         });
-        it('returns false when the pid file points to a dead process', async () => {
+        it('caches the verified process identity across repeated checks', async () => {
             const env_8 = { stack: [], error: void 0, hasError: false };
             try {
                 const tempDir = __addDisposableResource(env_8, createTempDir('cdm-daemon-utils-test-'), false);
                 process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-                const child = spawn(process.execPath, ['--version'], { stdio: 'ignore' });
-                await once(child, 'exit');
+                const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', DAEMON_SCRIPT_PATH], { stdio: 'ignore' });
                 assert.ok(child.pid);
-                // In theory the OS could reuse the pid between the child exiting and
-                // this check, but pid reuse within milliseconds is practically
-                // impossible on all supported platforms.
-                writePidFile(SESSION_ID, `${child.pid}\n`);
-                assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+                try {
+                    writePidFile(SESSION_ID, `${child.pid}\n`);
+                    assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+                    const readFileSyncSpy = sinon.spy(fs, 'readFileSync');
+                    const execFileSyncSpy = sinon.spy(childProcess, 'execFileSync');
+                    assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+                    sinon.assert.calledOnceWithExactly(readFileSyncSpy, getPidFilePath(SESSION_ID), sinon.match('utf-8'));
+                    sinon.assert.notCalled(execFileSyncSpy);
+                    child.kill();
+                    await once(child, 'exit');
+                    assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+                }
+                finally {
+                    child.kill();
+                    child.unref();
+                }
             }
             catch (e_8) {
                 env_8.error = e_8;
@@ -395,14 +428,12 @@ describe('daemon pid handling', () => {
                 __disposeResources(env_8);
             }
         });
-        it('returns false when the pid file contains 0', () => {
+        it('returns false when the pid file points to an unrelated live process', () => {
             const env_9 = { stack: [], error: void 0, hasError: false };
             try {
                 const tempDir = __addDisposableResource(env_9, createTempDir('cdm-daemon-utils-test-'), false);
                 process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-                // Important: signaling pid 0 would target the whole process group, so
-                // isDaemonRunning must not treat it as a live daemon.
-                writePidFile(SESSION_ID, '0');
+                writePidFile(SESSION_ID, `${process.pid}\n`);
                 assert.strictEqual(isDaemonRunning(SESSION_ID), false);
             }
             catch (e_9) {
@@ -413,13 +444,29 @@ describe('daemon pid handling', () => {
                 __disposeResources(env_9);
             }
         });
-        it('returns false for non-numeric pid files', () => {
+        it('falls back to true when command line lookup throws for a live process', () => {
             const env_10 = { stack: [], error: void 0, hasError: false };
             try {
                 const tempDir = __addDisposableResource(env_10, createTempDir('cdm-daemon-utils-test-'), false);
                 process.env['XDG_RUNTIME_DIR'] = tempDir.path;
-                writePidFile(SESSION_ID, 'garbage');
-                assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+                const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+                child.unref();
+                assert.ok(child.pid);
+                try {
+                    writePidFile(SESSION_ID, `${child.pid}\n`);
+                    sinon
+                        .stub(fs, 'existsSync')
+                        .callThrough()
+                        .withArgs('/proc')
+                        .returns(false);
+                    sinon
+                        .stub(childProcess, 'execFileSync')
+                        .throws(new Error('lookup failed'));
+                    assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+                }
+                finally {
+                    child.kill();
+                }
             }
             catch (e_10) {
                 env_10.error = e_10;
@@ -427,6 +474,92 @@ describe('daemon pid handling', () => {
             }
             finally {
                 __disposeResources(env_10);
+            }
+        });
+        it('falls back to true when command line lookup returns an empty string for a live process', () => {
+            const env_11 = { stack: [], error: void 0, hasError: false };
+            try {
+                const tempDir = __addDisposableResource(env_11, createTempDir('cdm-daemon-utils-test-'), false);
+                process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+                const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+                child.unref();
+                assert.ok(child.pid);
+                try {
+                    writePidFile(SESSION_ID, `${child.pid}\n`);
+                    sinon
+                        .stub(fs, 'existsSync')
+                        .callThrough()
+                        .withArgs('/proc')
+                        .returns(false);
+                    sinon.stub(childProcess, 'execFileSync').returns('\r\n');
+                    assert.strictEqual(isDaemonRunning(SESSION_ID), true);
+                }
+                finally {
+                    child.kill();
+                }
+            }
+            catch (e_11) {
+                env_11.error = e_11;
+                env_11.hasError = true;
+            }
+            finally {
+                __disposeResources(env_11);
+            }
+        });
+        it('returns false when the pid file points to a dead process', async () => {
+            const env_12 = { stack: [], error: void 0, hasError: false };
+            try {
+                const tempDir = __addDisposableResource(env_12, createTempDir('cdm-daemon-utils-test-'), false);
+                process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+                const child = spawn(process.execPath, ['--version'], { stdio: 'ignore' });
+                await once(child, 'exit');
+                assert.ok(child.pid);
+                // In theory the OS could reuse the pid between the child exiting and
+                // this check, but pid reuse within milliseconds is practically
+                // impossible on all supported platforms.
+                writePidFile(SESSION_ID, `${child.pid}\n`);
+                assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+            }
+            catch (e_12) {
+                env_12.error = e_12;
+                env_12.hasError = true;
+            }
+            finally {
+                __disposeResources(env_12);
+            }
+        });
+        it('returns false when the pid file contains 0', () => {
+            const env_13 = { stack: [], error: void 0, hasError: false };
+            try {
+                const tempDir = __addDisposableResource(env_13, createTempDir('cdm-daemon-utils-test-'), false);
+                process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+                // Important: signaling pid 0 would target the whole process group, so
+                // isDaemonRunning must not treat it as a live daemon.
+                writePidFile(SESSION_ID, '0');
+                assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+            }
+            catch (e_13) {
+                env_13.error = e_13;
+                env_13.hasError = true;
+            }
+            finally {
+                __disposeResources(env_13);
+            }
+        });
+        it('returns false for non-numeric pid files', () => {
+            const env_14 = { stack: [], error: void 0, hasError: false };
+            try {
+                const tempDir = __addDisposableResource(env_14, createTempDir('cdm-daemon-utils-test-'), false);
+                process.env['XDG_RUNTIME_DIR'] = tempDir.path;
+                writePidFile(SESSION_ID, 'garbage');
+                assert.strictEqual(isDaemonRunning(SESSION_ID), false);
+            }
+            catch (e_14) {
+                env_14.error = e_14;
+                env_14.hasError = true;
+            }
+            finally {
+                __disposeResources(env_14);
             }
         });
     });

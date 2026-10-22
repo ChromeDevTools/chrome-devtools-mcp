@@ -22,7 +22,8 @@ function readContent(filePath) {
     }
 }
 /**
- * Watches a config file and calls `onChange` after it was modified.
+ * Watches a config file and calls `onChange` with the new content after it was
+ * modified.
  *
  * - Symlinks are resolved once on start, and the directory of the real file is
  *   watched. Watching the directory instead of the file keeps working when
@@ -63,7 +64,7 @@ export class ConfigWatcher {
             }
             this.#content = content;
             this.#pending = this.#pending
-                .then(() => this.#onChange())
+                .then(() => this.#onChange(content))
                 .catch(err => {
                 console.error(`Failed to apply ${this.#configPath}:`, err);
             });

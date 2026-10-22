@@ -59,5 +59,10 @@ export class PerformanceMetricsModel extends SDKModel {
         return { metrics, timestamp };
     }
 }
+var MetricMode;
+(function (MetricMode) {
+    MetricMode["CUMULATIVE_TIME"] = "CumulativeTime";
+    MetricMode["CUMULATIVE_COUNT"] = "CumulativeCount";
+})(MetricMode || (MetricMode = {}));
 SDKModel.register(PerformanceMetricsModel, { capabilities: 2 /* Capability.DOM */, autostart: false });
 //# sourceMappingURL=PerformanceMetricsModel.js.map

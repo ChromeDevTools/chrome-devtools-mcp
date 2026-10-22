@@ -516,6 +516,13 @@ const AutoClosingTags = new Map([
     ['td', new Set(['td', 'th'])],
     ['th', new Set(['td', 'th'])],
 ]);
+var ParseState;
+(function (ParseState) {
+    ParseState["INITIAL"] = "Initial";
+    ParseState["TAG"] = "Tag";
+    ParseState["ATTRIBUTE_NAME"] = "AttributeName";
+    ParseState["ATTRIBUTE_VALUE"] = "AttributeValue";
+})(ParseState || (ParseState = {}));
 class Token {
     value;
     type;

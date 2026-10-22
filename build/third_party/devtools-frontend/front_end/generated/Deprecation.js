@@ -273,6 +273,10 @@ export const UIStrings = {
      */
     V8SharedArrayBufferConstructedInExtensionWithoutIsolation: "Extensions should opt into cross-origin isolation to continue using `SharedArrayBuffer`. See https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/.",
     /**
+     * @description Warning displayed to developers when an SVG filter is applied to view transition content, which is disallowed because the content may contain cross-origin iframes or plugins. `::view-transition-old()` and `::view-transition-new()` are CSS pseudo-element names and should not be translated.
+     */
+    ViewTransitionPreventSvgFilterPaint: "SVG filters cannot be applied to view transition content, such as `::view-transition-old()` and `::view-transition-new()`, as it may contain cross-origin iframes or plugins.",
+    /**
      * @description This warning occurs when the deprecated `BluetoothRemoteGATTCharacteristic.writeValue()` method is used. Developers should use `writeValueWithResponse()` or `writeValueWithoutResponse()` instead.
      */
     WebBluetoothRemoteCharacteristicWriteValue: "`BluetoothRemoteGATTCharacteristic.writeValue()` is deprecated. Use `writeValueWithResponse()` or `writeValueWithoutResponse()` instead.",

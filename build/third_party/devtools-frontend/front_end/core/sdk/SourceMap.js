@@ -59,6 +59,12 @@ export class SourceMapEntry {
         return entry1.columnNumber - entry2.columnNumber;
     }
 }
+export var SourceMapProvenance;
+(function (SourceMapProvenance) {
+    SourceMapProvenance["CDP"] = "cdp";
+    SourceMapProvenance["EXTENSION"] = "extension";
+    SourceMapProvenance["USER"] = "user";
+})(SourceMapProvenance || (SourceMapProvenance = {}));
 export class SourceMap {
     static retainRawSourceMaps = false;
     #json;

@@ -316,6 +316,17 @@ export class TextMatcher extends TextMatcherBase {
         return null;
     }
 }
+export class ImportantMatch extends TextMatch {
+    computedText = () => '';
+}
+const ImportantMatcherBase = matcherBase(ImportantMatch);
+// clang-format off
+export class ImportantMatcher extends ImportantMatcherBase {
+    // clang-format on
+    matches(node, matching) {
+        return node.name === 'Important' ? new ImportantMatch(matching.ast.text(node), node) : null;
+    }
+}
 export class AngleMatch {
     text;
     node;
@@ -733,6 +744,24 @@ export class AutoBaseMatcher extends AutoBaseMatcherBase {
         return new AutoBaseMatch(matching.ast.text(node), node, args[0], args[1]);
     }
 }
+export var LinkableNameProperties;
+(function (LinkableNameProperties) {
+    LinkableNameProperties["ANIMATION"] = "animation";
+    LinkableNameProperties["ANIMATION_NAME"] = "animation-name";
+    LinkableNameProperties["FONT_PALETTE"] = "font-palette";
+    LinkableNameProperties["LIST_STYLE"] = "list-style";
+    LinkableNameProperties["LIST_STYLE_TYPE"] = "list-style-type";
+    LinkableNameProperties["POSITION_TRY"] = "position-try";
+    LinkableNameProperties["POSITION_TRY_FALLBACKS"] = "position-try-fallbacks";
+})(LinkableNameProperties || (LinkableNameProperties = {}));
+var AnimationLonghandPart;
+(function (AnimationLonghandPart) {
+    AnimationLonghandPart["DIRECTION"] = "direction";
+    AnimationLonghandPart["FILL_MODE"] = "fill-mode";
+    AnimationLonghandPart["PLAY_STATE"] = "play-state";
+    AnimationLonghandPart["ITERATION_COUNT"] = "iteration-count";
+    AnimationLonghandPart["EASING_FUNCTION"] = "easing-function";
+})(AnimationLonghandPart || (AnimationLonghandPart = {}));
 export class LinkableNameMatch {
     text;
     node;
@@ -895,6 +924,11 @@ export class StringMatcher extends StringMatcherBase {
         return node.name === 'StringLiteral' ? new StringMatch(matching.ast.text(node), node) : null;
     }
 }
+export var ShadowType;
+(function (ShadowType) {
+    ShadowType["BOX_SHADOW"] = "boxShadow";
+    ShadowType["TEXT_SHADOW"] = "textShadow";
+})(ShadowType || (ShadowType = {}));
 export class ShadowMatch {
     text;
     node;
@@ -956,6 +990,21 @@ export class LengthMatcher extends LengthMatcherBase {
         return new LengthMatch(text, node, unit);
     }
 }
+export var SelectFunction;
+(function (SelectFunction) {
+    SelectFunction["MIN"] = "min";
+    SelectFunction["MAX"] = "max";
+    SelectFunction["CLAMP"] = "clamp";
+})(SelectFunction || (SelectFunction = {}));
+export var ArithmeticFunction;
+(function (ArithmeticFunction) {
+    ArithmeticFunction["CALC"] = "calc";
+    ArithmeticFunction["SIBLING_COUNT"] = "sibling-count";
+    ArithmeticFunction["SIBLING_INDEX"] = "sibling-index";
+    ArithmeticFunction["ROUND"] = "round";
+    ArithmeticFunction["MOD"] = "mod";
+    ArithmeticFunction["REM"] = "rem";
+})(ArithmeticFunction || (ArithmeticFunction = {}));
 export class BaseFunctionMatch {
     text;
     node;
@@ -1050,6 +1099,12 @@ export class CustomFunctionMatcher extends CustomFunctionMatcherBase {
         return new CustomFunctionMatch(text, node, callee, args);
     }
 }
+export var LayoutType;
+(function (LayoutType) {
+    LayoutType["FLEX"] = "flex";
+    LayoutType["GRID"] = "grid";
+    LayoutType["GRID_LANES"] = "grid-lanes";
+})(LayoutType || (LayoutType = {}));
 export class FlexGridGridLanesMatch {
     text;
     node;
@@ -1082,14 +1137,15 @@ export class FlexGridGridLanesMatcher extends FlexGridGridLanesMatcherBase {
             .map(node => matching.getComputedText(node).trim())
             .filter(value => value);
         const text = values.join(' ');
+        const valueText = matching.ast.textRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
         if (FlexGridGridLanesMatcher.FLEX.includes(text)) {
-            return new FlexGridGridLanesMatch(matching.ast.text(node), node, "flex" /* LayoutType.FLEX */);
+            return new FlexGridGridLanesMatch(valueText, node, "flex" /* LayoutType.FLEX */);
         }
         if (FlexGridGridLanesMatcher.GRID.includes(text)) {
-            return new FlexGridGridLanesMatch(matching.ast.text(node), node, "grid" /* LayoutType.GRID */);
+            return new FlexGridGridLanesMatch(valueText, node, "grid" /* LayoutType.GRID */);
         }
         if (FlexGridGridLanesMatcher.GRID_LANES.includes(text)) {
-            return new FlexGridGridLanesMatch(matching.ast.text(node), node, "grid-lanes" /* LayoutType.GRID_LANES */);
+            return new FlexGridGridLanesMatch(valueText, node, "grid-lanes" /* LayoutType.GRID_LANES */);
         }
         return null;
     }
@@ -1295,7 +1351,11 @@ export class CSSWideKeywordMatch {
         return this.matchedStyles.resolveGlobalKeyword(this.property, this.text);
     }
     computedText() {
-        return this.resolveProperty()?.value ?? null;
+        return this.resolveProperty()
+            ?.declaration.parseValue(this.matchedStyles, null)
+            ?.getComputedPropertyValueText()
+            .trim() ??
+            null;
     }
 }
 const CSSWideKeywordMatcherBase = matcherBase(CSSWideKeywordMatch);
@@ -1315,6 +1375,7 @@ export class CSSWideKeywordMatcher extends CSSWideKeywordMatcherBase {
             return null;
         }
         if (Array.from(ASTUtils.stripComments(ASTUtils.siblings(ASTUtils.declValue(parentNode))))
+            .filter(child => child.name !== 'Important')
             .some(child => !ASTUtils.equals(child, node))) {
             return null;
         }
@@ -1352,16 +1413,15 @@ export class PositionTryMatcher extends PositionTryMatcherBase {
         let preamble = [];
         const valueNodes = ASTUtils.siblings(ASTUtils.declValue(node));
         const fallbacks = ASTUtils.split(valueNodes);
-        if (matching.ast.propertyName === "position-try" /* LinkableNameProperties.POSITION_TRY */) {
-            for (const [i, n] of fallbacks[0].entries()) {
-                const computedText = matching.getComputedText(n);
-                if (CSSMetadata.isCSSWideKeyword(computedText)) {
-                    return null;
-                }
-                if (CSSMetadata.isPositionTryOrderKeyword(computedText)) {
-                    preamble = fallbacks[0].splice(0, i + 1);
-                    break;
-                }
+        for (const [i, n] of fallbacks[0].entries()) {
+            const computedText = matching.getComputedText(n);
+            if (CSSMetadata.isCSSWideKeyword(computedText)) {
+                return null;
+            }
+            if (matching.ast.propertyName === "position-try" /* LinkableNameProperties.POSITION_TRY */ &&
+                CSSMetadata.isPositionTryOrderKeyword(computedText)) {
+                preamble = fallbacks[0].splice(0, i + 1);
+                break;
             }
         }
         const valueText = matching.ast.textRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
@@ -1431,10 +1491,11 @@ export class PositionAreaMatcher extends PositionAreaMatcherBase {
         if (valueNodes.length === 0) {
             return null;
         }
-        const valueText = matching.getComputedTextRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
-        if (CSSMetadata.isCSSWideKeyword(valueText)) {
+        const computedText = matching.getComputedTextRange(valueNodes[0], valueNodes[valueNodes.length - 1]).trim();
+        if (CSSMetadata.isCSSWideKeyword(computedText)) {
             return null;
         }
+        const valueText = matching.ast.textRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
         return new PositionAreaMatch(valueText, node);
     }
 }

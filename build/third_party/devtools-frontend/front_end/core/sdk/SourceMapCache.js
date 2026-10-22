@@ -18,19 +18,19 @@ export class SourceMapCache {
     constructor(name) {
         this.#name = name;
     }
-    async set(debugId, securityOrigin, sourceMap) {
-        if (!securityOrigin || securityOrigin === 'file://') {
+    async set(debugId, scriptOrigin, loaderOrigin, sourceMap) {
+        if (scriptOrigin.isOpaque() || loaderOrigin.isOpaque()) {
             return;
         }
         const cache = await this.#cache();
-        await cache?.put(SourceMapCache.#urlForDebugId(debugId, securityOrigin), new Response(JSON.stringify(sourceMap)));
+        await cache?.put(SourceMapCache.#urlForDebugId(debugId, scriptOrigin, loaderOrigin), new Response(JSON.stringify(sourceMap)));
     }
-    async get(debugId, securityOrigin) {
-        if (!securityOrigin || securityOrigin === 'file://') {
+    async get(debugId, scriptOrigin, loaderOrigin) {
+        if (scriptOrigin.isOpaque() || loaderOrigin.isOpaque()) {
             return null;
         }
         const cache = await this.#cache();
-        const response = await cache?.match(SourceMapCache.#urlForDebugId(debugId, securityOrigin));
+        const response = await cache?.match(SourceMapCache.#urlForDebugId(debugId, scriptOrigin, loaderOrigin));
         return await response?.json() ?? null;
     }
     async #cache() {
@@ -45,8 +45,8 @@ export class SourceMapCache {
         return await this.#cachePromise;
     }
     /** The Cache API only allows URL as keys, so we construct a simple one. Given that we have our own cache, we have no risk of conflicting URLs */
-    static #urlForDebugId(debugId, securityOrigin) {
-        return `http://debug.id/${encodeURIComponent(debugId)}?origin=${encodeURIComponent(securityOrigin)}`;
+    static #urlForDebugId(debugId, scriptOrigin, loaderOrigin) {
+        return `http://debug.id/${encodeURIComponent(debugId)}?origin=${encodeURIComponent(scriptOrigin.siteId())}&loader=${encodeURIComponent(loaderOrigin.siteId())}`;
     }
     async disposeForTest() {
         await Platform.HostRuntime.HOST_RUNTIME.getCacheStorage()?.delete(this.#name);
@@ -54,20 +54,20 @@ export class SourceMapCache {
 }
 const IN_MEMORY_INSTANCE = new (class {
     #cache = new Map();
-    async set(debugId, securityOrigin, sourceMap) {
-        if (!securityOrigin || securityOrigin === 'file://') {
+    async set(debugId, scriptOrigin, loaderOrigin, sourceMap) {
+        if (scriptOrigin.isOpaque() || loaderOrigin.isOpaque()) {
             return;
         }
-        this.#cache.set(`${debugId}|${securityOrigin}`, sourceMap);
+        this.#cache.set(`${debugId}|${scriptOrigin.siteId()}|${loaderOrigin.siteId()}`, sourceMap);
     }
-    async get(debugId, securityOrigin) {
-        if (!securityOrigin || securityOrigin === 'file://') {
+    async get(debugId, scriptOrigin, loaderOrigin) {
+        if (scriptOrigin.isOpaque() || loaderOrigin.isOpaque()) {
             return null;
         }
-        return this.#cache.get(`${debugId}|${securityOrigin}`) ?? null;
+        return this.#cache.get(`${debugId}|${scriptOrigin.siteId()}|${loaderOrigin.siteId()}`) ?? null;
     }
     async disposeForTest() {
-        // Do nothing.
+        this.#cache.clear();
     }
 })();
 //# sourceMappingURL=SourceMapCache.js.map

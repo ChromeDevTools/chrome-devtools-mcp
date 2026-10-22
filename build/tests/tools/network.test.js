@@ -3,15 +3,21 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { afterEach, describe, it } from 'node:test';
+import assert from 'node:assert';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { getNetworkRequest, listNetworkRequests, } from '../../src/tools/network.js';
-import { createHandlerMocks } from '../mocks.js';
+import { createHandlerMocks, createMockParsedArguments } from '../mocks.js';
 describe('network', () => {
-    afterEach(() => {
-        sinon.restore();
-    });
     describe('list_network_requests', () => {
+        it('describes the default preserved navigation history', () => {
+            const tool = listNetworkRequests(createMockParsedArguments());
+            assert.strictEqual(tool.schema.includePreservedRequests.description, 'Set to true to return the preserved requests over the last 3 navigations.');
+        });
+        it('describes preserved requests using maxNavigationSaved', () => {
+            const tool = listNetworkRequests(createMockParsedArguments({ maxNavigationSaved: 5 }));
+            assert.strictEqual(tool.schema.includePreservedRequests.description, 'Set to true to return the preserved requests over the last 5 navigations.');
+        });
         it('handles default parameters', async () => {
             const { page, context, response, args } = createHandlerMocks();
             page.getDevToolsData.resolves({});

@@ -9,7 +9,7 @@ import sinon from 'sinon';
 import { DAEMON_CLIENT_NAME } from '../../src/daemon/utils.js';
 import { ClearcutLogger } from '../../src/telemetry/ClearcutLogger.js';
 import { ErrorCode } from '../../src/telemetry/errors.js';
-import { FilePersistence } from '../../src/telemetry/persistence.js';
+import { FilePersistence, } from '../../src/telemetry/persistence.js';
 import { McpClient, WatchdogMessageType } from '../../src/telemetry/types.js';
 import { WatchdogClient } from '../../src/telemetry/WatchdogClient.js';
 import { zod } from '../../src/third_party/index.js';
@@ -24,7 +24,6 @@ describe('ClearcutLogger', () => {
         mockWatchdogClient = sinon.createStubInstance(WatchdogClient);
     });
     afterEach(() => {
-        sinon.restore();
         ClearcutLogger.resetForTesting();
     });
     describe('logToolInvocation', () => {
@@ -229,7 +228,7 @@ describe('ClearcutLogger', () => {
             const msg = mockWatchdogClient.send.firstCall.args[0];
             assert.strictEqual(msg.type, WatchdogMessageType.LOG_EVENT);
             assert.ok(msg.payload.daily_active);
-            assert.ok(msg.payload.daily_active.days_since_last_active !== undefined);
+            assert.notStrictEqual(msg.payload.daily_active.days_since_last_active, undefined);
             sinon.assert.called(mockPersistence.saveState);
         });
         it('caps days_since_last_active at 31 if lastActive was > 30 days ago', async () => {

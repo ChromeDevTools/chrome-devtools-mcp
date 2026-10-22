@@ -31,6 +31,41 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/Issue.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export var IssueCategory;
+(function (IssueCategory) {
+    IssueCategory["CROSS_ORIGIN_EMBEDDER_POLICY"] = "CrossOriginEmbedderPolicy";
+    IssueCategory["GENERIC"] = "Generic";
+    IssueCategory["MIXED_CONTENT"] = "MixedContent";
+    IssueCategory["COOKIE"] = "Cookie";
+    IssueCategory["HEAVY_AD"] = "HeavyAd";
+    IssueCategory["CONTENT_SECURITY_POLICY"] = "ContentSecurityPolicy";
+    IssueCategory["LOW_TEXT_CONTRAST"] = "LowTextContrast";
+    IssueCategory["CORS"] = "Cors";
+    IssueCategory["QUIRKS_MODE"] = "QuirksMode";
+    IssueCategory["PERMISSION_ELEMENT"] = "PermissionElement";
+    IssueCategory["SELECTIVE_PERMISSIONS_INTERVENTION"] = "SelectivePermissionsIntervention";
+    IssueCategory["OTHER"] = "Other";
+})(IssueCategory || (IssueCategory = {}));
+export var IssueKind;
+(function (IssueKind) {
+    /**
+     * Something is not working in the page right now. Issues of this kind need
+     * usually be fixed right away. They usually indicate that a Web API is being
+     * used in a wrong way, or that a network request was misconfigured.
+     */
+    IssueKind["PAGE_ERROR"] = "PageError";
+    /**
+     * The page is using a Web API or relying on browser behavior that is going
+     * to change in the future. If possible, the message associated with issues
+     * of this kind should include a time when the behavior is going to change.
+     */
+    IssueKind["BREAKING_CHANGE"] = "BreakingChange";
+    /**
+     * Anything that can be improved about the page, but isn't urgent and doesn't
+     * impair functionality in a major way.
+     */
+    IssueKind["IMPROVEMENT"] = "Improvement";
+})(IssueKind || (IssueKind = {}));
 export function getIssueKindName(issueKind) {
     switch (issueKind) {
         case "BreakingChange" /* IssueKind.BREAKING_CHANGE */:

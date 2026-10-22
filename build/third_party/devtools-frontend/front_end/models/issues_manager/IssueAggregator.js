@@ -320,4 +320,9 @@ export class IssueAggregator extends Common.ObjectWrapper.ObjectWrapper {
         return issue.code();
     }
 }
+export var Events;
+(function (Events) {
+    Events["AGGREGATED_ISSUE_UPDATED"] = "AggregatedIssueUpdated";
+    Events["FULL_UPDATE_REQUIRED"] = "FullUpdateRequired";
+})(Events || (Events = {}));
 //# sourceMappingURL=IssueAggregator.js.map

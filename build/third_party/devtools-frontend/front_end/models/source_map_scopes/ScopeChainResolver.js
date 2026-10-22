@@ -70,4 +70,8 @@ export class ScopeChainResolver extends Common.ObjectWrapper.ObjectWrapper {
         this.#invalidate(event.data.client);
     }
 }
+export var Events;
+(function (Events) {
+    Events["SCOPE_CHAIN_INVALIDATED"] = "ScopeChainInvalidated";
+})(Events || (Events = {}));
 //# sourceMappingURL=ScopeChainResolver.js.map

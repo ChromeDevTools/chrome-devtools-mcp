@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { zod } from '../third_party/index.js';
+import { zodTransform } from '../tools/ToolDefinition.js';
 const BYTE_UNITS = {
     b: 1,
     byte: 1,
@@ -88,18 +89,7 @@ export function parseByteSizeRange(value) {
 export function byteSizeRangeSchema(description) {
     return zod
         .string()
-        .transform((value, context) => {
-        try {
-            return parseByteSizeRange(value);
-        }
-        catch (error) {
-            context.addIssue({
-                code: zod.ZodIssueCode.custom,
-                message: error instanceof Error ? error.message : 'Invalid byte size range',
-            });
-            return zod.NEVER;
-        }
-    })
+        .transform(zodTransform(parseByteSizeRange))
         .describe(description);
 }
 //# sourceMappingURL=bytes.js.map

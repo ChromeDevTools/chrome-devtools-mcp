@@ -12,6 +12,35 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('models/issues_manager/SharedDictionaryIssue.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
+export var IssueCode;
+(function (IssueCode) {
+    IssueCode["USE_ERROR_CROSS_ORIGIN_NO_CORS_REQUEST"] = "SharedDictionaryIssue::UseErrorCrossOriginNoCorsRequest";
+    IssueCode["USE_ERROR_DICTIONARY_LOAD_FAILURE"] = "SharedDictionaryIssue::UseErrorDictionaryLoadFailure";
+    IssueCode["USE_ERROR_MATCHING_DICTIONARY_NOT_USED"] = "SharedDictionaryIssue::UseErrorMatchingDictionaryNotUsed";
+    IssueCode["USE_ERROR_UNEXPECTED_CONTENT_DICTIONARY_HEADER"] = "SharedDictionaryIssue::UseErrorUnexpectedContentDictionaryHeader";
+    IssueCode["WRITE_ERROR_CROSS_ORIGIN_NO_CORS_REQUEST"] = "SharedDictionaryIssue::WriteErrorCossOriginNoCorsRequest";
+    IssueCode["WRITE_ERROR_DISALLOWED_BY_SETTINGS"] = "SharedDictionaryIssue::WriteErrorDisallowedBySettings";
+    IssueCode["WRITE_ERROR_EXPIRED_RESPONSE"] = "SharedDictionaryIssue::WriteErrorExpiredResponse";
+    IssueCode["WRITE_ERROR_FEATURE_DISABLED"] = "SharedDictionaryIssue::WriteErrorFeatureDisabled";
+    IssueCode["WRITE_ERROR_INSUFFICIENT_RESOURCES"] = "SharedDictionaryIssue::WriteErrorInsufficientResources";
+    IssueCode["WRITE_ERROR_INVALID_MATCH_FIELD"] = "SharedDictionaryIssue::WriteErrorInvalidMatchField";
+    IssueCode["WRITE_ERROR_INVALID_STRUCTURED_HEADER"] = "SharedDictionaryIssue::WriteErrorInvalidStructuredHeader";
+    IssueCode["WRITE_ERROR_INVALID_TTL_FIELD"] = "SharedDictionaryIssue::WriteErrorInvalidTTLField";
+    IssueCode["WRITE_ERROR_NAVIGATION_REQUEST"] = "SharedDictionaryIssue::WriteErrorNavigationRequest";
+    IssueCode["WRITE_ERROR_NO_MATCH_FIELD"] = "SharedDictionaryIssue::WriteErrorNoMatchField";
+    IssueCode["WRITE_ERROR_NON_INTEGER_TTL_FIELD"] = "SharedDictionaryIssue::WriteErrorNonIntegerTTLField";
+    IssueCode["WRITE_ERROR_NON_LIST_MATCH_DEST_FIELD"] = "SharedDictionaryIssue::WriteErrorNonListMatchDestField";
+    IssueCode["WRITE_ERROR_NON_SECURE_CONTEXT"] = "SharedDictionaryIssue::WriteErrorNonSecureContext";
+    IssueCode["WRITE_ERROR_NON_STRING_ID_FIELD"] = "SharedDictionaryIssue::WriteErrorNonStringIdField";
+    IssueCode["WRITE_ERROR_NON_STRING_IN_MATCH_DEST_LIST"] = "SharedDictionaryIssue::WriteErrorNonStringInMatchDestList";
+    IssueCode["WRITE_ERROR_NON_STRING_MATCH_FIELD"] = "SharedDictionaryIssue::WriteErrorNonStringMatchField";
+    IssueCode["WRITE_ERROR_NON_TOKEN_TYPE_FIELD"] = "SharedDictionaryIssue::WriteErrorNonTokenTypeField";
+    IssueCode["WRITE_ERROR_REQUEST_ABORTED"] = "SharedDictionaryIssue::WriteErrorRequestAborted";
+    IssueCode["WRITE_ERROR_SHUTTING_DOWN"] = "SharedDictionaryIssue::WriteErrorShuttingDown";
+    IssueCode["WRITE_ERROR_TOO_LONG_ID_FIELD"] = "SharedDictionaryIssue::WriteErrorTooLongIdField";
+    IssueCode["WRITE_ERROR_UNSUPPORTED_TYPE"] = "SharedDictionaryIssue::WriteErrorUnsupportedType";
+    IssueCode["UNKNOWN"] = "SharedDictionaryIssue::WriteErrorUnknown";
+})(IssueCode || (IssueCode = {}));
 function getIssueCode(details) {
     switch (details.sharedDictionaryError) {
         case "UseErrorCrossOriginNoCorsRequest" /* Protocol.Audits.SharedDictionaryError.UseErrorCrossOriginNoCorsRequest */:

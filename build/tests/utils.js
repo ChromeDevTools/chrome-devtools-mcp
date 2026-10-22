@@ -3,25 +3,30 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import './setupDevTools.js';
 import assert from 'node:assert';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import puppeteer, { Locator } from 'puppeteer';
 import sinon from 'sinon';
+import { stopDaemon } from '../src/daemon/client.js';
+import { isDaemonRunning } from '../src/daemon/utils.js';
 import { McpContext } from '../src/McpContext.js';
 import { McpResponse } from '../src/McpResponse.js';
 import { HeapSnapshotManager } from '../src/processors/HeapSnapshotManager.js';
+import { TaskRunner } from '../src/utils/TaskRunner.js';
 import { TextSnapshot } from '../src/TextSnapshot.js';
 import { DevTools } from '../src/third_party/index.js';
 import { stableIdSymbol } from '../src/utils/id.js';
-import { createMockParsedArguments, createMockPuppeteerPage, mockListener, } from './mocks.js';
+import { createMockParsedArguments, createMockPuppeteerPage, createMockServerConfig, mockListener, stripUndefined, } from './mocks.js';
 export function assertNoServiceWorkerReported(targets, id) {
     const target = targets.find(target => {
         return target.url().includes(id) && target.type() === 'service_worker';
     });
-    assert(target === undefined);
+    assert.strictEqual(target, undefined);
 }
 export function getTextContent(content) {
     if (content.type === 'text') {
@@ -108,27 +113,43 @@ export async function withBrowser(cb, options = {}) {
         }
     }
 }
+/**
+ * Creates an McpContext that is already connected to `browser`.
+ */
+export async function createConnectedMcpContext(browser, options, locatorClass) {
+    const context = McpContext.create(undefined, {
+        taskRunner: new TaskRunner(),
+        ...options,
+        getBrowser: async () => browser,
+    }, locatorClass);
+    await context.ensureBrowser();
+    return context;
+}
 export async function withMcpContext(cb, options = {}, args = {}) {
     await withBrowser(async (browser) => {
         TextSnapshot.resetCounter();
         McpContext.resetPageIdsForTesting();
         McpContext.resetWorkerIdsForTesting();
         const parsedArgs = createMockParsedArguments(args);
-        const response = new McpResponse(parsedArgs);
-        const heapSnapshotManager = new HeapSnapshotManager();
+        const serverConfig = createMockServerConfig({
+            ...args,
+            ...stripUndefined({
+                performanceCrux: options.performanceCrux,
+                sourceMaps: options.sourceMaps,
+                allowedUrlPattern: options.allowedUrlPattern,
+                blockedUrlPattern: options.blockedUrlPattern,
+                allowUnrestrictedPaths: options.allowUnrestrictedPaths,
+            }),
+        });
+        const response = new McpResponse(serverConfig);
+        const heapSnapshotManager = new HeapSnapshotManager(new TaskRunner());
         if (context) {
             context.dispose();
         }
-        context = await McpContext.from(browser, undefined, {
-            experimentalDevToolsDebugging: false,
-            performanceCrux: options.performanceCrux ?? true,
-            sourceMaps: options.sourceMaps ?? true,
-            allowlist: options.allowedUrlPattern,
-            blocklist: options.blockedUrlPattern,
-            allowUnrestrictedPaths: options.allowUnrestrictedPaths ?? false,
+        context = await createConnectedMcpContext(browser, {
+            config: serverConfig,
             navigationTimeout: options.navigationTimeout ??
                 (process.platform === 'win32' ? 20000 : undefined),
-            categoryExtensions: parsedArgs.categoryExtensions,
             heapSnapshotManager,
         }, Locator);
         response.setPage(context.getSelectedMcpPage());
@@ -330,6 +351,25 @@ export async function runCli(args, sessionId, options) {
 export async function assertDaemonIsNotRunning(sessionId) {
     const result = await runCli(['status'], sessionId);
     assert.strictEqual(result.stdout, 'chrome-devtools-mcp daemon is not running.\n');
+}
+/**
+ * Stops the daemon in-process. Use it for test cleanup: it does not spawn
+ * a CLI process, which takes about a second per call.
+ */
+export async function stopDaemonForCleanup(sessionId) {
+    await stopDaemon(sessionId);
+    assert.ok(!isDaemonRunning(sessionId), 'daemon is still running');
+}
+/**
+ * Creates a new CLI session ID for one test and stops its daemon after the
+ * test. Each test gets its own session, so tests can run concurrently.
+ */
+export function createCliSession(t) {
+    const sessionId = crypto.randomUUID();
+    t.after(async () => {
+        await stopDaemonForCleanup(sessionId);
+    });
+    return sessionId;
 }
 export async function assertDaemonIsRunning(sessionId) {
     const result = await runCli(['status'], sessionId);

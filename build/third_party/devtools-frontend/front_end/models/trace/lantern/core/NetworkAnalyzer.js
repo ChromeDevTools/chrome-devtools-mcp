@@ -460,15 +460,19 @@ class NetworkAnalyzer {
         if (exactMatch) {
             return exactMatch;
         }
-        // Cross-origin redirects in renderer trace events have their pre-redirect URL path scrubbed to the origin.
-        try {
-            const originUrl = `${new URL(resourceUrl).origin}/`;
-            return records.find(request => Boolean(request.redirectDestination) && originUrl.startsWith(request.url) &&
-                UrlUtils.equalWithExcludedFragments(request.url, originUrl));
-        }
-        catch {
+        // Cross-origin document redirects in renderer trace events have their pre-redirect URL scrubbed to the origin.
+        const origin = URL.parse(resourceUrl)?.origin;
+        if (!origin) {
             return undefined;
         }
+        return records.find(request => {
+            if (!request.redirectDestination || request.url !== `${origin}/`) {
+                return false;
+            }
+            const finalRequest = NetworkAnalyzer.resolveRedirects(request);
+            return finalRequest.resourceType === 'Document' && !finalRequest.failed &&
+                URL.parse(finalRequest.url)?.origin !== origin;
+        });
     }
     static findLastDocumentForUrl(records, resourceUrl) {
         // equalWithExcludedFragments is expensive, so check that the resourceUrl starts with the request url first

@@ -1,0 +1,33 @@
+import type * as SDK from '../../core/sdk/sdk.js';
+import * as Protocol from '../../generated/protocol.js';
+import { type AffectedElement, Issue, IssueCategory, IssueKind } from './Issue.js';
+import { type LazyMarkdownIssueDescription, type MarkdownIssueDescription } from './MarkdownIssueDescription.js';
+export declare class GenericIssue extends Issue<Protocol.Audits.GenericIssueDetails> {
+    constructor(issueDetails: Protocol.Audits.GenericIssueDetails, issuesModel: SDK.IssuesModel.IssuesModel | null, issueId?: Protocol.Audits.IssueId);
+    requests(): Iterable<Protocol.Audits.AffectedRequest>;
+    elements(): Iterable<AffectedElement>;
+    getCategory(): IssueCategory;
+    primaryKey(): string;
+    getDescription(): MarkdownIssueDescription | null;
+    getKind(): IssueKind;
+    static fromInspectorIssue(issuesModel: SDK.IssuesModel.IssuesModel | null, inspectorIssue: Protocol.Audits.InspectorIssue): GenericIssue[];
+}
+export declare const genericFormLabelForNameError: LazyMarkdownIssueDescription;
+export declare const genericFormInputWithNoLabelError: LazyMarkdownIssueDescription;
+export declare const genericFormAutocompleteAttributeEmptyError: LazyMarkdownIssueDescription;
+export declare const genericFormDuplicateIdForInputError: LazyMarkdownIssueDescription;
+export declare const genericFormAriaLabelledByToNonExistingIdError: LazyMarkdownIssueDescription;
+export declare const genericFormEmptyIdAndNameAttributesForInputError: LazyMarkdownIssueDescription;
+export declare const genericFormInputAssignedAutocompleteValueToIdOrNameAttributeError: LazyMarkdownIssueDescription;
+export declare const genericFormInputHasWrongButWellIntendedAutocompleteValue: LazyMarkdownIssueDescription;
+export declare const genericFormLabelForMatchesNonExistingIdError: LazyMarkdownIssueDescription;
+export declare const genericFormLabelHasNeitherForNorNestedInputError: LazyMarkdownIssueDescription;
+export declare const genericResponseWasBlockedbyORB: LazyMarkdownIssueDescription;
+export declare const genericNavigationEntryMarkedSkippable: LazyMarkdownIssueDescription;
+export declare const genericBackUINavigationWouldSkipAd: LazyMarkdownIssueDescription;
+export declare const genericFormModelContextMissingToolName: LazyMarkdownIssueDescription;
+export declare const genericFormModelContextMissingToolDescription: LazyMarkdownIssueDescription;
+export declare const genericFormModelContextParameterMissingTitleAndDescription: LazyMarkdownIssueDescription;
+export declare const genericFormModelContextRequiredParameterMissingName: LazyMarkdownIssueDescription;
+export declare const genericFormModelContextParameterMissingName: LazyMarkdownIssueDescription;
+export declare const genericGeolocationPromptWithoutUserGesture: LazyMarkdownIssueDescription;

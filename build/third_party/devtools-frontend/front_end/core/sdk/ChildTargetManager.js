@@ -231,4 +231,10 @@ export class ChildTargetManager extends SDKModel {
     static lastAnonymousTargetId = 0;
     static attachCallback;
 }
+export var Events;
+(function (Events) {
+    Events["TARGET_CREATED"] = "TargetCreated";
+    Events["TARGET_DESTROYED"] = "TargetDestroyed";
+    Events["TARGET_INFO_CHANGED"] = "TargetInfoChanged";
+})(Events || (Events = {}));
 //# sourceMappingURL=ChildTargetManager.js.map

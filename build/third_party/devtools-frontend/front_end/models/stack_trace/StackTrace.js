@@ -1,6 +1,17 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+export var MissingDebugInfoType;
+(function (MissingDebugInfoType) {
+    /** No debug information at all for the call frame */
+    MissingDebugInfoType["NO_INFO"] = "NO_INFO";
+    /** Some debug information available, but it references files with debug information we were not able to retrieve */
+    MissingDebugInfoType["PARTIAL_INFO"] = "PARTIAL_INFO";
+})(MissingDebugInfoType || (MissingDebugInfoType = {}));
+export var Events;
+(function (Events) {
+    Events["UPDATED"] = "UPDATED";
+})(Events || (Events = {}));
 /**
  * A small wrapper around a DebuggableFrame usable as a UI.Context flavor.
  * This is necessary as DebuggableFrame are just interfaces and the impl classes are hidden.

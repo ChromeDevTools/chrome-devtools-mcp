@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import path from 'node:path';
-import { lighthouseRunner, generateReport, zod, } from '../third_party/index.js';
+import { generateReport, zod, } from '../third_party/index.js';
 import { ToolCategory } from './categories.js';
 import { startTrace } from './performance.js';
 import { definePageTool, } from './ToolDefinition.js';
@@ -20,6 +20,12 @@ const DESKTOP_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Appl
 const MAX_NODES_PER_AUDIT = 10;
 const isRecord = (value) => {
     return typeof value === 'object' && value !== null;
+};
+// Lighthouse's navigation mode only accepts the URL schemes in
+// `allowedProtocols` (core/lib/url-utils.js) and throws a bare `INVALID_URL`
+// for anything else, such as file:// or about:blank.
+const isInvalidUrlError = (error) => {
+    return isRecord(error) && error.code === 'INVALID_URL';
 };
 const getString = (value) => {
     return typeof value === 'string' ? value : undefined;
@@ -144,6 +150,7 @@ export const lighthouseAudit = definePageTool((args) => ({
             .describe('Directory for reports. If omitted, uses temporary files.'),
     },
     blockedByDialog: true,
+    concurrency: 'exclusive',
     verifyFilesSchema: {
         outputDirPath: true,
     },
@@ -188,14 +195,19 @@ export const lighthouseAudit = definePageTool((args) => ({
         let result;
         try {
             if (mode === 'navigation') {
-                result = await lighthouseRunner.navigation(page.pptrPage, page.pptrPage.url(), {
-                    flags,
-                });
+                try {
+                    result = await page.lighthouseNavigation(flags);
+                }
+                catch (error) {
+                    if (isInvalidUrlError(error)) {
+                        const url = page.pptrPage.url();
+                        throw new Error(`Lighthouse "navigation" mode cannot audit ${url}: it only supports http:, https:, chrome: and chrome-extension: URLs. Use mode "snapshot" to audit the page in its current state.`, { cause: error });
+                    }
+                    throw error;
+                }
             }
             else {
-                result = await lighthouseRunner.snapshot(page.pptrPage, {
-                    flags,
-                });
+                result = await page.lighthouseSnapshot(flags);
             }
             if (!result) {
                 throw new Error('Lighthouse audit failed.');
@@ -208,7 +220,7 @@ export const lighthouseAudit = definePageTool((args) => ({
         const reportPaths = [];
         const encoder = new TextEncoder();
         const savePromises = formats.map(async (format) => {
-            const report = generateReport(lhr, format);
+            const report = await generateReport(lhr, format);
             const data = encoder.encode(report);
             if (outputDirPath) {
                 const reportPath = path.join(outputDirPath, `report`);
@@ -224,6 +236,10 @@ export const lighthouseAudit = definePageTool((args) => ({
                 throw res.reason;
             }
             reportPaths.push(res.value);
+        }
+        // Lighthouse sets runtimeError when it could not load the page; the categories are unscored.
+        if (lhr.runtimeError) {
+            throw new Error(`Lighthouse could not audit the page (${lhr.runtimeError.code}): ${lhr.runtimeError.message} Reports: ${reportPaths.join(', ')}`);
         }
         const categoryScores = Object.values(lhr.categories).map(c => ({
             id: c.id,

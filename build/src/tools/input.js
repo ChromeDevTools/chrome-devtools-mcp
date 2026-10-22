@@ -55,11 +55,11 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     var e = new Error(message);
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
-import { TimeoutError, zod } from '../third_party/index.js';
-import { parseKey } from '../utils/keyboard.js';
+import { TimeoutError, zod, } from '../third_party/index.js';
+import { invalidKeyMessage, isValidKey, parseKey } from '../utils/keyboard.js';
 import { logger } from '../utils/logger.js';
 import { ToolCategory } from './categories.js';
-import { definePageTool } from './ToolDefinition.js';
+import { definePageTool, } from './ToolDefinition.js';
 const dblClickSchema = zod
     .boolean()
     .optional()
@@ -70,6 +70,10 @@ const includeSnapshotSchema = zod
     .describe('Whether to include a snapshot in the response. Default is false.');
 const submitKeySchema = zod
     .string()
+    // An empty string means no submit key, as before.
+    .refine((key) => key === '' || isValidKey(key), {
+    error: issue => invalidKeyMessage(String(issue.input)),
+})
     .optional()
     .describe('Optional key to press after typing. E.g., "Enter", "Tab", "Escape"');
 /**
@@ -146,6 +150,7 @@ export const click = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const env_2 = { stack: [], error: void 0, hasError: false };
@@ -204,6 +209,7 @@ export const clickAt = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const page = request.page;
@@ -235,6 +241,7 @@ export const hover = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const env_3 = { stack: [], error: void 0, hasError: false };
@@ -422,6 +429,7 @@ export const fill = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const { result } = await fillFormElements([{ uid: request.params.uid, value: request.params.value }], request.page);
@@ -448,16 +456,19 @@ export const typeText = definePageTool(() => ({
         submitKey: submitKeySchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const page = request.page;
+        const submitKey = request.params.submitKey;
         const result = await page.waitForEventsAfterAction(async () => {
             await page.pptrPage.keyboard.type(request.params.text);
-            if (request.params.submitKey) {
-                await page.pptrPage.keyboard.press(request.params.submitKey);
+            // submitKeySchema has already validated the key; isValidKey narrows the type.
+            if (submitKey && isValidKey(submitKey)) {
+                await page.pptrPage.keyboard.press(submitKey);
             }
         });
-        response.appendResponseLine(`Typed text "${request.params.text}${request.params.submitKey ? ` + ${request.params.submitKey}` : ''}"`);
+        response.appendResponseLine(`Typed text "${request.params.text}${submitKey ? ` + ${submitKey}` : ''}"`);
         response.attachWaitForResult(result);
     },
 }));
@@ -474,6 +485,7 @@ export const drag = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const env_7 = { stack: [], error: void 0, hasError: false };
@@ -523,6 +535,7 @@ export const fillForm = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const { result, interruptedUid } = await fillFormElements(request.params.elements, request.page);
@@ -560,6 +573,7 @@ export const uploadFile = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     // We do not validate file paths for remote browser instances
     // because they are on the remote host and not accessed by the MCP server.
     verifyFilesSchema: {
@@ -624,6 +638,7 @@ export const pressKey = definePageTool(() => ({
         includeSnapshot: includeSnapshotSchema,
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const page = request.page;

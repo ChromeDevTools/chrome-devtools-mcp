@@ -196,4 +196,8 @@ export class CookieModel extends SDKModel {
     }
 }
 SDKModel.register(CookieModel, { capabilities: 16 /* Capability.NETWORK */, autostart: false });
+export var Events;
+(function (Events) {
+    Events["COOKIE_LIST_UPDATED"] = "CookieListUpdated";
+})(Events || (Events = {}));
 //# sourceMappingURL=CookieModel.js.map

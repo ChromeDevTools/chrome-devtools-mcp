@@ -6,6 +6,19 @@
 import { createStackTraceForConsoleMessage, SymbolizedError, } from '../devtools/DevtoolsUtils.js';
 import { UncaughtError } from '../collectors/PageCollector.js';
 import * as DevTools from '../third_party/index.js';
+import { formatRemoteObject } from './RemoteObjectFormatter.js';
+// JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
+// on symbols and cyclic objects. Those are formatted from their preview.
+function isJsonLike(remoteObject) {
+    if (remoteObject.type === 'object') {
+        return (remoteObject.subtype === undefined ||
+            remoteObject.subtype === 'array' ||
+            remoteObject.subtype === 'null');
+    }
+    return (remoteObject.type !== 'function' &&
+        remoteObject.type !== 'symbol' &&
+        remoteObject.type !== 'bigint');
+}
 export class ConsoleFormatter {
     #id;
     #type;
@@ -47,6 +60,7 @@ export class ConsoleFormatter {
                 devTools: options?.devTools,
                 details: msg.details,
                 targetId: msg.targetId,
+                session: msg.session,
                 includeStackAndCause: options?.fetchDetailedData || options?.fetchStackTrace,
                 resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
                 resolvedCauseForTesting: options?.resolvedCauseForTesting,
@@ -78,7 +92,20 @@ export class ConsoleFormatter {
                             targetId: msg._targetId(),
                         });
                     }
-                    return await arg.jsonValue();
+                    if (!isJsonLike(remoteObject)) {
+                        return formatRemoteObject(remoteObject);
+                    }
+                    try {
+                        return await arg.jsonValue();
+                    }
+                    catch (error) {
+                        // JSON can't represent the value (for example, a cyclic object)
+                        // or the page is gone; the preview still describes it.
+                        if (remoteObject.preview) {
+                            return formatRemoteObject(remoteObject);
+                        }
+                        throw error;
+                    }
                 }
                 catch {
                     return `<error: Argument ${i} is no longer available>`;

@@ -39,6 +39,15 @@ export class DOMStorage extends Common.ObjectWrapper.ObjectWrapper {
         void this.model.agent.invoke_clear({ storageId: this.id });
     }
 }
+(function (DOMStorage) {
+    let Events;
+    (function (Events) {
+        Events["DOM_STORAGE_ITEMS_CLEARED"] = "DOMStorageItemsCleared";
+        Events["DOM_STORAGE_ITEM_REMOVED"] = "DOMStorageItemRemoved";
+        Events["DOM_STORAGE_ITEM_ADDED"] = "DOMStorageItemAdded";
+        Events["DOM_STORAGE_ITEM_UPDATED"] = "DOMStorageItemUpdated";
+    })(Events = DOMStorage.Events || (DOMStorage.Events = {}));
+})(DOMStorage || (DOMStorage = {}));
 export class DOMStorageModel extends SDKModel {
     #storageKeyManager;
     #storages;
@@ -153,6 +162,11 @@ export class DOMStorageModel extends SDKModel {
     }
 }
 SDKModel.register(DOMStorageModel, { capabilities: 1048576 /* Capability.DOM_STORAGE */, autostart: false });
+export var Events;
+(function (Events) {
+    Events["DOM_STORAGE_ADDED"] = "DOMStorageAdded";
+    Events["DOM_STORAGE_REMOVED"] = "DOMStorageRemoved";
+})(Events || (Events = {}));
 export class DOMStorageDispatcher {
     model;
     constructor(model) {

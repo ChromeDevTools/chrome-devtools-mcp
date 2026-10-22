@@ -5,7 +5,7 @@ import * as Platform from '../platform/platform.js';
 import { CSSMetadata, cssMetadata } from './CSSMetadata.js';
 import { CSSProperty } from './CSSProperty.js';
 import * as PropertyParser from './CSSPropertyParser.js';
-import { AnchorFunctionMatcher, AngleMatcher, AttributeMatcher, AutoBaseMatcher, BaseVariableMatcher, BezierMatcher, BinOpMatcher, ColorMatcher, ColorMixMatcher, ContrastColorMatcher, CustomFunctionMatcher, defaultValueForCSSType, EnvFunctionMatcher, FlexGridGridLanesMatcher, GridTemplateMatcher, LengthMatcher, LightDarkColorMatcher, LinearGradientMatcher, LinkableNameMatcher, localEvalCSS, MathFunctionMatcher, PositionAnchorMatcher, PositionAreaMatcher, PositionTryMatcher, RelativeColorChannelMatcher, ShadowMatcher, StringMatcher, URLMatcher, VariableMatcher, VariableNameMatcher, } from './CSSPropertyParserMatchers.js';
+import { AnchorFunctionMatcher, AngleMatcher, AttributeMatcher, AutoBaseMatcher, BaseVariableMatcher, BezierMatcher, BinOpMatcher, ColorMatcher, ColorMixMatcher, ContrastColorMatcher, CustomFunctionMatcher, defaultValueForCSSType, EnvFunctionMatcher, FlexGridGridLanesMatcher, GridTemplateMatcher, ImportantMatcher, LengthMatcher, LightDarkColorMatcher, LinearGradientMatcher, LinkableNameMatcher, localEvalCSS, MathFunctionMatcher, PositionAnchorMatcher, PositionAreaMatcher, PositionTryMatcher, RelativeColorChannelMatcher, ShadowMatcher, StringMatcher, URLMatcher, VariableMatcher, VariableNameMatcher, } from './CSSPropertyParserMatchers.js';
 import { CSSAtRule, CSSFunctionRule, CSSKeyframeRule, CSSKeyframesRule, CSSPositionTryRule, CSSPropertyRule, CSSStyleRule, } from './CSSRule.js';
 import { CSSStyleDeclaration, Type } from './CSSStyleDeclaration.js';
 function containsStyle(styles, query) {
@@ -85,6 +85,9 @@ function cleanUserAgentPayload(payload) {
         ruleMatch.matchingSelectors = matchingSelectors.map((_, i) => i);
     }
 }
+function parseCustomHighlightName(selectorText) {
+    return selectorText.match(/::highlight\(([^)]+)\)/)?.[1] ?? null;
+}
 /**
  * Return a mapping of the highlight names in the specified RuleMatch to
  * the indices of selectors in that selector list with that highlight name.
@@ -109,14 +112,13 @@ function cleanUserAgentPayload(payload) {
  * list associated with ruleMatch. The indices correspond to the selectors in the rule
  * associated with the key's highlight name.
  */
-function customHighlightNamesToMatchingSelectorIndices(ruleMatch) {
+function customHighlightNamesToMatchingSelectorIndices(ruleMatch, highlightNames) {
     const highlightNamesToMatchingSelectors = new Map();
     for (let i = 0; i < ruleMatch.matchingSelectors.length; i++) {
         const matchingSelectorIndex = ruleMatch.matchingSelectors[i];
         const selectorText = ruleMatch.rule.selectorList.selectors[matchingSelectorIndex].text;
-        const highlightNameMatch = selectorText.match(/::highlight\((.*)\)/);
-        if (highlightNameMatch) {
-            const highlightName = highlightNameMatch[1];
+        const highlightName = parseCustomHighlightName(selectorText);
+        if (highlightName) {
             const selectorsForName = highlightNamesToMatchingSelectors.get(highlightName);
             if (selectorsForName) {
                 selectorsForName.push(matchingSelectorIndex);
@@ -126,7 +128,32 @@ function customHighlightNamesToMatchingSelectorIndices(ruleMatch) {
             }
         }
     }
+    const universalSelectors = highlightNamesToMatchingSelectors.get('*');
+    if (universalSelectors) {
+        for (const highlightName of highlightNames) {
+            const selectorsForName = highlightNamesToMatchingSelectors.get(highlightName) ?? [];
+            highlightNamesToMatchingSelectors.set(highlightName, [...selectorsForName, ...universalSelectors]);
+        }
+    }
     return highlightNamesToMatchingSelectors;
+}
+function getCustomHighlightNames(pseudoPayload) {
+    const highlightNames = new Set();
+    for (const entryPayload of pseudoPayload) {
+        if (entryPayload.pseudoType !== "highlight" /* Protocol.DOM.PseudoType.Highlight */ || !entryPayload.matches) {
+            continue;
+        }
+        for (const ruleMatch of entryPayload.matches) {
+            for (const matchingSelectorIndex of ruleMatch.matchingSelectors) {
+                const selectorText = ruleMatch.rule.selectorList.selectors[matchingSelectorIndex].text;
+                const highlightName = parseCustomHighlightName(selectorText);
+                if (highlightName && highlightName !== '*') {
+                    highlightNames.add(highlightName);
+                }
+            }
+        }
+    }
+    return highlightNames;
 }
 function queryMatches(style) {
     if (!style.parentRule) {
@@ -405,10 +432,10 @@ export class CSSMatchedStyles {
      * This helper function takes a list of rule matches and generates separate NodeCascades
      * for each custom highlight name that was matched.
      */
-    buildSplitCustomHighlightCascades(rules, node, isInherited, pseudoCascades) {
+    buildSplitCustomHighlightCascades(rules, node, isInherited, highlightNames, pseudoCascades) {
         const splitHighlightRules = new Map();
         for (let j = rules.length - 1; j >= 0; --j) {
-            const highlightNamesToMatchingSelectorIndices = customHighlightNamesToMatchingSelectorIndices(rules[j]);
+            const highlightNamesToMatchingSelectorIndices = customHighlightNamesToMatchingSelectorIndices(rules[j], highlightNames);
             for (const [highlightName, matchingSelectors] of highlightNamesToMatchingSelectorIndices) {
                 const pseudoRule = new CSSStyleRule(this.#cssModel, rules[j].rule);
                 this.#nodeForStyle.set(pseudoRule.style, node);
@@ -444,6 +471,7 @@ export class CSSMatchedStyles {
         }
         const pseudoCascades = new Map();
         const customHighlightPseudoCascades = new Map();
+        const highlightNames = getCustomHighlightNames([...pseudoPayload, ...(inheritedPseudoPayload || []).flatMap(entry => entry.pseudoElements)]);
         for (let i = 0; i < pseudoPayload.length; ++i) {
             const entryPayload = pseudoPayload[i];
             // PseudoElement nodes are not created unless "content" css property is set.
@@ -451,7 +479,7 @@ export class CSSMatchedStyles {
             const pseudoStyles = [];
             const rules = entryPayload.matches || [];
             if (entryPayload.pseudoType === "highlight" /* Protocol.DOM.PseudoType.Highlight */) {
-                this.buildSplitCustomHighlightCascades(rules, this.#node, false /* #isInherited */, customHighlightPseudoCascades);
+                this.buildSplitCustomHighlightCascades(rules, this.#node, false /* #isInherited */, highlightNames, customHighlightPseudoCascades);
             }
             else {
                 for (let j = rules.length - 1; j >= 0; --j) {
@@ -476,7 +504,7 @@ export class CSSMatchedStyles {
                     const inheritedEntryPayload = inheritedPseudoMatches[j];
                     const rules = inheritedEntryPayload.matches || [];
                     if (inheritedEntryPayload.pseudoType === "highlight" /* Protocol.DOM.PseudoType.Highlight */) {
-                        this.buildSplitCustomHighlightCascades(rules, parentNode, true /* #isInherited */, customHighlightPseudoCascades);
+                        this.buildSplitCustomHighlightCascades(rules, parentNode, true /* #isInherited */, highlightNames, customHighlightPseudoCascades);
                     }
                     else {
                         const pseudoStyles = [];
@@ -1197,18 +1225,23 @@ class DOMInheritanceCascade {
         if (definedValue === undefined || definedValue === null) {
             return null;
         }
-        if (definedValue.declaration.declaration instanceof CSSProperty && definedValue.declaration.value &&
-            CSSMetadata.isCSSWideKeyword(definedValue.declaration.value)) {
-            const resolvedProperty = this.resolveGlobalKeyword(definedValue.declaration.declaration, definedValue.declaration.value);
+        while (definedValue.declaration.declaration instanceof CSSProperty && definedValue.declaration.value) {
+            const value = PropertyParser
+                .matchDeclaration(`--${variableName}`, definedValue.declaration.value, [new ImportantMatcher()])
+                ?.getComputedPropertyValueText()
+                .trim();
+            if (!value || !CSSMetadata.isCSSWideKeyword(value)) {
+                break;
+            }
+            const resolvedProperty = this.resolveGlobalKeyword(definedValue.declaration.declaration, value);
             if (!resolvedProperty) {
                 return definedValue;
             }
             const declaration = new CSSValueSource(resolvedProperty);
-            const { value } = declaration;
-            if (!value) {
+            if (!declaration.value) {
                 return definedValue;
             }
-            definedValue = { declaration, value };
+            definedValue = { declaration, value: declaration.value };
         }
         const ast = PropertyParser.tokenizeDeclaration(`--${variableName}`, definedValue.value);
         if (!ast) {
@@ -1306,9 +1339,10 @@ class DOMInheritanceCascade {
                 }
                 return evaluateFallback(match.fallback, match.matching);
             }),
+            ...(declaration ? [new ImportantMatcher()] : []),
         ]);
         const decl = PropertyParser.ASTUtils.siblings(PropertyParser.ASTUtils.declValue(matching.ast.tree));
-        const declText = decl.length > 0 ? matching.getComputedTextRange(decl[0], decl[decl.length - 1]) : '';
+        const declText = decl.length > 0 ? matching.getComputedTextRange(decl[0], decl[decl.length - 1]).trim() : '';
         const hasUnresolvedSubstitutions = decl.length > 0 && matching.hasUnresolvedSubstitutionsRange(decl[0], decl[decl.length - 1]);
         const computedText = hasUnresolvedSubstitutions ? null : declText;
         const outerComputedCSSVariables = computedCSSVariablesMap.get(outerNodeCascade);
@@ -1489,4 +1523,9 @@ class DOMInheritanceCascade {
         }
     }
 }
+export var PropertyState;
+(function (PropertyState) {
+    PropertyState["ACTIVE"] = "Active";
+    PropertyState["OVERLOADED"] = "Overloaded";
+})(PropertyState || (PropertyState = {}));
 //# sourceMappingURL=CSSMatchedStyles.js.map

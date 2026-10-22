@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { parseKey } from '../../src/utils/keyboard.js';
+import { isValidKey, parseKey } from '../../src/utils/keyboard.js';
 describe('parseKey', () => {
     it('parses single keys', () => {
         assert.deepStrictEqual(parseKey('Enter'), ['Enter']);
@@ -102,6 +102,18 @@ describe('parseKey', () => {
         assert.throws(() => {
             parseKey('a+a');
         }, { message: 'Key a+a contains duplicate keys.' });
+    });
+});
+describe('isValidKey', () => {
+    it('accepts single key names', () => {
+        for (const key of ['Enter', 'Tab', 'Escape', 'a', 'A', '5', ' ']) {
+            assert.strictEqual(isValidKey(key), true, key);
+        }
+    });
+    it('rejects unknown names and combinations', () => {
+        for (const key of ['XXX', 'enter', 'Shift+Enter', ' Enter', '']) {
+            assert.strictEqual(isValidKey(key), false, key);
+        }
     });
 });
 //# sourceMappingURL=keyboard.test.js.map

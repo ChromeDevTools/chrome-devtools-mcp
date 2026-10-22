@@ -1,6 +1,26 @@
 // Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+export var RequestTimeRangeNames;
+(function (RequestTimeRangeNames) {
+    RequestTimeRangeNames["PUSH"] = "push";
+    RequestTimeRangeNames["QUEUEING"] = "queueing";
+    RequestTimeRangeNames["BLOCKING"] = "blocking";
+    RequestTimeRangeNames["CONNECTING"] = "connecting";
+    RequestTimeRangeNames["DNS"] = "dns";
+    RequestTimeRangeNames["PROXY"] = "proxy";
+    RequestTimeRangeNames["RECEIVING"] = "receiving";
+    RequestTimeRangeNames["RECEIVING_PUSH"] = "receiving-push";
+    RequestTimeRangeNames["SENDING"] = "sending";
+    RequestTimeRangeNames["SERVICE_WORKER"] = "serviceworker";
+    RequestTimeRangeNames["SERVICE_WORKER_PREPARATION"] = "serviceworker-preparation";
+    RequestTimeRangeNames["SERVICE_WORKER_RESPOND_WITH"] = "serviceworker-respondwith";
+    RequestTimeRangeNames["SERVICE_WORKER_ROUTER_EVALUATION"] = "serviceworker-routerevaluation";
+    RequestTimeRangeNames["SERVICE_WORKER_CACHE_LOOKUP"] = "serviceworker-cachelookup";
+    RequestTimeRangeNames["SSL"] = "ssl";
+    RequestTimeRangeNames["TOTAL"] = "total";
+    RequestTimeRangeNames["WAITING"] = "waiting";
+})(RequestTimeRangeNames || (RequestTimeRangeNames = {}));
 export const ServiceWorkerRangeNames = new Set([
     "serviceworker" /* RequestTimeRangeNames.SERVICE_WORKER */,
     "serviceworker-preparation" /* RequestTimeRangeNames.SERVICE_WORKER_PREPARATION */,

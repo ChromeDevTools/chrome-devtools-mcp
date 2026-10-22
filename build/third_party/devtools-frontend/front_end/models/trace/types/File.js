@@ -24,6 +24,7 @@ export var EventKeyType;
     EventKeyType["SYNTHETIC_EVENT"] = "s";
     EventKeyType["PROFILE_CALL"] = "p";
     EventKeyType["LEGACY_TIMELINE_FRAME"] = "l";
+    EventKeyType["LAYOUT_SHIFT_CLUSTER"] = "c";
 })(EventKeyType || (EventKeyType = {}));
 export function isTimeRangeAnnotation(annotation) {
     return annotation.type === 'TIME_RANGE';
@@ -69,6 +70,15 @@ export function traceEventKeyToValues(key) {
         case EventKeyType.LEGACY_TIMELINE_FRAME: {
             if (parts.length !== 2 || Number.isNaN(parseInt(parts[1], 10))) {
                 throw new Error(`Invalid LegacyTimelineFrame Key: ${key}`);
+            }
+            return {
+                type,
+                rawIndex: parseInt(parts[1], 10),
+            };
+        }
+        case EventKeyType.LAYOUT_SHIFT_CLUSTER: {
+            if (parts.length !== 2 || Number.isNaN(parseInt(parts[1], 10))) {
+                throw new Error(`Invalid LayoutShiftCluster Key: ${key}`);
             }
             return {
                 type,

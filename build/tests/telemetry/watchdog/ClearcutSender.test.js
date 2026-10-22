@@ -5,13 +5,12 @@
  */
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import { describe, it, afterEach, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'node:test';
 import sinon from 'sinon';
 import { OsType } from '../../../src/telemetry/types.js';
 import { ClearcutSender } from '../../../src/telemetry/watchdog/ClearcutSender.js';
 const FLUSH_INTERVAL_MS = 15 * 1000;
 describe('ClearcutSender', () => {
-    let randomUUIDStub;
     let fetchStub;
     let clock;
     beforeEach(() => {
@@ -20,17 +19,11 @@ describe('ClearcutSender', () => {
             toFake: ['setTimeout', 'clearTimeout', 'Date'],
         });
         let uuidCounter = 0;
-        randomUUIDStub = sinon.stub(crypto, 'randomUUID').callsFake(() => {
+        sinon.stub(crypto, 'randomUUID').callsFake(() => {
             return `uuid-${++uuidCounter}`;
         });
         fetchStub = sinon.stub(global, 'fetch');
         fetchStub.resolves(new Response(JSON.stringify({}), { status: 200 }));
-    });
-    afterEach(() => {
-        randomUUIDStub.restore();
-        fetchStub.restore();
-        clock.restore();
-        sinon.restore();
     });
     it('enriches events with app version, os type, and session id', async () => {
         const sender = new ClearcutSender({
@@ -42,7 +35,7 @@ describe('ClearcutSender', () => {
         assert.strictEqual(sender.bufferSizeForTesting, 1);
         await clock.tickAsync(FLUSH_INTERVAL_MS);
         sender.stopForTesting();
-        assert.strictEqual(fetchStub.callCount, 1);
+        sinon.assert.callCount(fetchStub, 1);
         const requestBody = JSON.parse(fetchStub.firstCall.args[1].body);
         const event = JSON.parse(requestBody.log_event[0].source_extension_json);
         assert.strictEqual(event.session_id, 'uuid-1');
@@ -62,7 +55,7 @@ describe('ClearcutSender', () => {
             tool_invocation: { tool_name: 'test2', success: true, latency_ms: 200 },
         });
         assert.strictEqual(sender.bufferSizeForTesting, 2);
-        assert.strictEqual(fetchStub.callCount, 0);
+        sinon.assert.callCount(fetchStub, 0);
         sender.stopForTesting();
     });
     it('sends correct LogRequest format', async () => {
@@ -153,7 +146,7 @@ describe('ClearcutSender', () => {
             forceFlushIntervalMs: FLUSH_INTERVAL_MS,
         });
         await sender.sendShutdownEvent();
-        assert.strictEqual(fetchStub.callCount, 1);
+        sinon.assert.callCount(fetchStub, 1);
         const requestBody = JSON.parse(fetchStub.firstCall.args[1].body);
         const event = JSON.parse(requestBody.log_event[0].source_extension_json);
         assert.ok(event.server_shutdown);
@@ -220,7 +213,7 @@ describe('ClearcutSender', () => {
         const shutdownPromise = sender.sendShutdownEvent();
         resolveFirstRequest(new Response(JSON.stringify({}), { status: 200 }));
         await shutdownPromise;
-        assert.strictEqual(fetchStub.callCount, 2);
+        sinon.assert.callCount(fetchStub, 2);
         const firstBody = JSON.parse(fetchStub.args[0][1].body);
         const secondBody = JSON.parse(fetchStub.args[1][1].body);
         const firstEvents = firstBody.log_event.map(e => JSON.parse(e.source_extension_json));

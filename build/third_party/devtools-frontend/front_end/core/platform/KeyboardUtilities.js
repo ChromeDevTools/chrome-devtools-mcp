@@ -1,6 +1,18 @@
 // Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+export var ArrowKey;
+(function (ArrowKey) {
+    ArrowKey["UP"] = "ArrowUp";
+    ArrowKey["DOWN"] = "ArrowDown";
+    ArrowKey["LEFT"] = "ArrowLeft";
+    ArrowKey["RIGHT"] = "ArrowRight";
+})(ArrowKey || (ArrowKey = {}));
+export var PageKey;
+(function (PageKey) {
+    PageKey["UP"] = "PageUp";
+    PageKey["DOWN"] = "PageDown";
+})(PageKey || (PageKey = {}));
 export const ENTER_KEY = 'Enter';
 export const ESCAPE_KEY = 'Escape';
 export const TAB_KEY = 'Tab';

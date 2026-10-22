@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { DevTools, zod } from '../../src/third_party/index.js';
 import { getCssStyles } from '../../src/tools/css.js';
 import { createHandlerMocks } from '../mocks.js';
 describe('get_css_styles', () => {
-    afterEach(() => {
-        sinon.restore();
-    });
     it('defaults pagination to the first page of 10 rules', () => {
         const { args } = createHandlerMocks();
         const params = zod

@@ -38,5 +38,9 @@ export class IssuesModel extends SDKModel {
         return null;
     }
 }
+export var Events;
+(function (Events) {
+    Events["ISSUE_ADDED"] = "IssueAdded";
+})(Events || (Events = {}));
 SDKModel.register(IssuesModel, { capabilities: 32768 /* Capability.AUDITS */, autostart: true });
 //# sourceMappingURL=IssuesModel.js.map

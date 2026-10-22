@@ -6,7 +6,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { zod } from '../third_party/index.js';
+import { zod, } from '../third_party/index.js';
 import { ToolCategory } from './categories.js';
 import { definePageTool } from './ToolDefinition.js';
 async function generateTempFilePath() {
@@ -32,6 +32,20 @@ function getLegacyExtension(filePath) {
     }
     return matchedExtension ?? '.mp4';
 }
+/**
+ * Returns the size of the page viewport in device pixels.
+ */
+async function getPagePixelSize(pptrPage) {
+    const { width, height, dpr } = await pptrPage.evaluate(() => ({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        dpr: window.devicePixelRatio,
+    }));
+    return {
+        maxWidth: Math.max(1, Math.round(width * dpr)),
+        maxHeight: Math.max(1, Math.round(height * dpr)),
+    };
+}
 export const startScreencast = definePageTool((args) => ({
     name: 'screencast_start',
     description: `Starts recording a screencast (video) of the target page.`,
@@ -48,6 +62,7 @@ export const startScreencast = definePageTool((args) => ({
             : 'Output file path (.mp4). Uses mkdtemp to generate a unique path if not provided.'),
     },
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {
         filePath: true,
     },
@@ -76,9 +91,14 @@ export const startScreencast = definePageTool((args) => ({
                 });
             }
             else {
+                // Without explicit limits Chrome downscales frames to a small default
+                // size. Record at the actual device pixel size of the page instead.
+                const { maxWidth, maxHeight } = await getPagePixelSize(page.pptrPage);
                 recorder = await page.pptrPage.record({
                     path: resolvedPath,
                     fps: args?.screencastFps,
+                    maxWidth,
+                    maxHeight,
                 });
             }
         }
@@ -119,6 +139,7 @@ export const stopScreencast = definePageTool(() => ({
     },
     schema: {},
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const page = request.page;

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it, beforeEach } from 'node:test';
 import sinon from 'sinon';
 import { ISSUE_UTILS } from '../../src/devtools/issueDescriptions.js';
 import { IssueFormatter } from '../../src/formatters/IssueFormatter.js';
@@ -13,9 +13,6 @@ describe('IssueFormatter', () => {
     let getIssueDescriptionStub;
     beforeEach(() => {
         getIssueDescriptionStub = sinon.stub(ISSUE_UTILS, 'getIssueDescription');
-    });
-    afterEach(() => {
-        sinon.restore();
     });
     function formatterTestConcise(label, setup) {
         it(label + ' toString', async (t) => {

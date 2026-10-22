@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import assert from 'node:assert';
-import { afterEach, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import sinon from 'sinon';
 import { installPwa, uninstallPwa, launchPwa, getOsAppState, } from '../../src/tools/pwa.js';
 import { createHandlerMocks, createMockPuppeteerPage } from '../mocks.js';
@@ -43,9 +43,6 @@ const MANIFEST = JSON.stringify({
 });
 describe('pwa', () => {
     const server = serverHooks();
-    afterEach(() => {
-        sinon.restore();
-    });
     function setupPwaRoutes() {
         server.addRoute('/pwa/index.html', (_req, res) => {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');

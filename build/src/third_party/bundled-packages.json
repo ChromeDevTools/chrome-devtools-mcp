@@ -6,6 +6,6 @@
   "semver": "7.8.5",
   "yargs": "18.2.0",
   "zod": "4.6.5",
-  "puppeteer-core": "25.14.0",
-  "https://github.com/ChromeDevTools/devtools-frontend": "f7e7785de52d6f5955d6a9c5956c2fe2d520d091"
+  "puppeteer-core": "25.15.0",
+  "https://github.com/ChromeDevTools/devtools-frontend": "f22c645573adc85e4553747c577eebb874c3fb43"
 }

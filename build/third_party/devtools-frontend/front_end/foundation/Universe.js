@@ -5,7 +5,7 @@ import * as Common from '../core/common/common.js';
 import * as Host from '../core/host/host.js';
 import * as Root from '../core/root/root.js';
 import * as SDK from '../core/sdk/sdk.js';
-import * as AiAssistance from '../models/ai_assistance/ai_assistance.js';
+import * as AiAssistance from '../models/ai-utils/ai-utils.js';
 import * as AutofillManager from '../models/autofill_manager/autofill_manager.js';
 import * as Badges from '../models/badges/badges.js';
 import * as Bindings from '../models/bindings/bindings.js';

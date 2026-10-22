@@ -443,6 +443,13 @@ export var Type;
     Type["Unknown"] = "unknown";
     /* eslint-enable @typescript-eslint/naming-convention */
 })(Type || (Type = {}));
+export var Category;
+(function (Category) {
+    Category["MOBILE"] = "mobile";
+    Category["FOLDABLE"] = "foldable";
+    Category["TABLET_DESKTOP"] = "tablet_desktop";
+    Category["SMART_DISPLAY"] = "smart_display";
+})(Category || (Category = {}));
 export function deviceCategory(device) {
     if (device.type === Type.Foldable || device.isFoldableScreen || device.isDualScreen) {
         return "foldable" /* Category.FOLDABLE */;
@@ -473,6 +480,11 @@ export function getCategoryTitle(category) {
             return i18nString(UIStrings.smartDisplaysGroup);
     }
 }
+export var Capability;
+(function (Capability) {
+    Capability["TOUCH"] = "touch";
+    Capability["MOBILE"] = "mobile";
+})(Capability || (Capability = {}));
 var Show;
 (function (Show) {
     /* eslint-disable @typescript-eslint/naming-convention -- Indexed access. */
@@ -589,6 +601,18 @@ export class EmulatedDevicesList extends Common.ObjectWrapper.ObjectWrapper {
         }
     }
 }
+export var Events;
+(function (Events) {
+    Events["CUSTOM_DEVICES_UPDATED"] = "CustomDevicesUpdated";
+    Events["STANDARD_DEVICES_UPDATED"] = "StandardDevicesUpdated";
+})(Events || (Events = {}));
+export var CutoutShape;
+(function (CutoutShape) {
+    CutoutShape["PILL"] = "pill";
+    CutoutShape["NOTCH"] = "notch";
+    CutoutShape["CIRCLE"] = "circle";
+    CutoutShape["RECTANGLE"] = "rectangle";
+})(CutoutShape || (CutoutShape = {}));
 // These props should quoted for the script to work properly
 /* eslint-disable @stylistic/quote-props */
 // TODO(crbug.com/40718410): Add Android system navigation bar safe areas to the Pixel presets.

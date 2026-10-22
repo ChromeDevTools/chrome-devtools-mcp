@@ -211,4 +211,10 @@ export class Location {
         this.columnNumber = columnNumber;
     }
 }
+export var DOMLinkState;
+(function (DOMLinkState) {
+    DOMLinkState[DOMLinkState["UNKNOWN"] = 0] = "UNKNOWN";
+    DOMLinkState[DOMLinkState["ATTACHED"] = 1] = "ATTACHED";
+    DOMLinkState[DOMLinkState["DETACHED"] = 2] = "DETACHED";
+})(DOMLinkState || (DOMLinkState = {}));
 //# sourceMappingURL=HeapSnapshotModel.js.map

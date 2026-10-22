@@ -902,6 +902,13 @@ const RESERVED_FILENAMES = new Set([
     'com8', 'com9', 'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
 ]);
 export const HEADERS_FILENAME = '.headers';
+export var Events;
+(function (Events) {
+    Events["PROJECT_CHANGED"] = "ProjectChanged";
+    Events["REQUEST_FOR_HEADER_OVERRIDES_FILE_CHANGED"] = "RequestsForHeaderOverridesFileChanged";
+    Events["LOCAL_OVERRIDES_PROJECT_UPDATED"] = "LocalOverridesProjectUpdated";
+    Events["LOCAL_OVERRIDES_REQUESTED"] = "LocalOverridesRequested";
+})(Events || (Events = {}));
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isHeaderOverride(arg) {
     if (!(arg && typeof arg.applyTo === 'string' && arg.headers?.length && Array.isArray(arg.headers))) {

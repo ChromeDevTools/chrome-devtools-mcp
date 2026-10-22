@@ -1567,6 +1567,16 @@ export var Events;
     Events["EVENT_SOURCE_MESSAGE_ADDED"] = "EventSourceMessageAdded";
     Events["TRUST_TOKEN_RESULT_ADDED"] = "TrustTokenResultAdded";
 })(Events || (Events = {}));
+export var InitiatorType;
+(function (InitiatorType) {
+    InitiatorType["OTHER"] = "other";
+    InitiatorType["PARSER"] = "parser";
+    InitiatorType["REDIRECT"] = "redirect";
+    InitiatorType["SCRIPT"] = "script";
+    InitiatorType["PRELOAD"] = "preload";
+    InitiatorType["SIGNED_EXCHANGE"] = "signedExchange";
+    InitiatorType["PREFLIGHT"] = "preflight";
+})(InitiatorType || (InitiatorType = {}));
 export var WebSocketFrameType;
 (function (WebSocketFrameType) {
     /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */

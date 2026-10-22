@@ -220,6 +220,12 @@ export class ServiceWorkerManager extends SDKModel {
         void this.#agent.invoke_setForceUpdateOnPageLoad({ forceUpdateOnPageLoad });
     }
 }
+export var Events;
+(function (Events) {
+    Events["REGISTRATION_UPDATED"] = "RegistrationUpdated";
+    Events["REGISTRATION_ERROR_ADDED"] = "RegistrationErrorAdded";
+    Events["REGISTRATION_DELETED"] = "RegistrationDeleted";
+})(Events || (Events = {}));
 class ServiceWorkerDispatcher {
     #manager;
     constructor(manager) {
@@ -450,6 +456,13 @@ export class ServiceWorkerVersion {
         ["new" /* Protocol.ServiceWorker.ServiceWorkerVersionStatus.New */]: i18nLazyString(UIStrings.new),
         ["redundant" /* Protocol.ServiceWorker.ServiceWorkerVersionStatus.Redundant */]: i18nLazyString(UIStrings.redundant),
     };
+    let Modes;
+    (function (Modes) {
+        Modes["INSTALLING"] = "installing";
+        Modes["WAITING"] = "waiting";
+        Modes["ACTIVE"] = "active";
+        Modes["REDUNDANT"] = "redundant";
+    })(Modes = ServiceWorkerVersion.Modes || (ServiceWorkerVersion.Modes = {}));
 })(ServiceWorkerVersion || (ServiceWorkerVersion = {}));
 export class ServiceWorkerRegistration {
     #fingerprint;

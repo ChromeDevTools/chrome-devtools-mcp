@@ -5,6 +5,37 @@ import * as Root from '../../core/root/root.js';
 import { CategorizedBreakpoint } from './CategorizedBreakpoint.js';
 import { SDKModel } from './SDKModel.js';
 import { TargetManager } from './TargetManager.js';
+export var InstrumentationNames;
+(function (InstrumentationNames) {
+    InstrumentationNames["BEFORE_BIDDER_WORKLET_BIDDING_START"] = "beforeBidderWorkletBiddingStart";
+    InstrumentationNames["BEFORE_BIDDER_WORKLET_REPORTING_START"] = "beforeBidderWorkletReportingStart";
+    InstrumentationNames["BEFORE_SELLER_WORKLET_SCORING_START"] = "beforeSellerWorkletScoringStart";
+    InstrumentationNames["BEFORE_SELLER_WORKLET_REPORTING_START"] = "beforeSellerWorkletReportingStart";
+    InstrumentationNames["SET_TIMEOUT"] = "setTimeout";
+    InstrumentationNames["CLEAR_TIMEOUT"] = "clearTimeout";
+    InstrumentationNames["SET_TIMEOUT_CALLBACK"] = "setTimeout.callback";
+    InstrumentationNames["SET_INTERVAL"] = "setInterval";
+    InstrumentationNames["CLEAR_INTERVAL"] = "clearInterval";
+    InstrumentationNames["SET_INTERVAL_CALLBACK"] = "setInterval.callback";
+    InstrumentationNames["SCRIPT_FIRST_STATEMENT"] = "scriptFirstStatement";
+    InstrumentationNames["SCRIPT_BLOCKED_BY_CSP"] = "scriptBlockedByCSP";
+    InstrumentationNames["REQUEST_ANIMATION_FRAME"] = "requestAnimationFrame";
+    InstrumentationNames["CANCEL_ANIMATION_FRAME"] = "cancelAnimationFrame";
+    InstrumentationNames["REQUEST_ANIMATION_FRAME_CALLBACK"] = "requestAnimationFrame.callback";
+    InstrumentationNames["WEBGL_ERROR_FIRED"] = "webglErrorFired";
+    InstrumentationNames["WEBGL_WARNING_FIRED"] = "webglWarningFired";
+    InstrumentationNames["ELEMENT_SET_INNER_HTML"] = "Element.setInnerHTML";
+    InstrumentationNames["CANVAS_CONTEXT_CREATED"] = "canvasContextCreated";
+    InstrumentationNames["GEOLOCATION_GET_CURRENT_POSITION"] = "Geolocation.getCurrentPosition";
+    InstrumentationNames["GEOLOCATION_WATCH_POSITION"] = "Geolocation.watchPosition";
+    InstrumentationNames["NOTIFICATION_REQUEST_PERMISSION"] = "Notification.requestPermission";
+    InstrumentationNames["DOM_WINDOW_CLOSE"] = "DOMWindow.close";
+    InstrumentationNames["DOCUMENT_WRITE"] = "Document.write";
+    InstrumentationNames["AUDIO_CONTEXT_CREATED"] = "audioContextCreated";
+    InstrumentationNames["AUDIO_CONTEXT_CLOSED"] = "audioContextClosed";
+    InstrumentationNames["AUDIO_CONTEXT_RESUMED"] = "audioContextResumed";
+    InstrumentationNames["AUDIO_CONTEXT_SUSPENDED"] = "audioContextSuspended";
+})(InstrumentationNames || (InstrumentationNames = {}));
 export class EventBreakpointsModel extends SDKModel {
     agent;
     constructor(target) {

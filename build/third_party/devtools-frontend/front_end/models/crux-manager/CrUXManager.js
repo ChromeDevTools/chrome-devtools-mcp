@@ -295,4 +295,8 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper {
         this.#endpoint = endpoint;
     }
 }
+export var Events;
+(function (Events) {
+    Events["FIELD_DATA_CHANGED"] = "field-data-changed";
+})(Events || (Events = {}));
 //# sourceMappingURL=CrUXManager.js.map

@@ -58,15 +58,20 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 import assert from 'node:assert';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import sinon from 'sinon';
+import { DEFAULT_MAX_NAVIGATION_SAVED } from '../src/collectors/constants.js';
+import { ConfigLocator } from '../src/config/ConfigLocator.js';
 import { ConfigParser } from '../src/config/ConfigParser.js';
-import { getCliOptions, mcpOptions, DEFAULT_FILESYSTEM_ROOT, } from '../src/config/mcp-options.js';
+import { getCliOptions, mcpOptions, DEFAULT_FILESYSTEM_ROOT, MAX_NAVIGATION_SAVED_LIMIT, } from '../src/config/mcp-options.js';
 import { buildCommand, getCommandArgSpec, shieldLiteralArgs, } from '../src/config/cli-commands.js';
 import { commands } from '../src/config/cli-options.js';
 import { computeFlagUsage } from '../src/telemetry/flagUtils.js';
 import { puppeteerOptions } from '../src/config/puppeteer-options.js';
 import { createTempFile } from './utils.js';
 function parseConfig(argv, env = {}) {
-    return new ConfigParser('0.0.0', ['node', 'main.js', ...argv], env, false).parse();
+    const locator = new ConfigLocator();
+    sinon.stub(locator, 'locate').returns(undefined);
+    return new ConfigParser('0.0.0', ['node', 'main.js', ...argv], env, false, locator).parse();
 }
 describe('cli args parsing', () => {
     const defaultArgs = {
@@ -98,11 +103,13 @@ describe('cli args parsing', () => {
         experimentalStructuredContent: false,
         pageIdRouting: true,
         sourceMaps: true,
+        maxNavigationSaved: 3,
         clearcutIncludePidHeader: false,
         screenshotFormat: 'png',
         slim: false,
         viaCli: false,
         devtoolsComments: false,
+        watchConfig: false,
     };
     it('parses with default args', async () => {
         const args = parseConfig([]);
@@ -546,29 +553,31 @@ describe('cli args parsing', () => {
             'https://b.com/*',
         ]);
     });
-    it('rejects url-pattern with a regexp group or named group', async () => {
+    it('rejects url-pattern with a regexp group, named group, or partial IPv4 wildcard', async () => {
         assert.throws(() => parseConfig([
             String.raw `--blockedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
-        ]), /Invalid --blockedUrlPattern .*is not enforced/);
+        ]), /Invalid --blockedUrlPattern .*a regexp group is not enforced/);
         assert.throws(() => parseConfig([
             String.raw `--allowedUrlPattern=*://(127\.\d+\.\d+\.\d+):*/*`,
-        ]), /Invalid --allowedUrlPattern .*is not enforced/);
-        assert.throws(() => parseConfig(['--blockedUrlPattern=*://127.0.0.1::port/secret']), /Invalid --blockedUrlPattern .*is not enforced/);
-        assert.throws(() => parseConfig(['--allowedUrlPattern=*://127.0.0.1::port/secret']), /Invalid --allowedUrlPattern .*is not enforced/);
+        ]), /Invalid --allowedUrlPattern .*a regexp group is not enforced/);
+        assert.throws(() => parseConfig(['--blockedUrlPattern=*://127.0.0.1::port/secret']), /Invalid --blockedUrlPattern .*a ":name" named group is not enforced/);
+        assert.throws(() => parseConfig(['--allowedUrlPattern=*://127.0.0.1::port/secret']), /Invalid --allowedUrlPattern .*a ":name" named group is not enforced/);
+        assert.throws(() => parseConfig(['--blockedUrlPattern=*://127.0.0.*/*']), /Invalid --blockedUrlPattern .*a partial IPv4 wildcard is not enforced/);
+        assert.throws(() => parseConfig(['--allowedUrlPattern=*://127.0.0.*/*']), /Invalid --allowedUrlPattern .*a partial IPv4 wildcard is not enforced/);
     });
     it('rejects when any pattern in multiple url patterns is unenforceable', async () => {
         assert.throws(() => parseConfig([
             '--blocked-url-pattern=https://a.com/*',
             String.raw `--blocked-url-pattern=*://example.com/(foo|bar)`,
-        ]), /Invalid --blockedUrlPattern .*is not enforced/);
+        ]), /Invalid --blockedUrlPattern .*a regexp group is not enforced/);
         assert.throws(() => parseConfig([
             '--allowed-url-pattern=https://a.com/*',
             String.raw `--allowed-url-pattern=*://example.com/(foo|bar)`,
-        ]), /Invalid --allowedUrlPattern .*is not enforced/);
+        ]), /Invalid --allowedUrlPattern .*a regexp group is not enforced/);
     });
     it('rejects url-pattern with invalid syntax', async () => {
-        assert.throws(() => parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']));
-        assert.throws(() => parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']));
+        assert.throws(() => parseConfig(['--blocked-url-pattern=*://example.com/(unterminated']), /Invalid --blockedUrlPattern "\*:\/\/example\.com\/\(unterminated":/);
+        assert.throws(() => parseConfig(['--allowed-url-pattern=*://example.com/(unterminated']), /Invalid --allowedUrlPattern "\*:\/\/example\.com\/\(unterminated":/);
     });
     it('strips an empty blocked-url-pattern', async () => {
         const args = parseConfig(['--blocked-url-pattern']);
@@ -621,6 +630,34 @@ describe('cli args parsing', () => {
         assert.strictEqual(explicitFalseArgs.sourceMaps, false);
         const explicitTrueArgs = parseConfig(['--source-maps=true']);
         assert.strictEqual(explicitTrueArgs.sourceMaps, true);
+    });
+    it('parses maxNavigationSaved flag', async () => {
+        const defaultParsed = parseConfig(['main.js']);
+        assert.strictEqual(defaultParsed.maxNavigationSaved, 3);
+        assert.strictEqual(defaultParsed.maxNavigationSaved, DEFAULT_MAX_NAVIGATION_SAVED);
+        const camelCaseArgs = parseConfig(['--maxNavigationSaved', '5']);
+        assert.strictEqual(camelCaseArgs.maxNavigationSaved, 5);
+        const kebabCaseArgs = parseConfig(['--max-navigation-saved=1']);
+        assert.strictEqual(kebabCaseArgs.maxNavigationSaved, 1);
+        assert.throws(() => parseConfig(['--maxNavigationSaved', '26']), /Invalid maxNavigationSaved 26/);
+    });
+    it('rejects invalid maxNavigationSaved values', async () => {
+        const coerce = mcpOptions.maxNavigationSaved.coerce;
+        assert.ok(coerce);
+        assert.strictEqual(coerce(undefined), undefined);
+        assert.strictEqual(coerce(1), 1);
+        assert.strictEqual(coerce(MAX_NAVIGATION_SAVED_LIMIT), MAX_NAVIGATION_SAVED_LIMIT);
+        for (const value of [
+            0,
+            -1,
+            2.5,
+            Number.NaN,
+            MAX_NAVIGATION_SAVED_LIMIT + 1,
+            Number.MAX_SAFE_INTEGER,
+            Number.POSITIVE_INFINITY,
+        ]) {
+            assert.throws(() => coerce(value), /Invalid maxNavigationSaved .* Expected an integer between 1 and 25\./);
+        }
     });
     it('parses config option', async () => {
         const env_7 = { stack: [], error: void 0, hasError: false };
@@ -941,6 +978,7 @@ describe('cli args parsing', () => {
     it('clears default values and populates defaultDescription in getCliOptions', () => {
         const cliOptions = getCliOptions();
         assert.strictEqual(cliOptions.viewport, undefined);
+        assert.strictEqual(cliOptions.slim, undefined);
         assert.strictEqual(cliOptions.experimentalStructuredContent, undefined);
         assert.strictEqual(cliOptions.experimentalInteropTools, undefined);
         for (const [key, option] of Object.entries(cliOptions)) {

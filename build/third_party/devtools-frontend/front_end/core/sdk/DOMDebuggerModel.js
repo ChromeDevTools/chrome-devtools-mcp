@@ -214,6 +214,12 @@ export class DOMDebuggerModel extends SDKModel {
         this.#domBreakpointsSetting.set(breakpoints);
     }
 }
+export var Events;
+(function (Events) {
+    Events["DOM_BREAKPOINT_ADDED"] = "DOMBreakpointAdded";
+    Events["DOM_BREAKPOINT_TOGGLED"] = "DOMBreakpointToggled";
+    Events["DOM_BREAKPOINTS_REMOVED"] = "DOMBreakpointsRemoved";
+})(Events || (Events = {}));
 const Marker = 'breakpoint-marker';
 export class DOMBreakpoint {
     domDebuggerModel;
@@ -349,6 +355,14 @@ export class EventListener {
             this.#type === 'wheel';
     }
 }
+(function (EventListener) {
+    let Origin;
+    (function (Origin) {
+        Origin["RAW"] = "Raw";
+        Origin["FRAMEWORK"] = "Framework";
+        Origin["FRAMEWORK_USER"] = "FrameworkUser";
+    })(Origin = EventListener.Origin || (EventListener.Origin = {}));
+})(EventListener || (EventListener = {}));
 export class CSPViolationBreakpoint extends CategorizedBreakpoint {
     #type;
     constructor(category, type) {

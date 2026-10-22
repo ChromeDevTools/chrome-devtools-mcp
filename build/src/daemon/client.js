@@ -7,9 +7,9 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { PipeTransport } from '../third_party/index.js';
+import { PipeTransport } from '../third_party/cli.js';
 import { getTempFilePath } from '../utils/files.js';
-import { logger, puppeteerLogger } from '../utils/logger.js';
+import { logger, puppeteerLogger, redactDaemonArgsForLogging, } from '../utils/logger.js';
 import { DAEMON_SCRIPT_PATH, getDaemonPid, getSocketPath, getPidFilePath, isDaemonRunning, } from './utils.js';
 const FILE_TIMEOUT = 10_000;
 const READY_CHECK_INTERVAL = 100;
@@ -89,7 +89,7 @@ export async function startDaemon(mcpArgs = [], sessionId) {
         }
         fs.unlinkSync(pidFilePath);
     }
-    logger?.('Starting daemon...', ...mcpArgs);
+    logger?.('Starting daemon...', ...redactDaemonArgsForLogging(mcpArgs));
     const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
         detached: true,
         stdio: 'ignore',

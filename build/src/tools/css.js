@@ -34,6 +34,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
             .describe('Page number to return (0-based). Defaults to 0 (the first page).'),
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const matchedStyles = await request.page.getMatchedStylesForUid(request.params.uid);

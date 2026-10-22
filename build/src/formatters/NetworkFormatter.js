@@ -5,8 +5,25 @@
  * */
 import { isUtf8 } from 'node:buffer';
 import { DevTools, } from '../third_party/index.js';
+import { truncateText, truncateUrl } from '../utils/text.js';
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
-const URL_CONTEXT_SIZE_LIMIT = 255;
+/**
+ * How long to wait for a response body. Puppeteer reads a body only after the
+ * response finished loading, with no timeout of its own, and a response that
+ * never finishes (e.g. a `Cache-Control: no-store` response the page did not
+ * read) would otherwise hold the tool mutex forever.
+ */
+export const RESPONSE_BODY_TIMEOUT_MS = 5000;
+class ResponseBodyTimeoutError extends Error {
+    timeout;
+    constructor(timeout) {
+        super(`Response body timed out after ${timeout} ms`);
+        this.timeout = timeout;
+    }
+}
+function responseBodyTimeoutMessage(error) {
+    return `<Response body not available: the response did not finish loading within ${error.timeout} ms>`;
+}
 export class NetworkFormatter {
     #request;
     #options;
@@ -63,10 +80,13 @@ export class NetworkFormatter {
             if (this.#options.responseFilePath) {
                 let buffer;
                 try {
-                    buffer = await response.buffer();
+                    buffer = await this.#readResponseBody(response);
                 }
-                catch {
-                    // Response body is not available anymore
+                catch (error) {
+                    this.#responseBody =
+                        error instanceof ResponseBodyTimeoutError
+                            ? responseBodyTimeoutMessage(error)
+                            : responseBodyNotAvailableMessage;
                 }
                 if (buffer) {
                     if (!this.#options.saveFile) {
@@ -74,9 +94,6 @@ export class NetworkFormatter {
                     }
                     const result = await this.#options.saveFile(buffer, this.#options.responseFilePath, '.network-response');
                     this.#responseBodyFilePath = result.filename;
-                }
-                else {
-                    this.#responseBody = responseBodyNotAvailableMessage;
                 }
             }
             else {
@@ -110,7 +127,12 @@ export class NetworkFormatter {
         }, {});
     }
     toJSONDetailed() {
-        const redirectChain = this.#request.redirectChain();
+        // Puppeteer shares one redirect chain array between all hops of a
+        // redirect, so earlier hops also list themselves and the hops after them.
+        // Keep only the requests that redirected to this one.
+        const fullChain = this.#request.redirectChain();
+        const ownIndex = fullChain.indexOf(this.#request);
+        const redirectChain = ownIndex === -1 ? fullChain : fullChain.slice(0, ownIndex);
         const formattedRedirectChain = redirectChain.reverse().map(request => {
             const id = this.#options.requestIdResolver
                 ? this.#options.requestIdResolver(request)
@@ -158,7 +180,7 @@ export class NetworkFormatter {
     }
     async #getFormattedResponseBody(httpResponse, sizeLimit = BODY_CONTEXT_SIZE_LIMIT) {
         try {
-            const responseBuffer = await httpResponse.buffer();
+            const responseBuffer = await this.#readResponseBody(httpResponse);
             if (isUtf8(responseBuffer)) {
                 const responseAsTest = responseBuffer.toString('utf-8');
                 if (responseAsTest.length === 0) {
@@ -168,21 +190,38 @@ export class NetworkFormatter {
             }
             return '<binary data>';
         }
-        catch {
+        catch (error) {
+            if (error instanceof ResponseBodyTimeoutError) {
+                return responseBodyTimeoutMessage(error);
+            }
             return '<not available anymore>';
+        }
+    }
+    async #readResponseBody(httpResponse) {
+        const timeout = this.#options.responseBodyTimeout ?? RESPONSE_BODY_TIMEOUT_MS;
+        let timeoutId;
+        try {
+            return await Promise.race([
+                httpResponse.buffer(),
+                new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => {
+                        reject(new ResponseBodyTimeoutError(timeout));
+                    }, timeout);
+                }),
+            ]);
+        }
+        finally {
+            clearTimeout(timeoutId);
         }
     }
 }
 function getSizeLimitedString(text, sizeLimit) {
-    if (text.length > sizeLimit) {
-        return text.substring(0, sizeLimit) + '... <truncated>';
-    }
-    return text;
+    return truncateText(text, sizeLimit, { ellipsis: '... <truncated>' });
 }
 function convertNetworkRequestConciseToString(data) {
     // Long URLs (e.g., data: URLs) bloat the concise list output. The full URL
     // remains available via the detailed view and the structured content.
-    const url = getSizeLimitedString(data.url, URL_CONTEXT_SIZE_LIMIT);
+    const url = truncateUrl(data.url);
     return `reqid=${data.requestId} ${data.method} ${url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 function formatHeaders(headers) {

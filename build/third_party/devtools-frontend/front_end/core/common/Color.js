@@ -128,6 +128,22 @@ function getColorSpace(colorSpaceText) {
     }
     return null;
 }
+export var ColorChannel;
+(function (ColorChannel) {
+    ColorChannel["A"] = "a";
+    ColorChannel["ALPHA"] = "alpha";
+    ColorChannel["B"] = "b";
+    ColorChannel["C"] = "c";
+    ColorChannel["G"] = "g";
+    ColorChannel["H"] = "h";
+    ColorChannel["L"] = "l";
+    ColorChannel["R"] = "r";
+    ColorChannel["S"] = "s";
+    ColorChannel["W"] = "w";
+    ColorChannel["X"] = "x";
+    ColorChannel["Y"] = "y";
+    ColorChannel["Z"] = "z";
+})(ColorChannel || (ColorChannel = {}));
 /**
  * Percents in color spaces are mapped to ranges.
  * These ranges change based on the syntax.
@@ -536,6 +552,31 @@ function equals(a, b, accuracy = EPSILON) {
 function lessOrEquals(a, b, accuracy = EPSILON) {
     return a - b <= accuracy;
 }
+export var Format;
+(function (Format) {
+    Format["HEX"] = "hex";
+    Format["HEXA"] = "hexa";
+    Format["RGB"] = "rgb";
+    Format["RGBA"] = "rgba";
+    Format["HSL"] = "hsl";
+    Format["HSLA"] = "hsla";
+    Format["HWB"] = "hwb";
+    Format["HWBA"] = "hwba";
+    Format["LCH"] = "lch";
+    Format["OKLCH"] = "oklch";
+    Format["LAB"] = "lab";
+    Format["OKLAB"] = "oklab";
+    Format["SRGB"] = "srgb";
+    Format["SRGB_LINEAR"] = "srgb-linear";
+    Format["DISPLAY_P3"] = "display-p3";
+    Format["DISPLAY_P3_LINEAR"] = "display-p3-linear";
+    Format["A98_RGB"] = "a98-rgb";
+    Format["PROPHOTO_RGB"] = "prophoto-rgb";
+    Format["REC_2020"] = "rec2020";
+    Format["XYZ"] = "xyz";
+    Format["XYZ_D50"] = "xyz-d50";
+    Format["XYZ_D65"] = "xyz-d65";
+})(Format || (Format = {}));
 export class Lab {
     l;
     a;

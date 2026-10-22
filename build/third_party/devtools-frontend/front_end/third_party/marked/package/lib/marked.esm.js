@@ -979,4 +979,3 @@ g.parse = g;
 var Ft = g.options, Ut = g.setOptions, Kt = g.use, Wt = g.walkTokens, Xt = g.parseInline, Jt = g, Vt = b.parse, Yt = x.lex;
 export { P as Hooks, x as Lexer, q as Marked, b as Parser, y as Renderer, L as TextRenderer, w as Tokenizer, T as defaults, M as getDefaults, Yt as lexer, g as marked, Ft as options, Jt as parse, Xt as parseInline, Vt as parser, Ut as setOptions, Kt as use, Wt as walkTokens };
 //# sourceMappingURL=marked.esm.js.map
-//# sourceMappingURL=marked.esm.js.map

@@ -45,6 +45,10 @@ export class ScopeChainModel extends Common.ObjectWrapper.ObjectWrapper {
         }
     }
 }
+export var Events;
+(function (Events) {
+    Events["SCOPE_CHAIN_UPDATED"] = "ScopeChainUpdated";
+})(Events || (Events = {}));
 /**
  * A scope chain ready to be shown in the UI with debugging info applied.
  */

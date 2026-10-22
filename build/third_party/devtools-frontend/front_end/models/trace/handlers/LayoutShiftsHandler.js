@@ -264,11 +264,8 @@ async function buildLayoutShiftsClusters() {
             else {
                 navigationId = Types.Events.NO_NAVIGATION;
             }
-            clusters.push(Helpers.SyntheticEvents.SyntheticEventsManager
-                .registerSyntheticEvent({
+            clusters.push({
                 name: 'SyntheticLayoutShiftCluster',
-                // Will be replaced by the worst layout shift in the next for loop.
-                rawSourceEvent: event,
                 events: [],
                 clusterWindow: traceWindowFromTime(clusterStartTime),
                 clusterCumulativeScore: 0,
@@ -283,7 +280,7 @@ async function buildLayoutShiftsClusters() {
                 ph: Types.Events.Phase.COMPLETE,
                 cat: '',
                 dur: Types.Timing.Micro(-1), // This `cluster.dur` is updated below.
-            }));
+            });
             firstShiftTime = clusterStartTime;
         }
         // Given the above we should have a cluster available, so pick the most
@@ -402,7 +399,6 @@ async function buildLayoutShiftsClusters() {
         // Update the cluster's worst layout shift.
         if (worstShiftEvent) {
             cluster.worstShiftEvent = worstShiftEvent;
-            cluster.rawSourceEvent = worstShiftEvent.rawSourceEvent;
         }
         // layout shifts are already sorted by time ascending.
         // Capture the time range of the cluster.

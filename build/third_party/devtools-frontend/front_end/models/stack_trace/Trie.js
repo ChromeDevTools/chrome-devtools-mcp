@@ -9,6 +9,16 @@ export function isBuiltinFrame(rawFrame) {
     return rawFrame.lineNumber === -1 && rawFrame.columnNumber === -1 && !Boolean(rawFrame.scriptId) &&
         !Boolean(rawFrame.url);
 }
+/** How a single raw frame participates in stack traces. Context-free: it only depends on the raw frame itself. */
+export var FrameKind;
+(function (FrameKind) {
+    /** Shown as is. */
+    FrameKind["VISIBLE"] = "VISIBLE";
+    /** Code of an authored function that the compiler moved into a separate function. Merged with its caller(s). */
+    FrameKind["OUTLINED"] = "OUTLINED";
+    /** Compiler helper without authored counterpart. Never shown. */
+    FrameKind["HIDDEN"] = "HIDDEN";
+})(FrameKind || (FrameKind = {}));
 export class EvalOrigin {
     frames;
     evalOrigin;

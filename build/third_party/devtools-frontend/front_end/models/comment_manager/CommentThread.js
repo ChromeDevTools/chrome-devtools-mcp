@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
+export var Events;
+(function (Events) {
+    Events["CHANGED"] = "Changed";
+})(Events || (Events = {}));
 export class CommentThread extends Common.ObjectWrapper.ObjectWrapper {
     static #nextIndex = 1;
     static resetIndex() {
@@ -38,9 +43,24 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper {
         }
         return false;
     }
+    /**
+     * Records UMA for a developer-authored comment when it leaves the DRAFT state.
+     */
+    #recordCommentCreated() {
+        if (this.isGeneratedComment) {
+            return;
+        }
+        const text = this.comments.find(c => c.author === 'DEVELOPER')?.text.trim();
+        if (!text) {
+            return;
+        }
+        Host.userMetrics.commentCreated(1);
+        Host.userMetrics.commentSize(text.length);
+    }
     save(text, author = 'DEVELOPER') {
         let changed = this.#saveText(text, author);
         if (this.status === 'DRAFT') {
+            this.#recordCommentCreated();
             if (this.#savedIndex === undefined) {
                 this.#savedIndex = CommentThread.#nextIndex++;
             }
@@ -65,6 +85,9 @@ export class CommentThread extends Common.ObjectWrapper.ObjectWrapper {
     }
     sendToAgent(text, author = 'DEVELOPER') {
         let changed = this.#saveText(text, author);
+        if (this.status === 'DRAFT') {
+            this.#recordCommentCreated();
+        }
         if (this.status === 'DRAFT' || this.status === 'ACTIVE') {
             if (this.#savedIndex === undefined) {
                 this.#savedIndex = CommentThread.#nextIndex++;

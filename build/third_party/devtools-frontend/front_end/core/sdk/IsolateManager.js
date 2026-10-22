@@ -107,6 +107,10 @@ export class IsolateManager extends Common.ObjectWrapper.ObjectWrapper {
         }
     }
 }
+export var Events;
+(function (Events) {
+    Events["MEMORY_CHANGED"] = "MemoryChanged";
+})(Events || (Events = {}));
 export const MemoryTrendWindowMs = 120e3;
 const PollIntervalMs = 2e3;
 export class Isolate {

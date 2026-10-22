@@ -565,4 +565,8 @@ function mergeSourceRanges(ranges) {
     }
     return result;
 }
+export var Events;
+(function (Events) {
+    Events["IGNORED_SCRIPT_RANGES_UPDATED"] = "IGNORED_SCRIPT_RANGES_UPDATED";
+})(Events || (Events = {}));
 //# sourceMappingURL=IgnoreListManager.js.map

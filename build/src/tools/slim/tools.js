@@ -9,24 +9,38 @@ import { definePageTool } from '../ToolDefinition.js';
 import { validateUrl } from '../../utils/url.js';
 export const screenshot = definePageTool(() => ({
     name: 'screenshot',
-    description: `Takes a screenshot`,
+    description: `Takes a png screenshot`,
     annotations: {
         category: ToolCategory.DEBUGGING,
         // Not read-only due to filePath param.
         readOnlyHint: false,
         conditions: ['slim'],
     },
-    schema: {},
+    schema: {
+        filePath: zod
+            .string()
+            .optional()
+            .describe('The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.'),
+    },
     blockedByDialog: true,
-    verifyFilesSchema: {},
+    concurrency: 'page',
+    verifyFilesSchema: {
+        filePath: true,
+    },
     handler: async (request, response, context) => {
         const page = request.page;
         const screenshot = await page.pptrPage.screenshot({
             type: 'png',
             optimizeForSpeed: true,
         });
-        const { filepath } = await context.saveTemporaryFile(screenshot, `screenshot.png`);
-        response.appendResponseLine(filepath);
+        if (request.params.filePath) {
+            const result = await context.saveFile(screenshot, request.params.filePath, '.png');
+            response.appendResponseLine(result.filename);
+        }
+        else {
+            const { filepath } = await context.saveTemporaryFile(screenshot, `screenshot.png`);
+            response.appendResponseLine(filepath);
+        }
     },
 }));
 export const navigate = definePageTool((args) => {
@@ -42,6 +56,7 @@ export const navigate = definePageTool((args) => {
             url: zod.string().describe('URL to navigate to'),
         },
         blockedByDialog: false,
+        concurrency: 'page',
         verifyFilesSchema: {},
         handler: async (request, response) => {
             validateUrl(request.params.url, {
@@ -84,6 +99,7 @@ export const evaluate = definePageTool(() => ({
         script: zod.string().describe(`JS script to run on the page`),
     },
     blockedByDialog: true,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         const page = request.page;

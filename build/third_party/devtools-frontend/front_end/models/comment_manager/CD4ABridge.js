@@ -4,6 +4,10 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as SDK from '../../core/sdk/sdk.js';
+export var Events;
+(function (Events) {
+    Events["COMMENT_THREADS_CHANGED"] = "CommentThreadsChanged";
+})(Events || (Events = {}));
 /**
  * Headless model bridge connecting DevTools comments subsystem to CD4A.
  * Provides serialization, transmission state tracking, and element reveal capabilities.

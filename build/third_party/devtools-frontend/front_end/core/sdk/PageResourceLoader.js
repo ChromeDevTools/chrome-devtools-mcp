@@ -459,4 +459,8 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper {
         return this.#settings.createSetting('load-through-target', true);
     }
 }
+export var Events;
+(function (Events) {
+    Events["UPDATE"] = "Update";
+})(Events || (Events = {}));
 //# sourceMappingURL=PageResourceLoader.js.map

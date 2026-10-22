@@ -7,8 +7,12 @@ import * as Platform from '../platform/platform.js';
 import * as TextUtils from '../text_utils/text_utils.js';
 import { cssMetadata, GridAreaRowRegex } from './CSSMetadata.js';
 import { matchDeclaration, stripComments, } from './CSSPropertyParser.js';
-import { CSSWideKeywordMatcher } from './CSSPropertyParserMatchers.js';
+import { CSSWideKeywordMatcher, ImportantMatcher } from './CSSPropertyParserMatchers.js';
 import { textEditorIndentSettingDescriptor } from './SDKSettings.js';
+export var Events;
+(function (Events) {
+    Events["LOCAL_VALUE_UPDATED"] = "localValueUpdated";
+})(Events || (Events = {}));
 export class CSSProperty extends Common.ObjectWrapper.ObjectWrapper {
     ownerStyle;
     index;
@@ -76,7 +80,7 @@ export class CSSProperty extends Common.ObjectWrapper.ObjectWrapper {
     }
     #matchers(matchedStyles, computedStyles) {
         const matchers = matchedStyles.propertyMatchers(this.ownerStyle, computedStyles);
-        matchers.push(new CSSWideKeywordMatcher(this, matchedStyles));
+        matchers.push(new CSSWideKeywordMatcher(this, matchedStyles), new ImportantMatcher());
         return matchers;
     }
     ensureRanges() {

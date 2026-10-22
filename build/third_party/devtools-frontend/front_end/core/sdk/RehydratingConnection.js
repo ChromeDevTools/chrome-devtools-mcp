@@ -52,6 +52,12 @@ export function isTraceUrlAllowed(traceUrl) {
     }
     return false;
 }
+export var RehydratingConnectionState;
+(function (RehydratingConnectionState) {
+    RehydratingConnectionState[RehydratingConnectionState["UNINITIALIZED"] = 1] = "UNINITIALIZED";
+    RehydratingConnectionState[RehydratingConnectionState["INITIALIZED"] = 2] = "INITIALIZED";
+    RehydratingConnectionState[RehydratingConnectionState["REHYDRATED"] = 3] = "REHYDRATED";
+})(RehydratingConnectionState || (RehydratingConnectionState = {}));
 export class RehydratingConnectionTransport {
     rehydratingConnectionState = 1 /* RehydratingConnectionState.UNINITIALIZED */;
     onDisconnect = null;

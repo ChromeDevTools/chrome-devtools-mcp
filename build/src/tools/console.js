@@ -32,7 +32,7 @@ const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 export const listConsoleMessages = definePageTool((cliArgs) => {
     return {
         name: LIST_CONSOLE_MESSAGES_TOOL_NAME,
-        description: `List all console messages for the target page since the last navigation.${cliArgs?.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
+        description: `List all console messages for the target page since the last navigation.${cliArgs.categoryExtensions ? ' This includes console messages originating from extensions content scripts.' : ''}`,
         annotations: {
             category: ToolCategory.DEBUGGING,
             readOnlyHint: true,
@@ -49,7 +49,7 @@ export const listConsoleMessages = definePageTool((cliArgs) => {
                 .int()
                 .min(0)
                 .optional()
-                .describe('Page number to return (0-based). When omitted, returns the first page.'),
+                .describe('Page number to return (0-based). When omitted, returns the first page. Ignored unless pageSize is set.'),
             types: zod
                 .array(zod.enum(FILTERABLE_MESSAGE_TYPES))
                 .optional()
@@ -58,7 +58,7 @@ export const listConsoleMessages = definePageTool((cliArgs) => {
                 .boolean()
                 .default(false)
                 .optional()
-                .describe('Set to true to return the preserved messages over the last 3 navigations.'),
+                .describe(`Set to true to return the preserved messages over the last ${cliArgs.maxNavigationSaved} navigations.`),
             includeStackTraces: zod
                 .boolean()
                 .default(false)
@@ -67,9 +67,10 @@ export const listConsoleMessages = definePageTool((cliArgs) => {
             serviceWorkerId: zod
                 .string()
                 .optional()
-                .describe('Filter messages to only return messages of the specified service worker.'),
+                .describe('Filter messages by the service worker ID shown by list_pages (sw-N).'),
         },
         blockedByDialog: false,
+        concurrency: 'page',
         verifyFilesSchema: {},
         handler: async (request, response) => {
             response.setIncludeConsoleData(true, {
@@ -96,6 +97,7 @@ export const getConsoleMessage = definePageTool(() => ({
             .describe('The msgid of a console message on the page from the listed console messages'),
     },
     blockedByDialog: false,
+    concurrency: 'page',
     verifyFilesSchema: {},
     handler: async (request, response) => {
         response.attachConsoleMessage(request.params.msgid);

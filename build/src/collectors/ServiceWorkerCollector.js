@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { UncaughtError } from './PageCollector.js';
-import { createIdGenerator, stableIdSymbol } from '../utils/id.js';
+import { createIdGenerator, stableIdSymbol, } from '../utils/id.js';
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
 export class ServiceWorkerSubscriber {
     #target;
@@ -37,7 +37,7 @@ export class ServiceWorkerSubscriber {
         const url = this.#target.url();
         const extensionId = extractExtensionId(url);
         if (extensionId) {
-            this.#callback(new UncaughtError(event.exceptionDetails, extensionId));
+            this.#callback(new UncaughtError(event.exceptionDetails, extensionId, this.#session));
         }
     };
 }

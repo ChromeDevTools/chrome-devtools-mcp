@@ -100,6 +100,14 @@ export class HeapProfilerModel extends SDKModel {
         this.dispatchEventToListeners("ResetProfiles" /* Events.RESET_PROFILES */, this);
     }
 }
+export var Events;
+(function (Events) {
+    Events["HEAP_STATS_UPDATED"] = "HeapStatsUpdate";
+    Events["LAST_SEEN_OBJECT_ID"] = "LastSeenObjectId";
+    Events["ADD_HEAP_SNAPSHOT_CHUNK"] = "AddHeapSnapshotChunk";
+    Events["REPORT_HEAP_SNAPSHOT_PROGRESS"] = "ReportHeapSnapshotProgress";
+    Events["RESET_PROFILES"] = "ResetProfiles";
+})(Events || (Events = {}));
 class HeapProfilerDispatcher {
     #heapProfilerModel;
     constructor(model) {

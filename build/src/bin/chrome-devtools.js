@@ -7,13 +7,13 @@
 import process from 'node:process';
 import { startDaemon, stopDaemon, sendCommand, handleResponse, verifyDaemonVersion, } from '../daemon/client.js';
 import { isDaemonRunning, serializeArgs, assertValidSessionId, } from '../daemon/utils.js';
-import { logDisclaimers } from '../index.js';
-import { hideBin, yargs } from '../third_party/index.js';
+import { logDisclaimers } from '../utils/disclaimers.js';
+import { hideBin, yargs } from '../third_party/cli.js';
 import { checkForUpdates } from '../utils/check-for-updates.js';
 import { VERSION } from '../version.js';
 import { buildCommand, getCommandArgSpec, shieldLiteralArgs, } from '../config/cli-commands.js';
 import { commands } from '../config/cli-options.js';
-import { mcpOptions, getCliOptions } from '../config/mcp-options.js';
+import { getCliOptions } from '../config/mcp-options.js';
 import { ConfigParser } from '../config/ConfigParser.js';
 process.title = 'chrome-devtools';
 await checkForUpdates('Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.');
@@ -170,11 +170,12 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     }, async (argv) => {
         const sessionId = argv.sessionId;
         try {
-            const versionWarningPromise = isDaemonRunning(sessionId)
+            const daemonRunning = isDaemonRunning(sessionId);
+            const versionWarningPromise = daemonRunning
                 ? verifyDaemonVersion(sessionId, VERSION)
                 : Promise.resolve(undefined);
-            if (!isDaemonRunning(sessionId)) {
-                await start(serializeArgs(mcpOptions, argv), sessionId);
+            if (!daemonRunning) {
+                await start([], sessionId);
             }
             const commandArgs = {};
             for (const argName of Object.keys(args)) {

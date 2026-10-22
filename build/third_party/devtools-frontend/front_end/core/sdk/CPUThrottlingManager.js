@@ -10,6 +10,7 @@ export var CalibrationError;
 (function (CalibrationError) {
     CalibrationError["DEVICE_TOO_WEAK"] = "DEVICE_TOO_WEAK";
 })(CalibrationError || (CalibrationError = {}));
+export var CPUPerformanceTier = Protocol.Emulation.SetCPUPerformanceOverrideRequestPerformanceTier;
 export function numberToTier(value) {
     switch (value) {
         case 1:
@@ -283,4 +284,10 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper {
         // Implemented as a requirement for being a SDKModelObserver.
     }
 }
+export var Events;
+(function (Events) {
+    Events["RATE_CHANGED"] = "RateChanged";
+    Events["HARDWARE_CONCURRENCY_CHANGED"] = "HardwareConcurrencyChanged";
+    Events["CPU_PERFORMANCE_TIER_CHANGED"] = "CpuPerformanceTierChanged";
+})(Events || (Events = {}));
 //# sourceMappingURL=CPUThrottlingManager.js.map

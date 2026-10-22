@@ -60,8 +60,8 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Mutex, puppeteer } from './third_party/index.js';
-import { logger, puppeteerLogger } from './utils/logger.js';
+import { Mutex, puppeteer, } from './third_party/index.js';
+import { logger, puppeteerLogger, redactConnectOptionsForLogging, } from './utils/logger.js';
 import { isAllowedUrl } from './utils/url.js';
 /**
  * Identity token for an in-flight connect/launch attempt. Instances carry no
@@ -76,11 +76,11 @@ export class BrowserManager {
     #initPromise;
     #mutex = new Mutex();
     #closingCount = 0;
-    #serverArgs;
+    #config;
     #options;
     #browserAttempt = new BrowserAttempt();
-    constructor(serverArgs, options = {}) {
-        this.#serverArgs = serverArgs;
+    constructor(config, options = {}) {
+        this.#config = config;
         this.#options = options;
     }
     static makeTargetFilter(enableExtensions = false) {
@@ -207,8 +207,9 @@ export class BrowserManager {
      * McpContext initialization built on it — if ensureBrowser() already
      * resolved and it's that later step hanging (e.g. a dead CDP transport),
      * the token rotation alone does nothing, since #browser is already
-     * cached. Safe to forget unconditionally here: the tool mutex serializes
-     * every call, so there's no concurrent caller to disrupt.
+     * cached. Safe to forget unconditionally here: a tool call that already
+     * received a Browser keeps using it, so forgetting the cached value only
+     * makes the next ensureBrowser() reconnect.
      */
     abandonPendingAttempt() {
         this.#browserAttempt = new BrowserAttempt();
@@ -216,26 +217,28 @@ export class BrowserManager {
         this.#forgetCurrentBrowser();
     }
     async #initBrowser() {
-        if (this.#serverArgs.browserUrl ||
-            this.#serverArgs.wsEndpoint ||
-            this.#serverArgs.autoConnect) {
+        if (this.#config.resolved.browserUrl ||
+            this.#config.resolved.wsEndpoint ||
+            this.#config.resolved.autoConnect) {
             return await this.#connect();
         }
         return await this.#launch();
     }
     async #launch() {
-        const { channel, executablePath, headless, isolated = false, categoryExtensions: enableExtensions, viaCli, viewport, acceptInsecureCerts, experimentalDevtools: devtools = false, blockedUrlPattern: blocklist, allowedUrlPattern: allowlist, ignoreDefaultChromeArg, proxyServer, } = this.#serverArgs;
+        const { channel, executablePath, headless, isolated = false, categoryExtensions: enableExtensions, viaCli, viewport, acceptInsecureCerts, experimentalDevtools: devtools = false, blockedUrlPattern: blocklist, allowedUrlPattern: allowlist, ignoreDefaultChromeArg, proxyServer, } = this.#config.resolved;
         const profileDirName = channel && channel !== 'stable'
             ? `chrome-profile-${channel}`
             : 'chrome-profile';
-        let userDataDir = this.#serverArgs.userDataDir;
+        let userDataDir = this.#config.resolved.userDataDir;
         if (!isolated && !userDataDir) {
             userDataDir = path.join(os.homedir(), '.cache', viaCli ? 'chrome-devtools-mcp-cli' : 'chrome-devtools-mcp', profileDirName);
             await fs.promises.mkdir(userDataDir, {
                 recursive: true,
             });
         }
-        const args = [...(this.#serverArgs.chromeArg ?? [])];
+        const args = [
+            ...(this.#config.resolved.chromeArg ?? []),
+        ];
         if (proxyServer) {
             args.push(`--proxy-server=${proxyServer}`);
         }
@@ -273,6 +276,12 @@ export class BrowserManager {
                 blocklist,
                 allowlist,
                 logger: puppeteerLogger,
+                // The entry points own signal handling and call close(), which
+                // closes the browser gracefully. Puppeteer's handlers would SIGKILL
+                // Chrome synchronously on the same signal and win the race.
+                handleSIGINT: false,
+                handleSIGTERM: false,
+                handleSIGHUP: false,
             });
             if (this.#options.logFile) {
                 // FIXME: we are probably subscribing too late to catch startup logs. We
@@ -314,9 +323,9 @@ export class BrowserManager {
         }
     }
     async #connect() {
-        const { browserUrl: browserURL, wsEndpoint, wsHeaders, autoConnect: isAutoConnect, userDataDir, blockedUrlPattern: blocklist, allowedUrlPattern: allowlist, categoryExtensions: enableExtensions, } = this.#serverArgs;
+        const { browserUrl: browserURL, wsEndpoint, wsHeaders, autoConnect: isAutoConnect, userDataDir, blockedUrlPattern: blocklist, allowedUrlPattern: allowlist, categoryExtensions: enableExtensions, } = this.#config.resolved;
         // Important: only pass channel, if autoConnect is true.
-        const channel = isAutoConnect ? this.#serverArgs.channel : undefined;
+        const channel = isAutoConnect ? this.#config.resolved.channel : undefined;
         const connectOptions = {
             targetFilter: _a.makeTargetFilter(enableExtensions),
             defaultViewport: null,
@@ -329,7 +338,7 @@ export class BrowserManager {
             // periodically and terminates it on a missed pong, which rejects the
             // in-flight CDP calls and fires `disconnected` so #evictIfCurrent()
             // drops the stale handle. Without this, such a call would hang until
-            // protocolTimeout while holding the tool mutex.
+            // protocolTimeout inside the context queue.
             wsOptions: {
                 keepAlive: true,
                 headers: wsHeaders,
@@ -343,8 +352,8 @@ export class BrowserManager {
             connectOptions.browserURL = browserURL;
         }
         else if (channel || userDataDir) {
+            autoConnect = true;
             if (userDataDir) {
-                autoConnect = true;
                 // TODO: re-expose this logic via Puppeteer.
                 const portPath = path.join(userDataDir, 'DevToolsActivePort');
                 try {
@@ -384,7 +393,7 @@ export class BrowserManager {
         else {
             throw new Error('Either browserURL, wsEndpoint, channel or userDataDir must be provided');
         }
-        logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+        logger?.('Connecting Puppeteer to ', JSON.stringify(redactConnectOptionsForLogging(connectOptions)));
         try {
             const connected = await puppeteer.connect(connectOptions);
             logger?.('Connected Puppeteer');

@@ -153,4 +153,8 @@ export class AutofillModel extends SDKModel {
     }
 }
 SDKModel.register(AutofillModel, { capabilities: 2 /* Capability.DOM */, autostart: true });
+export var Events;
+(function (Events) {
+    Events["ADDRESS_FORM_FILLED"] = "AddressFormFilled";
+})(Events || (Events = {}));
 //# sourceMappingURL=AutofillModel.js.map

@@ -16,6 +16,12 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('core/sdk/OverlayModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export var EmulatedOSType;
+(function (EmulatedOSType) {
+    EmulatedOSType["WINDOWS"] = "Windows";
+    EmulatedOSType["MAC"] = "Mac";
+    EmulatedOSType["LINUX"] = "Linux";
+})(EmulatedOSType || (EmulatedOSType = {}));
 const platformOverlayDimensions = {
     mac: { x: 85, y: 0, width: 185, height: 40 },
     linux: { x: 0, y: 0, width: 196, height: 34 },
@@ -698,11 +704,9 @@ export class OverlayModel extends SDKModel {
     async hasStyleSheetText(url) {
         return await this.#windowControls.initializeStyleSheetText(url);
     }
-    inspectPanelShowRequested({ backendNodeId }) {
-        this.dispatchEventToListeners("InspectPanelShowRequested" /* Events.INSPECT_PANEL_SHOW_REQUESTED */, backendNodeId);
+    inspectPanelShowRequested(_event) {
     }
-    inspectedElementWindowRestored({ backendNodeId }) {
-        this.dispatchEventToListeners("InspectedElementWindowRestored" /* Events.INSPECTED_ELEMENT_WINDOW_RESTORED */, backendNodeId);
+    inspectedElementWindowRestored(_event) {
     }
 }
 export class WindowControls {
@@ -799,6 +803,17 @@ export class WindowControls {
         return WindowControls.#transformStyleSheet(x, y, width, height, originalStyleSheet);
     }
 }
+export var Events;
+(function (Events) {
+    Events["INSPECT_MODE_WILL_BE_TOGGLED"] = "InspectModeWillBeToggled";
+    Events["EXITED_INSPECT_MODE"] = "InspectModeExited";
+    Events["HIGHLIGHT_NODE_REQUESTED"] = "HighlightNodeRequested";
+    Events["SCREENSHOT_REQUESTED"] = "ScreenshotRequested";
+    Events["PERSISTENT_GRID_OVERLAY_STATE_CHANGED"] = "PersistentGridOverlayStateChanged";
+    Events["PERSISTENT_FLEX_CONTAINER_OVERLAY_STATE_CHANGED"] = "PersistentFlexContainerOverlayStateChanged";
+    Events["PERSISTENT_SCROLL_SNAP_OVERLAY_STATE_CHANGED"] = "PersistentScrollSnapOverlayStateChanged";
+    Events["PERSISTENT_CONTAINER_QUERY_OVERLAY_STATE_CHANGED"] = "PersistentContainerQueryOverlayStateChanged";
+})(Events || (Events = {}));
 class DefaultHighlighter {
     #model;
     constructor(model) {

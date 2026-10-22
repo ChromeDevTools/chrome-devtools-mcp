@@ -201,7 +201,7 @@ describe('Network Blocking Integration', () => {
                 },
                 page: context.getSelectedMcpPage(),
             }, response, context);
-            assert.equal(response.attachedLighthouseResult?.summary.mode, 'navigation');
+            assert.strictEqual(response.attachedLighthouseResult?.summary.mode, 'navigation');
             await assertFetchIsBlocked(blockedUrl, received, response, context, args, 'Fetch should still be blocked after audit');
         }, {
             blockedUrlPattern,

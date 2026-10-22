@@ -561,6 +561,7 @@ export const generatedProperties = [
             "fill-opacity",
             "fill-rule",
             "filter",
+            "fit-tolerance",
             "flex-basis",
             "flex-direction",
             "flex-grow",
@@ -570,7 +571,6 @@ export const generatedProperties = [
             "float",
             "flood-color",
             "flood-opacity",
-            "flow-tolerance",
             "font-display",
             "font-family",
             "font-feature-settings",
@@ -1313,6 +1313,15 @@ export const generatedProperties = [
         "name": "border-block-end-color"
     },
     {
+        "longhands": [
+            "border-end-start-radius",
+            "border-end-end-radius"
+        ],
+        "name": "border-block-end-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
+    },
+    {
         "keywords": [
             "none",
             "hidden",
@@ -1348,6 +1357,15 @@ export const generatedProperties = [
             "currentcolor"
         ],
         "name": "border-block-start-color"
+    },
+    {
+        "longhands": [
+            "border-start-start-radius",
+            "border-start-end-radius"
+        ],
+        "name": "border-block-start-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
     },
     {
         "keywords": [
@@ -1402,6 +1420,15 @@ export const generatedProperties = [
     },
     {
         "name": "border-bottom-left-radius"
+    },
+    {
+        "longhands": [
+            "border-bottom-left-radius",
+            "border-bottom-right-radius"
+        ],
+        "name": "border-bottom-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
     },
     {
         "name": "border-bottom-right-radius"
@@ -1529,6 +1556,15 @@ export const generatedProperties = [
         "name": "border-inline-end-color"
     },
     {
+        "longhands": [
+            "border-start-end-radius",
+            "border-end-end-radius"
+        ],
+        "name": "border-inline-end-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
+    },
+    {
         "keywords": [
             "none",
             "hidden",
@@ -1564,6 +1600,15 @@ export const generatedProperties = [
             "currentcolor"
         ],
         "name": "border-inline-start-color"
+    },
+    {
+        "longhands": [
+            "border-start-start-radius",
+            "border-end-start-radius"
+        ],
+        "name": "border-inline-start-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
     },
     {
         "keywords": [
@@ -1617,6 +1662,15 @@ export const generatedProperties = [
         "name": "border-left-color"
     },
     {
+        "longhands": [
+            "border-top-left-radius",
+            "border-bottom-left-radius"
+        ],
+        "name": "border-left-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
+    },
+    {
         "keywords": [
             "none",
             "hidden",
@@ -1661,6 +1715,15 @@ export const generatedProperties = [
             "currentcolor"
         ],
         "name": "border-right-color"
+    },
+    {
+        "longhands": [
+            "border-top-right-radius",
+            "border-bottom-right-radius"
+        ],
+        "name": "border-right-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
     },
     {
         "keywords": [
@@ -1735,6 +1798,15 @@ export const generatedProperties = [
     },
     {
         "name": "border-top-left-radius"
+    },
+    {
+        "longhands": [
+            "border-top-left-radius",
+            "border-top-right-radius"
+        ],
+        "name": "border-top-radius",
+        "runtime_flag": "CSSBorderRadiusSideShorthands",
+        "runtime_flag_status": "experimental"
     },
     {
         "name": "border-top-right-radius"
@@ -2811,6 +2883,15 @@ export const generatedProperties = [
         "name": "filter"
     },
     {
+        "keywords": [
+            "normal",
+            "infinite"
+        ],
+        "name": "fit-tolerance",
+        "runtime_flag": "CSSGridLanesLayout",
+        "runtime_flag_status": "experimental"
+    },
+    {
         "devtools_keywords": [
             "none",
             "auto",
@@ -2891,15 +2972,6 @@ export const generatedProperties = [
     },
     {
         "name": "flood-opacity"
-    },
-    {
-        "keywords": [
-            "normal",
-            "infinite"
-        ],
-        "name": "flow-tolerance",
-        "runtime_flag": "CSSGridLanesLayout",
-        "runtime_flag_status": "experimental"
     },
     {
         "devtools_keywords": [],
@@ -5504,7 +5576,7 @@ export const generatedProperties = [
         ],
         "name": "text-decoration-skip-spaces",
         "runtime_flag": "CSSTextDecorationSkipSpaces",
-        "runtime_flag_status": "stable"
+        "runtime_flag_status": "experimental"
     },
     {
         "keywords": [
@@ -7425,6 +7497,12 @@ export const generatedPropertyValues = {
             "none"
         ]
     },
+    "fit-tolerance": {
+        "values": [
+            "normal",
+            "infinite"
+        ]
+    },
     "flex": {
         "values": [
             "none",
@@ -7473,12 +7551,6 @@ export const generatedPropertyValues = {
     "flood-color": {
         "values": [
             "currentcolor"
-        ]
-    },
-    "flow-tolerance": {
-        "values": [
-            "normal",
-            "infinite"
         ]
     },
     "font": {

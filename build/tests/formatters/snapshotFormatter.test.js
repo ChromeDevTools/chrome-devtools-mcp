@@ -33,6 +33,21 @@ describe('snapshotFormatter', () => {
             children: [{ id: '1_2', role: 'StaticText', name: 'Privacy Policy' }],
         });
     });
+    it('omits uid= when node id is empty', () => {
+        const node = createNode('1_1', 'paragraph', 'alpha', [
+            createNode('', 'InlineTextBox', 'alpha'),
+        ]);
+        const formatter = new SnapshotFormatter({ root: node });
+        assert.strictEqual(formatter.toString(), `uid=1_1 paragraph "alpha"
+  InlineTextBox "alpha"
+`);
+        assert.deepStrictEqual(formatter.toJSON(), {
+            id: '1_1',
+            role: 'paragraph',
+            name: 'alpha',
+            children: [{ role: 'InlineTextBox', name: 'alpha' }],
+        });
+    });
     it('skips the only StaticText child duplicating the parent name', () => {
         const node = createNode('1_1', 'link', 'Privacy Policy', [
             createNode('1_2', 'StaticText', 'Privacy Policy'),
@@ -109,6 +124,31 @@ describe('snapshotFormatter', () => {
   uid=1_2 option "English"
   uid=1_3 option "Deutsch" selected value="de"
 `);
+    });
+    it('keeps long non-data url attributes in full', () => {
+        const url = 'https://example.com/?q=' + 'a'.repeat(500);
+        const node = { ...createNode('1_1', 'link', 'Next'), url };
+        const formatter = new SnapshotFormatter({ root: node });
+        assert.strictEqual(formatter.toString(), `uid=1_1 link "Next" url="${url}"\n`);
+        assert.deepStrictEqual(formatter.toJSON(), {
+            id: '1_1',
+            role: 'link',
+            name: 'Next',
+            url,
+        });
+    });
+    it('truncates long data url attributes in text and JSON output', () => {
+        const url = 'data:image/png;base64,' + 'A'.repeat(5000);
+        const truncated = url.slice(0, 255) + '... <truncated>';
+        const node = { ...createNode('1_1', 'image', 'logo'), url };
+        const formatter = new SnapshotFormatter({ root: node });
+        assert.strictEqual(formatter.toString(), `uid=1_1 image "logo" url="${truncated}"\n`);
+        assert.deepStrictEqual(formatter.toJSON(), {
+            id: '1_1',
+            role: 'image',
+            name: 'logo',
+            url: truncated,
+        });
     });
     it('formats a snapshot with value properties', () => {
         const node = {

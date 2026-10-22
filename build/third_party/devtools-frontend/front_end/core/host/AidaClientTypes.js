@@ -11,6 +11,22 @@ export var Role;
     /** Tags the content came from the LLM */
     Role[Role["MODEL"] = 2] = "MODEL";
 })(Role || (Role = {}));
+export var Rating;
+(function (Rating) {
+    // Resets the vote to null in the logs
+    Rating["SENTIMENT_UNSPECIFIED"] = "SENTIMENT_UNSPECIFIED";
+    Rating["POSITIVE"] = "POSITIVE";
+    Rating["NEGATIVE"] = "NEGATIVE";
+})(Rating || (Rating = {}));
+export var ParametersTypes;
+(function (ParametersTypes) {
+    ParametersTypes[ParametersTypes["STRING"] = 1] = "STRING";
+    ParametersTypes[ParametersTypes["NUMBER"] = 2] = "NUMBER";
+    ParametersTypes[ParametersTypes["INTEGER"] = 3] = "INTEGER";
+    ParametersTypes[ParametersTypes["BOOLEAN"] = 4] = "BOOLEAN";
+    ParametersTypes[ParametersTypes["ARRAY"] = 5] = "ARRAY";
+    ParametersTypes[ParametersTypes["OBJECT"] = 6] = "OBJECT";
+})(ParametersTypes || (ParametersTypes = {}));
 export var FunctionalityType;
 (function (FunctionalityType) {
     // Unspecified functionality type.
@@ -123,6 +139,34 @@ export var CitationSourceType;
     CitationSourceType["LOCAL_FACTS"] = "LOCAL_FACTS";
     CitationSourceType["INDIRECT"] = "INDIRECT";
 })(CitationSourceType || (CitationSourceType = {}));
+export var AidaAccessPreconditions;
+(function (AidaAccessPreconditions) {
+    AidaAccessPreconditions["AVAILABLE"] = "available";
+    AidaAccessPreconditions["NO_ACCOUNT_EMAIL"] = "no-account-email";
+    AidaAccessPreconditions["NO_INTERNET"] = "no-internet";
+    // This is the state (mostly enterprise) users are in, when they are automatically logged out from
+    // Chrome after a certain time period. For making AIDA requests, they need to log in again.
+    AidaAccessPreconditions["SYNC_IS_PAUSED"] = "sync-is-paused";
+})(AidaAccessPreconditions || (AidaAccessPreconditions = {}));
+export var AidaInferenceLanguage;
+(function (AidaInferenceLanguage) {
+    AidaInferenceLanguage["CPP"] = "CPP";
+    AidaInferenceLanguage["PYTHON"] = "PYTHON";
+    AidaInferenceLanguage["KOTLIN"] = "KOTLIN";
+    AidaInferenceLanguage["JAVA"] = "JAVA";
+    AidaInferenceLanguage["JAVASCRIPT"] = "JAVASCRIPT";
+    AidaInferenceLanguage["GO"] = "GO";
+    AidaInferenceLanguage["TYPESCRIPT"] = "TYPESCRIPT";
+    AidaInferenceLanguage["HTML"] = "HTML";
+    AidaInferenceLanguage["BASH"] = "BASH";
+    AidaInferenceLanguage["CSS"] = "CSS";
+    AidaInferenceLanguage["DART"] = "DART";
+    AidaInferenceLanguage["JSON"] = "JSON";
+    AidaInferenceLanguage["MARKDOWN"] = "MARKDOWN";
+    AidaInferenceLanguage["VUE"] = "VUE";
+    AidaInferenceLanguage["XML"] = "XML";
+    AidaInferenceLanguage["UNKNOWN"] = "UNKNOWN";
+})(AidaInferenceLanguage || (AidaInferenceLanguage = {}));
 export function debugLog(...log) {
     if (!Boolean(Platform.HostRuntime.HOST_RUNTIME.getLocalStorage()?.getItem('debugAiServicesEnabled'))) {
         return;

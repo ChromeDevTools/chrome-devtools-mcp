@@ -56,22 +56,13 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
 import assert from 'node:assert';
-import crypto from 'node:crypto';
 import path from 'node:path';
-import { describe, it, afterEach, beforeEach } from 'node:test';
-import { assertDaemonIsNotRunning, assertDaemonIsRunning, createTempDir, createTempFile, runCli, } from '../utils.js';
-describe('chrome-devtools', () => {
-    let sessionId;
-    beforeEach(async () => {
-        sessionId = crypto.randomUUID();
-        await runCli(['stop'], sessionId);
-        await assertDaemonIsNotRunning(sessionId);
-    });
-    afterEach(async () => {
-        await runCli(['stop'], sessionId);
-        await assertDaemonIsNotRunning(sessionId);
-    });
-    it('can start and stop the daemon', async () => {
+import { describe, it } from 'node:test';
+import { assertDaemonIsNotRunning, assertDaemonIsRunning, createCliSession, createTempDir, createTempFile, runCli, } from '../utils.js';
+// Each test uses its own daemon session, so the tests run in parallel.
+describe('chrome-devtools', { concurrency: true }, () => {
+    it('can start and stop the daemon', async (t) => {
+        const sessionId = createCliSession(t);
         await assertDaemonIsNotRunning(sessionId);
         const startResult = await runCli(['start'], sessionId);
         assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
@@ -80,9 +71,10 @@ describe('chrome-devtools', () => {
         assert.strictEqual(stopResult.status, 0, `stop command failed: ${stopResult.stderr}`);
         await assertDaemonIsNotRunning(sessionId);
     });
-    it('can start the daemon with userDataDir', async () => {
+    it('can start the daemon with userDataDir', async (t) => {
         const env_1 = { stack: [], error: void 0, hasError: false };
         try {
+            const sessionId = createCliSession(t);
             const userDataDir = __addDisposableResource(env_1, createTempDir('chrome-devtools-test-'), false);
             const startResult = await runCli(['start', '--userDataDir', userDataDir.path], sessionId);
             assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
@@ -97,16 +89,18 @@ describe('chrome-devtools', () => {
             __disposeResources(env_1);
         }
     });
-    it('forwards an explicit headless=false option', async () => {
+    it('forwards an explicit headless=false option', async (t) => {
+        const sessionId = createCliSession(t);
         const startResult = await runCli(['start', '--headless=false'], sessionId);
         assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
         const statusResult = await runCli(['status'], sessionId);
         assert.strictEqual(statusResult.status, 0);
         assert.ok(statusResult.stdout.includes('--no-headless'), `headless=false was not forwarded: ${statusResult.stdout}`);
     });
-    it('can start the daemon with a workspace', async () => {
+    it('can start the daemon with a workspace', async (t) => {
         const env_2 = { stack: [], error: void 0, hasError: false };
         try {
+            const sessionId = createCliSession(t);
             const workspace = __addDisposableResource(env_2, createTempDir('chrome-devtools-workspace-'), false);
             const startResult = await runCli(['start', '--workspace', workspace.path], sessionId);
             assert.strictEqual(startResult.status, 0, `start command failed: ${startResult.stderr}`);
@@ -123,9 +117,10 @@ describe('chrome-devtools', () => {
             __disposeResources(env_2);
         }
     });
-    it('can start the daemon with a config file', async () => {
+    it('can start the daemon with a config file', async (t) => {
         const env_3 = { stack: [], error: void 0, hasError: false };
         try {
+            const sessionId = createCliSession(t);
             const userDataDir = __addDisposableResource(env_3, createTempDir('chrome-devtools-config-profile-'), false);
             const configFile = __addDisposableResource(env_3, createTempFile(JSON.stringify({
                 userDataDir: userDataDir.path,

@@ -55,9 +55,10 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     var e = new Error(message);
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
-import { zod } from '../third_party/index.js';
+import { zod, } from '../third_party/index.js';
 import { ToolCategory } from './categories.js';
 import { definePageTool } from './ToolDefinition.js';
+const MAX_CHROMIUM_SCREENSHOT_DIMENSION = 16384;
 async function getSourceBox(page, element, fullPage) {
     if (element) {
         const viewport = page.viewport();
@@ -190,6 +191,7 @@ export const screenshot = definePageTool((args) => {
                 .describe('The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.'),
         },
         blockedByDialog: true,
+        concurrency: 'page',
         verifyFilesSchema: {
             filePath: true,
         },
@@ -217,12 +219,17 @@ export const screenshot = definePageTool((args) => {
                 // The smaller scale factor wins so both bounds are respected while
                 // preserving aspect ratio.
                 let clip;
-                if (screenshotMaxWidth !== undefined ||
-                    screenshotMaxHeight !== undefined) {
-                    const box = await getSourceBox(page, element, fullPage);
-                    if (box) {
-                        clip = computeDownscaleClip(box, screenshotMaxWidth, screenshotMaxHeight);
-                    }
+                const shouldInspectBox = fullPage ||
+                    element !== undefined ||
+                    screenshotMaxWidth !== undefined ||
+                    screenshotMaxHeight !== undefined;
+                const box = shouldInspectBox
+                    ? await getSourceBox(page, element, fullPage)
+                    : undefined;
+                if (box &&
+                    (screenshotMaxWidth !== undefined ||
+                        screenshotMaxHeight !== undefined)) {
+                    clip = computeDownscaleClip(box, screenshotMaxWidth, screenshotMaxHeight);
                 }
                 if (clip) {
                     // page.screenshot with clip lets the CDP scale param downscale the
@@ -277,6 +284,15 @@ export const screenshot = definePageTool((args) => {
                         mimeType: `image/${format}`,
                         data: Buffer.from(screenshot).toString('base64'),
                     });
+                }
+                if (box) {
+                    const effectiveScale = clip?.scale ?? 1;
+                    const effectiveWidth = box.width * box.devicePixelRatio * effectiveScale;
+                    const effectiveHeight = box.height * box.devicePixelRatio * effectiveScale;
+                    if (effectiveWidth > MAX_CHROMIUM_SCREENSHOT_DIMENSION ||
+                        effectiveHeight > MAX_CHROMIUM_SCREENSHOT_DIMENSION) {
+                        response.appendResponseLine(`Warning: Screenshot dimensions exceed the maximum capturable dimension of ${MAX_CHROMIUM_SCREENSHOT_DIMENSION}px. Content beyond 16384px may repeat or be corrupted due to browser texture limits. Set --screenshotMaxHeight or --screenshotMaxWidth to downscale.`);
+                    }
                 }
             }
             catch (e_1) {

@@ -98,4 +98,18 @@ export const getPhysicalAxisFromQueryAxis = (queryAxis, writingMode) => {
             return isVerticalWritingMode ? "Horizontal" /* PhysicalAxis.HORIZONTAL */ : "Vertical" /* PhysicalAxis.VERTICAL */;
     }
 };
+export var QueryAxis;
+(function (QueryAxis) {
+    QueryAxis["NONE"] = "";
+    QueryAxis["INLINE"] = "inline-size";
+    QueryAxis["BLOCK"] = "block-size";
+    QueryAxis["BOTH"] = "size";
+})(QueryAxis || (QueryAxis = {}));
+export var PhysicalAxis;
+(function (PhysicalAxis) {
+    PhysicalAxis["NONE"] = "";
+    PhysicalAxis["HORIZONTAL"] = "Horizontal";
+    PhysicalAxis["VERTICAL"] = "Vertical";
+    PhysicalAxis["BOTH"] = "Both";
+})(PhysicalAxis || (PhysicalAxis = {}));
 //# sourceMappingURL=CSSContainerQuery.js.map

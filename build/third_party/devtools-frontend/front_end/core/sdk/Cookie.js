@@ -239,4 +239,29 @@ export class Cookie {
         return hostname.length > domain.length && hostname.endsWith(domain);
     }
 }
+export var Type;
+(function (Type) {
+    Type[Type["REQUEST"] = 0] = "REQUEST";
+    Type[Type["RESPONSE"] = 1] = "RESPONSE";
+})(Type || (Type = {}));
+export var Attribute;
+(function (Attribute) {
+    Attribute["NAME"] = "name";
+    Attribute["VALUE"] = "value";
+    Attribute["SIZE"] = "size";
+    Attribute["DOMAIN"] = "domain";
+    Attribute["PATH"] = "path";
+    Attribute["EXPIRES"] = "expires";
+    Attribute["MAX_AGE"] = "max-age";
+    Attribute["HTTP_ONLY"] = "http-only";
+    Attribute["SECURE"] = "secure";
+    Attribute["SAME_SITE"] = "same-site";
+    Attribute["SOURCE_SCHEME"] = "source-scheme";
+    Attribute["SOURCE_PORT"] = "source-port";
+    Attribute["PRIORITY"] = "priority";
+    Attribute["PARTITIONED"] = "partitioned";
+    Attribute["PARTITION_KEY"] = "partition-key";
+    Attribute["PARTITION_KEY_SITE"] = "partition-key-site";
+    Attribute["HAS_CROSS_SITE_ANCESTOR"] = "has-cross-site-ancestor";
+})(Attribute || (Attribute = {}));
 //# sourceMappingURL=Cookie.js.map

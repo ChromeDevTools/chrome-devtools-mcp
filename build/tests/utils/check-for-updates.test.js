@@ -18,7 +18,6 @@ describe('checkForUpdates', () => {
         sinon.stub(fs, 'writeFile').resolves();
     });
     afterEach(() => {
-        sinon.restore();
         resetUpdateCheckFlagForTesting();
     });
     it('does nothing if CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS is set', async () => {
@@ -28,10 +27,10 @@ describe('checkForUpdates', () => {
         const readFileStub = sinon.stub(fs, 'readFile');
         const statStub = sinon.stub(fs, 'stat');
         await checkForUpdates('Run `npm update` to update.');
-        assert.ok(warnStub.notCalled);
-        assert.ok(spawnStub.notCalled);
-        assert.ok(readFileStub.notCalled);
-        assert.ok(statStub.notCalled);
+        sinon.assert.notCalled(warnStub);
+        sinon.assert.notCalled(spawnStub);
+        sinon.assert.notCalled(readFileStub);
+        sinon.assert.notCalled(statStub);
         delete process.env['CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS'];
     });
     it('notifies if cache exists and version is different', async () => {
@@ -48,8 +47,8 @@ describe('checkForUpdates', () => {
         const warnStub = sinon.stub(console, 'warn');
         const spawnStub = sinon.stub(child_process, 'spawn');
         await checkForUpdates('Run `npm update` to update.');
-        assert.ok(warnStub.calledWith(sinon.match('Update available: ' + VERSION + ' -> 99.9.9')));
-        assert.ok(spawnStub.notCalled);
+        sinon.assert.calledWith(warnStub, sinon.match('Update available: ' + VERSION + ' -> 99.9.9'));
+        sinon.assert.notCalled(spawnStub);
     });
     it('does not notify if incoming version is older than current version', async () => {
         sinon.stub(os, 'homedir').returns('/home/user');
@@ -65,8 +64,8 @@ describe('checkForUpdates', () => {
         const warnStub = sinon.stub(console, 'warn');
         const spawnStub = sinon.stub(child_process, 'spawn');
         await checkForUpdates('Run `npm update` to update.');
-        assert.ok(warnStub.notCalled);
-        assert.ok(spawnStub.notCalled);
+        sinon.assert.notCalled(warnStub);
+        sinon.assert.notCalled(spawnStub);
     });
     it('does not spawn fetch process if cache is fresh', async () => {
         sinon.stub(os, 'homedir').returns('/home/user');
@@ -81,7 +80,7 @@ describe('checkForUpdates', () => {
         });
         const spawnStub = sinon.stub(child_process, 'spawn');
         await checkForUpdates('Run `npm update` to update.');
-        assert.ok(spawnStub.notCalled);
+        sinon.assert.notCalled(spawnStub);
     });
     it('spawns detached process if cache is stale', async () => {
         sinon.stub(os, 'homedir').returns('/home/user');
@@ -101,13 +100,13 @@ describe('checkForUpdates', () => {
             unref: unrefSpy,
         });
         await checkForUpdates('Run `npm update` to update.');
-        assert.ok(spawnStub.calledOnce);
+        sinon.assert.calledOnce(spawnStub);
         assert.strictEqual(spawnStub.firstCall.args[0], process.execPath);
         assert.ok(spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'));
         assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
         assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
         assert.strictEqual(spawnStub.firstCall.args[2]?.windowsHide, true);
-        assert.ok(unrefSpy.calledOnce);
+        sinon.assert.calledOnce(unrefSpy);
     });
     it('spawns detached process if cache is missing', async () => {
         sinon.stub(os, 'homedir').returns('/home/user');
@@ -120,13 +119,13 @@ describe('checkForUpdates', () => {
             unref: unrefSpy,
         });
         await checkForUpdates('Run `npm update` to update.');
-        assert.ok(spawnStub.calledOnce);
+        sinon.assert.calledOnce(spawnStub);
         assert.strictEqual(spawnStub.firstCall.args[0], process.execPath);
         assert.ok(spawnStub.firstCall.args[1][0]?.includes('check-latest-version.js'));
         assert.ok(spawnStub.firstCall.args[1][1]?.includes('latest.json'));
         assert.strictEqual(spawnStub.firstCall.args[2]?.detached, true);
         assert.strictEqual(spawnStub.firstCall.args[2]?.windowsHide, true);
-        assert.ok(unrefSpy.calledOnce);
+        sinon.assert.calledOnce(unrefSpy);
     });
 });
 //# sourceMappingURL=check-for-updates.test.js.map

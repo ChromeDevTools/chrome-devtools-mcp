@@ -886,6 +886,13 @@ export class RemoteError {
 }
 const descriptionLengthParenRegex = /\(([0-9]+)\)/;
 const descriptionLengthSquareRegex = /\[([0-9]+)\]/;
+var UnserializableNumber;
+(function (UnserializableNumber) {
+    UnserializableNumber["NEGATIVE_ZERO"] = "-0";
+    UnserializableNumber["NAN"] = "NaN";
+    UnserializableNumber["INFINITY"] = "Infinity";
+    UnserializableNumber["NEGATIVE_INFINITY"] = "-Infinity";
+})(UnserializableNumber || (UnserializableNumber = {}));
 /**
  * Pair of a linear memory inspectable {@link RemoteObject} and an optional
  * expression, which identifies the variable holding the object in the

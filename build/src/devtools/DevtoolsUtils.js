@@ -3,7 +3,7 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { DevTools } from '../third_party/index.js';
+import { DevTools, } from '../third_party/index.js';
 import { McpHostBindingAdapter } from './McpHostBindingAdapter.js';
 /**
  * A mock implementation of an issues manager that only implements the methods
@@ -153,14 +153,14 @@ export class SymbolizedError {
     }
     static async fromDetails(opts) {
         const message = SymbolizedError.#getMessage(opts.details);
-        if (!opts.includeStackAndCause || !opts.devTools) {
+        if (!opts.includeStackAndCause || (!opts.devTools && !opts.session)) {
             return new SymbolizedError(message, opts.resolvedStackTraceForTesting, opts.resolvedCauseForTesting);
         }
         let stackTrace;
         if (opts.resolvedStackTraceForTesting) {
             stackTrace = opts.resolvedStackTraceForTesting;
         }
-        else if (opts.details.stackTrace) {
+        else if (opts.devTools && opts.details.stackTrace) {
             try {
                 stackTrace = await createStackTrace(opts.devTools, opts.details.stackTrace, opts.targetId);
             }
@@ -176,12 +176,13 @@ export class SymbolizedError {
         }
         else if (opts.details.exception) {
             try {
-                const causeRemoteObj = await SymbolizedError.#lookupCause(opts.devTools, opts.details.exception, opts.targetId);
+                const causeRemoteObj = await SymbolizedError.#lookupCause(opts.devTools, opts.details.exception, opts.targetId, opts.session);
                 if (causeRemoteObj) {
                     cause = await SymbolizedError.fromError({
                         devTools: opts.devTools,
                         error: causeRemoteObj,
                         targetId: opts.targetId,
+                        session: opts.session,
                     });
                 }
             }
@@ -192,12 +193,13 @@ export class SymbolizedError {
         return new SymbolizedError(message, stackTrace, cause);
     }
     static async fromError(opts) {
-        const details = await SymbolizedError.#getExceptionDetails(opts.devTools, opts.error, opts.targetId);
+        const details = await SymbolizedError.#getExceptionDetails(opts.devTools, opts.error, opts.targetId, opts.session);
         if (details) {
             return await SymbolizedError.fromDetails({
                 details,
                 devTools: opts.devTools,
                 targetId: opts.targetId,
+                session: opts.session,
                 includeStackAndCause: true,
             });
         }
@@ -207,18 +209,41 @@ export class SymbolizedError {
         // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
         // we have to manually parse out the error text from the exception description.
         // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
-        if (details.text === 'Uncaught' && details.exception) {
-            return ('Uncaught ' +
+        // Unhandled promise rejections work the same way, with
+        // "Uncaught (in promise)" as `details.text` and the rejection reason as
+        // the exception.
+        if ((details.text === 'Uncaught' ||
+            details.text === 'Uncaught (in promise)') &&
+            details.exception) {
+            return (details.text +
+                ' ' +
                 SymbolizedError.#getMessageFromException(details.exception));
         }
         return details.text;
     }
     static #getMessageFromException(error) {
-        const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
+        if (error.description === undefined) {
+            // Primitive values, e.g. `Promise.reject('reason')`, have no description.
+            if (error.unserializableValue !== undefined) {
+                return error.unserializableValue;
+            }
+            return error.value === undefined ? '' : String(error.value);
+        }
+        const messageWithRest = error.description.split('\n    at ', 2);
         return messageWithRest[0] ?? '';
     }
-    static async #getExceptionDetails(devTools, error, targetId) {
-        if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    static async #getExceptionDetails(devTools, error, targetId, session) {
+        if (error.type !== 'object' && error.subtype !== 'error') {
+            return null;
+        }
+        if (session) {
+            if (!error.objectId) {
+                return null;
+            }
+            const { exceptionDetails } = await session.send('Runtime.getExceptionDetails', { errorObjectId: error.objectId });
+            return exceptionDetails ?? null;
+        }
+        if (!devTools) {
             return null;
         }
         const targetManager = devTools.universe.context.get(DevTools.TargetManager);
@@ -228,8 +253,20 @@ export class SymbolizedError {
         const model = target.model(DevTools.RuntimeModel);
         return ((await model.getExceptionDetails(error.objectId)) ?? null);
     }
-    static async #lookupCause(devTools, error, targetId) {
-        if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    static async #lookupCause(devTools, error, targetId, session) {
+        if (error.type !== 'object' && error.subtype !== 'error') {
+            return null;
+        }
+        if (session) {
+            if (!error.objectId) {
+                return null;
+            }
+            const { result } = await session.send('Runtime.getProperties', {
+                objectId: error.objectId,
+            });
+            return result.find(prop => prop.name === 'cause')?.value ?? null;
+        }
+        if (!devTools) {
             return null;
         }
         const targetManager = devTools.universe.context.get(DevTools.TargetManager);

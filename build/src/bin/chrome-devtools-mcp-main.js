@@ -6,11 +6,12 @@
 import '../utils/polyfill.js';
 import process from 'node:process';
 import { BrowserManager } from '../BrowserManager.js';
-import { McpServer, logDisclaimers } from '../index.js';
+import { McpServer } from '../index.js';
 import { ClearcutLogger } from '../telemetry/ClearcutLogger.js';
 import { computeFlagUsage } from '../telemetry/flagUtils.js';
 import { StdioServerTransport } from '../third_party/index.js';
 import { checkForUpdates } from '../utils/check-for-updates.js';
+import { logDisclaimers } from '../utils/disclaimers.js';
 import { logger, saveLogsToFile } from '../utils/logger.js';
 import { setupUnhandledRejectionHandler } from '../utils/errorHandling.js';
 import { VERSION } from '../version.js';
@@ -18,16 +19,17 @@ import { mcpOptions } from '../config/mcp-options.js';
 import { ConfigParser } from '../config/ConfigParser.js';
 await checkForUpdates('Run `npm install chrome-devtools-mcp@latest` to update.');
 const configParser = new ConfigParser(VERSION);
-export const args = configParser.parse();
+const serverConfig = configParser.parseConfig();
+const args = serverConfig.resolved;
 const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
 setupUnhandledRejectionHandler(() => {
     process.exit(1);
 });
 logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
-const browserManager = new BrowserManager(args, {
+const browserManager = new BrowserManager(serverConfig, {
     logFile,
 });
-const serverPromise = McpServer.from(args, {
+const serverPromise = McpServer.from(serverConfig, {
     browserManager,
 });
 // Shutdown on stdin EOF (stdio MCP convention — the client closes the

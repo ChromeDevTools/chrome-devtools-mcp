@@ -8,7 +8,7 @@ import { zod, DevTools } from '../third_party/index.js';
 import { parseRawTraceBuffer, traceResultIsSuccess, } from '../processors/PerformanceTrace.js';
 import { logger } from '../utils/logger.js';
 import { ToolCategory } from './categories.js';
-import { definePageTool } from './ToolDefinition.js';
+import { definePageTool, } from './ToolDefinition.js';
 const filePathSchema = zod
     .string()
     .optional()
@@ -36,6 +36,7 @@ export const startTrace = definePageTool(() => ({
         filePath: filePathSchema,
     },
     blockedByDialog: true,
+    concurrency: 'exclusive',
     verifyFilesSchema: {
         filePath: true,
     },
@@ -44,8 +45,8 @@ export const startTrace = definePageTool(() => ({
             response.appendResponseLine('Error: a performance trace is already running. Use performance_stop_trace to stop it. Only one trace can be running at any given time.');
             return;
         }
-        context.setIsRunningPerformanceTrace(true);
         const page = request.page;
+        page.setIsRunningPerformanceTrace(true);
         const pageUrlForTracing = page.pptrPage.url();
         try {
             if (request.params.reload) {
@@ -106,7 +107,7 @@ export const startTrace = definePageTool(() => ({
                 catch {
                     // Tracing may not have started yet; ignore.
                 }
-                context.setIsRunningPerformanceTrace(false);
+                page.setIsRunningPerformanceTrace(false);
             }
             throw error;
         }
@@ -123,6 +124,7 @@ export const stopTrace = definePageTool(() => ({
         filePath: filePathSchema,
     },
     blockedByDialog: true,
+    concurrency: 'exclusive',
     verifyFilesSchema: {
         filePath: true,
     },
@@ -151,6 +153,7 @@ export const analyzeInsight = definePageTool(() => ({
             .describe('The name of the Insight you want more information on. For example: "DocumentLatency" or "LCPBreakdown"'),
     },
     blockedByDialog: false,
+    concurrency: 'exclusive',
     verifyFilesSchema: {},
     handler: async (request, response, context) => {
         const lastRecording = context.recordedTraces().at(-1);
@@ -198,7 +201,7 @@ async function stopTracingAndAppendOutput(page, response, context, filePath) {
         }
     }
     finally {
-        context.setIsRunningPerformanceTrace(false);
+        page.setIsRunningPerformanceTrace(false);
     }
 }
 /** We tell CrUXManager to fetch data so it's available when DevTools.PerformanceTraceFormatter is invoked */

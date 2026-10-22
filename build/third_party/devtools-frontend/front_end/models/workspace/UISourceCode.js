@@ -582,6 +582,14 @@ export class Message {
         return this.text() === another.text() && this.level() === another.level() && this.range.equal(another.range);
     }
 }
+(function (Message) {
+    let Level;
+    (function (Level) {
+        Level["ERROR"] = "Error";
+        Level["ISSUE"] = "Issue";
+        Level["WARNING"] = "Warning";
+    })(Level = Message.Level || (Message.Level = {}));
+})(Message || (Message = {}));
 export class UISourceCodeMetadata {
     modificationTime;
     contentSize;
@@ -590,6 +598,11 @@ export class UISourceCodeMetadata {
         this.contentSize = contentSize;
     }
 }
+export var DecoratorType;
+(function (DecoratorType) {
+    DecoratorType["PERFORMANCE"] = "performance";
+    DecoratorType["COVERAGE"] = "coverage";
+})(DecoratorType || (DecoratorType = {}));
 /**
  * Converts an existing LineColumnProfileMap to a new one using the provided mapping.
  *
