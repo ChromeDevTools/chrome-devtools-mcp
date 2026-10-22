@@ -12,7 +12,7 @@ describe('THIRD_PARTY_NOTICES', () => {
   it('matches snapshot', t => {
     const noticesPath = path.join(
       process.cwd(),
-      'build/src/third_party/THIRD_PARTY_NOTICES',
+      'out/Default/gen/src/third_party/THIRD_PARTY_NOTICES',
     );
     if (!fs.existsSync(noticesPath)) {
       throw new Error(

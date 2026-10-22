@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT_DIR = process.cwd();
-const TARGET_DIR = path.join(ROOT_DIR, 'build/src/third_party');
+const TARGET_DIR = path.join(ROOT_DIR, 'out/Default/gen/src/third_party');
 const SOURCE_DIR = path.join(ROOT_DIR, 'src/third_party');
 
 function main() {

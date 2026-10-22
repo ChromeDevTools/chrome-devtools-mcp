@@ -8,6 +8,8 @@ import {spawnSync} from 'node:child_process';
 import {appendFileSync, existsSync, writeFileSync} from 'node:fs';
 import {delimiter, dirname, join, resolve} from 'node:path';
 
+import {runGnGen} from './gn-gen.ts';
+
 const isWindows = process.platform === 'win32';
 const projectRoot = process.cwd();
 const thirdPartyDir = resolve(projectRoot, 'third_party');
@@ -157,3 +159,6 @@ if (
     env,
   });
 }
+
+console.log('Linking DevTools DEPS and generating GN build files...');
+runGnGen();

@@ -34,7 +34,7 @@ describe('e2e', {concurrency: true}, () => {
       const transport = new StdioClientTransport({
         command: 'node',
         args: [
-          'build/src/bin/chrome-devtools-mcp.js',
+          'out/Default/gen/src/bin/chrome-devtools-mcp.js',
           '--headless',
           '--isolated',
           '--executable-path',
