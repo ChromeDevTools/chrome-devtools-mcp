@@ -1015,6 +1015,7 @@ describe('McpPage', () => {
         networkConditions: 'Slow 3G',
         cpuThrottlingRate: 2,
       });
+      pptrPage.emulateNetworkConditions.resetHistory();
       pptrPage.setDefaultTimeout.resetHistory();
       pptrPage.setDefaultNavigationTimeout.resetHistory();
       config.commit(
@@ -1023,10 +1024,14 @@ describe('McpPage', () => {
         }),
       );
 
-      mcpPage.clearNetworkConditions();
+      await mcpPage.clearNetworkConditions();
 
       assert.strictEqual(mcpPage.networkConditions, null);
       assert.strictEqual(mcpPage.cpuThrottlingRate, 2);
+      sinon.assert.calledOnceWithExactly(
+        pptrPage.emulateNetworkConditions,
+        null,
+      );
       sinon.assert.calledOnceWithExactly(pptrPage.setDefaultTimeout, 10_000);
       sinon.assert.calledOnceWithExactly(
         pptrPage.setDefaultNavigationTimeout,
@@ -1040,8 +1045,9 @@ describe('McpPage', () => {
       pptrPage.setDefaultTimeout.resetHistory();
       pptrPage.setDefaultNavigationTimeout.resetHistory();
 
-      mcpPage.clearNetworkConditions();
+      await mcpPage.clearNetworkConditions();
 
+      sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
       sinon.assert.notCalled(pptrPage.setDefaultTimeout);
       sinon.assert.notCalled(pptrPage.setDefaultNavigationTimeout);
     });

@@ -1337,10 +1337,11 @@ export class McpPage implements ContextPage {
     }
   }
 
-  clearNetworkConditions(): void {
+  async clearNetworkConditions(): Promise<void> {
     if (!this.emulationSettings.networkConditions) {
       return;
     }
+    await this.#pptrPage?.emulateNetworkConditions(null);
     delete this.emulationSettings.networkConditions;
     this.updateTimeouts();
   }

@@ -251,16 +251,16 @@ export class McpContext implements Context, BrowserlessContext {
    */
   async syncNetworkRestrictions(): Promise<void> {
     const {blockedUrlPattern, allowedUrlPattern} = this.#config.resolved;
+    if (blockedUrlPattern || allowedUrlPattern) {
+      for (const mcpPage of this.#allMcpPages()) {
+        await mcpPage.clearNetworkConditions();
+      }
+    }
     if (this.#browser) {
       await this.#browser.restrictNetwork({
         blocklist: blockedUrlPattern,
         allowlist: allowedUrlPattern,
       });
-    }
-    if (blockedUrlPattern || allowedUrlPattern) {
-      for (const mcpPage of this.#allMcpPages()) {
-        mcpPage.clearNetworkConditions();
-      }
     }
   }
 
