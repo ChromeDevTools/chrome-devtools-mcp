@@ -4,17 +4,13 @@
 group("default") {
   deps = [
     ":devtools_deps",
-    "//src:issue_descriptions",
-    "//src:lighthouse_bundle",
-    "//src:third_party",
+    "//src:all",
   ]
 }
 
 group("devtools_deps") {
   public_deps = [
-    "//src:issue_descriptions",
-    "//src:lighthouse_bundle",
-    "//src:third_party",
+    "//src:all",
     "//third_party/devtools-frontend/front_end/entrypoints/formatter_worker:worker_entrypoint",
     "//third_party/devtools-frontend/front_end/entrypoints/heap_snapshot_worker:worker_entrypoint",
     "//third_party/devtools-frontend/front_end/models/issues_manager:descriptions",
