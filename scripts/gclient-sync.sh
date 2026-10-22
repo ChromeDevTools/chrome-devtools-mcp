@@ -64,3 +64,6 @@ echo "Running gclient sync..."
     vpython3 scripts/deps/ensure_node_modules.py
   fi
 )
+
+echo "Linking DevTools DEPS and generating GN build files..."
+node scripts/gn-gen.ts

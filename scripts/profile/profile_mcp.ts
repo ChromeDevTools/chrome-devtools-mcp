@@ -116,7 +116,7 @@ async function profileScenario(
     command: process.execPath,
     args: [
       '--inspect=127.0.0.1:0',
-      path.join(rootDir, 'build/src/bin/chrome-devtools-mcp.js'),
+      path.join(rootDir, 'out/Default/gen/src/bin/chrome-devtools-mcp.js'),
       '--headless',
       '--isolated',
     ],

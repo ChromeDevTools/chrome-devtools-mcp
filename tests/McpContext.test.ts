@@ -62,11 +62,11 @@ import {
 
 const EXTENSION_WITH_SW_PATH = path.join(
   import.meta.dirname,
-  '../../tests/tools/fixtures/extension-sw',
+  '../../../../tests/tools/fixtures/extension-sw',
 );
 const EXTENSION_CONTENT_SCRIPT_PATH = path.join(
   import.meta.dirname,
-  '../../tests/tools/fixtures/extension-content-script',
+  '../../../../tests/tools/fixtures/extension-content-script',
 );
 
 describe('McpContext', () => {
