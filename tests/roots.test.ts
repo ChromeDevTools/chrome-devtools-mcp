@@ -79,23 +79,6 @@ describe('McpContext Roots', () => {
     });
   });
 
-  it('should allow paths below a workspace root that is the filesystem root', async () => {
-    const outsidePath = path.resolve(
-      os.homedir(),
-      'a_very_unlikely_path_name_filesystem_root',
-    );
-    // Use the root of the same drive so the test also holds on Windows,
-    // where the checkout and the home directory can be on different drives.
-    const filesystemRoot = path.parse(outsidePath).root;
-    await withMcpContext(async (_response, context) => {
-      context.setRoots([
-        {uri: pathToFileURL(filesystemRoot).href, name: 'filesystem root'},
-      ]);
-      const resolved = await context.validatePath(outsidePath);
-      assert.strictEqual(resolved, await resolveCanonicalPath(outsidePath));
-    });
-  });
-
   it('should enforce extensions and validate the output path', async () => {
     using workspace = createTempDir('workspace-root-');
     await withMcpContext(async (_response, context) => {
@@ -197,6 +180,23 @@ describe('McpContext path validation escaping', () => {
       heapSnapshotManager: new HeapSnapshotManager(new TaskRunner()),
     });
   }
+
+  it('allows paths below a workspace root that is the filesystem root', async () => {
+    const context = await createContext();
+    const targetPath = path.resolve(
+      os.homedir(),
+      'a_very_unlikely_path_name_filesystem_root',
+    );
+    const canonicalPath = await resolveCanonicalPath(targetPath);
+    // Use the root of the canonical path so the test also holds when the home
+    // directory goes through a symlink or junction onto another drive.
+    const filesystemRoot = path.parse(canonicalPath).root;
+    context.setRoots([
+      {uri: pathToFileURL(filesystemRoot).href, name: 'filesystem root'},
+    ]);
+    const resolved = await context.validatePath(targetPath);
+    assert.strictEqual(resolved, canonicalPath);
+  });
 
   it('escapes the file path when it cannot be resolved', async () => {
     const context = await createContext();
