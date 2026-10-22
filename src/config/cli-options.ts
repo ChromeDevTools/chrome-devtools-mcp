@@ -252,7 +252,7 @@ export const commands: Commands = {
   },
   configure_webauthn: {
     description:
-      'Sets up a virtual WebAuthn authenticator on the selected page so passkey and security key flows can be tested without a physical device. It answers navigator.credentials.create() and get() automatically and is removed when the page closes. On later calls, omitted parameters keep their current values. Changing only isUserVerified keeps the stored credentials; changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and its credentials. With enabled set to false, the tool ignores all other parameters and disables the virtual authenticator environment for the whole page, which also removes authenticators that other clients, such as the DevTools WebAuthn panel, added. The response shows the authenticator and its stored credentials. (requires flag: --categoryWebauthn=true)',
+      'Adds a virtual WebAuthn authenticator to the page. Call this before the page calls navigator.credentials. It answers navigator.credentials.create() and get() and is removed when the page closes. Omitted parameters keep their current values. Changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and deletes its credentials. enabled=false ignores other parameters and removes all authenticators on the page. (requires flag: --categoryWebauthn=true)',
     category: 'WebAuthn',
     args: {
       pageId: {
@@ -266,7 +266,7 @@ export const commands: Commands = {
         name: 'enabled',
         type: 'boolean',
         description:
-          'Whether the page has a virtual authenticator. Set to false to disable the virtual authenticator environment for the page and remove all its authenticators and credentials.',
+          'Set to false to remove all virtual authenticators from the page.',
         required: true,
         positional: true,
       },
@@ -291,7 +291,7 @@ export const commands: Commands = {
         name: 'hasResidentKey',
         type: 'boolean',
         description:
-          'Whether the authenticator can store discoverable credentials (passkeys). Default: true.',
+          'Whether the authenticator can store discoverable credentials (passkeys). Default: true. u2f does not support it, so it is false for u2f.',
         required: false,
         positional: false,
       },
@@ -299,7 +299,7 @@ export const commands: Commands = {
         name: 'hasUserVerification',
         type: 'boolean',
         description:
-          'Whether the authenticator supports user verification (PIN or biometrics). Default: true.',
+          'Whether the authenticator supports user verification (PIN or biometrics). Default: true. u2f does not support it, so it is false for u2f.',
         required: false,
         positional: false,
       },

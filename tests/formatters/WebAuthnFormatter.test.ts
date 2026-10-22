@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {WebAuthnFormatter} from '../../src/formatters/WebAuthnFormatter.js';
@@ -42,7 +43,7 @@ describe('WebAuthnFormatter', () => {
       isUserVerified: true,
       credentials: [
         {
-          credentialId: 'Y3JlZA==',
+          credentialId: 'Bq4IsoJ+lZuj/w==',
           rpId: 'example.com',
           isResidentCredential: true,
           userName: 'alice',
@@ -55,5 +56,28 @@ describe('WebAuthnFormatter', () => {
         },
       ],
     });
+  });
+
+  it('prints credential IDs as base64url without padding', () => {
+    const formatter = new WebAuthnFormatter({
+      protocol: 'ctap2',
+      transport: 'internal',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      credentials: [
+        {
+          credentialId: 'Bq4IsoJ+lZuj/w==',
+          isResidentCredential: true,
+          signCount: 1,
+        },
+      ],
+    });
+
+    assert.strictEqual(
+      formatter.toJSON()?.credentials[0]?.credentialId,
+      'Bq4IsoJ-lZuj_w',
+    );
+    assert.match(formatter.toString(), /credentialId=Bq4IsoJ-lZuj_w,/);
   });
 });

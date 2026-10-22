@@ -149,6 +149,7 @@ describe('configure_webauthn in a browser', () => {
         isUserVerified: false,
       });
       assert.match(text, /isUserVerified=false/);
+      assert.ok(text.includes(`credentialId=${credentialId},`));
       assert.match(text, /rpId=localhost, discoverable=true/);
       assert.match(text, /userName=alice@example\.com/);
       assert.doesNotMatch(text, /privateKey/);

@@ -48,6 +48,10 @@ export class WebAuthnFormatter {
       ...this.#authenticator,
       credentials: this.#authenticator.credentials.map(credential => ({
         ...credential,
+        // Match PublicKeyCredential.id, which the page sees as base64url.
+        credentialId: Buffer.from(credential.credentialId, 'base64').toString(
+          'base64url',
+        ),
       })),
     };
   }

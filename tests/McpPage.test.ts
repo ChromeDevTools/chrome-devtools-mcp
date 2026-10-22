@@ -2508,7 +2508,7 @@ describe('McpPage', () => {
 
       const result = await mcpPage.configureWebAuthn({
         enabled: true,
-        protocol: 'u2f',
+        transport: 'nfc',
       });
 
       sinon.assert.calledOnceWithExactly(
@@ -2517,7 +2517,7 @@ describe('McpPage', () => {
       );
       sinon.assert.calledWithExactly(model.addAuthenticator.secondCall, {
         ...DEFAULT_OPTIONS,
-        protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
+        transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Nfc,
         isUserVerified: false,
       });
       sinon.assert.notCalled(model.setUserVerified);
@@ -2525,7 +2525,57 @@ describe('McpPage', () => {
         model.getCredentials.secondCall,
         createMockAuthenticatorId('auth-2'),
       );
-      assert.strictEqual(result?.protocol, 'u2f');
+      assert.strictEqual(result?.transport, 'nfc');
+    });
+
+    it('creates a u2f authenticator without resident keys or user verification after a ctap2 one', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(createMockAuthenticatorId('auth-1'));
+      model.addAuthenticator
+        .onSecondCall()
+        .resolves(createMockAuthenticatorId('auth-2'));
+      await mcpPage.configureWebAuthn({enabled: true});
+
+      const result = await mcpPage.configureWebAuthn({
+        enabled: true,
+        protocol: 'u2f',
+      });
+
+      sinon.assert.calledWithExactly(model.addAuthenticator.secondCall, {
+        ...DEFAULT_OPTIONS,
+        protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
+        hasResidentKey: false,
+        hasUserVerification: false,
+      });
+      assert.strictEqual(result?.hasResidentKey, false);
+      assert.strictEqual(result.hasUserVerification, false);
+    });
+
+    it('rejects hasResidentKey or hasUserVerification for u2f before calling CDP', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+      const before = mcpPage.getWebAuthnAuthenticator();
+
+      for (const option of ['hasResidentKey', 'hasUserVerification']) {
+        await assert.rejects(
+          mcpPage.configureWebAuthn({
+            enabled: true,
+            protocol: 'u2f',
+            [option]: true,
+          }),
+          {
+            message:
+              "protocol 'u2f' does not support hasResidentKey or hasUserVerification. Set them to false or omit them.",
+          },
+        );
+      }
+
+      sinon.assert.calledOnce(model.addAuthenticator);
+      sinon.assert.notCalled(model.removeAuthenticator);
+      assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticator(), before);
     });
 
     it('disables the virtual authenticator environment', async () => {

@@ -1908,11 +1908,16 @@ function formatPage(
     structured: createStructuredPage(mcpPage, context, title),
   };
 }
-function formatWebAuthnLabel(mcpPage: McpPage): string {
+function getWebAuthnLabel(mcpPage: McpPage): string | undefined {
   const authenticator = mcpPage.getWebAuthnAuthenticator();
   return authenticator
-    ? ` webauthn=${authenticator.protocol}/${authenticator.transport}`
-    : '';
+    ? `${authenticator.protocol}/${authenticator.transport}`
+    : undefined;
+}
+
+function formatWebAuthnLabel(mcpPage: McpPage): string {
+  const label = getWebAuthnLabel(mcpPage);
+  return label ? ` webauthn=${label}` : '';
 }
 
 function createStructuredPage(
@@ -1945,9 +1950,9 @@ function createStructuredPage(
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
   }
-  const webAuthnAuthenticator = mcpPage.getWebAuthnAuthenticator();
-  if (webAuthnAuthenticator) {
-    entry.webauthn = `${webAuthnAuthenticator.protocol}/${webAuthnAuthenticator.transport}`;
+  const webAuthnLabel = getWebAuthnLabel(mcpPage);
+  if (webAuthnLabel) {
+    entry.webauthn = webAuthnLabel;
   }
   return entry;
 }

@@ -449,8 +449,11 @@ export class McpPage implements ContextPage {
     if (!model) {
       throw new Error(`WebAuthn is not available for page ${this.id}.`);
     }
+    const options = config.enabled
+      ? this.#resolveWebAuthnOptions(config)
+      : undefined;
     try {
-      return await this.#applyWebAuthnConfig(model, config);
+      return await this.#applyWebAuthnConfig(model, options);
     } catch (error) {
       const orphan = this.#webAuthnAuthenticator;
       this.#webAuthnEnabled = false;
@@ -469,11 +472,43 @@ export class McpPage implements ContextPage {
     }
   }
 
+  #resolveWebAuthnOptions(
+    config: WebAuthnAuthenticatorConfig,
+  ): WebAuthnAuthenticator['options'] {
+    const current = this.#webAuthnAuthenticator?.options;
+    const protocol = config.protocol ?? current?.protocol ?? 'ctap2';
+    const transport = config.transport ?? current?.transport ?? 'internal';
+    const isUserVerified =
+      config.isUserVerified ?? current?.isUserVerified ?? true;
+    if (protocol === 'u2f') {
+      if (config.hasResidentKey || config.hasUserVerification) {
+        throw new Error(
+          `protocol 'u2f' does not support hasResidentKey or hasUserVerification. Set them to false or omit them.`,
+        );
+      }
+      return {
+        protocol,
+        transport,
+        hasResidentKey: false,
+        hasUserVerification: false,
+        isUserVerified,
+      };
+    }
+    return {
+      protocol,
+      transport,
+      hasResidentKey: config.hasResidentKey ?? current?.hasResidentKey ?? true,
+      hasUserVerification:
+        config.hasUserVerification ?? current?.hasUserVerification ?? true,
+      isUserVerified,
+    };
+  }
+
   async #applyWebAuthnConfig(
     model: DevTools.WebAuthnModel.WebAuthnModel,
-    config: WebAuthnAuthenticatorConfig,
+    options: WebAuthnAuthenticator['options'] | undefined,
   ): Promise<WebAuthnAuthenticatorState | undefined> {
-    if (!config.enabled) {
+    if (!options) {
       this.#webAuthnAuthenticator = undefined;
       this.#webAuthnEnabled = false;
       await model.setVirtualAuthEnvEnabled(false);
@@ -485,18 +520,6 @@ export class McpPage implements ContextPage {
     }
 
     const current = this.#webAuthnAuthenticator;
-    const options = {
-      protocol: config.protocol ?? current?.options.protocol ?? 'ctap2',
-      transport: config.transport ?? current?.options.transport ?? 'internal',
-      hasResidentKey:
-        config.hasResidentKey ?? current?.options.hasResidentKey ?? true,
-      hasUserVerification:
-        config.hasUserVerification ??
-        current?.options.hasUserVerification ??
-        true,
-      isUserVerified:
-        config.isUserVerified ?? current?.options.isUserVerified ?? true,
-    };
     let authenticator = current;
     if (
       !authenticator ||

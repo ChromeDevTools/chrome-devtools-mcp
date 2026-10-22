@@ -7,14 +7,14 @@ exports[`WebAuthnFormatter > formats an authenticator with credentials toJSON 1`
   "isUserVerified": true,
   "credentials": [
     {
-      "credentialId": "Y3JlZA==",
+      "credentialId": "Bq4IsoJ-lZuj_w",
       "rpId": "example.com",
       "isResidentCredential": true,
       "userName": "alice",
       "signCount": 0
     },
     {
-      "credentialId": "b3RoZXI=",
+      "credentialId": "b3RoZXI",
       "isResidentCredential": false,
       "signCount": 3
     }
@@ -26,8 +26,8 @@ exports[`WebAuthnFormatter > formats an authenticator with credentials toString 
 ## Virtual authenticator
 protocol=ctap2, transport=usb, hasResidentKey=true, hasUserVerification=true, isUserVerified=true
 ### Credentials
-- credentialId=Y3JlZA==, rpId=example.com, discoverable=true, signCount=0, userName=alice
-- credentialId=b3RoZXI=, rpId=unknown, discoverable=false, signCount=3
+- credentialId=Bq4IsoJ-lZuj_w, rpId=example.com, discoverable=true, signCount=0, userName=alice
+- credentialId=b3RoZXI, rpId=unknown, discoverable=false, signCount=3
 `;
 
 exports[`WebAuthnFormatter > formats an authenticator without credentials toJSON 1`] = `
