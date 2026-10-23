@@ -1,0 +1,10 @@
+import type * as Platform from '../platform/platform.js';
+import * as ByteUtilities from './ByteUtilities.js';
+import * as DevToolsLocale from './DevToolsLocale.js';
+import * as i18n from './i18nImpl.js';
+import type * as i18nTypes from './i18nTypes.js';
+import * as NumberFormatter from './NumberFormatter.js';
+import * as TimeUtilities from './time-utilities.js';
+export type LocalizeString = (id: string, values?: i18nTypes.Values) => Platform.UIString.LocalizedString;
+export type LazyLocalizeString = () => Platform.UIString.LocalizedString;
+export { ByteUtilities, DevToolsLocale, i18n, NumberFormatter, TimeUtilities, };

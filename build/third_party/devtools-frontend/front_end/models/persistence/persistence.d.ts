@@ -1,0 +1,10 @@
+import * as Automapping from './Automapping.js';
+import * as AutomaticFileSystemManager from './AutomaticFileSystemManager.js';
+import * as AutomaticFileSystemWorkspaceBinding from './AutomaticFileSystemWorkspaceBinding.js';
+import * as FileSystemWorkspaceBinding from './FileSystemWorkspaceBinding.js';
+import * as IsolatedFileSystem from './IsolatedFileSystem.js';
+import * as IsolatedFileSystemManager from './IsolatedFileSystemManager.js';
+import * as NetworkPersistenceManager from './NetworkPersistenceManager.js';
+import * as Persistence from './PersistenceImpl.js';
+import * as PlatformFileSystem from './PlatformFileSystem.js';
+export { Automapping, AutomaticFileSystemManager, AutomaticFileSystemWorkspaceBinding, FileSystemWorkspaceBinding, IsolatedFileSystem, IsolatedFileSystemManager, NetworkPersistenceManager, Persistence, PlatformFileSystem, };

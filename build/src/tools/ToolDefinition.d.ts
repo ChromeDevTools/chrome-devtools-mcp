@@ -1,0 +1,401 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import type { ParsedArguments } from '../config/mcp-options.js';
+import type { HeapSnapshotAggregateData, HeapSnapshotDiff, HeapSnapshotDetailedClassDiff, DuplicateStringGroup, HeapEdgesQueryOptions, HeapQueryOptions } from '../processors/HeapSnapshotManager.js';
+import type { McpPage } from '../McpPage.js';
+import type { DevToolsCommentBridge } from '../devtools/DevToolsCommentBridge.js';
+import type { CssFormatterOptions } from '../formatters/CssFormatter.js';
+import type { ContextFilterOptions, HeapSnapshotFormatOptions } from '../formatters/HeapSnapshotFormatter.js';
+import { zod, type Dialog, type ElementHandle, type Extension, type GetPWAStateOptions, type InstallPWAOptions, type LaunchPWAOptions, type PWAState, type ScreenRecorder, type ScreenRecording, type UninstallPWAOptions, type Viewport, type DevTools, type Flags, type Protocol, type Page, type RunnerResult, type WebMCPTool } from '../third_party/index.js';
+import type { InsightName, TraceResult } from '../processors/PerformanceTrace.js';
+import type { TextSnapshotNode, GeolocationOptions, CD4ACommentThread, PaginationOptions, ForcedColors, PrefersContrast, PrefersReducedMotion } from '../types.js';
+import type { McpWorker } from '../McpWorker.js';
+import type { WaitForEventsResult, DialogAction } from '../utils/WaitForHelper.js';
+import type { ToolCategory } from './categories.js';
+import type { ToolGroups } from './thirdPartyDeveloper.js';
+export type FileVerificationOption = true | {
+    local?: boolean;
+    remote?: boolean;
+    /**
+     * When true, a value that parses as an `http(s):`/`ws(s):` URL is passed
+     * through unchanged instead of being resolved as a filesystem path. Only
+     * set this for parameters whose sink fetches the URL (for example a
+     * source map or script source the server downloads) or hands it to the
+     * browser (for example a PWA install URL). For filesystem-path
+     * parameters it MUST stay unset: otherwise a value such as
+     * `http://x/../../etc/passwd` skips `validatePath` and is resolved to an
+     * absolute host path by the downstream filesystem API.
+     */
+    allowUrl?: boolean;
+};
+/**
+ * Which task queue `ToolHandler` runs a tool call on. A task on a queue
+ * waits for tasks on the same queue, on its parent, and on its children.
+ *
+ * - `'exclusive'`: the context queue, for the whole call. No other browser
+ *   tool runs at the same time. For every tool that touches browser-global
+ *   state or that is not reviewed for page-only access.
+ * - `'page'`: the queue of the page named by `pageId`, a child of the
+ *   context queue. Tools on different pages run at the same time; tools on
+ *   one page and `'exclusive'` tools wait. Without page id routing the call
+ *   runs on the context queue. Only for page-scoped tools whose handler
+ *   touches the target page and no browser-global state.
+ * - `'none'`: no queue. The tool runs at the same time as any other tool.
+ *   For browserless tools, whose data guards itself (see
+ *   `HeapSnapshotManager`), and for page tools that only read page state
+ *   and wait for external events.
+ */
+export type ToolConcurrency = 'exclusive' | 'page' | 'none';
+type AllKeys<T> = T extends unknown ? keyof T : never;
+type SchemaField<Schema, K extends PropertyKey> = Schema extends unknown ? K extends keyof Schema ? Schema[K] : undefined : never;
+export type ToolSchema = Record<string, zod.ZodType>;
+type MergeSchema<Schema extends ToolSchema> = {
+    [K in AllKeys<Schema>]: undefined extends SchemaField<Schema, K> ? zod.ZodOptional<Exclude<SchemaField<Schema, K>, undefined>> : SchemaField<Schema, K>;
+};
+export interface CapabilityGate {
+    category?: ToolCategory;
+    conditions?: Array<keyof ParsedArguments>;
+}
+export interface BaseToolDefinition<Schema extends ToolSchema = ToolSchema> {
+    name: string;
+    description: string;
+    annotations: {
+        category: ToolCategory;
+        /**
+         * If true, the tool does not modify its environment.
+         */
+        readOnlyHint: boolean;
+        title?: string;
+        /**
+         * If `'slim'` is included, the tool is only available with `--slim`. Tools
+         * without `'slim'` are only available without `--slim`, see
+         * {@link isAvailableInMode}.
+         */
+        conditions?: Array<keyof ParsedArguments>;
+    };
+    schema: Schema;
+    blockedByDialog: boolean;
+    /**
+     * Which task queue the server holds while the tool runs. See
+     * {@link ToolConcurrency}.
+     */
+    concurrency: ToolConcurrency;
+    verifyFilesSchema: Partial<Record<AllKeys<Schema>, FileVerificationOption>>;
+}
+export interface ToolDefinition<Schema extends ToolSchema = ToolSchema> extends BaseToolDefinition<Schema> {
+    /**
+     * Only page-scoped tools are checked for open dialogs by ToolHandler, so a
+     * non-page tool must handle dialogs itself.
+     */
+    blockedByDialog: false;
+    /**
+     * A non-page tool has no target page, so it cannot take the page queue. It
+     * touches browser state, so it always runs in a queue.
+     */
+    concurrency: Exclude<ToolConcurrency, 'page' | 'none'>;
+    handler(request: Request<Schema>, response: Response, context: Context): Promise<void>;
+}
+export interface Request<Schema extends ToolSchema> {
+    params: zod.output<zod.ZodObject<MergeSchema<Schema>>>;
+}
+export interface ImageContentData {
+    data: string;
+    mimeType: string;
+}
+export interface SnapshotParams {
+    verbose?: boolean;
+    filePath?: string;
+}
+export interface LighthouseAuditNode {
+    selector?: string;
+    snippet?: string;
+    nodeLabel?: string;
+    explanation?: string;
+}
+export interface LighthouseFailedAudit {
+    id: string;
+    title: string;
+    description?: string;
+    score: number;
+    displayValue?: string;
+    /**
+     * IDs of the categories that reference this audit.
+     */
+    categories: string[];
+    /**
+     * DOM nodes flagged by the audit, capped to a small number.
+     */
+    nodes: LighthouseAuditNode[];
+    /**
+     * Total number of distinct DOM nodes flagged by the audit, which may exceed
+     * the number of entries in `nodes`.
+     */
+    totalNodes: number;
+}
+export interface LighthouseData {
+    summary: {
+        mode: string;
+        device: string;
+        scores: Array<{
+            id: string;
+            title: string;
+            score: number | null;
+        }>;
+        audits: {
+            failed: number;
+            passed: number;
+        };
+        timing: {
+            total: number;
+        };
+        url?: string;
+    };
+    failedAudits: LighthouseFailedAudit[];
+    reports: string[];
+}
+export interface DevToolsData {
+    cdpRequestId?: string;
+    cdpBackendNodeId?: number;
+}
+export interface Response {
+    appendResponseLine(value: string): void;
+    setHeapSnapshotAggregates(aggregateData: HeapSnapshotAggregateData, options?: PaginationOptions & HeapSnapshotFormatOptions): void;
+    setHeapSnapshotStats(stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics, staticData: DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null, nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes, retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary, options?: HeapSnapshotFormatOptions): void;
+    setHeapSnapshotNodes(nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange, options?: PaginationOptions & HeapSnapshotFormatOptions): void;
+    setHeapSnapshotDuplicateStrings(duplicateStrings: DuplicateStringGroup[], options?: PaginationOptions & HeapSnapshotFormatOptions): void;
+    setHeapSnapshotRetainingPaths(retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths, options?: HeapSnapshotFormatOptions): void;
+    setHeapSnapshotDominators(dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain, options?: HeapSnapshotFormatOptions): void;
+    setHeapSnapshotClassDiffs(diff: HeapSnapshotDiff, options?: PaginationOptions & HeapSnapshotFormatOptions): void;
+    setHeapSnapshotDetailedClassDiff(detailedClassDiff: HeapSnapshotDetailedClassDiff, options?: PaginationOptions & HeapSnapshotFormatOptions): void;
+    setHeapSnapshotObjectDetails(objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo, options?: HeapSnapshotFormatOptions): void;
+    setHeapSnapshotContextAnalysis(analysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult, options?: PaginationOptions & ContextFilterOptions & HeapSnapshotFormatOptions): void;
+    setIncludePages(value: boolean): void;
+    setIncludeNetworkRequests(value: boolean, options?: PaginationOptions & {
+        resourceTypes?: string[];
+        includePreservedRequests?: boolean;
+        networkRequestIdInDevToolsUI?: number;
+    }): void;
+    setIncludeConsoleData(value: boolean, options?: PaginationOptions & {
+        types?: string[];
+        includePreservedMessages?: boolean;
+        includeStackTraces?: boolean;
+        serviceWorkerId?: string;
+    }): void;
+    setIncludeCssStyles(matchedStyles: MatchedStyles, options: CssFormatterOptions & PaginationOptions): void;
+    includeSnapshot(params?: SnapshotParams): void;
+    attachImage(value: ImageContentData): void;
+    attachNetworkRequest(reqId: number, options?: {
+        requestFilePath?: string;
+        responseFilePath?: string;
+    }): void;
+    attachConsoleMessage(msgid: number): void;
+    attachDevToolsData(data: DevToolsData): void;
+    setTabId(tabId: string): void;
+    attachTraceSummary(trace: TraceResult): void;
+    attachTraceInsight(trace: TraceResult, insightSetId: string, insightName: InsightName): void;
+    setListExtensions(): void;
+    attachLighthouseResult(result: LighthouseData): void;
+    setListThirdPartyDeveloperTools(): void;
+    setListWebMcpTools(): void;
+    attachWaitForResult(result: WaitForEventsResult): void;
+    setDevToolsComments(threads: CD4ACommentThread[]): void;
+}
+export type SupportedExtensions = '.png' | '.jpeg' | '.webp' | '.json' | '.network-response' | '.network-request' | '.html' | '.txt' | '.csv' | '.gz';
+/**
+ * Only add methods used by tools/*.
+ */
+export interface ScreenRecorderData {
+    recorder: ScreenRecorder | ScreenRecording;
+    filePath: string;
+}
+export type Context = Readonly<{
+    installPWA(options: InstallPWAOptions): Promise<string>;
+    uninstallPWA(options: UninstallPWAOptions): Promise<void>;
+    launchPWA(options: LaunchPWAOptions): Promise<Page>;
+    getPWAState(options: GetPWAStateOptions): Promise<PWAState>;
+    ensureExtension<Extension extends `.${string}`>(filePath: string, extension: Extension): Promise<`${string}${Extension}`>;
+    isRunningPerformanceTrace(): boolean;
+    isCruxEnabled(): boolean;
+    recordedTraces(): TraceResult[];
+    storeTraceRecording(result: TraceResult): void;
+    getPageById(pageId: number): ContextPage;
+    newPage(background?: boolean, isolatedContextName?: string): Promise<ContextPage>;
+    closePage(pageId: number): Promise<void>;
+    selectPage(page: ContextPage): void;
+    saveTemporaryFile(data: Uint8Array<ArrayBufferLike>, filename: string): Promise<{
+        filepath: string;
+    }>;
+    saveFile(data: Uint8Array<ArrayBufferLike>, clientProvidedFilePath: string, extension: SupportedExtensions): Promise<{
+        filename: string;
+    }>;
+    loadResource(path: string): Promise<string>;
+    installExtension(path: string): Promise<string>;
+    uninstallExtension(id: string): Promise<void>;
+    triggerExtensionAction(id: string): Promise<void>;
+    listExtensions(): Promise<Map<string, Extension>>;
+    getExtension(id: string): Promise<Extension | undefined>;
+    getSelectedMcpPage(): McpPage;
+    getWorkers(): McpWorker[];
+    getWorkerById(id: string): McpWorker | undefined;
+}>;
+/**
+ * The context available to tools that do not need a browser connection, see
+ * {@link defineBrowserlessTool}. Using it never triggers a browser launch or
+ * connection.
+ */
+export type BrowserlessContext = Readonly<{
+    getHeapSnapshotAggregates(filePath: string, filterName?: string, objectId?: number): Promise<HeapSnapshotAggregateData>;
+    getHeapSnapshotDuplicateStrings(filePath: string): Promise<DuplicateStringGroup[]>;
+    getHeapSnapshotStats(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics>;
+    getHeapSnapshotStaticData(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.StaticData | null>;
+    getHeapSnapshotNativeContextSizes(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes>;
+    getHeapSnapshotRetainedByContextSummary(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary>;
+    getHeapSnapshotNodesById(filePath: string, id: number, filterName?: string, objectId?: number): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+    getHeapSnapshotRetainers(filePath: string, nodeId: number): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+    getHeapSnapshotObjectDetails(filePath: string, nodeId: number): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo>;
+    analyzeHeapSnapshotContexts(filePath: string): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult>;
+    closeHeapSnapshot(filePath: string): Promise<boolean>;
+    getHeapSnapshotRetainingPaths(filePath: string, nodeId: number, maxDepth?: number, maxNodes?: number, maxSiblings?: number): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths>;
+    getHeapSnapshotDominators(filePath: string, nodeId: number): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain>;
+    getHeapSnapshotEdges(filePath: string, nodeId: number, options?: HeapEdgesQueryOptions): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+    getHeapSnapshotClassDiffs(baseFilePath: string, currentFilePath: string): Promise<HeapSnapshotDiff>;
+    getHeapSnapshotDetailedClassDiff(baseFilePath: string, currentFilePath: string, classIndex: number): Promise<HeapSnapshotDetailedClassDiff>;
+    queryHeapSnapshotObjects(filePath: string, options: HeapQueryOptions): Promise<DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange>;
+}>;
+export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
+/**
+ * Only add methods used by tools/*.
+ */
+export type ContextPage = Readonly<{
+    readonly id: number;
+    readonly pptrPage: Page;
+    readonly cpuThrottlingRate: number;
+    readonly networkConditions: string | null;
+    init(options?: {
+        emulateFocus?: boolean;
+    }): Promise<void>;
+    getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
+    getElementByUid(uid: string): Promise<ElementHandle<Element>>;
+    getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+    /**
+     * Returns a reqid for a cdpRequestId.
+     */
+    resolveCdpRequestId(cdpRequestId: string): number | undefined;
+    resolveReqidToCdpRequestId(reqid: number): string | undefined;
+    resolveBackendNodeId(backendNodeId: number): Promise<string | undefined>;
+    resolveUidToBackendNodeId(uid: string): Promise<{
+        backendNodeId: number;
+        targetId?: string;
+    } | undefined>;
+    getDialog(): Dialog | undefined;
+    clearDialog(): void;
+    throwIfDialogOpen(): void;
+    isClosed(): boolean;
+    getScreenRecorder(): ScreenRecorderData | null;
+    setScreenRecorder(data: ScreenRecorderData | null): void;
+    setIsRunningPerformanceTrace(x: boolean): void;
+    waitForEventsAfterAction(action: (signal: AbortSignal) => Promise<unknown>, options?: {
+        timeout?: number;
+        waitForStableDom?: boolean;
+        handleDialog?: DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
+    }): Promise<WaitForEventsResult>;
+    getWebMcpTools(): WebMCPTool[];
+    discoverThirdPartyDeveloperTools(): Promise<ToolGroups>;
+    executeThirdPartyDeveloperTool(toolName: string, params: Record<string, unknown>, response: Response): Promise<void>;
+    getDevToolsData(): Promise<DevToolsData>;
+    restoreEmulation(): Promise<void>;
+    emulate(options: {
+        networkConditions?: string;
+        cpuThrottlingRate?: number;
+        geolocation?: GeolocationOptions;
+        userAgent?: string;
+        colorScheme?: 'dark' | 'light' | 'auto';
+        forcedColors?: ForcedColors | 'auto';
+        prefersContrast?: PrefersContrast | 'auto';
+        prefersReducedMotion?: PrefersReducedMotion | 'auto';
+        viewport?: Viewport;
+    }): Promise<void>;
+    waitForTextOnPage(text: string[], options?: {
+        timeout?: number;
+        visible?: boolean;
+    }): Promise<Element>;
+    getDevToolsPage(): Promise<Page | undefined>;
+    openDevTools(): Promise<Page | undefined>;
+    ensureDevToolsCommentBridge(devtoolsPage: Page): Promise<DevToolsCommentBridge | undefined>;
+    lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
+    lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
+}>;
+export type ToolFactory<Schema extends ToolSchema = ToolSchema> = (args: ParsedArguments) => ToolDefinition<Schema>;
+export declare function defineTool<Schema extends ToolSchema>(definition: ToolFactory<Schema>): ToolFactory<Schema>;
+interface PageToolDefinition<Schema extends ToolSchema = ToolSchema> extends BaseToolDefinition<Schema> {
+    /**
+     * A page tool with `'none'` must only read page state. Its page lookup and
+     * response formatting run at the same time as other tools on the page.
+     */
+    concurrency: ToolConcurrency;
+    handler(request: Request<Schema> & {
+        page: ContextPage;
+    }, response: Response, context: Context): Promise<void>;
+}
+export interface DefinedPageTool<Schema extends ToolSchema = ToolSchema> extends PageToolDefinition<Schema> {
+    pageScoped: true;
+}
+export type PageToolFactory<Schema extends ToolSchema = ToolSchema> = (args: ParsedArguments) => DefinedPageTool<Schema>;
+export declare function definePageTool<Schema extends ToolSchema>(definition: (args: ParsedArguments) => PageToolDefinition<Schema>): PageToolFactory<Schema>;
+export interface BrowserlessToolDefinition<Schema extends ToolSchema = ToolSchema> extends BaseToolDefinition<Schema> {
+    browserless: true;
+    /**
+     * Browserless tools have no page, so ToolHandler never checks them for open
+     * dialogs.
+     */
+    blockedByDialog: false;
+    /**
+     * A browserless tool has no page. `defineBrowserlessTool` sets `'none'`.
+     */
+    concurrency: Exclude<ToolConcurrency, 'page'>;
+    handler(request: Request<Schema>, response: Response, context: BrowserlessContext): Promise<void>;
+}
+export type BrowserlessToolFactory<Schema extends ToolSchema = ToolSchema> = (args: ParsedArguments) => BrowserlessToolDefinition<Schema>;
+/**
+ * Defines a tool that does not need a browser connection, e.g. a tool that only
+ * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ * Such a tool runs without the context queue (`concurrency: 'none'`) unless
+ * the definition sets another value.
+ */
+export declare function defineBrowserlessTool<Schema extends ToolSchema>(definition: (args: ParsedArguments) => Omit<BrowserlessToolDefinition<Schema>, 'browserless' | 'concurrency'> & Partial<Pick<BrowserlessToolDefinition<Schema>, 'concurrency'>>): BrowserlessToolFactory<Schema>;
+export type AnyToolDefinition = ToolDefinition | DefinedPageTool | BrowserlessToolDefinition;
+export declare function isPageScopedTool(tool: AnyToolDefinition): tool is DefinedPageTool;
+export declare function isBrowserlessTool(tool: AnyToolDefinition): tool is BrowserlessToolDefinition;
+export declare const CLOSE_PAGE_ERROR = "The last open page cannot be closed. It is fine to keep it open.";
+export declare const pageIdSchema: {
+    pageId: zod.ZodNumber;
+};
+export declare function zodTransform<Input, Output>(transform: (arg: Input) => Output): (arg: Input, ctx: zod.RefinementCtx) => Output;
+export declare const timeoutSchema: {
+    timeout: zod.ZodOptional<zod.ZodType<number | undefined>>;
+};
+export declare function viewportTransform(arg: string | undefined): {
+    width: number;
+    height: number;
+    deviceScaleFactor?: number;
+    isMobile?: boolean;
+    isLandscape?: boolean;
+    hasTouch?: boolean;
+} | undefined;
+export declare function geolocationTransform(arg: string | undefined): {
+    latitude: number;
+    longitude: number;
+} | undefined;
+export declare function isSlimTool(tool: Pick<BaseToolDefinition, 'annotations'>): boolean;
+/**
+ * Slim mode replaces the regular tools with the slim tools.
+ */
+export declare function isAvailableInMode(tool: Pick<BaseToolDefinition, 'annotations'>, serverArgs: Pick<ParsedArguments, 'slim'>): boolean;
+/**
+ * Returns whether a capability gate is enabled under the given arguments.
+ */
+export declare function isCapabilityEnabled(gate: CapabilityGate, serverArgs: ParsedArguments): boolean;
+export {};

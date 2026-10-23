@@ -1,0 +1,99 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import type { ErrorCode } from './errors.js';
+export interface ChromeDevToolsMcpExtension {
+    os_type?: OsType;
+    mcp_client?: McpClient;
+    raw_mcp_client_info?: RawMcpClientInfo;
+    app_version?: string;
+    session_id?: string;
+    tool_invocation?: ToolInvocation;
+    server_start?: ServerStart;
+    daily_active?: DailyActive;
+    server_shutdown?: ServerShutdown;
+    server_error?: ServerError;
+    tool_active?: ToolActive;
+}
+export interface RawMcpClientInfo {
+    raw_client_name: string;
+}
+export interface ServerError {
+    tool_name?: string;
+    error_code: ErrorCode;
+}
+export type ServerShutdown = Record<string, never>;
+export interface LoggedDevToolsData {
+    is_dom_element_selected?: boolean;
+    is_network_request_selected?: boolean;
+}
+export interface ToolInvocationContext {
+    is_devtools_open?: boolean;
+    is_localhost?: boolean;
+    devtools_data?: LoggedDevToolsData;
+}
+export interface ToolInvocation {
+    tool_name: string;
+    success: boolean;
+    latency_ms: number;
+    tool_params?: object;
+    context?: ToolInvocationContext;
+}
+export interface ServerStart {
+    flag_usage?: FlagUsage;
+}
+export interface DailyActive {
+    days_since_last_active: number;
+}
+export interface ToolActive {
+    days_since_last_tool_call: number;
+}
+export type FlagUsage = Record<string, boolean | string | number | undefined>;
+export interface LogRequest {
+    log_source: number;
+    request_time_ms: string;
+    client_info: {
+        client_type: number;
+    };
+    log_event: Array<{
+        event_time_ms: string;
+        source_extension_json: string;
+    }>;
+}
+export interface LogResponse {
+    /**
+     * If present, the client must wait this many milliseconds before
+     * issuing the next HTTP request.
+     */
+    next_request_wait_millis?: number;
+}
+export declare enum OsType {
+    OS_TYPE_UNSPECIFIED = 0,
+    OS_TYPE_WINDOWS = 1,
+    OS_TYPE_MACOS = 2,
+    OS_TYPE_LINUX = 3
+}
+export declare enum McpClient {
+    MCP_CLIENT_UNSPECIFIED = 0,
+    MCP_CLIENT_CLAUDE_CODE = 1,
+    MCP_CLIENT_GEMINI_CLI = 2,
+    MCP_CLIENT_DT_MCP_CLI = 4,
+    MCP_CLIENT_OPENCLAW = 5,
+    MCP_CLIENT_CODEX = 6,
+    MCP_CLIENT_ANTIGRAVITY = 7,
+    MCP_CLIENT_GROK = 8,
+    MCP_CLIENT_OPENCODE = 9,
+    MCP_CLIENT_CLAUDE_DESKTOP = 10,
+    MCP_CLIENT_GITHUB_COPILOT = 11,
+    MCP_CLIENT_HERMES = 12,
+    MCP_CLIENT_OTHER = 3
+}
+export declare enum WatchdogMessageType {
+    LOG_EVENT = "log-event"
+}
+export interface WatchdogMessage {
+    type: WatchdogMessageType.LOG_EVENT;
+    payload: ChromeDevToolsMcpExtension;
+}
