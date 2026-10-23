@@ -1812,5 +1812,53 @@ describe('input', () => {
         ]);
       });
     });
+
+    it('dispatches editing commands for Meta+A and Meta+Z', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setContent(
+          html`<textarea>Hello world</textarea><input id="txt" />`,
+        );
+        await page.focus('textarea');
+        context.getSelectedMcpPage().textSnapshot = await TextSnapshot.create(
+          context.getSelectedMcpPage(),
+        );
+
+        await pressKey(args).handler(
+          {
+            params: {
+              key: 'Meta+A',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const selection = await page.evaluate(() => {
+          const ta = document.querySelector('textarea')!;
+          return {start: ta.selectionStart, end: ta.selectionEnd};
+        });
+        assert.deepStrictEqual(selection, {start: 0, end: 11});
+
+        await page.focus('#txt');
+        await page.keyboard.type('typed-value');
+        await pressKey(args).handler(
+          {
+            params: {
+              key: 'Meta+Z',
+            },
+            page: context.getSelectedMcpPage(),
+          },
+          response,
+          context,
+        );
+
+        const val = await page.evaluate(
+          () => document.querySelector<HTMLInputElement>('#txt')!.value,
+        );
+        assert.strictEqual(val, '');
+      });
+    });
   });
 });
