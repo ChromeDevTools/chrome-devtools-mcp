@@ -22,6 +22,7 @@ import {mcpOptions} from '../src/config/mcp-options.js';
 import {McpServer} from '../src/index.js';
 import {McpContext} from '../src/McpContext.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import {ToolHandler} from '../src/ToolHandler.js';
 import type {ToolCategory} from '../src/tools/categories.js';
 import type {ToolDefinition} from '../src/tools/ToolDefinition.js';
 import {saveLogsToFile} from '../src/utils/logger.js';
@@ -116,6 +117,51 @@ describe('McpServer', () => {
   });
 
   describe('callTool', () => {
+    it(
+      'forwards the MCP request signal through the dispatcher',
+      {timeout: 30_000},
+      async () => {
+        const started = Promise.withResolvers<AbortSignal>();
+        const aborted = Promise.withResolvers<void>();
+        const handle = sinon
+          .stub(ToolHandler.prototype, 'handle')
+          .callsFake(async (_args, options) => {
+            const signal = options?.signal;
+            assert.ok(signal);
+            signal.addEventListener('abort', () => aborted.resolve(), {
+              once: true,
+            });
+            started.resolve(signal);
+            await aborted.promise;
+            signal.throwIfAborted();
+            return {content: []};
+          });
+        const {server} = await createTestServer();
+        const client = await connectClient(server);
+        try {
+          const controller = new AbortController();
+          const pending = client.callTool(
+            {name: 'list_pages', arguments: {}},
+            {signal: controller.signal},
+          );
+          const signal = await started.promise;
+          sinon.assert.calledOnceWithExactly(
+            handle,
+            {},
+            {viaMcp: true, signal},
+          );
+          assert.strictEqual(signal.aborted, false);
+          controller.abort();
+          await assert.rejects(pending);
+          await aborted.promise;
+          assert.strictEqual(signal.aborted, true);
+        } finally {
+          await client.close();
+          await server.close();
+        }
+      },
+    );
+
     it('returns an error for unknown tool names', async () => {
       const {server, browserManager} = await createTestServer();
 

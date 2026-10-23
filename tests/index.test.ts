@@ -15,8 +15,10 @@ import {executablePath} from 'puppeteer';
 import {Client, type ClientCapabilities} from '@modelcontextprotocol/client';
 import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import type {TextContent} from '../src/third_party/index.js';
+import {withTimeout} from '../src/utils/timeout.js';
 
 import {createTempDir} from './utils.js';
+import {TestServer} from './server.js';
 
 // Each test starts its own server process, so the tests run in parallel. Most
 // of the test time is server start and waits, not CPU work.
@@ -103,6 +105,67 @@ describe('e2e', {concurrency: true}, () => {
       t.assert.snapshot(JSON.stringify(result.content));
     });
   });
+
+  it(
+    'cancels a running page evaluation without restarting Chrome',
+    {timeout: 90_000},
+    async t => {
+      const server = new TestServer(TestServer.randomPort());
+      await server.start();
+      t.after(() => server.stop());
+      await withClient(async client => {
+        const started = Promise.withResolvers<void>();
+        server.addHtmlRoute(
+          '/evaluation',
+          '<!doctype html><title>Cancellation test</title>',
+        );
+        server.addRoute('/started', (_request, response) => {
+          response.end();
+          started.resolve();
+        });
+        await client.callTool({
+          name: 'navigate_page',
+          arguments: {pageId: 1, url: server.getRoute('/evaluation')},
+        });
+
+        const abortController = new AbortController();
+        const pendingEvaluation = client.callTool(
+          {
+            name: 'evaluate_script',
+            arguments: {
+              pageId: 1,
+              function: `async () => {
+                await fetch('/started');
+                await new Promise(() => {});
+              }`,
+              waitForStableDom: false,
+            },
+          },
+          {signal: abortController.signal},
+        );
+        const rejected = assert.rejects(pendingEvaluation);
+        await withTimeout(started.promise, {
+          timeout: 30_000,
+          message: 'The page evaluation did not signal that it started.',
+        });
+        abortController.abort();
+        await rejected;
+
+        const pagesAfterCancellation = await client.callTool({
+          name: 'list_pages',
+          arguments: {},
+        });
+        assert.match(
+          JSON.stringify(pagesAfterCancellation.content),
+          /\/evaluation/,
+        );
+        assert.doesNotMatch(
+          JSON.stringify(pagesAfterCancellation.content),
+          /reconnect|restart/i,
+        );
+      });
+    },
+  );
 
   it('calls a tool multiple times', async t => {
     await withClient(async client => {

@@ -397,7 +397,7 @@ export class McpServer {
    * checks run inside `ToolHandler.handle()` inside the task runner.
    */
   #setToolCallRequestHandler(): void {
-    this.server.server.setRequestHandler('tools/call', async request => {
+    this.server.server.setRequestHandler('tools/call', async (request, ctx) => {
       const entry = this.#tools.get(request.params.name);
       if (!entry) {
         throw new ProtocolError(
@@ -407,6 +407,7 @@ export class McpServer {
       }
       const result = await entry.handler.handle(request.params.arguments, {
         viaMcp: true,
+        signal: ctx.mcpReq.signal,
       });
       return this.server.server.projectCallToolResult(result, undefined);
     });

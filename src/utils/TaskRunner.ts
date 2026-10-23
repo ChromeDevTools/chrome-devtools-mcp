@@ -16,7 +16,7 @@ interface Entry {
 
 /** The runner methods a queue uses. Not part of the public API. */
 interface QueueHooks {
-  scheduleTask(queue: TaskQueue): Promise<Disposable>;
+  scheduleTask(queue: TaskQueue, signal?: AbortSignal): Promise<Disposable>;
   cancel(queue: TaskQueue, reason: Error): void;
 }
 
@@ -39,13 +39,14 @@ export class TaskQueue {
    * Schedules a task on this queue. Resolves when no earlier task on a
    * related queue runs, with a guard that holds the queue until it is
    * disposed. Rejects when the queue is disposed while the task waits. A
-   * second dispose of the guard throws.
+   * second dispose of the guard throws. Cancellation rejects a waiting task
+   * with the signal's reason; after acquisition, the caller owns the guard.
    */
-  async scheduleTask(): Promise<Disposable> {
+  async scheduleTask(signal?: AbortSignal): Promise<Disposable> {
     if (this.#disposed) {
       throw this.#disposed;
     }
-    return await this.#hooks.scheduleTask(this);
+    return await this.#hooks.scheduleTask(this, signal);
   }
 
   /**
@@ -85,7 +86,8 @@ export class TaskQueue {
  */
 export class TaskRunner {
   readonly #hooks: QueueHooks = {
-    scheduleTask: queue => this.#scheduleTask(queue),
+    scheduleTask: (queue, signal) =>
+      this.#scheduleTask(queue, 'normal', signal),
     cancel: (queue, reason) => this.#cancel(queue, reason),
   };
   readonly #root = new TaskQueue(this.#hooks, undefined);
@@ -112,25 +114,44 @@ export class TaskRunner {
   async #scheduleTask(
     queue: TaskQueue,
     priority: Priority = 'normal',
+    signal?: AbortSignal,
   ): Promise<Disposable> {
-    const {guard, started} = this.#enter(queue, priority);
-    await started;
-    return guard;
+    signal?.throwIfAborted();
+    const {entry, started} = this.#enter(queue, priority);
+    const onAbort = (): void => {
+      this.#cancelEntry(entry, signal?.reason);
+    };
+    signal?.addEventListener('abort', onAbort, {once: true});
+    try {
+      await started;
+      return {
+        [Symbol.dispose]: () => this.#leave(entry),
+      };
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+    }
   }
 
   #cancel(queue: TaskQueue, reason: Error): void {
     for (const entry of [...this.#entries]) {
-      if (entry.queue === queue && !entry.running) {
-        this.#leave(entry);
-        entry.reject(reason);
+      if (entry.queue === queue) {
+        this.#cancelEntry(entry, reason);
       }
     }
+  }
+
+  #cancelEntry(entry: Entry, reason: Error): void {
+    if (entry.running || !this.#entries.includes(entry)) {
+      return;
+    }
+    this.#leave(entry);
+    entry.reject(reason);
   }
 
   #enter(
     queue: TaskQueue,
     priority: Priority,
-  ): {guard: Disposable; started: Promise<void>} {
+  ): {entry: Entry; started: Promise<void>} {
     const {promise, resolve, reject} = Promise.withResolvers<void>();
     const entry: Entry = {queue, priority, running: false, resolve, reject};
     // A high-priority entry goes before the first waiting normal entry.
@@ -142,11 +163,7 @@ export class TaskRunner {
     this.#schedule();
     return {
       started: promise,
-      guard: {
-        [Symbol.dispose]: () => {
-          this.#leave(entry);
-        },
-      },
+      entry,
     };
   }
 
