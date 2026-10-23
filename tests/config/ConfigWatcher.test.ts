@@ -74,14 +74,19 @@ async function startWatcher(
     debounceMs: DEBOUNCE_MS,
   });
   watcher.start();
-  const probe = await waitForWatchReady(
-    path.dirname(fs.realpathSync(watchedPath)),
-  );
+  const realDir = path.dirname(fs.realpathSync(watchedPath));
+  const linkDir = fs.realpathSync(path.dirname(watchedPath));
+  const probes = [await waitForWatchReady(realDir)];
+  if (linkDir !== realDir) {
+    probes.push(await waitForWatchReady(linkDir));
+  }
   return {
     watcher,
     [Symbol.dispose]() {
       watcher.dispose();
-      probe.close();
+      for (const probe of probes) {
+        probe.close();
+      }
     },
   };
 }
@@ -139,6 +144,37 @@ describe('ConfigWatcher', () => {
     await waitForCall(onChange);
 
     sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
+  });
+
+  it('detects symlink retargeting and subsequent writes to the new target', async () => {
+    using dir1 = createTempDir('cd4a-target1-');
+    using dir2 = createTempDir('cd4a-target2-');
+    using linkDir = createTempDir('cd4a-link-');
+    const v1Path = path.join(dir1.path, 'v1.json');
+    const v2Path = path.join(dir2.path, 'v2.json');
+    fs.writeFileSync(v1Path, '{"headless": false}');
+    fs.writeFileSync(v2Path, '{"headless": true}');
+    const linkPath = path.join(linkDir.path, 'cd4a.config.json');
+    fs.symlinkSync(v1Path, linkPath);
+    const onChange = sinon.stub().resolves();
+    using watcher = await startWatcher(linkPath, onChange);
+
+    const tempLinkPath = path.join(linkDir.path, 'cd4a.config.json.tmp');
+    fs.symlinkSync(v2Path, tempLinkPath);
+    fs.renameSync(tempLinkPath, linkPath);
+    await waitForCall(onChange);
+    sinon.assert.calledOnceWithExactly(onChange, '{"headless": true}');
+
+    onChange.resetHistory();
+    using probe2 = {
+      handle: await waitForWatchReady(fs.realpathSync(dir2.path)),
+      [Symbol.dispose]() {
+        this.handle.close();
+      },
+    };
+    fs.writeFileSync(v2Path, '{"slim": true}');
+    await waitForCall(onChange);
+    sinon.assert.calledOnceWithExactly(onChange, '{"slim": true}');
   });
 
   it('does not call onChange if the content did not change', async () => {

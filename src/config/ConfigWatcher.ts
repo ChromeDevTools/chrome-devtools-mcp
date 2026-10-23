@@ -29,9 +29,10 @@ function readContent(filePath: string): string | undefined {
  * Watches a config file and calls `onChange` with the new content after it was
  * modified.
  *
- * - Symlinks are resolved once on start, and the directory of the real file is
- *   watched. Watching the directory instead of the file keeps working when
- *   editors save atomically by replacing the file.
+ * - Both the config path's directory and (for symlinks to another directory)
+ *   the target file's directory are watched. Watching the directory instead of
+ *   the file keeps working when editors save atomically by replacing the file
+ *   or when a symlink is retargeted.
  * - Events are debounced because some platforms emit several events for a
  *   single change.
  * - Some platforms do not report the file name, such events are not filtered.
@@ -42,7 +43,10 @@ export class ConfigWatcher implements Disposable {
   readonly #configPath: string;
   readonly #onChange: (content: string) => Promise<void>;
   readonly #debounceMs: number;
-  #watcher?: fs.FSWatcher;
+  #linkWatcher?: fs.FSWatcher;
+  #targetWatcher?: fs.FSWatcher;
+  #targetWatchDir?: string;
+  #realPath = '';
   #debounced?: ReturnType<typeof DevTools.Common.Debouncer.debounce>;
   #content?: string;
   #pending = Promise.resolve();
@@ -61,15 +65,31 @@ export class ConfigWatcher implements Disposable {
    * Starts watching the config file. Throws if `configPath` does not exist.
    */
   start(): void {
-    if (this.#watcher) {
+    if (this.#linkWatcher) {
       return;
     }
     const realPath = fs.realpathSync(this.#configPath);
-    const fileName = path.basename(realPath);
+    const linkDir = fs.realpathSync(path.dirname(this.#configPath));
+    const linkName = path.basename(this.#configPath);
+    this.#realPath = realPath;
     this.#content = readContent(realPath);
     this.#debounced = DevTools.Common.Debouncer.debounce(() => {
-      const content = readContent(realPath);
-      if (content === undefined || content === this.#content) {
+      if (!this.#linkWatcher) {
+        return;
+      }
+      let currentRealPath: string;
+      try {
+        currentRealPath = fs.realpathSync(this.#configPath);
+      } catch {
+        return;
+      }
+      const content = readContent(currentRealPath);
+      if (content === undefined) {
+        return;
+      }
+      this.#realPath = currentRealPath;
+      this.#syncTargetWatcher(linkDir);
+      if (content === this.#content) {
         return;
       }
       this.#content = content;
@@ -79,30 +99,82 @@ export class ConfigWatcher implements Disposable {
           console.error(`Failed to apply ${this.#configPath}:`, err);
         });
     }, this.#debounceMs);
-    this.#watcher = fs.watch(
-      path.dirname(realPath),
+    this.#linkWatcher = this.#watchDirectory(linkDir, changedFileName => {
+      if (
+        changedFileName !== null &&
+        changedFileName !== linkName &&
+        (path.dirname(this.#realPath) !== linkDir ||
+          changedFileName !== path.basename(this.#realPath))
+      ) {
+        return;
+      }
+      this.#debounced?.();
+    });
+    this.#syncTargetWatcher(linkDir);
+    logger?.(`Watching ${realPath} for config changes`);
+  }
+
+  #watchDirectory(
+    dir: string,
+    onEvent: (changedFileName: string | null) => void,
+  ): fs.FSWatcher {
+    const watcher = fs.watch(
+      dir,
       {persistent: false},
       (_eventType, changedFileName) => {
-        if (changedFileName !== null && changedFileName !== fileName) {
-          return;
-        }
-        this.#debounced?.();
+        onEvent(changedFileName);
       },
     );
-    this.#watcher.on('error', err => {
+    watcher.on('error', err => {
       console.error(
         `Stopped watching ${this.#configPath}: ${getErrorMessage(err)}`,
       );
       this.dispose();
     });
-    logger?.(`Watching ${realPath} for config changes`);
+    return watcher;
+  }
+
+  #syncTargetWatcher(linkDir: string): void {
+    const realDir = path.dirname(this.#realPath);
+    if (realDir === linkDir) {
+      this.#targetWatcher?.close();
+      this.#targetWatcher = undefined;
+      this.#targetWatchDir = undefined;
+      return;
+    }
+    if (this.#targetWatchDir === realDir && this.#targetWatcher) {
+      return;
+    }
+    this.#targetWatcher?.close();
+    this.#targetWatcher = undefined;
+    this.#targetWatchDir = undefined;
+    try {
+      this.#targetWatcher = this.#watchDirectory(realDir, changedFileName => {
+        if (
+          changedFileName !== null &&
+          changedFileName !== path.basename(this.#realPath)
+        ) {
+          return;
+        }
+        this.#debounced?.();
+      });
+      this.#targetWatchDir = realDir;
+    } catch (err) {
+      console.error(
+        `Stopped watching ${this.#configPath}: ${getErrorMessage(err)}`,
+      );
+      this.dispose();
+    }
   }
 
   dispose(): void {
     this.#debounced?.cancel();
     this.#debounced = undefined;
-    this.#watcher?.close();
-    this.#watcher = undefined;
+    this.#linkWatcher?.close();
+    this.#linkWatcher = undefined;
+    this.#targetWatcher?.close();
+    this.#targetWatcher = undefined;
+    this.#targetWatchDir = undefined;
   }
 
   [Symbol.dispose](): void {
