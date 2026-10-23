@@ -88,10 +88,13 @@ To install Chrome DevTools MCP with skills, add the marketplace registry in Clau
 Then, install the plugin:
 
 ```sh
-/plugin install chrome-devtools-mcp@chrome-devtools-plugins
+/plugin install chrome-devtools@chrome-devtools-plugins
 ```
 
 Restart Claude Code to have the MCP server and skills load (check with `/skills`).
+
+> [!NOTE]
+> The plugin was previously named `chrome-devtools-mcp`. To get the renamed plugin, refresh the marketplace with `/plugin marketplace update chrome-devtools-plugins` (or turn on auto-update for it). Claude Code then moves your install to `chrome-devtools`, with no reinstall needed. If the plugin is missing the next time you start Claude Code (`/plugin` shows `Plugin "chrome-devtools" not cached`), run `/reload-plugins` or restart Claude Code once more. Skills are now prefixed `chrome-devtools:`, and MCP tools are named `mcp__plugin_chrome-devtools_chrome-devtools__*`, so you will need to approve tool permissions again. If the plugin is still missing, run `/plugin install chrome-devtools@chrome-devtools-plugins`.
 
 > [!TIP]
 > If the plugin installation fails with a `Failed to clone repository` error (e.g., HTTPS connectivity issues behind a corporate firewall), see the [troubleshooting guide](./troubleshooting.md#claude-code-plugin-installation-fails-with-failed-to-clone-repository) for workarounds, or use the CLI installation method above instead.
