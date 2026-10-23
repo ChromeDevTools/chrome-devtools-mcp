@@ -1,0 +1,15 @@
+# Copyright 2026 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+
+group("devtools_deps") {
+  deps = [
+    "//third_party/devtools-frontend/front_end/entrypoints/formatter_worker:worker_entrypoint",
+    "//third_party/devtools-frontend/front_end/entrypoints/heap_snapshot_worker:worker_entrypoint",
+    "//third_party/devtools-frontend/front_end/models/issues_manager:descriptions",
+    "//third_party/devtools-frontend/mcp:mcp",
+  ]
+}
+
+group("default") {
+  deps = [ ":devtools_deps" ]
+}
