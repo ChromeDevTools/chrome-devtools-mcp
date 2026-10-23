@@ -30,7 +30,7 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (9 tools)
+- **[Debugging](#debugging)** (10 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
@@ -38,6 +38,7 @@
   - [`list_console_messages`](#list_console_messages)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
+  - [`set_logpoints`](#set_logpoints)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 - **[Memory](#memory)** (14 tools)
@@ -472,6 +473,17 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 **Parameters:**
 
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+
+---
+
+### `set_logpoints`
+
+**Description:** Set the logpoints of the selected page. A logpoint logs the value of one or more expressions to the console every time a line of code executes, without pausing execution and without modifying the source code. It works like logpoints in the Chrome DevTools Sources panel and replaces temporarily instrumenting code with console.log() calls. The given list is the complete set of logpoints for the page: logpoints not in the list are removed, new ones are added and the expression of a logpoint at an existing location is replaced; an empty list removes all logpoints. Locations are given as the URL of a script as served to the browser or as an original source file (for example a TypeScript file), which is resolved through the source maps of the parsed scripts and re-resolved automatically when a rebuilt bundle is loaded. A location in a generated script moves to its original source line when a source map covers it, so the response can show a different URL and line than requested; locations that end up on the same line become one logpoint with the last given expression. Original source locations require source maps, which --no-source-maps turns off. Only scripts of the page's main frame are supported: scripts in workers and in out-of-process iframes do not match. The logged output appears as regular console messages that can be read with [`list_console_messages`](#list_console_messages). Logpoints stay active across page reloads and navigations until they are removed or the page is closed. The response lists the resulting logpoints and where they are bound.
+
+**Parameters:**
+
+- **logpoints** (array) **(required)**: The complete set of logpoints for the page, each formatted as &lt;url&gt;:&lt;lineNumber&gt;[:&lt;columnNumber&gt;] &lt;expression&gt;. The url is the URL of a script as served to the browser or the path of an original source file resolvable through source maps, matched exactly or as a path suffix (e.g. "src/app.ts"). lineNumber and the optional columnNumber are 1-based in the coordinates of the url; a line without executable code moves the logpoint to the next possible location. The expression is formatted like the arguments of console.log() and is evaluated in the scope of the location, so local variables are accessible (for source-mapped locations by their original names). Log values directly: objects and arrays appear as JSON in the console messages, and values that JSON cannot represent (Map, Set, functions, DOM nodes, cyclic objects) are described from their preview, so wrapping them in JSON.stringify() is unnecessary and can lose or throw on such values. For large objects, log the specific properties of interest. Example: "src/cart.ts:42 'cart total:', cart.total, cart.items.length". Pass an empty array to remove all logpoints.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---

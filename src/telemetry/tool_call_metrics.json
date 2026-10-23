@@ -1363,5 +1363,18 @@
         "argType": "number"
       }
     ]
+  },
+  {
+    "name": "set_logpoints",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "logpoints_count",
+        "argType": "number"
+      }
+    ]
   }
 ]
