@@ -368,6 +368,10 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   });
 
   page.emulateFocusedPage.resolves();
+  page.goto.resolves(null);
+  page.goBack.resolves(null);
+  page.goForward.resolves(null);
+  page.reload.resolves(null);
   page.evaluateHandle.resolves(createMockElementHandle().handle);
 
   return Object.assign(page, {

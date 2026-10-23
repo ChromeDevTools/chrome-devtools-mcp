@@ -28,6 +28,7 @@ import {
   createMockMcpPage,
   createMockParsedArguments,
 } from '../mocks.js';
+import {serverHooks} from '../server.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -230,6 +231,240 @@ describe('pages', () => {
         await evalPromise;
       });
     });
+  });
+  describe('navigation dialogs', () => {
+    const server = serverHooks();
+    for (const tool of ['new_page', 'navigate_page']) {
+      for (const hasDialog of [true, false]) {
+        it(`${tool} ${hasDialog ? 'skips' : 'requests'} third-party discovery ${hasDialog ? 'with' : 'without'} a dialog`, async () => {
+          const {page, context, response, args} = createHandlerMocks({
+            categoryExperimentalThirdParty: true,
+          });
+          context.newPage.resolves(page);
+          if (hasDialog) {
+            page.getDialog.returns(createMockDialog({message: 'load dialog'}));
+          }
+          const params = {url: 'https://example.com'};
+          if (tool === 'new_page') {
+            await newPage(args).handler({params}, response, context);
+            sinon.assert.notCalled(response.setListWebMcpTools);
+          } else {
+            await navigatePage(args).handler({params, page}, response, context);
+            sinon.assert.calledOnceWithExactly(response.setListWebMcpTools);
+          }
+          sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+          if (hasDialog) {
+            sinon.assert.notCalled(response.setListThirdPartyDeveloperTools);
+          } else {
+            sinon.assert.calledOnceWithExactly(
+              response.setListThirdPartyDeveloperTools,
+            );
+          }
+        });
+      }
+    }
+    for (const tool of ['new_page', 'navigate_page']) {
+      it(`${tool} still times out a load without a dialog`, async () => {
+        server.addRoute('/hanging', (_request, response) => {
+          response.writeHead(200, {'Content-Type': 'text/html'});
+          response.write('<html><body>Still loading');
+        });
+        await withMcpContext(async (response, context, args) => {
+          const page = context.getSelectedMcpPage();
+          const listeners = page.pptrPage.listenerCount('dialog');
+          const params = {url: server.getRoute('/hanging'), timeout: 300};
+          if (tool === 'new_page') {
+            await assert.rejects(
+              newPage(args).handler({params}, response, context),
+              /Navigation timeout of 300 ms exceeded/,
+            );
+            assert.strictEqual(context.getSelectedMcpPage(), page);
+          } else {
+            await navigatePage(args).handler({params, page}, response, context);
+            assert.match(
+              response.responseLines.join('\n'),
+              /Navigation timeout of 300 ms exceeded/,
+            );
+          }
+          assert.strictEqual(page.getDialog(), undefined);
+          assert.strictEqual(page.pptrPage.listenerCount('dialog'), listeners);
+        });
+      });
+    }
+    it('cleans up initScript across handle_dialog then immediate reload after beforeunload', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          html`<script>
+            window.addEventListener('beforeunload', event => {
+              event.preventDefault();
+              event.returnValue = '';
+            });
+          </script>`,
+        );
+        await page.pptrPage.mouse.click(10, 10);
+        let loadDialog: Dialog | undefined;
+        const onDialog = (dialog: Dialog): void => {
+          if (dialog.type() !== 'beforeunload') {
+            loadDialog = dialog;
+          }
+        };
+        page.pptrPage.on('dialog', onDialog);
+        const removeScript = sinon.spy(
+          page.pptrPage,
+          'removeScriptToEvaluateOnNewDocument',
+        );
+        const started = performance.now();
+        try {
+          await navigatePage(args).handler(
+            {
+              params: {
+                type: 'reload',
+                initScript: 'alert("after beforeunload")',
+                timeout: 5000,
+              },
+              page,
+            },
+            response,
+            context,
+          );
+          assert.ok(performance.now() - started < 2500);
+          assert.strictEqual(page.getDialog()?.message(), 'after beforeunload');
+          await handleDialog(args).handler(
+            {params: {action: 'dismiss'}, page},
+            response,
+            context,
+          );
+          await navigatePage(args).handler(
+            {params: {type: 'reload', timeout: 2000}, page},
+            response,
+            context,
+          );
+          assert.strictEqual(page.getDialog(), undefined);
+          assert.match(
+            response.responseLines.join('\n'),
+            /Successfully reloaded the page/,
+          );
+          loadDialog = undefined;
+          sinon.assert.calledOnceWithExactly(
+            removeScript,
+            removeScript.firstCall.args[0],
+          );
+          await removeScript.firstCall.returnValue;
+        } finally {
+          page.pptrPage.off('dialog', onDialog);
+          await loadDialog?.dismiss();
+        }
+      });
+    });
+    for (const tool of [
+      'new_page',
+      'navigate_page',
+      'reload',
+      'back',
+      'forward',
+    ]) {
+      it(`${tool} reports a load dialog with third-party discovery before the navigation timeout`, async () => {
+        await withMcpContext(
+          async (response, context, args) => {
+            const url = 'data:text/html,<script>alert("load dialog")</script>';
+            const initialPage = context.getSelectedMcpPage();
+            if (tool === 'reload' || tool === 'back' || tool === 'forward') {
+              await initialPage.pptrPage.goto('data:text/html,initial');
+              await initialPage.pptrPage.goto('data:text/html,next');
+              if (tool === 'forward') {
+                await initialPage.pptrPage.goBack();
+              }
+              await initialPage.pptrPage.evaluateOnNewDocument(
+                'alert("load dialog")',
+              );
+            }
+            const dialogListeners =
+              initialPage.pptrPage.listenerCount('dialog');
+            const started = performance.now();
+            let deadline: ReturnType<typeof setTimeout> | undefined;
+            try {
+              const result = await Promise.race([
+                (async () => {
+                  if (tool === 'new_page') {
+                    await newPage(args).handler(
+                      {params: {url, timeout: 5000}},
+                      response,
+                      context,
+                    );
+                    response.setPage(context.getSelectedMcpPage());
+                  } else {
+                    await navigatePage(args).handler(
+                      {
+                        params: {
+                          url,
+                          timeout: 5000,
+                          type:
+                            tool === 'reload' ||
+                            tool === 'back' ||
+                            tool === 'forward'
+                              ? tool
+                              : 'url',
+                        },
+                        page: context.getSelectedMcpPage(),
+                      },
+                      response,
+                      context,
+                    );
+                  }
+                  return await response.handle(context);
+                })(),
+                new Promise<never>((_, reject) => {
+                  deadline = setTimeout(() => {
+                    reject(new Error('Dialog response exceeded 2500 ms'));
+                  }, 2500);
+                }),
+              ]);
+              assert.ok(
+                performance.now() - started < 2500,
+                'The complete response should return before navigation timeout',
+              );
+              const page = context.getSelectedMcpPage();
+              assert.strictEqual(page.getDialog()?.message(), 'load dialog');
+              assert.strictEqual(
+                page.pptrPage.listenerCount('dialog'),
+                dialogListeners,
+              );
+              const text = result.content.find(
+                content => content.type === 'text',
+              );
+              assert.ok(text && text.type === 'text');
+              assert.match(text.text, /Call handle_dialog/);
+              assert.match(text.text, /## Pages/);
+              assert.strictEqual(context.getPageById(page.id), page);
+              assert.doesNotMatch(
+                text.text,
+                /Navigation timeout|Successfully navigated|Successfully reloaded/,
+              );
+              assert.ok(response.includePages);
+              await handleDialog(args).handler(
+                {params: {action: 'accept'}, page},
+                response,
+                context,
+              );
+              assert.strictEqual(page.getDialog(), undefined);
+              await page.pptrPage.waitForFunction(
+                () => document.readyState === 'complete',
+                {timeout: 2000},
+              );
+            } finally {
+              clearTimeout(deadline);
+              await context.getSelectedMcpPage().getDialog()?.dismiss();
+            }
+          },
+          {},
+          {
+            categoryExperimentalThirdParty: true,
+            categoryExperimentalWebmcp: true,
+          },
+        );
+      });
+    }
   });
   describe('new_page', () => {
     it('sets the selected page and response flags', async () => {

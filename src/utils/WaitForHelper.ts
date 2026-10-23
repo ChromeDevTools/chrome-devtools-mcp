@@ -16,6 +16,27 @@ import {logger} from './logger.js';
 
 export type DialogAction = 'accept' | 'dismiss' | string;
 
+/** Returns false when a dialog interrupts waiting, without cancelling the load. */
+export async function waitForNavigationWithDialog(
+  navigation: Promise<unknown>,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const interrupted = Promise.withResolvers<false>();
+  const onAbort = (): void => interrupted.resolve(false);
+  signal.addEventListener('abort', onAbort, {once: true});
+  if (signal.aborted) {
+    onAbort();
+  }
+  try {
+    return await Promise.race([
+      navigation.then(() => true),
+      interrupted.promise,
+    ]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
 export class WaitForHelper {
   #abortController = new AbortController();
   #page: CdpPage;
