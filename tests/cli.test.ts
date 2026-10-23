@@ -252,37 +252,33 @@ describe('cli args parsing', () => {
       );
     });
 
-    it('rejects a config unrestricted flag with a CLI workspace', async () => {
+    it('lets a CLI workspace override a config unrestricted flag', async () => {
       using testConfig = createTempFile(
         JSON.stringify({allowUnrestrictedPaths: true}),
         'cd4a.test.config.unrestricted-workspace.json',
       );
-      assert.throws(
-        () =>
-          parseConfig([
-            '--viaCli',
-            '--config',
-            testConfig.path,
-            '--workspace=/tmp/one',
-          ]),
-        /Arguments allowUnrestrictedPaths and filesystemRoot are mutually exclusive/,
-      );
+      const args = parseConfig([
+        '--viaCli',
+        '--config',
+        testConfig.path,
+        '--workspace=/tmp/one',
+      ]);
+      assert.strictEqual(args.allowUnrestrictedPaths, false);
+      assert.deepStrictEqual(args.filesystemRoot, ['/tmp/one']);
     });
 
-    it('rejects a config filesystem root with a CLI unrestricted flag', async () => {
+    it('lets a CLI unrestricted flag override a config filesystem root', async () => {
       using testConfig = createTempFile(
         JSON.stringify({filesystemRoot: ['/tmp/one']}),
         'cd4a.test.config.root-unrestricted.json',
       );
-      assert.throws(
-        () =>
-          parseConfig([
-            '--config',
-            testConfig.path,
-            '--allow-unrestricted-paths',
-          ]),
-        /Arguments allowUnrestrictedPaths and filesystemRoot are mutually exclusive/,
-      );
+      const args = parseConfig([
+        '--config',
+        testConfig.path,
+        '--allow-unrestricted-paths',
+      ]);
+      assert.strictEqual(args.allowUnrestrictedPaths, true);
+      assert.deepStrictEqual(args.filesystemRoot, DEFAULT_FILESYSTEM_ROOT);
     });
 
     it('lets an explicit false override config unrestricted with a workspace', async () => {
@@ -1202,32 +1198,34 @@ describe('cli args parsing', () => {
       );
     });
 
-    it('rejects config-based channel with browserUrl', async () => {
+    it('lets CLI browserUrl override config-based channel', async () => {
       using testConfig = createTempFile(
         JSON.stringify({channel: 'canary'}),
         'cd4a.test.config.channel.json',
       );
-      assert.throws(
-        () =>
-          parseConfig([
-            '--config',
-            testConfig.path,
-            '--browserUrl',
-            'http://localhost:9222',
-          ]),
-        /Arguments channel and browserUrl are mutually exclusive/,
-      );
+      const args = parseConfig([
+        '--config',
+        testConfig.path,
+        '--browserUrl',
+        'http://localhost:9222',
+      ]);
+      assert.strictEqual(args.browserUrl, 'http://localhost:9222');
+      assert.strictEqual(args.channel, undefined);
     });
 
-    it('rejects cli channel with config-based browserUrl', async () => {
+    it('lets CLI channel override config-based browserUrl', async () => {
       using testConfig = createTempFile(
         JSON.stringify({browserUrl: 'http://localhost:9222'}),
         'cd4a.test.config.browser-url.json',
       );
-      assert.throws(
-        () => parseConfig(['--config', testConfig.path, '--channel', 'canary']),
-        /Arguments channel and browserUrl are mutually exclusive/,
-      );
+      const args = parseConfig([
+        '--config',
+        testConfig.path,
+        '--channel',
+        'canary',
+      ]);
+      assert.strictEqual(args.channel, 'canary');
+      assert.strictEqual(args.browserUrl, undefined);
     });
 
     it('rejects conflicting arguments within a config file', async () => {
