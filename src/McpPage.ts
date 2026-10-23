@@ -56,6 +56,7 @@ import type {
   TextSnapshotNode,
 } from './types.js';
 import {getErrorMessage} from './utils/errorHandling.js';
+import {authenticateBrowserContext} from './utils/authHelper.js';
 import {logger} from './utils/logger.js';
 import {
   getNetworkMultiplierFromString,
@@ -557,6 +558,18 @@ export class McpPage implements ContextPage {
         signCount: credential.signCount,
       })),
     };
+  }
+
+  async authenticate(url: string): Promise<void> {
+    const authHelperCommand = this.#config.resolved.authHelper;
+    if (!authHelperCommand) {
+      return;
+    }
+    await authenticateBrowserContext({
+      browserContext: this.pptrPage.browserContext(),
+      url,
+      authHelperCommand,
+    });
   }
 
   getDialog(): Dialog | undefined {

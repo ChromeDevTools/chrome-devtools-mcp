@@ -9,6 +9,7 @@ import type {YargsOptions} from '../third_party/index.js';
 import os from 'node:os';
 import path from 'node:path';
 
+import {validateAuthHelperCommand} from '../utils/authHelper.js';
 import {
   getCategoryOptions,
   type CategoryArguments,
@@ -29,6 +30,7 @@ export interface McpArguments
     PuppeteerArguments,
     ToolArguments {
   logFile?: string;
+  authHelper?: string;
   pageIdRouting: boolean;
   devtoolsComments: boolean;
   experimentalDevtools: boolean;
@@ -80,6 +82,22 @@ export const mcpOptions: McpOptions = {
     type: 'string',
     describe:
       'Path to a file to write debug logs to. Set the env variable `NODE_DEBUG` to `*` to enable verbose logs. Useful for submitting bug reports.',
+  },
+  authHelper: {
+    type: 'string',
+    describe:
+      'Command template for an external authentication helper containing ' +
+      '{cookieJar} and {url} placeholders. The helper must write a JSON ' +
+      'array of {URL, Cookies: [{Name, Value, Domain, Path, Secure, ' +
+      'HttpOnly}]} entries to {cookieJar}.',
+    hidden: true,
+    reloadable: true,
+    coerce: (value: string | undefined) => {
+      if (value === undefined) {
+        return undefined;
+      }
+      return validateAuthHelperCommand(value);
+    },
   },
   pageIdRouting: {
     type: 'boolean',
