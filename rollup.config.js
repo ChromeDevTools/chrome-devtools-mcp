@@ -42,7 +42,7 @@ const allowedLicenses = [
   '0BSD',
 ];
 
-const thirdPartyDir = './build/src/third_party';
+const thirdPartyDir = './out/Default/gen/src/third_party';
 
 const {devDependencies = {}} = JSON.parse(
   fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8'),
@@ -84,7 +84,7 @@ const projectNodeModulesPath =
 const devtoolsThirdPartyBuildPath =
   path.join(
     process.cwd(),
-    'build/third_party/devtools-frontend/front_end/third_party',
+    'out/Default/gen/third_party/devtools-frontend/front_end/third_party',
   ) + path.sep;
 
 function getPackageName(modulePath) {
@@ -229,6 +229,7 @@ const bundleDependency = (
       // http://b/390559299 and
       // https://github.com/microsoft/TypeScript/issues/60811.
       comments: [/Copyright/i],
+      exclude: ['**/third_party/devtools-frontend/**'],
     }),
     listBundledDeps(),
     license({

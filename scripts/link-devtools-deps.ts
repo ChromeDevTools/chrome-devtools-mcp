@@ -4,14 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import {lstatSync, rmSync, symlinkSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 const root = process.cwd();
@@ -43,18 +36,4 @@ for (const [linkRel, targetRel] of links) {
     // Path does not exist yet.
   }
   symlinkSync(targetPath, linkPath, type);
-}
-
-const buildExclude = resolve(
-  root,
-  'third_party/devtools-frontend/build/.git/info/exclude',
-);
-if (existsSync(buildExclude)) {
-  const current = readFileSync(buildExclude, 'utf8');
-  if (!current.includes('/src/')) {
-    writeFileSync(
-      buildExclude,
-      `${current}\n/src/\n/tests/\n/third_party/\n/node_modules/\n`,
-    );
-  }
 }

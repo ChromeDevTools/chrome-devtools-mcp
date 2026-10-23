@@ -7,6 +7,7 @@
 import {execFileSync} from 'node:child_process';
 import {rmSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 const projectRoot = process.cwd();
 
@@ -21,10 +22,16 @@ function getGnBinaryPath(): string {
   }
 }
 
-execFileSync(getGnBinaryPath(), ['gen', 'out/Default'], {
-  cwd: projectRoot,
-  stdio: 'inherit',
-});
+export function runGnGen(): void {
+  execFileSync(getGnBinaryPath(), ['gen', 'out/Default'], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
 
-// Remove the generated .gitignore so npm pack / publish includes out/Default/gen.
-rmSync(resolve(projectRoot, 'out', 'Default', '.gitignore'), {force: true});
+  // Remove the generated .gitignore so npm pack / publish includes out/Default/gen.
+  rmSync(resolve(projectRoot, 'out', 'Default', '.gitignore'), {force: true});
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runGnGen();
+}

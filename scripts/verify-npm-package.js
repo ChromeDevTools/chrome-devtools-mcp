@@ -17,9 +17,9 @@ function verifyPackageContents() {
     const files = data['chrome-devtools-mcp'].files.map(f => f.path);
     // Check some important files.
     const requiredPaths = [
-      'build/src/index.js',
-      'build/src/third_party/index.js',
-      'build/src/third_party/cli.js',
+      'out/Default/gen/src/index.js',
+      'out/Default/gen/src/third_party/index.js',
+      'out/Default/gen/src/third_party/cli.js',
     ];
     for (const requiredPath of requiredPaths) {
       const hasBuildFolder = files.some(path => path.startsWith(requiredPath));

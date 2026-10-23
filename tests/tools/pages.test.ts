@@ -32,15 +32,15 @@ import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
   import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-sw',
+  '../../../../../tests/tools/fixtures/extension-sw',
 );
 const EXTENSION_PATH = path.join(
   import.meta.dirname,
-  '../../../tests/tools/fixtures/extension',
+  '../../../../../tests/tools/fixtures/extension',
 );
 const EXTENSION_SIDE_PANEL_PATH = path.join(
   import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-side-panel',
+  '../../../../../tests/tools/fixtures/extension-side-panel',
 );
 
 describe('pages', () => {
