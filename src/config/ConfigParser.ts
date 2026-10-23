@@ -30,6 +30,70 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function validateConfigValues(
+  fileContent: Record<string, unknown>,
+  options: Record<string, YargsOptions>,
+): void {
+  const optionMap = new Map<
+    string,
+    {canonicalKey: string; option: YargsOptions}
+  >();
+  for (const [key, option] of Object.entries(options)) {
+    optionMap.set(key, {canonicalKey: key, option});
+    const aliases = Array.isArray(option.alias)
+      ? option.alias
+      : option.alias
+        ? [option.alias]
+        : [];
+    for (const alias of aliases) {
+      optionMap.set(alias, {canonicalKey: key, option});
+    }
+  }
+
+  for (const [key, value] of Object.entries(fileContent)) {
+    const entry = optionMap.get(key);
+    if (!entry) {
+      continue;
+    }
+    const {canonicalKey, option} = entry;
+    switch (option.type) {
+      case 'boolean':
+        if (typeof value !== 'boolean') {
+          throw new Error(`Invalid value for ${key}: expected a boolean`);
+        }
+        break;
+      case 'number':
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          throw new Error(`Invalid value for ${key}: expected a number`);
+        }
+        break;
+      case 'array':
+        if (
+          !Array.isArray(value) ||
+          !value.every(item => typeof item === 'string')
+        ) {
+          throw new Error(
+            `Invalid value for ${key}: expected an array of strings`,
+          );
+        }
+        break;
+      case 'string':
+        if (canonicalKey === 'wsHeaders') {
+          if (typeof value !== 'string' && !isPlainObject(value)) {
+            throw new Error(
+              `Invalid value for ${key}: expected a JSON object or string`,
+            );
+          }
+          break;
+        }
+        if (typeof value !== 'string') {
+          throw new Error(`Invalid value for ${key}: expected a string`);
+        }
+        break;
+    }
+  }
+}
+
 export class ConfigParser {
   #configPath?: string;
   #cliArgs?: Partial<ParsedArguments>;
@@ -100,6 +164,7 @@ export class ConfigParser {
       }
       const configOptions = withoutDefaults(mcpOptions);
       delete configOptions.config;
+      validateConfigValues(fileContent, configOptions);
       const parsed = yargs([])
         .parserConfiguration({
           'strip-aliased': true,

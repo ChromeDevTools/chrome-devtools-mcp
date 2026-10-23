@@ -104,6 +104,70 @@ describe('mcp-options steps', () => {
         );
       }
     });
+
+    it('rejects null and mismatched JSON types for option values', () => {
+      const invalidCases: Array<{
+        config: Record<string, unknown>;
+        expectedError: RegExp;
+      }> = [
+        {
+          config: {javascriptEvaluation: 0},
+          expectedError:
+            /Invalid JSON config file: Invalid value for javascriptEvaluation: expected a boolean/,
+        },
+        {
+          config: {headless: null},
+          expectedError:
+            /Invalid JSON config file: Invalid value for headless: expected a boolean/,
+        },
+        {
+          config: {screenshotQuality: null},
+          expectedError:
+            /Invalid JSON config file: Invalid value for screenshotQuality: expected a number/,
+        },
+        {
+          config: {maxNavigationSaved: '5'},
+          expectedError:
+            /Invalid JSON config file: Invalid value for maxNavigationSaved: expected a number/,
+        },
+        {
+          config: {blockedUrlPattern: null},
+          expectedError:
+            /Invalid JSON config file: Invalid value for blockedUrlPattern: expected an array of strings/,
+        },
+        {
+          config: {filesystemRoot: [null]},
+          expectedError:
+            /Invalid JSON config file: Invalid value for filesystemRoot: expected an array of strings/,
+        },
+        {
+          config: {workspace: '/tmp/not-an-array'},
+          expectedError:
+            /Invalid JSON config file: Invalid value for workspace: expected an array of strings/,
+        },
+        {
+          config: {executablePath: null},
+          expectedError:
+            /Invalid JSON config file: Invalid value for executablePath: expected a string/,
+        },
+        {
+          config: {wsHeaders: null},
+          expectedError:
+            /Invalid JSON config file: Invalid value for wsHeaders: expected a JSON object or string/,
+        },
+      ];
+
+      for (const {config, expectedError} of invalidCases) {
+        assert.throws(
+          () =>
+            ConfigParser.parseConfigFile(
+              'cd4a.config.json',
+              JSON.stringify(config),
+            ),
+          expectedError,
+        );
+      }
+    });
   });
 
   describe('config discovery', () => {
