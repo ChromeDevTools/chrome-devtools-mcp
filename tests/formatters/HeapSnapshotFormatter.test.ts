@@ -192,8 +192,8 @@ describe('HeapSnapshotFormatter', () => {
 
       const summarizedJson = JSON.stringify(summarized);
       assert.ok(summarizedJson);
-      assert.equal(summarizedJson.includes('addedIndexes'), false);
-      assert.equal(summarizedJson.includes('deletedIndexes'), false);
+      assert.strictEqual(summarizedJson.includes('addedIndexes'), false);
+      assert.strictEqual(summarizedJson.includes('deletedIndexes'), false);
     });
 
     it('truncates className according to maxNameLength', () => {

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
-import {mcpOptions} from '../config/mcp-options.js';
+import {mcpOptions, type ParsedArguments} from '../config/mcp-options.js';
 import type {YargsOptions} from '../third_party/index.js';
 
 import * as commentsTools from './comments.js';
@@ -28,6 +27,7 @@ import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
 import type {AnyToolDefinition} from './ToolDefinition.js';
+import * as webauthnTools from './webauthn.js';
 import * as webmcpTools from './webmcp.js';
 
 export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
@@ -51,6 +51,7 @@ export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
     ...Object.values(slimTools),
     ...Object.values(snapshotTools),
     ...Object.values(thirdPartyDeveloperTools),
+    ...Object.values(webauthnTools),
     ...Object.values(webmcpTools),
   ];
 

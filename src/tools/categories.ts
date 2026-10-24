@@ -16,6 +16,7 @@ export enum ToolCategory {
   MEMORY = 'memory',
   WEBMCP = 'experimentalWebmcp',
   PWA = 'pwa',
+  WEBAUTHN = 'webauthn',
 }
 
 export const labels: Record<ToolCategory, string> = {
@@ -30,4 +31,5 @@ export const labels: Record<ToolCategory, string> = {
   [ToolCategory.MEMORY]: 'Memory',
   [ToolCategory.WEBMCP]: 'WebMCP',
   [ToolCategory.PWA]: 'Progressive Web Apps',
+  [ToolCategory.WEBAUTHN]: 'WebAuthn',
 };

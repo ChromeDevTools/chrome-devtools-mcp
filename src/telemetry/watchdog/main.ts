@@ -10,8 +10,7 @@ import readline from 'node:readline';
 import {parseArgs} from 'node:util';
 
 import {logger, flushLogs, saveLogsToFile} from '../../utils/logger.js';
-import type {OsType} from '../types.js';
-import {WatchdogMessageType} from '../types.js';
+import {WatchdogMessageType, type OsType} from '../types.js';
 
 import {ClearcutSender} from './ClearcutSender.js';
 

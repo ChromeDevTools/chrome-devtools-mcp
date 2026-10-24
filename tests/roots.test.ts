@@ -181,6 +181,23 @@ describe('McpContext path validation escaping', () => {
     });
   }
 
+  it('allows paths below a workspace root that is the filesystem root', async () => {
+    const context = await createContext();
+    const targetPath = path.resolve(
+      os.homedir(),
+      'a_very_unlikely_path_name_filesystem_root',
+    );
+    const canonicalPath = await resolveCanonicalPath(targetPath);
+    // Use the root of the canonical path so the test also holds when the home
+    // directory goes through a symlink or junction onto another drive.
+    const filesystemRoot = path.parse(canonicalPath).root;
+    context.setRoots([
+      {uri: pathToFileURL(filesystemRoot).href, name: 'filesystem root'},
+    ]);
+    const resolved = await context.validatePath(targetPath);
+    assert.strictEqual(resolved, canonicalPath);
+  });
+
   it('escapes the file path when it cannot be resolved', async () => {
     const context = await createContext();
     const filePath = path.join(os.tmpdir(), 'file.txt', INJECTED);

@@ -6,13 +6,23 @@
 
 import {pathToFileURL} from 'node:url';
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
-import {zod} from '../third_party/index.js';
-import type {Frame, JSHandle, Page, WebWorker} from '../third_party/index.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
+import {
+  zod,
+  type Frame,
+  type JSHandle,
+  type Page,
+  type WebWorker,
+} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import type {Context, Response, ToolFactory} from './ToolDefinition.js';
-import {defineTool, pageIdSchema} from './ToolDefinition.js';
+import {
+  defineTool,
+  pageIdSchema,
+  type Context,
+  type Response,
+  type ToolFactory,
+} from './ToolDefinition.js';
 
 export type Evaluatable = Page | Frame | WebWorker;
 
@@ -244,7 +254,7 @@ const performEvaluation = async (
   format: 'function' | 'script',
   args: Array<JSHandle<unknown>>,
   response: Response,
-  options: {filePath?: string; context: Context},
+  options: {context: Context; filePath?: string},
 ): Promise<void> => {
   let result: string | undefined;
   if (format === 'function') {

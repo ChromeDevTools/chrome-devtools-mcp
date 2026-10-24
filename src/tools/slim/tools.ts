@@ -4,37 +4,54 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../../config/ConfigParser.js';
-import type {Dialog} from '../../third_party/index.js';
-import {zod} from '../../third_party/index.js';
+import type {ParsedArguments} from '../../config/mcp-options.js';
+import {zod, type Dialog} from '../../third_party/index.js';
 import {ToolCategory} from '../categories.js';
 import {definePageTool, type PageToolFactory} from '../ToolDefinition.js';
 import {validateUrl} from '../../utils/url.js';
 
 export const screenshot: PageToolFactory = definePageTool(() => ({
   name: 'screenshot',
-  description: `Takes a screenshot`,
+  description: `Takes a png screenshot`,
   annotations: {
     category: ToolCategory.DEBUGGING,
     // Not read-only due to filePath param.
     readOnlyHint: false,
     conditions: ['slim'],
   },
-  schema: {},
+  schema: {
+    filePath: zod
+      .string()
+      .optional()
+      .describe(
+        'The absolute path, or a path relative to the current working directory, to save the screenshot to instead of attaching it to the response.',
+      ),
+  },
   blockedByDialog: true,
   concurrency: 'page',
-  verifyFilesSchema: {},
+  verifyFilesSchema: {
+    filePath: true,
+  },
   handler: async (request, response, context) => {
     const page = request.page;
     const screenshot = await page.pptrPage.screenshot({
       type: 'png',
       optimizeForSpeed: true,
     });
-    const {filepath} = await context.saveTemporaryFile(
-      screenshot,
-      `screenshot.png`,
-    );
-    response.appendResponseLine(filepath);
+    if (request.params.filePath) {
+      const result = await context.saveFile(
+        screenshot,
+        request.params.filePath,
+        '.png',
+      );
+      response.appendResponseLine(result.filename);
+    } else {
+      const {filepath} = await context.saveTemporaryFile(
+        screenshot,
+        `screenshot.png`,
+      );
+      response.appendResponseLine(filepath);
+    }
   },
 }));
 

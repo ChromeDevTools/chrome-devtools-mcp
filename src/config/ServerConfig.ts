@@ -6,7 +6,6 @@
 
 import {isDeepStrictEqual} from 'node:util';
 
-import type {InferredOptionTypes} from '../third_party/cli.js';
 import {yargs} from '../third_party/cli.js';
 
 import {
@@ -17,17 +16,9 @@ import {
   mcpOptions,
   mcpOptionsForViaCli,
   stripYargsPositionalArgs,
+  type McpOptions,
+  type ParsedArguments,
 } from './mcp-options.js';
-
-type InferredMcpArguments = InferredOptionTypes<typeof mcpOptions>;
-
-export type ParsedArguments = Omit<
-  InferredMcpArguments,
-  'channel' | 'filesystemRoot'
-> & {
-  channel?: InferredMcpArguments['channel'];
-  filesystemRoot?: InferredMcpArguments['filesystemRoot'];
-};
 
 function isMcpOptionKey(key: string): key is keyof ParsedArguments {
   return key in mcpOptions;
@@ -47,7 +38,7 @@ function copyOption<K extends keyof ParsedArguments>(
 
 function filterExplicitArgs(
   args: Partial<ParsedArguments>,
-  baseOptions: typeof mcpOptions | typeof mcpOptionsForViaCli,
+  baseOptions: McpOptions,
 ): Partial<ParsedArguments> {
   const filtered: Partial<ParsedArguments> = {};
   for (const key of Object.keys(args)) {
@@ -75,9 +66,7 @@ function mergeLayer(
   return merged;
 }
 
-function parseDefaultArgs(
-  options: typeof mcpOptions | typeof mcpOptionsForViaCli,
-): ParsedArguments {
+function parseDefaultArgs(options: McpOptions): ParsedArguments {
   const parsed = yargs([])
     .parserConfiguration({
       'strip-aliased': true,

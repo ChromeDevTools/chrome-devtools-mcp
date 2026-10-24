@@ -73,6 +73,8 @@
   - [`install_pwa`](#install_pwa)
   - [`launch_pwa`](#launch_pwa)
   - [`uninstall_pwa`](#uninstall_pwa)
+- **[WebAuthn](#webauthn)** (1 tools)
+  - [`configure_webauthn`](#configure_webauthn)
 
 ## Input automation
 
@@ -299,7 +301,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.
+**Description:** Resizes the page's window so that the page has specified dimension
 
 **Parameters:**
 
@@ -869,5 +871,25 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Parameters:**
 
 - **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
+
+---
+
+## WebAuthn
+
+> NOTE: The WebAuthn category is not active by default. Use the '--categoryWebauthn' flag.
+
+### `configure_webauthn`
+
+**Description:** Adds a virtual WebAuthn authenticator to the page. Call this before the page calls navigator.credentials. It answers navigator.credentials.create() and get() and is removed when the page closes. Omitted parameters keep their current values. Changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and deletes its credentials. enabled=false ignores other parameters and removes all authenticators on the page. (requires flag: --categoryWebauthn=true)
+
+**Parameters:**
+
+- **enabled** (boolean) **(required)**: Set to false to remove all virtual authenticators from the page.
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **hasResidentKey** (boolean) _(optional)_: Whether the authenticator can store discoverable credentials (passkeys). Default: true. u2f does not support it, so it is false for u2f.
+- **hasUserVerification** (boolean) _(optional)_: Whether the authenticator supports user verification (PIN or biometrics). Default: true. u2f does not support it, so it is false for u2f.
+- **isUserVerified** (boolean) _(optional)_: Whether user verification succeeds. Set to false to test a failed verification. Default: true.
+- **protocol** (enum: "ctap2", "u2f") _(optional)_: The authenticator protocol. Default: ctap2.
+- **transport** (enum: "internal", "usb", "nfc", "ble", "hybrid") _(optional)_: "internal" is a platform authenticator such as Touch ID or Windows Hello; the others are roaming security keys. Default: internal.
 
 ---

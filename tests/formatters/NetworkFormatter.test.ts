@@ -25,7 +25,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [pending]',
       );
@@ -38,7 +38,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 POST http://example.com [pending]',
       );
@@ -52,7 +52,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [200]',
       );
@@ -68,7 +68,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [199]',
       );
@@ -84,7 +84,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [300]',
       );
@@ -103,7 +103,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [Error in Network]',
       );
@@ -118,7 +118,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [pending] [selected in the DevTools Network panel]',
       );
@@ -133,12 +133,12 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         `reqid=1 GET ${longUrl.substring(0, 255)}... <truncated> [pending]`,
       );
       // The structured data keeps the full URL.
-      assert.equal(formatter.toJSON().url, longUrl);
+      assert.strictEqual(formatter.toJSON().url, longUrl);
     });
 
     it('does not split a surrogate pair when truncating a url', async () => {
@@ -152,7 +152,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         `reqid=1 GET ${prefix}... <truncated> [pending]`,
       );
@@ -167,7 +167,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         `reqid=1 GET ${dataUrl.substring(0, 255)}... <truncated> [pending]`,
       );
@@ -183,7 +183,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(formatter.toString(), `reqid=1 GET ${url} [pending]`);
+      assert.strictEqual(formatter.toString(), `reqid=1 GET ${url} [pending]`);
     });
   });
 

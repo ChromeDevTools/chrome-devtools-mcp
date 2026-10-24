@@ -1780,7 +1780,7 @@ describe('input', () => {
 
         // Simulate the main key press failing mid-sequence (e.g. a CDP
         // hiccup) after the modifiers have already been pressed down.
-        sinon
+        const pressStub = sinon
           .stub(page.keyboard, 'press')
           .throws(new Error('injected press failure'));
 
@@ -1798,7 +1798,7 @@ describe('input', () => {
             ),
           );
         } finally {
-          sinon.restore();
+          pressStub.restore();
         }
 
         // The modifiers were pressed down; both must be released even though

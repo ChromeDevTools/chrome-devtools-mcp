@@ -60,6 +60,36 @@ export function isLocalhost(url?: string): boolean {
   return false;
 }
 
+// URL serializes `0`, `0x0` and `0.0` as 0.0.0.0, `[::0]` as [::], and
+// [::ffff:0.0.0.0] as [::ffff:0:0].
+const UNSPECIFIED_HOSTNAMES = new Set(['0.0.0.0', '[::]', '[::ffff:0:0]']);
+
+/**
+ * Determines whether a browser endpoint URL points to the local machine.
+ *
+ * In addition to {@link isLocalhost}, this accepts the unspecified addresses
+ * 0.0.0.0 and [::]. A connection to an unspecified address reaches the local
+ * machine.
+ *
+ * @param url The browser endpoint URL (for example, a WebSocket endpoint).
+ * @returns true if the endpoint is on the local machine.
+ */
+export function isLocalBrowserEndpoint(url: string): boolean {
+  if (isLocalhost(url)) {
+    return true;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+    return false;
+  }
+  return UNSPECIFIED_HOSTNAMES.has(parsed.hostname);
+}
+
 export interface ValidateUrlOptions {
   javascriptEvaluation: boolean | undefined;
   categoryExtensions: boolean | undefined;

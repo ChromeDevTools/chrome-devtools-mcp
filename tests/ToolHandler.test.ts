@@ -779,7 +779,7 @@ describe('ToolHandler', () => {
       }
 
       const logSpy = sinon.spy();
-      sinon.stub(ClearcutLogger, 'get').returns({
+      const getLoggerStub = sinon.stub(ClearcutLogger, 'get').returns({
         logToolInvocation: logSpy,
       } as unknown as ClearcutLogger);
 
@@ -800,7 +800,7 @@ describe('ToolHandler', () => {
       assert.strictEqual(logSpy.firstCall.args[0].pageUrl, testCase.pageUrl);
       assert.strictEqual(handlerCalled, true);
 
-      sinon.restore();
+      getLoggerStub.restore();
       ClearcutLogger.resetForTesting();
     }
   });
@@ -1115,7 +1115,7 @@ describe('ToolHandler', () => {
 
     assert.strictEqual(result.isError, undefined);
     assert.strictEqual(handlerCalled, true);
-    assert.strictEqual(mockContext.validatePath.callCount, 3);
+    sinon.assert.callCount(mockContext.validatePath, 3);
     assert.strictEqual(mockContext.validatePath.calledWith(testFile), true);
     assert.strictEqual(
       mockContext.validatePath.calledWith(testListFile1),
@@ -1328,6 +1328,53 @@ describe('ToolHandler', () => {
     assert.deepStrictEqual(receivedParams, {
       installUrlOrBundleUrl: pathToFileURL(canonicalBundlePath).href,
     });
+  });
+
+  it('validates local-only verifyFilesSchema when browser is connected to a 0.0.0.0 wsEndpoint', async () => {
+    const handler = sinon.stub().resolves();
+    const tool: ToolDefinition = {
+      name: 'upload_tool',
+      description: 'A tool with local-only file verification',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {
+        filePaths: zod.array(zod.string()),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePaths: {
+          local: true,
+          remote: false,
+        },
+      },
+      handler,
+    };
+
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://0.0.0.0:9222/devtools/browser/test',
+      }),
+    );
+    mockContext.validatePath.rejects(new Error('Access denied'));
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseConfig(),
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({
+      filePaths: ['/etc/passwd'],
+    });
+
+    assert.strictEqual(result.isError, true);
+    sinon.assert.calledOnceWithExactly(mockContext.validatePath, '/etc/passwd');
+    sinon.assert.notCalled(handler);
   });
 
   it('skips local-only verifyFilesSchema when browser is remote', async () => {
@@ -2357,5 +2404,60 @@ describe('ToolHandler', () => {
 
       assert.deepStrictEqual(result.structuredContent, {message: 'done'});
     });
+  });
+
+  it('includes nested error causes in error output', async () => {
+    const config = parseConfig();
+    const tool: ToolDefinition = {
+      name: 'failing_connect_tool',
+      description: 'A tool whose ensureBrowser() fails with nested causes',
+      annotations: {
+        category: ToolCategory.NAVIGATION,
+        readOnlyHint: true,
+      },
+      schema: {},
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {},
+      handler: async () => undefined,
+    };
+
+    const rootCause = Object.assign(
+      new Error(
+        "EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+      ),
+      {code: 'EPERM'},
+    );
+    const puppeteerError = new Error(
+      'Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+      {cause: rootCause},
+    );
+    const connectError = new Error(
+      'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+      {cause: puppeteerError},
+    );
+
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.rejects(connectError);
+
+    const toolHandler = new ToolHandler(
+      tool,
+      config,
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({});
+    assert.strictEqual(result.isError, true);
+    const text =
+      result.content[0].type === 'text' ? result.content[0].text : '';
+    assert.strictEqual(
+      text,
+      [
+        'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+        'Cause: Could not find DevToolsActivePort for chrome at /Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort',
+        "Cause: EPERM: operation not permitted, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
+      ].join('\n'),
+    );
   });
 });

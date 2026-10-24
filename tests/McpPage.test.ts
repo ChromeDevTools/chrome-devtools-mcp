@@ -19,18 +19,20 @@ import {
   Frame,
   Locator,
   ScreenRecorder,
+  type JSONSchema7Definition,
 } from '../src/third_party/index.js';
-import type {JSONSchema7Definition} from '../src/third_party/index.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
 import type {TextSnapshotNode} from '../src/types.js';
 import {
   createMockCDPSession,
   createMockDialog,
   createMockMcpResponse,
-  createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
   createMockServerConfig,
+  createMockAuthenticatorId,
+  createMockTargetUniverse,
+  createMockWebAuthnModel,
   createMockWebMCPTool,
 } from './mocks.js';
 import {serverHooks} from './server.js';
@@ -1017,6 +1019,7 @@ describe('McpPage', () => {
         networkConditions: 'Slow 3G',
         cpuThrottlingRate: 2,
       });
+      pptrPage.emulateNetworkConditions.resetHistory();
       pptrPage.setDefaultTimeout.resetHistory();
       pptrPage.setDefaultNavigationTimeout.resetHistory();
       config.commit(
@@ -1025,10 +1028,14 @@ describe('McpPage', () => {
         }),
       );
 
-      mcpPage.clearNetworkConditions();
+      await mcpPage.clearNetworkConditions();
 
       assert.strictEqual(mcpPage.networkConditions, null);
       assert.strictEqual(mcpPage.cpuThrottlingRate, 2);
+      sinon.assert.calledOnceWithExactly(
+        pptrPage.emulateNetworkConditions,
+        null,
+      );
       sinon.assert.calledOnceWithExactly(pptrPage.setDefaultTimeout, 10_000);
       sinon.assert.calledOnceWithExactly(
         pptrPage.setDefaultNavigationTimeout,
@@ -1042,8 +1049,9 @@ describe('McpPage', () => {
       pptrPage.setDefaultTimeout.resetHistory();
       pptrPage.setDefaultNavigationTimeout.resetHistory();
 
-      mcpPage.clearNetworkConditions();
+      await mcpPage.clearNetworkConditions();
 
+      sinon.assert.notCalled(pptrPage.emulateNetworkConditions);
       sinon.assert.notCalled(pptrPage.setDefaultTimeout);
       sinon.assert.notCalled(pptrPage.setDefaultNavigationTimeout);
     });
@@ -2259,107 +2267,6 @@ describe('McpPage', () => {
     });
   });
 
-  describe('resize()', () => {
-    it('resizes the page and returns the resulting cssLayoutViewport dimensions', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      const browser = createMockPuppeteerBrowser();
-      pptrPage.browser.returns(browser);
-      pptrPage.windowId.resolves('win-1');
-      browser.getWindowBounds.resolves({windowState: 'normal'});
-      pptrPage.cdpSession.send.withArgs('Page.getLayoutMetrics').resolves({
-        cssLayoutViewport: {
-          clientWidth: 500,
-          clientHeight: 232,
-          pageX: 0,
-          pageY: 0,
-        },
-      });
-
-      const actualSize = await mcpPage.resize(100, 100);
-
-      sinon.assert.notCalled(browser.setWindowBounds);
-      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
-        contentWidth: 100,
-        contentHeight: 100,
-      });
-      assert.deepStrictEqual(actualSize, {width: 500, height: 232});
-    });
-
-    it('restores normal window state from fullscreen twice before resizing', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      const browser = createMockPuppeteerBrowser();
-      pptrPage.browser.returns(browser);
-      pptrPage.windowId.resolves('win-1');
-      browser.getWindowBounds.resolves({windowState: 'fullscreen'});
-      pptrPage.cdpSession.send.withArgs('Page.getLayoutMetrics').resolves({
-        cssLayoutViewport: {
-          clientWidth: 800,
-          clientHeight: 600,
-          pageX: 0,
-          pageY: 0,
-        },
-      });
-
-      const actualSize = await mcpPage.resize(800, 600);
-
-      sinon.assert.calledTwice(browser.setWindowBounds);
-      sinon.assert.calledWithExactly(
-        browser.setWindowBounds.firstCall,
-        'win-1',
-        {windowState: 'normal'},
-      );
-      sinon.assert.calledWithExactly(
-        browser.setWindowBounds.secondCall,
-        'win-1',
-        {windowState: 'normal'},
-      );
-      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
-        contentWidth: 800,
-        contentHeight: 600,
-      });
-      assert.deepStrictEqual(actualSize, {width: 800, height: 600});
-    });
-
-    it('continues resizing when window bounds APIs are unsupported', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      pptrPage.windowId.rejects(new Error('Window APIs not supported'));
-      pptrPage.cdpSession.send.withArgs('Page.getLayoutMetrics').resolves({
-        cssLayoutViewport: {
-          clientWidth: 700,
-          clientHeight: 500,
-          pageX: 0,
-          pageY: 0,
-        },
-      });
-
-      const actualSize = await mcpPage.resize(700, 500);
-
-      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
-        contentWidth: 700,
-        contentHeight: 500,
-      });
-      assert.deepStrictEqual(actualSize, {width: 700, height: 500});
-    });
-
-    it('returns undefined without reading layout metrics when a dialog is open', async () => {
-      const {mcpPage, pptrPage} = await createMcpPage();
-      pptrPage.windowId.rejects(new Error('Window APIs not supported'));
-      pptrPage.emit('dialog', createMockDialog());
-
-      const actualSize = await mcpPage.resize(700, 500);
-
-      sinon.assert.calledOnceWithExactly(pptrPage.resize, {
-        contentWidth: 700,
-        contentHeight: 500,
-      });
-      sinon.assert.neverCalledWith(
-        pptrPage.cdpSession.send,
-        'Page.getLayoutMetrics',
-      );
-      assert.strictEqual(actualSize, undefined);
-    });
-  });
-
   describe('dialogs', () => {
     it('returns the dialog and throws when unhandled', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
@@ -2385,6 +2292,353 @@ describe('McpPage', () => {
 
       assert.strictEqual(mcpPage.getDialog(), undefined);
       assert.doesNotThrow(() => mcpPage.throwIfDialogOpen());
+    });
+  });
+
+  describe('configureWebAuthn()', () => {
+    const DEFAULT_OPTIONS = {
+      protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
+      transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
+    };
+    const CDP_ERROR = 'Could not find a virtual authenticator matching the ID';
+
+    async function createWebAuthnPage() {
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.emulateFocusedPage.resolves();
+      const mcpPage = new McpPage(
+        createMockPuppeteerTarget({page: pptrPage}),
+        1,
+        {config: createMockServerConfig(), locatorClass: Locator},
+      );
+      const model = createMockWebAuthnModel();
+      let universe: TargetUniverse | undefined =
+        createMockTargetUniverse(model);
+      sinon.stub(mcpPage, 'devtoolsUniverse').get(() => universe);
+      await mcpPage.init();
+      return {
+        mcpPage,
+        model,
+        detachUniverse: () => {
+          universe = undefined;
+        },
+      };
+    }
+
+    async function assertFailsWithCdpError(
+      promise: Promise<unknown>,
+    ): Promise<void> {
+      await assert.rejects(promise, {
+        message: `Failed to configure WebAuthn for page 1: ${CDP_ERROR}`,
+      });
+    }
+
+    it('creates an authenticator with defaults', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+
+      const result = await mcpPage.configureWebAuthn({enabled: true});
+
+      sinon.assert.calledOnceWithExactly(
+        model.setVirtualAuthEnvEnabled,
+        true,
+        false,
+      );
+      sinon.assert.calledOnceWithExactly(
+        model.addAuthenticator,
+        DEFAULT_OPTIONS,
+      );
+      sinon.assert.calledOnceWithExactly(
+        model.getCredentials,
+        createMockAuthenticatorId('auth-1'),
+      );
+      assert.deepStrictEqual(result, {
+        protocol: 'ctap2',
+        transport: 'internal',
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        credentials: [],
+      });
+      assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticator(), {
+        protocol: 'ctap2',
+        transport: 'internal',
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+      });
+    });
+
+    it('updates isUserVerified in place and keeps omitted options', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true, transport: 'usb'});
+
+      const result = await mcpPage.configureWebAuthn({
+        enabled: true,
+        isUserVerified: false,
+      });
+
+      sinon.assert.calledOnceWithExactly(
+        model.setVirtualAuthEnvEnabled,
+        true,
+        false,
+      );
+      sinon.assert.calledOnceWithExactly(model.addAuthenticator, {
+        ...DEFAULT_OPTIONS,
+        transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Usb,
+      });
+      sinon.assert.notCalled(model.removeAuthenticator);
+      sinon.assert.calledOnceWithExactly(
+        model.setUserVerified,
+        createMockAuthenticatorId('auth-1'),
+        false,
+      );
+      assert.strictEqual(result?.transport, 'usb');
+      assert.strictEqual(result.isUserVerified, false);
+    });
+
+    it('replaces the authenticator and keeps isUserVerified when a creation option changes', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(createMockAuthenticatorId('auth-1'));
+      model.addAuthenticator
+        .onSecondCall()
+        .resolves(createMockAuthenticatorId('auth-2'));
+      await mcpPage.configureWebAuthn({enabled: true, isUserVerified: false});
+
+      const result = await mcpPage.configureWebAuthn({
+        enabled: true,
+        transport: 'nfc',
+      });
+
+      sinon.assert.calledOnceWithExactly(
+        model.removeAuthenticator,
+        createMockAuthenticatorId('auth-1'),
+      );
+      sinon.assert.calledWithExactly(model.addAuthenticator.secondCall, {
+        ...DEFAULT_OPTIONS,
+        transport: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Nfc,
+        isUserVerified: false,
+      });
+      sinon.assert.notCalled(model.setUserVerified);
+      sinon.assert.calledWithExactly(
+        model.getCredentials.secondCall,
+        createMockAuthenticatorId('auth-2'),
+      );
+      assert.strictEqual(result?.transport, 'nfc');
+    });
+
+    it('creates a u2f authenticator without resident keys or user verification after a ctap2 one', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(createMockAuthenticatorId('auth-1'));
+      model.addAuthenticator
+        .onSecondCall()
+        .resolves(createMockAuthenticatorId('auth-2'));
+      await mcpPage.configureWebAuthn({enabled: true});
+
+      const result = await mcpPage.configureWebAuthn({
+        enabled: true,
+        protocol: 'u2f',
+      });
+
+      sinon.assert.calledWithExactly(model.addAuthenticator.secondCall, {
+        ...DEFAULT_OPTIONS,
+        protocol: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
+        hasResidentKey: false,
+        hasUserVerification: false,
+      });
+      assert.strictEqual(result?.hasResidentKey, false);
+      assert.strictEqual(result.hasUserVerification, false);
+    });
+
+    it('rejects hasResidentKey or hasUserVerification for u2f before calling CDP', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+      const before = mcpPage.getWebAuthnAuthenticator();
+
+      for (const option of ['hasResidentKey', 'hasUserVerification']) {
+        await assert.rejects(
+          mcpPage.configureWebAuthn({
+            enabled: true,
+            protocol: 'u2f',
+            [option]: true,
+          }),
+          {
+            message:
+              "protocol 'u2f' does not support hasResidentKey or hasUserVerification. Set them to false or omit them.",
+          },
+        );
+      }
+
+      sinon.assert.calledOnce(model.addAuthenticator);
+      sinon.assert.notCalled(model.removeAuthenticator);
+      assert.deepStrictEqual(mcpPage.getWebAuthnAuthenticator(), before);
+    });
+
+    it('disables the virtual authenticator environment', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+
+      assert.strictEqual(
+        await mcpPage.configureWebAuthn({enabled: false}),
+        undefined,
+      );
+
+      sinon.assert.calledWithExactly(
+        model.setVirtualAuthEnvEnabled.secondCall,
+        false,
+      );
+      sinon.assert.notCalled(model.removeAuthenticator);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('disables the virtual authenticator environment that another client enabled', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+
+      await mcpPage.configureWebAuthn({enabled: false});
+
+      sinon.assert.calledOnceWithExactly(model.setVirtualAuthEnvEnabled, false);
+      sinon.assert.notCalled(model.addAuthenticator);
+    });
+
+    it('lists stored credentials', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      model.getCredentials.resolves([
+        {
+          credentialId: 'Y3JlZA==',
+          isResidentCredential: true,
+          rpId: 'example.com',
+          privateKey: 'a2V5',
+          userHandle: 'dXNlcg==',
+          signCount: 2,
+          userName: 'alice',
+        },
+      ]);
+
+      const result = await mcpPage.configureWebAuthn({enabled: true});
+
+      assert.deepStrictEqual(result?.credentials, [
+        {
+          credentialId: 'Y3JlZA==',
+          rpId: 'example.com',
+          isResidentCredential: true,
+          userName: 'alice',
+          signCount: 2,
+        },
+      ]);
+    });
+
+    it('throws when the page has no WebAuthn model', async () => {
+      const {mcpPage, detachUniverse} = await createWebAuthnPage();
+      detachUniverse();
+
+      await assert.rejects(mcpPage.configureWebAuthn({enabled: true}), {
+        message: 'WebAuthn is not available for page 1.',
+      });
+    });
+
+    it('throws the CDP error when enabling the environment fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.setVirtualAuthEnvEnabled.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(mcpPage.configureWebAuthn({enabled: true}));
+
+      sinon.assert.notCalled(model.addAuthenticator);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('throws the CDP error when adding the authenticator fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(mcpPage.configureWebAuthn({enabled: true}));
+
+      sinon.assert.notCalled(model.getCredentials);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('throws the CDP error when removing the replaced authenticator fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+      model.removeAuthenticator.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(
+        mcpPage.configureWebAuthn({enabled: true, transport: 'usb'}),
+      );
+
+      sinon.assert.calledOnce(model.addAuthenticator);
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('throws the CDP error when disabling the environment fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.setVirtualAuthEnvEnabled
+        .withArgs(false)
+        .rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(
+        mcpPage.configureWebAuthn({enabled: false}),
+      );
+    });
+
+    it('throws the CDP error and removes the authenticator when setting isUserVerified fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator.resolves(createMockAuthenticatorId('auth-1'));
+      await mcpPage.configureWebAuthn({enabled: true});
+      model.setUserVerified.rejects(new Error(CDP_ERROR));
+
+      await assertFailsWithCdpError(
+        mcpPage.configureWebAuthn({enabled: true, isUserVerified: false}),
+      );
+
+      sinon.assert.calledOnceWithExactly(
+        model.removeAuthenticator,
+        createMockAuthenticatorId('auth-1'),
+      );
+      assert.strictEqual(mcpPage.getWebAuthnAuthenticator(), undefined);
+    });
+
+    it('creates a new authenticator on the call after reading credentials fails', async () => {
+      const {mcpPage, model} = await createWebAuthnPage();
+      model.addAuthenticator
+        .onFirstCall()
+        .resolves(createMockAuthenticatorId('auth-1'));
+      model.addAuthenticator
+        .onSecondCall()
+        .resolves(createMockAuthenticatorId('auth-2'));
+      model.getCredentials.onFirstCall().rejects(new Error(CDP_ERROR));
+      await assertFailsWithCdpError(mcpPage.configureWebAuthn({enabled: true}));
+
+      await mcpPage.configureWebAuthn({enabled: true});
+
+      sinon.assert.calledOnceWithExactly(
+        model.removeAuthenticator,
+        createMockAuthenticatorId('auth-1'),
+      );
+      sinon.assert.calledWithExactly(
+        model.setVirtualAuthEnvEnabled.secondCall,
+        true,
+        false,
+      );
+      sinon.assert.calledWithExactly(
+        model.addAuthenticator.secondCall,
+        DEFAULT_OPTIONS,
+      );
+      sinon.assert.calledWithExactly(
+        model.getCredentials.secondCall,
+        createMockAuthenticatorId('auth-2'),
+      );
     });
   });
 });

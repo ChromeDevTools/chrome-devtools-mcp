@@ -62,6 +62,12 @@ On macOS, Chrome launched by an MCP client application (such as Claude Desktop) 
 
 To resolve this, grant Bluetooth permission to the MCP client application in `System Settings > Privacy & Security > Bluetooth`. After granting permission, restart the client application and start a new MCP session.
 
+### `--autoConnect` fails with `Could not find DevToolsActivePort` or `EPERM: operation not permitted` on macOS
+
+On recent macOS versions, macOS blocks other applications from reading browser profile folders under `~/Library/Application Support/Google/Chrome` without showing a permission prompt (TCC `kTCCServiceSystemPolicyAppDataDetailed`). Because the MCP server inherits the permissions of the terminal or IDE host application that launched it, reading `DevToolsActivePort` fails with `EPERM: operation not permitted`.
+
+To resolve this, grant the terminal or MCP client host application access to **Google Chrome** in `System Settings > Privacy & Security > Files & Folders`. The change applies immediately without restarting the terminal or MCP client.
+
 ### Remote debugging between virtual machine (VM) and host fails
 
 When attempting to connect to Chrome running on a host machine from within a virtual machine (VM), Chrome may reject the connection due to 'Host' header validation. You can bypass this restriction by creating an SSH tunnel from the VM to the host. In the VM, run:

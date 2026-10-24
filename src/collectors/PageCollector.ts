@@ -5,18 +5,19 @@
  */
 
 import {FakeIssuesManager} from '../devtools/DevtoolsUtils.js';
-import type {
-  CDPSession,
-  ConsoleMessage,
-  Protocol,
-  Issue,
-  Frame,
-  Handler,
-  HTTPRequest,
-  Page,
-  PageEvents as PuppeteerPageEvents,
+import {
+  DevTools,
+  FrameEvent,
+  type CDPSession,
+  type ConsoleMessage,
+  type Protocol,
+  type Issue,
+  type Frame,
+  type Handler,
+  type HTTPRequest,
+  type Page,
+  type PageEvents as PuppeteerPageEvents,
 } from '../third_party/index.js';
-import {DevTools, FrameEvent} from '../third_party/index.js';
 import {
   createIdGenerator,
   stableIdSymbol,

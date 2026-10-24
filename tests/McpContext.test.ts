@@ -1747,11 +1747,15 @@ describe('McpContext', () => {
       await updateConfig(config, context, {
         blockedUrlPattern: ['https://blocked.example.com/*'],
       });
+      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
       sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
         blocklist: ['https://blocked.example.com/*'],
         allowlist: undefined,
       });
-      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
+      sinon.assert.callOrder(
+        clearNetworkConditionsSpy,
+        browser.restrictNetwork,
+      );
 
       browser.restrictNetwork.resetHistory();
       clearNetworkConditionsSpy.resetHistory();
@@ -1765,11 +1769,15 @@ describe('McpContext', () => {
         blockedUrlPattern: undefined,
         allowedUrlPattern: ['https://allowed.example.com/*'],
       });
+      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
       sinon.assert.calledOnceWithExactly(browser.restrictNetwork, {
         blocklist: undefined,
         allowlist: ['https://allowed.example.com/*'],
       });
-      sinon.assert.calledOnceWithExactly(clearNetworkConditionsSpy);
+      sinon.assert.callOrder(
+        clearNetworkConditionsSpy,
+        browser.restrictNetwork,
+      );
 
       browser.restrictNetwork.resetHistory();
       clearNetworkConditionsSpy.resetHistory();

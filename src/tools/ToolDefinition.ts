@@ -5,7 +5,7 @@
  */
 
 import {categoryToFlagName} from '../config/category-options.js';
-import type {ParsedArguments} from '../config/ConfigParser.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotDiff,
@@ -22,25 +22,25 @@ import type {
   ContextFilterOptions,
   HeapSnapshotFormatOptions,
 } from '../formatters/HeapSnapshotFormatter.js';
-import {zod} from '../third_party/index.js';
-import type {
-  Dialog,
-  ElementHandle,
-  Extension,
-  GetPWAStateOptions,
-  InstallPWAOptions,
-  LaunchPWAOptions,
-  PWAState,
-  ScreenRecorder,
-  ScreenRecording,
-  UninstallPWAOptions,
-  Viewport,
-  DevTools,
-  Flags,
-  Protocol,
-  Page,
-  RunnerResult,
-  WebMCPTool,
+import {
+  zod,
+  type Dialog,
+  type ElementHandle,
+  type Extension,
+  type GetPWAStateOptions,
+  type InstallPWAOptions,
+  type LaunchPWAOptions,
+  type PWAState,
+  type ScreenRecorder,
+  type ScreenRecording,
+  type UninstallPWAOptions,
+  type Viewport,
+  type DevTools,
+  type Flags,
+  type Protocol,
+  type Page,
+  type RunnerResult,
+  type WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
@@ -123,12 +123,12 @@ export interface BaseToolDefinition<Schema extends ToolSchema = ToolSchema> {
   name: string;
   description: string;
   annotations: {
-    title?: string;
     category: ToolCategory;
     /**
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    title?: string;
     /**
      * If `'slim'` is included, the tool is only available with `--slim`. Tools
      * without `'slim'` are only available without `--slim`, see
@@ -212,7 +212,6 @@ export interface LighthouseData {
   summary: {
     mode: string;
     device: string;
-    url?: string;
     scores: Array<{
       id: string;
       title: string;
@@ -225,6 +224,7 @@ export interface LighthouseData {
     timing: {
       total: number;
     };
+    url?: string;
   };
   failedAudits: LighthouseFailedAudit[];
   reports: string[];
@@ -311,6 +311,9 @@ export interface Response {
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
   attachConsoleMessage(msgid: number): void;
+  attachWebAuthnAuthenticator(
+    authenticator: WebAuthnAuthenticatorState | undefined,
+  ): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
@@ -466,6 +469,33 @@ export type BrowserlessContext = Readonly<{
 
 export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
 
+export type WebAuthnProtocol = 'ctap2' | 'u2f';
+export type WebAuthnTransport = 'internal' | 'usb' | 'nfc' | 'ble' | 'hybrid';
+
+export interface WebAuthnAuthenticatorConfig {
+  enabled: boolean;
+  protocol?: WebAuthnProtocol;
+  transport?: WebAuthnTransport;
+  hasResidentKey?: boolean;
+  hasUserVerification?: boolean;
+  isUserVerified?: boolean;
+}
+
+export interface WebAuthnAuthenticatorState {
+  protocol: WebAuthnProtocol;
+  transport: WebAuthnTransport;
+  hasResidentKey: boolean;
+  hasUserVerification: boolean;
+  isUserVerified: boolean;
+  credentials: Array<{
+    credentialId: string;
+    rpId?: string;
+    isResidentCredential: boolean;
+    userName?: string;
+    signCount: number;
+  }>;
+}
+
 /**
  * Only add methods used by tools/*.
  */
@@ -478,6 +508,9 @@ export type ContextPage = Readonly<{
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+  configureWebAuthn(
+    config: WebAuthnAuthenticatorConfig,
+  ): Promise<WebAuthnAuthenticatorState | undefined>;
 
   /**
    * Returns a reqid for a cdpRequestId.
@@ -531,10 +564,6 @@ export type ContextPage = Readonly<{
     text: string[],
     options?: {timeout?: number; visible?: boolean},
   ): Promise<Element>;
-  resize(
-    width: number,
-    height: number,
-  ): Promise<{width: number; height: number} | undefined>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
