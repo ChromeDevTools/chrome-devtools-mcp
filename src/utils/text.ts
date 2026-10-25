@@ -61,5 +61,12 @@ const URL_SIZE_LIMIT = 255;
  * Truncates a URL for tool output, such as a `data:` URL with a base64 payload.
  */
 export function truncateUrl(url: string): string {
-  return truncateText(url, URL_SIZE_LIMIT, {ellipsis: '... <truncated>'});
+  let limit = URL_SIZE_LIMIT;
+  if (url.length > limit) {
+    const partial = /%[0-9a-fA-F]?$/.exec(url.slice(0, limit));
+    if (partial) {
+      limit -= partial[0].length;
+    }
+  }
+  return truncateText(url, limit, {ellipsis: '... <truncated>'});
 }
