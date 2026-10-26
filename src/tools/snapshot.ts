@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {zod} from '../third_party/index.js';
+import {TimeoutError, zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -62,7 +62,11 @@ export const waitFor: PageToolFactory = definePageTool(() => ({
       .array(zod.string())
       .min(1)
       .describe(
-        'Non-empty list of texts. Resolves when any value appears on the page.',
+        'Non-empty list of texts. Resolves when any value matches an ' +
+          'accessible name exactly or is a substring of DOM text. Matching ' +
+          'is case-sensitive. DOM text preserves spaces and newlines, unlike ' +
+          'snapshot text which may normalize whitespace. Use the original ' +
+          'whitespace or a shorter distinctive substring.',
       ),
     ...timeoutSchema,
     visible: zod
@@ -78,10 +82,22 @@ export const waitFor: PageToolFactory = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    await page.waitForTextOnPage(request.params.text, {
-      timeout: request.params.timeout,
-      visible: request.params.visible,
-    });
+    try {
+      await page.waitForTextOnPage(request.params.text, {
+        timeout: request.params.timeout,
+        visible: request.params.visible,
+      });
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        response.appendResponseLine(
+          'Text matching is case-sensitive. DOM text must preserve spaces and ' +
+            'newlines; snapshot text may have normalized whitespace. Try a ' +
+            'shorter distinctive substring or use evaluate_script to inspect ' +
+            "the element's textContent.",
+        );
+      }
+      throw error;
+    }
 
     response.appendResponseLine(
       `Element matching one of ${JSON.stringify(request.params.text)} found.`,

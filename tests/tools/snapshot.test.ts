@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
+import {McpResponse} from '../../src/McpResponse.js';
+import {TimeoutError} from '../../src/third_party/index.js';
 import {takeSnapshot, waitFor} from '../../src/tools/snapshot.js';
-import {createHandlerMocks} from '../mocks.js';
+import {createHandlerMocks, createMockServerConfig} from '../mocks.js';
 
 describe('snapshot', () => {
   describe('take_snapshot', () => {
@@ -37,6 +40,83 @@ describe('snapshot', () => {
   });
 
   describe('wait_for', () => {
+    it('explains whitespace matching when the wait times out', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const error = new TimeoutError('Timed out after waiting 2000ms');
+      page.waitForTextOnPage.rejects(error);
+
+      await assert.rejects(
+        waitFor(args).handler(
+          {params: {text: ['Order confirmed'], timeout: 2000}, page},
+          response,
+          context,
+        ),
+        error,
+      );
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Text matching is case-sensitive. DOM text must preserve spaces and ' +
+          'newlines; snapshot text may have normalized whitespace. Try a ' +
+          'shorter distinctive substring or use evaluate_script to inspect ' +
+          "the element's textContent.",
+      );
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
+    it('includes whitespace advice alongside the formatted timeout', async () => {
+      const {page, context, args} = createHandlerMocks();
+      const response = new McpResponse(createMockServerConfig());
+      const error = new TimeoutError('Timed out after waiting 2000ms');
+      page.waitForTextOnPage.rejects(error);
+      await assert.rejects(
+        waitFor(args).handler(
+          {params: {text: ['Order confirmed']}, page},
+          response,
+          context,
+        ),
+        error,
+      );
+      response.setError(error);
+      const result = await response.handle(context);
+      assert.match(
+        JSON.stringify(result.content),
+        /Timed out after waiting 2000ms/,
+      );
+      assert.match(
+        JSON.stringify(result.content),
+        /preserve spaces and newlines/,
+      );
+    });
+
+    it('preserves newlines and repeated spaces in the wait pattern', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const text = ['Order\n    confirmed', 'Multi   spaced    words'];
+      await waitFor(args).handler({params: {text}, page}, response, context);
+      sinon.assert.calledOnceWithExactly(page.waitForTextOnPage, text, {
+        timeout: undefined,
+        visible: undefined,
+      });
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        `Element matching one of ${JSON.stringify(text)} found.`,
+      );
+    });
+
+    it('does not add whitespace advice for non-timeout errors', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const error = new Error('Target closed');
+      page.waitForTextOnPage.rejects(error);
+      await assert.rejects(
+        waitFor(args).handler(
+          {params: {text: ['Order confirmed']}, page},
+          response,
+          context,
+        ),
+        error,
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
     it('waits for text and appends response line', async () => {
       const {page, context, response, args} = createHandlerMocks();
       await waitFor(args).handler(
