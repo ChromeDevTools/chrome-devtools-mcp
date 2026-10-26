@@ -416,6 +416,12 @@ export class NetworkCollector extends PageCollector<HTTPRequest> {
     ) => ListenerMap<PageEvents> = collect => {
       return {
         request: req => {
+          // With the debugger `createTargetUniverse()` starts, initiator stacks
+          // carry up to 32 async parents, which no tool reads.
+          const stack = req.initiator()?.stack;
+          if (stack) {
+            delete stack.parent;
+          }
           collect(req);
         },
       } as ListenerMap;
