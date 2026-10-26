@@ -8,50 +8,101 @@
 // Node 20 does not support --experimental-strip-types flag.
 
 import {spawn} from 'node:child_process';
-import {readFile} from 'node:fs/promises';
+import {glob, readFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import {parseArgs} from 'node:util';
 
-const args = process.argv.slice(2);
-const userArgs = args.filter(arg => !arg.startsWith('-'));
-const flags = args.filter(arg => arg.startsWith('-'));
+const callerCwd = process.cwd();
+const projectRoot = path.resolve(import.meta.dirname, '..');
+
+const ownOptions = {
+  retry: {
+    type: 'boolean',
+    default: false,
+  },
+  'build-dir': {
+    type: 'string',
+  },
+  suite: {
+    type: 'string',
+    default: 'all',
+  },
+};
+
+const {
+  values,
+  positionals: userArgs,
+  tokens,
+} = parseArgs({
+  options: ownOptions,
+  strict: false,
+  allowPositionals: true,
+  tokens: true,
+});
+
+const shouldRetry = values.retry;
+const suite = values.suite;
+const buildDir = values['build-dir']
+  ? path.resolve(callerCwd, values['build-dir'])
+  : path.join(projectRoot, 'out', 'Default');
+
+const flags = tokens
+  .filter(token => token.kind === 'option' && !(token.name in ownOptions))
+  .map(token =>
+    token.value !== undefined
+      ? `${token.rawName}=${token.value}`
+      : token.rawName,
+  );
+
+const relGenDir = path
+  .relative(projectRoot, path.join(buildDir, 'gen'))
+  .replaceAll('\\', '/');
+const relGenTestsDir = `${relGenDir}/tests`;
+const genTestsDir = path.join(buildDir, 'gen', 'tests');
 
 const files = [];
 
-let shouldRetry = false;
-const retryIndex = flags.indexOf('--retry');
-if (retryIndex !== -1) {
-  shouldRetry = true;
-  flags.splice(retryIndex, 1);
-}
-
 if (userArgs.length > 0) {
   for (const arg of userArgs) {
-    // Map .ts files to out/Default/gen/ .js files
+    // Map .ts files to <buildDir>/gen/ .js files
     let testPath = arg;
     if (testPath.endsWith('.ts')) {
       testPath = testPath.replace(/\.ts$/, '.js');
-      if (!testPath.startsWith('out/Default/gen/')) {
-        testPath = path.join('out/Default/gen', testPath);
+      if (!testPath.startsWith(`${relGenDir}/`)) {
+        testPath = path.posix.join(relGenDir, testPath.replaceAll('\\', '/'));
       }
     }
     files.push(testPath);
   }
 } else if (flags.includes('--test-only')) {
-  const {glob} = await import('node:fs/promises');
-  for await (const tsFile of glob('tests/**/*.test.ts')) {
-    const content = await readFile(tsFile, 'utf8');
+  for await (const tsFile of glob('tests/**/*.test.ts', {cwd: projectRoot})) {
+    const content = await readFile(path.join(projectRoot, tsFile), 'utf8');
     if (content.includes('.only(')) {
-      files.push(path.join('out/Default/gen', tsFile.replace(/\.ts$/, '.js')));
+      files.push(
+        path.posix.join(
+          relGenDir,
+          tsFile.replaceAll('\\', '/').replace(/\.ts$/, '.js'),
+        ),
+      );
     }
   }
   if (files.length === 0) {
     console.warn('no files contain .only');
     process.exit(0);
   }
+} else if (suite === 'e2e') {
+  files.push(`${relGenTestsDir}/e2e/**/*.test.js`);
+} else if (suite === 'unit') {
+  for await (const jsFile of glob('**/*.test.js', {cwd: genTestsDir})) {
+    const normalized = jsFile.replaceAll('\\', '/');
+    if (!normalized.startsWith('e2e/')) {
+      files.push(`${relGenTestsDir}/${normalized}`);
+    }
+  }
 } else if (files.length === 0) {
-  files.push('out/Default/gen/tests/**/*.test.js');
+  files.push(`${relGenTestsDir}/**/*.test.js`);
 }
 
 // Node runs `availableParallelism() - 1` test files at a time by default, so
@@ -66,7 +117,7 @@ if (!flags.some(flag => flag.startsWith('--test-concurrency'))) {
 
 const nodeArgs = [
   '--import',
-  './out/Default/gen/tests/setup.js',
+  `./${relGenTestsDir}/setup.js`,
   '--no-warnings=ExperimentalWarning',
   '--test-reporter',
   (process.env['NODE_TEST_REPORTER'] ?? process.env['CI']) ? 'spec' : 'dot',
@@ -82,7 +133,8 @@ async function runTests(attempt) {
     console.log(`\nRun attempt ${attempt}...\n`);
   }
   return await new Promise(resolve => {
-    const child = spawn('node', nodeArgs, {
+    const child = spawn(process.execPath, nodeArgs, {
+      cwd: projectRoot,
       stdio: 'inherit',
       env: {
         ...process.env,

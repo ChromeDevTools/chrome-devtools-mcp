@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 group("default") {
+  testonly = true
   deps = [
     ":devtools_deps",
     "//src:all",
     "//tests",
+    "//tests:run_chrome_devtools_mcp_e2e_tests",
+    "//tests:run_chrome_devtools_mcp_unit_tests",
   ]
 }
 

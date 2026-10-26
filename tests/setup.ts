@@ -20,13 +20,13 @@ afterEach(() => {
 
 // This is run by Node when we execute the tests via the --import flag.
 it.snapshot.setResolveSnapshotPath(testPath => {
+  if (!testPath) {
+    return '';
+  }
   // By default the snapshots go into the build directory, but we want them
-  // in the tests/ directory.
-  const correctPath = testPath?.replace(
-    path.join('out', 'Default', 'gen', 'tests'),
-    'tests',
-  );
-  return correctPath + '.snapshot';
+  // in the source tests/ directory regardless of the GN output directory.
+  const relativePath = path.relative(import.meta.dirname, testPath);
+  return path.join(path.resolve('tests'), `${relativePath}.snapshot`);
 });
 
 // The default serializer is JSON.stringify which outputs a very hard to read

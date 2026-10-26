@@ -470,7 +470,8 @@ export function getMockBrowser(options?: {
 }
 
 export const CLI_PATH: string = path.resolve(
-  'out/Default/gen/src/bin/chrome-devtools.js',
+  import.meta.dirname,
+  '../src/bin/chrome-devtools.js',
 );
 
 export async function runCli(
@@ -484,7 +485,7 @@ export async function runCli(
       // Prepend so that the flag is not swallowed by a trailing `--`.
       finalArgs.unshift('--sessionId', sessionId);
     }
-    const child = spawn('node', [CLI_PATH, ...finalArgs], {
+    const child = spawn(process.execPath, [CLI_PATH, ...finalArgs], {
       env: process.env,
       cwd: options?.cwd,
     });

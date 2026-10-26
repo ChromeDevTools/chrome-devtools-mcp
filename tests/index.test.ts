@@ -32,9 +32,12 @@ describe('e2e', {concurrency: true}, () => {
     let attempt = 1;
     while (attempt <= 3) {
       const transport = new StdioClientTransport({
-        command: 'node',
+        command: process.execPath,
         args: [
-          'out/Default/gen/src/bin/chrome-devtools-mcp.js',
+          path.resolve(
+            import.meta.dirname,
+            '../src/bin/chrome-devtools-mcp.js',
+          ),
           '--headless',
           '--isolated',
           '--executable-path',

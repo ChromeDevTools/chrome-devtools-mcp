@@ -1,10 +1,12 @@
 # Copyright 2026 Google LLC
 # SPDX-License-Identifier: Apache-2.0
 
+import("//third_party/devtools-frontend/scripts/build/ninja/script_test.gni")
 import(
     "//third_party/devtools-frontend/scripts/build/typescript/typescript.gni")
 
 ts_library("tests") {
+  testonly = true
   runs_in = "node"
 
   es_libs = [
@@ -118,4 +120,38 @@ ts_library("tests") {
     "//src:mcp_lib",
     "//src:third_party",
   ]
+}
+
+_common_test_data = [
+  "//node_modules/",
+  "//package.json",
+  "//tests/",
+]
+
+_common_test_data_deps = [
+  ":tests",
+  "//:devtools_deps",
+  "//src:all",
+]
+
+node_script_test("run_chrome_devtools_mcp_unit_tests") {
+  script = "//scripts/test.js"
+  args = [
+    "--build-dir",
+    "@WrappedPath(.)",
+    "--suite=unit",
+  ]
+  data = _common_test_data
+  data_deps = _common_test_data_deps
+}
+
+node_script_test("run_chrome_devtools_mcp_e2e_tests") {
+  script = "//scripts/test.js"
+  args = [
+    "--build-dir",
+    "@WrappedPath(.)",
+    "--suite=e2e",
+  ]
+  data = _common_test_data
+  data_deps = _common_test_data_deps
 }
