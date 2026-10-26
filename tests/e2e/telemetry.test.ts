@@ -14,7 +14,8 @@ import {describe, it} from 'node:test';
 import type {ChromeDevToolsMcpExtension} from '../../src/telemetry/types';
 
 const SERVER_PATH = path.resolve(
-  'out/Default/gen/src/bin/chrome-devtools-mcp.js',
+  import.meta.dirname,
+  '../../src/bin/chrome-devtools-mcp.js',
 );
 
 interface MockServerContext {
