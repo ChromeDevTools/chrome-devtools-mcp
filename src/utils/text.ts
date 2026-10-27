@@ -63,10 +63,20 @@ const URL_SIZE_LIMIT = 255;
 export function truncateUrl(url: string): string {
   let limit = URL_SIZE_LIMIT;
   if (url.length > limit) {
-    const partial = /%[0-9a-fA-F]?$/.exec(url.slice(0, limit));
-    if (partial) {
-      limit -= partial[0].length;
+    let kept = url.slice(0, limit);
+    // 1. drop a partial escape
+    kept = kept.replace(/%[0-9a-f]?$/i, '');
+    // 2. drop an incomplete multi-byte character
+    const tail = /%[c-f][0-9a-f](?:%[89ab][0-9a-f])*$/i.exec(kept);
+    if (tail) {
+      const lead = parseInt(tail[0].slice(1, 3), 16);
+      const needed = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : 2;
+      const have = tail[0].length / 3;
+      if (have < needed) {
+        kept = kept.slice(0, kept.length - tail[0].length);
+      }
     }
+    limit = kept.length;
   }
   return truncateText(url, limit, {ellipsis: '... <truncated>'});
 }
