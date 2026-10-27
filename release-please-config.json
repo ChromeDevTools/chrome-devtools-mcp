@@ -43,7 +43,7 @@
         {
           "type": "json",
           "path": ".claude-plugin/plugin.json",
-          "jsonpath": "mcpServers['chrome-devtools'].args[0]"
+          "jsonpath": "mcpServers['chrome-devtools'].args[2]"
         },
         {
           "type": "json",

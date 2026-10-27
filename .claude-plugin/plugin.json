@@ -6,6 +6,8 @@
     "chrome-devtools": {
       "command": "npx",
       "args": [
+        "--prefix",
+        "${CLAUDE_PLUGIN_DATA}",
         "chrome-devtools-mcp@1.12.0"
       ]
     }
