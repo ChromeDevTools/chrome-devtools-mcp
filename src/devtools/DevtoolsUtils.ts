@@ -230,6 +230,13 @@ export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
 /**
+ * Maximum number of `cause` links resolved for one error. A page can create a
+ * cyclic chain (`error.cause = error`), and CDP returns a new object id on
+ * every lookup of the same object, so a cycle cannot be detected by id.
+ */
+const MAX_CAUSE_DEPTH = 10;
+
+/**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
  *
  * TODO: Also construct from a RemoteObject of subtype 'error'.
@@ -262,6 +269,13 @@ export class SymbolizedError {
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
     resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
+    return await SymbolizedError.#fromDetails(opts, 0);
+  }
+
+  static async #fromDetails(
+    opts: Parameters<typeof SymbolizedError.fromDetails>[0],
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
     const message = SymbolizedError.#getMessage(opts.details);
     if (!opts.includeStackAndCause || (!opts.devTools && !opts.session)) {
       return new SymbolizedError(
@@ -291,7 +305,7 @@ export class SymbolizedError {
     let cause: SymbolizedError | undefined;
     if (opts.resolvedCauseForTesting) {
       cause = opts.resolvedCauseForTesting;
-    } else if (opts.details.exception) {
+    } else if (opts.details.exception && causeDepth < MAX_CAUSE_DEPTH) {
       try {
         const causeRemoteObj = await SymbolizedError.#lookupCause(
           opts.devTools,
@@ -300,12 +314,15 @@ export class SymbolizedError {
           opts.session,
         );
         if (causeRemoteObj) {
-          cause = await SymbolizedError.fromError({
-            devTools: opts.devTools,
-            error: causeRemoteObj,
-            targetId: opts.targetId,
-            session: opts.session,
-          });
+          cause = await SymbolizedError.#fromError(
+            {
+              devTools: opts.devTools,
+              error: causeRemoteObj,
+              targetId: opts.targetId,
+              session: opts.session,
+            },
+            causeDepth + 1,
+          );
         }
       } catch {
         // Ignore
@@ -320,6 +337,13 @@ export class SymbolizedError {
     devTools?: TargetUniverse;
     session?: CDPSession;
   }): Promise<SymbolizedError> {
+    return await SymbolizedError.#fromError(opts, 0);
+  }
+
+  static async #fromError(
+    opts: Parameters<typeof SymbolizedError.fromError>[0],
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
     const details = await SymbolizedError.#getExceptionDetails(
       opts.devTools,
       opts.error,
@@ -327,13 +351,16 @@ export class SymbolizedError {
       opts.session,
     );
     if (details) {
-      return await SymbolizedError.fromDetails({
-        details,
-        devTools: opts.devTools,
-        targetId: opts.targetId,
-        session: opts.session,
-        includeStackAndCause: true,
-      });
+      return await SymbolizedError.#fromDetails(
+        {
+          details,
+          devTools: opts.devTools,
+          targetId: opts.targetId,
+          session: opts.session,
+          includeStackAndCause: true,
+        },
+        causeDepth,
+      );
     }
 
     return new SymbolizedError(
