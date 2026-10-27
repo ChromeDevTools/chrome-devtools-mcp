@@ -347,6 +347,26 @@ describe('NetworkCollector', () => {
     assert.strictEqual(collector.getData().length, 2);
   });
 
+  it('lists no requests after a navigation without a request', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const navRequest = getMockRequest({
+      navigationRequest: true,
+      frame: page.mainFrame(),
+    });
+    const request = getMockRequest();
+    const collector = new NetworkCollector(page);
+
+    page.emit('request', navRequest);
+    page.emit('framenavigated', mainFrame);
+    page.emit('request', request);
+    // A back/forward cache restore or about:blank commits without a request.
+    page.emit('framenavigated', mainFrame);
+
+    assert.deepStrictEqual(collector.getData(), []);
+  });
+
   it('works with previous navigations', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
