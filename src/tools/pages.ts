@@ -16,9 +16,30 @@ import {
   definePageTool,
   defineTool,
   type PageToolFactory,
+  type Response,
   timeoutSchema,
   type ToolFactory,
 } from './ToolDefinition.js';
+
+function reportActionError(
+  response: Response,
+  error: unknown,
+  description: string,
+): void {
+  const normalizedError =
+    error instanceof Error
+      ? error
+      : new Error(
+          error !== null &&
+            typeof error === 'object' &&
+            'message' in error &&
+            typeof error.message === 'string'
+            ? error.message
+            : String(error),
+        );
+  response.setError(normalizedError);
+  response.appendResponseLine(`${description}: ${normalizedError.message}.`);
+}
 
 export const listPages: ToolFactory = defineTool((args: ParsedArguments) => {
   return {
@@ -278,8 +299,10 @@ export const navigatePage: PageToolFactory = definePageTool(
                       `Successfully navigated to ${request.params.url}.`,
                     );
                   } catch (error) {
-                    response.appendResponseLine(
-                      `Unable to navigate in the selected page: ${error.message}.`,
+                    reportActionError(
+                      response,
+                      error,
+                      'Unable to navigate in the selected page',
                     );
                   }
                   break;
@@ -290,8 +313,10 @@ export const navigatePage: PageToolFactory = definePageTool(
                       `Successfully navigated back to ${page.pptrPage.url()}.`,
                     );
                   } catch (error) {
-                    response.appendResponseLine(
-                      `Unable to navigate back in the selected page: ${error.message}.`,
+                    reportActionError(
+                      response,
+                      error,
+                      'Unable to navigate back in the selected page',
                     );
                   }
                   break;
@@ -302,8 +327,10 @@ export const navigatePage: PageToolFactory = definePageTool(
                       `Successfully navigated forward to ${page.pptrPage.url()}.`,
                     );
                   } catch (error) {
-                    response.appendResponseLine(
-                      `Unable to navigate forward in the selected page: ${error.message}.`,
+                    reportActionError(
+                      response,
+                      error,
+                      'Unable to navigate forward in the selected page',
                     );
                   }
                   break;
@@ -317,8 +344,10 @@ export const navigatePage: PageToolFactory = definePageTool(
                       `Successfully reloaded the page.`,
                     );
                   } catch (error) {
-                    response.appendResponseLine(
-                      `Unable to reload the selected page: ${error.message}.`,
+                    reportActionError(
+                      response,
+                      error,
+                      'Unable to reload the selected page',
                     );
                   }
                   break;
@@ -428,6 +457,8 @@ export const handleDialog: PageToolFactory = definePageTool(() => ({
         } catch (err) {
           // Likely already handled by the user outside of MCP.
           logger?.(err);
+          reportActionError(response, err, 'Unable to accept the dialog');
+          break;
         }
         response.appendResponseLine('Successfully accepted the dialog');
         break;
@@ -438,6 +469,8 @@ export const handleDialog: PageToolFactory = definePageTool(() => ({
         } catch (err) {
           // Likely already handled.
           logger?.(err);
+          reportActionError(response, err, 'Unable to dismiss the dialog');
+          break;
         }
         response.appendResponseLine('Successfully dismissed the dialog');
         break;

@@ -35,10 +35,16 @@ import {
   type ToolDefinition,
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
+import {handleDialog, navigatePage} from '../src/tools/pages.js';
 import {createTools} from '../src/tools/tools.js';
 import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
-import {createMockMcpContext, createMockMcpPage} from './mocks.js';
-import {getMockBrowser, withMcpContext} from './utils.js';
+import {
+  createMockDialog,
+  createMockMcpContext,
+  createMockMcpPage,
+  createMockServerConfig,
+} from './mocks.js';
+import {getMockBrowser, getTextContent, withMcpContext} from './utils.js';
 
 describe('ToolHandler', () => {
   /** Runs `fn` as a task on `queue`. */
@@ -63,6 +69,94 @@ describe('ToolHandler', () => {
       locator,
     ).parseConfig();
   }
+
+  describe('navigation and dialog error results', () => {
+    const actions: Array<
+      'url' | 'back' | 'forward' | 'reload' | 'accept' | 'dismiss'
+    > = ['url', 'back', 'forward', 'reload', 'accept', 'dismiss'];
+    for (const action of actions) {
+      for (const fails of [false, true]) {
+        const outcome = fails ? 'an error' : 'success';
+        it(`returns ${outcome} and pages for ${action}`, async () => {
+          const page = createMockMcpPage({id: 1});
+          page.pptrPage.url.returns('https://example.com/');
+          const context = createMockMcpContext({selectedPage: page});
+          context.ensureBrowser.resolves(getMockBrowser());
+          context.getPageById.returns(page);
+          context.getPages.returns([page]);
+          context.isPageSelected.returns(true);
+          const config = createMockServerConfig({
+            experimentalStructuredContent: true,
+          });
+          let tool: DefinedPageTool;
+          let params: Record<string, unknown>;
+          if (action === 'accept' || action === 'dismiss') {
+            const dialog = createMockDialog();
+            page.getDialog.onFirstCall().returns(dialog);
+            const method = dialog[action];
+            if (fails) {
+              method.rejects({message: 'Action failed'});
+            } else {
+              method.resolves();
+            }
+            tool = handleDialog(config.resolved);
+            params = {pageId: 1, action};
+          } else {
+            const method = {
+              url: page.pptrPage.goto,
+              back: page.pptrPage.goBack,
+              forward: page.pptrPage.goForward,
+              reload: page.pptrPage.reload,
+            }[action];
+            if (fails) {
+              method.rejects(new Error('Action failed'));
+            } else {
+              method.resolves(null);
+            }
+            tool = navigatePage(config.resolved);
+            params = {
+              pageId: 1,
+              type: action,
+              ...(action === 'url' ? {url: 'https://example.com/'} : {}),
+            };
+          }
+          const handler = new ToolHandler(
+            tool,
+            config,
+            async () => context,
+            sinon.spy(),
+          );
+
+          const result = await handler.handle(params);
+
+          assert.strictEqual(result.isError, fails ? true : undefined);
+          const structuredContent = zod
+            .object({
+              errorMessage: zod.string().optional(),
+              pages: zod.unknown(),
+            })
+            .parse(result.structuredContent);
+          assert.strictEqual(
+            structuredContent.errorMessage,
+            fails ? 'Action failed' : undefined,
+          );
+          assert.deepStrictEqual(structuredContent.pages, [
+            {id: 1, url: 'https://example.com/', title: '', selected: true},
+          ]);
+          const text = getTextContent(result.content[0]);
+          assert.match(text, /## Pages/);
+          assert.match(
+            text,
+            fails ? /Unable to.*Action failed/ : /Successfully/,
+          );
+          assert.doesNotMatch(
+            text,
+            fails ? /Successfully/ : /Unable to|Error:/,
+          );
+        });
+      }
+    }
+  });
 
   it('calls getPageById for page scoped tools when pageId is provided', async () => {
     let handlerCalled = false;
