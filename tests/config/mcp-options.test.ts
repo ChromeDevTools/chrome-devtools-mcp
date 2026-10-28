@@ -68,6 +68,15 @@ describe('mcp-options steps', () => {
       );
     });
 
+    it('accepts a config file with a UTF-8 BOM', () => {
+      using configFile = createTempFile(
+        `\uFEFF${JSON.stringify({headless: true})}`,
+        'cd4a.steps.config.bom.json',
+      );
+      const args = parser.parseConfigFile(configFile.path);
+      assert.strictEqual(args.headless, true);
+    });
+
     it('accepts wsHeaders as a JSON object and validates string values', () => {
       using validFile = createTempFile(
         JSON.stringify({

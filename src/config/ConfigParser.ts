@@ -92,9 +92,8 @@ export class ConfigParser {
     rawContent?: string,
   ): Partial<ParsedArguments> {
     try {
-      const fileContent: unknown = JSON.parse(
-        rawContent ?? readFileSync(configPath, 'utf-8'),
-      );
+      const content = rawContent ?? readFileSync(configPath, 'utf-8');
+      const fileContent: unknown = JSON.parse(content.replace(/^\uFEFF/, ''));
       if (!isPlainObject(fileContent)) {
         throw new Error('Config must be a JSON object');
       }
