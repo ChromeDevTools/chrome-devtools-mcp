@@ -22,56 +22,108 @@
  *   sinon.assert.calledOnceWithExactly(page.emulate, {networkConditions: 'Slow 3G'});
  */
 
-import type {Frame} from 'puppeteer-core';
+import './setupDevTools.js';
+
+import type {Frame, Mouse, SerializedAXNode} from 'puppeteer-core';
 import sinon from 'sinon';
 
-import {
-  type ParsedArguments,
-  ConfigParser,
-} from '../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
+import {ServerConfig} from '../src/config/ServerConfig.js';
+import type {TargetUniverse} from '../src/devtools/DevtoolsUtils.js';
 import {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse} from '../src/McpResponse.js';
 import {McpWorker, type WorkerType} from '../src/McpWorker.js';
+import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
 import type {
-  AggregatedInfoWithId,
   DuplicateStringGroup,
+  HeapSnapshotAggregate,
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
+  HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
+  HeapSnapshotDiff,
+  HeapSnapshotDiffObject,
 } from '../src/processors/HeapSnapshotManager.js';
-import {stableIdSymbol} from '../src/utils/id.js';
 import {
+  Accessibility,
   CdpBrowser,
   CdpExtension,
   CdpFrame,
+  CdpMouse,
   CdpPage,
+  CDPSession,
+  Connection,
+  ConsoleMessage,
   DevTools,
   Dialog,
   ElementHandle,
   Locator,
   Target,
   TargetType,
+  Tracing,
   WebWorker,
-} from '../src/third_party/index.js';
-import type {
-  Browser,
-  BrowserContext,
-  CDPSession,
-  Extension,
-  Page,
-  Protocol,
-  Realm,
-  Result,
-  RunnerResult,
+  WebMCP,
+  WebMCPTool,
+  type Browser,
+  type BrowserContext,
+  type ConsoleMessageLocation,
+  type ConsoleMessageType,
+  type Extension,
+  type JSHandle,
+  type Page,
+  type Protocol,
+  type Realm,
+  type Result,
+  type RunnerResult,
 } from '../src/third_party/index.js';
 
+export type MockPuppeteerPage = sinon.SinonStubbedInstance<Page> & {
+  webmcp: sinon.SinonStubbedInstance<WebMCP>;
+  tracing: sinon.SinonStubbedInstance<Tracing>;
+  mouse: sinon.SinonStubbedInstance<Mouse>;
+  accessibility: sinon.SinonStubbedInstance<Accessibility>;
+  cdpSession: {
+    on: sinon.SinonStub;
+    off: sinon.SinonStub;
+    send: sinon.SinonStub;
+    target: sinon.SinonStub;
+    emit: (eventName: string | symbol | number, data?: unknown) => void;
+  };
+};
+
 export type MockMcpPage = sinon.SinonStubbedInstance<McpPage> & {
-  pptrPage: sinon.SinonStubbedInstance<Page>;
+  pptrPage: MockPuppeteerPage;
   target: sinon.SinonStubbedInstance<MockTarget>;
 };
 export type MockMcpContext = sinon.SinonStubbedInstance<McpContext>;
 export type MockMcpResponse = sinon.SinonStubbedInstance<McpResponse>;
+
+export interface ProtocolAXNode extends SerializedAXNode {
+  loaderId?: string;
+  backendNodeId?: number;
+  children?: ProtocolAXNode[];
+  elementHandle: () => Promise<ElementHandle<Element> | null>;
+}
+
+export function createMockAXNode(
+  role: string,
+  options: {
+    name?: string;
+    loaderId?: string;
+    backendNodeId?: number;
+    children?: ProtocolAXNode[];
+  } = {},
+): ProtocolAXNode {
+  return {
+    role,
+    name: options.name,
+    loaderId: options.loaderId,
+    backendNodeId: options.backendNodeId,
+    children: options.children,
+    elementHandle: async () => null,
+  };
+}
 export type MockDOMNode = sinon.SinonStubbedInstance<DevTools.DOMModel.DOMNode>;
 export type MockCSSProperty =
   sinon.SinonStubbedInstance<DevTools.CSSProperty.CSSProperty>;
@@ -97,13 +149,27 @@ export type MockCSSFunctionRule =
  * Puppeteer objects (Page, CDPSession, Browser) so tests can trigger events
  * synchronously without a real browser.
  */
-export function mockListener() {
+export function mockListener(): {
+  on: (
+    eventName: string | symbol | number,
+    listener: (data: unknown) => void,
+  ) => void;
+  off: (
+    eventName: string | symbol | number,
+    listener?: (data: unknown) => void,
+  ) => void;
+  emit: (eventName: string | symbol | number, data?: unknown) => void;
+  listenerCount: (eventName: string | symbol | number) => number;
+} {
   const listeners: Record<
     string | symbol | number,
     Array<(data: unknown) => void>
   > = {};
   return {
-    on(eventName: string | symbol | number, listener: (data: unknown) => void) {
+    on(
+      eventName: string | symbol | number,
+      listener: (data: unknown) => void,
+    ): void {
       const arr = listeners[eventName];
       if (arr) {
         arr.push(listener);
@@ -114,7 +180,7 @@ export function mockListener() {
     off(
       eventName: string | symbol | number,
       listener?: (data: unknown) => void,
-    ) {
+    ): void {
       const arr = listeners[eventName];
       if (!arr) {
         return;
@@ -125,10 +191,13 @@ export function mockListener() {
       }
       listeners[eventName] = arr.filter(entry => entry !== listener);
     },
-    emit(eventName: string | symbol | number, data?: unknown) {
+    emit(eventName: string | symbol | number, data?: unknown): void {
       for (const listener of listeners[eventName] ?? []) {
         listener(data);
       }
+    },
+    listenerCount(eventName: string | symbol | number): number {
+      return listeners[eventName]?.length ?? 0;
     },
   };
 }
@@ -140,7 +209,10 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   sinon.stub(browser, 'connected').get(() => true);
   browser.close.resolves();
   browser.disconnect.resolves();
+  browser.restrictNetwork.resolves();
   browser.pages.resolves([]);
+  browser.targets.returns([]);
+  browser.browserContexts.returns([]);
   browser.process.returns(null);
 
   const browserListener = mockListener();
@@ -168,11 +240,49 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   return browser;
 }
 
-export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
-  const page = sinon.createStubInstance(
-    CdpPage,
-  ) as unknown as sinon.SinonStubbedInstance<Page>;
+export class MockCDPSession extends CDPSession {
+  override connection(): Connection | undefined {
+    return undefined;
+  }
+  override get detached(): boolean {
+    return false;
+  }
+  override send(): Promise<never> {
+    throw new Error('Not implemented');
+  }
+  override detach(): Promise<void> {
+    throw new Error('Not implemented');
+  }
+  override id(): string {
+    return '';
+  }
+}
+
+export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSession> {
+  const session = sinon.createStubInstance(MockCDPSession);
+  const connection = sinon.createStubInstance(Connection);
+  connection.session.returns(session);
+  session.connection.returns(connection);
+  session.id.returns('<mock-session-id>');
+  session.send.resolves();
+  session.detach.resolves();
+  const listener = mockListener();
+  session.on.callsFake((eventName, handler) => {
+    listener.on(eventName, handler);
+    return session;
+  });
+  session.off.callsFake((eventName, handler) => {
+    listener.off(eventName, handler);
+    return session;
+  });
+  return session;
+}
+
+export function createMockPuppeteerPage(): MockPuppeteerPage {
+  const pptrPage = sinon.createStubInstance(CdpPage);
+  const page = pptrPage as unknown as sinon.SinonStubbedInstance<Page>;
   const pageListener = mockListener();
+  page.listenerCount.callsFake(pageListener.listenerCount);
   page.on.callsFake((eventName, handler) => {
     pageListener.on(eventName, handler);
     return page;
@@ -192,6 +302,7 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   // PageCollector can subscribe to FrameNavigatedWithinDocument and tests
   // can trigger it.
   const mainFrameStub = sinon.createStubInstance(CdpFrame);
+  mainFrameStub.page.returns(pptrPage);
   const mainFrameListener = mockListener();
   mainFrameStub.on.callsFake((eventName, handler) => {
     mainFrameListener.on(eventName, handler);
@@ -223,7 +334,63 @@ export function createMockPuppeteerPage(): sinon.SinonStubbedInstance<Page> {
   // @ts-expect-error internal API
   page._client = sinon.stub().returns(cdpSession);
 
-  return page;
+  const webmcp = sinon.createStubInstance(WebMCP);
+  webmcp.tools.returns([]);
+  Object.defineProperty(page, 'webmcp', {
+    value: webmcp,
+    writable: true,
+    configurable: true,
+  });
+
+  // The real `tracing` getter reads a private field, which throws on a stub
+  // instance, so it is replaced with a stubbed Tracing instance.
+  const tracing = sinon.createStubInstance(Tracing);
+  Object.defineProperty(page, 'tracing', {
+    value: tracing,
+    writable: true,
+    configurable: true,
+  });
+
+  const mouse = sinon.createStubInstance(
+    CdpMouse,
+  ) as unknown as sinon.SinonStubbedInstance<Mouse>;
+  Object.defineProperty(page, 'mouse', {
+    value: mouse,
+    writable: true,
+    configurable: true,
+  });
+
+  const accessibility = sinon.createStubInstance(Accessibility);
+  Object.defineProperty(page, 'accessibility', {
+    value: accessibility,
+    writable: true,
+    configurable: true,
+  });
+
+  page.emulateFocusedPage.resolves();
+  page.evaluateHandle.resolves(createMockElementHandle().handle);
+
+  return Object.assign(page, {
+    webmcp,
+    tracing,
+    mouse,
+    accessibility,
+    cdpSession,
+  });
+}
+
+export function createMockWebMCPTool(options: {
+  name: string;
+  description?: string;
+  inputSchema?: object;
+  annotations?: Protocol.WebMCP.Annotation & {debugging?: boolean};
+}): sinon.SinonStubbedInstance<WebMCPTool> {
+  const tool = sinon.createStubInstance(WebMCPTool);
+  tool.name = options.name;
+  tool.description = options.description ?? '';
+  tool.inputSchema = options.inputSchema;
+  tool.annotations = options.annotations;
+  return tool;
 }
 
 export class MockTarget extends Target {
@@ -258,6 +425,7 @@ export function createMockPuppeteerTarget(
     page?: sinon.SinonStubbedInstance<Page>;
     url?: string;
     title?: string;
+    type?: TargetType;
   } = {},
 ): sinon.SinonStubbedInstance<MockTarget> {
   const target = sinon.createStubInstance(MockTarget);
@@ -265,10 +433,11 @@ export function createMockPuppeteerTarget(
   page.target.returns(target);
   target.page.resolves(page);
   target.asPage.resolves(page);
+  target.type.returns(options.type ?? TargetType.PAGE);
   target.url.returns(options.url ?? 'https://example.com');
   target._getTargetInfo.returns({
     targetId: '<mock-target-id>',
-    type: 'page',
+    type: options.type ?? 'page',
     title: options.title ?? '',
     url: options.url ?? 'https://example.com',
     attached: true,
@@ -279,12 +448,16 @@ export function createMockPuppeteerTarget(
 
 export function createMockMcpPage(
   options: {
-    pptrPage?: sinon.SinonStubbedInstance<Page>;
+    id?: number;
+    pptrPage?: MockPuppeteerPage;
     target?: sinon.SinonStubbedInstance<MockTarget>;
   } = {},
 ): MockMcpPage {
   const page = sinon.createStubInstance(McpPage);
   page.emulationSettings = {};
+  if (options.id !== undefined) {
+    Object.defineProperty(page, 'id', {value: options.id});
+  }
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
@@ -298,6 +471,9 @@ export function createMockMcpPage(
     await action(new AbortController().signal);
     return {};
   });
+  page.getWebMcpTools.returns([]);
+  page.discoverThirdPartyDeveloperTools.resolves([]);
+  page.getWebAuthnAuthenticator.returns(undefined);
   Object.defineProperty(page, 'pptrPage', {
     value: pptrPage,
     writable: true,
@@ -312,11 +488,16 @@ export function createMockMcpPage(
 }
 
 export function createMockDialog(
-  options: {type?: Protocol.Page.DialogType; message?: string} = {},
+  options: {
+    type?: Protocol.Page.DialogType;
+    message?: string;
+    handled?: boolean;
+  } = {},
 ): sinon.SinonStubbedInstance<Dialog> {
   const dialog = sinon.createStubInstance(Dialog);
   dialog.type.returns(options.type ?? 'alert');
   dialog.message.returns(options.message ?? '');
+  sinon.stub(dialog, 'handled').get(() => options.handled ?? false);
   return dialog;
 }
 
@@ -326,6 +507,7 @@ export function createMockElementHandle(): {
 } {
   const handle =
     sinon.createStubInstance<ElementHandle<Element>>(ElementHandle);
+  handle.remoteObject.returns({type: 'object', objectId: '<mock-object-id>'});
   handle.dispose.resolves();
   const locator = sinon.createStubInstance<Locator<Element>>(Locator);
   locator.setTimeout.returns(locator);
@@ -375,13 +557,61 @@ export function createMockMcpWorker(
 }
 
 export function createMockMcpContext(
-  options: {selectedPage?: MockMcpPage} = {},
+  options: {selectedPage?: MockMcpPage; taskRunner?: TaskRunner} = {},
 ): MockMcpContext {
   const context = sinon.createStubInstance(McpContext);
   const page = options.selectedPage ?? createMockMcpPage();
   context.getSelectedMcpPage.returns(page satisfies McpPage);
+  context.getTargetInfos.resolves(new Map());
+  // Real queues, so handler tests observe the real scheduling.
+  const taskRunner = options.taskRunner ?? new TaskRunner();
+  const taskQueue = taskRunner.createQueue();
+  Object.defineProperty(context, 'taskQueue', {value: taskQueue});
+  const pageTaskQueues = new Map<number, TaskQueue>();
+  context.pageTaskQueue.callsFake(pageId => {
+    let queue = pageTaskQueues.get(pageId);
+    if (!queue) {
+      queue = taskRunner.createQueue(taskQueue);
+      pageTaskQueues.set(pageId, queue);
+    }
+    return queue;
+  });
 
   return context;
+}
+
+export function createMockWebAuthnModel(): sinon.SinonStubbedInstance<DevTools.WebAuthnModel.WebAuthnModel> {
+  const model = sinon.createStubInstance(DevTools.WebAuthnModel.WebAuthnModel);
+  model.setVirtualAuthEnvEnabled.resolves();
+  model.getCredentials.resolves([]);
+  return model;
+}
+
+function isAuthenticatorId(
+  id: unknown,
+): id is DevTools.Protocol.WebAuthn.AuthenticatorId {
+  return typeof id === 'string';
+}
+
+export function createMockAuthenticatorId(
+  id: string,
+): DevTools.Protocol.WebAuthn.AuthenticatorId {
+  if (!isAuthenticatorId(id)) {
+    throw new Error(`Invalid authenticator id: ${id}`);
+  }
+  return id;
+}
+
+export function createMockTargetUniverse(
+  model: NonNullable<ReturnType<DevTools.Target['model']>>,
+): TargetUniverse {
+  const target = sinon.createStubInstance(DevTools.Target);
+  target.model.returns(model);
+  return {
+    target,
+    universe: sinon.createStubInstance(DevTools.Foundation.Universe.Universe),
+    session: createMockCDPSession(),
+  };
 }
 
 export function createMockMcpResponse(): MockMcpResponse {
@@ -555,7 +785,7 @@ export function synthesizeRuleTypes(
   ];
   for (const [items, ruleType] of mappings) {
     if (items) {
-      for (const _ of items) {
+      for (let i = 0; i < items.length; i++) {
         ruleTypes.push(ruleType);
       }
     }
@@ -945,7 +1175,7 @@ export function createMockRetainedByContextSummary(): DevTools.HeapSnapshotModel
 
 export function createMockHeapSnapshotAggregateData(): HeapSnapshotAggregateData {
   return {
-    aggregates: {},
+    aggregates: [],
     objectCount: 0,
     totalSelfSize: 0,
   };
@@ -975,33 +1205,59 @@ export function createMockDominatorChain(): DevTools.HeapSnapshotModel.HeapSnaps
   return [];
 }
 
-export function createMockClassDiffs(): HeapSnapshotClassDiff[] {
-  return [
-    {
-      className: 'TestClass',
-      addedCount: 1,
-      removedCount: 0,
-      countDelta: 1,
-      addedSize: 10,
-      removedSize: 0,
-      sizeDelta: 10,
-    },
-  ];
+export function createMockClassDiff(
+  options: Partial<HeapSnapshotClassDiff> = {},
+): HeapSnapshotClassDiff {
+  return {
+    index: options.index ?? 0,
+    className: options.className ?? 'TestClass',
+    addedCount: options.addedCount ?? 1,
+    removedCount: options.removedCount ?? 0,
+    countDelta: options.countDelta ?? 1,
+    addedSize: options.addedSize ?? 10,
+    removedSize: options.removedSize ?? 0,
+    sizeDelta: options.sizeDelta ?? 10,
+  };
 }
 
-export function createMockDetailedClassDiff(): HeapSnapshotDetailedClassDiff {
+export function createMockClassDiffTotals(
+  options: Partial<HeapSnapshotClassDiffTotals> = {},
+): HeapSnapshotClassDiffTotals {
   return {
-    className: 'TestClass',
-    addedCount: 1,
-    removedCount: 0,
-    countDelta: 1,
-    addedSize: 10,
-    removedSize: 0,
-    sizeDelta: 10,
-    addedIds: [1],
-    addedSelfSizes: [10],
-    deletedIds: [],
-    deletedSelfSizes: [],
+    addedCount: options.addedCount ?? 1,
+    removedCount: options.removedCount ?? 0,
+    countDelta: options.countDelta ?? 1,
+    addedSize: options.addedSize ?? 10,
+    removedSize: options.removedSize ?? 0,
+    sizeDelta: options.sizeDelta ?? 10,
+  };
+}
+
+export function createMockHeapSnapshotDiff(
+  options: Partial<HeapSnapshotDiff> = {},
+): HeapSnapshotDiff {
+  return {
+    classDiffs: options.classDiffs ?? [createMockClassDiff()],
+    totals: options.totals ?? createMockClassDiffTotals(),
+  };
+}
+
+export function createMockDiffObject(
+  options: Partial<HeapSnapshotDiffObject> = {},
+): HeapSnapshotDiffObject {
+  return {
+    id: options.id ?? 1,
+    selfSize: options.selfSize ?? 10,
+    change: options.change ?? 'added',
+  };
+}
+
+export function createMockDetailedClassDiff(
+  options: Partial<HeapSnapshotDetailedClassDiff> = {},
+): HeapSnapshotDetailedClassDiff {
+  return {
+    classDiff: options.classDiff ?? createMockClassDiff(),
+    objects: options.objects ?? [createMockDiffObject()],
   };
 }
 
@@ -1117,16 +1373,36 @@ export function createMockContextAnalysisResult(): DevTools.HeapSnapshotModel.He
   };
 }
 
+export function stripUndefined<T extends object>(options: T): T {
+  const result = {...options};
+  for (const [key, value] of Object.entries(result)) {
+    if (value === undefined) {
+      Reflect.deleteProperty(result, key);
+    }
+  }
+  return result;
+}
+
 export function createMockParsedArguments(
   options: Partial<ParsedArguments> = {},
 ): ParsedArguments {
-  const defaultArgs = new ConfigParser(
-    '0.0.0',
-    ['node', 'main.js'],
-    process.env,
-    false,
-  ).parse();
-  return {...defaultArgs, ...options};
+  const defaultArgs = ServerConfig.applyDefaults(
+    {},
+    {suppressUsageStatisticsNotice: true},
+  );
+  return {...defaultArgs, ...stripUndefined(options)};
+}
+
+export function createMockServerConfig(
+  options: Partial<ParsedArguments> = {},
+): ServerConfig {
+  const definedOptions = stripUndefined(options);
+  return new ServerConfig({
+    cliArgs: definedOptions,
+    fileArgs: {},
+    configPath: definedOptions.config,
+    resolved: createMockParsedArguments(definedOptions),
+  });
 }
 
 export function createMockHeapSnapshotNode(
@@ -1159,16 +1435,30 @@ export function createMockHeapSnapshotEdge(
   };
 }
 
-export function createMockAggregatedInfo(
-  options: Partial<AggregatedInfoWithId> = {},
-): AggregatedInfoWithId {
+export function createMockHeapSnapshotAggregate(
+  options: Partial<HeapSnapshotAggregate> = {},
+): HeapSnapshotAggregate {
   return {
+    id: options.id ?? 1,
+    className: options.className ?? 'Object',
     count: options.count ?? 1,
-    distance: options.distance ?? 1,
-    self: options.self ?? 10,
-    maxRet: options.maxRet ?? 100,
-    name: options.name ?? 'Object',
-    idxs: options.idxs ?? [],
-    [stableIdSymbol]: options[stableIdSymbol] ?? 1,
+    selfSize: options.selfSize ?? 10,
+    retainedSize: options.retainedSize ?? 100,
   };
+}
+
+export function createMockConsoleMessage(
+  options: {
+    type?: ConsoleMessageType;
+    text?: string;
+    args?: JSHandle[];
+    location?: ConsoleMessageLocation;
+  } = {},
+): sinon.SinonStubbedInstance<ConsoleMessage> {
+  const message = sinon.createStubInstance(ConsoleMessage);
+  message.type.returns(options.type ?? 'log');
+  message.text.returns(options.text ?? '');
+  message.args.returns(options.args ?? []);
+  message.location.returns(options.location ?? {});
+  return message;
 }

@@ -12,20 +12,18 @@ import {
   assertDaemonIsNotRunning,
   assertDaemonIsRunning,
   runCli,
+  stopDaemonForCleanup,
 } from '../utils.js';
 
 describe('chrome-devtools', () => {
   let sessionId: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
   });
 
   afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
+    await stopDaemonForCleanup(sessionId);
   });
 
   it('reports daemon status correctly', async () => {
@@ -39,5 +37,27 @@ describe('chrome-devtools', () => {
     );
 
     await assertDaemonIsRunning(sessionId);
+  });
+
+  it('does not forward emulate viewport tool arg to daemon startup flags on auto-start', async () => {
+    await assertDaemonIsNotRunning(sessionId);
+
+    const emulateResult = await runCli(
+      ['emulate', '1', '--viewport', '500x400x1'],
+      sessionId,
+    );
+    assert.strictEqual(
+      emulateResult.status,
+      0,
+      `emulate command failed: ${emulateResult.stderr}`,
+    );
+
+    const statusResult = await runCli(['status'], sessionId);
+    assert.strictEqual(
+      statusResult.status,
+      0,
+      `status command failed: ${statusResult.stderr}`,
+    );
+    assert.match(statusResult.stdout, /args=\["--viaCli"\]/);
   });
 });

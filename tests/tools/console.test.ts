@@ -10,17 +10,17 @@ import {before, describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
 
-import type {ParsedArguments} from '../../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
-import type {CdpWebWorker} from '../../src/third_party/index.js';
-import {DevTools} from '../../src/third_party/index.js';
+import {DevTools, type CdpWebWorker} from '../../src/third_party/index.js';
 import {
   getConsoleMessage,
   listConsoleMessages,
 } from '../../src/tools/console.js';
 import {installExtension} from '../../src/tools/extensions.js';
+import {createMockParsedArguments, createMockServerConfig} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {
   getTextContent,
@@ -62,7 +62,7 @@ describe('console', () => {
         const sw = swList.find(s => s.target === swTarget);
         assert(sw, 'Service worker not found in context list');
 
-        const response2 = new McpResponse(args);
+        const response2 = new McpResponse(createMockServerConfig(args));
 
         await context.triggerExtensionAction(extensionId);
         const worker = await swTarget.worker();
@@ -100,7 +100,7 @@ describe('console', () => {
 
         await listConsoleMessages(args).handler(
           {
-            params: {serviceWorkerId: extensionId},
+            params: {serviceWorkerId: sw.id},
             page: context.getSelectedMcpPage(),
           },
           response2,
@@ -142,6 +142,24 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    it('describes the default preserved navigation history', () => {
+      const tool = listConsoleMessages(createMockParsedArguments());
+      assert.strictEqual(
+        tool.schema.includePreservedMessages.description,
+        'Set to true to return the preserved messages over the last 3 navigations.',
+      );
+    });
+
+    it('describes preserved messages using maxNavigationSaved', () => {
+      const tool = listConsoleMessages(
+        createMockParsedArguments({maxNavigationSaved: 5}),
+      );
+      assert.strictEqual(
+        tool.schema.includePreservedMessages.description,
+        'Set to true to return the preserved messages over the last 5 navigations.',
+      );
+    });
+
     it('list messages', async () => {
       await withMcpContext(async (response, context, args) => {
         await listConsoleMessages(args).handler(
@@ -252,6 +270,51 @@ describe('console', () => {
         const formattedResponse = await response.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.ok(textContent.includes('msgid=1 [error] Uncaught  (0 args)'));
+      });
+    });
+
+    it('lists the reason of each unhandled promise rejection', async () => {
+      await withMcpContext(async (_response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(`<script>
+          Promise.reject(new Error('reason-A'));
+          Promise.reject('reason-B');
+          (async () => { throw new TypeError('reason-C'); })();
+        </script>`);
+        // Rejections are reported once the microtask queue drains, after
+        // setContent resolves, so poll until the collector has all three.
+        let textContent = '';
+        await waitExecutionFor(async () => {
+          const pollResponse = new McpResponse(createMockServerConfig(args));
+          pollResponse.setPage(page);
+          await listConsoleMessages(args).handler(
+            {params: {}, page},
+            pollResponse,
+            context,
+          );
+          const formattedResponse = await pollResponse.handle(context);
+          textContent = getTextContent(formattedResponse.content[0]);
+          assert.ok(textContent.includes('msgid=3 '), textContent);
+        }, 5000);
+        assert.ok(
+          textContent.includes(
+            'msgid=1 [error] Uncaught (in promise) Error: reason-A (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(
+          textContent.includes(
+            'msgid=2 [error] Uncaught (in promise) reason-B (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(
+          textContent.includes(
+            'msgid=3 [error] Uncaught (in promise) TypeError: reason-C (0 args)',
+          ),
+          textContent,
+        );
+        assert.ok(!textContent.includes('times]'), textContent);
       });
     });
 
@@ -420,7 +483,7 @@ describe('console', () => {
             response,
             context,
           );
-          const response2 = new McpResponse(args);
+          const response2 = new McpResponse(createMockServerConfig(args));
           response2.setPage(context.getSelectedMcpPage());
           await getConsoleMessage(args).handler(
             {params: {msgid: 1}, page: context.getSelectedMcpPage()},
@@ -476,7 +539,7 @@ describe('console', () => {
             response,
             context,
           );
-          const response2 = new McpResponse(args);
+          const response2 = new McpResponse(createMockServerConfig(args));
           response2.setPage(context.getSelectedMcpPage());
           await getConsoleMessage(args).handler(
             {params: {msgid: id}, page: context.getSelectedMcpPage()},
@@ -493,6 +556,68 @@ describe('console', () => {
             ),
           );
         });
+      });
+    });
+
+    it('uses document locations in stack traces of inline scripts', async () => {
+      server.addHtmlRoute(
+        '/inline.html',
+        `<!doctype html>
+<title>inline</title>
+<script>
+console.error('inline-line-4');
+</script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/inline.html'));
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.match(rawText, /inline-line-4/);
+        assert.match(rawText, /\(inline\.html:4:9\)/);
+        assert.doesNotMatch(rawText, /VM\d+/);
+      });
+    });
+
+    it('uses document locations in stack traces of inline scripts in iframes', async () => {
+      server.addHtmlRoute(
+        '/inline.html',
+        `<!doctype html>
+<title>inline</title>
+<script>
+console.error('inline-line-4');
+</script>`,
+      );
+      server.addHtmlRoute(
+        '/outer.html',
+        `<!doctype html>
+<title>outer</title>
+<iframe src="${server.getRoute('/inline.html')}"></iframe>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/outer.html'));
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.match(rawText, /inline-line-4/);
+        assert.match(rawText, /\(inline\.html:4:9\)/);
+        assert.doesNotMatch(rawText, /VM\d+/);
       });
     });
 
@@ -609,6 +734,37 @@ describe('console', () => {
         const rawText = getTextContent(formattedResponse.content[0]);
 
         t.assert.snapshot(rawText);
+      });
+    });
+
+    it('resolves the cause of an uncaught exception thrown after load', async () => {
+      server.addHtmlRoute(
+        '/index.html',
+        `<!DOCTYPE html><script>
+          window.addEventListener('load', () => {
+            setTimeout(() => {
+              window.thrown = true;
+              throw new Error('outer', {cause: new Error('inner')});
+            }, 100);
+          });
+        </script>`,
+      );
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/index.html'));
+        await page.pptrPage.waitForFunction(() => 'thrown' in window);
+
+        await getConsoleMessage(args).handler(
+          {params: {msgid: 1}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const rawText = getTextContent(formattedResponse.content[0]);
+
+        assert.ok(rawText.includes('Uncaught Error: outer'), rawText);
+        assert.ok(rawText.includes('Caused by: Error: inner'), rawText);
       });
     });
 

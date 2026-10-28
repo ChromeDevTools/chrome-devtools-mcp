@@ -4,7 +4,94 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
+import {
+  createTargetUniverse,
+  type TargetUniverse,
+} from './devtools/DevtoolsUtils.js';
+import {
+  ConsoleCollector,
+  NetworkCollector,
+  type ListenerMap,
+  type UncaughtError,
+} from './collectors/PageCollector.js';
+import {TextSnapshot} from './TextSnapshot.js';
+import {
+  type Locator,
+  PredefinedNetworkConditions,
+  type Dialog,
+  type ElementHandle,
+  type Frame,
+  type Viewport,
+  type WebMCPTool,
+  type Protocol,
+  type Page,
+  type Target,
+  type ConsoleMessage,
+  type HTTPRequest,
+  DevTools,
+  type Flags,
+  type JSONSchema7Definition,
+  lighthouseNavigation,
+  lighthouseSnapshot,
+  type RunnerResult,
+} from './third_party/index.js';
+import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
+import type {
+  ContextPage,
+  DevToolsData,
+  MatchedStyles,
+  Response,
+  ScreenRecorderData,
+  WebAuthnAuthenticatorConfig,
+  WebAuthnAuthenticatorState,
+} from './tools/ToolDefinition.js';
+import type {
+  EmulationSettings,
+  ForcedColors,
+  GeolocationOptions,
+  PrefersContrast,
+  PrefersReducedMotion,
+  TextSnapshotNode,
+} from './types.js';
+import {getErrorMessage} from './utils/errorHandling.js';
+import {logger} from './utils/logger.js';
+import {
+  getNetworkMultiplierFromString,
+  WaitForHelper,
+  type WaitForEventsResult,
+  type DialogAction,
+} from './utils/WaitForHelper.js';
+
+const WEBAUTHN_PROTOCOLS = {
+  ctap2: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.Ctap2,
+  u2f: DevTools.Protocol.WebAuthn.AuthenticatorProtocol.U2f,
+};
+
+const WEBAUTHN_TRANSPORTS = {
+  internal: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Internal,
+  usb: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Usb,
+  nfc: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Nfc,
+  ble: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Ble,
+  hybrid: DevTools.Protocol.WebAuthn.AuthenticatorTransport.Hybrid,
+};
+
+interface WebAuthnAuthenticator {
+  id: DevTools.Protocol.WebAuthn.AuthenticatorId;
+  options: Omit<WebAuthnAuthenticatorState, 'credentials'>;
+}
+
+const WEBAUTHN_CREATION_OPTIONS = [
+  'protocol',
+  'transport',
+  'hasResidentKey',
+  'hasUserVerification',
+] as const;
+
+export function replaceHtmlElementsWithUids(
+  schema: JSONSchema7Definition,
+): void {
   if (typeof schema === 'boolean') {
     return;
   }
@@ -55,54 +142,29 @@ export function replaceHtmlElementsWithUids(schema: JSONSchema7Definition) {
   }
 }
 
-import {DevToolsCommentBridge} from './devtools/DevToolsCommentBridge.js';
-import {
-  createTargetUniverse,
-  type TargetUniverse,
-} from './devtools/DevtoolsUtils.js';
-import {
-  ConsoleCollector,
-  NetworkCollector,
-  type ListenerMap,
-  type UncaughtError,
-} from './collectors/PageCollector.js';
-import {TextSnapshot} from './TextSnapshot.js';
-import type {Locator} from './third_party/index.js';
-import {
-  PredefinedNetworkConditions,
-  type Dialog,
-  type ElementHandle,
-  type Viewport,
-  type WebMCPTool,
-  type Protocol,
-  type Page,
-  type Target,
-  type ConsoleMessage,
-  type HTTPRequest,
-  DevTools,
-  type JSONSchema7Definition,
-} from './third_party/index.js';
-import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
+function isDebuggingWebMcpTool(tool: WebMCPTool): boolean {
+  return Boolean(
+    tool.annotations &&
+    'debugging' in tool.annotations &&
+    tool.annotations.debugging === true,
+  );
+}
+
 const DEFAULT_TIMEOUT = 5_000;
 const NAVIGATION_TIMEOUT = 10_000;
-import type {
-  ContextPage,
-  DevToolsData,
-  MatchedStyles,
-  Response,
-} from './tools/ToolDefinition.js';
-import type {
-  EmulationSettings,
-  GeolocationOptions,
-  TextSnapshotNode,
-} from './types.js';
-import {logger} from './utils/logger.js';
-import {
-  getNetworkMultiplierFromString,
-  WaitForHelper,
-  type WaitForEventsResult,
-  type DialogAction,
-} from './utils/WaitForHelper.js';
+
+/**
+ * Chrome reports a URL-derived placeholder as the target title until the
+ * document provides one. The placeholder omits the `http://` / `https://`
+ * scheme and the trailing slash of a bare hostname.
+ */
+function isPlaceholderTitle(title: string, url: string): boolean {
+  if (title === url) {
+    return true;
+  }
+  const withoutScheme = url.replace(/^https?:\/\//, '');
+  return title === withoutScheme || title === withoutScheme.replace(/\/$/, '');
+}
 
 function isBackendNodeId(
   id: unknown,
@@ -124,12 +186,13 @@ export class McpPage implements ContextPage {
 
   #pptrPage?: Page;
   #initPromise?: Promise<void>;
+  #focusEmulationRequested = false;
   #disposed = false;
   #closed = false;
 
   // Snapshot
   textSnapshot: TextSnapshot | null = null;
-  uniqueBackendNodeIdToMcpId = new Map<string, string>();
+  uniqueBackendNodeIdToMcpId: Map<string, string> = new Map<string, string>();
   extraHandles: ElementHandle[] = [];
 
   // Emulation
@@ -138,46 +201,53 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   #devtoolsUniverse?: TargetUniverse;
+  #webAuthnEnabled = false;
+  #webAuthnAuthenticator?: WebAuthnAuthenticator;
 
   // Dialog
   #dialog?: Dialog;
   #dialogHandler: (dialog: Dialog) => void;
 
-  thirdPartyDeveloperTools: ToolGroups = [];
+  // Screencast
+  #screenRecorder: ScreenRecorderData | null = null;
+
+  // Performance trace
+  #isRunningPerformanceTrace = false;
 
   #networkCollector?: NetworkCollector;
   #consoleCollector?: ConsoleCollector;
 
-  #hasNetworkBlockOrAllowlist: boolean;
   #locatorClass: typeof Locator;
   #navigationTimeout: number;
-  #sourceMaps: boolean;
+  #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
-  #onNotification?: (message: string) => void;
 
   constructor(
     target: Target,
     id: number,
     options: {
-      hasNetworkBlockOrAllowlist: boolean;
+      config: ReadonlyServerConfig;
       locatorClass: typeof Locator;
       isolatedContextName?: string;
       navigationTimeout?: number;
-      sourceMaps?: boolean;
-      onNotification?: (message: string) => void;
     },
   ) {
-    this.#hasNetworkBlockOrAllowlist = options.hasNetworkBlockOrAllowlist;
+    this.#config = options.config;
     this.#locatorClass = options.locatorClass;
     this.#navigationTimeout = options.navigationTimeout ?? NAVIGATION_TIMEOUT;
-    this.#sourceMaps = options.sourceMaps ?? true;
-    this.#onNotification = options.onNotification;
     this.target = target;
     this.id = id;
     this.isolatedContextName = options.isolatedContextName;
     this.#dialogHandler = (dialog: Dialog): void => {
       this.#dialog = dialog;
     };
+  }
+
+  get #hasNetworkBlockOrAllowlist(): boolean {
+    return Boolean(
+      this.#config.resolved.allowedUrlPattern ||
+      this.#config.resolved.blockedUrlPattern,
+    );
   }
 
   get pptrPage(): Page {
@@ -212,13 +282,29 @@ export class McpPage implements ContextPage {
   }
 
   url(): string {
-    return this.#pptrPage ? this.#pptrPage.url() : this.target.url();
+    return this.#pptrPage?.url() ?? this.target.url();
   }
 
-  getTitle(): string {
+  get targetId(): string {
     // @ts-expect-error internal types
-    const info = this.target._getTargetInfo();
-    return info.title !== this.target.url() ? info.title : '';
+    const info: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    return info.targetId;
+  }
+
+  /**
+   * Returns the page title or an empty string if the target only has Chrome's
+   * URL-based placeholder title.
+   *
+   * Puppeteer's cached target info is only refreshed by
+   * `Target.targetInfoChanged`, which Chrome emits on navigation commit (before
+   * the document title is known) but not on title changes. Callers should pass
+   * fresh target info (e.g., from `Target.getTargets`) when available.
+   */
+  getTitle(freshTargetInfo?: Protocol.Target.TargetInfo): string {
+    // @ts-expect-error internal types
+    const cachedInfo: Protocol.Target.TargetInfo = this.target._getTargetInfo();
+    const info = freshTargetInfo ?? cachedInfo;
+    return isPlaceholderTitle(info.title, info.url) ? '' : info.title;
   }
 
   isClosed(): boolean {
@@ -241,19 +327,26 @@ export class McpPage implements ContextPage {
     await page?.close({runBeforeUnload: false});
   }
 
-  async init(): Promise<void> {
+  async init(options?: {emulateFocus?: boolean}): Promise<void> {
     if (this.#disposed) {
       throw new Error(`McpPage (id=${this.id}) has already been disposed.`);
     }
-    if (this.#initPromise) {
-      return this.#initPromise;
+    if (!this.#initPromise) {
+      this.#initPromise = this.#doInit().catch(err => {
+        this.#initPromise = undefined;
+        throw err;
+      });
     }
-    this.#initPromise = this.#doInit();
-    try {
-      await this.#initPromise;
-    } catch (err) {
-      this.#initPromise = undefined;
-      throw err;
+    await this.#initPromise;
+    // Discovery skips focus emulation, but a later page tool still needs it.
+    if (
+      options?.emulateFocus !== false &&
+      !this.#disposed &&
+      !this.#focusEmulationRequested
+    ) {
+      // Prevent duplicate requests while pending and after success.
+      this.#focusEmulationRequested = true;
+      this.#initFocusEmulationNoThrow();
     }
   }
 
@@ -270,34 +363,39 @@ export class McpPage implements ContextPage {
       }
       this.#pptrPage = page;
       page.on('dialog', this.#dialogHandler);
-      this.#networkCollector = new NetworkCollector(page);
-      this.#consoleCollector = new ConsoleCollector(page, collect => {
-        return {
-          console: event => {
-            collect(event);
-          },
-          uncaughtError: event => {
-            collect(event);
-          },
-          devtoolsAggregatedIssue: event => {
-            collect(event);
-          },
-        };
+      this.#networkCollector = new NetworkCollector(page, {
+        maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
       });
+      this.#consoleCollector = new ConsoleCollector(
+        page,
+        collect => {
+          return {
+            console: event => {
+              collect(event);
+            },
+            uncaughtError: event => {
+              collect(event);
+            },
+            devtoolsAggregatedIssue: event => {
+              collect(event);
+            },
+          };
+        },
+        {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
+      );
     }
     this.updateTimeouts();
-    await Promise.allSettled([
-      this.#initDevToolsUniverseNoThrow(),
-      this.#initFocusEmulationNoThrow(),
-    ]);
+    await this.#initDevToolsUniverseNoThrow();
     if (this.#disposed) {
       this.dispose();
     }
   }
 
-  async #initFocusEmulationNoThrow(): Promise<void> {
-    // We emulate a focused page for all pages to support multi-agent workflows.
+  #initFocusEmulationNoThrow(): void {
+    // Background pages need emulated focus for multi-agent workflows.
     void this.pptrPage.emulateFocusedPage(true).catch(error => {
+      // Allow the next page operation to retry a transient failure.
+      this.#focusEmulationRequested = false;
       logger?.('Error turning on focused page emulation', error);
     });
   }
@@ -309,18 +407,162 @@ export class McpPage implements ContextPage {
     try {
       const session = await this.pptrPage.createCDPSession();
       this.#devtoolsUniverse = await createTargetUniverse(session, {
-        sourceMaps: this.#sourceMaps,
+        sourceMaps: this.#config.resolved.sourceMaps,
       });
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
   }
 
+  syncSourceMaps(): void {
+    if (!this.#devtoolsUniverse) {
+      return;
+    }
+    const sourceMaps = this.#config.resolved.sourceMaps;
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.jsSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+    this.#devtoolsUniverse.universe.settings
+      .resolve(DevTools.SDKSettings.cssSourceMapsEnabledSettingDescriptor)
+      .set(sourceMaps);
+  }
+
   get devtoolsUniverse(): TargetUniverse | undefined {
     return this.#devtoolsUniverse;
   }
 
+  getWebAuthnAuthenticator():
+    Omit<WebAuthnAuthenticatorState, 'credentials'> | undefined {
+    return (
+      this.#webAuthnAuthenticator && {
+        ...this.#webAuthnAuthenticator.options,
+      }
+    );
+  }
+
+  async configureWebAuthn(
+    config: WebAuthnAuthenticatorConfig,
+  ): Promise<WebAuthnAuthenticatorState | undefined> {
+    const model = this.devtoolsUniverse?.target.model(
+      DevTools.WebAuthnModel.WebAuthnModel,
+    );
+    if (!model) {
+      throw new Error(`WebAuthn is not available for page ${this.id}.`);
+    }
+    const options = config.enabled
+      ? this.#resolveWebAuthnOptions(config)
+      : undefined;
+    try {
+      return await this.#applyWebAuthnConfig(model, options);
+    } catch (error) {
+      const orphan = this.#webAuthnAuthenticator;
+      this.#webAuthnEnabled = false;
+      this.#webAuthnAuthenticator = undefined;
+      if (orphan) {
+        try {
+          await model.removeAuthenticator(orphan.id);
+        } catch {
+          // Already gone, e.g. another client disabled the environment.
+        }
+      }
+      throw new Error(
+        `Failed to configure WebAuthn for page ${this.id}: ${getErrorMessage(error)}`,
+        {cause: error},
+      );
+    }
+  }
+
+  #resolveWebAuthnOptions(
+    config: WebAuthnAuthenticatorConfig,
+  ): WebAuthnAuthenticator['options'] {
+    const current = this.#webAuthnAuthenticator?.options;
+    const protocol = config.protocol ?? current?.protocol ?? 'ctap2';
+    const transport = config.transport ?? current?.transport ?? 'internal';
+    const isUserVerified =
+      config.isUserVerified ?? current?.isUserVerified ?? true;
+    if (protocol === 'u2f') {
+      if (config.hasResidentKey || config.hasUserVerification) {
+        throw new Error(
+          `protocol 'u2f' does not support hasResidentKey or hasUserVerification. Set them to false or omit them.`,
+        );
+      }
+      return {
+        protocol,
+        transport,
+        hasResidentKey: false,
+        hasUserVerification: false,
+        isUserVerified,
+      };
+    }
+    return {
+      protocol,
+      transport,
+      hasResidentKey: config.hasResidentKey ?? current?.hasResidentKey ?? true,
+      hasUserVerification:
+        config.hasUserVerification ?? current?.hasUserVerification ?? true,
+      isUserVerified,
+    };
+  }
+
+  async #applyWebAuthnConfig(
+    model: DevTools.WebAuthnModel.WebAuthnModel,
+    options: WebAuthnAuthenticator['options'] | undefined,
+  ): Promise<WebAuthnAuthenticatorState | undefined> {
+    if (!options) {
+      this.#webAuthnAuthenticator = undefined;
+      this.#webAuthnEnabled = false;
+      await model.setVirtualAuthEnvEnabled(false);
+      return undefined;
+    }
+    if (!this.#webAuthnEnabled) {
+      await model.setVirtualAuthEnvEnabled(true, false);
+      this.#webAuthnEnabled = true;
+    }
+
+    const current = this.#webAuthnAuthenticator;
+    let authenticator = current;
+    if (
+      !authenticator ||
+      WEBAUTHN_CREATION_OPTIONS.some(
+        key => options[key] !== authenticator?.options[key],
+      )
+    ) {
+      if (authenticator) {
+        await model.removeAuthenticator(authenticator.id);
+        this.#webAuthnAuthenticator = undefined;
+      }
+      const id = await model.addAuthenticator({
+        ...options,
+        protocol: WEBAUTHN_PROTOCOLS[options.protocol],
+        transport: WEBAUTHN_TRANSPORTS[options.transport],
+        automaticPresenceSimulation: true,
+      });
+      authenticator = {id, options};
+      this.#webAuthnAuthenticator = authenticator;
+    } else if (
+      options.isUserVerified !== authenticator.options.isUserVerified
+    ) {
+      await model.setUserVerified(authenticator.id, options.isUserVerified);
+      authenticator.options.isUserVerified = options.isUserVerified;
+    }
+
+    const credentials = await model.getCredentials(authenticator.id);
+    return {
+      ...authenticator.options,
+      credentials: credentials.map(credential => ({
+        credentialId: credential.credentialId,
+        rpId: credential.rpId,
+        isResidentCredential: credential.isResidentCredential,
+        userName: credential.userName,
+        signCount: credential.signCount,
+      })),
+    };
+  }
+
   getDialog(): Dialog | undefined {
+    if (this.#dialog?.handled) {
+      this.#dialog = undefined;
+    }
     return this.#dialog;
   }
 
@@ -328,32 +570,65 @@ export class McpPage implements ContextPage {
     this.#dialog = undefined;
   }
 
+  getScreenRecorder(): ScreenRecorderData | null {
+    return this.#screenRecorder;
+  }
+
+  setScreenRecorder(data: ScreenRecorderData | null): void {
+    this.#screenRecorder = data;
+  }
+
+  isRunningPerformanceTrace(): boolean {
+    return this.#isRunningPerformanceTrace;
+  }
+
+  setIsRunningPerformanceTrace(x: boolean): void {
+    this.#isRunningPerformanceTrace = x;
+  }
+
   throwIfDialogOpen(): void {
-    if (this.#dialog && !this.#dialog.handled) {
+    const dialog = this.getDialog();
+    if (dialog) {
       throw new Error(
-        `A dialog is open (${this.#dialog.type()}: ${this.#dialog.message()}).`,
+        `A dialog is open (${dialog.type()}: ${dialog.message()}).`,
       );
     }
   }
 
-  getThirdPartyDeveloperTools(): ToolGroups {
-    return this.thirdPartyDeveloperTools;
+  #getDebuggingWebMcpToolGroups(): ToolGroups {
+    const webmcpTools = this.pptrPage.webmcp
+      .tools()
+      .filter(isDebuggingWebMcpTool);
+    if (webmcpTools.length === 0) {
+      return [];
+    }
+    return [
+      {
+        name: 'WebMCP Tools',
+        description: 'Tools exposed via WebMCP',
+        tools: webmcpTools.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: structuredClone(tool.inputSchema ?? {}),
+        })),
+      },
+    ];
   }
 
-  async getToolGroups(): Promise<ToolGroups> {
+  async discoverThirdPartyDeveloperTools(): Promise<ToolGroups> {
     // Check if there is a `devtoolstooldiscovery` event listener
     using windowHandle = await this.pptrPage.evaluateHandle(() => window);
     // @ts-expect-error internal API
     const client = this.pptrPage._client();
-    const {listeners}: {listeners: Protocol.DOMDebugger.EventListener[]} =
+    const {listeners = []}: {listeners?: Protocol.DOMDebugger.EventListener[]} =
       await client.send('DOMDebugger.getEventListeners', {
         objectId: windowHandle.remoteObject().objectId,
       });
     if (listeners.find(l => l.type === 'devtoolstooldiscovery') === undefined) {
-      return [];
+      return this.#getDebuggingWebMcpToolGroups();
     }
 
-    const toolGroups = await this.pptrPage.evaluate(() => {
+    const eventToolGroups = await this.pptrPage.evaluate(() => {
       if (window.__dtmcp) {
         window.__dtmcp.toolGroups = [];
       }
@@ -430,19 +705,19 @@ export class McpPage implements ContextPage {
       });
     });
 
-    for (const group of toolGroups) {
+    for (const group of eventToolGroups) {
       for (const tool of group.tools ?? []) {
         replaceHtmlElementsWithUids(tool.inputSchema);
       }
     }
 
-    this.thirdPartyDeveloperTools = toolGroups;
-
-    return toolGroups;
+    return [...this.#getDebuggingWebMcpToolGroups(), ...eventToolGroups];
   }
 
   getWebMcpTools(): WebMCPTool[] {
-    return this.pptrPage.webmcp.tools();
+    return this.pptrPage.webmcp
+      .tools()
+      .filter(tool => !isDebuggingWebMcpTool(tool));
   }
 
   resolveCdpRequestId(cdpRequestId: string): number | undefined {
@@ -478,16 +753,23 @@ export class McpPage implements ContextPage {
     return this.#commentBridge;
   }
 
+  disposeCommentBridge(): void {
+    this.#commentBridge?.dispose();
+    this.#commentBridge = undefined;
+  }
+
+  /**
+   * Returns the comment bridge attached to the DevTools page, or undefined if
+   * the DevTools page does not support DevTools comments.
+   */
   async ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge> {
+  ): Promise<DevToolsCommentBridge | undefined> {
     if (!this.#commentBridge) {
-      this.#commentBridge = new DevToolsCommentBridge({
-        onNotification: this.#onNotification,
-      });
+      this.#commentBridge = new DevToolsCommentBridge();
     }
-    await this.#commentBridge.attach(devtoolsPage);
-    return this.#commentBridge;
+    const attached = await this.#commentBridge.attach(devtoolsPage);
+    return attached ? this.#commentBridge : undefined;
   }
 
   async getDevToolsPage(): Promise<Page | undefined> {
@@ -506,7 +788,9 @@ export class McpPage implements ContextPage {
 
   async openDevTools(): Promise<Page | undefined> {
     const devtoolsPage = await this.pptrPage.openDevTools();
-    await this.ensureDevToolsCommentBridge(devtoolsPage);
+    if (this.#config.resolved.devtoolsComments) {
+      await this.ensureDevToolsCommentBridge(devtoolsPage);
+    }
     return devtoolsPage;
   }
 
@@ -550,6 +834,18 @@ export class McpPage implements ContextPage {
     return this.emulationSettings.colorScheme ?? null;
   }
 
+  get forcedColors(): ForcedColors | null {
+    return this.emulationSettings.forcedColors ?? null;
+  }
+
+  get prefersContrast(): PrefersContrast | null {
+    return this.emulationSettings.prefersContrast ?? null;
+  }
+
+  get prefersReducedMotion(): PrefersReducedMotion | null {
+    return this.emulationSettings.prefersReducedMotion ?? null;
+  }
+
   // Public for testability: tests spy on this method to verify throttle multipliers.
   createWaitForHelper(
     cpuMultiplier: number,
@@ -577,13 +873,21 @@ export class McpPage implements ContextPage {
 
   dispose(): void {
     this.#disposed = true;
-    this.#commentBridge?.dispose();
-    this.#commentBridge = undefined;
+    this.#isRunningPerformanceTrace = false;
+    this.disposeCommentBridge();
+    if (this.#screenRecorder) {
+      const {recorder} = this.#screenRecorder;
+      this.#screenRecorder = null;
+      void recorder.stop().catch(e => {
+        logger?.('Failed to stop screencast recording on dispose', e);
+      });
+    }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
+    this.#webAuthnAuthenticator = undefined;
     devtoolsUniverse?.universe.dispose();
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
@@ -595,6 +899,26 @@ export class McpPage implements ContextPage {
     params: Record<string, unknown>,
     response: Response,
   ): Promise<void> {
+    const webmcpTool = this.pptrPage.webmcp
+      .tools()
+      .find(t => t.name === toolName && isDebuggingWebMcpTool(t));
+    if (webmcpTool) {
+      const {status, output, errorText, exception} =
+        await webmcpTool.execute(params);
+      if (status !== 'Completed') {
+        const error = exception?.description ?? exception?.value ?? errorText;
+        throw new Error(
+          error ? String(error) : `Tool execution failed: ${status}`,
+        );
+      }
+      if (output !== undefined) {
+        response.appendResponseLine(JSON.stringify(output, null, 2));
+      } else {
+        response.appendResponseLine('Tool returned no result.');
+      }
+      return;
+    }
+
     // Creates array of ElementHandles from the UIDs in the params.
     // We do not replace the uids with the ElementsHandles yet, because
     // the `evaluate` function only turns them into DOM elements if they
@@ -633,7 +957,7 @@ export class McpPage implements ContextPage {
 
         const stashedElements: Element[] = [];
 
-        const stashDOMElement = (el: Element) => {
+        const stashDOMElement = (el: Element): {stashedId: string} => {
           stashedElements.push(el);
           return {
             stashedId: `stashed-${stashedElements.length - 1}`,
@@ -791,7 +1115,7 @@ export class McpPage implements ContextPage {
           node.stashedId.startsWith('stashed-') &&
           Object.keys(node).length === 1
         ) {
-          const index = parseInt(node.stashedId.split('-')[1]);
+          const index = parseInt(node.stashedId.split('-')[1], 10);
           return {uid: cdpElementIds[index]};
         }
         const resultObj: Record<string, unknown> = {};
@@ -822,7 +1146,7 @@ export class McpPage implements ContextPage {
     if (!node) {
       throw new Error(`Element uid "${uid}" not found on page ${this.id}.`);
     }
-    return this.#resolveElementHandle(node, uid);
+    return await this.#resolveElementHandle(node, uid);
   }
 
   async #resolveElementHandle(
@@ -843,7 +1167,7 @@ export class McpPage implements ContextPage {
     }
   }
 
-  getAXNodeByUid(uid: string) {
+  getAXNodeByUid(uid: string): TextSnapshotNode | undefined {
     return this.textSnapshot?.idToNode.get(uid);
   }
 
@@ -963,10 +1287,11 @@ export class McpPage implements ContextPage {
         logger?.('No DevTools page detected');
         return {};
       }
-      await this.ensureDevToolsCommentBridge(devtoolsPage);
+      if (this.#config.resolved.devtoolsComments) {
+        await this.ensureDevToolsCommentBridge(devtoolsPage);
+      }
       const {cdpRequestId, cdpBackendNodeId} = await devtoolsPage.evaluate(
         async () => {
-          window.universe?.cd4aBridge?.setAgentAttached(true);
           // @ts-expect-error no types
           const UI = await import('/bundled/ui/legacy/legacy.js');
           // @ts-expect-error no types
@@ -990,9 +1315,37 @@ export class McpPage implements ContextPage {
     return {};
   }
 
-  async restoreEmulation() {
+  async restoreEmulation(): Promise<void> {
     const currentSetting = this.emulationSettings;
+    const {viewport} = currentSetting;
+    if (viewport) {
+      // Lighthouse's CDP session replaces the device metrics override and
+      // clears it on detach, and Chrome ignores an override identical to the
+      // last one this session sent. A different width first makes the real
+      // call take effect without a reload (`isMobile` and `hasTouch` stay the
+      // same). This also runs after snapshot audits and fires a resize event,
+      // so do not remove it as redundant.
+      await this.pptrPage.setViewport({
+        ...viewport,
+        width: Math.max(1, viewport.width - 1),
+      });
+    }
     await this.emulate(currentSetting);
+  }
+
+  async #emulateMediaFeatures(settings: EmulationSettings): Promise<void> {
+    // `page.emulateMediaFeatures` replaces all previously emulated media
+    // features, so every supported feature is sent on each call. An empty
+    // value disables the override for that feature.
+    await this.pptrPage.emulateMediaFeatures([
+      {name: 'prefers-color-scheme', value: settings.colorScheme ?? ''},
+      {name: 'forced-colors', value: settings.forcedColors ?? ''},
+      {name: 'prefers-contrast', value: settings.prefersContrast ?? ''},
+      {
+        name: 'prefers-reduced-motion',
+        value: settings.prefersReducedMotion ?? '',
+      },
+    ]);
   }
 
   async emulate(options: {
@@ -1001,6 +1354,9 @@ export class McpPage implements ContextPage {
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
     extraHttpHeaders?: Record<string, string> | undefined;
   }): Promise<void> {
@@ -1054,7 +1410,7 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.geolocation) {
-      await page.setGeolocation({latitude: 0, longitude: 0});
+      await page.setGeolocation(null);
       delete newSettings.geolocation;
     } else {
       await page.setGeolocation(options.geolocation);
@@ -1070,16 +1426,33 @@ export class McpPage implements ContextPage {
     }
 
     if (!options.colorScheme || options.colorScheme === 'auto') {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: ''},
-      ]);
       delete newSettings.colorScheme;
     } else {
-      await page.emulateMediaFeatures([
-        {name: 'prefers-color-scheme', value: options.colorScheme},
-      ]);
       newSettings.colorScheme = options.colorScheme;
     }
+
+    if (!options.forcedColors || options.forcedColors === 'auto') {
+      delete newSettings.forcedColors;
+    } else {
+      newSettings.forcedColors = options.forcedColors;
+    }
+
+    if (!options.prefersContrast || options.prefersContrast === 'auto') {
+      delete newSettings.prefersContrast;
+    } else {
+      newSettings.prefersContrast = options.prefersContrast;
+    }
+
+    if (
+      !options.prefersReducedMotion ||
+      options.prefersReducedMotion === 'auto'
+    ) {
+      delete newSettings.prefersReducedMotion;
+    } else {
+      newSettings.prefersReducedMotion = options.prefersReducedMotion;
+    }
+
+    await this.#emulateMediaFeatures(newSettings);
 
     if (!options.viewport) {
       delete newSettings.viewport;
@@ -1101,61 +1474,151 @@ export class McpPage implements ContextPage {
       }
     }
 
+    const previousViewport = this.emulationSettings.viewport;
     this.emulationSettings = Object.keys(newSettings).length ? newSettings : {};
 
     this.updateTimeouts();
 
     // This should happen after updating the page timeouts.
     // Setting the viewport can trigger a reload which we don't want to timeout.
-    await page.setViewport(newSettings.viewport ?? null);
+    try {
+      await page.setViewport(newSettings.viewport ?? null);
+    } catch (error) {
+      if (previousViewport) {
+        newSettings.viewport = previousViewport;
+      } else {
+        delete newSettings.viewport;
+      }
+      this.emulationSettings = Object.keys(newSettings).length
+        ? newSettings
+        : {};
+      throw error;
+    }
   }
 
-  updateTimeouts() {
+  async clearNetworkConditions(): Promise<void> {
+    if (!this.emulationSettings.networkConditions) {
+      return;
+    }
+    await this.#pptrPage?.emulateNetworkConditions(null);
+    delete this.emulationSettings.networkConditions;
+    this.updateTimeouts();
+  }
+
+  updateTimeouts(): void {
     if (!this.#pptrPage) {
       return;
     }
     // For waiters 5sec timeout should be sufficient.
     // Increased in case we throttle the CPU
     const cpuMultiplier = this.cpuThrottlingRate;
-    this.#pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
+    this.pptrPage.setDefaultTimeout(DEFAULT_TIMEOUT * cpuMultiplier);
     // 10sec should be enough for the load event to be emitted during
     // navigations.
     // Increased in case we throttle the network requests or the CPU
     const networkMultiplier = getNetworkMultiplierFromString(
       this.networkConditions,
     );
-    this.#pptrPage.setDefaultNavigationTimeout(
+    this.pptrPage.setDefaultNavigationTimeout(
       this.#navigationTimeout * networkMultiplier * cpuMultiplier,
     );
   }
 
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element> {
-    const frames = this.pptrPage.frames();
+  waitForTextOnPage(
+    text: string[],
+    options: {timeout?: number; visible?: boolean} = {},
+  ): Promise<Element> {
+    const {timeout, visible} = options;
+    const page = this.pptrPage;
+    const initialFrames = page.frames();
+    const observedFrames = new Set(initialFrames);
+    const controller = new AbortController();
 
-    let locator = this.#locatorClass.race(
-      frames.flatMap(frame =>
-        text.flatMap(value => [
-          frame.locator(`aria/${value}`),
-          frame.locator(`text/${value}`),
-        ]),
-      ),
-    );
+    const locatorForFrames = (frames: Frame[]): Locator<Element> =>
+      this.#locatorClass.race(
+        frames.flatMap(frame =>
+          text.flatMap(value => {
+            const locators = [
+              frame.locator(`aria/${value}`),
+              frame.locator(`text/${value}`),
+            ];
+            return visible
+              ? locators.map(locator => locator.setVisibility('visible'))
+              : locators;
+          }),
+        ),
+      );
 
+    let initialLocator = locatorForFrames(initialFrames);
     if (timeout) {
-      locator = locator.setTimeout(timeout);
+      initialLocator = initialLocator.setTimeout(timeout);
     }
 
-    return locator.wait();
+    return new Promise<Element>((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): boolean => {
+        if (settled) {
+          return false;
+        }
+        settled = true;
+        page.off('frameattached', onFrameAttached);
+        controller.abort();
+        return true;
+      };
+      const finish = (element: Element): void => {
+        if (cleanup()) {
+          resolve(element);
+        }
+      };
+      const fail = (error: unknown): void => {
+        if (cleanup()) {
+          reject(error);
+        }
+      };
+      const onFrameAttached = (frame: Frame): void => {
+        if (observedFrames.has(frame)) {
+          return;
+        }
+        observedFrames.add(frame);
+        // The initial locator race does not include frames added later.
+        // Watch each new frame until the initial race resolves or times out.
+        // A timeout of 0 disables the frame timer; controller.abort() stops it.
+        void locatorForFrames([frame])
+          .setTimeout(0)
+          .wait({signal: controller.signal})
+          .then(finish, error => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            logger?.('Failed to wait for text in an attached frame', error);
+          });
+      };
+
+      page.on('frameattached', onFrameAttached);
+      void initialLocator.wait({signal: controller.signal}).then(finish, fail);
+    });
+  }
+
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseNavigation(this.pptrPage, this.pptrPage.url(), {
+      flags,
+    });
+  }
+
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined> {
+    return lighthouseSnapshot(this.pptrPage, {
+      flags,
+    });
   }
 
   /**
    * We need to ignore favicon request as they make our test flaky
    */
-  async setUpNetworkCollectorForTesting() {
+  async setUpNetworkCollectorForTesting(): Promise<void> {
     this.networkCollector.dispose();
     this.networkCollector = new NetworkCollector(
       this.pptrPage,
-      undefined,
+      {maxNavigationSaved: this.#config.resolved.maxNavigationSaved},
       collect => {
         return {
           request: req => {

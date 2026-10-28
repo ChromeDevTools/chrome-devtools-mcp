@@ -9,7 +9,7 @@ You are acting as a troubleshooting wizard to help the user configure and fix th
 
 ### Step 1: Find and Read Configuration
 
-Your first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `gemini-extension.json`, `.claude/settings.json`, `.vscode/launch.json`, or `.gemini/settings.json`.
+Your first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `.vscode/mcp.json`, `gemini-extension.json`, or `.gemini/settings.json` (or user-scoped files such as `~/.claude.json` if accessible).
 
 If you find a configuration file, read and interpret it to identify potential issues such as:
 
@@ -52,7 +52,6 @@ All tools in `chrome-devtools-mcp` are annotated with `readOnlyHint: true` (for 
 If the tools related to extensions (like `install_extension`) are not available, or if the extensions you load are not functioning:
 
 1. **Check for the `--categoryExtensions` flag**: Ensure this flag is passed in the MCP server configuration to enable the extension category tools.
-2. **Make sure the MCP server in configured to launch Chrome instead of connecting to an instance**: Chrome before 149 is not able to load extensions when connecting to an existing instance (`--auto-connect`, `--browserUrl`).
 
 #### Other Common Errors
 

@@ -9,14 +9,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type {ParsedArguments} from './config/ConfigParser.js';
-import type {
-  Browser,
-  ChromeReleaseChannel,
-  LaunchOptions,
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import {
+  Mutex,
+  puppeteer,
+  type Browser,
+  type ChromeReleaseChannel,
+  type LaunchOptions,
 } from './third_party/index.js';
-import {Mutex, puppeteer} from './third_party/index.js';
-import {logger, puppeteerLogger} from './utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactConnectOptionsForLogging,
+} from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
 
 export interface BrowserManagerOptions {
@@ -36,16 +41,16 @@ export class BrowserManager {
   #initPromise?: Promise<Browser>;
   #mutex = new Mutex();
   #closingCount = 0;
-  #serverArgs: ParsedArguments;
+  #config: ReadonlyServerConfig;
   #options: BrowserManagerOptions;
 
   #browserAttempt: BrowserAttempt = new BrowserAttempt();
 
   constructor(
-    serverArgs: ParsedArguments,
+    config: ReadonlyServerConfig,
     options: BrowserManagerOptions = {},
   ) {
-    this.#serverArgs = serverArgs;
+    this.#config = config;
     this.#options = options;
   }
 
@@ -91,7 +96,7 @@ export class BrowserManager {
   static rootSandboxLaunchError(
     error: Error,
     args: readonly string[],
-    uid = process.getuid?.(),
+    uid: number | undefined = process.getuid?.(),
   ): Error | undefined {
     if (uid !== 0) {
       return undefined;
@@ -141,7 +146,7 @@ export class BrowserManager {
     // a call silently adopt the freshly-rotated token as its own baseline
     // once the lock frees up, defeating the abandonment check entirely.
     const attempt = this.#browserAttempt;
-    using _guard = await this.#mutex.acquire();
+    using guard = await this.#mutex.acquire();
     if (this.#closingCount > 0) {
       throw new Error('Browser was closed while initializing.');
     }
@@ -182,22 +187,21 @@ export class BrowserManager {
    * McpContext initialization built on it — if ensureBrowser() already
    * resolved and it's that later step hanging (e.g. a dead CDP transport),
    * the token rotation alone does nothing, since #browser is already
-   * cached. Safe to forget unconditionally here: the tool mutex serializes
-   * every call, so there's no concurrent caller to disrupt.
+   * cached. Safe to forget unconditionally here: a tool call that already
+   * received a Browser keeps using it, so forgetting the cached value only
+   * makes the next ensureBrowser() reconnect.
    */
   abandonPendingAttempt(): void {
     this.#browserAttempt = new BrowserAttempt();
     this.#initPromise = undefined;
-    if (this.#browser) {
-      this.forget(this.#browser);
-    }
+    this.#forgetCurrentBrowser();
   }
 
   async #initBrowser(): Promise<Browser> {
     if (
-      this.#serverArgs.browserUrl ||
-      this.#serverArgs.wsEndpoint ||
-      this.#serverArgs.autoConnect
+      this.#config.resolved.browserUrl ||
+      this.#config.resolved.wsEndpoint ||
+      this.#config.resolved.autoConnect
     ) {
       return await this.#connect();
     }
@@ -219,14 +223,14 @@ export class BrowserManager {
       allowedUrlPattern: allowlist,
       ignoreDefaultChromeArg,
       proxyServer,
-    } = this.#serverArgs;
+    } = this.#config.resolved;
 
     const profileDirName =
       channel && channel !== 'stable'
         ? `chrome-profile-${channel}`
         : 'chrome-profile';
 
-    let userDataDir = this.#serverArgs.userDataDir;
+    let userDataDir = this.#config.resolved.userDataDir;
     if (!isolated && !userDataDir) {
       userDataDir = path.join(
         os.homedir(),
@@ -239,7 +243,9 @@ export class BrowserManager {
       });
     }
 
-    const args: LaunchOptions['args'] = [...(this.#serverArgs.chromeArg ?? [])];
+    const args: LaunchOptions['args'] = [
+      ...(this.#config.resolved.chromeArg ?? []),
+    ];
     if (proxyServer) {
       args.push(`--proxy-server=${proxyServer}`);
     }
@@ -282,6 +288,12 @@ export class BrowserManager {
         blocklist,
         allowlist,
         logger: puppeteerLogger,
+        // The entry points own signal handling and call close(), which
+        // closes the browser gracefully. Puppeteer's handlers would SIGKILL
+        // Chrome synchronously on the same signal and win the race.
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false,
       });
       if (this.#options.logFile) {
         // FIXME: we are probably subscribing too late to catch startup logs. We
@@ -336,30 +348,38 @@ export class BrowserManager {
       userDataDir,
       blockedUrlPattern: blocklist,
       allowedUrlPattern: allowlist,
-    } = this.#serverArgs;
+      categoryExtensions: enableExtensions,
+    } = this.#config.resolved;
     // Important: only pass channel, if autoConnect is true.
-    const channel = isAutoConnect ? this.#serverArgs.channel : undefined;
+    const channel = isAutoConnect ? this.#config.resolved.channel : undefined;
 
     const connectOptions: Parameters<typeof puppeteer.connect>[0] = {
-      targetFilter: BrowserManager.makeTargetFilter(),
+      targetFilter: BrowserManager.makeTargetFilter(enableExtensions),
       defaultViewport: null,
       handleDevToolsAsPage: true,
       blocklist,
       allowlist,
       logger: puppeteerLogger,
+      // Detects a transport that died without a close frame (e.g. an adb
+      // port-forward torn down mid-call). Puppeteer pings the socket
+      // periodically and terminates it on a missed pong, which rejects the
+      // in-flight CDP calls and fires `disconnected` so #evictIfCurrent()
+      // drops the stale handle. Without this, such a call would hang until
+      // protocolTimeout inside the context queue.
+      wsOptions: {
+        keepAlive: true,
+        headers: wsHeaders,
+      },
     };
 
     let autoConnect = false;
     if (wsEndpoint) {
       connectOptions.browserWSEndpoint = wsEndpoint;
-      if (wsHeaders) {
-        connectOptions.headers = wsHeaders;
-      }
     } else if (browserURL) {
       connectOptions.browserURL = browserURL;
     } else if (channel || userDataDir) {
+      autoConnect = true;
       if (userDataDir) {
-        autoConnect = true;
         // TODO: re-expose this logic via Puppeteer.
         const portPath = path.join(userDataDir, 'DevToolsActivePort');
         try {
@@ -404,7 +424,10 @@ export class BrowserManager {
       );
     }
 
-    logger?.('Connecting Puppeteer to ', JSON.stringify(connectOptions));
+    logger?.(
+      'Connecting Puppeteer to ',
+      JSON.stringify(redactConnectOptionsForLogging(connectOptions)),
+    );
     try {
       const connected = await puppeteer.connect(connectOptions);
       logger?.('Connected Puppeteer');
@@ -423,31 +446,30 @@ export class BrowserManager {
   }
 
   /**
-   * Clears the cached browser handle if it still matches `candidate`, so the
-   * next ensureBrowser() call establishes a fresh connection instead of
-   * reusing a handle that looks connected but is actually dead (e.g. its CDP
-   * transport died without ever emitting a `close`/`disconnected` event — as
-   * happens when an adb port-forward is torn down mid-call rather than
-   * closed cleanly).
+   * Drops the cached browser handle so the next ensureBrowser() call
+   * establishes a fresh connection. Only called from abandonPendingAttempt()
+   * when a getContext()-level timeout fires after ensureBrowser() already
+   * resolved, which means the handle looks connected but its CDP
+   * initialization is hanging.
    *
-   * Also actively tears `candidate` down in the background: closes it if it
-   * was launched (so the Chrome subprocess doesn't leak), or disconnects if
-   * it was only connected to (so the transport and its listeners don't
-   * leak). This also settles any CDP call still pending against it —
-   * Puppeteer's connection disposal synchronously rejects in-flight
-   * callbacks — instead of leaving a hung call to leak forever.
+   * Also tears the browser down in the background: closes it if it was
+   * launched (so the Chrome subprocess doesn't leak), or disconnects if it
+   * was only connected to (so the transport and its listeners don't leak).
+   * Puppeteer's connection disposal rejects any in-flight CDP call, so a hung
+   * call settles instead of leaking forever.
    */
-  forget(candidate: Browser): void {
-    if (this.#browser !== candidate) {
+  #forgetCurrentBrowser(): void {
+    const browser = this.#browser;
+    if (!browser) {
       return;
     }
     const mode = this.#browserMode;
     this.#browser = undefined;
     this.#browserMode = undefined;
     if (mode === 'launched') {
-      void this.#closeLaunchedBrowser(candidate);
+      void this.#closeLaunchedBrowser(browser);
     } else {
-      void candidate.disconnect().catch(err => {
+      void browser.disconnect().catch(err => {
         logger?.('Failed to disconnect forgotten browser', err);
       });
     }
@@ -459,9 +481,8 @@ export class BrowserManager {
    * call reconnects proactively rather than only discovering the staleness
    * lazily on the next call's `!this.#browser?.connected` check. No teardown
    * here — the browser is already disconnected/closed, that's why this
-   * fired — so this shares forget()'s identity guard without its cleanup,
-   * making a `disconnected` that fires late on an already-superseded browser
-   * a safe no-op.
+   * fired. The identity guard makes a `disconnected` that fires late on an
+   * already-superseded browser a safe no-op.
    */
   #evictIfCurrent(candidate: Browser): void {
     if (this.#browser !== candidate) {
@@ -518,7 +539,7 @@ export class BrowserManager {
   async close(): Promise<void> {
     this.#initPromise = undefined;
     this.#closingCount++;
-    using _guard = await this.#mutex.acquire();
+    using guard = await this.#mutex.acquire();
     try {
       await this.#closeBrowser();
     } finally {

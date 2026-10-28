@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
-import {mcpOptions} from '../config/mcp-options.js';
+import {mcpOptions, type ParsedArguments} from '../config/mcp-options.js';
 import type {YargsOptions} from '../third_party/index.js';
 
 import * as commentsTools from './comments.js';
@@ -26,10 +25,11 @@ import * as scriptTools from './script.js';
 import * as slimTools from './slim/tools.js';
 import * as snapshotTools from './snapshot.js';
 import * as thirdPartyDeveloperTools from './thirdPartyDeveloper.js';
-import type {DefinedPageTool, ToolDefinition} from './ToolDefinition.js';
+import type {AnyToolDefinition} from './ToolDefinition.js';
+import * as webauthnTools from './webauthn.js';
 import * as webmcpTools from './webmcp.js';
 
-export const createTools = (args: ParsedArguments) => {
+export const createTools = (args: ParsedArguments): AnyToolDefinition[] => {
   const rawTools = [
     ...Object.values(commentsTools),
     ...Object.values(consoleTools),
@@ -49,10 +49,11 @@ export const createTools = (args: ParsedArguments) => {
     ...Object.values(slimTools),
     ...Object.values(snapshotTools),
     ...Object.values(thirdPartyDeveloperTools),
+    ...Object.values(webauthnTools),
     ...Object.values(webmcpTools),
   ];
 
-  const tools: Array<ToolDefinition | DefinedPageTool> = [];
+  const tools: AnyToolDefinition[] = [];
   for (const tool of rawTools) {
     tools.push(tool(args));
   }
@@ -66,9 +67,7 @@ export const createTools = (args: ParsedArguments) => {
  * Returns true if the tool is gated behind a hidden (internal) flag. Such
  * tools are excluded from the generated documentation and CLI.
  */
-export function requiresHiddenFlag(
-  tool: ToolDefinition | DefinedPageTool,
-): boolean {
+export function requiresHiddenFlag(tool: AnyToolDefinition): boolean {
   for (const condition of tool.annotations.conditions ?? []) {
     const option: YargsOptions = mcpOptions[condition];
     if (option.hidden) {

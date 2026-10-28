@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, beforeEach, describe, it} from 'node:test';
+import {beforeEach, describe, it} from 'node:test';
 
 import type {
   ConsoleMessage,
@@ -15,14 +15,15 @@ import type {
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ListenerMap} from '../../src/collectors/PageCollector.js';
 import {
   ConsoleCollector,
   NetworkCollector,
   PageCollector,
+  type ListenerMap,
 } from '../../src/collectors/PageCollector.js';
 import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
+import {createMockPuppeteerPage} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
 function createMockConsoleMessage(text: string): ConsoleMessage {
@@ -34,6 +35,35 @@ function createMockConsoleMessage(text: string): ConsoleMessage {
 }
 
 describe('PageCollector', () => {
+  it('applies resource and navigation limits independently', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const collector = new PageCollector<Error>(
+      pptrPage,
+      collect => ({
+        pageerror: error => {
+          if (error instanceof Error) {
+            collect(error);
+          }
+        },
+      }),
+      {maxResourcesPerNavigation: 2, maxNavigationSaved: 4},
+    );
+    const errors: Error[] = [];
+    for (let navigation = 0; navigation < 6; navigation++) {
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+      for (let resource = 0; resource < 3; resource++) {
+        const error = new Error(`${navigation}-${resource}`);
+        pptrPage.emit('pageerror', error);
+        if (resource > 0) {
+          errors.push(error);
+        }
+      }
+    }
+    assert.deepStrictEqual(collector.getData(), errors.slice(-2));
+    assert.deepStrictEqual(collector.getData(true), errors.slice(-8));
+    collector.dispose();
+  });
+
   it('works', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
@@ -48,7 +78,7 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
   });
 
   it('clean up after navigation', async () => {
@@ -66,10 +96,10 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
   });
 
   it('does not clean up after same-document navigation', async () => {
@@ -87,14 +117,14 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
 
     // Simulate a same-document (SPA) navigation: Puppeteer emits
     // `FrameNavigatedWithinDocument` right before `framenavigated`.
     mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
   });
 
   it('cleans up after a cross-document navigation following a same-document one', async () => {
@@ -115,11 +145,11 @@ describe('PageCollector', () => {
     // Same-document navigation: history is kept.
     mainFrame.emit(FrameEvent.FrameNavigatedWithinDocument, undefined);
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
 
     // A real cross-document navigation must still rotate the history.
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
   });
 
   it('does not clean up after sub frame navigation', async () => {
@@ -137,7 +167,7 @@ describe('PageCollector', () => {
     page.emit('request', request);
     page.emit('framenavigated', {} as Frame);
 
-    assert.equal(collector.getData().length, 1);
+    assert.strictEqual(collector.getData().length, 1);
   });
 
   it('clean up after navigation and be able to add data after', async () => {
@@ -155,14 +185,14 @@ describe('PageCollector', () => {
 
     page.emit('request', request);
 
-    assert.equal(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[0], request);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
 
     page.emit('request', request);
 
-    assert.equal(collector.getData().length, 1);
+    assert.strictEqual(collector.getData().length, 1);
   });
 
   it('should assign ids to requests', async () => {
@@ -181,14 +211,75 @@ describe('PageCollector', () => {
     page.emit('request', request1);
     page.emit('request', request2);
 
-    assert.equal(collector.getData().length, 2);
+    assert.strictEqual(collector.getData().length, 2);
 
-    assert.equal(collector.getIdForResource(request1), 1);
-    assert.equal(collector.getIdForResource(request2), 2);
+    assert.strictEqual(collector.getIdForResource(request1), 1);
+    assert.strictEqual(collector.getIdForResource(request2), 2);
   });
 });
 
 describe('NetworkCollector', () => {
+  it('applies both limits while retaining navigation requests', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const collector = new NetworkCollector(pptrPage, {
+      maxResourcesPerNavigation: 2,
+      maxNavigationSaved: 4,
+    });
+    const requests: HTTPRequest[] = [];
+    for (let navigation = 0; navigation < 6; navigation++) {
+      const request = getMockRequest({
+        navigationRequest: true,
+        frame: pptrPage.mainFrame(),
+      });
+      pptrPage.emit('request', request);
+      pptrPage.emit('framenavigated', pptrPage.mainFrame());
+      for (let resource = 0; resource < 3; resource++) {
+        const request = getMockRequest();
+        pptrPage.emit('request', request);
+        if (resource > 0) {
+          requests.push(request);
+        }
+      }
+    }
+    assert.deepStrictEqual(collector.getData(), requests.slice(-2));
+    // The next navigation request arrives before framenavigated, evicting
+    // the oldest resource in each completed navigation.
+    assert.deepStrictEqual(collector.getData(true), [
+      requests[5],
+      requests[7],
+      requests[9],
+      ...requests.slice(-2),
+    ]);
+    collector.dispose();
+  });
+
+  it('drops the async parents of a request initiator stack', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const collector = new NetworkCollector(pptrPage);
+    const frame: Protocol.Runtime.CallFrame = {
+      functionName: 'poll',
+      scriptId: '1',
+      url: 'https://example.com/app.js',
+      lineNumber: 0,
+      columnNumber: 0,
+    };
+    const request = getMockRequest({
+      initiator: {
+        type: 'script',
+        stack: {
+          callFrames: [frame],
+          parent: {description: 'setTimeout', callFrames: [frame]},
+        },
+      },
+    });
+    pptrPage.emit('request', request);
+    assert.deepStrictEqual(request.initiator(), {
+      type: 'script',
+      stack: {callFrames: [frame]},
+    });
+    collector.dispose();
+  });
+
   it('retains only the newest requests without navigation', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
@@ -206,13 +297,13 @@ describe('NetworkCollector', () => {
     }
 
     const retainedRequests = collector.getData();
-    assert.equal(
+    assert.strictEqual(
       retainedRequests.length,
       NetworkCollector.MAX_REQUESTS_PER_NAVIGATION,
     );
     assert.deepEqual(retainedRequests, requests.slice(1));
-    assert.equal(collector.getIdForResource(retainedRequests[0]), 2);
-    assert.equal(collector.getById(2), retainedRequests[0]);
+    assert.strictEqual(collector.getIdForResource(retainedRequests[0]), 2);
+    assert.strictEqual(collector.getById(2), retainedRequests[0]);
     assert.throws(() => collector.getById(1), {
       message: 'Request not found for selected page',
     });
@@ -233,18 +324,18 @@ describe('NetworkCollector', () => {
     page.emit('request', request);
     page.emit('request', navRequest);
 
-    assert.equal(collector.getData()[0], request);
-    assert.equal(collector.getData()[1], navRequest);
+    assert.strictEqual(collector.getData()[0], request);
+    assert.strictEqual(collector.getData()[1], navRequest);
     page.emit('framenavigated', mainFrame);
 
-    assert.equal(collector.getData().length, 1);
-    assert.equal(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData().length, 1);
+    assert.strictEqual(collector.getData()[0], navRequest);
 
     page.emit('request', request2);
 
-    assert.equal(collector.getData().length, 2);
-    assert.equal(collector.getData()[0], navRequest);
-    assert.equal(collector.getData()[1], request2);
+    assert.strictEqual(collector.getData().length, 2);
+    assert.strictEqual(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData()[1], request2);
   });
 
   it('correctly picks up after multiple back to back navigations', async () => {
@@ -264,23 +355,23 @@ describe('NetworkCollector', () => {
     const collector = new NetworkCollector(page);
 
     page.emit('request', navRequest);
-    assert.equal(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData()[0], navRequest);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData().length, 1);
-    assert.equal(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData().length, 1);
+    assert.strictEqual(collector.getData()[0], navRequest);
 
     page.emit('request', navRequest2);
-    assert.equal(collector.getData().length, 2);
-    assert.equal(collector.getData()[0], navRequest);
-    assert.equal(collector.getData()[1], navRequest2);
+    assert.strictEqual(collector.getData().length, 2);
+    assert.strictEqual(collector.getData()[0], navRequest);
+    assert.strictEqual(collector.getData()[1], navRequest2);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData().length, 1);
-    assert.equal(collector.getData()[0], navRequest2);
+    assert.strictEqual(collector.getData().length, 1);
+    assert.strictEqual(collector.getData()[0], navRequest2);
 
     page.emit('request', request);
-    assert.equal(collector.getData().length, 2);
+    assert.strictEqual(collector.getData().length, 2);
   });
 
   it('works with previous navigations', async () => {
@@ -300,19 +391,19 @@ describe('NetworkCollector', () => {
     const collector = new NetworkCollector(page);
 
     page.emit('request', navRequest);
-    assert.equal(collector.getData(true).length, 1);
+    assert.strictEqual(collector.getData(true).length, 1);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData(true).length, 1);
+    assert.strictEqual(collector.getData(true).length, 1);
 
     page.emit('request', navRequest2);
-    assert.equal(collector.getData(true).length, 2);
+    assert.strictEqual(collector.getData(true).length, 2);
 
     page.emit('framenavigated', mainFrame);
-    assert.equal(collector.getData(true).length, 2);
+    assert.strictEqual(collector.getData(true).length, 2);
 
     page.emit('request', request);
-    assert.equal(collector.getData(true).length, 3);
+    assert.strictEqual(collector.getData(true).length, 3);
   });
 
   it('should not grow beyond maxNavigationSaved', async () => {
@@ -334,7 +425,26 @@ describe('NetworkCollector', () => {
 
     // We expect 3 arrays in navigations (current + 2 saved)
     // Each navigation has 1 request, so total should be 3
-    assert.equal(collector.getData(true).length, 3);
+    assert.strictEqual(collector.getData(true).length, 3);
+  });
+
+  it('respects a custom maxNavigationSaved', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const mainFrame = page.mainFrame();
+    const collector = new NetworkCollector(page, {maxNavigationSaved: 5});
+
+    for (let i = 0; i < 7; i++) {
+      const req = getMockRequest({
+        url: `http://example.com/nav${i}`,
+        navigationRequest: true,
+        frame: mainFrame,
+      });
+      page.emit('request', req);
+      page.emit('framenavigated', mainFrame);
+    }
+
+    assert.strictEqual(collector.getData(true).length, 5);
   });
 
   it('bounds retained navigation buckets with redirects and subframes', async () => {
@@ -347,7 +457,9 @@ describe('NetworkCollector', () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
     const mainFrame = page.mainFrame();
-    const collector = new TestNetworkCollector(page, 3);
+    const collector = new TestNetworkCollector(page, {
+      maxResourcesPerNavigation: 3,
+    });
 
     const firstNavigation = getMockRequest({
       url: 'http://example.com/first',
@@ -409,8 +521,8 @@ describe('NetworkCollector', () => {
       finalResource1,
       finalResource2,
     ]);
-    assert.equal(collector.getData().length, 3);
-    assert.equal(collector.getData()[0], finalNavigation);
+    assert.strictEqual(collector.getData().length, 3);
+    assert.strictEqual(collector.getData()[0], finalNavigation);
     assert.deepEqual(collector.navigationSizes, [3, 2, 2]);
   });
 });
@@ -431,9 +543,43 @@ describe('ConsoleCollector', () => {
     };
   });
 
-  afterEach(() => {
-    sinon.restore();
-  });
+  for (const maxResourcesPerNavigation of [undefined, 2]) {
+    it(`retains a custom navigation history with resource limit ${maxResourcesPerNavigation}`, () => {
+      const pptrPage = createMockPuppeteerPage();
+      const collector = new ConsoleCollector(
+        pptrPage,
+        collect => ({
+          pageerror: error => {
+            if (error instanceof Error) {
+              collect(error);
+            }
+          },
+        }),
+        {maxResourcesPerNavigation, maxNavigationSaved: 4},
+      );
+      const errors: Error[] = [];
+      for (let navigation = 0; navigation < 6; navigation++) {
+        pptrPage.emit('framenavigated', pptrPage.mainFrame());
+        for (let resource = 0; resource < 3; resource++) {
+          const error = new Error(`${navigation}-${resource}`);
+          pptrPage.emit('pageerror', error);
+          if (maxResourcesPerNavigation === undefined || resource > 0) {
+            errors.push(error);
+          }
+        }
+      }
+      const retainedPerNavigation = maxResourcesPerNavigation ?? 3;
+      assert.deepStrictEqual(
+        collector.getData(),
+        errors.slice(-retainedPerNavigation),
+      );
+      assert.deepStrictEqual(
+        collector.getData(true),
+        errors.slice(-4 * retainedPerNavigation),
+      );
+      collector.dispose();
+    });
+  }
 
   it('collects issues', async () => {
     const browser = getMockBrowser();
@@ -460,7 +606,7 @@ describe('ConsoleCollector', () => {
     page.emit('issue', issue);
     page.emit('issue', issue2);
     const data = collector.getData();
-    assert.equal(data.length, 2);
+    assert.strictEqual(data.length, 2);
   });
 
   it('silently ignores unmapped PerformanceIssue events', async () => {
@@ -487,7 +633,7 @@ describe('ConsoleCollector', () => {
 
     page.emit('issue', performanceIssue);
 
-    assert.equal(collector.getData().length, 0);
+    assert.strictEqual(collector.getData().length, 0);
     sinon.assert.notCalled(warnStub);
   });
 
@@ -506,11 +652,11 @@ describe('ConsoleCollector', () => {
     page.emit('issue', issue);
     page.emit('issue', issue);
     const data = collector.getData();
-    assert.equal(data.length, 1);
+    assert.strictEqual(data.length, 1);
     const collectedIssue = data[0];
     assert(collectedIssue instanceof DevTools.AggregatedIssue);
-    assert.equal(collectedIssue.code(), 'MixedContentIssue');
-    assert.equal(collectedIssue.getAggregatedIssuesCount(), 1);
+    assert.strictEqual(collectedIssue.code(), 'MixedContentIssue');
+    assert.strictEqual(collectedIssue.getAggregatedIssuesCount(), 1);
   });
 
   it('emits UncaughtErrors for Runtime.exceptionThrown CDP events', async () => {
@@ -558,7 +704,7 @@ describe('ConsoleCollector', () => {
           },
         } as ListenerMap;
       },
-      cap,
+      {maxResourcesPerNavigation: cap},
     );
 
     const messages = Array.from({length: cap + 3}, (_, i) =>
@@ -570,7 +716,7 @@ describe('ConsoleCollector', () => {
     }
 
     const retained = collector.getData();
-    assert.equal(retained.length, cap);
+    assert.strictEqual(retained.length, cap);
     assert.deepEqual(retained, messages.slice(messages.length - cap));
   });
 
@@ -594,7 +740,7 @@ describe('ConsoleCollector', () => {
       page.emit('console', msg);
     }
 
-    assert.equal(
+    assert.strictEqual(
       collector.getData().length,
       ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION,
     );

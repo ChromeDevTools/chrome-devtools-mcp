@@ -8,11 +8,51 @@ import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
 import {
-  findUnenforceablePattern,
   isAllowedUrl,
+  isLocalBrowserEndpoint,
   isLocalhost,
   validateUrl,
+  validateUrlPatterns,
 } from '../../src/utils/url.js';
+
+describe('isLocalBrowserEndpoint', () => {
+  it('returns true for loopback endpoints', () => {
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://127.0.0.1:9222/devtools/browser/id'),
+      true,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('ws://localhost:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::1]:9222'), true);
+  });
+
+  it('returns true for unspecified address endpoints', () => {
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://0.0.0.0:9222/devtools/browser/id'),
+      true,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('http://0:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://0x0:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://0.0.0.0.:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::]:9222'), true);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::0]:9222'), true);
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://[::ffff:0.0.0.0]:9222'),
+      true,
+    );
+  });
+
+  it('returns false for remote and invalid endpoints', () => {
+    assert.strictEqual(
+      isLocalBrowserEndpoint('ws://remote-host.com:9222'),
+      false,
+    );
+    assert.strictEqual(isLocalBrowserEndpoint('ws://0.0.0.1:9222'), false);
+    assert.strictEqual(isLocalBrowserEndpoint('ws://[::2]:9222'), false);
+    assert.strictEqual(isLocalBrowserEndpoint('file://0.0.0.0/x'), false);
+    assert.strictEqual(isLocalBrowserEndpoint(''), false);
+    assert.strictEqual(isLocalBrowserEndpoint('not a url'), false);
+  });
+});
 
 describe('isLocalhost', () => {
   it('should return true for valid localhost and loopback URLs', () => {
@@ -53,6 +93,14 @@ describe('isLocalhost', () => {
 
   it('should return true for uncompressed IPv6 loopback', () => {
     assert.strictEqual(isLocalhost('http://[0:0:0:0:0:0:0:1]:8080'), true);
+  });
+
+  it('should return true for IPv4-mapped IPv6 loopback', () => {
+    assert.strictEqual(isLocalhost('ws://[::ffff:127.0.0.1]:9222'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:127.1.2.3]'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:7f00:1]:8080'), true);
+    assert.strictEqual(isLocalhost('http://[::ffff:128.0.0.1]'), false);
+    assert.strictEqual(isLocalhost('http://[::ffff:192.168.1.1]'), false);
   });
 
   it('should return true for URLs with user credentials', () => {
@@ -307,6 +355,17 @@ describe('validateUrl', () => {
         fileNavigations: undefined,
       }).href,
       'chrome-extension://abcdef/popup.html',
+    );
+  });
+
+  it('should reject devtools: URLs', () => {
+    assert.throws(
+      () =>
+        validateUrl(
+          'devtools://devtools/bundled/devtools_app.html',
+          defaultOptions,
+        ),
+      /Navigating to devtools: URLs is not allowed\./,
     );
   });
 
@@ -565,40 +624,52 @@ describe('isAllowedUrl', () => {
   });
 });
 
-describe('findUnenforceablePattern', () => {
-  it('flags a regexp group', () => {
+describe('validateUrlPatterns', () => {
+  it('rejects a regexp group with a specific error message', () => {
     for (const pattern of [
       String.raw`*://(127\.\d+\.\d+\.\d+):*/*`,
       '*://example.com/(foo|bar)',
       '(http|https)://example.com/*',
     ]) {
-      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+      assert.throws(
+        () => validateUrlPatterns([pattern], '--blockedUrlPattern'),
+        new Error(
+          `Invalid --blockedUrlPattern "${pattern}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+        ),
+      );
     }
   });
 
-  it('returns the first offending pattern among several', () => {
-    assert.strictEqual(
-      findUnenforceablePattern([
-        '*://127.0.0.1:*/*',
-        '*://*.example.com/*',
-        String.raw`*://(localhost|127\.0\.0\.1):*/*`,
-      ]),
-      String.raw`*://(localhost|127\.0\.0\.1):*/*`,
+  it('throws on the first offending pattern among several', () => {
+    const offending = String.raw`*://(localhost|127\.0\.0\.1):*/*`;
+    assert.throws(
+      () =>
+        validateUrlPatterns(
+          ['*://127.0.0.1:*/*', '*://*.example.com/*', offending],
+          '--allowedUrlPattern',
+        ),
+      new Error(
+        `Invalid --allowedUrlPattern "${offending}": a regexp group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+      ),
     );
   });
 
   it('allows plain wildcard patterns', () => {
-    assert.strictEqual(
-      findUnenforceablePattern([
-        '*://127.0.0.1:*/*',
-        '*://*.example.com/*',
-        'https://127.0.0.1:8080/secret',
-      ]),
-      undefined,
+    assert.doesNotThrow(() =>
+      validateUrlPatterns(
+        [
+          '*://127.0.0.1:*/*',
+          '*://127.0.0.1/*',
+          '*://*.example.com/*',
+          '*://*.123.example.com/*',
+          'https://127.0.0.1:8080/secret',
+        ],
+        '--blockedUrlPattern',
+      ),
     );
   });
 
-  it('flags a named group in any component', () => {
+  it('rejects a named group in any component with a specific error message', () => {
     for (const pattern of [
       '*://127.0.0.1::port/secret',
       '*://127.0.0.1:{:port}/secret',
@@ -614,38 +685,78 @@ describe('findUnenforceablePattern', () => {
       '*://example.com/path?token=:secret',
       '*://example.com/*#:hash',
     ]) {
-      assert.strictEqual(findUnenforceablePattern([pattern]), pattern);
+      assert.throws(
+        () => validateUrlPatterns([pattern], '--blockedUrlPattern'),
+        new Error(
+          `Invalid --blockedUrlPattern "${pattern}": a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+        ),
+      );
+    }
+  });
+
+  it('rejects a partial IPv4 wildcard in the hostname with a specific error message', () => {
+    for (const pattern of [
+      '*://127.0.0.*/*',
+      '*://127.*:*/*',
+      '*://*.0.0.1/*',
+      '*://127.*.0.1/*',
+      '*://127.0.0*/*',
+      '*://127.0.0.{*}/*',
+      '*://{127.0.0.*}/*',
+      '*://{*.0.0.1}/*',
+      '*://*1*/*',
+      '*://0x7f.0.0.*/*',
+      '*://0x7f.*/*',
+      '*://user:pw@127.0.0.*/*',
+      '*://user:pw@127.0.0.*:8080/*',
+      String.raw`*://127.0.0.*\:8080/*`,
+      String.raw`*://127.0.\0.*/*`,
+    ]) {
+      assert.throws(
+        () => validateUrlPatterns([pattern], '--blockedUrlPattern'),
+        new Error(
+          `Invalid --blockedUrlPattern "${pattern}": a partial IPv4 wildcard is not enforced on redirects or subresources. Use an exact IPv4 address or a "*" wildcard instead.`,
+        ),
+      );
     }
   });
 
   it('allows escaped colons unless an unescaped named group is also present', () => {
-    assert.strictEqual(
-      findUnenforceablePattern([
-        String.raw`http://[\:\:1]:8080/*`,
-        String.raw`*://example.com/path?foo=a\:b#bar\:c`,
-        String.raw`*://example.com/path?foo=a\\\:b#bar\\\:c`,
-      ]),
-      undefined,
+    assert.doesNotThrow(() =>
+      validateUrlPatterns(
+        [
+          String.raw`http://[\:\:1]:8080/*`,
+          String.raw`*://example.com/path?foo=a\:b#bar\:c`,
+          String.raw`*://example.com/path?foo=a\\\:b#bar\\\:c`,
+        ],
+        '--blockedUrlPattern',
+      ),
     );
-    assert.strictEqual(
-      findUnenforceablePattern([
-        String.raw`*://example.com/path?foo=a\:b&bar=:baz`,
-      ]),
+    for (const pattern of [
       String.raw`*://example.com/path?foo=a\:b&bar=:baz`,
-    );
-    assert.strictEqual(
-      findUnenforceablePattern([String.raw`*://example.com/path?foo\\:bar`]),
       String.raw`*://example.com/path?foo\\:bar`,
-    );
+    ]) {
+      assert.throws(
+        () => validateUrlPatterns([pattern], '--blockedUrlPattern'),
+        new Error(
+          `Invalid --blockedUrlPattern "${pattern}": a ":name" named group is not enforced on redirects or subresources. Use an exact value or a "*" wildcard instead.`,
+        ),
+      );
+    }
   });
 
   it('throws for a pattern that fails to construct', () => {
-    assert.throws(() =>
-      findUnenforceablePattern(['*://example.com/(unterminated']),
+    assert.throws(
+      () =>
+        validateUrlPatterns(
+          ['*://example.com/(unterminated'],
+          '--blockedUrlPattern',
+        ),
+      /Invalid --blockedUrlPattern "\*:\/\/example\.com\/\(unterminated":/,
     );
   });
 
-  it('returns undefined for an empty list', () => {
-    assert.strictEqual(findUnenforceablePattern([]), undefined);
+  it('allows an empty list', () => {
+    assert.doesNotThrow(() => validateUrlPatterns([], '--blockedUrlPattern'));
   });
 });

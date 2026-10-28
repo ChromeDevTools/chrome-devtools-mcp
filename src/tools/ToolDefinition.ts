@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
+import {categoryToFlagName} from '../config/category-options.js';
+import type {ParsedArguments} from '../config/mcp-options.js';
 import type {
   HeapSnapshotAggregateData,
-  HeapSnapshotClassDiff,
+  HeapSnapshotDiff,
   HeapSnapshotDetailedClassDiff,
   DuplicateStringGroup,
   HeapEdgesQueryOptions,
@@ -20,30 +21,37 @@ import type {
   ContextFilterOptions,
   HeapSnapshotFormatOptions,
 } from '../formatters/HeapSnapshotFormatter.js';
-import {zod} from '../third_party/index.js';
-import type {
-  Dialog,
-  ElementHandle,
-  Extension,
-  GetPWAStateOptions,
-  InstallPWAOptions,
-  LaunchPWAOptions,
-  PWAState,
-  ScreenRecorder,
-  UninstallPWAOptions,
-  Viewport,
-  DevTools,
-  Protocol,
-  Page,
+import {
+  zod,
+  type Dialog,
+  type ElementHandle,
+  type Extension,
+  type GetPWAStateOptions,
+  type InstallPWAOptions,
+  type LaunchPWAOptions,
+  type PWAState,
+  type ScreenRecorder,
+  type ScreenRecording,
+  type UninstallPWAOptions,
+  type Viewport,
+  type DevTools,
+  type Flags,
+  type Protocol,
+  type Page,
+  type RunnerResult,
+  type WebMCPTool,
 } from '../third_party/index.js';
 import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import type {
   TextSnapshotNode,
   GeolocationOptions,
   CD4ACommentThread,
+  PaginationOptions,
+  ForcedColors,
+  PrefersContrast,
+  PrefersReducedMotion,
 } from '../types.js';
 import type {McpWorker} from '../McpWorker.js';
-import type {PaginationOptions} from '../types.js';
 import type {
   WaitForEventsResult,
   DialogAction,
@@ -57,54 +65,99 @@ export type FileVerificationOption =
   | {
       local?: boolean;
       remote?: boolean;
+      /**
+       * When true, a value that parses as an `http(s):`/`ws(s):` URL is passed
+       * through unchanged instead of being resolved as a filesystem path. Only
+       * set this for parameters whose sink fetches the URL (for example a
+       * source map or script source the server downloads) or hands it to the
+       * browser (for example a PWA install URL). For filesystem-path
+       * parameters it MUST stay unset: otherwise a value such as
+       * `http://x/../../etc/passwd` skips `validatePath` and is resolved to an
+       * absolute host path by the downstream filesystem API.
+       */
+      allowUrl?: boolean;
     };
+
+/**
+ * Which task queue `ToolHandler` runs a tool call on. A task on a queue
+ * waits for tasks on the same queue, on its parent, and on its children.
+ *
+ * - `'exclusive'`: the context queue, for the whole call. No other browser
+ *   tool runs at the same time. For every tool that touches browser-global
+ *   state or that is not reviewed for page-only access.
+ * - `'page'`: the queue of the page named by `pageId`, a child of the
+ *   context queue. Tools on different pages run at the same time; tools on
+ *   one page and `'exclusive'` tools wait. Without page id routing the call
+ *   runs on the context queue. Only for page-scoped tools whose handler
+ *   touches the target page and no browser-global state.
+ * - `'none'`: no queue. The tool runs at the same time as any other tool.
+ *   For browserless tools, whose data guards itself (see
+ *   `HeapSnapshotManager`), and for page tools that only read page state
+ *   and wait for external events.
+ */
+export type ToolConcurrency = 'exclusive' | 'page' | 'none';
 
 type AllKeys<T> = T extends unknown ? keyof T : never;
 
-type ExtractSchemaField<Schema, K extends PropertyKey> = Schema extends unknown
+type SchemaField<Schema, K extends PropertyKey> = Schema extends unknown
   ? K extends keyof Schema
-    ? Exclude<Schema[K], undefined>
-    : never
+    ? Schema[K]
+    : undefined
   : never;
 
-export type MergeSchema<Schema extends zod.ZodRawShape> = {
-  [K in AllKeys<Schema>]: K extends keyof Schema
-    ? undefined extends Schema[K]
-      ? zod.ZodOptional<ExtractSchemaField<Schema, K>>
-      : Schema[K]
-    : zod.ZodOptional<ExtractSchemaField<Schema, K>>;
+export type ToolSchema = Record<string, zod.ZodType>;
+
+type MergeSchema<Schema extends ToolSchema> = {
+  [K in AllKeys<Schema>]: undefined extends SchemaField<Schema, K>
+    ? zod.ZodOptional<Exclude<SchemaField<Schema, K>, undefined>>
+    : SchemaField<Schema, K>;
 };
 
-export interface BaseToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
-> {
+export interface CapabilityGate {
+  category?: ToolCategory;
+  conditions?: Array<keyof ParsedArguments>;
+}
+
+export interface BaseToolDefinition<Schema extends ToolSchema = ToolSchema> {
   name: string;
   description: string;
   annotations: {
-    title?: string;
     category: ToolCategory;
     /**
      * If true, the tool does not modify its environment.
      */
     readOnlyHint: boolean;
+    title?: string;
     /**
      * If `'slim'` is included, the tool is only available with `--slim`. Tools
-     * without `'slim'` are only available without `--slim`. Slim tools may
-     * reuse the names of other tools, see {@link isAvailableInMode}.
+     * without `'slim'` are only available without `--slim`, see
+     * {@link isAvailableInMode}.
      */
     conditions?: Array<keyof ParsedArguments>;
   };
   schema: Schema;
   blockedByDialog: boolean;
-  verifyFilesSchema: Partial<
-    Record<keyof MergeSchema<Schema>, FileVerificationOption>
-  >;
+  /**
+   * Which task queue the server holds while the tool runs. See
+   * {@link ToolConcurrency}.
+   */
+  concurrency: ToolConcurrency;
+  verifyFilesSchema: Partial<Record<AllKeys<Schema>, FileVerificationOption>>;
 }
 
 export interface ToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends ToolSchema = ToolSchema,
 > extends BaseToolDefinition<Schema> {
-  schema: Schema;
+  /**
+   * Only page-scoped tools are checked for open dialogs by ToolHandler, so a
+   * non-page tool must handle dialogs itself.
+   */
+  blockedByDialog: false;
+  /**
+   * A non-page tool has no target page, so it cannot take the page queue. It
+   * touches browser state, so it always runs in a queue.
+   */
+  concurrency: Exclude<ToolConcurrency, 'page' | 'none'>;
   handler(
     request: Request<Schema>,
     response: Response,
@@ -112,12 +165,8 @@ export interface ToolDefinition<
   ): Promise<void>;
 }
 
-export type SchemaType<T extends zod.ZodRawShape> = zod.output<
-  zod.ZodObject<MergeSchema<T>>
->;
-
-export interface Request<Schema extends zod.ZodRawShape> {
-  params: SchemaType<Schema>;
+export interface Request<Schema extends ToolSchema> {
+  params: zod.output<zod.ZodObject<MergeSchema<Schema>>>;
 }
 
 export interface ImageContentData {
@@ -130,11 +179,38 @@ export interface SnapshotParams {
   filePath?: string;
 }
 
+export interface LighthouseAuditNode {
+  selector?: string;
+  snippet?: string;
+  nodeLabel?: string;
+  explanation?: string;
+}
+
+export interface LighthouseFailedAudit {
+  id: string;
+  title: string;
+  description?: string;
+  score: number;
+  displayValue?: string;
+  /**
+   * IDs of the categories that reference this audit.
+   */
+  categories: string[];
+  /**
+   * DOM nodes flagged by the audit, capped to a small number.
+   */
+  nodes: LighthouseAuditNode[];
+  /**
+   * Total number of distinct DOM nodes flagged by the audit, which may exceed
+   * the number of entries in `nodes`.
+   */
+  totalNodes: number;
+}
+
 export interface LighthouseData {
   summary: {
     mode: string;
     device: string;
-    url?: string;
     scores: Array<{
       id: string;
       title: string;
@@ -147,7 +223,9 @@ export interface LighthouseData {
     timing: {
       total: number;
     };
+    url?: string;
   };
+  failedAudits: LighthouseFailedAudit[];
   reports: string[];
 }
 
@@ -160,7 +238,7 @@ export interface Response {
   appendResponseLine(value: string): void;
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
-    options?: PaginationOptions,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotStats(
     stats: DevTools.HeapSnapshotModel.HeapSnapshotModel.Statistics,
@@ -185,9 +263,13 @@ export interface Response {
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
     options?: HeapSnapshotFormatOptions,
   ): void;
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]): void;
+  setHeapSnapshotClassDiffs(
+    diff: HeapSnapshotDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void;
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
   ): void;
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
@@ -228,6 +310,9 @@ export interface Response {
     options?: {requestFilePath?: string; responseFilePath?: string},
   ): void;
   attachConsoleMessage(msgid: number): void;
+  attachWebAuthnAuthenticator(
+    authenticator: WebAuthnAuthenticatorState | undefined,
+  ): void;
   // Allows re-using DevTools data queried by some tools.
   attachDevToolsData(data: DevToolsData): void;
   setTabId(tabId: string): void;
@@ -260,6 +345,11 @@ export type SupportedExtensions =
 /**
  * Only add methods used by tools/*.
  */
+export interface ScreenRecorderData {
+  recorder: ScreenRecorder | ScreenRecording;
+  filePath: string;
+}
+
 export type Context = Readonly<{
   installPWA(options: InstallPWAOptions): Promise<string>;
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
@@ -270,7 +360,6 @@ export type Context = Readonly<{
     extension: Extension,
   ): Promise<`${string}${Extension}`>;
   isRunningPerformanceTrace(): boolean;
-  setIsRunningPerformanceTrace(x: boolean): void;
   isCruxEnabled(): boolean;
   recordedTraces(): TraceResult[];
   storeTraceRecording(result: TraceResult): void;
@@ -292,10 +381,6 @@ export type Context = Readonly<{
   ): Promise<{filename: string}>;
   loadResource(path: string): Promise<string>;
 
-  getScreenRecorder(): {recorder: ScreenRecorder; filePath: string} | null;
-  setScreenRecorder(
-    data: {recorder: ScreenRecorder; filePath: string} | null,
-  ): void;
   installExtension(path: string): Promise<string>;
   uninstallExtension(id: string): Promise<void>;
   triggerExtensionAction(id: string): Promise<void>;
@@ -304,6 +389,14 @@ export type Context = Readonly<{
   getSelectedMcpPage(): McpPage;
   getWorkers(): McpWorker[];
   getWorkerById(id: string): McpWorker | undefined;
+}>;
+
+/**
+ * The context available to tools that do not need a browser connection, see
+ * {@link defineBrowserlessTool}. Using it never triggers a browser launch or
+ * connection.
+ */
+export type BrowserlessContext = Readonly<{
   getHeapSnapshotAggregates(
     filePath: string,
     filterName?: string,
@@ -361,7 +454,7 @@ export type Context = Readonly<{
   getHeapSnapshotClassDiffs(
     baseFilePath: string,
     currentFilePath: string,
-  ): Promise<HeapSnapshotClassDiff[]>;
+  ): Promise<HeapSnapshotDiff>;
   getHeapSnapshotDetailedClassDiff(
     baseFilePath: string,
     currentFilePath: string,
@@ -375,17 +468,48 @@ export type Context = Readonly<{
 
 export type MatchedStyles = DevTools.CSSMatchedStyles.CSSMatchedStyles;
 
+export type WebAuthnProtocol = 'ctap2' | 'u2f';
+export type WebAuthnTransport = 'internal' | 'usb' | 'nfc' | 'ble' | 'hybrid';
+
+export interface WebAuthnAuthenticatorConfig {
+  enabled: boolean;
+  protocol?: WebAuthnProtocol;
+  transport?: WebAuthnTransport;
+  hasResidentKey?: boolean;
+  hasUserVerification?: boolean;
+  isUserVerified?: boolean;
+}
+
+export interface WebAuthnAuthenticatorState {
+  protocol: WebAuthnProtocol;
+  transport: WebAuthnTransport;
+  hasResidentKey: boolean;
+  hasUserVerification: boolean;
+  isUserVerified: boolean;
+  credentials: Array<{
+    credentialId: string;
+    rpId?: string;
+    isResidentCredential: boolean;
+    userName?: string;
+    signCount: number;
+  }>;
+}
+
 /**
  * Only add methods used by tools/*.
  */
 export type ContextPage = Readonly<{
+  readonly id: number;
   readonly pptrPage: Page;
   readonly cpuThrottlingRate: number;
   readonly networkConditions: string | null;
-  init(): Promise<void>;
+  init(options?: {emulateFocus?: boolean}): Promise<void>;
   getAXNodeByUid(uid: string): TextSnapshotNode | undefined;
   getElementByUid(uid: string): Promise<ElementHandle<Element>>;
   getMatchedStylesForUid(uid: string): Promise<MatchedStyles>;
+  configureWebAuthn(
+    config: WebAuthnAuthenticatorConfig,
+  ): Promise<WebAuthnAuthenticatorState | undefined>;
 
   /**
    * Returns a reqid for a cdpRequestId.
@@ -400,6 +524,10 @@ export type ContextPage = Readonly<{
   getDialog(): Dialog | undefined;
   clearDialog(): void;
   throwIfDialogOpen(): void;
+  isClosed(): boolean;
+  getScreenRecorder(): ScreenRecorderData | null;
+  setScreenRecorder(data: ScreenRecorderData | null): void;
+  setIsRunningPerformanceTrace(x: boolean): void;
   waitForEventsAfterAction(
     action: (signal: AbortSignal) => Promise<unknown>,
     options?: {
@@ -409,7 +537,8 @@ export type ContextPage = Readonly<{
         DialogAction | Partial<Record<Protocol.Page.DialogType, DialogAction>>;
     },
   ): Promise<WaitForEventsResult>;
-  getThirdPartyDeveloperTools(): ToolGroups;
+  getWebMcpTools(): WebMCPTool[];
+  discoverThirdPartyDeveloperTools(): Promise<ToolGroups>;
 
   executeThirdPartyDeveloperTool(
     toolName: string,
@@ -424,25 +553,42 @@ export type ContextPage = Readonly<{
     geolocation?: GeolocationOptions;
     userAgent?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
+    forcedColors?: ForcedColors | 'auto';
+    prefersContrast?: PrefersContrast | 'auto';
+    prefersReducedMotion?: PrefersReducedMotion | 'auto';
     viewport?: Viewport;
   }): Promise<void>;
-  waitForTextOnPage(text: string[], timeout?: number): Promise<Element>;
+  waitForTextOnPage(
+    text: string[],
+    options?: {timeout?: number; visible?: boolean},
+  ): Promise<Element>;
   getDevToolsPage(): Promise<Page | undefined>;
   openDevTools(): Promise<Page | undefined>;
   ensureDevToolsCommentBridge(
     devtoolsPage: Page,
-  ): Promise<DevToolsCommentBridge>;
+  ): Promise<DevToolsCommentBridge | undefined>;
+  lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
+  lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
 }>;
 
-export function defineTool<Schema extends zod.ZodRawShape>(
-  definition: (args: ParsedArguments) => ToolDefinition<Schema>,
-): (args: ParsedArguments) => ToolDefinition<Schema> {
+export type ToolFactory<Schema extends ToolSchema = ToolSchema> = (
+  args: ParsedArguments,
+) => ToolDefinition<Schema>;
+
+export function defineTool<Schema extends ToolSchema>(
+  definition: ToolFactory<Schema>,
+): ToolFactory<Schema> {
   return definition;
 }
 
 interface PageToolDefinition<
-  Schema extends zod.ZodRawShape = zod.ZodRawShape,
+  Schema extends ToolSchema = ToolSchema,
 > extends BaseToolDefinition<Schema> {
+  /**
+   * A page tool with `'none'` must only read page state. Its page lookup and
+   * response formatting run at the same time as other tools on the page.
+   */
+  concurrency: ToolConcurrency;
   handler(
     request: Request<Schema> & {page: ContextPage},
     response: Response,
@@ -450,20 +596,19 @@ interface PageToolDefinition<
   ): Promise<void>;
 }
 
-export type DefinedPageTool<Schema extends zod.ZodRawShape = zod.ZodRawShape> =
-  Omit<PageToolDefinition<Schema>, 'schema'> & {
-    schema: Schema & Partial<typeof pageIdSchema>;
-    pageScoped: true;
-    handler(
-      request: Request<Schema> & {page: ContextPage},
-      response: Response,
-      context: Context,
-    ): Promise<void>;
-  };
+export interface DefinedPageTool<
+  Schema extends ToolSchema = ToolSchema,
+> extends PageToolDefinition<Schema> {
+  pageScoped: true;
+}
 
-export function definePageTool<Schema extends zod.ZodRawShape>(
+export type PageToolFactory<Schema extends ToolSchema = ToolSchema> = (
+  args: ParsedArguments,
+) => DefinedPageTool<Schema>;
+
+export function definePageTool<Schema extends ToolSchema>(
   definition: (args: ParsedArguments) => PageToolDefinition<Schema>,
-): (args: ParsedArguments) => DefinedPageTool<Schema> {
+): PageToolFactory<Schema> {
   return (args: ParsedArguments): DefinedPageTool<Schema> => {
     const tool = definition(args);
     return {
@@ -477,25 +622,119 @@ export function definePageTool<Schema extends zod.ZodRawShape>(
   };
 }
 
+export interface BrowserlessToolDefinition<
+  Schema extends ToolSchema = ToolSchema,
+> extends BaseToolDefinition<Schema> {
+  browserless: true;
+  /**
+   * Browserless tools have no page, so ToolHandler never checks them for open
+   * dialogs.
+   */
+  blockedByDialog: false;
+  /**
+   * A browserless tool has no page. `defineBrowserlessTool` sets `'none'`.
+   */
+  concurrency: Exclude<ToolConcurrency, 'page'>;
+  handler(
+    request: Request<Schema>,
+    response: Response,
+    context: BrowserlessContext,
+  ): Promise<void>;
+}
+
+export type BrowserlessToolFactory<Schema extends ToolSchema = ToolSchema> = (
+  args: ParsedArguments,
+) => BrowserlessToolDefinition<Schema>;
+
+/**
+ * Defines a tool that does not need a browser connection, e.g. a tool that only
+ * analyzes local files. Its handler only receives a {@link BrowserlessContext}.
+ * Such a tool runs without the context queue (`concurrency: 'none'`) unless
+ * the definition sets another value.
+ */
+export function defineBrowserlessTool<Schema extends ToolSchema>(
+  definition: (
+    args: ParsedArguments,
+  ) => Omit<BrowserlessToolDefinition<Schema>, 'browserless' | 'concurrency'> &
+    Partial<Pick<BrowserlessToolDefinition<Schema>, 'concurrency'>>,
+): BrowserlessToolFactory<Schema> {
+  return (args: ParsedArguments): BrowserlessToolDefinition<Schema> => {
+    return {
+      concurrency: 'none',
+      ...definition(args),
+      browserless: true,
+    };
+  };
+}
+
+export type AnyToolDefinition =
+  ToolDefinition | DefinedPageTool | BrowserlessToolDefinition;
+
+export function isPageScopedTool(
+  tool: AnyToolDefinition,
+): tool is DefinedPageTool {
+  return 'pageScoped' in tool && tool.pageScoped === true;
+}
+
+export function isBrowserlessTool(
+  tool: AnyToolDefinition,
+): tool is BrowserlessToolDefinition {
+  return 'browserless' in tool && tool.browserless === true;
+}
+
 export const CLOSE_PAGE_ERROR =
   'The last open page cannot be closed. It is fine to keep it open.';
 
-export const pageIdSchema = {
+export const pageIdSchema: {
+  pageId: zod.ZodNumber;
+} = {
   pageId: zod.number().describe('Targets a specific page by ID.'),
 };
 
-export const timeoutSchema = {
+export function zodTransform<Input, Output>(
+  transform: (arg: Input) => Output,
+): (arg: Input, ctx: zod.RefinementCtx) => Output {
+  return (arg: Input, ctx: zod.RefinementCtx): Output => {
+    try {
+      return transform(arg);
+    } catch (error) {
+      ctx.addIssue({
+        code: 'custom',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return zod.NEVER;
+    }
+  };
+}
+
+export const timeoutSchema: {
+  timeout: zod.ZodOptional<zod.ZodType<number | undefined>>;
+} = {
   timeout: zod
     .number()
     .int()
-    .transform(value => {
-      return value <= 0 ? undefined : value;
-    })
+    .transform(
+      zodTransform(value => {
+        return value <= 0 ? undefined : value;
+      }),
+    )
     .optional()
     .describe(
       `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
     ),
 };
+
+const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+const VALID_VIEWPORT_TAGS = new Set(['mobile', 'touch', 'landscape']);
+
+function parseDecimal(part: string | undefined, name: string): number {
+  if (part === undefined || !DECIMAL.test(part)) {
+    throw new Error(
+      `Invalid ${name} "${part ?? ''}". Expected a decimal number.`,
+    );
+  }
+  return Number(part);
+}
 
 export function viewportTransform(arg: string | undefined):
   | {
@@ -511,49 +750,73 @@ export function viewportTransform(arg: string | undefined):
     return undefined;
   }
   const [dimensions, ...tags] = arg.split(',');
+  for (const tag of tags) {
+    if (!VALID_VIEWPORT_TAGS.has(tag)) {
+      throw new Error(
+        `Invalid viewport tag "${tag}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+      );
+    }
+  }
   const isMobile = tags.includes('mobile');
   const hasTouch = tags.includes('touch');
   const isLandscape = tags.includes('landscape');
-  const [width, height, dpr] = dimensions.split('x').map(Number) as [
-    number,
-    number,
-    number | undefined,
-  ];
+  const dimParts = dimensions.split('x');
+  if (dimParts.length !== 2 && dimParts.length !== 3) {
+    throw new Error(
+      `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+    );
+  }
+  const width = parseDecimal(dimParts[0], 'viewport width');
   if (!Number.isFinite(width) || width <= 0) {
     throw new Error(
       `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
     );
   }
+  const height = parseDecimal(dimParts[1], 'viewport height');
   if (!Number.isFinite(height) || height <= 0) {
     throw new Error(
       `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
     );
   }
-  if (dpr !== undefined && (!Number.isFinite(dpr) || dpr <= 0)) {
-    throw new Error(
-      `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
-    );
+  let deviceScaleFactor: number | undefined;
+  if (dimParts.length === 3) {
+    const dpr = parseDecimal(dimParts[2], 'devicePixelRatio');
+    if (!Number.isFinite(dpr) || dpr <= 0) {
+      throw new Error(
+        `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
+      );
+    }
+    deviceScaleFactor = dpr;
   }
   return {
     width,
     height,
-    deviceScaleFactor: dpr,
-    isMobile: isMobile,
-    isLandscape: isLandscape,
-    hasTouch: hasTouch,
+    deviceScaleFactor,
+    isMobile,
+    isLandscape,
+    hasTouch,
   };
 }
 
-export function geolocationTransform(arg: string | undefined) {
+export function geolocationTransform(
+  arg: string | undefined,
+): {latitude: number; longitude: number} | undefined {
   if (!arg) {
     return undefined;
   }
-  const [latitude, longitude] = arg.split(',').map(Number) as [number, number];
+  const parts = arg.split(',');
+  if (parts.length !== 2) {
+    throw new Error(
+      `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
+    );
+  }
+  const latitude = parseDecimal(parts[0], 'latitude');
   if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
     throw new Error(
       `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
     );
   }
+  const longitude = parseDecimal(parts[1], 'longitude');
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     throw new Error(
       `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
@@ -572,14 +835,32 @@ export function isSlimTool(
 }
 
 /**
- * Slim mode replaces the regular tools with the slim tools. Only the tools of
- * the current mode are registered, so a slim tool may share its name with a
- * regular tool. `--slim` requires a restart, so the mode never changes while
- * the server is running.
+ * Slim mode replaces the regular tools with the slim tools.
  */
 export function isAvailableInMode(
   tool: Pick<BaseToolDefinition, 'annotations'>,
   serverArgs: Pick<ParsedArguments, 'slim'>,
 ): boolean {
   return isSlimTool(tool) === Boolean(serverArgs.slim);
+}
+
+/**
+ * Returns whether a capability gate is enabled under the given arguments.
+ */
+export function isCapabilityEnabled(
+  gate: CapabilityGate,
+  serverArgs: ParsedArguments,
+): boolean {
+  if (Boolean(gate.conditions?.includes('slim')) !== Boolean(serverArgs.slim)) {
+    return false;
+  }
+  if (gate.category && !serverArgs[categoryToFlagName(gate.category)]) {
+    return false;
+  }
+  for (const condition of gate.conditions ?? []) {
+    if (!serverArgs[condition]) {
+      return false;
+    }
+  }
+  return true;
 }

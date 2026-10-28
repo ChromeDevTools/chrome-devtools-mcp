@@ -6,7 +6,7 @@
 
 import type {WebMCPTool} from 'puppeteer-core';
 
-import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {
   CommentFormatter,
   type StructuredCommentThread,
@@ -31,24 +31,30 @@ import {
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
+import {WebAuthnFormatter} from './formatters/WebAuthnFormatter.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
+  HeapSnapshotClassDiffTotals,
   HeapSnapshotDetailedClassDiff,
+  HeapSnapshotDiff,
   DuplicateStringGroup,
 } from './processors/HeapSnapshotManager.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
-import type {
-  ConsoleMessage,
-  ImageContent,
-  ResourceType,
-  TextContent,
-  Extension,
-  HTTPRequest,
+import {
+  DevTools,
+  getToonEncode,
+  getGcfEncode,
+  type ConsoleMessage,
+  type ImageContent,
+  type ResourceType,
+  type TextContent,
+  type Extension,
+  type HTTPRequest,
+  type Protocol,
 } from './third_party/index.js';
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -59,6 +65,7 @@ import type {
   MatchedStyles,
   Response,
   SnapshotParams,
+  WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import {
   type InsightName,
@@ -67,9 +74,10 @@ import {
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
 import type {CD4ACommentThread, PaginationOptions} from './types.js';
-import type {WithSymbolId} from './utils/id.js';
-import {stableIdSymbol} from './utils/id.js';
+import {stableIdSymbol, type WithSymbolId} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
+import {getFilterableResourceType} from './utils/resourceType.js';
+import {truncateText} from './utils/text.js';
 import type {WaitForEventsResult} from './utils/WaitForHelper.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
@@ -112,7 +120,7 @@ export class McpResponse implements Response {
     nodes?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange;
     retainingPaths?: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths;
     dominators?: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain;
-    classDiffs?: HeapSnapshotClassDiff[];
+    diff?: HeapSnapshotDiff;
     detailedClassDiff?: HeapSnapshotDetailedClassDiff;
     duplicateStrings?: DuplicateStringGroup[];
     objectInfo?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
@@ -144,28 +152,24 @@ export class McpResponse implements Response {
   #listWebMcpTools?: boolean;
   #devToolsData?: DevToolsData;
   #tabId?: string;
-  #args: ParsedArguments;
+  #config: ReadonlyServerConfig;
   #page?: McpPage;
-  #redactNetworkHeaders = true;
   #error?: Error;
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
+  #webAuthnFormatter?: WebAuthnFormatter;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
   }
 
-  constructor(args: ParsedArguments) {
-    this.#args = args;
+  constructor(config: ReadonlyServerConfig) {
+    this.#config = config;
   }
 
   setPage(page: McpPage): void {
     this.#page = page;
-  }
-
-  setRedactNetworkHeaders(value: boolean): void {
-    this.#redactNetworkHeaders = value;
   }
 
   /**
@@ -187,7 +191,7 @@ export class McpResponse implements Response {
   setIncludePages(value: boolean): void {
     this.#includePages = value;
 
-    if (this.#args.categoryExtensions) {
+    if (this.#config.resolved.categoryExtensions) {
       this.#includeExtensionServiceWorkers = value;
       this.#includeExtensionPages = value;
     }
@@ -231,7 +235,7 @@ export class McpResponse implements Response {
     this.#networkRequestsOptions = {
       include: value,
       pagination:
-        options?.pageSize !== undefined || options?.pageIdx !== undefined
+        options?.pageSize !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -260,7 +264,7 @@ export class McpResponse implements Response {
     this.#consoleDataOptions = {
       include: value,
       pagination:
-        options?.pageSize !== undefined || options?.pageIdx !== undefined
+        options?.pageSize !== undefined
           ? {
               pageSize: options.pageSize,
               pageIdx: options.pageIdx,
@@ -297,6 +301,12 @@ export class McpResponse implements Response {
 
   attachConsoleMessage(msgid: number): void {
     this.#attachedConsoleMessageId = msgid;
+  }
+
+  attachWebAuthnAuthenticator(
+    authenticator: WebAuthnAuthenticatorState | undefined,
+  ): void {
+    this.#webAuthnFormatter = new WebAuthnFormatter(authenticator);
   }
 
   attachTraceSummary(result: TraceResult): void {
@@ -377,13 +387,14 @@ export class McpResponse implements Response {
 
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
-    options?: PaginationOptions,
-  ) {
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       aggregateData,
       pagination: options,
+      formatOptions: options,
     };
   }
 
@@ -393,7 +404,7 @@ export class McpResponse implements Response {
     nativeContextSizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
     retainedByContextSummary: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainedByContextSummary,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -408,7 +419,7 @@ export class McpResponse implements Response {
   setHeapSnapshotNodes(
     nodes: DevTools.HeapSnapshotModel.HeapSnapshotModel.ItemsRange,
     options?: PaginationOptions & HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -421,7 +432,7 @@ export class McpResponse implements Response {
   setHeapSnapshotDuplicateStrings(
     duplicateStrings: DuplicateStringGroup[],
     options?: PaginationOptions & HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -434,7 +445,7 @@ export class McpResponse implements Response {
   setHeapSnapshotRetainingPaths(
     retainingPaths: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingPaths,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -446,7 +457,7 @@ export class McpResponse implements Response {
   setHeapSnapshotDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -455,28 +466,36 @@ export class McpResponse implements Response {
     };
   }
 
-  setHeapSnapshotClassDiffs(classDiffs: HeapSnapshotClassDiff[]) {
+  setHeapSnapshotClassDiffs(
+    diff: HeapSnapshotDiff,
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
-      classDiffs,
+      diff,
+      pagination: options,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotDetailedClassDiff(
     detailedClassDiff: HeapSnapshotDetailedClassDiff,
-  ) {
+    options?: PaginationOptions & HeapSnapshotFormatOptions,
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
       detailedClassDiff,
+      pagination: options,
+      formatOptions: options,
     };
   }
 
   setHeapSnapshotObjectDetails(
     objectInfo: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
     options?: HeapSnapshotFormatOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -488,7 +507,7 @@ export class McpResponse implements Response {
   setHeapSnapshotContextAnalysis(
     contextAnalysis: DevTools.HeapSnapshotModel.HeapSnapshotModel.ContextAnalysisResult,
     options?: ContextAnalysisOptions,
-  ) {
+  ): void {
     this.#heapSnapshotOptions = {
       ...this.#heapSnapshotOptions,
       include: true,
@@ -521,9 +540,6 @@ export class McpResponse implements Response {
   async #handleSnapshot(
     context: McpContext,
   ): Promise<SnapshotFormatter | string | undefined> {
-    if (this.#includePages) {
-      await context.createPagesSnapshot();
-    }
     if (!this.#snapshotParams) {
       return undefined;
     }
@@ -542,9 +558,8 @@ export class McpResponse implements Response {
         '.txt',
       );
       return result.filename;
-    } else {
-      return formatter;
     }
+    return formatter;
   }
 
   async #handleAttachedNetworkRequest(
@@ -567,7 +582,7 @@ export class McpResponse implements Response {
       responseFilePath: this.#attachedNetworkRequestOptions?.responseFilePath,
       saveFile: (data, filename, extension) =>
         context.saveFile(data, filename, extension),
-      redactNetworkHeaders: this.#redactNetworkHeaders,
+      redactNetworkHeaders: this.#config.resolved.redactNetworkHeaders,
     });
   }
 
@@ -591,7 +606,8 @@ export class McpResponse implements Response {
         fetchDetailedData: true,
         devTools: this.#page.devtoolsUniverse,
       });
-    } else if (message instanceof DevTools.AggregatedIssue) {
+    }
+    if (message instanceof DevTools.AggregatedIssue) {
       const formatter = new IssueFormatter(message, {
         id: consoleMessageStableId,
         requestIdResolver: this.#page.resolveCdpRequestId.bind(this.#page),
@@ -605,25 +621,24 @@ export class McpResponse implements Response {
         );
       }
       return formatter;
-    } else {
-      return undefined;
     }
+    return undefined;
   }
 
-  async #handleThirdPartyDevelopeTools(): Promise<ToolGroups | undefined> {
+  async #handleThirdPartyDeveloperTools(): Promise<ToolGroups | undefined> {
     if (
-      this.#args.categoryExperimentalThirdParty &&
+      this.#config.resolved.categoryExperimentalThirdParty &&
       this.#listThirdPartyDeveloperTools &&
       this.#page
     ) {
-      return await this.#page.getToolGroups();
+      return await this.#page.discoverThirdPartyDeveloperTools();
     }
     return undefined;
   }
 
   async #handleWebMCP(): Promise<WebMCPTool[] | undefined> {
     if (
-      this.#args.categoryExperimentalWebmcp &&
+      this.#config.resolved.categoryExperimentalWebmcp &&
       this.#listWebMcpTools &&
       this.#page
     ) {
@@ -718,8 +733,7 @@ export class McpResponse implements Response {
         this.#networkRequestsOptions.resourceTypes,
       );
       requests = requests.filter(request => {
-        const type = request.resourceType();
-        return normalizedTypes.has(type);
+        return normalizedTypes.has(getFilterableResourceType(request));
       });
     }
 
@@ -733,7 +747,7 @@ export class McpResponse implements Response {
           fetchData: false,
           saveFile: (data, filename, extension) =>
             context.saveFile(data, filename, extension),
-          redactNetworkHeaders: this.#redactNetworkHeaders,
+          redactNetworkHeaders: this.#config.resolved.redactNetworkHeaders,
         }),
       ),
     );
@@ -776,6 +790,17 @@ export class McpResponse implements Response {
     content: Array<TextContent | ImageContent>;
     structuredContent: object;
   }> {
+    if (this.#includePages || this.#attachedWaitForResult?.openedPages) {
+      await context.createPagesSnapshot();
+    }
+    if (this.#includePages && (!this.#page || this.#page.isClosed())) {
+      try {
+        this.#page = context.getSelectedMcpPage();
+      } catch {
+        this.#page = undefined;
+      }
+    }
+
     const [
       snapshot,
       detailedNetworkRequest,
@@ -789,7 +814,7 @@ export class McpResponse implements Response {
       this.#handleSnapshot(context),
       this.#handleAttachedNetworkRequest(context),
       this.#handleAttachedConsoleMessage(),
-      this.#handleThirdPartyDevelopeTools(),
+      this.#handleThirdPartyDeveloperTools(),
       this.#handleWebMCP(),
       this.#handleConsoleList(context),
       this.#handleNetworkRequestList(context),
@@ -805,7 +830,7 @@ export class McpResponse implements Response {
       extensions = await context.listExtensions();
     }
 
-    return this.format(
+    return await this.format(
       context,
       {
         detailedConsoleMessage,
@@ -874,6 +899,8 @@ export class McpResponse implements Response {
         insightName: string;
         insightKey: string | undefined;
       }>;
+      traceInsight?: string;
+      error?: string;
       lighthouseResult?: object;
       extensions?: object[];
       thirdPartyDeveloperTools?: object[];
@@ -886,12 +913,16 @@ export class McpResponse implements Response {
       userAgent?: string;
       cpuThrottlingRate?: number;
       colorScheme?: string;
+      forcedColors?: string;
+      prefersContrast?: string;
+      prefersReducedMotion?: string;
       dialog?: {
         type: string;
         message: string;
         defaultValue?: string;
       };
       pages?: object[];
+      openedPages?: object[];
       pagination?: object;
       heapSnapshot?: {
         stats?: object;
@@ -902,12 +933,13 @@ export class McpResponse implements Response {
           objectCount: number;
           totalSelfSize: number;
         };
+        classDiffStats?: HeapSnapshotClassDiffTotals;
       };
-      heapSnapshotData?: object[];
+      heapSnapshotAggregates?: readonly object[];
       heapSnapshotNodes?: readonly object[];
       heapSnapshotRetainingPaths?: object;
       heapSnapshotDominators?: readonly object[];
-      heapSnapshotClassDiffs?: HeapSnapshotClassDiff[];
+      heapSnapshotClassDiffs?: readonly HeapSnapshotClassDiff[];
       heapSnapshotDetailedClassDiff?: HeapSnapshotDetailedClassDiff;
       heapSnapshotDuplicateStrings?: readonly DuplicateStringGroup[];
       heapSnapshotObjectDetails?: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo;
@@ -917,6 +949,7 @@ export class McpResponse implements Response {
       comments?: StructuredCommentThread[];
       commentsSnapshotRegenerated?: 'standard' | 'verbose';
       matchedStyles?: object;
+      webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -952,7 +985,7 @@ export class McpResponse implements Response {
     if (this.#reconnectNotice) {
       structuredContent.reconnected = true;
       response.push(
-        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#args).name} to see open pages.`,
+        `Note: the browser was restarted or reconnected since the last call. Page ids have changed. Call ${listPages(this.#config.resolved).name} to see open pages.`,
       );
     }
     if (this.#textResponseLines.length) {
@@ -968,11 +1001,34 @@ export class McpResponse implements Response {
         structuredContent.navigatedToUrl =
           this.#attachedWaitForResult.navigatedToUrl;
       }
+      if (this.#attachedWaitForResult.openedPages) {
+        const openedPages = this.#attachedWaitForResult.openedPages;
+        const openedMcpPages = context
+          .getPages()
+          .filter(mcpPage => openedPages.has(mcpPage.target));
+
+        if (openedMcpPages.length) {
+          const targetInfos = await context.getTargetInfos();
+          response.push('## Opened pages');
+          const structuredPages = [];
+          for (const mcpPage of openedMcpPages) {
+            const page = formatPage(
+              mcpPage,
+              context,
+              targetInfos.get(mcpPage.targetId),
+            );
+            response.push(page.text);
+            structuredPages.push(page.structured);
+          }
+          structuredContent.openedPages = structuredPages;
+        }
+      }
     }
 
-    const networkConditions = this.#page?.networkConditions;
-    if (networkConditions) {
-      const timeout = this.#page!.pptrPage.getDefaultNavigationTimeout();
+    const page = this.#page;
+    const networkConditions = page?.networkConditions;
+    if (page && networkConditions) {
+      const timeout = page.pptrPage.getDefaultNavigationTimeout();
       response.push(`Emulating network conditions: ${networkConditions}`);
       response.push(`Default navigation timeout set to ${timeout} ms`);
       structuredContent.networkConditions = networkConditions;
@@ -1011,6 +1067,26 @@ export class McpResponse implements Response {
       structuredContent.colorScheme = colorScheme;
     }
 
+    const forcedColors = this.#page?.forcedColors;
+    if (forcedColors) {
+      response.push(`Emulating forced-colors: ${forcedColors}`);
+      structuredContent.forcedColors = forcedColors;
+    }
+
+    const prefersContrast = this.#page?.prefersContrast;
+    if (prefersContrast) {
+      response.push(`Emulating prefers-contrast: ${prefersContrast}`);
+      structuredContent.prefersContrast = prefersContrast;
+    }
+
+    const prefersReducedMotion = this.#page?.prefersReducedMotion;
+    if (prefersReducedMotion) {
+      response.push(
+        `Emulating prefers-reduced-motion: ${prefersReducedMotion}`,
+      );
+      structuredContent.prefersReducedMotion = prefersReducedMotion;
+    }
+
     const dialog = this.#page?.getDialog();
     if (dialog) {
       const defaultValueIfNeeded =
@@ -1019,7 +1095,7 @@ export class McpResponse implements Response {
           : '';
       response.push(`# Open dialog
 ${dialog.type()}: ${dialog.message()}${defaultValueIfNeeded}.
-Call ${handleDialog(this.#args).name} to handle it before continuing.`);
+Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.`);
       structuredContent.dialog = {
         type: dialog.type(),
         message: dialog.message(),
@@ -1057,6 +1133,11 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           `Note: the previously selected page ${selectionFallback.wasClosed ? 'was closed' : 'is no longer listed'}.${selectedPageId !== undefined ? ` Page ${selectedPageId} is now selected.` : ''}`,
         );
       }
+      const targetInfos =
+        regularPages.length ||
+        (this.#includeExtensionPages && extensionPages.length)
+          ? await context.getTargetInfos()
+          : new Map<string, Protocol.Target.TargetInfo>();
       if (regularPages.length) {
         const parts = [`## Pages`];
         const structuredPages = [];
@@ -1065,14 +1146,15 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
           const contextLabel = isolatedContextName
             ? ` isolatedContext=${isolatedContextName}`
             : '';
-          const title = mcpPage.getTitle();
-          const pageLabel = title
-            ? `${truncateTitle(title)} (${mcpPage.url()})`
-            : mcpPage.url();
-          parts.push(
-            `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
+          const page = formatPage(
+            mcpPage,
+            context,
+            targetInfos.get(mcpPage.targetId),
           );
-          structuredPages.push(createStructuredPage(mcpPage, context, title));
+          parts.push(
+            `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}${formatWebAuthnLabel(mcpPage)}`,
+          );
+          structuredPages.push(page.structured);
         }
         response.push(...parts);
         structuredContent.pages = structuredPages;
@@ -1087,16 +1169,15 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
             const contextLabel = isolatedContextName
               ? ` isolatedContext=${isolatedContextName}`
               : '';
-            const title = mcpPage.getTitle();
-            const pageLabel = title
-              ? `${truncateTitle(title)} (${mcpPage.url()})`
-              : mcpPage.url();
+            const page = formatPage(
+              mcpPage,
+              context,
+              targetInfos.get(mcpPage.targetId),
+            );
             response.push(
-              `${mcpPage.id}: ${pageLabel}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
+              `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}${formatWebAuthnLabel(mcpPage)}`,
             );
-            structuredExtensionPages.push(
-              createStructuredPage(mcpPage, context, title),
-            );
+            structuredExtensionPages.push(page.structured);
           }
           structuredContent.extensionPages = structuredExtensionPages;
         }
@@ -1160,28 +1241,78 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       );
       if ('error' in insightOutput) {
         response.push(insightOutput.error);
+        structuredContent.error = insightOutput.error;
       } else {
         response.push(insightOutput.output);
+        structuredContent.traceInsight = insightOutput.output;
       }
     }
 
     if (data.lighthouseResult) {
       structuredContent.lighthouseResult = data.lighthouseResult;
-      const {summary, reports} = data.lighthouseResult;
-      response.push('## Lighthouse Audit Results');
+      const {summary, failedAudits, reports} = data.lighthouseResult;
+      response.push('## Lighthouse audit results');
       response.push(`Mode: ${summary.mode}`);
       response.push(`Device: ${summary.device}`);
       response.push(`URL: ${summary.url}`);
-      response.push('### Category Scores');
+      response.push('### Category scores');
       for (const score of summary.scores) {
-        response.push(
-          `- ${score.title}: ${(score.score ?? 0) * 100} (${score.id})`,
-        );
+        // Lighthouse uses a null score for categories that could not be
+        // scored and renders scores as Math.round(score * 100).
+        const formattedScore =
+          score.score === null ? 'n/a' : Math.round(score.score * 100);
+        response.push(`- ${score.title}: ${formattedScore} (${score.id})`);
       }
-      response.push('### Audit Summary');
+      response.push('### Audit summary');
       response.push(`Passed: ${summary.audits.passed}`);
       response.push(`Failed: ${summary.audits.failed}`);
-      response.push(`Total Timing: ${summary.timing.total}ms`);
+      response.push(`Total timing: ${summary.timing.total}ms`);
+      if (failedAudits.length) {
+        response.push('### Failed audits');
+        for (const audit of failedAudits) {
+          const categories = audit.categories.length
+            ? ` [${audit.categories.join(', ')}]`
+            : '';
+          const displayValue = audit.displayValue
+            ? ` (${audit.displayValue})`
+            : '';
+          response.push(
+            `- ${audit.id}${categories}: ${audit.title}${displayValue} (score: ${audit.score})`,
+          );
+          if (audit.description) {
+            response.push(`  ${collapseWhitespace(audit.description)}`);
+          }
+          if (audit.totalNodes) {
+            const shown =
+              audit.totalNodes > audit.nodes.length
+                ? `, showing ${audit.nodes.length}`
+                : '';
+            response.push(`  Nodes (${audit.totalNodes}${shown}):`);
+          }
+          for (const node of audit.nodes) {
+            // Values are JSON-encoded so that quotes or spaces within them
+            // cannot be confused with the `key=value` delimiters.
+            const parts: string[] = [];
+            if (node.selector) {
+              parts.push(`selector=${JSON.stringify(node.selector)}`);
+            }
+            if (node.nodeLabel) {
+              parts.push(
+                `label=${JSON.stringify(collapseWhitespace(node.nodeLabel))}`,
+              );
+            }
+            if (node.snippet) {
+              parts.push(
+                `snippet=${JSON.stringify(collapseWhitespace(node.snippet))}`,
+              );
+            }
+            response.push(`  - ${parts.join(' ')}`);
+            if (node.explanation) {
+              response.push(`    ${collapseWhitespace(node.explanation)}`);
+            }
+          }
+        }
+      }
       response.push('### Reports');
       for (const report of reports) {
         response.push(`- ${report}`);
@@ -1245,12 +1376,8 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
       const aggregateData = this.#heapSnapshotOptions.aggregateData;
       if (aggregateData) {
-        const sortedEntries = HeapSnapshotFormatter.sort(
-          aggregateData.aggregates,
-        );
-
         const paginationData = this.#dataWithPagination(
-          sortedEntries,
+          aggregateData.aggregates,
           this.#heapSnapshotOptions.pagination,
         );
 
@@ -1266,14 +1393,19 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         structuredContent.pagination = paginationData.pagination;
         response.push(...paginationData.info);
 
-        const paginatedRecord = Object.fromEntries(paginationData.items);
-        const formatter = new HeapSnapshotFormatter(paginatedRecord);
-
-        structuredContent.heapSnapshotData = formatter.toJSON();
+        structuredContent.heapSnapshotAggregates = paginationData.items;
         response.push(
           compactEncode
-            ? compactEncode(structuredContent.heapSnapshotData)
-            : formatter.toString(),
+            ? compactEncode(
+                paginationData.items.map(aggregate => ({
+                  ...aggregate,
+                  className: formatName(aggregate.className, formatOptions),
+                })),
+              )
+            : HeapSnapshotFormatter.formatAggregates(
+                paginationData.items,
+                formatOptions,
+              ),
         );
       }
       const nodes = this.#heapSnapshotOptions.nodes;
@@ -1341,25 +1473,65 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
         }
         structuredContent.heapSnapshotDominators = dominators;
       }
-      const classDiffs = this.#heapSnapshotOptions.classDiffs;
-      if (classDiffs) {
+      const diff = this.#heapSnapshotOptions.diff;
+      if (diff) {
         response.push('### Heap Snapshot Diff');
+        response.push(HeapSnapshotFormatter.formatDiffTotals(diff.totals));
+        structuredContent.heapSnapshot = structuredContent.heapSnapshot || {};
+        structuredContent.heapSnapshot.classDiffStats = diff.totals;
+        const paginationData = this.#dataWithPagination(
+          diff.classDiffs,
+          this.#heapSnapshotOptions.pagination,
+        );
+        structuredContent.pagination = paginationData.pagination;
+        response.push(...paginationData.info);
         response.push(
           compactEncode
-            ? compactEncode(classDiffs)
-            : HeapSnapshotFormatter.formatDiffSummary(classDiffs),
+            ? compactEncode(
+                paginationData.items.map(diff => ({
+                  ...diff,
+                  className: formatName(diff.className, formatOptions),
+                })),
+              )
+            : HeapSnapshotFormatter.formatDiffSummary(
+                paginationData.items,
+                formatOptions,
+              ),
         );
-        structuredContent.heapSnapshotClassDiffs = classDiffs;
+        structuredContent.heapSnapshotClassDiffs = paginationData.items;
       }
       const detailedClassDiff = this.#heapSnapshotOptions.detailedClassDiff;
       if (detailedClassDiff) {
         response.push('### Heap Snapshot Detailed Diff');
+        const {classDiff, objects} = detailedClassDiff;
+        const paginationData = this.#dataWithPagination(
+          objects,
+          this.#heapSnapshotOptions.pagination,
+        );
+        structuredContent.pagination = paginationData.pagination;
         response.push(
           compactEncode
-            ? compactEncode(detailedClassDiff)
-            : HeapSnapshotFormatter.formatDiffDetails(detailedClassDiff),
+            ? compactEncode({
+                ...classDiff,
+                className: formatName(classDiff.className, formatOptions),
+              })
+            : HeapSnapshotFormatter.formatDetailedClassDiffHeader(
+                classDiff,
+                formatOptions,
+              ),
         );
-        structuredContent.heapSnapshotDetailedClassDiff = detailedClassDiff;
+        response.push(...paginationData.info);
+        response.push(
+          compactEncode
+            ? compactEncode(paginationData.items)
+            : HeapSnapshotFormatter.formatDetailedClassDiffObjects(
+                paginationData.items,
+              ),
+        );
+        structuredContent.heapSnapshotDetailedClassDiff = {
+          classDiff,
+          objects: paginationData.items,
+        };
       }
       const duplicateStrings = this.#heapSnapshotOptions.duplicateStrings;
       if (duplicateStrings) {
@@ -1458,20 +1630,24 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     }
 
     const thirdPartyDeveloperTools = data.thirdPartyDeveloperTools;
-    if (thirdPartyDeveloperTools?.length) {
+    if (this.#listThirdPartyDeveloperTools && thirdPartyDeveloperTools) {
       structuredContent.thirdPartyDeveloperTools = thirdPartyDeveloperTools;
       response.push('## Third-party developer tools');
-      for (const toolGroup of thirdPartyDeveloperTools) {
-        response.push(`${toolGroup.name}: ${toolGroup.description}`);
-        response.push('Available tools:');
-        const toolDefinitionsMessage = toolGroup.tools
-          .map(tool => {
-            return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
-              tool.inputSchema,
-            )}`;
-          })
-          .join('\n');
-        response.push(toolDefinitionsMessage);
+      if (thirdPartyDeveloperTools.length === 0) {
+        response.push('No third-party developer tools available.');
+      } else {
+        for (const toolGroup of thirdPartyDeveloperTools) {
+          response.push(`${toolGroup.name}: ${toolGroup.description}`);
+          response.push('Available tools:');
+          const toolDefinitionsMessage = toolGroup.tools
+            .map(tool => {
+              return `name="${tool.name}", description="${tool.description}", inputSchema=${JSON.stringify(
+                tool.inputSchema,
+              )}`;
+            })
+            .join('\n');
+          response.push(toolDefinitionsMessage);
+        }
       }
     }
 
@@ -1574,8 +1750,18 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
       }
     }
 
+    if (this.#webAuthnFormatter) {
+      structuredContent.webauthnAuthenticator =
+        this.#webAuthnFormatter.toJSON();
+      response.push(
+        compactEncode
+          ? compactEncode(structuredContent.webauthnAuthenticator)
+          : this.#webAuthnFormatter.toString(),
+      );
+    }
+
     if (this.#cssStylesData) {
-      const resolveUid = (backendNodeId: number) =>
+      const resolveUid = (backendNodeId: number): string | undefined =>
         this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
 
       const containerDetails = await resolveContainerQueries(
@@ -1646,7 +1832,22 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     };
   }
 
-  #dataWithPagination<T>(data: T[], pagination?: PaginationOptions) {
+  #dataWithPagination<T>(
+    data: readonly T[],
+    pagination?: PaginationOptions,
+  ): {
+    info: string[];
+    items: readonly T[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startIndex: number;
+      endIndex: number;
+      invalidPage: boolean;
+    };
+  } {
     const response = [];
     const paginationResult = paginate<T>(data, pagination);
     if (paginationResult.invalidPage) {
@@ -1682,22 +1883,55 @@ Call ${handleDialog(this.#args).name} to handle it before continuing.`);
     };
   }
 
-  resetResponseLineForTesting() {
+  resetResponseLineForTesting(): void {
     this.#textResponseLines = [];
   }
 }
 function truncateTitle(title: string, maxLength = 50): string {
-  if (title.length <= maxLength) {
-    return title;
-  }
-  return title.slice(0, maxLength - 3) + '...';
+  return truncateText(title, maxLength, {includeEllipsisInLength: true});
+}
+
+const collapseWhitespace = (value: string): string => {
+  return value.replace(/\s+/g, ' ').trim();
+};
+
+function formatPage(
+  mcpPage: McpPage,
+  context: McpContext,
+  targetInfo: Protocol.Target.TargetInfo | undefined,
+): {text: string; structured: ReturnType<typeof createStructuredPage>} {
+  const title = mcpPage.getTitle(targetInfo);
+  const url = mcpPage.url();
+  const pageLabel = title ? `${truncateTitle(title)} (${url})` : url;
+  return {
+    text: `${mcpPage.id}: ${pageLabel}`,
+    structured: createStructuredPage(mcpPage, context, title),
+  };
+}
+function getWebAuthnLabel(mcpPage: McpPage): string | undefined {
+  const authenticator = mcpPage.getWebAuthnAuthenticator();
+  return authenticator
+    ? `${authenticator.protocol}/${authenticator.transport}`
+    : undefined;
+}
+
+function formatWebAuthnLabel(mcpPage: McpPage): string {
+  const label = getWebAuthnLabel(mcpPage);
+  return label ? ` webauthn=${label}` : '';
 }
 
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
   rawTitle: string,
-) {
+): {
+  id: number | undefined;
+  url: string;
+  title: string;
+  selected: boolean;
+  isolatedContext?: string;
+  webauthn?: string;
+} {
   const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
   const entry: {
@@ -1706,6 +1940,7 @@ function createStructuredPage(
     title: string;
     selected: boolean;
     isolatedContext?: string;
+    webauthn?: string;
   } = {
     id: mcpPage.id,
     url: mcpPage.url(),
@@ -1714,6 +1949,10 @@ function createStructuredPage(
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
+  }
+  const webAuthnLabel = getWebAuthnLabel(mcpPage);
+  if (webAuthnLabel) {
+    entry.webauthn = webAuthnLabel;
   }
   return entry;
 }

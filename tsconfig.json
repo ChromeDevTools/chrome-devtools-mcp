@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "module": "esnext",
     "target": "es2023",
     "lib": [
       "ES2023",
@@ -22,8 +23,10 @@
     "noFallthroughCasesInSwitch": true,
     "incremental": true,
     "sourceMap": true,
-    "allowJs": true,
-    "useUnknownInCatchVariables": false
+    "preserveConstEnums": true,
+    "useUnknownInCatchVariables": false,
+    "declaration": true,
+    "isolatedDeclarations": true
   },
   "include": [
     "src/**/*.ts",
@@ -100,8 +103,5 @@
     "third_party/devtools-frontend/front_end/third_party/puppeteer-legacy/**",
     "third_party/devtools-frontend/front_end/panels/recorder/**",
     "third_party/devtools-frontend/front_end/services/puppeteer/**"
-  ],
-  "files": [
-    "third_party/devtools-frontend/front_end/third_party/acorn/package/dist/acorn.mjs"
   ]
 }

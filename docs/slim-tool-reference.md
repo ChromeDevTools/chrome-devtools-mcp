@@ -34,8 +34,10 @@
 
 ### `screenshot`
 
-**Description:** Takes a [`screenshot`](#screenshot)
+**Description:** Takes a png [`screenshot`](#screenshot)
 
-**Parameters:** None
+**Parameters:**
+
+- **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the [`screenshot`](#screenshot) to instead of attaching it to the response.
 
 ---

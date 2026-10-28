@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -13,17 +13,13 @@ import {
   createTargetUniverse,
   SymbolizedError,
 } from '../../src/devtools/DevtoolsUtils.js';
-import {DevTools} from '../../src/third_party/index.js';
-import type {Protocol} from '../../src/third_party/index.js';
+import {DevTools, type Protocol} from '../../src/third_party/index.js';
+import {createMockCDPSession} from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withBrowser} from '../utils.js';
 
 describe('createTargetUniverse', () => {
   const server = serverHooks();
-
-  afterEach(() => {
-    sinon.restore();
-  });
 
   it('works with a real browser', async () => {
     await withBrowser(async (browser, page) => {
@@ -232,6 +228,39 @@ describe('SymbolizedError', () => {
       assert.strictEqual(error.cause, undefined);
     });
 
+    it('includes the reason of an unhandled promise rejection', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          text: 'Uncaught (in promise)',
+          exception: {
+            type: 'object',
+            subtype: 'error',
+            className: 'Error',
+            description:
+              'Error: reason-A\n    at http://example.com/app.js:4:16',
+          },
+        }),
+        targetId: '',
+      });
+
+      assert.strictEqual(
+        error.message,
+        'Uncaught (in promise) Error: reason-A',
+      );
+    });
+
+    it('includes a primitive rejection reason', async () => {
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({
+          text: 'Uncaught (in promise)',
+          exception: {type: 'string', value: 'reason-B'},
+        }),
+        targetId: '',
+      });
+
+      assert.strictEqual(error.message, 'Uncaught (in promise) reason-B');
+    });
+
     it('keeps the full description when it has no stack frames', async () => {
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({
@@ -268,7 +297,7 @@ describe('SymbolizedError', () => {
       );
     });
 
-    it('uses an empty exception message when the exception only has a value', async () => {
+    it('uses the value of a thrown primitive as the exception message', async () => {
       // A thrown primitive (e.g. `throw 'oops'`) has no description.
       const error = await SymbolizedError.fromDetails({
         details: exceptionDetails({
@@ -280,7 +309,7 @@ describe('SymbolizedError', () => {
         targetId: '',
       });
 
-      assert.strictEqual(error.message, 'Uncaught ');
+      assert.strictEqual(error.message, 'Uncaught oops');
     });
 
     it('uses the details text verbatim when there is no exception object', async () => {
@@ -368,6 +397,57 @@ describe('SymbolizedError', () => {
       assert.strictEqual(error.cause, cause);
       assert.strictEqual(error.cause?.message, 'cause message');
     });
+
+    it('stops resolving a cyclic cause chain after 10 causes', async () => {
+      const session = createMockCDPSession();
+      const send: sinon.SinonStub = session.send;
+      let lookups = 0;
+      // CDP returns a new object id on every lookup of the same error.
+      const selfCausedError = (): Protocol.Runtime.RemoteObject => ({
+        type: 'object',
+        subtype: 'error',
+        className: 'Error',
+        description: 'Error: self-cause',
+        objectId: `error-${++lookups}`,
+      });
+      send.withArgs('Runtime.getProperties').callsFake(async () => {
+        // Ends an unbounded chain so that the test fails instead of hanging.
+        if (lookups > 100) {
+          throw new Error('The cause chain is not bounded.');
+        }
+        return {
+          result: [
+            {
+              name: 'cause',
+              configurable: true,
+              enumerable: true,
+              value: selfCausedError(),
+            },
+          ],
+        };
+      });
+      send.withArgs('Runtime.getExceptionDetails').callsFake(async () => ({
+        exceptionDetails: exceptionDetails({
+          text: 'Error: self-cause',
+          exception: selfCausedError(),
+        }),
+      }));
+
+      const error = await SymbolizedError.fromDetails({
+        details: exceptionDetails({exception: selfCausedError()}),
+        targetId: '',
+        session,
+        includeStackAndCause: true,
+      });
+
+      let causes = 0;
+      for (let cause = error.cause; cause; cause = cause.cause) {
+        assert.strictEqual(cause.message, 'Error: self-cause');
+        causes++;
+      }
+      assert.strictEqual(causes, 10);
+      sinon.assert.callCount(send.withArgs('Runtime.getProperties'), 10);
+    });
   });
 
   describe('fromError', () => {
@@ -402,7 +482,7 @@ describe('SymbolizedError', () => {
       assert.strictEqual(error.message, 'TypeError: nope');
     });
 
-    it('falls back to an empty message without a description', async () => {
+    it('uses the value of a primitive error without a description', async () => {
       const error = await SymbolizedError.fromError({
         error: {
           type: 'string',
@@ -411,7 +491,7 @@ describe('SymbolizedError', () => {
         targetId: '',
       });
 
-      assert.strictEqual(error.message, '');
+      assert.strictEqual(error.message, 'oops');
     });
   });
 });

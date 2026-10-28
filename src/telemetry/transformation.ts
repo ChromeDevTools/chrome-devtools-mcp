@@ -42,7 +42,7 @@ export function sanitizeClientName(clientName: string): string {
   return REDACTED_CLIENT_NAME;
 }
 
-export const PARAM_BLOCKLIST = new Set(['uid', 'reqid', 'msgid']);
+export const PARAM_BLOCKLIST: Set<string> = new Set(['uid', 'reqid', 'msgid']);
 
 const SUPPORTED_ZOD_TYPES = [
   'ZodString',
@@ -211,31 +211,34 @@ function transformValue(
 ): LoggedToolCallArgValue {
   if (zodType === 'ZodString') {
     return bucketize((value as string).length);
-  } else if (zodType === 'ZodArray') {
-    return (value as unknown[]).length;
-  } else {
-    return value as LoggedToolCallArgValue;
   }
+  if (zodType === 'ZodArray') {
+    return (value as unknown[]).length;
+  }
+  return value as LoggedToolCallArgValue;
 }
 
 function hasEquivalentType(zodType: ZodType, value: unknown): boolean {
   if (zodType === 'ZodString') {
     return typeof value === 'string';
-  } else if (zodType === 'ZodArray') {
+  }
+  if (zodType === 'ZodArray') {
     return Array.isArray(value);
-  } else if (zodType === 'ZodNumber') {
+  }
+  if (zodType === 'ZodNumber') {
     return typeof value === 'number';
-  } else if (zodType === 'ZodBoolean') {
+  }
+  if (zodType === 'ZodBoolean') {
     return typeof value === 'boolean';
-  } else if (zodType === 'ZodEnum') {
+  }
+  if (zodType === 'ZodEnum') {
     return (
       typeof value === 'string' ||
       typeof value === 'number' ||
       typeof value === 'boolean'
     );
-  } else {
-    return false;
   }
+  return false;
 }
 
 export function sanitizeParams(

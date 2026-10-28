@@ -6,12 +6,19 @@
  */
 
 import {zod, PredefinedNetworkConditions} from '../third_party/index.js';
+import {
+  FORCED_COLORS_VALUES,
+  PREFERS_CONTRAST_VALUES,
+  PREFERS_REDUCED_MOTION_VALUES,
+} from '../types.js';
 
 import {ToolCategory} from './categories.js';
 import {
   definePageTool,
+  type PageToolFactory,
   geolocationTransform,
   viewportTransform,
+  zodTransform,
 } from './ToolDefinition.js';
 
 function headerStringTransform(
@@ -45,9 +52,9 @@ const throttlingOptions: [string, ...string[]] = [
   ...Object.keys(PredefinedNetworkConditions),
 ];
 
-export const emulate = definePageTool(() => ({
+export const emulate: PageToolFactory = definePageTool(() => ({
   name: 'emulate',
-  description: `Emulates various features on the target page.`,
+  description: `Emulates various features on the target page. Each call replaces all emulation settings (except extraHttpHeaders), so pass all desired settings in a single call.`,
   annotations: {
     category: ToolCategory.EMULATION,
     readOnlyHint: false,
@@ -67,7 +74,7 @@ export const emulate = definePageTool(() => ({
       ),
     geolocation: zod
       .string()
-      .transform(geolocationTransform)
+      .transform(zodTransform(geolocationTransform))
       .optional()
       .describe(
         'Geolocation (`<latitude>,<longitude>`) to emulate. Latitude between -90 and 90. Longitude between -180 and 180. Omit to clear the geolocation override.',
@@ -76,30 +83,49 @@ export const emulate = definePageTool(() => ({
       .string()
       .optional()
       .describe(
-        'User agent to emulate. Set to empty string to clear the user agent override.',
+        'User agent to emulate. Omit or set to empty string to clear the user agent override.',
       ),
     colorScheme: zod
       .enum(['dark', 'light', 'auto'])
       .optional()
       .describe(
-        'Emulate the dark or the light mode. Set to "auto" to reset to the default.',
+        'Emulate the dark or the light mode. Omit or set to "auto" to reset to the default.',
+      ),
+    forcedColors: zod
+      .enum([...FORCED_COLORS_VALUES, 'auto'])
+      .optional()
+      .describe(
+        'Emulate the `forced-colors` CSS media feature. Omit or set to "auto" to reset to the default.',
+      ),
+    prefersContrast: zod
+      .enum([...PREFERS_CONTRAST_VALUES, 'auto'])
+      .optional()
+      .describe(
+        'Emulate the `prefers-contrast` CSS media feature. Omit or set to "auto" to reset to the default.',
+      ),
+    prefersReducedMotion: zod
+      .enum([...PREFERS_REDUCED_MOTION_VALUES, 'auto'])
+      .optional()
+      .describe(
+        'Emulate the `prefers-reduced-motion` CSS media feature. Omit or set to "auto" to reset to the default.',
       ),
     viewport: zod
       .string()
-      .transform(viewportTransform)
+      .transform(zodTransform(viewportTransform))
       .optional()
       .describe(
-        `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode.`,
+        `Emulate device viewports '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'. 'touch' and 'mobile' to emulate mobile devices. 'landscape' to emulate landscape mode. Omit to clear the viewport override.`,
       ),
     extraHttpHeaders: zod
       .string()
-      .transform(headerStringTransform)
+      .transform(zodTransform(headerStringTransform))
       .optional()
       .describe(
         'Extra HTTP headers as a JSON string object, e.g. {"X-Custom": "value", "Authorization": "Bearer token"}. Headers are included into every HTTP request originating from the page and persist across navigations until cleared. Pass an empty string to clear all extra headers.',
       ),
   },
   blockedByDialog: true,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;

@@ -5,33 +5,22 @@
  */
 
 import assert from 'node:assert';
-import crypto from 'node:crypto';
 import path from 'node:path';
-import {describe, it, afterEach, beforeEach} from 'node:test';
+import {describe, it} from 'node:test';
 
 import {
   assertDaemonIsNotRunning,
   assertDaemonIsRunning,
+  createCliSession,
   createTempDir,
   createTempFile,
   runCli,
 } from '../utils.js';
 
-describe('chrome-devtools', () => {
-  let sessionId: string;
-
-  beforeEach(async () => {
-    sessionId = crypto.randomUUID();
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
-  });
-
-  afterEach(async () => {
-    await runCli(['stop'], sessionId);
-    await assertDaemonIsNotRunning(sessionId);
-  });
-
-  it('can start and stop the daemon', async () => {
+// Each test uses its own daemon session, so the tests run in parallel.
+describe('chrome-devtools', {concurrency: true}, () => {
+  it('can start and stop the daemon', async t => {
+    const sessionId = createCliSession(t);
     await assertDaemonIsNotRunning(sessionId);
 
     const startResult = await runCli(['start'], sessionId);
@@ -53,7 +42,8 @@ describe('chrome-devtools', () => {
     await assertDaemonIsNotRunning(sessionId);
   });
 
-  it('can start the daemon with userDataDir', async () => {
+  it('can start the daemon with userDataDir', async t => {
+    const sessionId = createCliSession(t);
     using userDataDir = createTempDir('chrome-devtools-test-');
 
     const startResult = await runCli(
@@ -75,7 +65,8 @@ describe('chrome-devtools', () => {
     await assertDaemonIsRunning(sessionId);
   });
 
-  it('forwards an explicit headless=false option', async () => {
+  it('forwards an explicit headless=false option', async t => {
+    const sessionId = createCliSession(t);
     const startResult = await runCli(['start', '--headless=false'], sessionId);
     assert.strictEqual(
       startResult.status,
@@ -91,7 +82,8 @@ describe('chrome-devtools', () => {
     );
   });
 
-  it('can start the daemon with a workspace', async () => {
+  it('can start the daemon with a workspace', async t => {
+    const sessionId = createCliSession(t);
     using workspace = createTempDir('chrome-devtools-workspace-');
 
     const startResult = await runCli(
@@ -113,7 +105,8 @@ describe('chrome-devtools', () => {
     );
   });
 
-  it('can start the daemon with a config file', async () => {
+  it('can start the daemon with a config file', async t => {
+    const sessionId = createCliSession(t);
     using userDataDir = createTempDir('chrome-devtools-config-profile-');
     using configFile = createTempFile(
       JSON.stringify({
