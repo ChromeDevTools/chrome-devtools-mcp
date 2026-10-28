@@ -698,10 +698,20 @@ export function zodTransform<Input, Output>(
     try {
       return transform(arg);
     } catch (error) {
-      ctx.addIssue({
-        code: 'custom',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      if (error instanceof zod.ZodError) {
+        for (const issue of error.issues) {
+          ctx.addIssue({
+            code: 'custom',
+            message: issue.message,
+            path: issue.path,
+          });
+        }
+      } else {
+        ctx.addIssue({
+          code: 'custom',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
       return zod.NEVER;
     }
   };
@@ -713,28 +723,51 @@ export const timeoutSchema: {
   timeout: zod
     .number()
     .int()
-    .transform(
-      zodTransform(value => {
-        return value <= 0 ? undefined : value;
-      }),
-    )
+    .transform(value => {
+      return value <= 0 ? undefined : value;
+    })
     .optional()
     .describe(
       `Maximum wait time in milliseconds. If set to 0, the default timeout will be used.`,
     ),
 };
 
-const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
-const VALID_VIEWPORT_TAGS = new Set(['mobile', 'touch', 'landscape']);
+const integerStringSchema = zod
+  .string()
+  .regex(/^[+-]?\d+$/, 'Expected an integer')
+  .pipe(zod.coerce.number());
 
-function parseDecimal(part: string | undefined, name: string): number {
-  if (part === undefined || !DECIMAL.test(part)) {
-    throw new Error(
-      `Invalid ${name} "${part ?? ''}". Expected a decimal number.`,
-    );
-  }
-  return Number(part);
-}
+const decimalStringSchema = zod
+  .string()
+  .regex(/^[+-]?\d+(\.\d+)?$/, 'Expected a number')
+  .pipe(zod.coerce.number());
+
+/* eslint-disable @local/enforce-zod-schema */
+const geolocationSchema = zod.object({
+  latitude: decimalStringSchema.pipe(zod.number().min(-90).max(90)),
+  longitude: decimalStringSchema.pipe(zod.number().min(-180).max(180)),
+});
+
+const VIEWPORT_FORMAT =
+  '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]';
+
+const viewportTagSchema = zod.enum(['mobile', 'touch', 'landscape'], {
+  error: issue =>
+    `Invalid viewport option "${String(issue.input)}". Expected "mobile", "touch", or "landscape" in '${VIEWPORT_FORMAT}'.`,
+});
+
+// CDP's Emulation.setDeviceMetricsOverride takes integer width and height.
+const viewportSchema = zod.object({
+  width: integerStringSchema.pipe(zod.number().int().positive()),
+  height: integerStringSchema.pipe(zod.number().int().positive()),
+  deviceScaleFactor: decimalStringSchema
+    .pipe(zod.number().positive())
+    .optional(),
+  isMobile: zod.boolean().optional(),
+  isLandscape: zod.boolean().optional(),
+  hasTouch: zod.boolean().optional(),
+});
+/* eslint-enable @local/enforce-zod-schema */
 
 export function viewportTransform(arg: string | undefined):
   | {
@@ -751,51 +784,22 @@ export function viewportTransform(arg: string | undefined):
   }
   const [dimensions, ...tags] = arg.split(',');
   for (const tag of tags) {
-    if (!VALID_VIEWPORT_TAGS.has(tag)) {
-      throw new Error(
-        `Invalid viewport tag "${tag}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
-      );
-    }
+    viewportTagSchema.parse(tag);
   }
-  const isMobile = tags.includes('mobile');
-  const hasTouch = tags.includes('touch');
-  const isLandscape = tags.includes('landscape');
   const dimParts = dimensions.split('x');
   if (dimParts.length !== 2 && dimParts.length !== 3) {
     throw new Error(
-      `Invalid viewport dimensions "${dimensions}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]'.`,
+      `Invalid viewport dimensions "${dimensions}". Expected format '${VIEWPORT_FORMAT}'.`,
     );
   }
-  const width = parseDecimal(dimParts[0], 'viewport width');
-  if (!Number.isFinite(width) || width <= 0) {
-    throw new Error(
-      `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
-    );
-  }
-  const height = parseDecimal(dimParts[1], 'viewport height');
-  if (!Number.isFinite(height) || height <= 0) {
-    throw new Error(
-      `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
-    );
-  }
-  let deviceScaleFactor: number | undefined;
-  if (dimParts.length === 3) {
-    const dpr = parseDecimal(dimParts[2], 'devicePixelRatio');
-    if (!Number.isFinite(dpr) || dpr <= 0) {
-      throw new Error(
-        `Invalid devicePixelRatio "${dpr}". Expected a positive number.`,
-      );
-    }
-    deviceScaleFactor = dpr;
-  }
-  return {
-    width,
-    height,
-    deviceScaleFactor,
-    isMobile,
-    isLandscape,
-    hasTouch,
-  };
+  return viewportSchema.parse({
+    width: dimParts[0],
+    height: dimParts[1],
+    deviceScaleFactor: dimParts[2],
+    isMobile: tags.includes('mobile'),
+    isLandscape: tags.includes('landscape'),
+    hasTouch: tags.includes('touch'),
+  });
 }
 
 export function geolocationTransform(
@@ -810,22 +814,10 @@ export function geolocationTransform(
       `Invalid geolocation "${arg}". Expected '<latitude>,<longitude>'.`,
     );
   }
-  const latitude = parseDecimal(parts[0], 'latitude');
-  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-    throw new Error(
-      `Invalid latitude "${latitude}". Latitude must be a number between -90 and 90.`,
-    );
-  }
-  const longitude = parseDecimal(parts[1], 'longitude');
-  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-    throw new Error(
-      `Invalid longitude "${longitude}". Longitude must be a number between -180 and 180.`,
-    );
-  }
-  return {
-    latitude,
-    longitude,
-  };
+  return geolocationSchema.parse({
+    latitude: parts[0],
+    longitude: parts[1],
+  });
 }
 
 export function isSlimTool(

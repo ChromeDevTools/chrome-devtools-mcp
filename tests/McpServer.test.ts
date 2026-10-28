@@ -155,8 +155,20 @@ describe('McpServer', () => {
           /^Input validation error: Invalid arguments for tool emulate: geolocation: Invalid geolocation "0x0"\. Expected '<latitude>,<longitude>'\.$/,
         ],
         [
+          {pageId: 1, geolocation: 'abc,11.5'},
+          /^Input validation error: Invalid arguments for tool emulate: geolocation\.latitude: Expected a number$/,
+        ],
+        [
           {pageId: 1, viewport: '0x0'},
-          /^Input validation error: Invalid arguments for tool emulate: viewport: Invalid viewport width "0"\./,
+          /^Input validation error: Invalid arguments for tool emulate: viewport\.width: Too small: expected number to be >0/,
+        ],
+        [
+          {pageId: 1, viewport: '1280.5x720'},
+          /^Input validation error: Invalid arguments for tool emulate: viewport\.width: Expected an integer$/,
+        ],
+        [
+          {pageId: 1, viewport: '1280x720,bogus'},
+          /^Input validation error: Invalid arguments for tool emulate: viewport: Invalid viewport option "bogus"\. Expected "mobile", "touch", or "landscape" in '<width>x<height>x<devicePixelRatio>\[,mobile\]\[,touch\]\[,landscape\]'\.$/,
         ],
         [
           {pageId: 1, extraHttpHeaders: 'notjson'},
