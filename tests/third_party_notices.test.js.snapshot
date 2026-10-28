@@ -2080,7 +2080,7 @@ License: MIT
 
 MIT License
 
-Copyright (c) 2021 FormatJS
+Copyright (c) 2023 FormatJS
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -2098,7 +2098,7 @@ License: MIT
 
 MIT License
 
-Copyright (c) 2021 FormatJS
+Copyright (c) 2023 FormatJS
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -2116,7 +2116,7 @@ License: MIT
 
 MIT License
 
-Copyright (c) 2021 FormatJS
+Copyright (c) 2023 FormatJS
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -2189,6 +2189,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-Party Dependency Notice
+
+The MIT License above applies to the code in this package. This package has
+the Sentry CLI (the \`sentry\` package on npm, https://github.com/getsentry/cli)
+as a direct or transitive dependency. The Sentry CLI is not part of this package
+and is not covered by the MIT License above. It is licensed under the
+Functional Source License, Version 1.1, Apache 2.0 Future License
+(FSL-1.1-Apache-2.0): https://github.com/getsentry/cli/blob/main/LICENSE.md
 
 
 -------------------- DEPENDENCY DIVIDER --------------------
@@ -2834,12 +2843,12 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: http-link-header
-URL: https://github.com/jhermsmeier/node-http-link-header
+URL: https://codeberg.org/jhermsmeier/node-http-link-header
 Version: <VERSION>
 License: MIT
 
 # The MIT License (MIT)
-Copyright (c) 2016 Jonas Hermsmeier
+Copyright (c) 2016-2026 Jonas Hermsmeier, and contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2867,7 +2876,7 @@ URL: https://github.com/formatjs/formatjs
 Version: <VERSION>
 License: BSD-3-Clause
 
-Copyright (c) 2021, Oath Inc.
+Copyright (c) 2023, Oath Inc.
 
 Licensed under the terms of the New BSD license. See below for terms.
 
@@ -2917,13 +2926,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
--------------------- DEPENDENCY DIVIDER --------------------
-
-Name: legacy-javascript
-URL: https://github.com/GoogleChrome/lighthouse#readme
-Version: <VERSION>
-License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
@@ -3348,69 +3350,6 @@ License: Apache-2.0
 
 -------------------- DEPENDENCY DIVIDER --------------------
 
-Name: lodash-es
-URL: https://lodash.com/custom-builds
-Version: <VERSION>
-License: MIT
-
-Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
-
-Based on Underscore.js, copyright Jeremy Ashkenas,
-DocumentCloud and Investigative Reporters & Editors <http://underscorejs.org/>
-
-This software consists of voluntary contributions made by many
-individuals. For exact contribution history, see the revision history
-available at https://github.com/lodash/lodash
-
-The following license applies to all parts of this software except as
-documented below:
-
-====
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-====
-
-Copyright and related rights for sample code are waived via CC0. Sample
-code is defined as all source code displayed within the prose of the
-documentation.
-
-CC0: http://creativecommons.org/publicdomain/zero/1.0/
-
-====
-
-Files located in the node_modules and vendor directories are externally
-maintained libraries used by this software which have their own
-licenses; we recommend you read them, as their terms may differ from the
-terms above.
-
-
--------------------- DEPENDENCY DIVIDER --------------------
-
-Name: lookup-closest-locale
-URL: https://github.com/format-message/format-message/tree/master/packages/lookup-closest-locale
-Version: <VERSION>
-License: MIT
-
--------------------- DEPENDENCY DIVIDER --------------------
-
 Name: marky
 URL: https://github.com/nolanlawson/marky#readme
 Version: <VERSION>
@@ -3630,13 +3569,13 @@ APPENDIX: How to apply the Apache License to your work
 -------------------- DEPENDENCY DIVIDER --------------------
 
 Name: ms
-URL: https://github.com/zeit/ms
+URL: https://github.com/vercel/ms
 Version: <VERSION>
 License: MIT
 
 The MIT License (MIT)
 
-Copyright (c) 2016 Zeit, Inc.
+Copyright (c) 2020 Vercel, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
