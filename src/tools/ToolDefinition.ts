@@ -767,15 +767,17 @@ export function viewportTransform(arg: string | undefined):
     );
   }
   const width = parseDecimal(dimParts[0], 'viewport width');
-  if (!Number.isFinite(width) || width <= 0) {
+  // CDP's Emulation.setDeviceMetricsOverride takes integer width and height,
+  // so a fractional size would only fail later as a protocol error.
+  if (!Number.isInteger(width) || width <= 0) {
     throw new Error(
-      `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive width.`,
+      `Invalid viewport width "${width}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive integer width.`,
     );
   }
   const height = parseDecimal(dimParts[1], 'viewport height');
-  if (!Number.isFinite(height) || height <= 0) {
+  if (!Number.isInteger(height) || height <= 0) {
     throw new Error(
-      `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive height.`,
+      `Invalid viewport height "${height}". Expected format '<width>x<height>x<devicePixelRatio>[,mobile][,touch][,landscape]' with a positive integer height.`,
     );
   }
   let deviceScaleFactor: number | undefined;
