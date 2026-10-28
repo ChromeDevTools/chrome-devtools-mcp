@@ -93,6 +93,8 @@ export class ConfigParser {
   ): Partial<ParsedArguments> {
     try {
       const content = rawContent ?? readFileSync(configPath, 'utf-8');
+      // Strip a leading UTF-8 byte order mark (U+FEFF). Windows PowerShell 5.1
+      // writes one by default, and JSON.parse rejects it.
       const fileContent: unknown = JSON.parse(content.replace(/^\uFEFF/, ''));
       if (!isPlainObject(fileContent)) {
         throw new Error('Config must be a JSON object');
