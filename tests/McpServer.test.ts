@@ -115,6 +115,22 @@ describe('McpServer', () => {
     await server.close();
   });
 
+  it('names the browser it controls in the server instructions', async () => {
+    const {server} = await createTestServer(['--autoConnect']);
+    const client = await connectClient(server);
+    try {
+      assert.strictEqual(
+        client.getInstructions(),
+        "This server controls the user's running Chrome, attached via " +
+          '--autoConnect. Its tabs, cookies and signed-in sessions belong to ' +
+          'the user.',
+      );
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
   describe('callTool', () => {
     it('returns an error for unknown tool names', async () => {
       const {server, browserManager} = await createTestServer();

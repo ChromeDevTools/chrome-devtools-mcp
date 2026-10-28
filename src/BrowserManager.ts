@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import {getDefaultUserDataDir} from './config/browser-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {
   Mutex,
@@ -215,7 +216,6 @@ export class BrowserManager {
       headless,
       isolated = false,
       categoryExtensions: enableExtensions,
-      viaCli,
       viewport,
       acceptInsecureCerts,
       experimentalDevtools: devtools = false,
@@ -225,19 +225,9 @@ export class BrowserManager {
       proxyServer,
     } = this.#config.resolved;
 
-    const profileDirName =
-      channel && channel !== 'stable'
-        ? `chrome-profile-${channel}`
-        : 'chrome-profile';
-
     let userDataDir = this.#config.resolved.userDataDir;
     if (!isolated && !userDataDir) {
-      userDataDir = path.join(
-        os.homedir(),
-        '.cache',
-        viaCli ? 'chrome-devtools-mcp-cli' : 'chrome-devtools-mcp',
-        profileDirName,
-      );
+      userDataDir = getDefaultUserDataDir(this.#config.resolved);
       await fs.promises.mkdir(userDataDir, {
         recursive: true,
       });

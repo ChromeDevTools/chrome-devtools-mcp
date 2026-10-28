@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
+import path from 'node:path';
+
 import type {McpOptionsFor} from './category-options.js';
 
 export interface BrowserArguments {
@@ -152,4 +155,24 @@ export const browserOptions: BrowserOptions = {
 
 export function getBrowserOptions(): BrowserOptions {
   return browserOptions;
+}
+
+/**
+ * The user data directory that Chrome is launched with when neither
+ * `--userDataDir` nor `--isolated` is set.
+ */
+export function getDefaultUserDataDir(args: {
+  channel?: BrowserArguments['channel'];
+  viaCli: boolean;
+}): string {
+  const profileDirName =
+    args.channel && args.channel !== 'stable'
+      ? `chrome-profile-${args.channel}`
+      : 'chrome-profile';
+  return path.join(
+    os.homedir(),
+    '.cache',
+    args.viaCli ? 'chrome-devtools-mcp-cli' : 'chrome-devtools-mcp',
+    profileDirName,
+  );
 }

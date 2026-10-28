@@ -8,6 +8,10 @@ import type {WebMCPTool} from 'puppeteer-core';
 
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {
+  BrowserFormatter,
+  type BrowserDescription,
+} from './formatters/BrowserFormatter.js';
+import {
   CommentFormatter,
   type StructuredCommentThread,
 } from './formatters/CommentFormatter.js';
@@ -921,6 +925,7 @@ export class McpResponse implements Response {
         message: string;
         defaultValue?: string;
       };
+      browser?: BrowserDescription;
       pages?: object[];
       openedPages?: object[];
       pagination?: object;
@@ -1139,7 +1144,8 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
           ? await context.getTargetInfos()
           : new Map<string, Protocol.Target.TargetInfo>();
       if (regularPages.length) {
-        const parts = [`## Pages`];
+        const browser = new BrowserFormatter(this.#config.resolved);
+        const parts = [`## Pages`, `Browser: ${browser.toString()}`];
         const structuredPages = [];
         for (const mcpPage of regularPages) {
           const isolatedContextName = mcpPage.isolatedContextName;
@@ -1157,6 +1163,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
           structuredPages.push(page.structured);
         }
         response.push(...parts);
+        structuredContent.browser = browser.toJSON();
         structuredContent.pages = structuredPages;
       }
 

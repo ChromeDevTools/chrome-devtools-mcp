@@ -175,6 +175,33 @@ describe('McpResponse', () => {
     });
   });
 
+  it('names the --autoConnect browser under ## Pages', async () => {
+    const page = createMockMcpPage({id: 1});
+    page.url.returns('https://example.com/');
+    const context = createMockMcpContext({selectedPage: page});
+    context.getPages.returns([page]);
+    context.isPageSelected.returns(true);
+    const response = new McpResponse(
+      createMockServerConfig({autoConnect: true}),
+    );
+    response.setIncludePages(true);
+
+    const result = await response.handle(context);
+
+    assert.strictEqual(
+      getTextContent(result.content[0]),
+      [
+        '## Pages',
+        "Browser: the user's running Chrome, attached via --autoConnect",
+        '1: https://example.com/ [selected]',
+      ].join('\n'),
+    );
+    assert.deepStrictEqual(result.structuredContent, {
+      browser: {connection: 'autoConnect'},
+      pages: [{id: 1, url: 'https://example.com/', title: '', selected: true}],
+    });
+  });
+
   it('includes a reconnect notice only when set', async () => {
     await withMcpContext(async (response, context) => {
       const before = await response.handle(context);

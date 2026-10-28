@@ -315,11 +315,15 @@ exports[`McpResponse > doesn't list the issue message if mapping returns null 1`
 
 exports[`McpResponse > list pages 1`] = `
 ## Pages
+Browser: a dedicated Chrome launched by chrome-devtools-mcp
 1: about:blank [selected]
 `;
 
 exports[`McpResponse > list pages 2`] = `
 {
+  "browser": {
+    "connection": "launched"
+  },
   "pages": [
     {
       "id": 1,
@@ -1510,6 +1514,7 @@ exports[`third-party developer tools > lists third-party developer tools 2`] = `
 
 exports[`webmcp > includes webmcp tools in list_pages response 1`] = `
 ## Pages
+Browser: a dedicated Chrome launched by chrome-devtools-mcp
 1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
@@ -1517,6 +1522,9 @@ name="test_tool", description="A test tool", inputSchema={"type":"object","prope
 
 exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
 {
+  "browser": {
+    "connection": "launched"
+  },
   "pages": [
     {
       "id": 1,
@@ -1542,6 +1550,7 @@ exports[`webmcp > includes webmcp tools in list_pages response 2`] = `
 exports[`webmcp > includes webmcp tools in navigate_page response 1`] = `
 Successfully navigated to about:blank.
 ## Pages
+Browser: a dedicated Chrome launched by chrome-devtools-mcp
 1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
@@ -1550,6 +1559,9 @@ name="test_tool", description="A test tool", inputSchema={"type":"object","prope
 exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
 {
   "message": "Successfully navigated to about:blank.",
+  "browser": {
+    "connection": "launched"
+  },
   "pages": [
     {
       "id": 1,
@@ -1574,6 +1586,7 @@ exports[`webmcp > includes webmcp tools in navigate_page response 2`] = `
 
 exports[`webmcp > includes webmcp tools in select_page response 1`] = `
 ## Pages
+Browser: a dedicated Chrome launched by chrome-devtools-mcp
 1: My test page (about:blank) [selected]
 ## WebMCP tools
 name="test_tool", description="A test tool", inputSchema={"type":"object","properties":{},"required":[]}, annotations=undefined
@@ -1581,6 +1594,9 @@ name="test_tool", description="A test tool", inputSchema={"type":"object","prope
 
 exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 {
+  "browser": {
+    "connection": "launched"
+  },
   "pages": [
     {
       "id": 1,
@@ -1606,12 +1622,16 @@ exports[`webmcp > includes webmcp tools in select_page response 2`] = `
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 1`] = `
 Successfully navigated to about:blank.
 ## Pages
+Browser: a dedicated Chrome launched by chrome-devtools-mcp
 1: My test page (about:blank) [selected]
 `;
 
 exports[`webmcp > list no webmcp tools if experimentalWebmcp is false 2`] = `
 {
   "message": "Successfully navigated to about:blank.",
+  "browser": {
+    "connection": "launched"
+  },
   "pages": [
     {
       "id": 1,

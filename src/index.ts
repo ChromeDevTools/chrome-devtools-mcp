@@ -17,6 +17,7 @@ import {
 } from './config/mcp-options.js';
 import {ServerConfig} from './config/ServerConfig.js';
 import {loadIssueDescriptions} from './devtools/issueDescriptions.js';
+import {BrowserFormatter} from './formatters/BrowserFormatter.js';
 import {McpContext} from './McpContext.js';
 import {HeapSnapshotManager} from './processors/HeapSnapshotManager.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
@@ -112,6 +113,8 @@ export class McpServer {
         capabilities: {logging: {}, tools: {listChanged: true}},
         // Enabling or updating many tools at once sends a single notification.
         debouncedNotificationMethods: ['notifications/tools/list_changed'],
+        // Connection options require a restart, so this never goes stale.
+        instructions: new BrowserFormatter(serverArgs).toInstructions(),
       },
     );
 
