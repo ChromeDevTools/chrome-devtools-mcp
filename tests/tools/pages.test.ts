@@ -244,6 +244,10 @@ describe('pages', () => {
 
       sinon.assert.calledOnceWithExactly(context.newPage, undefined, undefined);
       sinon.assert.calledOnceWithExactly(
+        page.authenticate,
+        'https://example.com',
+      );
+      sinon.assert.calledOnceWithExactly(
         page.pptrPage.goto,
         'https://example.com',
         {
@@ -991,6 +995,27 @@ describe('pages', () => {
     });
   });
   describe('navigate_page', () => {
+    it('authenticates before navigating to a url', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      await navigatePage(args).handler(
+        {
+          params: {url: 'https://example.com/login', type: 'url'},
+          page,
+        },
+        response,
+        context,
+      );
+      sinon.assert.calledOnceWithExactly(
+        page.authenticate,
+        'https://example.com/login',
+      );
+      sinon.assert.calledOnceWithExactly(
+        page.pptrPage.goto,
+        'https://example.com/login',
+        {timeout: undefined},
+      );
+    });
+
     it('navigates to correct page', async () => {
       await withMcpContext(async (response, context, args) => {
         await navigatePage(args).handler(
