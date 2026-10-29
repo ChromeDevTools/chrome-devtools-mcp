@@ -255,6 +255,56 @@ describe('browser', () => {
         sinon.assert.calledOnce(connectStub);
       });
 
+      it('treats attempts < 1 as a single attempt', async () => {
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .rejects(transient());
+
+        await assert.rejects(
+          connectWithRetry(
+            {browserURL: 'http://127.0.0.1:9222'},
+            {attempts: 0, baseDelayMs: 1},
+          ),
+          /ECONNREFUSED/,
+        );
+        sinon.assert.calledOnce(connectStub);
+      });
+
+      it('classifies nested and aggregate causes', () => {
+        const deep = new Error('outer', {
+          cause: new Error('middle', {cause: transient()}),
+        });
+        assert.ok(isTransientConnectError(deep));
+        assert.ok(
+          isTransientConnectError(
+            new Error('fetch failed', {
+              cause: new AggregateError([transient(), transient()], 'agg'),
+            }),
+          ),
+        );
+        assert.ok(
+          !isTransientConnectError(
+            new AggregateError(
+              [transient(), new Error('Unexpected server response: 403')],
+              'mixed',
+            ),
+          ),
+        );
+        assert.ok(
+          !isTransientConnectError(
+            new Error('wrapper', {
+              cause: new Error('Unexpected server response: 403'),
+            }),
+          ),
+        );
+        const cyclic: Error & {cause?: unknown} = new Error('cyclic');
+        cyclic.cause = cyclic;
+        assert.ok(!isTransientConnectError(cyclic));
+        assert.ok(!isTransientConnectError('ECONNREFUSED'));
+        assert.ok(!isTransientConnectError(new Error('NOT_ECONNREFUSEDX')));
+        assert.ok(isTransientConnectError(new Error('socket hang up')));
+      });
+
       it('classifies errors', () => {
         assert.ok(isTransientConnectError(transient()));
         assert.ok(
