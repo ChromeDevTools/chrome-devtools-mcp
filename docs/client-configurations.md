@@ -380,6 +380,20 @@ Add the following configuration to your `opencode.json` file. If you don't have 
 </details>
 
 <details>
+  <summary>Pi</summary>
+
+Install the Chrome DevTools MCP server using the Pi CLI (<a href="https://pi.dev/docs/latest/mcp">MCP guide</a>):
+
+```bash
+pi mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest
+pi mcp list
+```
+
+Run `/reload` in a running session to load the server. To add the skills, copy the [skill folders](../skills) to `~/.pi/agent/skills/` (<a href="https://pi.dev/docs/latest/skills">skills guide</a>).
+
+</details>
+
+<details>
   <summary>Qoder</summary>
 
 In **Qoder Settings**, go to `MCP Server` > `+ Add` > Use the [standard config][standard-config].
