@@ -247,7 +247,7 @@ export class MockCDPSession extends CDPSession {
   override get detached(): boolean {
     return false;
   }
-  override send(): Promise<never> {
+  override send(..._args: unknown[]): Promise<never> {
     throw new Error('Not implemented');
   }
   override detach(): Promise<void> {
