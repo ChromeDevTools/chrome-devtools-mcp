@@ -89,11 +89,11 @@ export const waitFor: PageToolFactory = definePageTool(() => ({
       });
     } catch (error) {
       if (error instanceof TimeoutError) {
-        response.appendResponseLine(
-          'Text matching is case-sensitive. DOM text must preserve spaces and ' +
-            'newlines; snapshot text may have normalized whitespace. Try a ' +
-            'shorter distinctive substring or use evaluate_script to inspect ' +
-            "the element's textContent.",
+        throw new TimeoutError(
+          `${error.message}. Text matching is case-sensitive. DOM text must ` +
+            'preserve spaces and newlines, whereas snapshot text may ' +
+            'normalize whitespace. Try a shorter distinctive substring.',
+          {cause: error},
         );
       }
       throw error;

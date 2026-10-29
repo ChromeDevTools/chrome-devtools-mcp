@@ -51,19 +51,23 @@ describe('snapshot', () => {
           response,
           context,
         ),
-        error,
+        thrown => {
+          assert.ok(thrown instanceof TimeoutError);
+          assert.strictEqual(thrown.cause, error);
+          assert.strictEqual(
+            thrown.message,
+            `${error.message}. Text matching is case-sensitive. DOM text must ` +
+              'preserve spaces and newlines, whereas snapshot text may ' +
+              'normalize whitespace. Try a shorter distinctive substring.',
+          );
+          return true;
+        },
       );
-      sinon.assert.calledOnceWithExactly(
-        response.appendResponseLine,
-        'Text matching is case-sensitive. DOM text must preserve spaces and ' +
-          'newlines; snapshot text may have normalized whitespace. Try a ' +
-          'shorter distinctive substring or use evaluate_script to inspect ' +
-          "the element's textContent.",
-      );
+      sinon.assert.notCalled(response.appendResponseLine);
       sinon.assert.notCalled(response.includeSnapshot);
     });
 
-    it('includes whitespace advice alongside the formatted timeout', async () => {
+    it('keeps timeout advice in the formatted error and structuredContent', async () => {
       const {page, context, args} = createHandlerMocks();
       const response = new McpResponse(createMockServerConfig());
       const error = new TimeoutError('Timed out after waiting 2000ms');
@@ -74,18 +78,21 @@ describe('snapshot', () => {
           response,
           context,
         ),
-        error,
+        thrown => {
+          assert.ok(thrown instanceof TimeoutError);
+          response.setError(thrown);
+          return true;
+        },
       );
-      response.setError(error);
       const result = await response.handle(context);
-      assert.match(
-        JSON.stringify(result.content),
-        /Timed out after waiting 2000ms/,
-      );
-      assert.match(
-        JSON.stringify(result.content),
-        /preserve spaces and newlines/,
-      );
+      const message =
+        `${error.message}. Text matching is case-sensitive. DOM text must ` +
+        'preserve spaces and newlines, whereas snapshot text may ' +
+        'normalize whitespace. Try a shorter distinctive substring.';
+      assert.deepStrictEqual(result.content, [
+        {type: 'text', text: `Error: ${message}`},
+      ]);
+      assert.deepStrictEqual(result.structuredContent, {errorMessage: message});
     });
 
     it('preserves newlines and repeated spaces in the wait pattern', async () => {
