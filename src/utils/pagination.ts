@@ -38,7 +38,14 @@ export function paginate<Item>(
     };
   }
 
-  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+  // Non-positive or non-finite page sizes used to yield Infinity totalPages
+  // (pageSize 0) or empty slices (negative). Tool schemas require a positive
+  // integer; defend the helper the same way ChunkedTraceParser does.
+  const rawPageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+  const pageSize =
+    Number.isFinite(rawPageSize) && rawPageSize > 0
+      ? rawPageSize
+      : DEFAULT_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const {currentPage, invalidPage} = resolvePageIndex(
     options.pageIdx,

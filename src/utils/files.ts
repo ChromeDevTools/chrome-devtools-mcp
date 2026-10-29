@@ -11,7 +11,8 @@ import path from 'node:path';
 export async function getTempFilePath(filename: string): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
 
-  const filepath = path.join(dir, filename);
+  // Drop any directory components so a name like `../x` cannot escape `dir`.
+  const filepath = path.join(dir, path.basename(filename));
   return filepath;
 }
 

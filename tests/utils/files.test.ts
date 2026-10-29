@@ -10,7 +10,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {
+  getTempFilePath,
+  resolveCanonicalPath,
+} from '../../src/utils/files.js';
 import {createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
@@ -159,5 +162,25 @@ describe('resolveCanonicalPath', () => {
       resolved,
       path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
     );
+  });
+});
+
+describe('getTempFilePath', () => {
+  it('keeps the file under the created temp directory', async () => {
+    const filepath = await getTempFilePath('shot.png');
+    assert.strictEqual(path.basename(filepath), 'shot.png');
+    const dir = path.dirname(filepath);
+    assert.ok(dir.includes('chrome-devtools-mcp-'));
+    assert.strictEqual(path.relative(dir, filepath), 'shot.png');
+    await fs.rm(dir, {recursive: true, force: true});
+  });
+
+  it('drops directory components so the path cannot escape the temp directory', async () => {
+    const filepath = await getTempFilePath('../escape.png');
+    const dir = path.dirname(filepath);
+    assert.strictEqual(path.basename(filepath), 'escape.png');
+    assert.strictEqual(path.relative(dir, filepath), 'escape.png');
+    assert.ok(!path.relative(dir, filepath).startsWith('..'));
+    await fs.rm(dir, {recursive: true, force: true});
   });
 });
