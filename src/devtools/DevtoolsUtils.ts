@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {DevTools} from '../third_party/index.js';
-import type {
-  CDPSession,
-  ConsoleMessage,
-  Protocol,
+import {
+  DevTools,
+  type CDPSession,
+  type ConsoleMessage,
+  type Protocol,
 } from '../third_party/index.js';
 
 import {McpHostBindingAdapter} from './McpHostBindingAdapter.js';
@@ -36,7 +36,7 @@ export function overrideDevToolsGlobals({
   // DevTools CDP errors can get noisy.
   DevTools.ProtocolClient.InspectorBackend.test.suppressRequestErrors = true;
 
-  const noopAgentCommand = () => {
+  const noopAgentCommand = (): Promise<{getError: () => undefined}> => {
     return Promise.resolve({
       getError: () => undefined,
     });
@@ -230,6 +230,13 @@ export type StackTraceLike =
   Protocol.Runtime.StackTrace | DevTools.Protocol.Runtime.StackTrace;
 
 /**
+ * Maximum number of `cause` links resolved for one error. A page can create a
+ * cyclic chain (`error.cause = error`), and CDP returns a new object id on
+ * every lookup of the same object, so a cycle cannot be detected by id.
+ */
+const MAX_CAUSE_DEPTH = 10;
+
+/**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
  *
  * TODO: Also construct from a RemoteObject of subtype 'error'.
@@ -252,15 +259,25 @@ export class SymbolizedError {
   }
 
   static async fromDetails(opts: {
-    devTools?: TargetUniverse;
     details: ExceptionDetailsLike;
     targetId: string;
+    devTools?: TargetUniverse;
+    // The session that reported `details`. Remote object ids are scoped to
+    // the session that issued them, so the cause has to be resolved there.
+    session?: CDPSession;
     includeStackAndCause?: boolean;
     resolvedStackTraceForTesting?: DevTools.StackTrace.StackTrace.StackTrace;
     resolvedCauseForTesting?: SymbolizedError;
   }): Promise<SymbolizedError> {
+    return await SymbolizedError.#fromDetails(opts, 0);
+  }
+
+  static async #fromDetails(
+    opts: Parameters<typeof SymbolizedError.fromDetails>[0],
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
     const message = SymbolizedError.#getMessage(opts.details);
-    if (!opts.includeStackAndCause || !opts.devTools) {
+    if (!opts.includeStackAndCause || (!opts.devTools && !opts.session)) {
       return new SymbolizedError(
         message,
         opts.resolvedStackTraceForTesting,
@@ -271,7 +288,7 @@ export class SymbolizedError {
     let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
     if (opts.resolvedStackTraceForTesting) {
       stackTrace = opts.resolvedStackTraceForTesting;
-    } else if (opts.details.stackTrace) {
+    } else if (opts.devTools && opts.details.stackTrace) {
       try {
         stackTrace = await createStackTrace(
           opts.devTools,
@@ -288,19 +305,24 @@ export class SymbolizedError {
     let cause: SymbolizedError | undefined;
     if (opts.resolvedCauseForTesting) {
       cause = opts.resolvedCauseForTesting;
-    } else if (opts.details.exception) {
+    } else if (opts.details.exception && causeDepth < MAX_CAUSE_DEPTH) {
       try {
         const causeRemoteObj = await SymbolizedError.#lookupCause(
           opts.devTools,
           opts.details.exception,
           opts.targetId,
+          opts.session,
         );
         if (causeRemoteObj) {
-          cause = await SymbolizedError.fromError({
-            devTools: opts.devTools,
-            error: causeRemoteObj,
-            targetId: opts.targetId,
-          });
+          cause = await SymbolizedError.#fromError(
+            {
+              devTools: opts.devTools,
+              error: causeRemoteObj,
+              targetId: opts.targetId,
+              session: opts.session,
+            },
+            causeDepth + 1,
+          );
         }
       } catch {
         // Ignore
@@ -310,22 +332,35 @@ export class SymbolizedError {
   }
 
   static async fromError(opts: {
-    devTools?: TargetUniverse;
     error: RemoteObjectLike;
     targetId: string;
+    devTools?: TargetUniverse;
+    session?: CDPSession;
   }): Promise<SymbolizedError> {
+    return await SymbolizedError.#fromError(opts, 0);
+  }
+
+  static async #fromError(
+    opts: Parameters<typeof SymbolizedError.fromError>[0],
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
     const details = await SymbolizedError.#getExceptionDetails(
       opts.devTools,
       opts.error,
       opts.targetId,
+      opts.session,
     );
     if (details) {
-      return SymbolizedError.fromDetails({
-        details,
-        devTools: opts.devTools,
-        targetId: opts.targetId,
-        includeStackAndCause: true,
-      });
+      return await SymbolizedError.#fromDetails(
+        {
+          details,
+          devTools: opts.devTools,
+          targetId: opts.targetId,
+          session: opts.session,
+          includeStackAndCause: true,
+        },
+        causeDepth,
+      );
     }
 
     return new SymbolizedError(
@@ -337,9 +372,17 @@ export class SymbolizedError {
     // For Runtime.exceptionThrown with a present exception object, `details.text` will be "Uncaught" and
     // we have to manually parse out the error text from the exception description.
     // In the case of Runtime.getExceptionDetails, `details.text` has the Error.message.
-    if (details.text === 'Uncaught' && details.exception) {
+    // Unhandled promise rejections work the same way, with
+    // "Uncaught (in promise)" as `details.text` and the rejection reason as
+    // the exception.
+    if (
+      (details.text === 'Uncaught' ||
+        details.text === 'Uncaught (in promise)') &&
+      details.exception
+    ) {
       return (
-        'Uncaught ' +
+        details.text +
+        ' ' +
         SymbolizedError.#getMessageFromException(details.exception)
       );
     }
@@ -347,7 +390,14 @@ export class SymbolizedError {
   }
 
   static #getMessageFromException(error: RemoteObjectLike): string {
-    const messageWithRest = error.description?.split('\n    at ', 2) ?? [];
+    if (error.description === undefined) {
+      // Primitive values, e.g. `Promise.reject('reason')`, have no description.
+      if (error.unserializableValue !== undefined) {
+        return error.unserializableValue;
+      }
+      return error.value === undefined ? '' : String(error.value);
+    }
+    const messageWithRest = error.description.split('\n    at ', 2);
     return messageWithRest[0] ?? '';
   }
 
@@ -355,8 +405,24 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-  ): Promise<DevTools.Protocol.Runtime.ExceptionDetails | null> {
-    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    session?: CDPSession,
+  ): Promise<ExceptionDetailsLike | null> {
+    if (error.type !== 'object' && error.subtype !== 'error') {
+      return null;
+    }
+
+    if (session) {
+      if (!error.objectId) {
+        return null;
+      }
+      const {exceptionDetails} = await session.send(
+        'Runtime.getExceptionDetails',
+        {errorObjectId: error.objectId},
+      );
+      return exceptionDetails ?? null;
+    }
+
+    if (!devTools) {
       return null;
     }
 
@@ -376,8 +442,23 @@ export class SymbolizedError {
     devTools: TargetUniverse | undefined,
     error: RemoteObjectLike,
     targetId: string,
-  ): Promise<DevTools.Protocol.Runtime.RemoteObject | null> {
-    if (!devTools || (error.type !== 'object' && error.subtype !== 'error')) {
+    session?: CDPSession,
+  ): Promise<RemoteObjectLike | null> {
+    if (error.type !== 'object' && error.subtype !== 'error') {
+      return null;
+    }
+
+    if (session) {
+      if (!error.objectId) {
+        return null;
+      }
+      const {result} = await session.send('Runtime.getProperties', {
+        objectId: error.objectId,
+      });
+      return result.find(prop => prop.name === 'cause')?.value ?? null;
+    }
+
+    if (!devTools) {
       return null;
     }
 
@@ -400,7 +481,7 @@ export class SymbolizedError {
     message: string,
     stackTrace?: DevTools.StackTrace.StackTrace.StackTrace,
     cause?: SymbolizedError,
-  ) {
+  ): SymbolizedError {
     return new SymbolizedError(message, stackTrace, cause);
   }
 }
@@ -415,7 +496,7 @@ export async function createStackTraceForConsoleMessage(
   };
   const rawStackTrace = message._rawStackTrace();
   if (rawStackTrace) {
-    return createStackTrace(devTools, rawStackTrace, message._targetId());
+    return await createStackTrace(devTools, rawStackTrace, message._targetId());
   }
   return undefined;
 }
@@ -465,7 +546,7 @@ export async function createStackTrace(
     DevTools.DebuggerWorkspaceBinding,
   );
   // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
-  return binding.createStackTraceFromProtocolRuntime(
+  return await binding.createStackTraceFromProtocolRuntime(
     rawStackTrace as Parameters<
       DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
     >[0],
@@ -478,7 +559,7 @@ async function waitForScript(
   model: DevTools.DebuggerModel,
   scriptId: string,
   signal: AbortSignal,
-) {
+): Promise<NonNullable<ReturnType<DevTools.DebuggerModel['scriptForId']>>> {
   while (true) {
     if (signal.aborted) {
       throw signal.reason;

@@ -105,6 +105,18 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "forced_colors",
+        "argType": "string"
+      },
+      {
+        "name": "prefers_contrast",
+        "argType": "string"
+      },
+      {
+        "name": "prefers_reduced_motion",
+        "argType": "string"
       }
     ]
   },
@@ -466,6 +478,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "ignore_cache",
+        "argType": "boolean"
       }
     ]
   },
@@ -554,7 +570,12 @@
   },
   {
     "name": "screenshot",
-    "args": []
+    "args": [
+      {
+        "name": "file_path_length",
+        "argType": "number"
+      }
+    ]
   },
   {
     "name": "select_page",
@@ -692,6 +713,10 @@
       {
         "name": "page_id",
         "argType": "number"
+      },
+      {
+        "name": "visible",
+        "argType": "boolean"
       }
     ]
   },
@@ -841,6 +866,10 @@
       {
         "name": "object_id",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -866,6 +895,10 @@
       {
         "name": "object_id",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -887,6 +920,10 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -895,6 +932,10 @@
     "args": [
       {
         "name": "file_path_length",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -943,6 +984,10 @@
       {
         "name": "max_siblings",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -981,6 +1026,10 @@
       {
         "name": "retained_size_length",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -993,6 +1042,10 @@
       },
       {
         "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -1043,6 +1096,18 @@
       {
         "name": "class_index",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
+      },
+      {
+        "name": "page_idx",
+        "argType": "number"
+      },
+      {
+        "name": "page_size",
+        "argType": "number"
       }
     ]
   },
@@ -1060,6 +1125,10 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -1072,6 +1141,10 @@
       },
       {
         "name": "node_id",
+        "argType": "number"
+      },
+      {
+        "name": "max_name_length",
         "argType": "number"
       }
     ]
@@ -1186,6 +1259,10 @@
       {
         "name": "self_size_length",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -1228,6 +1305,10 @@
       {
         "name": "page_size",
         "argType": "number"
+      },
+      {
+        "name": "max_name_length",
+        "argType": "number"
       }
     ]
   },
@@ -1236,6 +1317,10 @@
     "args": [
       {
         "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "timeout",
         "argType": "number"
       }
     ]
@@ -1276,6 +1361,39 @@
       {
         "name": "panel_name_length",
         "argType": "number"
+      }
+    ]
+  },
+  {
+    "name": "configure_webauthn",
+    "args": [
+      {
+        "name": "page_id",
+        "argType": "number"
+      },
+      {
+        "name": "enabled",
+        "argType": "boolean"
+      },
+      {
+        "name": "protocol",
+        "argType": "string"
+      },
+      {
+        "name": "transport",
+        "argType": "string"
+      },
+      {
+        "name": "has_resident_key",
+        "argType": "boolean"
+      },
+      {
+        "name": "has_user_verification",
+        "argType": "boolean"
+      },
+      {
+        "name": "is_user_verified",
+        "argType": "boolean"
       }
     ]
   }

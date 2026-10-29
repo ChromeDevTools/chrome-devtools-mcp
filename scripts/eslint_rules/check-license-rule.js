@@ -73,7 +73,7 @@ export default {
             nextToken.loc.start.line === header.loc.end.line + 1
           ) {
             context.report({
-              node: node,
+              node,
               loc: header.loc,
               messageId: 'emptyLine',
               fix(fixer) {
@@ -87,7 +87,7 @@ export default {
         // Add header license
         if (!header || !header.value.includes('@license')) {
           context.report({
-            node: node,
+            node,
             messageId: 'licenseRule',
             fix(fixer) {
               return fixer.insertTextAfterRange(insertAfter, licenseHeader);

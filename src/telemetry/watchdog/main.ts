@@ -10,8 +10,7 @@ import readline from 'node:readline';
 import {parseArgs} from 'node:util';
 
 import {logger, flushLogs, saveLogsToFile} from '../../utils/logger.js';
-import type {OsType} from '../types.js';
-import {WatchdogMessageType} from '../types.js';
+import {WatchdogMessageType, type OsType} from '../types.js';
 
 import {ClearcutSender} from './ClearcutSender.js';
 
@@ -75,7 +74,7 @@ function parseWatchdogArgs(): WatchdogArgs {
   };
 }
 
-function main() {
+function main(): void {
   const {
     parentPid,
     appVersion,
@@ -90,7 +89,7 @@ function main() {
     logStream = saveLogsToFile(logFile);
   }
 
-  const exit = (code: number) => {
+  const exit = (code: number): void => {
     if (!logStream) {
       process.exit(code);
     }
@@ -116,14 +115,14 @@ function main() {
 
   const sender = new ClearcutSender({
     appVersion,
-    osType: osType,
+    osType,
     clearcutEndpoint,
     forceFlushIntervalMs: clearcutForceFlushIntervalMs,
     includePidHeader: clearcutIncludePidHeader,
   });
 
   let isShuttingDown = false;
-  function onParentDeath(reason: string) {
+  function onParentDeath(reason: string): void {
     if (isShuttingDown) {
       return;
     }

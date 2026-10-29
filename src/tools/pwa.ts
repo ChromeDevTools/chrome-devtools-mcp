@@ -7,7 +7,7 @@
 import {zod} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
-import {defineTool} from './ToolDefinition.js';
+import {defineTool, type ToolFactory} from './ToolDefinition.js';
 
 const manifestIdSchema = zod
   .string()
@@ -28,7 +28,7 @@ const displayModeSchema = zod
       'app-window experience.',
   );
 
-export const installPwa = defineTool(() => ({
+export const installPwa: ToolFactory = defineTool(() => ({
   name: 'install_pwa',
   description:
     'Installs a Progressive Web App (PWA) identified by its manifest ID. ' +
@@ -50,12 +50,16 @@ export const installPwa = defineTool(() => ({
     displayMode: displayModeSchema,
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   // We do not validate file paths for remote browser instances
   // because they are on the remote host and not accessed by the MCP server.
   verifyFilesSchema: {
     installUrlOrBundleUrl: {
       local: true,
       remote: false,
+      // May be an http(s):// or file:// signed web bundle URL handed to the
+      // browser, so allow URLs through; a plain path is still validated.
+      allowUrl: true,
     },
   },
   handler: async (request, response, context) => {
@@ -74,7 +78,7 @@ export const installPwa = defineTool(() => ({
   },
 }));
 
-export const uninstallPwa = defineTool(() => ({
+export const uninstallPwa: ToolFactory = defineTool(() => ({
   name: 'uninstall_pwa',
   description:
     'Uninstalls a Progressive Web App identified by its manifest ID and ' +
@@ -87,6 +91,7 @@ export const uninstallPwa = defineTool(() => ({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;
@@ -98,7 +103,7 @@ export const uninstallPwa = defineTool(() => ({
   },
 }));
 
-export const launchPwa = defineTool(() => ({
+export const launchPwa: ToolFactory = defineTool(() => ({
   name: 'launch_pwa',
   description:
     'Launches an installed Progressive Web App using its saved display mode. ' +
@@ -118,6 +123,7 @@ export const launchPwa = defineTool(() => ({
       ),
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId, url} = request.params;
@@ -129,7 +135,7 @@ export const launchPwa = defineTool(() => ({
   },
 }));
 
-export const getOsAppState = defineTool(() => ({
+export const getOsAppState: ToolFactory = defineTool(() => ({
   name: 'get_os_app_state',
   description:
     'Returns the OS integration state (badge count and registered file ' +
@@ -142,6 +148,7 @@ export const getOsAppState = defineTool(() => ({
     manifestId: manifestIdSchema,
   },
   blockedByDialog: false,
+  concurrency: 'exclusive',
   verifyFilesSchema: {},
   handler: async (request, response, context) => {
     const {manifestId} = request.params;

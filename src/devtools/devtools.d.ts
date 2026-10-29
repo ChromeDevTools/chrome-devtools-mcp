@@ -12,7 +12,13 @@ declare module '*.css.js' {
 
 declare module '*.skill.js' {
   interface Skill {
-    name: 'styling' | 'network' | 'accessibility' | 'performance';
+    name:
+      | 'styling'
+      | 'network'
+      | 'performance'
+      | 'storage'
+      | 'sources'
+      | 'lighthouse';
     description: string;
     allowedTools: string[];
     instructions: string;

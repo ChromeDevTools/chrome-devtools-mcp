@@ -146,7 +146,7 @@ export class IssueFormatter {
       delete data.frameId;
       affectedResources.push({
         uid,
-        data: data,
+        data,
         request,
       });
     }
@@ -158,8 +158,9 @@ export class IssueFormatter {
   }
 
   #getParsedDescription(): {title?: string; description?: string} {
-    if (parsedDescriptionCache.has(this.#issue)) {
-      return parsedDescriptionCache.get(this.#issue)!;
+    const cached = parsedDescriptionCache.get(this.#issue);
+    if (cached) {
+      return cached;
     }
 
     const markdownDescription = this.#issue.getDescription();

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -12,7 +13,10 @@ import process from 'node:process';
 import type {YargsOptions} from '../third_party/index.js';
 import {logger} from '../utils/logger.js';
 
-export const DAEMON_SCRIPT_PATH = path.join(import.meta.dirname, 'daemon.js');
+export const DAEMON_SCRIPT_PATH: string = path.join(
+  import.meta.dirname,
+  'daemon.js',
+);
 
 const APP_NAME = 'chrome-devtools-mcp';
 export const DAEMON_CLIENT_NAME = 'chrome-devtools-cli-daemon';
@@ -65,15 +69,15 @@ export function getRuntimeHome(sessionId: string): string {
   return path.join(os.tmpdir(), appName);
 }
 
-export const IS_WINDOWS = os.platform() === 'win32';
+export const IS_WINDOWS: boolean = os.platform() === 'win32';
 
-export function getPidFilePath(sessionId: string) {
+export function getPidFilePath(sessionId: string): string {
   assertValidSessionId(sessionId);
   const runtimeDir = getRuntimeHome(sessionId);
   return path.join(runtimeDir, 'daemon.pid');
 }
 
-export function getDaemonPid(sessionId: string) {
+export function getDaemonPid(sessionId: string): number | null {
   assertValidSessionId(sessionId);
   try {
     const pidFile = getPidFilePath(sessionId);
@@ -93,15 +97,67 @@ export function getDaemonPid(sessionId: string) {
   }
 }
 
+const verifiedDaemonPids = new Map<number, boolean>();
+
+function getProcessCommandLine(pid: number): string {
+  if (process.platform === 'linux' && fs.existsSync('/proc')) {
+    return fs
+      .readFileSync(`/proc/${pid}/cmdline`, 'utf-8')
+      .replaceAll('\0', ' ');
+  }
+  if (IS_WINDOWS) {
+    return childProcess.execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`,
+      ],
+      {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      },
+    );
+  }
+  return childProcess.execFileSync(
+    'ps',
+    ['-p', String(pid), '-o', 'command='],
+    {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    },
+  );
+}
+
+function isDaemonProcess(pid: number): boolean {
+  const cached = verifiedDaemonPids.get(pid);
+  if (cached !== undefined) {
+    return cached;
+  }
+  try {
+    const commandLine = getProcessCommandLine(pid).trim();
+    const isDaemon =
+      commandLine === '' || /[\\/]daemon[\\/]daemon\.js/.test(commandLine);
+    verifiedDaemonPids.set(pid, isDaemon);
+    return isDaemon;
+  } catch {
+    verifiedDaemonPids.set(pid, true);
+    return true;
+  }
+}
+
 export function isDaemonRunning(sessionId: string): boolean {
   assertValidSessionId(sessionId);
   const pid = getDaemonPid(sessionId);
   if (pid) {
     try {
       process.kill(pid, 0); // Throws if process doesn't exist
-      return true;
+      return isDaemonProcess(pid);
     } catch {
       // Process is dead, stale PID file. Proceed with startup.
+      verifiedDaemonPids.delete(pid);
     }
   }
   return false;
@@ -136,7 +192,9 @@ export function serializeArgs(
         args.push(`--${kebabKey}=${String(item)}`);
       }
     } else {
-      args.push(`--${kebabKey}=${String(value)}`);
+      const serializedValue =
+        typeof value === 'object' ? JSON.stringify(value) : String(value);
+      args.push(`--${kebabKey}=${serializedValue}`);
     }
   }
   return args;

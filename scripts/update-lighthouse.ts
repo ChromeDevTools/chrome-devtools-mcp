@@ -27,6 +27,7 @@ function main() {
   const bundlePath = path.join(
     LIGHTHOUSE_DIR,
     'dist',
+    'devtools-mcp',
     'lighthouse-devtools-mcp-bundle.js',
   );
 
@@ -39,6 +40,7 @@ function main() {
   const noticesPath = path.join(
     LIGHTHOUSE_DIR,
     'dist',
+    'devtools-mcp',
     'LIGHTHOUSE_MCP_BUNDLE_THIRD_PARTY_NOTICES',
   );
 

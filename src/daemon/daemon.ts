@@ -138,24 +138,33 @@ const mcpServerArgs = process.argv.slice(2);
 let mcpServer: McpServer | null = null;
 let server: Server | null = null;
 
-async function setupMCPServer() {
+async function setupMCPServer(): Promise<void> {
   logger?.(`Starting Chrome DevTools MCP Server v${VERSION}`);
   const configParser = new ConfigParser(VERSION);
-  const args = configParser.parse();
+  const serverConfig = configParser.parseConfig();
+  const args = serverConfig.resolved;
   const logFile = args.logFile ? saveLogsToFile(args.logFile) : undefined;
-  const browserManager = new BrowserManager(args, {
+  const browserManager = new BrowserManager(serverConfig, {
     logFile,
   });
-  mcpServer = await McpServer.from(args, {
+  mcpServer = await McpServer.from(serverConfig, {
     browserManager,
     logFile,
   });
+  if (args.watchConfig) {
+    mcpServer.watchConfig();
+  }
   ClearcutLogger.get()?.setClientName(DAEMON_CLIENT_NAME);
   void ClearcutLogger.get()?.logDailyActiveIfNeeded();
   void ClearcutLogger.get()?.logServerStart(computeFlagUsage(args, mcpOptions));
 }
 
-async function handleRequest(msg: DaemonMessage) {
+async function handleRequest(msg: DaemonMessage): Promise<{
+  success: boolean;
+  result?: string;
+  message?: string;
+  error?: string;
+}> {
   try {
     if (msg.method === 'invoke_tool') {
       await started;
@@ -170,7 +179,8 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         result: JSON.stringify(result),
       };
-    } else if (msg.method === 'stop') {
+    }
+    if (msg.method === 'stop') {
       // Ensure we are not interrupting in-progress starting.
       await started;
       // Trigger cleanup asynchronously.
@@ -181,7 +191,8 @@ async function handleRequest(msg: DaemonMessage) {
         success: true,
         message: 'stopping',
       };
-    } else if (msg.method === 'status') {
+    }
+    if (msg.method === 'status') {
       await started;
       const statusResult: DaemonStatusResult = {
         pid: process.pid,
@@ -210,7 +221,7 @@ async function handleRequest(msg: DaemonMessage) {
   }
 }
 
-async function startSocketServer() {
+async function startSocketServer(): Promise<void> {
   // Remove existing socket file if it exists (only on non-Windows)
   if (!IS_WINDOWS) {
     try {
@@ -261,7 +272,7 @@ async function startSocketServer() {
 
 let isCleaningUp = false;
 
-async function cleanup(exitCode = 0) {
+async function cleanup(exitCode = 0): Promise<void> {
   if (isCleaningUp) {
     return;
   }
@@ -273,8 +284,8 @@ async function cleanup(exitCode = 0) {
   } catch (error) {
     logger?.('Error closing MCP server:', error);
   }
-  if (server) {
-    const activeServer = server;
+  const activeServer = server;
+  if (activeServer) {
     await new Promise<void>(resolve => {
       activeServer.close(() => resolve());
     });

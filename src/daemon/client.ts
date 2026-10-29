@@ -9,10 +9,14 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 
+import {PipeTransport} from '../third_party/cli.js';
 import type {CallToolResult} from '../third_party/index.js';
-import {PipeTransport} from '../third_party/index.js';
 import {getTempFilePath} from '../utils/files.js';
-import {logger, puppeteerLogger} from '../utils/logger.js';
+import {
+  logger,
+  puppeteerLogger,
+  redactDaemonArgsForLogging,
+} from '../utils/logger.js';
 
 import type {
   DaemonMessage,
@@ -31,31 +35,16 @@ const FILE_TIMEOUT = 10_000;
 const READY_CHECK_INTERVAL = 100;
 const READY_CHECK_COMMAND_TIMEOUT = 1_000;
 
-function delay(ms: number) {
+function delay(ms: number): Promise<void> {
   return new Promise<void>(resolve => {
     setTimeout(resolve, ms);
   });
 }
 
-/**
- * Waits for a file to be created and populated (removed = false) or removed (removed = true).
- */
-async function waitForFile(filePath: string, removed = false) {
-  const check = () => {
-    const exists = fs.existsSync(filePath);
-    if (removed) {
-      return !exists;
-    }
-    if (!exists) {
-      return false;
-    }
-    try {
-      return fs.statSync(filePath).size > 0;
-    } catch {
-      return false;
-    }
-  };
-
+async function waitFor(
+  check: () => boolean,
+  timeoutMessage: string,
+): Promise<void> {
   const deadline = Date.now() + FILE_TIMEOUT;
   while (Date.now() < deadline) {
     if (check()) {
@@ -71,12 +60,26 @@ async function waitForFile(filePath: string, removed = false) {
     return;
   }
 
-  throw new Error(
-    `Timeout: file ${filePath} ${removed ? 'not removed' : 'not found'} within ${FILE_TIMEOUT}ms`,
-  );
+  throw new Error(timeoutMessage);
 }
 
-async function waitForDaemonReady(sessionId: string) {
+/**
+ * Waits for a file to be created and populated.
+ */
+async function waitForFile(filePath: string): Promise<void> {
+  await waitFor(() => {
+    if (!fs.existsSync(filePath)) {
+      return false;
+    }
+    try {
+      return fs.statSync(filePath).size > 0;
+    } catch {
+      return false;
+    }
+  }, `Timeout: file ${filePath} not found within ${FILE_TIMEOUT}ms`);
+}
+
+async function waitForDaemonReady(sessionId: string): Promise<void> {
   const deadline = Date.now() + FILE_TIMEOUT;
   let lastError: unknown;
 
@@ -107,7 +110,10 @@ async function waitForDaemonReady(sessionId: string) {
   );
 }
 
-export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
+export async function startDaemon(
+  mcpArgs: string[] = [],
+  sessionId: string,
+): Promise<void> {
   if (isDaemonRunning(sessionId)) {
     logger?.('Daemon is already running');
     await waitForDaemonReady(sessionId);
@@ -131,7 +137,7 @@ export async function startDaemon(mcpArgs: string[] = [], sessionId: string) {
     fs.unlinkSync(pidFilePath);
   }
 
-  logger?.('Starting daemon...', ...mcpArgs);
+  logger?.('Starting daemon...', ...redactDaemonArgsForLogging(mcpArgs));
   const child = spawn(process.execPath, [DAEMON_SCRIPT_PATH, ...mcpArgs], {
     detached: true,
     stdio: 'ignore',
@@ -153,7 +159,7 @@ const SEND_COMMAND_TIMEOUT = 60_000; // ms
 export async function sendCommand(
   command: DaemonMessage,
   sessionId: string,
-  timeout = SEND_COMMAND_TIMEOUT,
+  timeout: number = SEND_COMMAND_TIMEOUT,
 ): Promise<DaemonResponse> {
   // Before connecting and sending, verify the daemon is still alive.
   if (!isDaemonRunning(sessionId)) {
@@ -166,7 +172,7 @@ export async function sendCommand(
     path: socketPath,
   });
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       socket.destroy();
       reject(new Error('Timeout waiting for daemon response'));
@@ -194,7 +200,7 @@ export async function sendCommand(
   });
 }
 
-export async function stopDaemon(sessionId: string) {
+export async function stopDaemon(sessionId: string): Promise<void> {
   if (!isDaemonRunning(sessionId)) {
     logger?.('Daemon is not running');
     return;
@@ -203,10 +209,25 @@ export async function stopDaemon(sessionId: string) {
   const pid = getDaemonPid(sessionId);
   const pidFilePath = getPidFilePath(sessionId);
 
-  await sendCommand({method: 'stop'}, sessionId);
+  try {
+    await sendCommand({method: 'stop'}, sessionId);
+  } catch (error) {
+    logger?.('Failed to stop daemon via socket, sending SIGTERM:', error);
+    if (pid) {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        // Ignore if process already exited.
+      }
+    }
+  }
 
   try {
-    await waitForFile(pidFilePath, /*removed=*/ true);
+    await waitFor(
+      () => !isDaemonRunning(sessionId),
+      `Timeout: daemon (pid ${pid}) did not exit within ${FILE_TIMEOUT}ms`,
+    );
+    fs.rmSync(pidFilePath, {force: true});
   } catch (error) {
     if (pid) {
       try {

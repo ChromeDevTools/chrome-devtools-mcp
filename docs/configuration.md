@@ -35,12 +35,12 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--categoryExtensions`/ `--category-extensions`**
-  Set to true to include tools related to extensions. Note: This feature is currently only supported with a pipe connection. autoConnect, browserUrl, and wsEndpoint are not supported with this feature until 149 will be released.
+  Set to true to include tools related to extensions.
   - **Type:** boolean
   - **Default:** `false`
 
 - **`--categoryExperimentalThirdParty`/ `--category-experimental-third-party`**
-  Set to true to enable third-party developer tools exposed by the inspected page itself
+  Set to true to enable third-party developer tools exposed by the inspected page itself (via WebMCP or devtoolstooldiscovery)
   - **Type:** boolean
   - **Default:** `false`
 
@@ -50,12 +50,17 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--categoryExperimentalWebmcp`/ `--category-experimental-webmcp`**
-  Set to true to enable debugging WebMCP tools. Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
+  Set to true to enable WebMCP tools (excluding debugging tools, which are exposed under the third-party developer tools category). Requires Chrome 150+ with the following flag: `--enable-features=WebMCP`
   - **Type:** boolean
   - **Default:** `false`
 
 - **`--categoryPwa`/ `--category-pwa`**
   Set to true to include tools for automating Progressive Web Apps (install, launch, uninstall, and OS state). This feature is only supported with a pipe connection; autoConnect, browserUrl, and wsEndpoint are not supported.
+  - **Type:** boolean
+  - **Default:** `false`
+
+- **`--categoryWebauthn`/ `--category-webauthn`**
+  Set to true to include a tool that manages virtual WebAuthn authenticators, for testing passkey and security key flows.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -122,11 +127,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--blockedUrlPattern`/ `--blocked-url-pattern`**
-  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group or a named group (`:name`) in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname or `*://127.0.0.1::port/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.
+  Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources); targets already open when patterns are updated via --watchConfig remain attached. Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\.\d+\.\d+\.\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).
   - **Type:** array
 
 - **`--allowedUrlPattern`/ `--allowed-url-pattern`**
-  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group or a named group (`:name`) in any component (for example `(127\.\d+\.\d+\.\d+)` in the hostname or `*://127.0.0.1::port/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead.
+  Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources); targets already open when patterns are updated via --watchConfig remain attached. Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\.\d+\.\d+\.\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).
   - **Type:** array
 
 - **`--screenshotFormat`/ `--screenshot-format`**
@@ -157,7 +162,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--experimentalDevtools`/ `--experimental-devtools`**
-  Whether to enable automation over DevTools targets
+  Whether to enable automation over DevTools targets. This exposes the DevTools UI to input tools, including the Console, which can evaluate JavaScript in the inspected page. --no-javascript-evaluation does not restrict this path.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -182,16 +187,16 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--experimentalScreencast`/ `--experimental-screencast`**
-  Exposes experimental screencast tools (requires ffmpeg). Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH.
+  Use the legacy ffmpeg-based screencast implementation instead of the built-in Chrome recorder. Install ffmpeg https://www.ffmpeg.org/download.html and ensure it is available in the MCP server PATH. This option is deprecated and will be removed in favour of dependency-free screencast commands that are available by default.
   - **Type:** boolean
   - **Default:** `false`
 
 - **`--experimentalFfmpegPath`/ `--experimental-ffmpeg-path`**
-  Path to ffmpeg executable for screencast recording.
+  Path to ffmpeg executable for legacy screencast recording (requires --experimentalScreencast).
   - **Type:** string
 
-- **`--experimentalScreencastFps`/ `--experimental-screencast-fps`**
-  Frames per second to use for screencast recording. Lower values can reduce memory pressure on pages that produce frames faster than ffmpeg can encode them.
+- **`--screencastFps`/ `--screencast-fps`, `--experimentalScreencastFps`**
+  Frames per second to use for screencast recording. Lower values reduce file size and encoding load.
   - **Type:** number
 
 - **`--performanceCrux`/ `--performance-crux`**
@@ -205,7 +210,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `true`
 
 - **`--javascriptEvaluation`/ `--javascript-evaluation`**
-  Set to false to disable JavaScript execution. When disabled, evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed.
+  Set to false to disable the server entry points for evaluating caller-provided JavaScript: evaluation tools (evaluate_script and slim evaluate) are disabled, the initScript parameter in navigate_page is turned off, and navigating to javascript:, data:, or vbscript: URLs is disallowed. This is not a JavaScript sandbox: page scripts and JavaScript triggered through other permitted browser interactions (e.g. clicks or typing) still run. If --experimentalDevtools is also enabled, the DevTools UI, including the Console that evaluates code in the inspected page, can be automated and is not restricted by this option. The client remains responsible for validating tool calls and parameters.
   - **Type:** boolean
   - **Default:** `true`
 
@@ -219,6 +224,11 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `true`
 
+- **`--maxNavigationSaved`/ `--max-navigation-saved`**
+  Number of navigations (including the current one) for which network requests and console messages are retained per page. Must be between 1 and 25. For earlier navigations, request URLs, status codes, and request and response headers are retained, which is sufficient to trace redirect hops, but response bodies are generally no longer available.
+  - **Type:** number
+  - **Default:** `3`
+
 - **`--slim`**
   Exposes a "slim" set of 3 tools covering navigation, script execution and screenshots only. Useful for basic browser tasks.
   - **Type:** boolean
@@ -230,7 +240,7 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Default:** `false`
 
 - **`--allowUnrestrictedPaths`/ `--allow-unrestricted-paths`**
-  If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, file-writing tools are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
+  If set, disables the default path restriction that applies when the MCP client does not negotiate the roots capability. By default, tools that read or write local files are restricted to the OS temp directory when no roots are configured. Use this only when connecting a trusted local client that does not implement MCP roots and requires access to paths outside the temp directory.
   - **Type:** boolean
   - **Default:** `false`
 
@@ -242,6 +252,11 @@ The Chrome DevTools MCP server supports the following configuration option:
 - **`--config`**
   Path to JSON configuration file.
   - **Type:** string
+
+- **`--watchConfig`/ `--watch-config`**
+  Watch the config file for changes and apply them without restarting. Tools (except --categoryExtensions) are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.
+  - **Type:** boolean
+  - **Default:** `false`
 
 <!-- END AUTO GENERATED OPTIONS -->
 
@@ -281,10 +296,9 @@ The server uses the first config file it finds in the following locations,
 from highest to lowest priority. Config files are not merged.
 
 1. The path passed via `--config`.
-2. `cd4a.config.json` in the current working directory.
-3. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
+2. `cd4a.config.json` in the `$PLUGIN_DATA` directory, when running as an
    [agent plugin](https://agent-plugins.org/specification).
-4. The global config file:
+3. The global config file:
    - macOS and Linux: `$XDG_CONFIG_HOME/cd4a/config.json`, falling back to
      `~/.config/cd4a/config.json`.
    - Windows: `%LOCALAPPDATA%/Google/cd4a/config.json`, falling back to
@@ -296,6 +310,35 @@ file.
 Set the `CHROME_DEVTOOLS_MCP_NO_CONFIG_DISCOVERY` env variable to turn off the
 search for config files, for example in tests. A config file passed via
 `--config` is still used.
+
+### Applying changes without a restart
+
+Pass `--watchConfig` to reload the config file whenever it changes. Watching is
+off by default. On a change, the server re-reads the file, updates the list of
+available tools, and notifies the MCP client with
+`notifications/tools/list_changed`. If the new file is invalid, the server logs
+the error to stderr and keeps the previous configuration.
+
+Tool categories (except `categoryExtensions`), network URL restrictions
+(`blockedUrlPattern`, `allowedUrlPattern`), and tool-specific options apply
+immediately. When `blockedUrlPattern` or `allowedUrlPattern` is updated on the
+fly, future requests and navigations are restricted, but targets already open on
+a newly disallowed URL remain attached. Options that launch or connect to the
+browser, such as `headless`, `channel`, `viewport`, or `categoryExtensions`,
+only apply after restarting chrome-devtools-mcp. The server logs a message to
+stderr when a change requires a restart.
+
+### Locking down the configuration file from agent access
+
+> [!WARNING]
+> Ensure that the configuration file and its parent directory are not writable
+> by the agent.
+
+The configuration file can set security-sensitive options such as
+`executablePath`, `chromeArg`, `allowedUrlPattern`, `blockedUrlPattern`, etc.
+If an agent can create or modify the configuration file in any of the
+discovered locations (or at the path passed via `--config`), it can alter
+these settings to bypass restrictions.
 
 ## Connecting via WebSocket with custom headers
 

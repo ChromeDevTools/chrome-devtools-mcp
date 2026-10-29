@@ -13,7 +13,7 @@ const mcpDebugNamespace = 'mcp:log';
 
 let logFileStream: fs.WriteStream | undefined;
 
-const _debugLog = util.debuglog(mcpDebugNamespace);
+const debugLog = util.debuglog(mcpDebugNamespace);
 
 export function saveLogsToFile(fileName: string): fs.WriteStream {
   const logFile = fs.createWriteStream(fileName, {flags: 'a+'});
@@ -52,32 +52,112 @@ export function escapeForLog(value: string): string {
   );
 }
 
+/**
+ * Redact credentials from URLs used in connection and diagnostic logs.
+ * The URL passed to Puppeteer is never modified.
+ */
+export function redactUrlForLogging(value: string): string {
+  try {
+    const url = new URL(value);
+    url.username = '';
+    url.password = '';
+    if (url.search) {
+      url.search = '?REDACTED';
+    }
+    return url.toString();
+  } catch {
+    // Unparseable URLs might still contain credentials. Fail closed.
+    return '[REDACTED]';
+  }
+}
+
+/**
+ * Return a redacted copy of the Puppeteer connection options for logging.
+ * Keep the actual headers and connection URLs intact for Puppeteer.
+ */
+export function redactConnectOptionsForLogging<
+  T extends {
+    headers?: Record<string, string>;
+    browserWSEndpoint?: string;
+    browserURL?: string;
+  },
+>(options: T): T {
+  return {
+    ...options,
+    ...(options.headers
+      ? {
+          headers: Object.fromEntries(
+            Object.keys(options.headers).map(name => [name, '[REDACTED]']),
+          ),
+        }
+      : {}),
+    ...(options.browserWSEndpoint
+      ? {browserWSEndpoint: redactUrlForLogging(options.browserWSEndpoint)}
+      : {}),
+    ...(options.browserURL
+      ? {browserURL: redactUrlForLogging(options.browserURL)}
+      : {}),
+  };
+}
+
+/**
+ * Filter sensitive CLI arguments in the daemon startup log only.
+ * Spawn still receives the original arguments unchanged.
+ */
+export function redactDaemonArgsForLogging(args: readonly string[]): string[] {
+  const headersFlag = /^--ws-?headers$/i;
+  const endpointFlag = /^--(?:ws-?endpoint|browser-?url)$/i;
+  return args.map((arg, index) => {
+    const previous = args[index - 1] ?? '';
+    if (headersFlag.test(previous)) {
+      return '[REDACTED]';
+    }
+    if (endpointFlag.test(previous)) {
+      return redactUrlForLogging(arg);
+    }
+    const equalsAt = arg.indexOf('=');
+    if (equalsAt === -1) {
+      return arg;
+    }
+    const flag = arg.slice(0, equalsAt);
+    const value = arg.slice(equalsAt + 1);
+    if (headersFlag.test(flag)) {
+      return `${flag}=[REDACTED]`;
+    }
+    if (endpointFlag.test(flag)) {
+      return `${flag}=${redactUrlForLogging(value)}`;
+    }
+    return arg;
+  });
+}
+
 export const logger: Logger = (...args: unknown[]) => {
   if (logFileStream) {
     logFileStream.write(
       `${new Date().toISOString()} ${mcpDebugNamespace} ${util.format(...args)}\n`,
     );
-  } else if (_debugLog.enabled) {
-    _debugLog('%s %s', new Date().toISOString(), util.format(...args));
+  } else if (debugLog.enabled) {
+    debugLog('%s %s', new Date().toISOString(), util.format(...args));
   }
 };
 
-export const puppeteerLogger = (prefix: string) => {
+export const puppeteerLogger = (prefix: string): Logger | undefined => {
   const dbg = util.debuglog(prefix);
 
   if (!dbg.enabled) {
     return;
   }
 
-  if (logFileStream) {
-    return (...args: unknown[]) => {
-      logFileStream!.write(
+  const stream = logFileStream;
+  if (stream) {
+    return (...args: unknown[]): void => {
+      stream.write(
         `${new Date().toISOString()} ${prefix} ${util.format(...args)}\n`,
       );
     };
   }
 
-  return (...args: unknown[]) => {
+  return (...args: unknown[]): void => {
     dbg('%s %s', new Date().toISOString(), util.format(...args));
   };
 };

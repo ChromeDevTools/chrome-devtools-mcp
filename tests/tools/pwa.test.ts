@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
@@ -55,10 +55,6 @@ const MANIFEST = JSON.stringify({
 
 describe('pwa', () => {
   const server = serverHooks();
-
-  afterEach(() => {
-    sinon.restore();
-  });
 
   function setupPwaRoutes(): {
     manifestId: string;

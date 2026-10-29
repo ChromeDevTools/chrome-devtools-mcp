@@ -11,9 +11,10 @@ import {
 } from '../devtools/DevtoolsUtils.js';
 import {UncaughtError} from '../collectors/PageCollector.js';
 import * as DevTools from '../third_party/index.js';
-import type {ConsoleMessage} from '../third_party/index.js';
+import type {ConsoleMessage, Protocol} from '../third_party/index.js';
 
 import type {IssueFormatter} from './IssueFormatter.js';
+import {formatRemoteObject} from './RemoteObjectFormatter.js';
 
 export interface ConsoleFormatterOptions {
   fetchDetailedData?: boolean;
@@ -48,6 +49,23 @@ interface ConsoleMessageDetailed extends ConsoleMessageConcise {
   stackTrace?: string;
 }
 
+// JSON.stringify prints Map, Set, functions and DOM nodes as `{}`, and throws
+// on symbols and cyclic objects. Those are formatted from their preview.
+function isJsonLike(remoteObject: Protocol.Runtime.RemoteObject): boolean {
+  if (remoteObject.type === 'object') {
+    return (
+      remoteObject.subtype === undefined ||
+      remoteObject.subtype === 'array' ||
+      remoteObject.subtype === 'null'
+    );
+  }
+  return (
+    remoteObject.type !== 'function' &&
+    remoteObject.type !== 'symbol' &&
+    remoteObject.type !== 'bigint'
+  );
+}
+
 export class ConsoleFormatter {
   readonly #id: number;
   readonly #type: string;
@@ -66,12 +84,12 @@ export class ConsoleFormatter {
     id: number;
     type: string;
     text: string;
+    isIgnored: IgnoreCheck;
     argCount?: number;
     resolvedArgs?: unknown[];
     stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
     cause?: SymbolizedError;
     includeStackInConcise?: boolean;
-    isIgnored: IgnoreCheck;
   }) {
     this.#id = params.id;
     this.#type = params.type;
@@ -117,6 +135,7 @@ export class ConsoleFormatter {
         devTools: options?.devTools,
         details: msg.details,
         targetId: msg.targetId,
+        session: msg.session,
         includeStackAndCause:
           options?.fetchDetailedData || options?.fetchStackTrace,
         resolvedStackTraceForTesting: options?.resolvedStackTraceForTesting,
@@ -152,7 +171,19 @@ export class ConsoleFormatter {
                 targetId: msg._targetId(),
               });
             }
-            return await arg.jsonValue();
+            if (!isJsonLike(remoteObject)) {
+              return formatRemoteObject(remoteObject);
+            }
+            try {
+              return await arg.jsonValue();
+            } catch (error) {
+              // JSON can't represent the value (for example, a cyclic object)
+              // or the page is gone; the preview still describes it.
+              if (remoteObject.preview) {
+                return formatRemoteObject(remoteObject);
+              }
+              throw error;
+            }
           } catch {
             return `<error: Argument ${i} is no longer available>`;
           }
@@ -301,10 +332,10 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
       type: string;
       text: string;
       argCount: number;
+      isIgnored: IgnoreCheck;
       stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
       cause?: SymbolizedError;
       includeStackInConcise?: boolean;
-      isIgnored: IgnoreCheck;
     },
     count: number,
   ) {
@@ -323,7 +354,9 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
   }
 }
 
-function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
+function convertConsoleMessageConciseToString(
+  msg: ConsoleMessageConcise,
+): string {
   const countSuffix = msg.count && msg.count > 1 ? ` [${msg.count} times]` : '';
   const messageLine = `msgid=${msg.id} [${msg.type}] ${msg.text} (${msg.argsCount} args)${countSuffix}`;
   if (!msg.stackTrace) {
@@ -338,7 +371,7 @@ function convertConsoleMessageConciseToString(msg: ConsoleMessageConcise) {
 
 function convertConsoleMessageConciseDetailedToString(
   msg: ConsoleMessageDetailed,
-) {
+): string {
   const result = [
     `ID: ${msg.id}`,
     `Message: ${msg.type}> ${msg.text}`,
@@ -364,7 +397,7 @@ function formatArgs(msg: ConsoleMessageDetailed): string {
   return result.join('\n');
 }
 
-function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}) {
+function formatArg(arg: unknown, formatter: {isIgnored: IgnoreCheck}): string {
   if (arg instanceof SymbolizedError) {
     return [
       arg.message,
@@ -438,7 +471,8 @@ function formatAsyncFragment(
 
   const separatorLineLength = 40;
   const prefix = `--- ${fragment.description || 'async'} `;
-  const separator = prefix + '-'.repeat(separatorLineLength - prefix.length);
+  const separator =
+    prefix + '-'.repeat(Math.max(0, separatorLineLength - prefix.length));
   return [separator, ...formattedFrames];
 }
 

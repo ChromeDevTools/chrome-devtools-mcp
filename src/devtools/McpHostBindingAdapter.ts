@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-empty-function */
-
 import {DevTools} from '../third_party/index.js';
 
 /**

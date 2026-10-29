@@ -5,8 +5,7 @@
  */
 
 import assert from 'node:assert';
-import type {ChildProcessByStdio} from 'node:child_process';
-import {spawn} from 'node:child_process';
+import {spawn, type ChildProcessByStdio} from 'node:child_process';
 import type {Readable, Writable} from 'node:stream';
 import {describe, it} from 'node:test';
 
@@ -165,10 +164,12 @@ async function setupServerWithRetry(): Promise<Server> {
       await new Promise(r => setTimeout(r, 500));
     }
   }
-  throw lastError;
+  throw lastError ?? new Error('Failed without an error');
 }
 
-describe('shutdown', () => {
+// Each test starts its own server and Chrome, so the tests run in parallel.
+// The budget only measures the time from the signal to the process exit.
+describe('shutdown', {concurrency: true}, () => {
   it('exits within budget on stdin EOF after Chrome launch', async () => {
     const child = await setupServerWithRetry();
     child.stdin.end();

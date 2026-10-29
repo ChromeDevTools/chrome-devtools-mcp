@@ -5,6 +5,8 @@ description: Uses Chrome DevTools MCP for inspecting, debugging, and testing coo
 
 ## Core Concepts
 
+**Page Targeting**: Page-scoped tools (`list_network_requests`, `get_network_request`, `list_console_messages`, `evaluate_script`, `navigate_page`, `take_snapshot`, `click`, `lighthouse_audit`, `close_page`, etc.) require a `pageId` parameter. Retrieve available page IDs using `list_pages` or from `new_page`.
+
 ### HttpOnly vs Client-Side Storage
 
 Cookies marked `HttpOnly` cannot be accessed or modified by client-side JavaScript (`cookieStore` or `document.cookie`). However, the browser **automatically attaches active HttpOnly cookies to outgoing HTTP request headers (`Cookie`)**.
@@ -19,7 +21,7 @@ Choose the right session environment to avoid state contamination (e.g., residua
 
 | Strategy                            | When to Use                                                                   | Setup / Teardown                                                                                              |
 | :---------------------------------- | :---------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
-| **Live Tab (Active Page)**          | Diagnosing an active user session, live 401/403 error, or current state.      | Operates directly on the currently selected page.                                                             |
+| **Live Tab (Active Page)**          | Diagnosing an active user session, live 401/403 error, or current state.      | Operates on the user's existing page; get its `pageId` from `list_pages`.                                     |
 | **Clean-Slate (`isolatedContext`)** | Testing cookie consent banners, first-time visits, or zero-cookie guarantees. | Call `new_page` with a unique `isolatedContext` (e.g. `"consent-audit-1"`). When finished, call `close_page`. |
 
 ### Client-Side Capabilities & Limitations
@@ -49,7 +51,7 @@ When an authenticated page request fails, returns 401/403, or redirects to login
    - Verify if the `Cookie` header was attached and whether required tokens (e.g. `SESSION_ID`, `auth_token`) were sent.
 4. **Trigger Active Inspection (If no recent request exists)**:
    - If the cookie was set in a previous session and no network call is listed, trigger a request:
-     - Use `navigate_page` with `reload: true`, OR
+     - Use `navigate_page` with `type: "reload"`, OR
      - Call `evaluate_script` with `() => fetch(window.location.href)`
    - Then call `get_network_request` on the new request to inspect the active `Cookie` header.
 5. **Trace the Setting Request**: If the cookie is missing or rejected:
@@ -91,6 +93,7 @@ To verify that no non-essential or tracking cookies are set before consent or wh
    - Call `list_console_messages` with:
      ```json
      {
+       "pageId": 1,
        "types": ["issue"],
        "includePreservedMessages": true
      }
@@ -101,10 +104,10 @@ To verify that no non-essential or tracking cookies are set before consent or wh
      - `SchemefulSameSite`: Cross-scheme cookie issues.
      - `PartitionedCookies`: Invalid CHIPS partitioning attributes.
 2. **Deep Audit: Lighthouse Third-Party Cookies**:
-   - Run `lighthouse_audit` with `mode: "navigation"` and `outputDirPath: "/tmp/lh-report"`.
-   - **Extract the specific cookie audit** without loading the full report into context:
+   - Run `lighthouse_audit` with `mode: "navigation"` (omit `outputDirPath` to use the default temporary files, or specify a directory within the workspace).
+   - **Extract the specific cookie audit** from the returned `report.json` path without loading the full report into context:
      ```bash
-     node -e "const r=require('/tmp/lh-report/report.json'); const a=r.audits['third-party-cookies']; console.log(JSON.stringify({score: a?.score, displayValue: a?.displayValue, items: a?.details?.items}))"
+     node -e "const r=require('<path/to/report.json>'); const a=r.audits['third-party-cookies']; console.log(JSON.stringify({score: a?.score, displayValue: a?.displayValue, items: a?.details?.items}))"
      ```
 
 ### 4. Client-Side Cookie Inspection & Manipulation

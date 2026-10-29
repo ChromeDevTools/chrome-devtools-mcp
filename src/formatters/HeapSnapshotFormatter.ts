@@ -5,23 +5,46 @@
  */
 
 import type {
-  AggregatedInfoWithId,
+  HeapSnapshotAggregate,
   HeapSnapshotClassDiff,
-  HeapSnapshotDetailedClassDiff,
+  HeapSnapshotClassDiffTotals,
+  HeapSnapshotDiffObject,
   DuplicateStringGroup,
 } from '../processors/HeapSnapshotManager.js';
 import {DevTools} from '../third_party/index.js';
 import type {ByteSizeRange} from '../utils/bytes.js';
-import {stableIdSymbol} from '../utils/id.js';
+import {truncateText} from '../utils/text.js';
 
 const {formatBytesToKb} = DevTools.I18n.ByteUtilities;
 
-export interface FormattedSnapshotEntry {
-  className: string;
-  id?: number;
-  count: number;
-  selfSize: string;
-  retainedSize: string;
+export const MAX_NAME_LENGTH = 100;
+
+export interface HeapSnapshotFormatOptions {
+  /**
+   * Values longer than this are truncated. Defaults to `MAX_NAME_LENGTH`. Pass
+   * a large value to get untruncated values.
+   */
+  maxNameLength?: number;
+}
+
+/**
+ * Renders a name for single-line output: the name is truncated to
+ * `maxNameLength` and line breaks are always escaped.
+ */
+export function formatName(
+  name: string,
+  options: HeapSnapshotFormatOptions,
+): string {
+  return truncateValue(name, options.maxNameLength)
+    .replaceAll('\r', '\\r')
+    .replaceAll('\n', '\\n');
+}
+
+/**
+ * Truncates `value` to `maxLength`, appending an ellipsis if it was cut off.
+ */
+function truncateValue(value: string, maxLength = MAX_NAME_LENGTH): string {
+  return truncateText(value, maxLength);
 }
 
 export interface ContextAnalysisReport {
@@ -100,17 +123,12 @@ export function isEdgeLike(
 }
 
 export class HeapSnapshotFormatter {
-  #aggregates: Record<string, AggregatedInfoWithId>;
-
-  constructor(aggregates: Record<string, AggregatedInfoWithId>) {
-    this.#aggregates = aggregates;
-  }
-
   static formatNodes(
     items: ReadonlyArray<
       | DevTools.HeapSnapshotModel.HeapSnapshotModel.Node
       | DevTools.HeapSnapshotModel.HeapSnapshotModel.Edge
     >,
+    options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
 
@@ -126,11 +144,11 @@ export class HeapSnapshotFormatter {
     for (const item of items) {
       if (isNodeLike(item)) {
         lines.push(
-          `${item.id},${item.name},${item.type},${item.distance},${formatBytesToKb(item.selfSize)},${formatBytesToKb(item.retainedSize)}`,
+          `${item.id},${formatName(item.name, options)},${item.type},${item.distance},${formatBytesToKb(item.selfSize)},${formatBytesToKb(item.retainedSize)}`,
         );
       } else if (isEdgeLike(item)) {
         lines.push(
-          `${item.name},${item.type},${item.node.id},${item.node.name},${formatBytesToKb(item.node.selfSize)},${formatBytesToKb(item.node.retainedSize)}`,
+          `${formatName(item.name, options)},${item.type},${item.node.id},${formatName(item.node.name, options)},${formatBytesToKb(item.node.selfSize)},${formatBytesToKb(item.node.retainedSize)}`,
         );
       }
     }
@@ -140,16 +158,17 @@ export class HeapSnapshotFormatter {
 
   static formatRetainingPaths(
     retainingPaths: readonly DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge[],
+    options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
 
     function formatEdge(
       edge: DevTools.HeapSnapshotModel.HeapSnapshotModel.RetainingEdge,
       depth: number,
-    ) {
+    ): void {
       const indent = '  '.repeat(depth);
       lines.push(
-        `${indent}<- @${edge.nodeId} ${edge.nodeName} via ${edge.edgeType} ${edge.edgeName} (distance: ${edge.distance})`,
+        `${indent}<- @${edge.nodeId} ${formatName(edge.nodeName, options)} via ${edge.edgeType} ${formatName(edge.edgeName, options)} (distance: ${edge.distance})`,
       );
       for (const child of edge.children) {
         formatEdge(child, depth + 1);
@@ -165,12 +184,13 @@ export class HeapSnapshotFormatter {
 
   static formatDominators(
     dominators: DevTools.HeapSnapshotModel.HeapSnapshotModel.DominatorChain,
+    options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
     lines.push('nodeId,nodeName,selfSize,retainedSize');
     for (const node of dominators) {
       lines.push(
-        `${node.nodeId},${node.nodeName},${formatBytesToKb(node.selfSize)},${formatBytesToKb(node.retainedSize)}`,
+        `${node.nodeId},${formatName(node.nodeName, options)},${formatBytesToKb(node.selfSize)},${formatBytesToKb(node.retainedSize)}`,
       );
     }
     return lines.join('\n');
@@ -178,14 +198,16 @@ export class HeapSnapshotFormatter {
 
   static formatDuplicateStrings(
     groups: readonly DuplicateStringGroup[],
+    options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
     lines.push('value,count,totalSelfSize,totalRetainedSize,truncated,nodeIds');
     for (const group of groups) {
       const nodeIds = group.nodes.map(n => `@${n.id}`).join(' ');
       const truncated = group.truncated ?? false;
+      const displayValue = truncateValue(group.value, options.maxNameLength);
       lines.push(
-        `${JSON.stringify(group.value)},${group.count},${formatBytesToKb(group.totalSelfSize)},${formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}`,
+        `${JSON.stringify(displayValue)},${group.count},${formatBytesToKb(group.totalSelfSize)},${formatBytesToKb(group.totalRetainedSize)},${truncated},${nodeIds}`,
       );
     }
     return lines.join('\n');
@@ -193,6 +215,7 @@ export class HeapSnapshotFormatter {
 
   static formatNativeContextSizes(
     sizes: DevTools.HeapSnapshotModel.HeapSnapshotModel.NativeContextSizes,
+    options: HeapSnapshotFormatOptions,
   ): string {
     const lines: string[] = [];
     lines.push('nodeId,nodeName,selfSize,retainedSize,attributedSize');
@@ -201,7 +224,7 @@ export class HeapSnapshotFormatter {
     );
     for (const nc of sortedContexts) {
       lines.push(
-        `${nc.nodeId},${nc.nodeName},${formatBytesToKb(nc.selfSize)},${formatBytesToKb(nc.retainedSize)},${formatBytesToKb(nc.attributedSize)}`,
+        `${nc.nodeId},${formatName(nc.nodeName, options)},${formatBytesToKb(nc.selfSize)},${formatBytesToKb(nc.retainedSize)},${formatBytesToKb(nc.attributedSize)}`,
       );
     }
     lines.push(`Shared Size: ${formatBytesToKb(sizes.sharedSize)}`);
@@ -226,97 +249,71 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
-  #getSortedAggregates(): AggregatedInfoWithId[] {
-    return Object.values(this.#aggregates).sort((a, b) => b.maxRet - a.maxRet);
-  }
-
-  toString(): string {
-    const sorted = this.#getSortedAggregates();
+  static formatAggregates(
+    aggregates: readonly HeapSnapshotAggregate[],
+    options: HeapSnapshotFormatOptions,
+  ): string {
     const lines: string[] = [];
-    lines.push('id,name,count,selfSize,retainedSize');
+    lines.push('id,className,count,selfSize,retainedSize');
 
-    for (const info of sorted) {
-      const id = info[stableIdSymbol] ?? '';
+    for (const info of aggregates) {
       lines.push(
-        `${id},${info.name},${info.count},${formatBytesToKb(info.self)},${formatBytesToKb(info.maxRet)}`,
+        `${info.id},${formatName(info.className, options)},${info.count},${formatBytesToKb(info.selfSize)},${formatBytesToKb(info.retainedSize)}`,
       );
     }
 
     return lines.join('\n');
   }
 
-  toJSON(): FormattedSnapshotEntry[] {
-    const sorted = this.#getSortedAggregates();
-    return sorted.map(info => ({
-      id: info[stableIdSymbol],
-      className: info.name,
-      count: info.count,
-      selfSize: formatBytesToKb(info.self),
-      retainedSize: formatBytesToKb(info.maxRet),
-    }));
-  }
-
-  static sort(
-    aggregates: Record<
-      string,
-      DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo
-    >,
-  ): Array<
-    [string, DevTools.HeapSnapshotModel.HeapSnapshotModel.AggregatedInfo]
-  > {
-    return Object.entries(aggregates).sort((a, b) => b[1].maxRet - a[1].maxRet);
-  }
-
-  static formatDiffSummary(diffs: HeapSnapshotClassDiff[]): string {
+  static formatDiffSummary(
+    diffs: readonly HeapSnapshotClassDiff[],
+    options: HeapSnapshotFormatOptions,
+  ): string {
     const lines: string[] = [];
     lines.push(
       'index,className,addedCount,removedCount,countDelta,addedSize,removedSize,sizeDelta',
     );
 
-    let index = 0;
     for (const diff of diffs) {
       lines.push(
-        `${index},${diff.className},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
+        `${diff.index},${formatName(diff.className, options)},${diff.addedCount},${diff.removedCount},${diff.countDelta},${formatBytesToKb(diff.addedSize)},${formatBytesToKb(diff.removedSize)},${formatBytesToKb(diff.sizeDelta)}`,
       );
-      index++;
     }
 
     return lines.join('\n');
   }
 
-  static formatDiffDetails(diff: HeapSnapshotDetailedClassDiff): string {
-    const lines: string[] = [];
-    lines.push(
-      `${diff.className}: # new: ${diff.addedCount}, # deleted: ${diff.removedCount}, # delta: ${formatSignedCount(diff.countDelta)}, alloc size: ${formatSignedSize(diff.addedSize)}, freed size: ${formatSignedSize(diff.removedSize)}, size delta: ${formatSignedSize(diff.sizeDelta)}`,
-    );
+  static formatDiffTotals(totals: HeapSnapshotClassDiffTotals): string {
+    return `Total: ${formatDiffCounts(totals)}`;
+  }
 
-    const addedIds = diff.addedIds;
-    const addedSelfSizes = diff.addedSelfSizes;
-    const deletedIds = diff.deletedIds;
-    const deletedSelfSizes = diff.deletedSelfSizes;
+  static formatDetailedClassDiffHeader(
+    diff: HeapSnapshotClassDiff,
+    options: HeapSnapshotFormatOptions,
+  ): string {
+    return `${formatName(diff.className, options)}: ${formatDiffCounts(diff)}`;
+  }
 
-    lines.push(`Objects:`);
-
-    for (let i = 0; i < addedIds.length; i++) {
+  static formatDetailedClassDiffObjects(
+    objects: readonly HeapSnapshotDiffObject[],
+  ): string {
+    const lines = ['Objects:'];
+    for (const object of objects) {
+      const sign = object.change === 'added' ? '+' : '-';
       lines.push(
-        `  + @${addedIds[i]} (self_size: ${formatBytesToKb(addedSelfSizes[i])})`,
+        `  ${sign} @${object.id} (self_size: ${formatBytesToKb(object.selfSize)})`,
       );
     }
-    for (let i = 0; i < deletedIds.length; i++) {
-      lines.push(
-        `  - @${deletedIds[i]} (self_size: ${formatBytesToKb(deletedSelfSizes[i])})`,
-      );
-    }
-
     return lines.join('\n');
   }
 
   static formatObjectInfo(
     info: DevTools.HeapSnapshotModel.HeapSnapshotModel.ObjectInfo,
+    options: HeapSnapshotFormatOptions,
   ): string {
     const lines = [
       `id: @${info.id}`,
-      `name: ${info.name}`,
+      `name: ${formatName(info.name, options)}`,
       `type: ${info.type}`,
       `detachedness: ${formatDOMLinkState(info.detachedness)}`,
       `selfSize: ${formatBytesToKb(info.selfSize)}`,
@@ -328,7 +325,10 @@ export class HeapSnapshotFormatter {
     return lines.join('\n');
   }
 
-  static formatContextAnalysis(report: ContextAnalysisReport): string {
+  static formatContextAnalysis(
+    report: ContextAnalysisReport,
+    options: HeapSnapshotFormatOptions,
+  ): string {
     const lines: string[] = [];
 
     if (report.contexts.length === 0) {
@@ -340,12 +340,12 @@ export class HeapSnapshotFormatter {
         lines.push('');
       }
       lines.push(
-        `#### Context @${context.contextNodeId} in \`${formatScopeName(scope)}\` — ${formatBytesToKb(context.deadFieldsRetainedSizeSum)}`,
+        `#### Context @${context.contextNodeId} in \`${formatScopeName(scope, options)}\` — ${formatBytesToKb(context.deadFieldsRetainedSizeSum)}`,
         `Script @${scope.scriptNodeId}, ScopeInfo @${scope.scopeInfoNodeId}, offsets ${scope.scopeStart}-${scope.scopeEnd}, ${formatCount(scope.contextFieldCount, 'context field')}`,
       );
       for (const field of context.deadFields) {
         lines.push(
-          `- \`${field.name}\` (${field.valueName} @${field.valueNodeId}) — ${formatBytesToKb(field.retainedSize)}`,
+          `- \`${formatName(field.name, options)}\` (${formatName(field.valueName, options)} @${field.valueNodeId}) — ${formatBytesToKb(field.retainedSize)}`,
         );
       }
     }
@@ -353,8 +353,11 @@ export class HeapSnapshotFormatter {
     if (report.scriptsWithoutScopes.length > 0) {
       lines.push('', 'Scripts without scope metadata could not be analyzed:');
       for (const script of report.scriptsWithoutScopes) {
+        const scriptName = script.scriptName
+          ? formatName(script.scriptName, options)
+          : `script @${script.scriptNodeId}`;
         lines.push(
-          `- \`${script.scriptName || `script @${script.scriptNodeId}`}\` (@${script.scriptNodeId}) — ${formatCount(script.contextCount, 'context')}`,
+          `- \`${scriptName}\` (@${script.scriptNodeId}) — ${formatCount(script.contextCount, 'context')}`,
         );
       }
     }
@@ -369,9 +372,14 @@ function formatCount(count: number, singular: string): string {
 
 function formatScopeName(
   scope: DevTools.HeapSnapshotModel.HeapSnapshotModel.ScopeAnalysis,
+  options: HeapSnapshotFormatOptions,
 ): string {
-  const scriptName = scope.scriptName || `script @${scope.scriptNodeId}`;
-  return scope.scopeName ? `${scope.scopeName} (${scriptName})` : scriptName;
+  const scriptName = scope.scriptName
+    ? formatName(scope.scriptName, options)
+    : `script @${scope.scriptNodeId}`;
+  return scope.scopeName
+    ? `${formatName(scope.scopeName, options)} (${scriptName})`
+    : scriptName;
 }
 
 function formatDOMLinkState(
@@ -395,4 +403,8 @@ function formatSignedCount(n: number): string {
 function formatSignedSize(bytes: number): string {
   const formatted = formatBytesToKb(bytes);
   return bytes > 0 ? `+${formatted}` : formatted;
+}
+
+function formatDiffCounts(counts: HeapSnapshotClassDiffTotals): string {
+  return `# new: ${counts.addedCount}, # deleted: ${counts.removedCount}, # delta: ${formatSignedCount(counts.countDelta)}, alloc size: ${formatSignedSize(counts.addedSize)}, freed size: ${formatSignedSize(counts.removedSize)}, size delta: ${formatSignedSize(counts.sizeDelta)}`;
 }

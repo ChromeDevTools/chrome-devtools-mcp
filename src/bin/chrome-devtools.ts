@@ -6,8 +6,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-process.title = 'chrome-devtools';
-
 import process from 'node:process';
 
 import type {Options, PositionalOptions} from 'yargs';
@@ -25,16 +23,23 @@ import {
   serializeArgs,
   assertValidSessionId,
 } from '../daemon/utils.js';
-import {logDisclaimers} from '../index.js';
-import {hideBin, yargs, type CallToolResult} from '../third_party/index.js';
+import {logDisclaimers} from '../utils/disclaimers.js';
+import {hideBin, yargs} from '../third_party/cli.js';
+import type {CallToolResult} from '../third_party/index.js';
 import {checkForUpdates} from '../utils/check-for-updates.js';
 import {VERSION} from '../version.js';
 
-import {buildCommand, isOptionalPositionalArg} from '../config/cli-commands.js';
+import {
+  buildCommand,
+  getCommandArgSpec,
+  shieldLiteralArgs,
+} from '../config/cli-commands.js';
 import {commands} from '../config/cli-options.js';
-import {mcpOptions, getCliOptions} from '../config/mcp-options.js';
+import {getCliOptions} from '../config/mcp-options.js';
 
 import {ConfigParser} from '../config/ConfigParser.js';
+
+process.title = 'chrome-devtools';
 
 await checkForUpdates(
   'Run `npm install -g chrome-devtools-mcp@latest` and `chrome-devtools start` to update and restart the daemon.',
@@ -42,7 +47,11 @@ await checkForUpdates(
 
 const DEFAULT_CLI_ARGS = ['--viaCli'];
 
-async function start(args: string[], sessionId: string, stopExisting = false) {
+async function start(
+  args: string[],
+  sessionId: string,
+  stopExisting = false,
+): Promise<void> {
   const combinedArgs = [...DEFAULT_CLI_ARGS, ...args];
   // Validates the arguments and the config file before starting the daemon.
   const parsedArgs = new ConfigParser(VERSION, [
@@ -57,7 +66,15 @@ async function start(args: string[], sessionId: string, stopExisting = false) {
   logDisclaimers(parsedArgs);
 }
 
-const y = yargs(hideBin(process.argv))
+const {argv: cliArgs, restore: restoreLiteralArg} = shieldLiteralArgs(
+  hideBin(process.argv),
+  commandName => {
+    const commandDef = commands[commandName];
+    return commandDef ? getCommandArgSpec(commandDef.args) : undefined;
+  },
+);
+
+const y = yargs(cliArgs)
   .locale('en') // Force English to ensure error string matching works in .fail, all custom messages we output are in English anyways
   .scriptName('chrome-devtools')
   .showHelpOnFail(true)
@@ -208,7 +225,7 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
                 ? 'array'
                 : 'string';
 
-        if (opt.required || isOptionalPositionalArg(commandName, argName)) {
+        if (opt.positional) {
           const options: PositionalOptions = {
             describe: opt.description,
             type: type as PositionalOptions['type'],
@@ -226,7 +243,9 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
             type: type as Options['type'],
           };
           if (opt.default !== undefined) {
-            options.default = opt.default;
+            // Document the default in --help without populating argv, so the
+            // daemon applies its current tool schema and config defaults.
+            options.defaultDescription = JSON.stringify(opt.default);
           }
           if (opt.enum) {
             options.choices = opt.enum as Array<string | number>;
@@ -238,18 +257,19 @@ for (const [commandName, commandDef] of Object.entries(commands)) {
     async argv => {
       const sessionId = argv.sessionId as string;
       try {
-        const versionWarningPromise = isDaemonRunning(sessionId)
+        const daemonRunning = isDaemonRunning(sessionId);
+        const versionWarningPromise = daemonRunning
           ? verifyDaemonVersion(sessionId, VERSION)
           : Promise.resolve(undefined);
 
-        if (!isDaemonRunning(sessionId)) {
-          await start(serializeArgs(mcpOptions, argv), sessionId);
+        if (!daemonRunning) {
+          await start([], sessionId);
         }
 
         const commandArgs: Record<string, unknown> = {};
         for (const argName of Object.keys(args)) {
           if (argName in argv) {
-            commandArgs[argName] = argv[argName];
+            commandArgs[argName] = restoreLiteralArg(argv[argName]);
           }
         }
 

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export function createIdGenerator() {
+export function createIdGenerator(): () => number {
   let i = 1;
-  return () => {
+  return (): number => {
     if (i === Number.MAX_SAFE_INTEGER) {
       i = 0;
     }
@@ -14,7 +14,7 @@ export function createIdGenerator() {
   };
 }
 
-export const stableIdSymbol = Symbol('stableIdSymbol');
+export const stableIdSymbol: unique symbol = Symbol('stableIdSymbol');
 
 export type WithSymbolId<T> = T & {
   [stableIdSymbol]?: number;

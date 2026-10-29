@@ -6,26 +6,16 @@
 
 import assert from 'node:assert';
 import fs from 'node:fs';
-import {afterEach, describe, it} from 'node:test';
+import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
 import {ConfigLocator} from '../../src/config/ConfigLocator.js';
 import {ConfigParser} from '../../src/config/ConfigParser.js';
-import {DEFAULT_FILESYSTEM_ROOT} from '../../src/config/mcp-options.js';
 import {createTempFile} from '../utils.js';
 
 describe('mcp-options steps', () => {
-  afterEach(() => sinon.restore());
-
   const parser = new ConfigParser('0.0.0');
-
-  describe('constructor', () => {
-    it('initializes configLocator', () => {
-      const testParser = new ConfigParser('0.0.0');
-      assert.ok(testParser.configLocator instanceof ConfigLocator);
-    });
-  });
 
   describe('parseCliArgs', () => {
     it('returns only explicitly passed flags', () => {
@@ -77,124 +67,58 @@ describe('mcp-options steps', () => {
         /Invalid JSON config file: Config must be a JSON object/,
       );
     });
-  });
 
-  describe('validateConflicts', () => {
-    it('accepts a single argument from a conflict group', () => {
-      parser.validateConflicts({browserUrl: 'http://localhost:9222'});
-    });
+    it('accepts wsHeaders as a JSON object and validates string values', () => {
+      using validFile = createTempFile(
+        JSON.stringify({
+          wsEndpoint: 'ws://localhost:9222',
+          wsHeaders: {Authorization: 'Bearer token'},
+        }),
+        'cd4a.wsheaders.valid.json',
+      );
+      const args = parser.parseConfigFile(validFile.path);
+      assert.deepStrictEqual(args.wsHeaders, {Authorization: 'Bearer token'});
 
-    it('ignores false and undefined values', () => {
-      parser.validateConflicts({
-        browserUrl: 'http://localhost:9222',
-        wsEndpoint: undefined,
-        categoryExtensions: false,
-      });
-    });
-
-    it('rejects two arguments from the same group', () => {
+      using invalidFile = createTempFile(
+        JSON.stringify({
+          wsEndpoint: 'ws://localhost:9222',
+          wsHeaders: {Authorization: 123},
+        }),
+        'cd4a.wsheaders.invalid.json',
+      );
       assert.throws(
-        () =>
-          parser.validateConflicts({
-            browserUrl: 'http://localhost:9222',
-            channel: 'canary',
-          }),
-        /Arguments channel and browserUrl are mutually exclusive/,
+        () => parser.parseConfigFile(invalidFile.path),
+        /Header "Authorization" must have a string value/,
       );
     });
 
-    describe('validateImplications', () => {
-      it('accepts when implying key is not set', () => {
-        parser.validateImplications({wsEndpoint: 'ws://localhost:9222'});
-      });
-
-      it('accepts when both implying and implied keys are set', () => {
-        parser.validateImplications({
-          wsHeaders: {Auth: 'token'},
-          wsEndpoint: 'ws://localhost:9222',
-        });
-      });
-
-      it('rejects when implying key is set but implied key is missing', () => {
+    it('rejects config, help, and version keys inside a config file', () => {
+      for (const forbiddenKey of ['config', 'help', 'version']) {
+        using configFile = createTempFile(
+          JSON.stringify({[forbiddenKey]: true}),
+          `cd4a.forbidden.${forbiddenKey}.json`,
+        );
         assert.throws(
-          () => parser.validateImplications({wsHeaders: {Auth: 'token'}}),
-          /Implications failed:\n {2}wsHeaders -> wsEndpoint/,
+          () => parser.parseConfigFile(configFile.path),
+          new RegExp(`Invalid JSON config file: .*${forbiddenKey}`),
         );
-      });
-
-      it('rejects when implying key is set but implied key is negated', () => {
-        assert.throws(
-          () =>
-            parser.validateImplications({
-              experimentalFfmpegPath: '/bin/ffmpeg',
-              experimentalScreencast: false,
-            }),
-          /Implications failed:\n {2}experimentalFfmpegPath -> experimentalScreencast/,
-        );
-      });
-    });
-  });
-  describe('applyDefaults', () => {
-    it('keeps explicit values and fills in defaults', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        headless: true,
-      });
-      assert.strictEqual(args.headless, true);
-      assert.strictEqual(args.isolated, false);
-      assert.strictEqual(args.channel, 'stable');
-      assert.strictEqual(args.categoryExtensions, undefined);
-    });
-
-    for (const explicitArgs of [
-      {browserUrl: 'http://localhost:9222'},
-      {wsEndpoint: 'ws://localhost:9222'},
-      {executablePath: '/tmp/chrome'},
-    ]) {
-      it(`does not default channel with ${Object.keys(explicitArgs)[0]}`, () => {
-        assert.strictEqual(
-          new ConfigParser('0.0.0', [], {}).applyDefaults(explicitArgs).channel,
-          undefined,
-        );
-      });
-    }
-
-    it('applies viaCli defaults when launching a browser', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        viaCli: true,
-        filesystemRoot: DEFAULT_FILESYSTEM_ROOT,
-      });
-      assert.strictEqual(args.headless, true);
-      assert.strictEqual(args.isolated, true);
-      assert.strictEqual(args.categoryExtensions, true);
-      assert.strictEqual(args.allowUnrestrictedPaths, true);
-      assert.strictEqual(args.filesystemRoot, undefined);
-    });
-
-    it('does not enable isolated or extensions for viaCli with browserUrl', () => {
-      const args = new ConfigParser('0.0.0', [], {}).applyDefaults({
-        viaCli: true,
-        browserUrl: 'http://localhost:9222',
-      });
-      assert.strictEqual(args.isolated, false);
-      assert.strictEqual(args.categoryExtensions, undefined);
-    });
-
-    it('turns off usage statistics in CI', () => {
-      sinon.stub(console, 'error');
-      const args = new ConfigParser('0.0.0', [], {
-        CI: 'true',
-      }).applyDefaults({
-        usageStatistics: true,
-      });
-      assert.strictEqual(args.usageStatistics, false);
+      }
     });
   });
 
   describe('config discovery', () => {
-    it('does not discover a config file without a locator', () => {
-      const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      sinon.stub(parser.configLocator, 'locate').returns(undefined);
+    it('does not discover a config file when locator returns undefined', () => {
+      const locator = new ConfigLocator();
+      sinon.stub(locator, 'locate').returns(undefined);
+      const parser = new ConfigParser(
+        '0.0.0',
+        ['node', 'main.js'],
+        {},
+        false,
+        locator,
+      );
       assert.strictEqual(parser.parse().config, undefined);
+      assert.strictEqual(parser.configPath, undefined);
     });
 
     it('uses the config file found by the locator', () => {
@@ -203,15 +127,13 @@ describe('mcp-options steps', () => {
         'cd4a.config.json',
       );
       const parser = new ConfigParser('0.0.0', ['node', 'main.js'], {}, false);
-      const locateStub = sinon
-        .stub(parser.configLocator, 'locate')
-        .returns(configFile.path);
+      sinon.stub(parser.configLocator, 'locate').returns(configFile.path);
 
       const args = parser.parse();
 
       assert.strictEqual(args.headless, true);
       assert.strictEqual(args.config, configFile.path);
-      sinon.assert.calledOnce(locateStub);
+      assert.strictEqual(parser.configPath, configFile.path);
     });
 
     it('prefers --config over a discovered config file', () => {

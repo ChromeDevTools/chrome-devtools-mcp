@@ -7,10 +7,17 @@
 import assert from 'node:assert';
 import {describe, it} from 'node:test';
 
+import sinon from 'sinon';
+
 import {UncaughtError} from '../../src/collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from '../../src/collectors/ServiceWorkerCollector.js';
-import type {Protocol} from '../../src/third_party/index.js';
+import {McpWorker} from '../../src/McpWorker.js';
+import {TargetType, type Protocol} from '../../src/third_party/index.js';
 import {stableIdSymbol} from '../../src/utils/id.js';
+import {
+  createMockPuppeteerBrowser,
+  createMockPuppeteerTarget,
+} from '../mocks.js';
 
 describe('ServiceWorkerConsoleCollector', () => {
   it('limits logs to 1000 per extension', () => {
@@ -71,5 +78,24 @@ describe('ServiceWorkerConsoleCollector', () => {
       logToFind,
       'find should return correct log',
     );
+  });
+
+  it('ignores "No target with given id found" when service worker target disappears during subscribe', async () => {
+    const browser = createMockPuppeteerBrowser();
+    const target = createMockPuppeteerTarget({
+      url: 'chrome-extension://ext-id/sw.js',
+    });
+    target.type.returns(TargetType.SERVICE_WORKER);
+    target.createCDPSession.rejects(
+      new Error(
+        'Protocol error (Target.attachToTarget): No target with given id found',
+      ),
+    );
+
+    const collector = new ServiceWorkerConsoleCollector(browser);
+    await collector.init([new McpWorker('sw-1', 'service_worker', target)]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    sinon.assert.calledOnce(target.createCDPSession);
+    collector.dispose();
   });
 });

@@ -12,7 +12,7 @@ import {
   categoryToFlagName,
 } from '../build/src/config/category-options.js';
 import {mcpOptions} from '../build/src/config/mcp-options.js';
-import {ConfigParser} from '../build/src/config/ConfigParser.js';
+import {ServerConfig} from '../build/src/config/ServerConfig.js';
 import {zod} from '../build/src/third_party/index.js';
 import {labels, ToolCategory} from '../build/src/tools/categories.js';
 import {isSlimTool} from '../build/src/tools/ToolDefinition.js';
@@ -23,11 +23,19 @@ const OUTPUT_PATH = path.join(
   '../src/config/cli-options.ts',
 );
 
+/**
+ * Optional args that intentionally remain positional for backwards-compatible
+ * CLI syntax. Every required arg is positional; every other optional arg is a
+ * flag.
+ */
+const OPTIONAL_POSITIONAL_ARGS = new Set(['evaluate_script:function']);
+
 interface CliOption {
   name: string;
   type: string;
   description: string;
   required: boolean;
+  positional: boolean;
   default?: unknown;
   enum?: unknown[];
 }
@@ -41,7 +49,7 @@ interface JsonSchema {
   enum?: unknown[];
 }
 
-function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
+function schemaToCLIOptions(toolName: string, schema: JsonSchema): CliOption[] {
   if (!schema || !schema.properties) {
     return [];
   }
@@ -60,6 +68,8 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
       type: prop.type,
       description,
       required: isRequired,
+      positional:
+        isRequired || OPTIONAL_POSITIONAL_ARGS.has(`${toolName}:${name}`),
       default: prop.default,
       enum: prop.enum,
     };
@@ -68,7 +78,10 @@ function schemaToCLIOptions(schema: JsonSchema): CliOption[] {
 
 async function generateCli() {
   const tools = createTools(
-    new ConfigParser('0.0.0', ['', '', '--viaCli']).parse(),
+    ServerConfig.applyDefaults(
+      {viaCli: true},
+      {suppressUsageStatisticsNotice: true},
+    ),
   );
 
   // Sort tools by name
@@ -109,7 +122,7 @@ async function generateCli() {
     const inputSchema = zod.toJSONSchema(zod.object(tool.schema), {
       io: 'input',
     }) as JsonSchema;
-    const options = schemaToCLIOptions(inputSchema);
+    const options = schemaToCLIOptions(tool.name, inputSchema);
     const args: Record<string, CliOption> = {};
     for (const opt of options) {
       args[opt.name] = opt;
@@ -171,6 +184,8 @@ export interface ArgDef {
   type: string;
   description: string;
   required: boolean;
+  /** Whether the arg is a positional on the command line, otherwise a flag. */
+  positional: boolean;
   default?: string | number | boolean;
   enum?: ReadonlyArray<string | number>;
 }

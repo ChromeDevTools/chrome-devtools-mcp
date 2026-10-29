@@ -6,6 +6,7 @@
 
 import type {TextSnapshot} from '../TextSnapshot.js';
 import type {TextSnapshotNode} from '../types.js';
+import {truncateUrl} from '../utils/text.js';
 
 export class SnapshotFormatter {
   #snapshot: TextSnapshot;
@@ -42,16 +43,36 @@ Get a verbose snapshot to include all elements if you are interested in the sele
     const line =
       ' '.repeat(depth * 2) +
       attributes.join(' ') +
-      (node.id === this.#snapshot.selectedElementUid
+      (node.id && node.id === this.#snapshot.selectedElementUid
         ? ' [selected in the DevTools Elements panel]'
         : '') +
       '\n';
     chunks.push(line);
 
-    for (const child of node.children) {
-      chunks.push(this.#formatNode(child, depth + 1));
+    if (!this.#hasRedundantTextChildren(node)) {
+      for (const child of node.children) {
+        chunks.push(this.#formatNode(child, depth + 1));
+      }
     }
     return chunks.join('');
+  }
+
+  #hasRedundantTextChildren(node: TextSnapshotNode): boolean {
+    if (this.#snapshot.verbose || !node.name || node.children.length === 0) {
+      return false;
+    }
+    let text = '';
+    for (const child of node.children) {
+      if (
+        child.role !== 'StaticText' ||
+        child.children.length !== 0 ||
+        child.id === this.#snapshot.selectedElementUid
+      ) {
+        return false;
+      }
+      text += child.name ?? '';
+    }
+    return stripWhitespace(text) === stripWhitespace(node.name);
   }
 
   #nodeToJSON(node: TextSnapshotNode): object {
@@ -65,9 +86,15 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   }
 
   #getAttributes(serializedAXNodeRoot: TextSnapshotNode): string[] {
-    const attributes = [`uid=${serializedAXNodeRoot.id}`];
+    const attributes: string[] = [];
+    if (serializedAXNodeRoot.id) {
+      attributes.push(`uid=${serializedAXNodeRoot.id}`);
+    }
 
-    if (serializedAXNodeRoot.role) {
+    if (
+      serializedAXNodeRoot.role &&
+      serializedAXNodeRoot.role !== 'StaticText'
+    ) {
       attributes.push(
         serializedAXNodeRoot.role === 'none'
           ? 'ignored'
@@ -83,17 +110,25 @@ Get a verbose snapshot to include all elements if you are interested in the sele
       /* excludeSpecial */ true,
     );
 
+    const isOption = serializedAXNodeRoot.role === 'option';
     for (const attr of Object.keys(serializedAXNodeRoot).sort()) {
       if (excludedAttributes.has(attr)) {
         continue;
       }
 
       const mapped = booleanPropertyMap[attr];
-      if (mapped && simpleAttrs[mapped]) {
+      if (
+        mapped &&
+        simpleAttrs[mapped] &&
+        !(isOption && mapped === 'selectable')
+      ) {
         attributes.push(mapped);
       }
 
       const val = simpleAttrs[attr];
+      if (isOption && attr === 'value' && val === serializedAXNodeRoot.name) {
+        continue;
+      }
       if (val === true) {
         attributes.push(attr);
       } else if (typeof val === 'string' || typeof val === 'number') {
@@ -110,7 +145,9 @@ Get a verbose snapshot to include all elements if you are interested in the sele
   ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     if (!excludeSpecial) {
-      result.id = node.id;
+      if (node.id) {
+        result.id = node.id;
+      }
       if (node.role) {
         result.role = node.role;
       }
@@ -141,6 +178,9 @@ Get a verbose snapshot to include all elements if you are interested in the sele
         if (value) {
           result[attr] = true;
         }
+      } else if (attr === 'url' && typeof value === 'string') {
+        // Keep other URLs whole: the snapshot is their only full copy.
+        result[attr] = value.startsWith('data:') ? truncateUrl(value) : value;
       } else if (typeof value === 'string' || typeof value === 'number') {
         result[attr] = value;
       }
@@ -165,3 +205,7 @@ const excludedAttributes = new Set([
   'backendNodeId',
   'loaderId',
 ]);
+
+function stripWhitespace(text: string): string {
+  return text.replace(/\s+/g, '');
+}

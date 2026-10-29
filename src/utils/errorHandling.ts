@@ -7,7 +7,11 @@
 import process from 'node:process';
 import {logger} from './logger.js';
 
-export function setupUnhandledRejectionHandler(onCrash: () => void) {
+export function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+export function setupUnhandledRejectionHandler(onCrash: () => void): void {
   process.on('unhandledRejection', (reason, promise) => {
     logger?.('Unhandled promise rejection:', promise, reason);
     console.error('Unhandled promise rejection:', reason);
