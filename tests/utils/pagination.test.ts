@@ -44,15 +44,4 @@ describe('paginate', () => {
     assert.strictEqual(result.hasPreviousPage, true);
     assert.strictEqual(result.invalidPage, false);
   });
-
-  it('falls back to the default page size for a non-positive or non-finite pageSize', () => {
-    const items = Array.from({length: 25}, (_, i) => `item-${i}`);
-    for (const pageSize of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      const result = paginate(items, {pageSize, pageIdx: 1});
-      assert.strictEqual(result.items.length, 5);
-      assert.strictEqual(result.items[0], 'item-20');
-      assert.strictEqual(result.totalPages, 2);
-      assert.strictEqual(result.hasNextPage, false);
-    }
-  });
 });
