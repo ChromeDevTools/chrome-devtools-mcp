@@ -475,7 +475,7 @@ export function getMockBrowser(options?: {
 }
 
 export const CLI_PATH: string = path.resolve(
-  'build/src/bin/chrome-devtools.js',
+  'out/Default/gen/src/bin/chrome-devtools.js',
 );
 
 export async function runCli(

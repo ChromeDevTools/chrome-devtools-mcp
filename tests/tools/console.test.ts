@@ -34,7 +34,7 @@ import {
 
 const EXTENSION_LOGGING_PATH = path.join(
   import.meta.dirname,
-  '../../../tests/tools/fixtures/extension-logging',
+  '../../../../../tests/tools/fixtures/extension-logging',
 );
 
 describe('console', () => {
