@@ -18,6 +18,11 @@ import {
 } from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
+  NetworkOverrideManager,
+  type NetworkOverride,
+  type NetworkOverrideInput,
+} from './NetworkOverrideManager.js';
+import {
   type Locator,
   PredefinedNetworkConditions,
   type Dialog,
@@ -221,6 +226,7 @@ export class McpPage implements ContextPage {
   #navigationTimeout: number;
   #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
+  #networkOverrideManager?: NetworkOverrideManager;
 
   constructor(
     target: Target,
@@ -362,6 +368,7 @@ export class McpPage implements ContextPage {
         return;
       }
       this.#pptrPage = page;
+      this.#networkOverrideManager = new NetworkOverrideManager(page);
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
         maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
@@ -883,6 +890,7 @@ export class McpPage implements ContextPage {
       });
     }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
+    void this.#networkOverrideManager?.dispose();
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
     const devtoolsUniverse = this.#devtoolsUniverse;
@@ -892,6 +900,24 @@ export class McpPage implements ContextPage {
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
     });
+  }
+
+  async addNetworkOverride(
+    input: NetworkOverrideInput,
+  ): Promise<NetworkOverride> {
+    await this.init();
+    if (!this.#networkOverrideManager) {
+      throw new Error(`McpPage (id=${this.id}) is not initialized.`);
+    }
+    return await this.#networkOverrideManager.add(input);
+  }
+
+  listNetworkOverrides(): NetworkOverride[] {
+    return this.#networkOverrideManager?.list() ?? [];
+  }
+
+  async removeNetworkOverride(id: number): Promise<boolean> {
+    return (await this.#networkOverrideManager?.remove(id)) ?? false;
   }
 
   async executeThirdPartyDeveloperTool(

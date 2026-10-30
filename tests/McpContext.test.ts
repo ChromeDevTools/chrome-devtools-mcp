@@ -125,6 +125,41 @@ describe('McpContext', () => {
     );
   }
 
+  describe('validateNetworkUrl', () => {
+    it('enforces current URL access policies for redirects', async () => {
+      const config = createMockServerConfig();
+      const context = await createMockContext({config});
+      try {
+        context.validateNetworkUrl('https://example.com/script.js');
+        assert.throws(
+          () => context.validateNetworkUrl('file:///tmp/script.js'),
+          /Unsupported URL protocol/,
+        );
+        config.commit(
+          createMockServerConfig({
+            blockedUrlPattern: ['https://example.com/*'],
+          }),
+        );
+        assert.throws(
+          () => context.validateNetworkUrl('https://example.com/script.js'),
+          /Blocked by blocklist/,
+        );
+        config.commit(
+          createMockServerConfig({
+            allowedUrlPattern: ['https://allowed.example/*'],
+          }),
+        );
+        assert.throws(
+          () => context.validateNetworkUrl('https://example.com/script.js'),
+          /Not allowed by allowlist/,
+        );
+        context.validateNetworkUrl('https://allowed.example/script.js');
+      } finally {
+        context.dispose();
+      }
+    });
+  });
+
   describe('getServiceWorkerConsoleData', () => {
     it('resolves the service worker ID to the collector extension ID', async () => {
       const browser = createMockPuppeteerBrowser();
