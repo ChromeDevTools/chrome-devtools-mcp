@@ -9,6 +9,7 @@ import {zod, type ConsoleMessageType} from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
+import {LIST_CONSOLE_MESSAGES_TOOL_NAME} from './toolNames.js';
 type ConsoleResponseType = ConsoleMessageType | 'issue';
 
 const FILTERABLE_MESSAGE_TYPES: [
@@ -36,8 +37,6 @@ const FILTERABLE_MESSAGE_TYPES: [
   'verbose',
   'issue',
 ];
-
-const LIST_CONSOLE_MESSAGES_TOOL_NAME = 'list_console_messages';
 
 export const listConsoleMessages: PageToolFactory = definePageTool(
   (cliArgs: ParsedArguments) => {
