@@ -1,6 +1,6 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools and Puppeteer",
   "mcpServers": {
     "chrome-devtools": {
@@ -8,7 +8,7 @@
       "args": [
         "--prefix",
         "${CLAUDE_PLUGIN_DATA}",
-        "chrome-devtools-mcp@1.12.0"
+        "chrome-devtools-mcp@1.12.1"
       ]
     }
   }
