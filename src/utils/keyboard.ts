@@ -272,14 +272,11 @@ export function isValidKey(key: string): key is KeyInput {
   return validKeys.has(key);
 }
 
-/**
- * Error message for a string that is not a valid key name.
- */
-export function invalidKeyMessage(key: string): string {
+function invalidKeyMessage(key: string): string {
   return `${key} is invalid. Valid keys are: ${Array.from(validKeys.values()).join(',')}.`;
 }
 
-function throwIfInvalidKey(key: string): KeyInput {
+export function throwIfInvalidKey(key: string): KeyInput {
   if (isValidKey(key)) {
     return key;
   }
@@ -305,7 +302,8 @@ export function parseKey(keyInput: string): [KeyInput, ...KeyInput[]] {
     result.push(throwIfInvalidKey(key));
   }
 
-  if (result.length === 0) {
+  const primaryKey = result.at(-1);
+  if (primaryKey === undefined) {
     throw new Error(`Key ${keyInput} could not be parsed.`);
   }
 
@@ -313,5 +311,5 @@ export function parseKey(keyInput: string): [KeyInput, ...KeyInput[]] {
     throw new Error(`Key ${keyInput} contains duplicate keys.`);
   }
 
-  return [result.at(-1), ...result.slice(0, -1)] as [KeyInput, ...KeyInput[]];
+  return [primaryKey, ...result.slice(0, -1)];
 }
