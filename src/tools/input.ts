@@ -11,13 +11,14 @@ import {
   type KeyInput,
 } from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
-import {invalidKeyMessage, isValidKey, parseKey} from '../utils/keyboard.js';
+import {parseKey, throwIfInvalidKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
 import {
   definePageTool,
+  zodTransform,
   type ContextPage,
   type PageToolFactory,
 } from './ToolDefinition.js';
@@ -35,9 +36,11 @@ const includeSnapshotSchema = zod
 const submitKeySchema = zod
   .string()
   // An empty string means no submit key, as before.
-  .refine((key): boolean => key === '' || isValidKey(key), {
-    error: issue => invalidKeyMessage(String(issue.input)),
-  })
+  .transform(
+    zodTransform((key): KeyInput | undefined =>
+      key === '' ? undefined : throwIfInvalidKey(key),
+    ),
+  )
   .optional()
   .describe(
     'Optional key to press after typing. E.g., "Enter", "Tab", "Escape"',
@@ -461,8 +464,7 @@ export const typeText: PageToolFactory = definePageTool(() => ({
     const submitKey = request.params.submitKey;
     const result = await page.waitForEventsAfterAction(async () => {
       await page.pptrPage.keyboard.type(request.params.text);
-      // submitKeySchema has already validated the key; isValidKey narrows the type.
-      if (submitKey && isValidKey(submitKey)) {
+      if (submitKey) {
         await page.pptrPage.keyboard.press(submitKey);
       }
     });
@@ -642,6 +644,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
   schema: {
     key: zod
       .string()
+      .transform(zodTransform(parseKey))
       .describe(
         'A key or a combination (e.g., "Enter", "Control+A", "Control++", "Control+Shift+R"). Modifiers: Control, Shift, Alt, Meta',
       ),
@@ -652,8 +655,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
   verifyFilesSchema: {},
   handler: async (request, response) => {
     const page = request.page;
-    const tokens = parseKey(request.params.key);
-    const [key, ...modifiers] = tokens;
+    const [key, ...modifiers] = request.params.key;
 
     const result = await page.waitForEventsAfterAction(async () => {
       const heldModifiers: KeyInput[] = [];
@@ -674,7 +676,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
     });
 
     response.appendResponseLine(
-      `Successfully pressed key: ${request.params.key}`,
+      `Successfully pressed key: ${[...modifiers, key].join('+')}`,
     );
     response.attachWaitForResult(result);
     if (request.params.includeSnapshot) {
