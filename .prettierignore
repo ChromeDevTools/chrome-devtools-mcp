@@ -1,6 +1,10 @@
 # Prettier-only ignores.
 CHANGELOG.md
 src/third_party/lighthouse-devtools-mcp-bundle.js
+build
+build_overrides
+buildtools
+out
 third_party
 
 # Release-please formatting breaks CI checks

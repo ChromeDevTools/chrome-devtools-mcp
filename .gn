@@ -1,0 +1,14 @@
+# Copyright 2026 Google LLC
+# SPDX-License-Identifier: Apache-2.0
+
+buildconfig = "//build_overrides/BUILDCONFIG.gn"
+script_executable = "//third_party/cpython3/host/bin/python3"
+
+default_args = {
+  use_siso = false
+  devtools_bundle = false
+
+  devtools_location = "third_party/devtools-frontend/"
+  devtools_root_location = "third_party/devtools-frontend"
+  devtools_visibility = [ "*" ]
+}
