@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {fileUrlToPath, resolveCanonicalPath} from '../../src/utils/files.js';
 import {createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
@@ -158,6 +158,41 @@ describe('resolveCanonicalPath', () => {
     assert.strictEqual(
       resolved,
       path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
+    );
+  });
+});
+
+describe('fileUrlToPath', () => {
+  it('reads a host-less URL without a drive letter as POSIX on Windows', () => {
+    assert.strictEqual(
+      fileUrlToPath('file:///home/user/my%20project', true),
+      '/home/user/my project',
+    );
+  });
+
+  it('keeps drive-letter URLs as Windows paths', () => {
+    assert.strictEqual(
+      fileUrlToPath('file:///C:/src/app', true),
+      'C:\\src\\app',
+    );
+    assert.strictEqual(
+      fileUrlToPath('file:///c%3A/Users/user', true),
+      'c:\\Users\\user',
+    );
+    assert.strictEqual(fileUrlToPath('file:///C|/src', true), 'C:\\src');
+  });
+
+  it('keeps UNC URLs as Windows paths', () => {
+    assert.strictEqual(
+      fileUrlToPath('file://wsl.localhost/Ubuntu/home/user', true),
+      '\\\\wsl.localhost\\Ubuntu\\home\\user',
+    );
+  });
+
+  it('matches fileURLToPath on POSIX', () => {
+    assert.strictEqual(
+      fileUrlToPath('file:///home/user/my%20project', false),
+      '/home/user/my project',
     );
   });
 });

@@ -7,12 +7,32 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 export async function getTempFilePath(filename: string): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
 
   const filepath = path.join(dir, filename);
   return filepath;
+}
+
+/**
+ * Converts a client-supplied `file:` URL to a path. On Windows, a URL with no
+ * host and no drive letter (`file:///home/user/project`) is read as a POSIX
+ * path instead of throwing: a WSL2 client sends such URLs to a Windows-side
+ * server. Callers resolve the result against the working directory, which for
+ * a server started from WSL is `\\wsl.localhost\<distro>\...`.
+ */
+export function fileUrlToPath(
+  url: string | URL,
+  windows: boolean = process.platform === 'win32',
+): string {
+  const parsed = typeof url === 'string' ? new URL(url) : url;
+  const hasDriveLetter = /^\/[a-z](:|%3a)/i.test(parsed.pathname);
+  if (windows && parsed.hostname === '' && !hasDriveLetter) {
+    return fileURLToPath(parsed, {windows: false});
+  }
+  return fileURLToPath(parsed, {windows});
 }
 
 export async function resolveCanonicalPath(filePath: string): Promise<string> {

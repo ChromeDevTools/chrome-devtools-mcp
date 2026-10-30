@@ -57,7 +57,11 @@ import {
 import type {TraceResult} from './processors/PerformanceTrace.js';
 import type {Logger} from './types.js';
 import {McpWorker} from './McpWorker.js';
-import {getTempFilePath, resolveCanonicalPath} from './utils/files.js';
+import {
+  fileUrlToPath,
+  getTempFilePath,
+  resolveCanonicalPath,
+} from './utils/files.js';
 import {escapeForLog} from './utils/logger.js';
 import type {TaskQueue, TaskRunner} from './utils/TaskRunner.js';
 import {isAllowedUrl} from './utils/url.js';
@@ -526,7 +530,7 @@ export class McpContext implements Context, BrowserlessContext {
     const resolvedRoots = await Promise.allSettled(
       roots.map(async root => {
         const rootPathUri = root.uri;
-        const rootPath = path.resolve(fileURLToPath(rootPathUri));
+        const rootPath = path.resolve(fileUrlToPath(rootPathUri));
         return await fs.realpath(rootPath);
       }),
     );
