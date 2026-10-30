@@ -1135,6 +1135,54 @@ describe('ToolHandler', () => {
     });
   });
 
+  it('validates a POSIX file URL argument without a drive letter', async () => {
+    let receivedParams: Record<string, unknown> | undefined;
+    const tool: ToolDefinition = {
+      name: 'file_tool',
+      description: 'A tool requiring file validation',
+      annotations: {
+        category: ToolCategory.PERFORMANCE,
+        readOnlyHint: true,
+      },
+      schema: {
+        filePath: zod.string(),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePath: true,
+      },
+      handler: async request => {
+        receivedParams = request.params;
+      },
+    };
+
+    const mockContext = createMockMcpContext();
+    const mockProcess = sinon.createStubInstance(ChildProcess);
+    mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
+    mockContext.validatePath.callsFake(async p => path.resolve(p ?? ''));
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseConfig(),
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({
+      filePath: 'file:///home/user/project/shot.png',
+    });
+
+    assert.strictEqual(result.isError, undefined);
+    sinon.assert.calledOnceWithExactly(
+      mockContext.validatePath,
+      '/home/user/project/shot.png',
+    );
+    assert.deepStrictEqual(receivedParams, {
+      filePath: pathToFileURL(path.resolve('/home/user/project/shot.png')).href,
+    });
+  });
+
   it('returns error when file validation fails for verifyFilesSchema', async () => {
     let handlerCalled = false;
     const tool: ToolDefinition = {
