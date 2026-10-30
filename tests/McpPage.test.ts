@@ -26,6 +26,7 @@ import {
   createMockCDPSession,
   createMockDialog,
   createMockMcpResponse,
+  createMockPuppeteerBrowser,
   createMockPuppeteerPage,
   createMockPuppeteerTarget,
   createMockServerConfig,
@@ -432,13 +433,37 @@ describe('McpPage', () => {
       sinon.assert.notCalled(target.page);
     });
 
-    it('closes the underlying page without running init()', async () => {
-      const pptrPage = createMockPuppeteerPage();
-      const target = createMockPuppeteerTarget({page: pptrPage});
+    it('closes an uninitialized page by its target', async () => {
+      const browser = createMockPuppeteerBrowser();
+      const browserTarget = createMockPuppeteerTarget();
+      const session = createMockCDPSession();
+      browser.target.returns(browserTarget);
+      browserTarget.createCDPSession.resolves(session);
+      const target = createMockPuppeteerTarget();
+      target.browser.returns(browser);
       const mcpPage = new McpPage(target, 1, {
         config: createMockServerConfig(),
         locatorClass: Locator,
       });
+
+      const closed = mcpPage.close();
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledOnceWithExactly(session.send, 'Target.closeTarget', {
+        targetId: '<mock-target-id>',
+      });
+      sinon.assert.calledOnceWithExactly(session.detach);
+      assert.strictEqual(mcpPage.isClosed(), false);
+
+      browser.emit('targetdestroyed', target);
+      await closed;
+
+      assert.strictEqual(mcpPage.isClosed(), true);
+      sinon.assert.notCalled(target.page);
+      sinon.assert.notCalled(target.asPage);
+    });
+
+    it('closes an initialized page through Puppeteer', async () => {
+      const {mcpPage, pptrPage, target} = await createMcpPage();
 
       await mcpPage.close();
 
@@ -446,7 +471,7 @@ describe('McpPage', () => {
       sinon.assert.calledOnceWithExactly(pptrPage.close, {
         runBeforeUnload: false,
       });
-      sinon.assert.notCalled(pptrPage.emulateFocusedPage);
+      sinon.assert.notCalled(target.browser);
     });
 
     it('stops and clears an active screenRecorder on dispose()', async () => {

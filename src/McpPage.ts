@@ -318,13 +318,40 @@ export class McpPage implements ContextPage {
   }
 
   async close(): Promise<void> {
+    const page = this.#pptrPage;
+    if (!page) {
+      // Creating a Puppeteer page stalls until the protocol timeout while the
+      // page shows a dialog, so an uninitialized page is closed by target.
+      await this.#closeTarget();
+      this.#closed = true;
+      this.dispose();
+      return;
+    }
     this.#closed = true;
-    const page =
-      this.#pptrPage ??
-      (await this.target.page()) ??
-      (await this.target.asPage());
     this.dispose();
-    await page?.close({runBeforeUnload: false});
+    await page.close({runBeforeUnload: false});
+  }
+
+  async #closeTarget(): Promise<void> {
+    const browser = this.target.browser();
+    const {promise: destroyed, resolve} = Promise.withResolvers<void>();
+    const onTargetDestroyed = (target: Target): void => {
+      if (target === this.target) {
+        resolve();
+      }
+    };
+    browser.on('targetdestroyed', onTargetDestroyed);
+    try {
+      const session = await browser.target().createCDPSession();
+      try {
+        await session.send('Target.closeTarget', {targetId: this.targetId});
+      } finally {
+        await session.detach();
+      }
+      await destroyed;
+    } finally {
+      browser.off('targetdestroyed', onTargetDestroyed);
+    }
   }
 
   async init(options?: {emulateFocus?: boolean}): Promise<void> {
