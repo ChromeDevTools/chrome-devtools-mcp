@@ -5,15 +5,13 @@
  */
 
 import assert from 'node:assert';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {
-  getTempFilePath,
-  resolveCanonicalPath,
-} from '../../src/utils/files.js';
+import {getTempFilePath, resolveCanonicalPath} from '../../src/utils/files.js';
 import {createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
@@ -165,22 +163,31 @@ describe('resolveCanonicalPath', () => {
   });
 });
 
+async function createDisposableTempFile(filename: string): Promise<{
+  path: string;
+  [Symbol.dispose]: () => void;
+}> {
+  const filepath = await getTempFilePath(filename);
+  return {
+    path: filepath,
+    [Symbol.dispose](): void {
+      fsSync.rmSync(path.dirname(filepath), {recursive: true, force: true});
+    },
+  };
+}
+
 describe('getTempFilePath', () => {
   it('keeps the file under the created temp directory', async () => {
-    const filepath = await getTempFilePath('shot.png');
-    assert.strictEqual(path.basename(filepath), 'shot.png');
-    const dir = path.dirname(filepath);
-    assert.ok(dir.includes('chrome-devtools-mcp-'));
-    assert.strictEqual(path.relative(dir, filepath), 'shot.png');
-    await fs.rm(dir, {recursive: true, force: true});
+    using tempFile = await createDisposableTempFile('shot.png');
+    const dir = path.dirname(tempFile.path);
+    assert.strictEqual(path.basename(tempFile.path), 'shot.png');
+    assert.ok(path.basename(dir).startsWith('chrome-devtools-mcp-'));
+    assert.strictEqual(path.relative(dir, tempFile.path), 'shot.png');
   });
 
-  it('drops directory components so the path cannot escape the temp directory', async () => {
-    const filepath = await getTempFilePath('../escape.png');
-    const dir = path.dirname(filepath);
-    assert.strictEqual(path.basename(filepath), 'escape.png');
-    assert.strictEqual(path.relative(dir, filepath), 'escape.png');
-    assert.ok(!path.relative(dir, filepath).startsWith('..'));
-    await fs.rm(dir, {recursive: true, force: true});
-  });
+  for (const name of ['../escape.png', 'sub/shot.png', '..', '.', '']) {
+    it(`rejects ${JSON.stringify(name)} instead of writing outside the temp directory`, async () => {
+      await assert.rejects(getTempFilePath(name), /Invalid temp file name/);
+    });
+  }
 });

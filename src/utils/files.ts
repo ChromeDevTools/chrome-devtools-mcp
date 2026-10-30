@@ -9,10 +9,21 @@ import os from 'node:os';
 import path from 'node:path';
 
 export async function getTempFilePath(filename: string): Promise<string> {
+  // Reject names with directory components (e.g. `../x`) instead of writing
+  // the file somewhere other than the temp directory.
+  if (
+    filename !== path.basename(filename) ||
+    filename === '' ||
+    filename === '.' ||
+    filename === '..'
+  ) {
+    throw new Error(
+      `Invalid temp file name "${filename}": it must not contain a directory.`,
+    );
+  }
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'chrome-devtools-mcp-'));
 
-  // Drop any directory components so a name like `../x` cannot escape `dir`.
-  const filepath = path.join(dir, path.basename(filename));
+  const filepath = path.join(dir, filename);
   return filepath;
 }
 
