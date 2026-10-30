@@ -10,6 +10,7 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import type {McpPage} from '../../src/McpPage.js';
+import {zod} from '../../src/third_party/index.js';
 import {listPages, navigatePage, selectPage} from '../../src/tools/pages.js';
 import {executeWebMcpTool} from '../../src/tools/webmcp.js';
 import {createHandlerMocks, createMockWebMCPTool} from '../mocks.js';
@@ -81,7 +82,7 @@ describe('webmcp', () => {
           await toolsAddedPromise;
 
           await executeWebMcpTool(args).handler(
-            {params: {toolName: 'test_tool', input: JSON.stringify({})}, page},
+            {params: {toolName: 'test_tool', input: {}}, page},
             response,
             context,
           );
@@ -102,7 +103,7 @@ describe('webmcp', () => {
             async () => {
               await executeWebMcpTool(args).handler(
                 {
-                  params: {toolName: 'missing-tool', input: JSON.stringify({})},
+                  params: {toolName: 'missing-tool', input: {}},
                   page: context.getSelectedMcpPage(),
                 },
                 response,
@@ -124,7 +125,7 @@ describe('webmcp', () => {
       await assert.rejects(
         executeWebMcpTool(args).handler(
           {
-            params: {toolName: 'debug_tool', input: '{}'},
+            params: {toolName: 'debug_tool', input: {}},
             page,
           },
           response,
@@ -149,7 +150,7 @@ describe('webmcp', () => {
 
       await executeWebMcpTool(args).handler(
         {
-          params: {toolName: 'my_tool', input: '{"key":"val"}'},
+          params: {toolName: 'my_tool', input: {key: 'val'}},
           page,
         },
         response,
@@ -238,43 +239,46 @@ describe('webmcp', () => {
       );
     });
 
-    it('rejects JSON array input', async () => {
-      const {page, context, response, args} = createHandlerMocks();
-      await assert.rejects(
-        executeWebMcpTool(args).handler(
-          {
-            params: {toolName: 'test_tool', input: '[]'},
-            page,
+    it('rejects JSON array and invalid JSON input in schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(executeWebMcpTool(args).schema);
+
+      assert.deepStrictEqual(
+        schema.safeParse({
+          pageId: 1,
+          toolName: 'test_tool',
+          input: '{"key":"val"}',
+        }),
+        {
+          success: true,
+          data: {
+            pageId: 1,
+            toolName: 'test_tool',
+            input: {key: 'val'},
           },
-          response,
-          context,
-        ),
-        {message: /Parsed input is not an object/},
-      );
-    });
-
-    it('throws if input is invalid', async () => {
-      await withMcpContext(
-        async (response, context, args) => {
-          await assert.rejects(
-            async () => {
-              const page = context.getSelectedMcpPage();
-              await setupWebMcpTool(page);
-
-              await executeWebMcpTool(args).handler(
-                {params: {toolName: 'test_tool', input: 'invalid'}, page},
-                response,
-                context,
-              );
-            },
-            {
-              message:
-                /Failed to parse input as JSON: Unexpected token 'i', "invalid" is not valid JSON/,
-            },
-          );
         },
-        {args: ['--enable-features=WebMCP,DevToolsWebMCPSupport']},
-        {categoryExperimentalWebmcp: true},
+      );
+
+      const arrayResult = schema.safeParse({
+        pageId: 1,
+        toolName: 'test_tool',
+        input: '[]',
+      });
+      assert.strictEqual(arrayResult.success, false);
+      assert.strictEqual(
+        arrayResult.error.issues[0].message,
+        'Invalid input: expected record, received array',
+      );
+
+      const invalidJsonResult = schema.safeParse({
+        pageId: 1,
+        toolName: 'test_tool',
+        input: 'invalid',
+      });
+      assert.strictEqual(invalidJsonResult.success, false);
+      assert.match(
+        invalidJsonResult.error.issues[0].message,
+        /Unexpected token 'i', "invalid" is not valid JSON/,
       );
     });
   });
