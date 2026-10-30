@@ -51,3 +51,133 @@ ts_library("third_party") {
     ":lighthouse_bundle",
   ]
 }
+
+ts_library("mcp_lib") {
+  runs_in = "node"
+
+  sources = [
+    "BrowserManager.ts",
+    "McpContext.ts",
+    "McpPage.ts",
+    "McpResponse.ts",
+    "McpWorker.ts",
+    "SlimMcpResponse.ts",
+    "TextSnapshot.ts",
+    "ToolHandler.ts",
+    "collectors/PageCollector.ts",
+    "collectors/ServiceWorkerCollector.ts",
+    "collectors/constants.ts",
+    "config/ConfigLocator.ts",
+    "config/ConfigParser.ts",
+    "config/ConfigWatcher.ts",
+    "config/ServerConfig.ts",
+    "config/browser-options.ts",
+    "config/category-options.ts",
+    "config/cli-commands.ts",
+    "config/cli-options.ts",
+    "config/mcp-options.ts",
+    "config/puppeteer-options.ts",
+    "config/tool-options.ts",
+    "daemon/client.ts",
+    "daemon/daemon.ts",
+    "daemon/types.ts",
+    "daemon/utils.ts",
+    "devtools/DevToolsCommentBridge.ts",
+    "devtools/DevtoolsUtils.ts",
+    "devtools/McpHostBindingAdapter.ts",
+    "devtools/devtools.d.ts",
+    "devtools/issueDescriptions.ts",
+    "formatters/CommentFormatter.ts",
+    "formatters/ConsoleFormatter.ts",
+    "formatters/CssFormatter.ts",
+    "formatters/HeapSnapshotFormatter.ts",
+    "formatters/IssueFormatter.ts",
+    "formatters/NetworkFormatter.ts",
+    "formatters/RemoteObjectFormatter.ts",
+    "formatters/SnapshotFormatter.ts",
+    "formatters/WebAuthnFormatter.ts",
+    "index.ts",
+    "processors/ChunkedTraceParser.ts",
+    "processors/HeapSnapshotManager.ts",
+    "processors/PerformanceTrace.ts",
+    "telemetry/ClearcutLogger.ts",
+    "telemetry/WatchdogClient.ts",
+    "telemetry/errors.ts",
+    "telemetry/flagUtils.ts",
+    "telemetry/metricsRegistry.ts",
+    "telemetry/persistence.ts",
+    "telemetry/transformation.ts",
+    "telemetry/types.ts",
+    "telemetry/watchdog/ClearcutSender.ts",
+    "telemetry/watchdog/main.ts",
+    "tools/ToolDefinition.ts",
+    "tools/categories.ts",
+    "tools/comments.ts",
+    "tools/console.ts",
+    "tools/css.ts",
+    "tools/emulation.ts",
+    "tools/extensions.ts",
+    "tools/input.ts",
+    "tools/lighthouse.ts",
+    "tools/memory.ts",
+    "tools/network.ts",
+    "tools/pages.ts",
+    "tools/performance.ts",
+    "tools/pwa.ts",
+    "tools/screencast.ts",
+    "tools/screenshot.ts",
+    "tools/script.ts",
+    "tools/slim/tools.ts",
+    "tools/snapshot.ts",
+    "tools/thirdPartyDeveloper.ts",
+    "tools/tools.ts",
+    "tools/webauthn.ts",
+    "tools/webmcp.ts",
+    "types.ts",
+    "utils/TaskRunner.ts",
+    "utils/WaitForHelper.ts",
+    "utils/bytes.ts",
+    "utils/check-for-updates.ts",
+    "utils/disclaimers.ts",
+    "utils/errorHandling.ts",
+    "utils/files.ts",
+    "utils/id.ts",
+    "utils/keyboard.ts",
+    "utils/logger.ts",
+    "utils/pagination.ts",
+    "utils/polyfill.ts",
+    "utils/resourceType.ts",
+    "utils/text.ts",
+    "utils/timeout.ts",
+    "utils/url.ts",
+    "version.ts",
+  ]
+
+  ts_deps = [ ":third_party" ]
+}
+
+ts_library("bin") {
+  runs_in = "node"
+
+  sources = [
+    "bin/check-latest-version.ts",
+    "bin/chrome-devtools-mcp-main.ts",
+    "bin/chrome-devtools-mcp.ts",
+    "bin/chrome-devtools.ts",
+  ]
+
+  ts_deps = [
+    ":mcp_lib",
+    ":third_party",
+  ]
+}
+
+group("all") {
+  public_deps = [
+    ":bin",
+    ":issue_descriptions",
+    ":lighthouse_bundle",
+    ":mcp_lib",
+    ":third_party",
+  ]
+}
