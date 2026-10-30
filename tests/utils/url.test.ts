@@ -438,6 +438,56 @@ describe('validateUrl', () => {
     );
   });
 
+  it('should reject view-source URLs that target devtools:, chrome:, chrome-untrusted:, and chrome-extension:', () => {
+    // These previously bypassed validateUrl entirely: the devtools:/chrome:
+    // checks were evaluated against the outer `view-source:` protocol
+    // instead of the wrapped target, even though Chrome strips the
+    // `view-source:` prefix at navigation time and loads the page under
+    // the wrapped URL's own origin.
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:devtools://devtools/bundled/devtools_app.html',
+          defaultOptions,
+        ),
+      /Navigating to devtools: URLs is not allowed\./,
+    );
+    assert.throws(
+      () => validateUrl('view-source:chrome://settings', defaultOptions),
+      /Navigating to chrome: URLs is not allowed\./,
+    );
+    // chrome://inspect is intentionally allowlisted by isAllowedUrl, so
+    // unwrapping view-source: and reaching chrome://inspect is expected
+    // to succeed, matching the direct chrome://inspect behavior above.
+    assert.strictEqual(
+      validateUrl('view-source:chrome://inspect', defaultOptions).protocol,
+      'view-source:',
+    );
+    assert.throws(
+      () =>
+        validateUrl('view-source:chrome-untrusted://terminal', defaultOptions),
+      /Navigating to chrome-untrusted: URLs is not allowed\./,
+    );
+    assert.throws(
+      () =>
+        validateUrl(
+          'view-source:chrome-extension://abcdef/popup.html',
+          defaultOptions,
+        ),
+      /Navigating to chrome-extension: URLs is not allowed without --categoryExtensions\./,
+    );
+    // Still rejected even with categoryExtensions enabled, mirroring the
+    // bare chrome-extension: behavior being unaffected by the unwrap.
+    assert.strictEqual(
+      validateUrl('view-source:chrome-extension://abcdef/popup.html', {
+        javascriptEvaluation: undefined,
+        categoryExtensions: true,
+        fileNavigations: undefined,
+      }).protocol,
+      'view-source:',
+    );
+  });
+
   it('should not reject view-source URLs that target other schemes', () => {
     const noFileNavigations = {
       javascriptEvaluation: undefined,
