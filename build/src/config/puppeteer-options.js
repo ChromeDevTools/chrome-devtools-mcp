@@ -1,0 +1,67 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import { validateUrlPatterns } from '../utils/url.js';
+/**
+ * Options that are applied through Puppeteer when launching or connecting to
+ * the browser.
+ */
+export const puppeteerOptions = {
+    viewport: {
+        type: 'string',
+        describe: 'Initial viewport size for the Chrome instances started by the server. For example, `1280x720`. In headless mode, max size is 3840x2160px.',
+        coerce: (arg) => {
+            if (arg === undefined) {
+                return;
+            }
+            const [width, height] = arg.split('x').map(Number);
+            if (!Number.isInteger(width) ||
+                !Number.isInteger(height) ||
+                width <= 0 ||
+                height <= 0) {
+                throw new Error('Invalid viewport. Expected format is `1280x720` with positive integer width and height.');
+            }
+            return {
+                width,
+                height,
+            };
+        },
+    },
+    acceptInsecureCerts: {
+        type: 'boolean',
+        default: false,
+        description: `If enabled, ignores errors relative to self-signed and expired certificates. Use with caution.`,
+    },
+    blockedUrlPattern: {
+        type: 'array',
+        string: true,
+        reloadable: true,
+        describe: "Restricts browser's network access by blocking specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Silently detaches from targets with blocked URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\\.\\d+\\.\\d+\\.\\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).",
+        coerce: (arg) => {
+            if (arg === undefined || arg.length === 0) {
+                return undefined;
+            }
+            validateUrlPatterns(arg, '--blockedUrlPattern');
+            return arg;
+        },
+    },
+    allowedUrlPattern: {
+        type: 'array',
+        string: true,
+        reloadable: true,
+        describe: "Restricts browser's network access by allowing only specified URL patterns (uses https://urlpattern.spec.whatwg.org/). Requires Chrome 149+. Silently detaches from targets with unallowed URLs upon connection, and blocks runtime requests (including navigations and subresources). Accepts an array of patterns. A pattern that uses a regexp group, a named group (`:name`), or a partial IPv4 wildcard (for example `(127\\.\\d+\\.\\d+\\.\\d+)`, `*://127.0.0.1::port/*`, or `*://127.0.0.*/*`) is rejected, because it is not enforced on redirects or subresources; use an exact value or a `*` wildcard instead. Patterns follow URL Pattern defaults: an omitted port matches only the scheme's default port (for example, `https://internal.corp/*` does not match `https://internal.corp:8443/`; use `https://internal.corp:*/*` to match any port), and the hostname must match exactly (a trailing-dot host such as `internal.corp.` is a different hostname).",
+        coerce: (arg) => {
+            if (arg === undefined) {
+                return undefined;
+            }
+            if (arg.length === 0) {
+                throw new Error('Invalid --allowedUrlPattern: at least one pattern is required.');
+            }
+            validateUrlPatterns(arg, '--allowedUrlPattern');
+            return arg;
+        },
+    },
+};
+//# sourceMappingURL=puppeteer-options.js.map
