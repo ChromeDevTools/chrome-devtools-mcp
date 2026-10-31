@@ -173,6 +173,33 @@ See the full [Tool Reference][tool-reference] for a complete list of all support
 
 Find the complete list of server parameters (e.g., `--headless`, `--isolated`, `--slim`) and how to configure WebSocket connections in the [Configuration Guide][configuration-guide].
 
+To use a Chrome-based browser installed outside the standard locations, choose
+the option that matches how you want to use the browser:
+
+- **Launch a new browser:** pass `--executablePath` (or `-e`) with the browser
+  executable:
+
+  ```json
+  "args": [
+    "chrome-devtools-mcp@latest",
+    "--executablePath=/path/to/chrome"
+  ]
+  ```
+
+- **Connect to a browser that is already running:** enable remote debugging in
+  that browser, then pass `--autoConnect` and `--userDataDir` with its profile
+  directory, which contains `DevToolsActivePort`:
+
+  ```json
+  "args": [
+    "chrome-devtools-mcp@latest",
+    "--autoConnect",
+    "--userDataDir=/path/to/browser/profile"
+  ]
+  ```
+
+  See [Connecting to a running Chrome instance][advanced-usage-guide] for the browser setup steps.
+
 For basic browser tasks only, the `--slim` flag exposes a reduced set of tools. See the [Slim tool reference][slim-tool-reference].
 
 ## Advanced Usage
