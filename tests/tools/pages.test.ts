@@ -1537,6 +1537,62 @@ describe('pages', () => {
       });
     });
 
+    it('reports the resulting size when the browser clamps the request', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const pptrPage = page.pptrPage;
+      pptrPage.resize.resolves();
+      // Chrome refuses the requested size, so the viewport never matches it.
+      pptrPage.waitForFunction.rejects(new Error('Timed out'));
+      pptrPage.evaluate.resolves({width: 500, height: 100});
+
+      await resizePage(args).handler(
+        {params: {width: 100, height: 100}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledWith(
+        response.appendResponseLine,
+        sinon.match('Requested 100x100, but the page is 500x100'),
+      );
+    });
+
+    it('stays quiet when the page ends up at the requested size', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const pptrPage = page.pptrPage;
+      pptrPage.resize.resolves();
+      pptrPage.waitForFunction.resolves();
+
+      await resizePage(args).handler(
+        {params: {width: 800, height: 600}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.neverCalledWith(
+        response.appendResponseLine,
+        sinon.match('clamped'),
+      );
+    });
+
+    it('does not read the viewport back while a dialog is open', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const pptrPage = page.pptrPage;
+      pptrPage.resize.resolves();
+      page.getDialog.returns(createMockDialog({message: 'blocked'}));
+
+      await resizePage(args).handler(
+        {params: {width: 800, height: 600}, page},
+        response,
+        context,
+      );
+
+      // A dialog blocks the renderer, so evaluating would never resolve.
+      sinon.assert.notCalled(pptrPage.waitForFunction);
+      sinon.assert.notCalled(pptrPage.evaluate);
+      sinon.assert.calledWith(response.setIncludePages, true);
+    });
+
     it('resize when window state is normal', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

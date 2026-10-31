@@ -391,6 +391,45 @@ export const resizePage: PageToolFactory = definePageTool(() => ({
       contentHeight: request.params.height,
     });
 
+    // A JavaScript dialog blocks the renderer, so the read-back below would
+    // never resolve; resize_page is deliberately usable while a dialog is open.
+    if (!page.getDialog()) {
+      const requested = {
+        width: request.params.width,
+        height: request.params.height,
+      };
+      // The deadline keeps this verification off the critical path: if the
+      // viewport cannot be observed, report nothing rather than hang.
+      const matched = await Promise.race([
+        page.pptrPage
+          .waitForFunction(
+            (width: number, height: number) =>
+              window.innerWidth === width && window.innerHeight === height,
+            {timeout: 1000},
+            requested.width,
+            requested.height,
+          )
+          .then(
+            () => true,
+            () => false,
+          ),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (matched === false) {
+        const actual = await page.pptrPage
+          .evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight,
+          }))
+          .catch(() => null);
+        if (actual) {
+          response.appendResponseLine(
+            `Requested ${requested.width}x${requested.height}, but the page is ${actual.width}x${actual.height}: the browser clamped the window to a size it allows.`,
+          );
+        }
+      }
+    }
+
     response.setIncludePages(true);
   },
 }));
