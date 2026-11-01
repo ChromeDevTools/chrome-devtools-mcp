@@ -73,7 +73,7 @@
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "core-js": "3.50.0",
+    "core-js": "3.51.0",
     "eslint": "^10.7.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-eslint-plugin": "^7.6.2",
