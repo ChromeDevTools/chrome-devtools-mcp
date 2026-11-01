@@ -4,16 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {TimeoutError, zod} from '../third_party/index.js';
-import type {ElementHandle, KeyInput} from '../third_party/index.js';
+import {
+  TimeoutError,
+  zod,
+  type ElementHandle,
+  type KeyInput,
+} from '../third_party/index.js';
 import type {TextSnapshotNode} from '../types.js';
 import {invalidKeyMessage, isValidKey, parseKey} from '../utils/keyboard.js';
 import {logger} from '../utils/logger.js';
 import type {WaitForEventsResult} from '../utils/WaitForHelper.js';
 
 import {ToolCategory} from './categories.js';
-import type {ContextPage, PageToolFactory} from './ToolDefinition.js';
-import {definePageTool} from './ToolDefinition.js';
+import {
+  definePageTool,
+  type ContextPage,
+  type PageToolFactory,
+} from './ToolDefinition.js';
 
 const dblClickSchema = zod
   .boolean()

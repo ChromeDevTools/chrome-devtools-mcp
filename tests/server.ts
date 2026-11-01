@@ -83,7 +83,7 @@ export class TestServer {
     }
   }
 
-  restore(): void {
+  reset(): void {
     this.#routes = {};
   }
 
@@ -138,7 +138,7 @@ export function serverHooks(): TestServer {
     await server.stop();
   });
   afterEach(() => {
-    server.restore();
+    server.reset();
   });
 
   return server;

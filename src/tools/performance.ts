@@ -7,21 +7,22 @@
 import zlib from 'node:zlib';
 
 import {zod, DevTools} from '../third_party/index.js';
-import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
+  type InsightName,
+  type TraceResult,
 } from '../processors/PerformanceTrace.js';
 import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
-import type {
-  Context,
-  Response,
-  ContextPage,
-  PageToolFactory,
+import {
+  definePageTool,
+  type Context,
+  type Response,
+  type ContextPage,
+  type PageToolFactory,
 } from './ToolDefinition.js';
-import {definePageTool} from './ToolDefinition.js';
 
 const filePathSchema = zod
   .string()

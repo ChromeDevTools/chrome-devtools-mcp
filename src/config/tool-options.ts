@@ -6,20 +6,31 @@
 
 import type {YargsOptions} from '../third_party/index.js';
 
+import type {McpOptionsFor} from './category-options.js';
+
 interface ToolOption extends YargsOptions {
   reloadable: true;
 }
 
+export interface ToolArguments {
+  screenshotFormat: 'jpeg' | 'png' | 'webp';
+  screenshotQuality?: number;
+  screenshotMaxWidth?: number;
+  screenshotMaxHeight?: number;
+}
+
+export type ToolOptions = McpOptionsFor<ToolArguments, ToolOption>;
+
 /**
  * Options that change the default behavior of tools.
  */
-export const toolOptions = {
+export const toolOptions: ToolOptions = {
   screenshotFormat: {
     type: 'string',
-    default: 'png' as const,
+    default: 'png',
     description:
       'Override the default output format used by take_screenshot when the caller does not specify one. JPEG and WebP are ~3-5x smaller than PNG, which reduces transfer and storage size. To reduce context size use --screenshotMaxWidth / --screenshotMaxHeight, since image tokens scale with dimensions rather than encoded bytes. Unset preserves the existing default ("png").',
-    choices: ['jpeg', 'png', 'webp'] as const,
+    choices: ['jpeg', 'png', 'webp'],
     reloadable: true,
   },
   screenshotQuality: {
@@ -73,4 +84,4 @@ export const toolOptions = {
       return value;
     },
   },
-} satisfies Record<string, ToolOption>;
+};

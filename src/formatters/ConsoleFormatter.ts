@@ -84,12 +84,12 @@ export class ConsoleFormatter {
     id: number;
     type: string;
     text: string;
+    isIgnored: IgnoreCheck;
     argCount?: number;
     resolvedArgs?: unknown[];
     stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
     cause?: SymbolizedError;
     includeStackInConcise?: boolean;
-    isIgnored: IgnoreCheck;
   }) {
     this.#id = params.id;
     this.#type = params.type;
@@ -332,10 +332,10 @@ export class GroupedConsoleFormatter extends ConsoleFormatter {
       type: string;
       text: string;
       argCount: number;
+      isIgnored: IgnoreCheck;
       stack?: DevTools.DevTools.StackTrace.StackTrace.StackTrace;
       cause?: SymbolizedError;
       includeStackInConcise?: boolean;
-      isIgnored: IgnoreCheck;
     },
     count: number,
   ) {

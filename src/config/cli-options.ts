@@ -250,6 +250,69 @@ export const commands: Commands = {
       },
     },
   },
+  configure_webauthn: {
+    description:
+      'Adds a virtual WebAuthn authenticator to the page. Call this before the page calls navigator.credentials. It answers navigator.credentials.create() and get() and is removed when the page closes. Omitted parameters keep their current values. Changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and deletes its credentials. enabled=false ignores other parameters and removes all authenticators on the page. (requires flag: --categoryWebauthn=true)',
+    category: 'WebAuthn',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      enabled: {
+        name: 'enabled',
+        type: 'boolean',
+        description:
+          'Set to false to remove all virtual authenticators from the page.',
+        required: true,
+        positional: true,
+      },
+      protocol: {
+        name: 'protocol',
+        type: 'string',
+        description: 'The authenticator protocol. Default: ctap2.',
+        required: false,
+        positional: false,
+        enum: ['ctap2', 'u2f'],
+      },
+      transport: {
+        name: 'transport',
+        type: 'string',
+        description:
+          '"internal" is a platform authenticator such as Touch ID or Windows Hello; the others are roaming security keys. Default: internal.',
+        required: false,
+        positional: false,
+        enum: ['internal', 'usb', 'nfc', 'ble', 'hybrid'],
+      },
+      hasResidentKey: {
+        name: 'hasResidentKey',
+        type: 'boolean',
+        description:
+          'Whether the authenticator can store discoverable credentials (passkeys). Default: true. u2f does not support it, so it is false for u2f.',
+        required: false,
+        positional: false,
+      },
+      hasUserVerification: {
+        name: 'hasUserVerification',
+        type: 'boolean',
+        description:
+          'Whether the authenticator supports user verification (PIN or biometrics). Default: true. u2f does not support it, so it is false for u2f.',
+        required: false,
+        positional: false,
+      },
+      isUserVerified: {
+        name: 'isUserVerified',
+        type: 'boolean',
+        description:
+          'Whether user verification succeeds. Set to false to test a failed verification. Default: true.',
+        required: false,
+        positional: false,
+      },
+    },
+  },
   drag: {
     description: 'Drag an element onto another element',
     category: 'Input automation',
@@ -1754,7 +1817,7 @@ export const commands: Commands = {
   },
   resize_page: {
     description:
-      "Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.",
+      "Resizes the page's window so that the page has specified dimension",
     category: 'Emulation',
     args: {
       pageId: {

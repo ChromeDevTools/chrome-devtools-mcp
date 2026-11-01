@@ -31,6 +31,7 @@ import {
 import {IssueFormatter} from './formatters/IssueFormatter.js';
 import {NetworkFormatter} from './formatters/NetworkFormatter.js';
 import {SnapshotFormatter} from './formatters/SnapshotFormatter.js';
+import {WebAuthnFormatter} from './formatters/WebAuthnFormatter.js';
 import type {
   HeapSnapshotAggregateData,
   HeapSnapshotClassDiff,
@@ -43,15 +44,17 @@ import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {UncaughtError} from './collectors/PageCollector.js';
 import {TextSnapshot} from './TextSnapshot.js';
-import {DevTools, getToonEncode, getGcfEncode} from './third_party/index.js';
-import type {
-  ConsoleMessage,
-  ImageContent,
-  ResourceType,
-  TextContent,
-  Extension,
-  HTTPRequest,
-  Protocol,
+import {
+  DevTools,
+  getToonEncode,
+  getGcfEncode,
+  type ConsoleMessage,
+  type ImageContent,
+  type ResourceType,
+  type TextContent,
+  type Extension,
+  type HTTPRequest,
+  type Protocol,
 } from './third_party/index.js';
 import {handleDialog, listPages} from './tools/pages.js';
 import type {ToolGroups} from './tools/thirdPartyDeveloper.js';
@@ -62,6 +65,7 @@ import type {
   MatchedStyles,
   Response,
   SnapshotParams,
+  WebAuthnAuthenticatorState,
 } from './tools/ToolDefinition.js';
 import {
   type InsightName,
@@ -70,8 +74,7 @@ import {
   getTraceSummary,
 } from './processors/PerformanceTrace.js';
 import type {CD4ACommentThread, PaginationOptions} from './types.js';
-import type {WithSymbolId} from './utils/id.js';
-import {stableIdSymbol} from './utils/id.js';
+import {stableIdSymbol, type WithSymbolId} from './utils/id.js';
 import {paginate} from './utils/pagination.js';
 import {getFilterableResourceType} from './utils/resourceType.js';
 import {truncateText} from './utils/text.js';
@@ -155,6 +158,7 @@ export class McpResponse implements Response {
   #attachedWaitForResult?: WaitForEventsResult;
   #reconnectNotice = false;
   #devToolsComments?: CD4ACommentThread[];
+  #webAuthnFormatter?: WebAuthnFormatter;
 
   get #deviceScope(): DevTools.CrUXManager.DeviceScope {
     return this.#page?.viewport?.isMobile ? 'PHONE' : 'DESKTOP';
@@ -297,6 +301,12 @@ export class McpResponse implements Response {
 
   attachConsoleMessage(msgid: number): void {
     this.#attachedConsoleMessageId = msgid;
+  }
+
+  attachWebAuthnAuthenticator(
+    authenticator: WebAuthnAuthenticatorState | undefined,
+  ): void {
+    this.#webAuthnFormatter = new WebAuthnFormatter(authenticator);
   }
 
   attachTraceSummary(result: TraceResult): void {
@@ -939,6 +949,7 @@ export class McpResponse implements Response {
       comments?: StructuredCommentThread[];
       commentsSnapshotRegenerated?: 'standard' | 'verbose';
       matchedStyles?: object;
+      webauthnAuthenticator?: WebAuthnAuthenticatorState | null;
       errorMessage?: string;
       navigatedToUrl?: string;
       geolocation?: {latitude: number; longitude: number};
@@ -1141,7 +1152,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
             targetInfos.get(mcpPage.targetId),
           );
           parts.push(
-            `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
+            `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}${formatWebAuthnLabel(mcpPage)}`,
           );
           structuredPages.push(page.structured);
         }
@@ -1164,7 +1175,7 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
               targetInfos.get(mcpPage.targetId),
             );
             response.push(
-              `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}`,
+              `${page.text}${context.isPageSelected(mcpPage) ? ' [selected]' : ''}${contextLabel}${formatWebAuthnLabel(mcpPage)}`,
             );
             structuredExtensionPages.push(page.structured);
           }
@@ -1739,6 +1750,16 @@ Call ${handleDialog(this.#config.resolved).name} to handle it before continuing.
       }
     }
 
+    if (this.#webAuthnFormatter) {
+      structuredContent.webauthnAuthenticator =
+        this.#webAuthnFormatter.toJSON();
+      response.push(
+        compactEncode
+          ? compactEncode(structuredContent.webauthnAuthenticator)
+          : this.#webAuthnFormatter.toString(),
+      );
+    }
+
     if (this.#cssStylesData) {
       const resolveUid = (backendNodeId: number): string | undefined =>
         this.#page?.textSnapshot?.resolveCdpElementId(backendNodeId);
@@ -1887,6 +1908,18 @@ function formatPage(
     structured: createStructuredPage(mcpPage, context, title),
   };
 }
+function getWebAuthnLabel(mcpPage: McpPage): string | undefined {
+  const authenticator = mcpPage.getWebAuthnAuthenticator();
+  return authenticator
+    ? `${authenticator.protocol}/${authenticator.transport}`
+    : undefined;
+}
+
+function formatWebAuthnLabel(mcpPage: McpPage): string {
+  const label = getWebAuthnLabel(mcpPage);
+  return label ? ` webauthn=${label}` : '';
+}
+
 function createStructuredPage(
   mcpPage: McpPage,
   context: McpContext,
@@ -1897,6 +1930,7 @@ function createStructuredPage(
   title: string;
   selected: boolean;
   isolatedContext?: string;
+  webauthn?: string;
 } {
   const isolatedContextName = mcpPage.isolatedContextName;
   const title = truncateTitle(rawTitle);
@@ -1906,6 +1940,7 @@ function createStructuredPage(
     title: string;
     selected: boolean;
     isolatedContext?: string;
+    webauthn?: string;
   } = {
     id: mcpPage.id,
     url: mcpPage.url(),
@@ -1914,6 +1949,10 @@ function createStructuredPage(
   };
   if (isolatedContextName) {
     entry.isolatedContext = isolatedContextName;
+  }
+  const webAuthnLabel = getWebAuthnLabel(mcpPage);
+  if (webAuthnLabel) {
+    entry.webauthn = webAuthnLabel;
   }
   return entry;
 }

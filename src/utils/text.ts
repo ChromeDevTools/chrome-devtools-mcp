@@ -54,3 +54,12 @@ export function truncateText(
     : maxLength;
   return StringUtilities.truncateToCodeUnitLength(text, keep) + ellipsis;
 }
+
+const URL_SIZE_LIMIT = 255;
+
+/**
+ * Truncates a URL for tool output, such as a `data:` URL with a base64 payload.
+ */
+export function truncateUrl(url: string): string {
+  return truncateText(url, URL_SIZE_LIMIT, {ellipsis: '... <truncated>'});
+}

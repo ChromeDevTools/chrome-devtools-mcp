@@ -11,10 +11,9 @@ import {
   type HTTPRequest,
   type HTTPResponse,
 } from '../third_party/index.js';
-import {truncateText} from '../utils/text.js';
+import {truncateText, truncateUrl} from '../utils/text.js';
 
 const BODY_CONTEXT_SIZE_LIMIT = 10000;
-const URL_CONTEXT_SIZE_LIMIT = 255;
 /**
  * How long to wait for a response body. Puppeteer reads a body only after the
  * response finished loading, with no timeout of its own, and a response that
@@ -311,7 +310,7 @@ function convertNetworkRequestConciseToString(
 ): string {
   // Long URLs (e.g., data: URLs) bloat the concise list output. The full URL
   // remains available via the detailed view and the structured content.
-  const url = getSizeLimitedString(data.url, URL_CONTEXT_SIZE_LIMIT);
+  const url = truncateUrl(data.url);
   return `reqid=${data.requestId} ${data.method} ${url} [${data.status}]${data.selectedInDevToolsUI ? ` [selected in the DevTools Network panel]` : ''}`;
 }
 

@@ -29,8 +29,7 @@
  *   trimEndWithMaxLength() inline is named MAX_DESCRIPTION_LENGTH.
  */
 
-import {DevTools} from '../third_party/index.js';
-import type {Protocol} from '../third_party/index.js';
+import {DevTools, type Protocol} from '../third_party/index.js';
 
 const {StringUtilities} = DevTools.Platform;
 

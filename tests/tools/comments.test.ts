@@ -10,12 +10,12 @@ import {describe, it} from 'node:test';
 import sinon from 'sinon';
 
 import {DevToolsCommentBridge} from '../../src/devtools/DevToolsCommentBridge.js';
-import type {CommentThreadPayload} from '../../src/tools/comments.js';
 import {
   getDevtoolsComments,
   openDevtools,
   resolveDevtoolsComment,
   revealInDevtools,
+  type CommentThreadPayload,
 } from '../../src/tools/comments.js';
 import {createHandlerMocks, createMockPuppeteerPage} from '../mocks.js';
 
