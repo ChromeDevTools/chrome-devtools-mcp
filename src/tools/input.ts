@@ -625,37 +625,6 @@ export const uploadFile: PageToolFactory = definePageTool(() => ({
   },
 }));
 
-function getEditingCommands(
-  key: string,
-  modifiers: string[],
-): string[] | undefined {
-  const isMeta = modifiers.includes('Meta');
-  const isShift = modifiers.includes('Shift');
-  const lowerKey = key.toLowerCase();
-
-  if (isMeta) {
-    if (lowerKey === 'a') {
-      return ['SelectAll'];
-    }
-    if (lowerKey === 'c') {
-      return ['Copy'];
-    }
-    if (lowerKey === 'v') {
-      return ['Paste'];
-    }
-    if (lowerKey === 'x') {
-      return ['Cut'];
-    }
-    if (lowerKey === 'z') {
-      return isShift ? ['Redo'] : ['Undo'];
-    }
-    if (lowerKey === 'y') {
-      return ['Redo'];
-    }
-  }
-  return undefined;
-}
-
 export const pressKey: PageToolFactory = definePageTool(() => ({
   name: 'press_key',
   description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations). Note: On macOS, native <select> elements cannot be operated with ArrowDown/Enter via press_key; use fill() on the combobox or click() on the option instead.`,
@@ -678,7 +647,6 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
     const page = request.page;
     const tokens = parseKey(request.params.key);
     const [key, ...modifiers] = tokens;
-    const commands = getEditingCommands(key, modifiers);
 
     const result = await page.waitForEventsAfterAction(async () => {
       const heldModifiers: KeyInput[] = [];
@@ -687,10 +655,7 @@ export const pressKey: PageToolFactory = definePageTool(() => ({
           await page.pptrPage.keyboard.down(modifier);
           heldModifiers.push(modifier);
         }
-        await page.pptrPage.keyboard.press(
-          key,
-          commands ? {commands} : undefined,
-        );
+        await page.pptrPage.keyboard.press(key);
       } finally {
         // Release every modifier that was successfully pressed, even if a
         // later key event throws. Otherwise a failed press leaves modifiers
