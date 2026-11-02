@@ -51,7 +51,16 @@ Data collection is **enabled by default**. You can opt-out by passing the `--no-
 Google handles this data in accordance with the [Google Privacy Policy](https://policies.google.com/privacy).
 
 Google's collection of usage statistics for Chrome DevTools MCP is independent from the Chrome browser's usage statistics. Opting out of Chrome metrics does not automatically opt you out of this tool, and vice-versa.
-   The check uses the registry from your npm configuration (`npm config get registry`), which is `registry.npmjs.org` by default.
+
+Collection is disabled if `CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS` or `CI` env variables are set.
+
+Usage statistics are sent to `play.googleapis.com`.
+
+## Update checks
+
+By default, the server periodically checks the npm registry for updates and logs a notification when a newer version is available.
+The check uses the registry from your npm configuration (`npm config get registry`), which is `registry.npmjs.org` by default.
+You can disable these update checks by setting the `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` environment variable.
 
 ## Requirements
 
