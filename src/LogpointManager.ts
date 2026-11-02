@@ -6,9 +6,11 @@
 
 import {Script} from 'node:vm';
 
-import type {TargetUniverse} from './devtools/DevtoolsUtils.js';
+import {
+  type TargetUniverse,
+  waitForSourceMaps,
+} from './devtools/DevtoolsUtils.js';
 import {DevTools} from './third_party/index.js';
-import {logger} from './utils/logger.js';
 
 export interface LogpointOptions {
   /**
@@ -153,24 +155,11 @@ function baseName(url: string): string {
 }
 
 /**
- * Source maps are loaded lazily in the DevTools universe. Loading the source
- * maps of all parsed scripts makes their original sources available in the
- * workspace, so that logpoints can be set on original source files.
+ * How long to wait for the source maps of the page to load before an original
+ * source URL is reported as unknown. Loads still pending then continue in the
+ * background, so a retry finds the source.
  */
-async function loadSourceMaps(model: DevTools.DebuggerModel): Promise<void> {
-  const manager = model.sourceMapManager();
-  await Promise.all(
-    model.scripts().map(script => {
-      if (!script.sourceMapURL) {
-        return undefined;
-      }
-      return manager.sourceMapForClientPromise(script).catch(error => {
-        logger?.('Failed to load source map for', script.sourceURL, error);
-        return undefined;
-      });
-    }),
-  );
-}
+const SOURCE_MAP_LOAD_TIMEOUT_MS = 5_000;
 
 /**
  * Manages logpoints for a single page on top of the `BreakpointManager` of
@@ -347,10 +336,17 @@ export class LogpointManager {
    */
   async #findUISourceCode(url: string): Promise<UISourceCode> {
     let match = this.#matchUISourceCode(url);
+    let timedOut = false;
     if (!match) {
-      // Original sources only appear in the workspace once their source map
-      // has loaded.
-      await loadSourceMaps(this.#debuggerModel);
+      // Source maps are loaded lazily in the DevTools universe and original
+      // sources only appear in the workspace once their source map has loaded.
+      const signal = AbortSignal.timeout(SOURCE_MAP_LOAD_TIMEOUT_MS);
+      await waitForSourceMaps(
+        this.#debuggerModel,
+        this.#debuggerModel.scripts(),
+        signal,
+      );
+      timedOut = signal.aborted;
       match = this.#matchUISourceCode(url);
     }
     if (match) {
@@ -362,7 +358,7 @@ export class LogpointManager {
       .filter(candidate => baseName(candidate) === name)
       .slice(0, 5);
     throw new Error(
-      `No parsed script or original source file matches "${url}". The url must match the URL of a script as served to the browser or an original source file from a source map, exactly or as a path suffix.${similar.length ? ` Sources with the same file name: ${similar.join(', ')}.` : ''}`,
+      `No parsed script or original source file matches "${url}". The url must match the URL of a script as served to the browser or an original source file from a source map, exactly or as a path suffix.${timedOut ? ` Some source maps were still loading after ${SOURCE_MAP_LOAD_TIMEOUT_MS / 1000} seconds; retry if the file comes from a source map.` : ''}${similar.length ? ` Sources with the same file name: ${similar.join(', ')}.` : ''}`,
     );
   }
 
@@ -370,10 +366,9 @@ export class LogpointManager {
   *#pageSourceCodes(): Iterable<UISourceCode> {
     for (const uiSourceCode of this.#universe.workspace.uiSourceCodes()) {
       const projectType = uiSourceCode.project().type();
-      if (
-        projectType === DevTools.Workspace.Workspace.projectTypes.Network ||
-        projectType === DevTools.Workspace.Workspace.projectTypes.ContentScripts
-      ) {
+      // Content scripts of extensions are left out: they are not part of the
+      // page under development and would make path-suffix matches ambiguous.
+      if (projectType === DevTools.Workspace.Workspace.projectTypes.Network) {
         yield uiSourceCode;
       }
     }
