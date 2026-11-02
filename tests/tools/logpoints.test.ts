@@ -68,7 +68,7 @@ describe('set_logpoints', () => {
     );
     sinon.assert.calledWithExactly(
       response.appendResponseLine.secondCall,
-      'Logged output appears in list_console_messages once a line executes.',
+      'Logged output appears in list_console_messages once a line executes; objects show as [object Object] there, get_console_message shows them as JSON.',
     );
   });
 

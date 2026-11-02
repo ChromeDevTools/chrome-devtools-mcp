@@ -78,6 +78,35 @@ function shiftBundle(
   return {js: banner + bundle.js, map: JSON.stringify(map)};
 }
 
+// A TypeScript file served the way a dev server like Vite does: transpiled
+// in place at the URL of the original file, with an inline source map that
+// points back at that same URL. The interface shifts the TypeScript lines
+// against the generated ones: tsDevGreet's message is on line 5 of the
+// TypeScript source and on line 3 of the served JavaScript.
+const DEV_TS_SOURCE = [
+  `interface Greeting {`,
+  `  text: string;`,
+  `}`,
+  `function tsDevGreet(name: string): string {`,
+  `  const devMessage: string = 'Hello, ' + name;`,
+  `  return devMessage;`,
+  `}`,
+  `(globalThis as {tsDevGreet?: unknown}).tsDevGreet = tsDevGreet;`,
+].join('\n');
+
+function transpileDevTs(): string {
+  const result = ts.transpileModule(DEV_TS_SOURCE, {
+    fileName: 'dev.ts',
+    compilerOptions: {
+      inlineSourceMap: true,
+      inlineSources: true,
+      module: ts.ModuleKind.None,
+      target: ts.ScriptTarget.ES2020,
+    },
+  });
+  return result.outputText;
+}
+
 /** Collects console messages of the page from now on. */
 function collectConsole(page: McpPage): string[] {
   const messages: string[] = [];
@@ -98,6 +127,21 @@ async function waitForMessage(
       );
     }
   }, 5000);
+}
+
+async function waitForMessageMatching(
+  messages: string[],
+  pattern: RegExp,
+): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (!messages.some(message => pattern.test(message))) {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `No console message matches ${pattern}: ${JSON.stringify(messages)}`,
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 }
 
 function evaluateWithTimeout(
@@ -319,6 +363,73 @@ describe('LogpointManager', () => {
 
       await page.pptrPage.evaluate(`tsGreet('Two')`);
       await waitForMessage(messages, 'ts greeting Two');
+    });
+  });
+
+  it('reports a failing expression with the logpoint location', async () => {
+    await withMcpContext(async (response, context) => {
+      setupRoutes();
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.goto(server.getRoute('/'));
+      const messages = collectConsole(page);
+      const url = server.getRoute('/app.js');
+
+      const logpoints = await page.setLogpoints([
+        {url: 'app.js', lineNumber: 2, expression: `'name', missingVariable`},
+      ]);
+
+      // The response shows the expression as given, not the wrapper that
+      // reports errors.
+      assertLogpoint(logpoints[0], {
+        url,
+        lineNumber: 2,
+        columnNumber: 1,
+        expression: `'name', missingVariable`,
+        sourceMapped: false,
+        generatedUrl: url,
+        generatedLineNumber: 2,
+      });
+
+      await page.pptrPage.evaluate(`greet('World')`);
+      // The label names the resolved location; the error text carries the
+      // stack, so match the start only.
+      await waitForMessageMatching(
+        messages,
+        /^Logpoint http:\/\/[^/]+\/app\.js:2 threw: ReferenceError: missingVariable is not defined/,
+      );
+    });
+  });
+
+  it('prefers the original source over a script served at the same URL', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/dev', html`<script src="/src/dev.ts"></script>`);
+      server.addRoute('/src/dev.ts', (req, res) => {
+        res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+        res.end(transpileDevTs());
+      });
+      const page = context.getSelectedMcpPage();
+      await page.pptrPage.goto(server.getRoute('/dev'));
+      const messages = collectConsole(page);
+      const url = server.getRoute('/src/dev.ts');
+
+      const logpoints = await page.setLogpoints([
+        {url: 'src/dev.ts', lineNumber: 5, expression: `'dev greeting', name`},
+      ]);
+
+      // Line 5 of the TypeScript file, not line 5 of the served JavaScript;
+      // the column is that of the indented statement.
+      assertLogpoint(logpoints[0], {
+        url,
+        lineNumber: 5,
+        columnNumber: 3,
+        expression: `'dev greeting', name`,
+        sourceMapped: true,
+        generatedUrl: url,
+        generatedLineNumber: 3,
+      });
+
+      await page.pptrPage.evaluate(`tsDevGreet('Dev')`);
+      await waitForMessage(messages, 'dev greeting Dev');
     });
   });
 

@@ -142,6 +142,31 @@ function toUserCondition(expression: string): string {
   return expression;
 }
 
+/**
+ * DevTools turns the condition of a logpoint into `console.log(<condition>)`.
+ * When the expression throws, the backend only reports an empty error
+ * message, so the expression is evaluated inside a try/catch that logs the
+ * error together with the requested location instead. The wrapper spreads
+ * its result into the console.log() call, so the expression keeps the
+ * semantics of console.log() arguments.
+ */
+const WRAPPED_EXPRESSION =
+  /^\.\.\.\(\(\) => \{ try \{ return \[(.*)\]; \} catch \(logpointError\) \{ return \["Logpoint (?:[^"\\]|\\.)* threw:", logpointError\]; \} \}\)\(\)$/s;
+
+function wrapExpression(expression: string, location: string): string {
+  const label = JSON.stringify(`Logpoint ${location} threw:`);
+  return `...(() => { try { return [${expression}]; } catch (logpointError) { return [${label}, logpointError]; } })()`;
+}
+
+function unwrapExpression(condition: string): string {
+  const match = WRAPPED_EXPRESSION.exec(condition);
+  return match ? match[1] : condition;
+}
+
+function isFromSourceMap(uiSourceCode: UISourceCode): boolean {
+  return uiSourceCode.contentType().isFromSourceMap();
+}
+
 function locationKey(
   url: string,
   lineNumber: number,
@@ -229,7 +254,7 @@ export class LogpointManager {
         options.columnNumber === undefined
           ? undefined
           : options.columnNumber - 1,
-        toUserCondition(options.expression),
+        toUserCondition(wrapExpression(options.expression, key)),
         /* enabled */ true,
         /* isLogpoint */ true,
         DevTools.BreakpointManager.BreakpointOrigin.USER_ACTION,
@@ -291,8 +316,8 @@ export class LogpointManager {
    * source-mapped follows from the breakpoint, not from the request.
    */
   #snapshot(breakpoint: Breakpoint): Logpoint {
-    const sourceMapped = [...breakpoint.getUiSourceCodes()].some(uiSourceCode =>
-      uiSourceCode.contentType().isFromSourceMap(),
+    const sourceMapped = [...breakpoint.getUiSourceCodes()].some(
+      isFromSourceMap,
     );
     const modelBreakpoint = breakpoint.modelBreakpoint(this.#debuggerModel);
     const generatedLocations: GeneratedLocation[] = [];
@@ -310,7 +335,7 @@ export class LogpointManager {
       url: breakpoint.url(),
       lineNumber: breakpoint.lineNumber() + 1,
       columnNumber: columnNumber === undefined ? undefined : columnNumber + 1,
-      expression: breakpoint.condition(),
+      expression: unwrapExpression(breakpoint.condition()),
       sourceMapped,
       generatedLocations,
     };
@@ -335,11 +360,26 @@ export class LogpointManager {
    * sources with the same file name, when nothing matches.
    */
   async #findUISourceCode(url: string): Promise<UISourceCode> {
+    // Source maps are loaded lazily in the DevTools universe and original
+    // sources only appear in the workspace once their source map has loaded.
     let match = this.#matchUISourceCode(url);
     let timedOut = false;
-    if (!match) {
-      // Source maps are loaded lazily in the DevTools universe and original
-      // sources only appear in the workspace once their source map has loaded.
+    if (match && !isFromSourceMap(match)) {
+      // The script may be a transpiled file served at the URL of its original
+      // source (see #matchUISourceCode); its source map decides.
+      const matchedUrl = match.url();
+      const scripts = this.#debuggerModel
+        .scripts()
+        .filter(script => script.sourceURL === matchedUrl);
+      if (scripts.some(script => script.sourceMapURL)) {
+        await waitForSourceMaps(
+          this.#debuggerModel,
+          scripts,
+          AbortSignal.timeout(SOURCE_MAP_LOAD_TIMEOUT_MS),
+        );
+        match = this.#matchUISourceCode(url);
+      }
+    } else if (!match) {
       const signal = AbortSignal.timeout(SOURCE_MAP_LOAD_TIMEOUT_MS);
       await waitForSourceMaps(
         this.#debuggerModel,
@@ -384,12 +424,21 @@ export class LogpointManager {
     const candidates = new Map<string, UISourceCode>();
     for (const uiSourceCode of this.#pageSourceCodes()) {
       const candidateUrl = uiSourceCode.url();
-      if (candidateUrl === url) {
-        return uiSourceCode;
+      if (candidateUrl !== url && !candidateUrl.endsWith('/' + url)) {
+        continue;
       }
-      if (candidateUrl.endsWith('/' + url) && !candidates.has(candidateUrl)) {
+      // Dev servers like Vite serve a transpiled file at the URL of its
+      // original source, with a source map pointing back at that same URL.
+      // The original source then has the line numbers of the file on disk,
+      // so it wins over the script served at the same URL.
+      const existing = candidates.get(candidateUrl);
+      if (!existing || isFromSourceMap(uiSourceCode)) {
         candidates.set(candidateUrl, uiSourceCode);
       }
+    }
+    const exact = candidates.get(url);
+    if (exact) {
+      return exact;
     }
     if (candidates.size > 1) {
       throw new Error(
