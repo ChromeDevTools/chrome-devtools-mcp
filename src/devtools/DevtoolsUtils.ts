@@ -517,9 +517,9 @@ export async function createStackTrace(
   // work in the MCP case, so we'll collect all script IDs upfront and wait for any pending source map
   // loads before creating the stack trace. We might also have to wait for Debugger.ScriptParsed events if
   // the stack trace is created particularly early.
-  const scriptIds = new Set<string>();
+  const scriptUrls = new Map<string, string>();
   for (const frame of rawStackTrace.callFrames) {
-    scriptIds.add(frame.scriptId);
+    scriptUrls.set(frame.scriptId, frame.url);
   }
   for (
     let asyncStack: StackTraceLike | undefined = rawStackTrace.parent;
@@ -527,19 +527,31 @@ export async function createStackTrace(
     asyncStack = asyncStack.parent
   ) {
     for (const frame of asyncStack.callFrames) {
-      scriptIds.add(frame.scriptId);
+      scriptUrls.set(frame.scriptId, frame.url);
     }
   }
 
   const signal = AbortSignal.timeout(1_000);
+  const knownScriptIds = new Set<string>();
   await Promise.all(
-    [...scriptIds].map(id =>
-      waitForScript(model, id, signal)
-        .then(script =>
-          model.sourceMapManager().sourceMapForClientPromise(script),
-        )
-        .catch(),
-    ),
+    [...scriptUrls].map(async ([scriptId, url]) => {
+      try {
+        const script = await waitForScript(model, scriptId, signal);
+        // V8 leaves data: URLs out of stack frames.
+        const scriptUrl = script.sourceURL.startsWith('data:')
+          ? ''
+          : script.sourceURL;
+        // Script ids restart in a new renderer process, so after a
+        // cross-process navigation the id can belong to another script.
+        if (scriptUrl !== url) {
+          return;
+        }
+        knownScriptIds.add(scriptId);
+        await model.sourceMapManager().sourceMapForClientPromise(script);
+      } catch {
+        // The script is gone, e.g. after a navigation.
+      }
+    }),
   );
 
   const binding = devTools.universe.context.get(
@@ -547,11 +559,32 @@ export async function createStackTrace(
   );
   // DevTools uses branded types for ScriptId and others. Casting the puppeteer protocol type to the DevTools protocol type is safe.
   return await binding.createStackTraceFromProtocolRuntime(
-    rawStackTrace as Parameters<
+    withUnknownScriptsRaw(rawStackTrace, knownScriptIds) as Parameters<
       DevTools.DebuggerWorkspaceBinding['createStackTraceFromProtocolRuntime']
     >[0],
     target,
   );
+}
+
+/**
+ * Copies `stackTrace` and gives the frames of scripts that are not in
+ * `knownScriptIds` the script id 0, which V8 never assigns, so DevTools
+ * resolves them neither by id nor by URL and keeps their raw location.
+ */
+function withUnknownScriptsRaw(
+  stackTrace: StackTraceLike,
+  knownScriptIds: ReadonlySet<string>,
+): Protocol.Runtime.StackTrace {
+  const copy: Protocol.Runtime.StackTrace = {
+    ...stackTrace,
+    callFrames: stackTrace.callFrames.map(frame =>
+      knownScriptIds.has(frame.scriptId) ? frame : {...frame, scriptId: '0'},
+    ),
+  };
+  if (stackTrace.parent) {
+    copy.parent = withUnknownScriptsRaw(stackTrace.parent, knownScriptIds);
+  }
+  return copy;
 }
 
 // Waits indefinitely for the script so pair it with Promise.race.

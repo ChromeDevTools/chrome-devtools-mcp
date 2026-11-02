@@ -142,6 +142,8 @@ describe('console', () => {
   });
 
   describe('list_console_messages', () => {
+    const server = serverHooks();
+
     it('describes the default preserved navigation history', () => {
       const tool = listConsoleMessages(createMockParsedArguments());
       assert.strictEqual(
@@ -254,6 +256,93 @@ describe('console', () => {
         assert.strictEqual(
           structuredContent.consoleMessages[0].stackTrace,
           undefined,
+        );
+      });
+    });
+
+    it('includes preserved stack traces with wasm byte offsets', async () => {
+      server.addRoute('/logger.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function logIt() {
+  console.log('before navigation');
+}
+logIt();`);
+      });
+      // A wasm module whose exported run() calls the imported env.log().
+      const wasmModule =
+        'AGFzbQEAAAABBAFgAAACCwEDZW52A2xvZwAAAwIBAAcHAQNydW4AAQoGAQQA' +
+        'EAALABIEbmFtZQELAgADbG9nAQNydW4=';
+      server.addHtmlRoute(
+        '/first.html',
+        `<script src="${server.getRoute('/logger.js')}"></script>
+<script>
+const bytes = Uint8Array.from(atob('${wasmModule}'), c => c.charCodeAt(0));
+new WebAssembly.Instance(new WebAssembly.Module(bytes), {
+  env: {log: () => console.log('from wasm')},
+}).exports.run();
+</script>`,
+      );
+      server.addHtmlRoute('/second.html', '<title>second</title>');
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/first.html'));
+        await page.pptrPage.goto(server.getRoute('/second.html'));
+
+        await listConsoleMessages(args).handler(
+          {
+            params: {includePreservedMessages: true, includeStackTraces: true},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(textContent, /at logIt \(.*logger\.js:2:11\)/);
+        assert.match(textContent, /at \$run \(wasm:\/\/wasm\/[\da-f]+:0x2d\)/);
+      });
+    });
+
+    it('keeps preserved frames raw after a cross-site navigation', async () => {
+      server.addRoute('/old.js', (_req, res) => {
+        res.setHeader('Content-Type', 'text/javascript');
+        res.statusCode = 200;
+        res.end(`function logFromOld() {
+  console.log('before navigation');
+}
+logFromOld();`);
+      });
+      server.addHtmlRoute(
+        '/old.html',
+        `<script src="${server.getRoute('/old.js')}"></script>`,
+      );
+      // Script ids restart in the new renderer process, so the scripts of the
+      // new page reuse the ids of the old one.
+      server.addHtmlRoute('/new.html', '<script>"new";</script>'.repeat(8));
+
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.goto(server.getRoute('/old.html'));
+        // localhost and 127.0.0.1 are different sites.
+        await page.pptrPage.goto(
+          server.getRoute('/new.html').replace('127.0.0.1', 'localhost'),
+        );
+
+        await listConsoleMessages(args).handler(
+          {
+            params: {includePreservedMessages: true, includeStackTraces: true},
+            page,
+          },
+          response,
+          context,
+        );
+        const formattedResponse = await response.handle(context);
+        const textContent = getTextContent(formattedResponse.content[0]);
+        assert.match(
+          textContent,
+          /at logFromOld \(http:\/\/127\.0\.0\.1:\d+\/old\.js:2:11\)/,
         );
       });
     });
