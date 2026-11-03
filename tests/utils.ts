@@ -23,6 +23,7 @@ import type {
   HTTPResponse,
   LaunchOptions,
   Page,
+  Protocol,
   Target,
 } from 'puppeteer-core';
 import sinon from 'sinon';
@@ -277,6 +278,7 @@ export function getMockRequest(
     frame?: Frame;
     redirectChain?: HTTPRequest[];
     headers?: Record<string, string>;
+    initiator?: Protocol.Network.Initiator;
   } = {},
 ): HTTPRequest {
   return {
@@ -322,6 +324,9 @@ export function getMockRequest(
     },
     frame() {
       return options.frame ?? ({} as Frame);
+    },
+    initiator() {
+      return options.initiator;
     },
     [stableIdSymbol]: options.stableId ?? 1,
   } as unknown as HTTPRequest;

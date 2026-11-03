@@ -253,6 +253,33 @@ describe('NetworkCollector', () => {
     collector.dispose();
   });
 
+  it('drops the async parents of a request initiator stack', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const collector = new NetworkCollector(pptrPage);
+    const frame: Protocol.Runtime.CallFrame = {
+      functionName: 'poll',
+      scriptId: '1',
+      url: 'https://example.com/app.js',
+      lineNumber: 0,
+      columnNumber: 0,
+    };
+    const request = getMockRequest({
+      initiator: {
+        type: 'script',
+        stack: {
+          callFrames: [frame],
+          parent: {description: 'setTimeout', callFrames: [frame]},
+        },
+      },
+    });
+    pptrPage.emit('request', request);
+    assert.deepStrictEqual(request.initiator(), {
+      type: 'script',
+      stack: {callFrames: [frame]},
+    });
+    collector.dispose();
+  });
+
   it('retains only the newest requests without navigation', async () => {
     const browser = getMockBrowser();
     const page = (await browser.pages())[0];
@@ -345,6 +372,27 @@ describe('NetworkCollector', () => {
 
     page.emit('request', request);
     assert.strictEqual(collector.getData().length, 2);
+  });
+
+  it('lists no requests after a navigation without a request', () => {
+    const pptrPage = createMockPuppeteerPage();
+    const mainFrame = pptrPage.mainFrame();
+    const navRequest = getMockRequest({
+      navigationRequest: true,
+      frame: mainFrame,
+    });
+    const request = getMockRequest();
+    const collector = new NetworkCollector(pptrPage);
+
+    pptrPage.emit('request', navRequest);
+    pptrPage.emit('framenavigated', mainFrame);
+    pptrPage.emit('request', request);
+    // A back/forward cache restore or about:blank commits without a request.
+    pptrPage.emit('framenavigated', mainFrame);
+
+    assert.deepStrictEqual(collector.getData(), []);
+    assert.deepStrictEqual(collector.getData(true), [navRequest, request]);
+    collector.dispose();
   });
 
   it('works with previous navigations', async () => {
