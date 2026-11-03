@@ -270,7 +270,7 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
+- **text** (array) **(required)**: Non-empty list of texts. Resolves when any value matches an accessible name exactly or is a substring of DOM text. Matching is case-sensitive. DOM text preserves spaces and newlines, unlike snapshot text which may normalize whitespace. Use the original whitespace or a shorter distinctive substring.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **visible** (boolean) _(optional)_: If true, wait until the matching text is visible. By default, hidden text also counts.
 
