@@ -506,15 +506,9 @@ export async function createStackTrace(
 
   const signal = AbortSignal.timeout(1_000);
   const scripts = await Promise.all(
-    [...scriptIds].map(id =>
-      waitForScript(model, id, signal).catch(() => undefined),
-    ),
+    [...scriptIds].map(id => waitForScript(model, id, signal)),
   );
-  await waitForSourceMaps(
-    model,
-    scripts.filter(script => script !== undefined),
-    signal,
-  );
+  await waitForSourceMaps(model, scripts, signal);
 
   const binding = devTools.universe.context.get(
     DevTools.DebuggerWorkspaceBinding,
@@ -530,10 +524,10 @@ export async function createStackTrace(
 
 /**
  * Waits for the source maps of `scripts` to load, so that their original
- * sources are in the workspace. Scripts without a source map and failed loads
- * are skipped. Non-trivial pages have hundreds of source maps, so the wait
- * ends when `signal` aborts; loads still pending then continue in the
- * background and resolve later.
+ * sources are in the workspace. Scripts without a source map are skipped.
+ * Non-trivial pages have hundreds of source maps, so the wait ends when
+ * `signal` aborts; loads still pending then continue in the background and
+ * resolve later.
  */
 export async function waitForSourceMaps(
   model: DevTools.DebuggerModel,
@@ -554,10 +548,7 @@ export async function waitForSourceMaps(
         return undefined;
       }
       return Promise.race([
-        manager.sourceMapForClientPromise(script).then(
-          () => undefined,
-          () => undefined,
-        ),
+        manager.sourceMapForClientPromise(script).then(() => undefined),
         aborted,
       ]);
     }),

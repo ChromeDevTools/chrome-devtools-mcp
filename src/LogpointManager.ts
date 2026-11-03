@@ -142,27 +142,6 @@ function toUserCondition(expression: string): string {
   return expression;
 }
 
-/**
- * DevTools turns the condition of a logpoint into `console.log(<condition>)`.
- * When the expression throws, the backend only reports an empty error
- * message, so the expression is evaluated inside a try/catch that logs the
- * error together with the requested location instead. The wrapper spreads
- * its result into the console.log() call, so the expression keeps the
- * semantics of console.log() arguments.
- */
-const WRAPPED_EXPRESSION =
-  /^\.\.\.\(\(\) => \{ try \{ return \[(.*)\]; \} catch \(logpointError\) \{ return \["Logpoint (?:[^"\\]|\\.)* threw:", logpointError\]; \} \}\)\(\)$/s;
-
-function wrapExpression(expression: string, location: string): string {
-  const label = JSON.stringify(`Logpoint ${location} threw:`);
-  return `...(() => { try { return [${expression}]; } catch (logpointError) { return [${label}, logpointError]; } })()`;
-}
-
-function unwrapExpression(condition: string): string {
-  const match = WRAPPED_EXPRESSION.exec(condition);
-  return match ? match[1] : condition;
-}
-
 function isFromSourceMap(uiSourceCode: UISourceCode): boolean {
   return uiSourceCode.contentType().isFromSourceMap();
 }
@@ -254,7 +233,7 @@ export class LogpointManager {
         options.columnNumber === undefined
           ? undefined
           : options.columnNumber - 1,
-        toUserCondition(wrapExpression(options.expression, key)),
+        toUserCondition(options.expression),
         /* enabled */ true,
         /* isLogpoint */ true,
         DevTools.BreakpointManager.BreakpointOrigin.USER_ACTION,
@@ -335,7 +314,7 @@ export class LogpointManager {
       url: breakpoint.url(),
       lineNumber: breakpoint.lineNumber() + 1,
       columnNumber: columnNumber === undefined ? undefined : columnNumber + 1,
-      expression: unwrapExpression(breakpoint.condition()),
+      expression: breakpoint.condition(),
       sourceMapped,
       generatedLocations,
     };
@@ -372,12 +351,16 @@ export class LogpointManager {
         .scripts()
         .filter(script => script.sourceURL === matchedUrl);
       if (scripts.some(script => script.sourceMapURL)) {
-        await waitForSourceMaps(
-          this.#debuggerModel,
-          scripts,
-          AbortSignal.timeout(SOURCE_MAP_LOAD_TIMEOUT_MS),
-        );
+        const signal = AbortSignal.timeout(SOURCE_MAP_LOAD_TIMEOUT_MS);
+        await waitForSourceMaps(this.#debuggerModel, scripts, signal);
         match = this.#matchUISourceCode(url);
+        if (signal.aborted && (!match || !isFromSourceMap(match))) {
+          // Setting the logpoint on the served script would use its line
+          // numbers instead of those of the original source.
+          throw new Error(
+            `The source map of ${matchedUrl} was still loading after ${SOURCE_MAP_LOAD_TIMEOUT_MS / 1000} seconds; retry.`,
+          );
+        }
       }
     } else if (!match) {
       const signal = AbortSignal.timeout(SOURCE_MAP_LOAD_TIMEOUT_MS);

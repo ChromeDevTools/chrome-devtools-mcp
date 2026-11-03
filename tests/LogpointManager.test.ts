@@ -107,6 +107,148 @@ function transpileDevTs(): string {
   return result.outputText;
 }
 
+// A "minified" script whose variable names differ from the original source,
+// as a minifier produces them, with a hand-written source map (there is no
+// minifier among the dev dependencies). Every identifier is mapped, which
+// DevTools needs to substitute original names in logpoint expressions.
+const MIN_TS_SOURCE = [
+  `function minGreet(name: string): string {`,
+  `  const minMessage: string = 'Hello, ' + name;`,
+  `  return minMessage;`,
+  `}`,
+  `(globalThis as {minGreet?: unknown}).minGreet = minGreet;`,
+].join('\n');
+
+const MIN_JS = [
+  `function minGreet(n){`,
+  `const m='Hello, '+n;`,
+  `return m;`,
+  `}`,
+  `globalThis.minGreet=minGreet;`,
+  `//# sourceMappingURL=min.js.map`,
+].join('\n');
+
+// Per generated line, the tokens of the generated text in order and the
+// original token each one comes from (same line of the original source).
+// Tokens are found in order, so repeated tokens map to their next occurrence.
+const MIN_NAMES = ['minGreet', 'name', 'minMessage'];
+const MIN_TOKENS: Array<Array<[string, string]>> = [
+  [
+    ['function', 'function'],
+    ['minGreet', 'minGreet'],
+    ['(', '('],
+    ['n', 'name'],
+    [')', ')'],
+    ['{', '{'],
+  ],
+  [
+    ['const', 'const'],
+    ['m', 'minMessage'],
+    ['=', '='],
+    [`'Hello, '`, `'Hello, '`],
+    ['+', '+'],
+    ['n', 'name'],
+    [';', ';'],
+  ],
+  [
+    ['return', 'return'],
+    ['m', 'minMessage'],
+    [';', ';'],
+  ],
+  [['}', '}']],
+  [
+    ['globalThis', 'globalThis'],
+    ['minGreet', 'minGreet'],
+    ['=', '='],
+    ['minGreet', 'minGreet'],
+    [';', ';'],
+  ],
+];
+
+// [generated column, original line, original column, name index] segments.
+function minSegments(): Array<Array<[number, number, number, number?]>> {
+  const originalLines = MIN_TS_SOURCE.split('\n');
+  const generatedLines = MIN_JS.split('\n');
+  return MIN_TOKENS.map((tokens, line) => {
+    let generatedFrom = 0;
+    let originalFrom = 0;
+    return tokens.map(([generatedToken, originalToken]) => {
+      const generatedColumn = generatedLines[line].indexOf(
+        generatedToken,
+        generatedFrom,
+      );
+      const originalColumn = originalLines[line].indexOf(
+        originalToken,
+        originalFrom,
+      );
+      assert.ok(generatedColumn >= 0 && originalColumn >= 0, generatedToken);
+      generatedFrom = generatedColumn + generatedToken.length;
+      originalFrom = originalColumn + originalToken.length;
+      const name = MIN_NAMES.indexOf(originalToken);
+      return name >= 0
+        ? [generatedColumn, line, originalColumn, name]
+        : [generatedColumn, line, originalColumn];
+    });
+  });
+}
+
+const BASE64 =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function encodeVlq(value: number): string {
+  let vlq = value < 0 ? (-value << 1) | 1 : value << 1;
+  let encoded = '';
+  do {
+    let digit = vlq & 31;
+    vlq >>>= 5;
+    if (vlq > 0) {
+      digit |= 32;
+    }
+    encoded += BASE64[digit];
+  } while (vlq > 0);
+  return encoded;
+}
+
+function encodeMappings(): string {
+  let previousSourceLine = 0;
+  let previousSourceColumn = 0;
+  let previousName = 0;
+  return minSegments()
+    .map(line => {
+      let previousGeneratedColumn = 0;
+      return line
+        .map(([generatedColumn, sourceLine, sourceColumn, name]) => {
+          const fields = [
+            generatedColumn - previousGeneratedColumn,
+            0,
+            sourceLine - previousSourceLine,
+            sourceColumn - previousSourceColumn,
+          ];
+          previousGeneratedColumn = generatedColumn;
+          previousSourceLine = sourceLine;
+          previousSourceColumn = sourceColumn;
+          if (name !== undefined) {
+            fields.push(name - previousName);
+            previousName = name;
+          }
+          return fields.map(encodeVlq).join('');
+        })
+        .join(',');
+    })
+    .join(';');
+}
+
+function minifiedSourceMap(): string {
+  return JSON.stringify({
+    version: 3,
+    file: 'min.js',
+    sources: ['min.ts'],
+    sourcesContent: [MIN_TS_SOURCE],
+    names: MIN_NAMES,
+    mappings: encodeMappings(),
+  });
+}
+
 /** Collects console messages of the page from now on. */
 function collectConsole(page: McpPage): string[] {
   const messages: string[] = [];
@@ -118,30 +260,19 @@ function collectConsole(page: McpPage): string[] {
 
 async function waitForMessage(
   messages: string[],
-  expected: string,
+  expected: string | RegExp,
 ): Promise<void> {
+  const matches = (message: string) =>
+    typeof expected === 'string'
+      ? message === expected
+      : expected.test(message);
   await waitExecutionFor(async () => {
-    if (!messages.includes(expected)) {
+    if (!messages.some(matches)) {
       throw new Error(
-        `Console messages do not include "${expected}" yet: ${JSON.stringify(messages)}`,
+        `Console messages do not include ${expected} yet: ${JSON.stringify(messages)}`,
       );
     }
   }, 5000);
-}
-
-async function waitForMessageMatching(
-  messages: string[],
-  pattern: RegExp,
-): Promise<void> {
-  const deadline = Date.now() + 5000;
-  while (!messages.some(message => pattern.test(message))) {
-    if (Date.now() > deadline) {
-      throw new Error(
-        `No console message matches ${pattern}: ${JSON.stringify(messages)}`,
-      );
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
 }
 
 function evaluateWithTimeout(
@@ -366,37 +497,43 @@ describe('LogpointManager', () => {
     });
   });
 
-  it('reports a failing expression with the logpoint location', async () => {
+  it('substitutes original variable names at minified locations', async () => {
     await withMcpContext(async (response, context) => {
-      setupRoutes();
+      server.addHtmlRoute('/min', html`<script src="/min.js"></script>`);
+      server.addRoute('/min.js', (req, res) => {
+        res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+        res.end(MIN_JS);
+      });
+      server.addRoute('/min.js.map', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(minifiedSourceMap());
+      });
       const page = context.getSelectedMcpPage();
-      await page.pptrPage.goto(server.getRoute('/'));
+      await page.pptrPage.goto(server.getRoute('/min'));
       const messages = collectConsole(page);
-      const url = server.getRoute('/app.js');
 
       const logpoints = await page.setLogpoints([
-        {url: 'app.js', lineNumber: 2, expression: `'name', missingVariable`},
+        {
+          url: 'min.ts',
+          lineNumber: 3,
+          expression: `'min greeting', name, minMessage`,
+        },
       ]);
 
-      // The response shows the expression as given, not the wrapper that
-      // reports errors.
+      // The original source is only served through the source map.
       assertLogpoint(logpoints[0], {
-        url,
-        lineNumber: 2,
-        columnNumber: 1,
-        expression: `'name', missingVariable`,
-        sourceMapped: false,
-        generatedUrl: url,
-        generatedLineNumber: 2,
+        url: server.getRoute('/min.js').replace(/min\.js$/, 'min.ts'),
+        lineNumber: 3,
+        columnNumber: 3,
+        expression: `'min greeting', name, minMessage`,
+        sourceMapped: true,
+        generatedUrl: server.getRoute('/min.js'),
+        generatedLineNumber: 3,
       });
 
-      await page.pptrPage.evaluate(`greet('World')`);
-      // The label names the resolved location; the error text carries the
-      // stack, so match the start only.
-      await waitForMessageMatching(
-        messages,
-        /^Logpoint http:\/\/[^/]+\/app\.js:2 threw: ReferenceError: missingVariable is not defined/,
-      );
+      // `name` and `minMessage` only exist as `n` and `m` in the script.
+      await page.pptrPage.evaluate(`minGreet('World')`);
+      await waitForMessage(messages, 'min greeting World Hello, World');
     });
   });
 
