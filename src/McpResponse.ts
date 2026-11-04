@@ -995,11 +995,13 @@ export class McpResponse implements Response {
 
     if (this.#attachedWaitForResult) {
       if (this.#attachedWaitForResult.navigatedToUrl) {
+        const navigatedToUrl = this.#attachedWaitForResult.navigatedToUrl;
         response.push(
-          `Page navigated to ${this.#attachedWaitForResult.navigatedToUrl}.`,
+          this.#attachedWaitForResult.sameDocument
+            ? `Page navigated to ${navigatedToUrl} within the same document.`
+            : `Page navigated to ${navigatedToUrl}.`,
         );
-        structuredContent.navigatedToUrl =
-          this.#attachedWaitForResult.navigatedToUrl;
+        structuredContent.navigatedToUrl = navigatedToUrl;
       }
       if (this.#attachedWaitForResult.openedPages) {
         const openedPages = this.#attachedWaitForResult.openedPages;
