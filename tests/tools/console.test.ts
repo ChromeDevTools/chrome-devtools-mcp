@@ -10,6 +10,7 @@ import {before, describe, it} from 'node:test';
 
 import type {Dialog} from 'puppeteer-core';
 
+import {ConsoleCollector} from '../../src/collectors/PageCollector.js';
 import type {ParsedArguments} from '../../src/config/mcp-options.js';
 import {loadIssueDescriptions} from '../../src/devtools/issueDescriptions.js';
 import {McpResponse} from '../../src/McpResponse.js';
@@ -490,6 +491,40 @@ describe('console', () => {
         const formattedResponse = await response.handle(context);
         const textContent = getTextContent(formattedResponse.content[0]);
         assert.match(textContent, /Arg #1: Error: boom\nat logError /);
+      });
+    });
+
+    it('keeps only retained console arguments alive', async () => {
+      await withMcpContext(async (response, context, args) => {
+        const page = context.getSelectedMcpPage();
+        await page.pptrPage.setContent(
+          `<script>
+            class Marker {}
+            function logMarkers(count) {
+              for (let i = 0; i < count; i++) {
+                console.log(new Marker());
+              }
+            }
+          </script>`,
+        );
+        await listConsoleMessages(args).handler(
+          {params: {}, page},
+          response,
+          context,
+        );
+        const cap = ConsoleCollector.MAX_MESSAGES_PER_NAVIGATION;
+
+        await page.pptrPage.evaluate(`logMarkers(${cap + 1})`);
+
+        using prototype =
+          await page.pptrPage.evaluateHandle('Marker.prototype');
+        await waitExecutionFor(async () => {
+          using markers = await page.pptrPage.queryObjects(prototype);
+          assert.strictEqual(
+            await markers.evaluate(objects => objects.length),
+            cap,
+          );
+        }, 10_000);
       });
     });
 

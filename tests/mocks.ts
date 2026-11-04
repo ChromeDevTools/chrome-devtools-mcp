@@ -276,6 +276,10 @@ export function createMockCDPSession(): sinon.SinonStubbedInstance<MockCDPSessio
     listener.off(eventName, handler);
     return session;
   });
+  session.emit.callsFake((eventName, data) => {
+    listener.emit(eventName, data);
+    return true;
+  });
   return session;
 }
 
