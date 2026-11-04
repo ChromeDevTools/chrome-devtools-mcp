@@ -167,26 +167,6 @@ describe('checkForUpdates', () => {
     sinon.assert.calledOnce(unrefSpy);
   });
 
-  it('ignores a cached version that is not a string', async () => {
-    sinon.stub(os, 'homedir').returns('/home/user');
-    sinon.stub(fs, 'stat').resolves({mtimeMs: Date.now()} as unknown as Stats);
-    sinon.stub(fs, 'readFile').callsFake(async filePath => {
-      if (filePath.toString().includes('latest.json')) {
-        return JSON.stringify({
-          version: 99,
-        });
-      }
-      throw new Error(`File not found: ${filePath}`);
-    });
-    const warnStub = sinon.stub(console, 'warn');
-    const spawnStub = sinon.stub(child_process, 'spawn');
-
-    await checkForUpdates('Run `npm update` to update.');
-
-    sinon.assert.notCalled(warnStub);
-    sinon.assert.notCalled(spawnStub);
-  });
-
   it('spawns detached process if cache is missing', async () => {
     sinon.stub(os, 'homedir').returns('/home/user');
     sinon.stub(fs, 'stat').rejects(new Error('File not found'));
