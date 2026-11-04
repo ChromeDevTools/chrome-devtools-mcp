@@ -258,6 +258,19 @@ The Chrome DevTools MCP server supports the following configuration option:
   - **Type:** boolean
   - **Default:** `false`
 
+- **`--packPolicy`/ `--pack-policy`**
+  Comma-separated list of domain pack policy overrides (e.g., "performance:active,extensions:locked,memory:on-demand").
+  - **Type:** string
+
+- **`--toolPolicy`/ `--tool-policy`**
+  Comma-separated list of individual tool policy overrides (e.g., "evaluate_script:locked,take_heapsnapshot:active").
+  - **Type:** string
+
+- **`--metaFeatureSystem`/ `--meta-feature-system`**
+  Enable the dynamic Meta-Feature System (manage_capabilities tool and progressive domain packs).
+  - **Type:** boolean
+  - **Default:** `false`
+
 <!-- END AUTO GENERATED OPTIONS -->
 
 Pass them via the `args` property in the JSON configuration. For example:

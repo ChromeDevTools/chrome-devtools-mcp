@@ -19,6 +19,17 @@ export interface ChromeDevToolsMcpExtension {
   server_shutdown?: ServerShutdown;
   server_error?: ServerError;
   tool_active?: ToolActive;
+  capability_event?: CapabilityEvent;
+}
+
+export interface CapabilityEvent {
+  action: 'enable' | 'disable' | 'call';
+  pack_id: string;
+  tool_name?: string;
+  policy_tier: 'enabled' | 'on-demand' | 'locked';
+  client_supports_list_changed: boolean;
+  latency_ms: number;
+  success: boolean;
 }
 
 export interface RawMcpClientInfo {

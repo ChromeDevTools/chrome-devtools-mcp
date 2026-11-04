@@ -106,6 +106,10 @@ async function generateCli() {
       if (tool.name === 'get_tab_id') {
         return false;
       }
+      // Skipping manage_capabilities as it is for MCP agent capability management
+      if (tool.name === 'manage_capabilities') {
+        return false;
+      }
       // Skipping in_page tools as they are not launched yet
       if (tool.annotations.category === ToolCategory.IN_PAGE) {
         return false;

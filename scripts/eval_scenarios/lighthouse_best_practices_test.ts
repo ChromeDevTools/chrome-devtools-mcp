@@ -27,6 +27,7 @@ export const scenario: TestScenario = {
     `,
   },
   expectations: result => {
+    result.assertCapabilityEnabled('audits');
     const pageId = result.consumePageNavigation();
     assert.ok(result.remainingCalls.length >= 1);
     result.assertNextCall(

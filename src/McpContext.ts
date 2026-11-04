@@ -11,6 +11,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
 
 import {overrideDevToolsGlobals} from './devtools/DevtoolsUtils.js';
+import type {McpServer} from './index.js';
 import type {
   HeapSnapshotManager,
   HeapSnapshotAggregateData,
@@ -64,6 +65,7 @@ import {isAllowedUrl} from './utils/url.js';
 
 export interface McpContextOptions {
   config: ReadonlyServerConfig;
+  mcpServer?: McpServer;
   // Custom navigation timeout in milliseconds to override default.
   navigationTimeout?: number;
   // Shared heap snapshot manager to preserve loaded snapshots across browser reconnects.
@@ -138,6 +140,7 @@ let nextPageId = 1;
 
 export class McpContext implements Context, BrowserlessContext {
   logger: Logger;
+  mcpServer?: McpServer;
 
   #browser?: Browser;
   // Initialization of #browser, settles once its browser-dependent state is
@@ -198,6 +201,7 @@ export class McpContext implements Context, BrowserlessContext {
     });
 
     this.logger = logger;
+    this.mcpServer = options.mcpServer;
     this.#locatorClass = locatorClass;
     this.#taskRunner = options.taskRunner;
     this.taskQueue = options.taskRunner.createQueue();

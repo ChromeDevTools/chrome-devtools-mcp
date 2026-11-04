@@ -58,6 +58,9 @@ export interface McpArguments
   filesystemRoot?: string[];
   config?: string;
   watchConfig: boolean;
+  packPolicy?: string;
+  toolPolicy?: string;
+  metaFeatureSystem?: boolean;
 }
 
 export type ParsedArguments = {
@@ -311,6 +314,24 @@ export const mcpOptions: McpOptions = {
     default: false,
     describe:
       'Watch the config file for changes and apply them without restarting. Tools (except --categoryExtensions) are enabled, disabled and updated on the fly; options used to launch or connect to the browser still require a restart.',
+  },
+  packPolicy: {
+    type: 'string',
+    describe:
+      'Comma-separated list of domain pack policy overrides (e.g., "performance:active,extensions:locked,memory:on-demand").',
+    reloadable: true,
+  },
+  toolPolicy: {
+    type: 'string',
+    describe:
+      'Comma-separated list of individual tool policy overrides (e.g., "evaluate_script:locked,take_heapsnapshot:active").',
+    reloadable: true,
+  },
+  metaFeatureSystem: {
+    type: 'boolean',
+    describe:
+      'Enable the dynamic Meta-Feature System (manage_capabilities tool and progressive domain packs).',
+    reloadable: true,
   },
 };
 
