@@ -169,6 +169,9 @@ export class ConsoleFormatter {
                 error: remoteObject,
                 // @ts-expect-error Internal ConsoleMessage API
                 targetId: msg._targetId(),
+                // The objectId is only valid on the session of its handle.
+                session:
+                  arg instanceof DevTools.CdpJSHandle ? arg.client : undefined,
               });
             }
             if (!isJsonLike(remoteObject)) {
