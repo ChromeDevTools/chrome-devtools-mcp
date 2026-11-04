@@ -210,6 +210,7 @@ export class McpPage implements ContextPage {
   // Metadata
   isolatedContextName?: string;
   #devtoolsUniverse?: TargetUniverse;
+  #stopReleasingUniverseConsoleObjects?: () => void;
   #webAuthnEnabled = false;
   #webAuthnAuthenticator?: WebAuthnAuthenticator;
 
@@ -426,9 +427,43 @@ export class McpPage implements ContextPage {
       this.#devtoolsUniverse = await createTargetUniverse(session, {
         sourceMaps: this.#config.resolved.sourceMaps,
       });
+      this.#releaseUniverseConsoleObjects(session);
     } catch (e) {
       logger?.('Failed to initialize DevTools universe', e);
     }
+  }
+
+  /**
+   * Releases the console arguments that the DevTools universe's session wraps
+   * on every console message. Tools read them through Puppeteer's handles, so
+   * these wrappers would only keep the logged objects alive in the page.
+   */
+  #releaseUniverseConsoleObjects(session: TargetUniverse['session']): void {
+    let inFlight = false;
+    let releaseAgain = false;
+    const release = (): void => {
+      if (inFlight) {
+        releaseAgain = true;
+        return;
+      }
+      inFlight = true;
+      void session
+        .send('Runtime.releaseObjectGroup', {objectGroup: 'console'})
+        .catch(error => {
+          logger?.('Failed to release console objects', error);
+        })
+        .finally(() => {
+          inFlight = false;
+          if (releaseAgain && !this.#disposed) {
+            releaseAgain = false;
+            release();
+          }
+        });
+    };
+    session.on('Runtime.consoleAPICalled', release);
+    this.#stopReleasingUniverseConsoleObjects = () => {
+      session.off('Runtime.consoleAPICalled', release);
+    };
   }
 
   syncSourceMaps(): void {
@@ -937,6 +972,8 @@ export class McpPage implements ContextPage {
     this.#consoleCollector?.dispose();
     this.#logpointManager?.dispose();
     this.#logpointManager = undefined;
+    this.#stopReleasingUniverseConsoleObjects?.();
+    this.#stopReleasingUniverseConsoleObjects = undefined;
     const devtoolsUniverse = this.#devtoolsUniverse;
     this.#devtoolsUniverse = undefined;
     this.#webAuthnAuthenticator = undefined;

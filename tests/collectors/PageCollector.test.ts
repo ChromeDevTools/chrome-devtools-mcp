@@ -23,7 +23,11 @@ import {
 } from '../../src/collectors/PageCollector.js';
 import {DevTools, FrameEvent} from '../../src/third_party/index.js';
 
-import {createMockPuppeteerPage} from '../mocks.js';
+import {
+  createMockConsoleMessage as createMockPuppeteerConsoleMessage,
+  createMockElementHandle,
+  createMockPuppeteerPage,
+} from '../mocks.js';
 import {getMockRequest, getMockBrowser} from '../utils.js';
 
 function createMockConsoleMessage(text: string): ConsoleMessage {
@@ -739,6 +743,29 @@ describe('ConsoleCollector', () => {
     const retained = collector.getData();
     assert.strictEqual(retained.length, cap);
     assert.deepEqual(retained, messages.slice(messages.length - cap));
+  });
+
+  it('disposes the arguments of the messages it drops', async () => {
+    const browser = getMockBrowser();
+    const page = (await browser.pages())[0];
+    const collector = new ConsoleCollector(
+      page,
+      collect => ({
+        console: (msg: ConsoleMessage) => {
+          collect(msg);
+        },
+      }),
+      {maxResourcesPerNavigation: 1},
+    );
+    const dropped = createMockElementHandle().handle;
+    const kept = createMockElementHandle().handle;
+
+    page.emit('console', createMockPuppeteerConsoleMessage({args: [dropped]}));
+    page.emit('console', createMockPuppeteerConsoleMessage({args: [kept]}));
+
+    sinon.assert.calledOnceWithExactly(dropped.dispose);
+    sinon.assert.notCalled(kept.dispose);
+    collector.dispose();
   });
 
   it('uses MAX_MESSAGES_PER_NAVIGATION as the default cap', async () => {

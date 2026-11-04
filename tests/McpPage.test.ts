@@ -1652,6 +1652,35 @@ describe('McpPage', () => {
     });
   });
 
+  describe('DevTools universe console objects', () => {
+    it('releases them after console messages until disposed', async () => {
+      const session = createMockCDPSession();
+      const pptrPage = createMockPuppeteerPage();
+      pptrPage.createCDPSession.resolves(session);
+      const mcpPage = new McpPage(
+        createMockPuppeteerTarget({page: pptrPage}),
+        1,
+        {config: createMockServerConfig(), locatorClass: Locator},
+      );
+      await mcpPage.init();
+      const send: sinon.SinonStub = session.send;
+      const release = send.withArgs('Runtime.releaseObjectGroup', {
+        objectGroup: 'console',
+      });
+
+      session.emit('Runtime.consoleAPICalled', {});
+      session.emit('Runtime.consoleAPICalled', {});
+      sinon.assert.calledOnce(release);
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledTwice(release);
+
+      mcpPage.dispose();
+      session.emit('Runtime.consoleAPICalled', {});
+      await new Promise(resolve => setImmediate(resolve));
+      sinon.assert.calledTwice(release);
+    });
+  });
+
   describe('syncSourceMaps()', () => {
     it('does nothing before init() initializes the DevTools universe', () => {
       const config = createMockServerConfig({sourceMaps: false});
