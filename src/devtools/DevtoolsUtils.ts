@@ -239,7 +239,7 @@ const MAX_CAUSE_DEPTH = 10;
 /**
  * Constructed from Runtime.ExceptionDetails of an uncaught error.
  *
- * TODO: Also construct from a RemoteObject of subtype 'error'.
+ * Also construct from a RemoteObject of subtype 'error' via fromRemoteObject()
  *
  * Consists of the message, a fully resolved stack trace and a fully resolved 'cause' chain.
  */
@@ -366,6 +366,90 @@ export class SymbolizedError {
     return new SymbolizedError(
       SymbolizedError.#getMessageFromException(opts.error),
     );
+  }
+
+  /**
+   * Construct a SymbolizedError from a RemoteObject of subtype 'error'.
+   * This handles the case where an error remote object is available directly
+   * rather than through ExceptionDetails.
+   *
+   * TODO: Remove once fully implemented - was tracking construction from
+   * RemoteObject of subtype 'error'.
+   */
+  static async fromRemoteObject(opts: {
+    error: RemoteObjectLike;
+    targetId: string;
+    devTools?: TargetUniverse;
+    session?: CDPSession;
+  }): Promise<SymbolizedError> {
+    return await SymbolizedError.fromRemoteError(opts, 0);
+  }
+
+  static async fromRemoteError(
+    opts: {
+      error: RemoteObjectLike;
+      targetId: string;
+      devTools?: TargetUniverse;
+      session?: CDPSession;
+    },
+    causeDepth: number,
+  ): Promise<SymbolizedError> {
+    const message = SymbolizedError.#getMessageFromException(opts.error);
+    let stackTrace: DevTools.StackTrace.StackTrace.StackTrace | undefined;
+    let cause: SymbolizedError | undefined;
+
+    if (opts.error.type === 'object' && opts.error.subtype === 'error') {
+      // Try to get stack trace and cause from the error object
+      if (opts.devTools && opts.session) {
+        try {
+          const details = await SymbolizedError.#getExceptionDetails(
+            opts.devTools,
+            opts.error,
+            opts.targetId,
+            opts.session,
+          );
+          if (details && details.stackTrace) {
+            try {
+              stackTrace = await createStackTrace(
+                opts.devTools,
+                details.stackTrace,
+                opts.targetId,
+              );
+            } catch {
+              // ignore
+            }
+          }
+          // Recursively resolve cause
+          if (details && details.exception && causeDepth < MAX_CAUSE_DEPTH) {
+            try {
+              const causeRemoteObj = await SymbolizedError.#lookupCause(
+                opts.devTools,
+                details.exception,
+                opts.targetId,
+                opts.session,
+              );
+              if (causeRemoteObj) {
+                cause = await SymbolizedError.fromRemoteError(
+                  {
+                    error: causeRemoteObj,
+                    targetId: opts.targetId,
+                    devTools: opts.devTools,
+                    session: opts.session,
+                  },
+                  causeDepth + 1,
+                );
+              }
+            } catch {
+              // Ignore
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    return new SymbolizedError(message, stackTrace, cause);
   }
 
   static #getMessage(details: ExceptionDetailsLike): string {

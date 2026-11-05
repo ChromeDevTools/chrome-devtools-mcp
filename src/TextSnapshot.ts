@@ -35,6 +35,7 @@ export class TextSnapshot {
 
   root: TextSnapshotNode;
   idToNode: Map<string, TextSnapshotNode>;
+  backendNodeIdToId: Map<number, string>;
   snapshotId: string;
   selectedElementUid?: string;
   hasSelectedElement: boolean;
@@ -43,13 +44,15 @@ export class TextSnapshot {
   constructor(data: {
     root: TextSnapshotNode;
     idToNode: Map<string, TextSnapshotNode>;
-    snapshotId: string;
+    backendNodeIdToId: Map<number, string>;
     hasSelectedElement: boolean;
+    snapshotId: string;
     verbose: boolean;
     selectedElementUid?: string;
   }) {
     this.root = data.root;
     this.idToNode = data.idToNode;
+    this.backendNodeIdToId = data.backendNodeIdToId;
     this.snapshotId = data.snapshotId;
     this.selectedElementUid = data.selectedElementUid;
     this.hasSelectedElement = data.hasSelectedElement;
@@ -150,6 +153,7 @@ export class TextSnapshot {
       root: rootNodeWithId,
       snapshotId: String(snapshotId),
       idToNode,
+      backendNodeIdToId: new Map<number, string>(),
       hasSelectedElement: false,
       verbose,
     });
@@ -177,19 +181,28 @@ export class TextSnapshot {
       logger?.('no cdpBackendNodeId');
       return;
     }
+    // Check the index first (O(1))
+    const cached = this.backendNodeIdToId.get(cdpBackendNodeId);
+    if (cached) {
+      return cached;
+    }
     // TODO: index by backendNodeId instead.
     const queue = [this.root];
     let current = queue.pop();
+    let foundId: string | undefined;
     while (current) {
       if (current.backendNodeId === cdpBackendNodeId) {
-        return current.id;
+        foundId = current.id;
+        break;
       }
       for (const child of current.children) {
         queue.push(child);
       }
       current = queue.pop();
     }
-    return;
+    // Update the index after finding the node
+    this.backendNodeIdToId.set(cdpBackendNodeId, foundId ?? '');
+    return foundId;
   }
 
   // ExtraHandles represent DOM nodes which might not be part of the accessibility tree, e.g. DOM nodes

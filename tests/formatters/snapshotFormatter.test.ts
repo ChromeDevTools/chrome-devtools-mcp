@@ -395,6 +395,7 @@ describe('snapshotFormatter', () => {
       root: node,
       idToNode: new Map(),
       hasSelectedElement: true,
+      backendNodeIdToId: new Map<number, string>(),
       verbose: false,
       resolveCdpElementId() {
         return undefined;
@@ -432,6 +433,7 @@ describe('snapshotFormatter', () => {
       root: node,
       idToNode: new Map(),
       hasSelectedElement: true,
+      backendNodeIdToId: new Map<number, string>(),
       verbose: true,
       resolveCdpElementId() {
         return undefined;
@@ -469,6 +471,7 @@ describe('snapshotFormatter', () => {
       root: node,
       idToNode: new Map(),
       hasSelectedElement: true,
+      backendNodeIdToId: new Map<number, string>(),
       selectedElementUid: '1_1',
       verbose: false,
       resolveCdpElementId() {
