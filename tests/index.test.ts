@@ -110,7 +110,7 @@ describe('e2e', {concurrency: true}, () => {
   });
 
   it(
-    'cancels a running page evaluation without restarting Chrome',
+    'cancels a request and resumes its queue after evaluation settles',
     {timeout: 90_000},
     async t => {
       const server = new TestServer(TestServer.randomPort());
@@ -118,6 +118,12 @@ describe('e2e', {concurrency: true}, () => {
       t.after(() => server.stop());
       await withClient(async client => {
         const started = Promise.withResolvers<void>();
+        const finish = Promise.withResolvers<void>();
+        t.after(() => finish.resolve());
+        server.addRoute('/finish', async (_request, response) => {
+          await finish.promise;
+          response.end();
+        });
         server.addHtmlRoute(
           '/evaluation',
           '<!doctype html><title>Cancellation test</title>',
@@ -139,7 +145,7 @@ describe('e2e', {concurrency: true}, () => {
               pageId: 1,
               function: `async () => {
                 await fetch('/started');
-                await new Promise(() => {});
+                await fetch('/finish');
               }`,
               waitForStableDom: false,
             },
@@ -154,10 +160,12 @@ describe('e2e', {concurrency: true}, () => {
         abortController.abort();
         await rejected;
 
-        const pagesAfterCancellation = await client.callTool({
+        const pendingPages = client.callTool({
           name: 'list_pages',
           arguments: {},
         });
+        finish.resolve();
+        const pagesAfterCancellation = await pendingPages;
         assert.match(
           JSON.stringify(pagesAfterCancellation.content),
           /\/evaluation/,

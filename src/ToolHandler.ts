@@ -12,6 +12,7 @@ import {McpResponse, type DataFormat} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
 import {
+  DisposableStack,
   ProtocolError,
   ProtocolErrorCode,
   zod,
@@ -494,8 +495,9 @@ export class ToolHandler {
   }
 
   /**
-   * A cancelled handler may continue operating on the same page while the
-   * next call runs, because uninterruptible page work cannot be stopped.
+   * Cancellation stops waiting for a result, but running work keeps its queue
+   * until it settles, including response processing, to preserve serialization.
+   * Operations without cancellation support can keep the queue indefinitely.
    */
   async handle(
     rawArgs: Record<string, unknown> = {},
@@ -516,7 +518,8 @@ export class ToolHandler {
       // The queue was disposed while the call waited, e.g. the page closed.
       return errorResult(getErrorMessage(err));
     }
-    using guard = queueGuard;
+    using guard = new DisposableStack();
+    guard.use(queueGuard);
     signal.throwIfAborted();
     if (options?.viaMcp && this.#disabled) {
       throw new ProtocolError(
@@ -545,7 +548,7 @@ export class ToolHandler {
       const response = isSlimTool(tool)
         ? new SlimMcpResponse(this.#config)
         : new McpResponse(this.#config);
-      // Abandoned work skips response processing and DevTools data collection.
+      // The execution owns the queue even when its caller stops waiting.
       const execution = isBrowserlessTool(tool)
         ? this.#runBrowserlessTool(tool, params, response, context, signal)
         : this.#runBrowserTool(
@@ -559,8 +562,10 @@ export class ToolHandler {
               pageUrl = url;
             },
           );
+      const executionGuard = guard.move();
+      const completion = execution.finally(() => executionGuard.dispose());
       const {content, structuredContent} = await Promise.race([
-        execution,
+        completion,
         cancellation.promise,
       ]);
       const result: CallToolResult & {
