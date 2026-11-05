@@ -37,6 +37,7 @@ import {
   type ToolConcurrency,
 } from '../src/tools/ToolDefinition.js';
 import {evaluateScript} from '../src/tools/script.js';
+import {selectPage} from '../src/tools/pages.js';
 import {createTools} from '../src/tools/tools.js';
 import {TaskRunner, type TaskQueue} from '../src/utils/TaskRunner.js';
 import {createMockMcpContext, createMockMcpPage} from './mocks.js';
@@ -116,7 +117,7 @@ describe('ToolHandler', () => {
     for (const mode of modes) {
       for (const rejects of [false, true]) {
         const outcome = rejects ? 'failure' : 'completion';
-        it(`logs abort before late ${outcome} (${mode})`, async () => {
+        it(`logs abort and retains running queues until late ${outcome} (${mode})`, async () => {
           const started = Promise.withResolvers<void>();
           const execution = Promise.withResolvers<void>();
           const config = parseConfig();
@@ -191,15 +192,29 @@ describe('ToolHandler', () => {
             getEventListeners(controller.signal, 'abort'),
             [],
           );
-          const probe = await queue.scheduleTask();
-          probe[Symbol.dispose]();
+          const acquired = sinon.spy();
+          const probe = queue.scheduleTask().then(guard => {
+            acquired();
+            return guard;
+          });
+          await settle();
+          if (mode === 'exclusive' || mode === 'page') {
+            sinon.assert.notCalled(acquired);
+          } else {
+            sinon.assert.calledOnceWithExactly(acquired);
+          }
+          if (mode === 'page') {
+            using unrelated = await context.pageTaskQueue(2).scheduleTask();
+          }
 
           if (rejects) {
             execution.reject(new Error('late failure'));
           } else {
             execution.resolve();
           }
+          (await probe)[Symbol.dispose]();
           await settle();
+          sinon.assert.calledOnceWithExactly(acquired);
           sinon.assert.notCalled(responseHandle);
           sinon.assert.notCalled(responseError);
           sinon.assert.notCalled(context.getDevToolsData);
@@ -392,8 +407,19 @@ describe('ToolHandler', () => {
             invocation,
           );
         }
-        using probe = await context.taskQueue.scheduleTask();
+        const acquired = sinon.spy();
+        const probe = context.taskQueue.scheduleTask().then(guard => {
+          acquired();
+          return guard;
+        });
+        await settle();
+        if (stage === 'context' || stage === 'browser') {
+          sinon.assert.calledOnceWithExactly(acquired);
+        } else {
+          sinon.assert.notCalled(acquired);
+        }
         initialization.resolve();
+        (await probe)[Symbol.dispose]();
         await settle();
         if (stage === 'context') {
           sinon.assert.notCalled(context.ensureBrowser);
@@ -422,6 +448,78 @@ describe('ToolHandler', () => {
         );
       });
     }
+
+    it('serializes select_page after a cancelled selection finishes', async () => {
+      const config = parseConfig();
+      const context = createMockMcpContext();
+      context.ensureBrowser.resolves(getMockBrowser());
+      const oldPage = createMockMcpPage();
+      const nextPage = createMockMcpPage();
+      context.getPageById.withArgs(1).returns(oldPage);
+      context.getPageById.withArgs(2).returns(nextPage);
+      const initialization = Promise.withResolvers<void>();
+      oldPage.init.returns(initialization.promise);
+      sinon
+        .stub(McpResponse.prototype, 'handle')
+        .resolves({content: [], structuredContent: {}});
+      const handler = new ToolHandler(
+        selectPage(config.resolved),
+        config,
+        async () => context,
+        sinon.spy(),
+      );
+      const controller = new AbortController();
+      const pending = handler.handle({pageId: 1}, {signal: controller.signal});
+      await settle();
+      sinon.assert.calledOnceWithExactly(oldPage.init, {emulateFocus: true});
+      controller.abort();
+      await assert.rejects(pending, {name: 'AbortError'});
+      const next = handler.handle({pageId: 2});
+      await settle();
+      sinon.assert.notCalled(nextPage.init);
+      sinon.assert.notCalled(context.selectPage);
+      initialization.resolve();
+      assert.strictEqual((await next).isError, undefined);
+      sinon.assert.calledTwice(context.selectPage);
+      sinon.assert.calledWithExactly(context.selectPage.firstCall, oldPage);
+      sinon.assert.calledWithExactly(context.selectPage.secondCall, nextPage);
+    });
+
+    it('retains the queue while cancelled response processing settles', async () => {
+      const config = parseConfig();
+      const runner = new TaskRunner();
+      const context = createMockMcpContext({taskRunner: runner});
+      context.ensureBrowser.resolves(getMockBrowser());
+      const page = createMockMcpPage();
+      context.getPageById.returns(page);
+      const processing =
+        Promise.withResolvers<Awaited<ReturnType<McpResponse['handle']>>>();
+      const responseHandle = sinon
+        .stub(McpResponse.prototype, 'handle')
+        .returns(processing.promise);
+      const handler = new ToolHandler(
+        selectPage(config.resolved),
+        config,
+        async () => context,
+        sinon.spy(),
+      );
+      const controller = new AbortController();
+      const pending = handler.handle({pageId: 1}, {signal: controller.signal});
+      await settle();
+      sinon.assert.calledOnceWithExactly(responseHandle, context, 'default');
+      controller.abort();
+      await assert.rejects(pending, {name: 'AbortError'});
+      const paused = sinon.spy();
+      const pause = runner.pause().then(guard => {
+        paused();
+        return guard;
+      });
+      await settle();
+      sinon.assert.notCalled(paused);
+      processing.resolve({content: [], structuredContent: {}});
+      (await pause)[Symbol.dispose]();
+      sinon.assert.calledOnceWithExactly(paused);
+    });
 
     it('skips context for an already cancelled request', async () => {
       const getContext = sinon.stub().resolves(createMockMcpContext());
