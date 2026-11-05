@@ -1898,6 +1898,28 @@ export const commands: Commands = {
       },
     },
   },
+  set_logpoints: {
+    description:
+      'Set the complete set of logpoints of the selected page: logpoints not in the list are removed, new ones are added, and an empty list removes all. A logpoint logs expressions to the console every time a line executes, without pausing or changing the source, like logpoints in the DevTools Sources panel. Locations are script URLs or original source files resolved through source maps (not available with --no-source-maps; scripts in workers and out-of-process iframes are not supported). A location in a generated script moves to its original source line when a source map covers it, and locations on the same line become one logpoint with the last expression. Output appears in list_console_messages; an expression that throws produces an error message without text. Logpoints survive reloads and navigations until removed or the page is closed. The response lists the resulting logpoints and where they are bound.',
+    category: 'Debugging',
+    args: {
+      pageId: {
+        name: 'pageId',
+        type: 'number',
+        description: 'Targets a specific page by ID.',
+        required: true,
+        positional: true,
+      },
+      logpoints: {
+        name: 'logpoints',
+        type: 'array',
+        description:
+          'Logpoints formatted as <url>:<lineNumber>[:<columnNumber>] <expression>. The url is a script URL or the path of an original source file from a source map, exact or as a path suffix (e.g. "src/app.ts"). Line and column numbers are 1-based in the coordinates of the url; a line without executable code moves to the next possible location. The expression is evaluated like console.log() arguments in the scope of the location, where local variables are accessible by their original names, and runs before the line executes, so a variable declared on that line is not set yet. list_console_messages shows objects as [object Object]: read them with get_console_message, or log JSON.stringify(value) for plain data. Example: "src/cart.ts:42 \'cart total:\', cart.total, cart.items.length". Pass an empty array to remove all logpoints.',
+        required: true,
+        positional: true,
+      },
+    },
+  },
   take_heapsnapshot: {
     description:
       'Capture a heap snapshot of the target page. Use to analyze the memory distribution of JavaScript objects and debug memory leaks.',
