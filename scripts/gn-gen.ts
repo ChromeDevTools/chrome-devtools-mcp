@@ -5,14 +5,14 @@
  */
 
 import {execFileSync} from 'node:child_process';
-import {rmSync} from 'node:fs';
+import {writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
 import {linkDevToolsDeps} from './link-devtools-deps.ts';
 
 const projectRoot = process.cwd();
 
-function getGnBinaryPath(): string {
+export function getGnBinaryPath(): string {
   switch (process.platform) {
     case 'win32':
       return resolve(projectRoot, 'buildtools', 'win', 'gn.exe');
@@ -30,8 +30,8 @@ export function runGnGen(): void {
     stdio: 'inherit',
   });
 
-  // Remove the generated .gitignore so npm pack / publish includes out/Default/gen.
-  rmSync(resolve(projectRoot, 'out', 'Default', '.gitignore'), {force: true});
+  // Empty .gitignore so npm pack includes gen/ and GN regeneration keeps it.
+  writeFileSync(resolve(projectRoot, 'out', 'Default', '.gitignore'), '');
 }
 
 if (import.meta.main) {
