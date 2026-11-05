@@ -27,6 +27,7 @@ export const setLogpoints: PageToolFactory = definePageTool(() => ({
   annotations: {
     category: ToolCategory.DEBUGGING,
     readOnlyHint: false,
+    conditions: ['javascriptEvaluation'],
   },
   schema: {
     logpoints: zod

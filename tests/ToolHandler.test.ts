@@ -997,6 +997,48 @@ describe('ToolHandler', () => {
     assert.strictEqual(disabledHandler.disabled, true);
   });
 
+  it('disables set_logpoints when javascriptEvaluation is false', async () => {
+    const mockContext = createMockMcpContext();
+
+    const defaultConfig = parseConfig();
+    const defaultTool = createTools(defaultConfig.resolved).find(
+      t => t.name === 'set_logpoints',
+    );
+    if (!defaultTool) {
+      assert.fail('set_logpoints not found');
+    }
+    const defaultHandler = new ToolHandler(
+      defaultTool,
+      defaultConfig,
+      async () => mockContext,
+      sinon.spy(),
+    );
+    assert.strictEqual(defaultHandler.disabled, false);
+
+    const disabledConfig = parseConfig(['--no-javascript-evaluation']);
+    const disabledTool = createTools(disabledConfig.resolved).find(
+      t => t.name === 'set_logpoints',
+    );
+    if (!disabledTool) {
+      assert.fail('set_logpoints not found');
+    }
+    const disabledHandler = new ToolHandler(
+      disabledTool,
+      disabledConfig,
+      async () => mockContext,
+      sinon.spy(),
+    );
+    assert.strictEqual(disabledHandler.disabled, true);
+    const disabledResult = await disabledHandler.handle({logpoints: []});
+    assert.strictEqual(disabledResult.isError, true);
+    assert.match(
+      disabledResult.content[0].type === 'text'
+        ? disabledResult.content[0].text
+        : '',
+      /Tool set_logpoints requires flag --javascriptEvaluation and is currently disabled/,
+    );
+  });
+
   describe('slim mode', () => {
     function createHandler(toolName: string, argv: string[]) {
       const config = parseConfig(argv);
