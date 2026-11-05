@@ -18,6 +18,9 @@ import type {McpContext} from '../src/McpContext.js';
 import {McpPage} from '../src/McpPage.js';
 import {McpResponse, type DataFormat} from '../src/McpResponse.js';
 import {ClearcutLogger} from '../src/telemetry/ClearcutLogger.js';
+import {FilePersistence} from '../src/telemetry/persistence.js';
+import {McpClient, WatchdogMessageType} from '../src/telemetry/types.js';
+import {WatchdogClient} from '../src/telemetry/WatchdogClient.js';
 import {
   ProtocolError,
   ProtocolErrorCode,
@@ -25,6 +28,8 @@ import {
 } from '../src/third_party/index.js';
 import {TOOL_CALL_TIMEOUT_MS, ToolHandler} from '../src/ToolHandler.js';
 import {ToolCategory} from '../src/tools/categories.js';
+import {emulate} from '../src/tools/emulation.js';
+import {pressKey, typeText} from '../src/tools/input.js';
 import {
   defineBrowserlessTool,
   definePageTool,
@@ -802,6 +807,101 @@ describe('ToolHandler', () => {
 
       getLoggerStub.restore();
       ClearcutLogger.resetForTesting();
+    }
+  });
+
+  it('sanitizes raw validated args for tools with transformed schemas', async () => {
+    sinon.stub(Date, 'now').returns(1000);
+    sinon
+      .stub(McpResponse.prototype, 'handle')
+      .resolves({content: [], structuredContent: {}});
+    const config = parseConfig(['--no-page-id-routing']);
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({process: sinon.createStubInstance(ChildProcess)}),
+    );
+    mockContext.getSelectedMcpPage.returns(sinon.createStubInstance(McpPage));
+    mockContext.getDevToolsData.resolves({});
+
+    const mockPersistence = sinon.createStubInstance(FilePersistence, {
+      loadState: Promise.resolve({lastToolCall: new Date().toISOString()}),
+    });
+    const mockWatchdogClient = sinon.createStubInstance(WatchdogClient);
+    ClearcutLogger.initialize({
+      persistence: mockPersistence,
+      appVersion: '1.0.0',
+      watchdogClient: mockWatchdogClient,
+    });
+    await Promise.resolve();
+
+    const testCases: Array<{
+      tool: DefinedPageTool;
+      rawArgs: Record<string, unknown>;
+      expectedParams: Record<string, unknown>;
+    }> = [
+      {
+        tool: pressKey(config.resolved),
+        rawArgs: {key: 'Control+Shift+C'},
+        expectedParams: {
+          press_key_params: {
+            key_length: 20,
+          },
+        },
+      },
+      {
+        tool: typeText(config.resolved),
+        rawArgs: {text: 'hello', submitKey: ''},
+        expectedParams: {
+          type_text_params: {
+            text_length: 5,
+            submit_key_length: 0,
+          },
+        },
+      },
+      {
+        tool: emulate(config.resolved),
+        rawArgs: {
+          viewport: '400x400x1',
+          geolocation: '37.7749,-122.4194',
+          extraHttpHeaders: '{"X-Custom":"1"}',
+        },
+        expectedParams: {
+          emulate_params: {
+            viewport_length: 10,
+            geolocation_length: 20,
+            extra_http_headers_length: 20,
+          },
+        },
+      },
+    ];
+
+    for (const {tool, rawArgs, expectedParams} of testCases) {
+      mockWatchdogClient.send.resetHistory();
+      const toolHandler = new ToolHandler(
+        tool,
+        config,
+        async () => mockContext,
+        sinon.spy(),
+      );
+
+      const result = await toolHandler.handle(rawArgs);
+
+      assert.strictEqual(result.isError, undefined);
+      sinon.assert.calledOnceWithExactly(mockWatchdogClient.send, {
+        type: WatchdogMessageType.LOG_EVENT,
+        payload: {
+          mcp_client: McpClient.MCP_CLIENT_UNSPECIFIED,
+          tool_invocation: {
+            tool_name: tool.name,
+            success: true,
+            latency_ms: 50,
+            context: {
+              is_devtools_open: false,
+            },
+            tool_params: expectedParams,
+          },
+        },
+      });
     }
   });
 
