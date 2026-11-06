@@ -363,7 +363,7 @@ export class ToolHandler {
   ): ReturnType<McpResponse['handle']> {
     try {
       await validateToolFiles(tool, params, context, true);
-      await tool.handler({params, ...(signal && {signal})}, response, context);
+      await tool.handler({params, signal}, response, context);
     } catch (err) {
       response.setError(toError(err));
     }
@@ -415,7 +415,7 @@ export class ToolHandler {
           {
             params,
             page,
-            ...(signal && {signal}),
+            signal,
           },
           response,
           context,
@@ -424,7 +424,7 @@ export class ToolHandler {
         await tool.handler(
           {
             params,
-            ...(signal && {signal}),
+            signal,
           },
           response,
           context,
