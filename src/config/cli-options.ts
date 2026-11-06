@@ -1479,7 +1479,7 @@ export const commands: Commands = {
   },
   mock_network: {
     description:
-      "Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing body or upstream updates the exact route/resourceType pair. An omitted route configures '*'. Other mocks are preserved. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Upstream responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.",
+      "Inspect or update network mocks for a page. With no actions, list mocks matching the supplied filters, or all mocks when no filters are given. Providing abort (including false), allowOrigin, body, or upstream updates the exact route/resourceType pair; omitted actions keep existing settings. Remove and recreate a mock to clear its source or allowOrigin. An omitted route configures '*'. Other mocks are preserved. abort=true suppresses its response and allowOrigin header. The most recently updated matching mock wins and persists across navigations. Configure before navigating or reloading; inspection shows hit counts and replacement errors. Upstream and allowOrigin-only responses use server-side GET/HEAD fetches. Changes are rejected during a performance trace. Mocks disable the page HTTP cache and intercept every request, affecting measurements. Service workers can bypass mocks. Use remove_network_mock to remove mocks.",
     category: 'Network',
     args: {
       pageId: {
@@ -1524,6 +1524,22 @@ export const commands: Commands = {
           'fedcm',
           'other',
         ],
+      },
+      abort: {
+        name: 'abort',
+        type: 'boolean',
+        description:
+          'Abort matching requests when true; false disables abortion while preserving the replacement source. Abortion takes precedence over body, upstream, and allowOrigin.',
+        required: false,
+        positional: false,
+      },
+      allowOrigin: {
+        name: 'allowOrigin',
+        type: 'string',
+        description:
+          'Set the Access-Control-Allow-Origin response header, for example * or https://example.com. This does not configure preflight or credential headers.',
+        required: false,
+        positional: false,
       },
       body: {
         name: 'body',

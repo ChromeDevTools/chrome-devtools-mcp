@@ -1441,13 +1441,11 @@
       },
       {
         "name": "abort",
-        "argType": "boolean",
-        "isDeprecated": true
+        "argType": "boolean"
       },
       {
         "name": "allow_origin_length",
-        "argType": "number",
-        "isDeprecated": true
+        "argType": "number"
       },
       {
         "name": "body_length",

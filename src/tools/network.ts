@@ -183,6 +183,24 @@ const mockNetworkSchema = zod
   // eslint-disable-next-line @local/enforce-zod-schema -- Flat parameters.
   .object({
     ...mockFilterSchema,
+    abort: zod
+      .boolean()
+      .optional()
+      .describe(
+        'Abort matching requests when true; false disables abortion while preserving the replacement source. Abortion takes precedence over body, upstream, and allowOrigin.',
+      ),
+    allowOrigin: zod
+      .string()
+      .refine(
+        value => !/[\r\n]/.test(value),
+        'allowOrigin cannot contain line breaks.',
+      )
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        'Set the Access-Control-Allow-Origin response header, for example * or https://example.com. This does not configure preflight or credential headers.',
+      ),
     body: zod
       .string()
       .trim()
@@ -211,12 +229,15 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
   description:
     'Inspect or update network mocks for a page. With no actions, list mocks ' +
     'matching the supplied filters, or all mocks when no filters are given. ' +
-    'Providing body or upstream updates the exact route/resourceType pair. ' +
+    'Providing abort (including false), allowOrigin, body, or upstream updates ' +
+    'the exact route/resourceType pair; omitted actions keep existing settings. ' +
+    'Remove and recreate a mock to clear its source or allowOrigin. ' +
     "An omitted route configures '*'. Other mocks are preserved. " +
+    'abort=true suppresses its response and allowOrigin header. ' +
     'The most recently updated matching mock wins and persists across ' +
     'navigations. Configure before navigating or reloading; inspection shows ' +
-    'hit counts and replacement errors. Upstream responses use server-side ' +
-    'GET/HEAD fetches. Changes are rejected during ' +
+    'hit counts and replacement errors. Upstream and allowOrigin-only ' +
+    'responses use server-side GET/HEAD fetches. Changes are rejected during ' +
     'a performance trace. Mocks disable the page HTTP cache and intercept ' +
     'every request, affecting measurements. Service workers can bypass mocks. ' +
     'Use remove_network_mock to remove mocks.',
@@ -234,29 +255,38 @@ export const mockNetwork: PageToolFactory = definePageTool(() => ({
       urlPattern: params.route,
       resourceType: params.resourceType,
     };
-    let input: NetworkMockInput | undefined;
-    if (params.upstream !== undefined) {
-      input = {...filter, kind: 'redirect', redirectUrl: params.upstream};
-    } else if (params.body !== undefined) {
-      const responseFilePath = await context.validatePath(params.body);
-      input = {
-        ...filter,
-        kind: 'file',
-        responseFilePath,
-        loadResponseFile: async () => {
-          const validatedPath = await context.validatePath(responseFilePath);
-          return await fs.readFile(validatedPath);
-        },
-      };
-    }
     let overrides;
-    if (input) {
+    if (
+      params.abort === undefined &&
+      params.allowOrigin === undefined &&
+      params.body === undefined &&
+      params.upstream === undefined
+    ) {
+      overrides = request.page.listNetworkOverrides(filter);
+    } else {
+      let input: NetworkMockInput = {
+        ...filter,
+        abort: params.abort,
+        allowOrigin: params.allowOrigin,
+      };
+      if (params.upstream !== undefined) {
+        input = {...input, kind: 'redirect', redirectUrl: params.upstream};
+      } else if (params.body !== undefined) {
+        const responseFilePath = await context.validatePath(params.body);
+        input = {
+          ...input,
+          kind: 'file',
+          responseFilePath,
+          loadResponseFile: async () => {
+            const validatedPath = await context.validatePath(responseFilePath);
+            return await fs.readFile(validatedPath);
+          },
+        };
+      }
       overrides = [await request.page.mockNetwork(input)];
       response.appendResponseLine(
         'Network mock configured. Reload or navigate the page to apply it.',
       );
-    } else {
-      overrides = request.page.listNetworkOverrides(filter);
     }
 
     if (overrides.length === 0) {

@@ -301,12 +301,7 @@ describe('McpPage', () => {
       });
       page.setIsRunningPerformanceTrace(true);
       await assert.rejects(
-        page.mockNetwork({
-          urlPattern: '*.js',
-          kind: 'file',
-          responseFilePath: '/tmp/app.js',
-          loadResponseFile: async () => new Uint8Array(),
-        }),
+        page.mockNetwork({urlPattern: '*.js', abort: true}),
         /trace is running/,
       );
       await assert.rejects(page.removeNetworkMocks({}), /trace is running/);
@@ -366,16 +361,9 @@ describe('McpPage', () => {
       const script = await page.mockNetwork({
         urlPattern: '*app.js',
         resourceType: 'script',
-        kind: 'file',
-        responseFilePath: '/tmp/app.js',
-        loadResponseFile: async () => new Uint8Array(),
+        abort: true,
       });
-      await page.mockNetwork({
-        resourceType: 'image',
-        kind: 'file',
-        responseFilePath: '/tmp/app.js',
-        loadResponseFile: async () => new Uint8Array(),
-      });
+      await page.mockNetwork({resourceType: 'image', abort: true});
       assert.deepStrictEqual(
         page.listNetworkOverrides({resourceType: 'script'}),
         [script],

@@ -25,11 +25,18 @@ import {logger, redactUrlForLogging} from './utils/logger.js';
 interface BaseNetworkOverride {
   urlPattern: string;
   resourceType?: ResourceType;
+  abort?: boolean;
+  allowOrigin?: string;
 }
 
 export interface NetworkMockFilter {
   urlPattern?: string;
   resourceType?: ResourceType;
+}
+
+interface NetworkMockActions {
+  abort?: boolean;
+  allowOrigin?: string;
 }
 
 export interface RedirectNetworkOverrideInput extends NetworkMockFilter {
@@ -44,8 +51,12 @@ export interface FileNetworkOverrideInput extends NetworkMockFilter {
   loadResponseFile: () => Promise<Uint8Array<ArrayBufferLike>>;
 }
 
-export type NetworkMockInput =
-  RedirectNetworkOverrideInput | FileNetworkOverrideInput;
+export type NetworkMockInput = NetworkMockActions &
+  (
+    | RedirectNetworkOverrideInput
+    | FileNetworkOverrideInput
+    | (NetworkMockFilter & {kind?: undefined})
+  );
 
 interface NetworkOverrideBase extends BaseNetworkOverride {
   id: number;
@@ -68,7 +79,12 @@ export interface FileNetworkOverride extends NetworkOverrideBase {
   contentType: string;
 }
 
-export type NetworkOverride = RedirectNetworkOverride | FileNetworkOverride;
+export interface PassthroughNetworkOverride extends NetworkOverrideBase {
+  kind: 'passthrough';
+}
+
+export type NetworkOverride =
+  RedirectNetworkOverride | FileNetworkOverride | PassthroughNetworkOverride;
 
 interface StoredNetworkOverrideBase extends NetworkOverrideBase {
   matcher: RegExp;
@@ -87,7 +103,9 @@ interface StoredFileNetworkOverride extends StoredNetworkOverrideBase {
 }
 
 type StoredNetworkOverride =
-  StoredRedirectNetworkOverride | StoredFileNetworkOverride;
+  | StoredRedirectNetworkOverride
+  | StoredFileNetworkOverride
+  | (StoredNetworkOverrideBase & {kind: 'passthrough'});
 
 const DEFAULT_URL_PATTERN = '*';
 
@@ -162,6 +180,8 @@ function toNetworkOverride(override: StoredNetworkOverride): NetworkOverride {
     id: override.id,
     urlPattern: override.urlPattern,
     resourceType: override.resourceType,
+    abort: override.abort,
+    allowOrigin: override.allowOrigin,
     diagnostics: {...override.diagnostics},
   };
   if (override.kind === 'redirect') {
@@ -170,6 +190,9 @@ function toNetworkOverride(override: StoredNetworkOverride): NetworkOverride {
       kind: override.kind,
       redirectUrl: override.redirectUrl,
     };
+  }
+  if (override.kind === 'passthrough') {
+    return {...base, kind: override.kind};
   }
   return {
     ...base,
@@ -263,6 +286,8 @@ export class NetworkOverrideManager {
       id: existing?.id ?? this.#nextId,
       urlPattern,
       resourceType: input.resourceType,
+      abort: input.abort ?? existing?.abort ?? false,
+      allowOrigin: input.allowOrigin ?? existing?.allowOrigin,
       matcher: compileUrlPattern(urlPattern),
       diagnostics: {hits: 0, errors: 0, navigations: 0},
     };
@@ -274,16 +299,18 @@ export class NetworkOverrideManager {
         redirectUrl: input.redirectUrl,
       };
     }
-
-    await input.loadResponseFile();
-    return {
-      ...base,
-      kind: input.kind,
-      responseFilePath: input.responseFilePath,
-      contentType:
-        input.contentType ?? inferContentType(input.responseFilePath),
-      loadResponseFile: input.loadResponseFile,
-    };
+    if (input.kind === 'file') {
+      await input.loadResponseFile();
+      return {
+        ...base,
+        kind: input.kind,
+        responseFilePath: input.responseFilePath,
+        contentType:
+          input.contentType ?? inferContentType(input.responseFilePath),
+        loadResponseFile: input.loadResponseFile,
+      };
+    }
+    return existing ? {...existing, ...base} : {...base, kind: 'passthrough'};
   }
 
   list(filter: NetworkMockFilter = {}): NetworkOverride[] {
@@ -471,8 +498,28 @@ export class NetworkOverrideManager {
 
     override.diagnostics.hits++;
     try {
+      if (override.abort) {
+        await request.abort('failed');
+        return;
+      }
       if (override.kind === 'redirect') {
-        await this.#fulfillUpstream(request, override.redirectUrl);
+        await this.#fulfillUpstream(
+          request,
+          override.redirectUrl,
+          override.allowOrigin,
+        );
+        return;
+      }
+      if (override.kind === 'passthrough') {
+        if (override.allowOrigin !== undefined) {
+          await this.#fulfillUpstream(
+            request,
+            request.url(),
+            override.allowOrigin,
+          );
+        } else {
+          await this.#continueRequest(request);
+        }
         return;
       }
 
@@ -482,6 +529,9 @@ export class NetworkOverrideManager {
         contentType: override.contentType,
         headers: {
           'Cache-Control': 'no-store',
+          ...(override.allowOrigin !== undefined
+            ? {'Access-Control-Allow-Origin': override.allowOrigin}
+            : {}),
         },
         body,
       });
@@ -496,7 +546,11 @@ export class NetworkOverrideManager {
       const source =
         override.kind === 'file'
           ? override.responseFilePath
-          : redactUrlForLogging(override.redirectUrl);
+          : redactUrlForLogging(
+              override.kind === 'redirect'
+                ? override.redirectUrl
+                : request.url(),
+            );
       override.diagnostics.errors++;
       override.diagnostics.lastError = (
         'Failed to load ' +
@@ -512,10 +566,13 @@ export class NetworkOverrideManager {
   async #fulfillUpstream(
     request: HTTPRequest,
     redirectUrl: string,
+    allowOrigin?: string,
   ): Promise<void> {
     const method = request.method();
     if (method !== 'GET' && method !== 'HEAD') {
-      throw new Error('Upstream mocks only support GET and HEAD requests.');
+      throw new Error(
+        'Upstream and allow-origin mocks only support GET and HEAD requests.',
+      );
     }
     const headers = getRedirectHeaders(
       new URL(request.url()),
@@ -532,6 +589,9 @@ export class NetworkOverrideManager {
       if (name !== 'content-encoding' && name !== 'content-length') {
         responseHeaders[name] = value;
       }
+    }
+    if (allowOrigin !== undefined) {
+      responseHeaders['access-control-allow-origin'] = allowOrigin;
     }
     await request.respond({
       status: response.status,
