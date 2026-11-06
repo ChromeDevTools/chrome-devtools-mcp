@@ -356,14 +356,13 @@ describe('NetworkOverrideManager', () => {
       loadResponseFile: async () => new Uint8Array(),
     });
     const updated = await manager.mock({
-      kind: 'file',
       urlPattern: '*://*:*/*new.js',
-      responseFilePath: '/tmp/updated.js',
-      loadResponseFile: async () => new Uint8Array(),
+      abort: true,
     });
     assert.deepEqual(manager.list(), [unrelated, updated]);
     assert.equal(updated.id, previous.id);
     assert.equal(updated.kind, 'file');
+    assert.equal(updated.abort, true);
     sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
     await manager.dispose();
   });
@@ -416,6 +415,8 @@ describe('NetworkOverrideManager', () => {
         kind: 'file',
         urlPattern: '*://*:*/*app.js',
         resourceType: undefined,
+        abort: false,
+        allowOrigin: undefined,
         responseFilePath: '/tmp/app.js',
         contentType: 'application/javascript; charset=utf-8',
       },
@@ -532,9 +533,7 @@ describe('NetworkOverrideManager', () => {
     );
     const previous = await manager.mock({
       urlPattern: '*://*:*/*app.js',
-      kind: 'file',
-      responseFilePath: '/tmp/app.js',
-      loadResponseFile: async () => new Uint8Array(),
+      abort: true,
     });
     pptrPage.setCacheEnabled
       .withArgs(true)
@@ -554,12 +553,7 @@ describe('NetworkOverrideManager', () => {
     const request = createMockHTTPRequest();
     pptrPage.emit('request', request);
     await settle();
-    sinon.assert.calledOnceWithExactly(request.respond, {
-      status: 200,
-      contentType: 'application/javascript; charset=utf-8',
-      headers: {'Cache-Control': 'no-store'},
-      body: new Uint8Array(),
-    });
+    sinon.assert.calledOnceWithExactly(request.abort, 'failed');
     sinon.assert.notCalled(request.continue);
     await manager.dispose();
   });
@@ -570,23 +564,9 @@ describe('NetworkOverrideManager', () => {
       pptrPage,
       createMockServerConfig(),
     );
-    const scripts = await manager.mock({
-      resourceType: 'script',
-      kind: 'file',
-      responseFilePath: '/tmp/app.js',
-      loadResponseFile: async () => new Uint8Array(),
-    });
-    const all = await manager.mock({
-      kind: 'file',
-      responseFilePath: '/tmp/app.js',
-      loadResponseFile: async () => new Uint8Array(),
-    });
-    const updated = await manager.mock({
-      resourceType: 'script',
-      kind: 'file',
-      responseFilePath: '/tmp/updated.js',
-      loadResponseFile: async () => new Uint8Array(),
-    });
+    const scripts = await manager.mock({resourceType: 'script', abort: true});
+    const all = await manager.mock({abort: true});
+    const updated = await manager.mock({resourceType: 'script', abort: false});
     assert.equal(scripts.urlPattern, '*://*:*/*');
     assert.equal(updated.id, scripts.id);
     assert.deepEqual(manager.list(), [all, updated]);
@@ -595,18 +575,142 @@ describe('NetworkOverrideManager', () => {
     });
     pptrPage.emit('request', request);
     await settle();
-    sinon.assert.calledOnceWithExactly(request.respond, {
-      status: 200,
-      contentType: 'application/javascript; charset=utf-8',
-      headers: {'Cache-Control': 'no-store'},
-      body: new Uint8Array(),
-    });
+    sinon.assert.calledOnceWithExactly(request.continue);
     sinon.assert.notCalled(request.abort);
     assert.equal(
       manager.list({resourceType: 'script'})[0]?.diagnostics.hits,
       1,
     );
     assert.equal(manager.list()[0]?.diagnostics.hits, 0);
+    await manager.dispose();
+  });
+
+  it('aborts matching requests without recording a replacement error and restores the source with abort false', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    const loadResponseFile = sinon
+      .stub()
+      .resolves(new TextEncoder().encode('replacement'));
+    await manager.mock({
+      kind: 'file',
+      urlPattern: '*://*:*/*app.js',
+      responseFilePath: '/tmp/app.js',
+      loadResponseFile,
+    });
+    await manager.mock({urlPattern: '*://*:*/*app.js', abort: true});
+    const blocked = createMockHTTPRequest();
+    pptrPage.emit('request', blocked);
+    await settle();
+    sinon.assert.calledOnceWithExactly(blocked.abort, 'failed');
+    sinon.assert.notCalled(blocked.respond);
+    sinon.assert.calledOnceWithExactly(loadResponseFile);
+    assert.deepEqual(manager.list()[0]?.diagnostics, {
+      hits: 1,
+      errors: 0,
+      navigations: 0,
+    });
+    assert.match(
+      new NetworkOverridesFormatter(manager.list()).toString(),
+      /Requests are aborted/,
+    );
+    await manager.mock({urlPattern: '*://*:*/*app.js', abort: false});
+    const restored = createMockHTTPRequest();
+    pptrPage.emit('request', restored);
+    await settle();
+    sinon.assert.calledOnceWithExactly(restored.respond, {
+      status: 200,
+      contentType: 'application/javascript; charset=utf-8',
+      headers: {'Cache-Control': 'no-store'},
+      body: new TextEncoder().encode('replacement'),
+    });
+    sinon.assert.notCalled(restored.abort);
+    await manager.dispose();
+  });
+
+  it('sets allow-origin for a local body and retains it when the body is updated', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({
+      urlPattern: '*://*:*/*app.js',
+      allowOrigin: 'https://consumer.example',
+    });
+    const loadResponseFile = sinon
+      .stub()
+      .resolves(new TextEncoder().encode('replacement'));
+    await manager.mock({
+      kind: 'file',
+      urlPattern: '*://*:*/*app.js',
+      responseFilePath: '/tmp/app.js',
+      loadResponseFile,
+    });
+    const request = createMockHTTPRequest();
+    pptrPage.emit('request', request);
+    await settle();
+    sinon.assert.calledOnceWithExactly(request.respond, {
+      status: 200,
+      contentType: 'application/javascript; charset=utf-8',
+      headers: {
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': 'https://consumer.example',
+      },
+      body: new TextEncoder().encode('replacement'),
+    });
+    assert.match(
+      new NetworkOverridesFormatter(manager.list()).toString(),
+      /Access-Control-Allow-Origin: https:\/\/consumer.example/,
+    );
+    await manager.dispose();
+  });
+
+  it('preserves credentials and Set-Cookie without forwarding Accept-Encoding for an allow-origin-only mock', async () => {
+    const pptrPage = createMockPuppeteerPage();
+    const manager = new NetworkOverrideManager(
+      pptrPage,
+      createMockServerConfig(),
+    );
+    await manager.mock({urlPattern: '*://*:*/*app.js', allowOrigin: '*'});
+    const fetch = sinon.stub(globalThis, 'fetch').resolves(
+      new Response('original', {
+        headers: [
+          ['access-control-allow-origin', 'https://old.example'],
+          ['set-cookie', 'session=updated; Path=/'],
+          ['set-cookie', 'theme=dark; Path=/'],
+        ],
+      }),
+    );
+    const request = createMockHTTPRequest();
+    request.headers.returns({
+      'accept-encoding': 'gzip, deflate, br, zstd',
+      authorization: 'secret',
+      cookie: 'session=secret',
+    });
+    pptrPage.emit('request', request);
+    await settle();
+    sinon.assert.calledOnceWithExactly(
+      fetch,
+      new URL('https://example.com/app.js'),
+      {
+        redirect: 'manual',
+        method: 'GET',
+        headers: {authorization: 'secret', cookie: 'session=secret'},
+      },
+    );
+    sinon.assert.calledOnceWithExactly(request.respond, {
+      status: 200,
+      headers: {
+        'content-type': 'text/plain;charset=UTF-8',
+        'access-control-allow-origin': '*',
+        'set-cookie': ['session=updated; Path=/', 'theme=dark; Path=/'],
+      },
+      body: new TextEncoder().encode('original'),
+    });
+    sinon.assert.notCalled(request.continue);
     await manager.dispose();
   });
 
@@ -722,7 +826,7 @@ describe('NetworkOverrideManager', () => {
     await manager.dispose();
   });
 
-  it('fulfills decoded upstream bodies without stale compression headers', async () => {
+  it('fulfills decoded upstream bodies without stale compression headers and applies allow-origin', async () => {
     const pptrPage = createMockPuppeteerPage();
     const manager = new NetworkOverrideManager(
       pptrPage,
@@ -732,6 +836,7 @@ describe('NetworkOverrideManager', () => {
       kind: 'upstream',
       urlPattern: '*://*:*/*app.js',
       upstreamUrl: 'https://example.com/replacement.js',
+      allowOrigin: '*',
     });
     sinon.stub(globalThis, 'fetch').resolves(
       new Response('decoded', {
@@ -749,6 +854,7 @@ describe('NetworkOverrideManager', () => {
       status: 200,
       headers: {
         'content-type': 'text/javascript',
+        'access-control-allow-origin': '*',
       },
       body: new TextEncoder().encode('decoded'),
     });
@@ -756,28 +862,37 @@ describe('NetworkOverrideManager', () => {
     await manager.dispose();
   });
 
-  it('rejects unsupported upstream methods before fetching', async () => {
-    const pptrPage = createMockPuppeteerPage();
-    const manager = new NetworkOverrideManager(
-      pptrPage,
-      createMockServerConfig(),
+  for (const source of ['upstream', 'allow-origin']) {
+    it(
+      'rejects unsupported methods for ' + source + ' before fetching',
+      async () => {
+        const pptrPage = createMockPuppeteerPage();
+        const manager = new NetworkOverrideManager(
+          pptrPage,
+          createMockServerConfig(),
+        );
+        await manager.mock(
+          source === 'upstream'
+            ? {
+                kind: 'upstream',
+                urlPattern: '*://*:*/*app.js',
+                upstreamUrl: 'https://example.com/replacement.js',
+              }
+            : {urlPattern: '*://*:*/*app.js', allowOrigin: '*'},
+        );
+        const fetch = sinon.stub(globalThis, 'fetch');
+        const request = createMockHTTPRequest();
+        request.method.returns('POST');
+        pptrPage.emit('request', request);
+        await settle();
+        sinon.assert.notCalled(fetch);
+        sinon.assert.calledOnceWithExactly(request.abort, 'failed');
+        assert.match(
+          manager.list()[0]?.diagnostics.lastError ?? '',
+          /only support GET and HEAD/,
+        );
+        await manager.dispose();
+      },
     );
-    await manager.mock({
-      kind: 'upstream',
-      urlPattern: '*://*:*/*app.js',
-      upstreamUrl: 'https://example.com/replacement.js',
-    });
-    const fetch = sinon.stub(globalThis, 'fetch');
-    const request = createMockHTTPRequest();
-    request.method.returns('POST');
-    pptrPage.emit('request', request);
-    await settle();
-    sinon.assert.notCalled(fetch);
-    sinon.assert.calledOnceWithExactly(request.abort, 'failed');
-    assert.match(
-      manager.list()[0]?.diagnostics.lastError ?? '',
-      /only support GET and HEAD/,
-    );
-    await manager.dispose();
-  });
+  }
 });
