@@ -165,6 +165,22 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reports a same-document navigation by the attached action', async () => {
+    const response = new McpResponse(createMockServerConfig());
+    response.attachWaitForResult({
+      navigatedToUrl: 'https://example.com/#top',
+      sameDocument: true,
+    });
+
+    const result = await response.handle(createMockMcpContext());
+
+    assert.ok(
+      getTextContent(result.content[0]).includes(
+        'Page navigated to https://example.com/#top within the same document.',
+      ),
+    );
+  });
+
   it('list pages', async t => {
     await withMcpContext(async (response, context) => {
       response.setIncludePages(true);

@@ -159,7 +159,7 @@ describe('WaitForHelper', () => {
     });
   });
 
-  it('awaits navigation when preceded by same-document navigation', async () => {
+  it('awaits a new document when preceded by same-document navigation', async () => {
     await withMcpContext(async (response, context) => {
       server.addHtmlRoute('/nav-start', html`<main>start</main>`);
       server.addHtmlRoute('/nav-target-2', html`<main>navigated 2</main>`);
@@ -179,10 +179,53 @@ describe('WaitForHelper', () => {
       );
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
+      assert.strictEqual(result.sameDocument, false);
     });
   });
 
-  it('captures navigatedToUrl for same-document navigation alone', async () => {
+  it('captures a reload that keeps the URL', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-reload', html`<main>reload</main>`);
+      const url = server.getRoute('/nav-reload');
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(url);
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(() => {
+            setTimeout(() => location.reload(), 0);
+          });
+        },
+        {waitForStableDom: false, expectNavigationIn: 1000},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, url);
+      assert.strictEqual(result.sameDocument, false);
+    });
+  });
+
+  it('treats a history navigation back to another document as a new document', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-back-start', html`<main>start</main>`);
+      server.addHtmlRoute('/nav-back-next', html`<main>next</main>`);
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(server.getRoute('/nav-back-start'));
+      await mcpPage.pptrPage.goto(server.getRoute('/nav-back-next'));
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(() => {
+            setTimeout(() => history.back(), 0);
+          });
+        },
+        {waitForStableDom: false, expectNavigationIn: 1000},
+      );
+
+      assert.strictEqual(result.sameDocument, false);
+    });
+  });
+
+  it('captures navigatedToUrl and sameDocument for same-document navigation alone', async () => {
     await withMcpContext(async (response, context) => {
       server.addHtmlRoute('/nav-start-push', html`<main>start push</main>`);
       server.addHtmlRoute('/same-doc-target', html`<main>target</main>`);
@@ -201,6 +244,26 @@ describe('WaitForHelper', () => {
       );
 
       assert.strictEqual(result.navigatedToUrl, targetUrl);
+      assert.strictEqual(result.sameDocument, true);
+    });
+  });
+
+  it('does not capture navigatedToUrl for same-document navigation to the same URL', async () => {
+    await withMcpContext(async (response, context) => {
+      server.addHtmlRoute('/nav-replace', html`<main>replace</main>`);
+      const mcpPage = context.getSelectedMcpPage();
+      await mcpPage.pptrPage.goto(server.getRoute('/nav-replace'));
+
+      const result = await mcpPage.waitForEventsAfterAction(
+        async () => {
+          await mcpPage.pptrPage.evaluate(() => {
+            history.replaceState({}, '', location.href);
+          });
+        },
+        {waitForStableDom: false},
+      );
+
+      assert.strictEqual(result.navigatedToUrl, undefined);
     });
   });
 
