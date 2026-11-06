@@ -47,6 +47,7 @@ import type {
 } from '../src/processors/HeapSnapshotManager.js';
 import {
   Accessibility,
+  BrowserContext,
   CdpBrowser,
   CdpExtension,
   CdpFrame,
@@ -66,9 +67,10 @@ import {
   WebMCP,
   WebMCPTool,
   type Browser,
-  type BrowserContext,
   type ConsoleMessageLocation,
   type ConsoleMessageType,
+  type Cookie,
+  type CookieData,
   type Extension,
   type JSHandle,
   type Page,
@@ -240,6 +242,48 @@ export function createMockPuppeteerBrowser(): sinon.SinonStubbedInstance<Browser
   return browser;
 }
 
+export class MockBrowserContext extends BrowserContext {
+  override targets(): Target[] {
+    return [];
+  }
+  override pages(): Promise<Page[]> {
+    return Promise.resolve([]);
+  }
+  override overridePermissions(): Promise<void> {
+    return Promise.resolve();
+  }
+  override setPermission(): Promise<void> {
+    return Promise.resolve();
+  }
+  override clearPermissionOverrides(): Promise<void> {
+    return Promise.resolve();
+  }
+  override newPage(): Promise<Page> {
+    throw new Error('Not implemented');
+  }
+  override browser(): Browser {
+    throw new Error('Not implemented');
+  }
+  override close(): Promise<void> {
+    return Promise.resolve();
+  }
+  override cookies(): Promise<Cookie[]> {
+    return Promise.resolve([]);
+  }
+  override setCookie(..._cookies: CookieData[]): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+export function createMockBrowserContext(): sinon.SinonStubbedInstance<MockBrowserContext> {
+  const browserContext = sinon.createStubInstance(MockBrowserContext);
+  browserContext.setCookie.resolves();
+  browserContext.cookies.resolves([]);
+  browserContext.pages.resolves([]);
+  browserContext.targets.returns([]);
+  return browserContext;
+}
+
 export class MockCDPSession extends CDPSession {
   override connection(): Connection | undefined {
     return undefined;
@@ -370,6 +414,9 @@ export function createMockPuppeteerPage(): MockPuppeteerPage {
   page.emulateFocusedPage.resolves();
   page.evaluateHandle.resolves(createMockElementHandle().handle);
 
+  const browserContext = createMockBrowserContext();
+  page.browserContext.returns(browserContext);
+
   return Object.assign(page, {
     webmcp,
     tracing,
@@ -461,6 +508,7 @@ export function createMockMcpPage(
   const pptrPage = options.pptrPage ?? createMockPuppeteerPage();
   const target = options.target ?? createMockPuppeteerTarget({page: pptrPage});
   page.init.resolves();
+  page.authenticate.resolves();
   page.close.callsFake(async () => {
     await pptrPage.close({runBeforeUnload: false});
   });

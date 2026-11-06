@@ -42,6 +42,24 @@ describe('slim', () => {
     sinon.assert.notCalled(response.appendResponseLine);
   });
 
+  it('authenticates before navigating', async () => {
+    const {page, context, response, args} = createHandlerMocks();
+    await navigate(args).handler(
+      {params: {url: 'https://example.com/app'}, page},
+      response,
+      context,
+    );
+    sinon.assert.calledOnceWithExactly(
+      page.authenticate,
+      'https://example.com/app',
+    );
+    sinon.assert.calledOnceWithExactly(
+      page.pptrPage.goto,
+      'https://example.com/app',
+      {timeout: 30000},
+    );
+  });
+
   it('navigates to correct page', async t => {
     await withMcpContext(async (response, context, args) => {
       await navigate(args).handler(
