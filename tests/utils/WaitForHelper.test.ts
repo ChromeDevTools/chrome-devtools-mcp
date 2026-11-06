@@ -9,7 +9,10 @@ import {describe, it} from 'node:test';
 
 import sinon from 'sinon';
 
-import {WaitForHelper} from '../../src/utils/WaitForHelper.js';
+import {
+  WaitForHelper,
+  waitForNavigationWithDialog,
+} from '../../src/utils/WaitForHelper.js';
 import {
   createMockDialog,
   createMockPuppeteerPage,
@@ -17,6 +20,52 @@ import {
 } from '../mocks.js';
 import {serverHooks} from '../server.js';
 import {html, withMcpContext} from '../utils.js';
+
+describe('waitForNavigationWithDialog', () => {
+  for (const outcome of ['success', 'error', 'dialog']) {
+    it(`removes the abort listener after ${outcome}`, async () => {
+      const controller = new AbortController();
+      const navigation = Promise.withResolvers<null>();
+      const addListener = sinon.spy(controller.signal, 'addEventListener');
+      const removeListener = sinon.spy(
+        controller.signal,
+        'removeEventListener',
+      );
+      const pending = waitForNavigationWithDialog(
+        navigation.promise,
+        controller.signal,
+      );
+      const error = new Error('Navigation timeout');
+      if (outcome === 'error') {
+        navigation.reject(error);
+        await assert.rejects(pending, error);
+      } else if (outcome === 'dialog') {
+        controller.abort(new Error('Action interrupted by a dialog'));
+        assert.strictEqual(await pending, false);
+        navigation.reject(error);
+      } else {
+        navigation.resolve(null);
+        assert.strictEqual(await pending, true);
+      }
+      const listener = addListener.firstCall.args[1];
+      sinon.assert.calledOnceWithExactly(addListener, 'abort', listener, {
+        once: true,
+      });
+      sinon.assert.calledOnceWithExactly(removeListener, 'abort', listener);
+    });
+  }
+
+  it('observes navigation rejection even when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const navigation = Promise.withResolvers<null>();
+    assert.strictEqual(
+      await waitForNavigationWithDialog(navigation.promise, controller.signal),
+      false,
+    );
+    navigation.reject(new Error('Late navigation failure'));
+  });
+});
 
 describe('WaitForHelper', () => {
   const server = serverHooks();
