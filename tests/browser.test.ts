@@ -12,7 +12,11 @@ import {describe, it} from 'node:test';
 import {executablePath} from 'puppeteer';
 import sinon from 'sinon';
 
-import {BrowserManager} from '../src/BrowserManager.js';
+import {
+  BrowserManager,
+  connectWithRetry,
+  isTransientConnectError,
+} from '../src/BrowserManager.js';
 import {puppeteer, type Browser} from '../src/third_party/index.js';
 
 import {
@@ -185,6 +189,137 @@ describe('browser', () => {
         handleSIGINT: false,
         handleSIGTERM: false,
         handleSIGHUP: false,
+      });
+    });
+
+    describe('connectWithRetry', () => {
+      const transient = () =>
+        Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:9222'), {
+          code: 'ECONNREFUSED',
+        });
+
+      it('retries a transient failure and then succeeds', async () => {
+        const pptrBrowser = createMockPuppeteerBrowser();
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .onFirstCall()
+          .rejects(transient())
+          .onSecondCall()
+          .resolves(pptrBrowser);
+
+        const browser = await connectWithRetry(
+          {browserURL: 'http://127.0.0.1:9222'},
+          {baseDelayMs: 1},
+        );
+
+        assert.strictEqual(browser, pptrBrowser);
+        sinon.assert.calledTwice(connectStub);
+      });
+
+      it('surfaces the last error after exhausting attempts', async () => {
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .rejects(transient());
+
+        await assert.rejects(
+          connectWithRetry(
+            {browserURL: 'http://127.0.0.1:9222'},
+            {attempts: 3, baseDelayMs: 1},
+          ),
+          /ECONNREFUSED/,
+        );
+        sinon.assert.calledThrice(connectStub);
+      });
+
+      it('does not retry permanent errors such as invalid URLs', async () => {
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .rejects(new TypeError('Invalid URL'));
+
+        await assert.rejects(
+          connectWithRetry({browserURL: 'not a url'}, {baseDelayMs: 1}),
+          /Invalid URL/,
+        );
+        sinon.assert.calledOnce(connectStub);
+      });
+
+      it('does not retry when the auto-connect consent is denied', async () => {
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .rejects(new Error('Unexpected server response: 403'));
+
+        await assert.rejects(
+          connectWithRetry({channel: 'chrome'}, {baseDelayMs: 1}),
+          /403/,
+        );
+        sinon.assert.calledOnce(connectStub);
+      });
+
+      it('treats attempts < 1 as a single attempt', async () => {
+        const connectStub = sinon
+          .stub(puppeteer, 'connect')
+          .rejects(transient());
+
+        await assert.rejects(
+          connectWithRetry(
+            {browserURL: 'http://127.0.0.1:9222'},
+            {attempts: 0, baseDelayMs: 1},
+          ),
+          /ECONNREFUSED/,
+        );
+        sinon.assert.calledOnce(connectStub);
+      });
+
+      it('classifies nested and aggregate causes', () => {
+        const deep = new Error('outer', {
+          cause: new Error('middle', {cause: transient()}),
+        });
+        assert.ok(isTransientConnectError(deep));
+        assert.ok(
+          isTransientConnectError(
+            new Error('fetch failed', {
+              cause: new AggregateError([transient(), transient()], 'agg'),
+            }),
+          ),
+        );
+        assert.ok(
+          !isTransientConnectError(
+            new AggregateError(
+              [transient(), new Error('Unexpected server response: 403')],
+              'mixed',
+            ),
+          ),
+        );
+        assert.ok(
+          !isTransientConnectError(
+            new Error('wrapper', {
+              cause: new Error('Unexpected server response: 403'),
+            }),
+          ),
+        );
+        const cyclic: Error & {cause?: unknown} = new Error('cyclic');
+        cyclic.cause = cyclic;
+        assert.ok(!isTransientConnectError(cyclic));
+        assert.ok(!isTransientConnectError('ECONNREFUSED'));
+        assert.ok(!isTransientConnectError(new Error('NOT_ECONNREFUSEDX')));
+        assert.ok(isTransientConnectError(new Error('socket hang up')));
+      });
+
+      it('classifies errors', () => {
+        assert.ok(isTransientConnectError(transient()));
+        assert.ok(
+          isTransientConnectError(
+            new Error('Failed to fetch browser webSocket URL', {
+              cause: transient(),
+            }),
+          ),
+        );
+        assert.ok(!isTransientConnectError(new Error('Invalid port')));
+        assert.ok(
+          !isTransientConnectError(
+            new Error('Unexpected server response: 403'),
+          ),
+        );
       });
     });
 
