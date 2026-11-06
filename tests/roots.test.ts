@@ -198,6 +198,20 @@ describe('McpContext path validation escaping', () => {
     assert.strictEqual(resolved, canonicalPath);
   });
 
+  it('accepts a POSIX root URL without a drive letter', async () => {
+    // A WSL2 client sends `file:///home/...` roots to a Windows-side server.
+    using root = createTempDir('posix_root_for_test-', process.cwd());
+    const context = await createContext();
+    const posixUri = pathToFileURL(root.path).href.replace(
+      /^file:\/\/\/[a-z]:/i,
+      'file://',
+    );
+    context.setRoots([{uri: posixUri, name: 'posix'}]);
+    const filePath = path.join(root.path, 'shot.png');
+    const resolved = await context.validatePath(filePath);
+    assert.strictEqual(resolved, await resolveCanonicalPath(filePath));
+  });
+
   it('escapes the file path when it cannot be resolved', async () => {
     const context = await createContext();
     const filePath = path.join(os.tmpdir(), 'file.txt', INJECTED);
