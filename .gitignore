@@ -151,3 +151,9 @@ log.txt
 .DS_Store
 
 mcp-heap-profiles/
+
+# gclient and depot_tools
+third_party/.cipd/
+third_party/.gclient*
+third_party/.gcs_entries
+third_party/depot_tools/
