@@ -4,37 +4,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {McpResponse, type DataFormat} from './McpResponse.js';
 import {SlimMcpResponse} from './SlimMcpResponse.js';
 import {ClearcutLogger} from './telemetry/ClearcutLogger.js';
-import type {Browser, CallToolResult} from './third_party/index.js';
-import {ProtocolError, ProtocolErrorCode, zod} from './third_party/index.js';
+import {
+  ProtocolError,
+  ProtocolErrorCode,
+  zod,
+  type Browser,
+  type CallToolResult,
+} from './third_party/index.js';
 import {labels} from './tools/categories.js';
 import {categoryToFlagName} from './config/category-options.js';
-import type {
-  AnyToolDefinition,
-  BrowserlessToolDefinition,
-  DefinedPageTool,
-  DevToolsData,
-  FileVerificationOption,
-  ToolDefinition,
-} from './tools/ToolDefinition.js';
 import {
   isAvailableInMode,
   isBrowserlessTool,
   isPageScopedTool,
   isSlimTool,
+  type AnyToolDefinition,
+  type BrowserlessToolDefinition,
+  type DefinedPageTool,
+  type DevToolsData,
+  type FileVerificationOption,
+  type ToolDefinition,
 } from './tools/ToolDefinition.js';
-import {getErrorMessage} from './utils/errorHandling.js';
+import {getErrorMessage, toError} from './utils/errorHandling.js';
 import {logger} from './utils/logger.js';
 import type {TaskQueue} from './utils/TaskRunner.js';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
-import {isLocalhost} from './utils/url.js';
+import {isLocalBrowserEndpoint} from './utils/url.js';
 
 /**
  * Upper bound on how long a tool call may wait to acquire the browser
@@ -133,7 +136,7 @@ function isLocalBrowser(browser: Browser): boolean {
     return true;
   }
   const wsEndpoint = browser.wsEndpoint();
-  if (wsEndpoint && isLocalhost(wsEndpoint)) {
+  if (wsEndpoint && isLocalBrowserEndpoint(wsEndpoint)) {
     return true;
   }
   return false;
@@ -361,7 +364,7 @@ export class ToolHandler {
       await validateToolFiles(tool, params, context, true);
       await tool.handler({params}, response, context);
     } catch (err) {
-      response.setError(err);
+      response.setError(toError(err));
     }
     return await response.handle(
       context,
@@ -424,7 +427,7 @@ export class ToolHandler {
         );
       }
     } catch (err) {
-      response.setError(err);
+      response.setError(toError(err));
     }
     onTelemetryData(
       await context.getDevToolsData(page),
@@ -528,7 +531,10 @@ export class ToolHandler {
       return result;
     } catch (err) {
       logger?.(`${tool.name} error:`, err, err?.stack);
-      let errorText = err && 'message' in err ? err.message : String(err);
+      let errorText =
+        err && typeof err === 'object' && 'message' in err
+          ? err.message
+          : String(err);
       let cause: unknown =
         err && typeof err === 'object' && 'cause' in err
           ? err.cause

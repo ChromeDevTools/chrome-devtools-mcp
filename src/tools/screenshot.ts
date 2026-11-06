@@ -4,19 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {ParsedArguments} from '../config/ConfigParser.js';
-import {zod} from '../third_party/index.js';
-import type {
-  BoundingBox,
-  ElementHandle,
-  Page,
-  ScreenshotClip,
+import type {ParsedArguments} from '../config/mcp-options.js';
+import {
+  zod,
+  type BoundingBox,
+  type ElementHandle,
+  type Page,
+  type ScreenshotClip,
 } from '../third_party/index.js';
 
 import {ToolCategory} from './categories.js';
 import {definePageTool, type PageToolFactory} from './ToolDefinition.js';
 
 type ScreenshotFormat = 'png' | 'jpeg' | 'webp';
+
+const MAX_CHROMIUM_SCREENSHOT_DIMENSION = 16384;
 
 type SourceBox = BoundingBox & {
   devicePixelRatio: number;
@@ -225,18 +227,26 @@ export const screenshot: PageToolFactory = definePageTool(
         // The smaller scale factor wins so both bounds are respected while
         // preserving aspect ratio.
         let clip: ScreenshotClip | undefined;
-        if (
+        const shouldInspectBox =
+          fullPage ||
+          element !== undefined ||
           screenshotMaxWidth !== undefined ||
-          screenshotMaxHeight !== undefined
+          screenshotMaxHeight !== undefined;
+
+        const box = shouldInspectBox
+          ? await getSourceBox(page, element, fullPage)
+          : undefined;
+
+        if (
+          box &&
+          (screenshotMaxWidth !== undefined ||
+            screenshotMaxHeight !== undefined)
         ) {
-          const box = await getSourceBox(page, element, fullPage);
-          if (box) {
-            clip = computeDownscaleClip(
-              box,
-              screenshotMaxWidth,
-              screenshotMaxHeight,
-            );
-          }
+          clip = computeDownscaleClip(
+            box,
+            screenshotMaxWidth,
+            screenshotMaxHeight,
+          );
         }
 
         if (clip) {
@@ -305,6 +315,22 @@ export const screenshot: PageToolFactory = definePageTool(
             mimeType: `image/${format}`,
             data: Buffer.from(screenshot).toString('base64'),
           });
+        }
+
+        if (box) {
+          const effectiveScale = clip?.scale ?? 1;
+          const effectiveWidth =
+            box.width * box.devicePixelRatio * effectiveScale;
+          const effectiveHeight =
+            box.height * box.devicePixelRatio * effectiveScale;
+          if (
+            effectiveWidth > MAX_CHROMIUM_SCREENSHOT_DIMENSION ||
+            effectiveHeight > MAX_CHROMIUM_SCREENSHOT_DIMENSION
+          ) {
+            response.appendResponseLine(
+              `Warning: Screenshot dimensions exceed the maximum capturable dimension of ${MAX_CHROMIUM_SCREENSHOT_DIMENSION}px. Content beyond 16384px may repeat or be corrupted due to browser texture limits. Set --screenshotMaxHeight or --screenshotMaxWidth to downscale.`,
+            );
+          }
         }
       },
     };

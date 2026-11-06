@@ -30,7 +30,7 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (9 tools)
+- **[Debugging](#debugging)** (10 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
@@ -38,6 +38,7 @@
   - [`list_console_messages`](#list_console_messages)
   - [`screencast_start`](#screencast_start)
   - [`screencast_stop`](#screencast_stop)
+  - [`set_logpoints`](#set_logpoints)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
 - **[Memory](#memory)** (14 tools)
@@ -72,6 +73,8 @@
   - [`install_pwa`](#install_pwa)
   - [`launch_pwa`](#launch_pwa)
   - [`uninstall_pwa`](#uninstall_pwa)
+- **[WebAuthn](#webauthn)** (1 tools)
+  - [`configure_webauthn`](#configure_webauthn)
 
 ## Input automation
 
@@ -268,7 +271,7 @@
 **Parameters:**
 
 - **pageId** (number) **(required)**: Targets a specific page by ID.
-- **text** (array) **(required)**: Non-empty list of texts. Resolves when any value appears on the page.
+- **text** (array) **(required)**: Non-empty list of texts. Resolves when any value matches an accessible name exactly or is a substring of DOM text. Matching is case-sensitive. DOM text preserves spaces and newlines, unlike snapshot text which may normalize whitespace. Use the original whitespace or a shorter distinctive substring.
 - **timeout** (integer) _(optional)_: Maximum wait time in milliseconds. If set to 0, the default timeout will be used.
 - **visible** (boolean) _(optional)_: If true, wait until the matching text is visible. By default, hidden text also counts.
 
@@ -298,7 +301,7 @@
 
 ### `resize_page`
 
-**Description:** Resizes the page's window so that the page has specified dimension. If the browser clamps the window size, the actual page dimensions are reported.
+**Description:** Resizes the page's window so that the page has specified dimension
 
 **Parameters:**
 
@@ -472,6 +475,17 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 **Parameters:**
 
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+
+---
+
+### `set_logpoints`
+
+**Description:** Set the complete set of logpoints of the selected page: logpoints not in the list are removed, new ones are added, and an empty list removes all. A logpoint logs expressions to the console every time a line executes, without pausing or changing the source, like logpoints in the DevTools Sources panel. Locations are script URLs or original source files resolved through source maps (not available with --no-source-maps; scripts in workers and out-of-process iframes are not supported). A location in a generated script moves to its original source line when a source map covers it, and locations on the same line become one logpoint with the last expression. Output appears in [`list_console_messages`](#list_console_messages); an expression that throws produces an error message without text. Logpoints survive reloads and navigations until removed or the page is closed. The response lists the resulting logpoints and where they are bound.
+
+**Parameters:**
+
+- **logpoints** (array) **(required)**: Logpoints formatted as &lt;url&gt;:&lt;lineNumber&gt;[:&lt;columnNumber&gt;] &lt;expression&gt;. The url is a script URL or the path of an original source file from a source map, exact or as a path suffix (e.g. "src/app.ts"). Line and column numbers are 1-based in the coordinates of the url; a line without executable code moves to the next possible location. The expression is evaluated like console.log() arguments in the scope of the location, where local variables are accessible by their original names, and runs before the line executes, so a variable declared on that line is not set yet. [`list_console_messages`](#list_console_messages) shows objects as [object Object]: read them with [`get_console_message`](#get_console_message), or log JSON.stringify(value) for plain data. Example: "src/cart.ts:42 'cart total:', cart.total, cart.items.length". Pass an empty array to remove all logpoints.
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 
 ---
@@ -857,5 +871,25 @@ third-party developer tools with additional functionality. (requires flag: --cat
 **Parameters:**
 
 - **manifestId** (string) **(required)**: The manifest ID of the web app: the resolved `id` member of its manifest. If `id` is omitted, it defaults to the resolved `start_url` (e.g. "https://example.com/"). See https://w3c.github.io/manifest/#id-member.
+
+---
+
+## WebAuthn
+
+> NOTE: The WebAuthn category is not active by default. Use the '--categoryWebauthn' flag.
+
+### `configure_webauthn`
+
+**Description:** Adds a virtual WebAuthn authenticator to the page. Call this before the page calls navigator.credentials. It answers navigator.credentials.create() and get() and is removed when the page closes. Omitted parameters keep their current values. Changing protocol, transport, hasResidentKey or hasUserVerification replaces the authenticator and deletes its credentials. enabled=false ignores other parameters and removes all authenticators on the page. (requires flag: --categoryWebauthn=true)
+
+**Parameters:**
+
+- **enabled** (boolean) **(required)**: Set to false to remove all virtual authenticators from the page.
+- **pageId** (number) **(required)**: Targets a specific page by ID.
+- **hasResidentKey** (boolean) _(optional)_: Whether the authenticator can store discoverable credentials (passkeys). Default: true. u2f does not support it, so it is false for u2f.
+- **hasUserVerification** (boolean) _(optional)_: Whether the authenticator supports user verification (PIN or biometrics). Default: true. u2f does not support it, so it is false for u2f.
+- **isUserVerified** (boolean) _(optional)_: Whether user verification succeeds. Set to false to test a failed verification. Default: true.
+- **protocol** (enum: "ctap2", "u2f") _(optional)_: The authenticator protocol. Default: ctap2.
+- **transport** (enum: "internal", "usb", "nfc", "ble", "hybrid") _(optional)_: "internal" is a platform authenticator such as Touch ID or Windows Hello; the others are roaming security keys. Default: internal.
 
 ---

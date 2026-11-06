@@ -12,7 +12,7 @@ export interface CapturedFunctionCall {
 }
 
 export class Result {
-  private nextCallIndex = 0;
+  #nextCallIndex = 0;
   readonly calls: CapturedFunctionCall[];
   readonly serverArgs: string[];
   /** The model's final response text. */
@@ -29,7 +29,7 @@ export class Result {
   }
 
   get remainingCalls(): CapturedFunctionCall[] {
-    return this.calls.slice(this.nextCallIndex);
+    return this.calls.slice(this.#nextCallIndex);
   }
 
   /**
@@ -40,20 +40,20 @@ export class Result {
    * - Returns the active pageId.
    */
   consumePageNavigation(): number | undefined {
-    if (this.calls[this.nextCallIndex]?.name === 'list_pages') {
-      this.nextCallIndex++;
+    if (this.calls[this.#nextCallIndex]?.name === 'list_pages') {
+      this.#nextCallIndex++;
     }
 
-    const navCall = this.calls[this.nextCallIndex];
+    const navCall = this.calls[this.#nextCallIndex];
     assert.ok(
       navCall &&
         (navCall.name === 'new_page' || navCall.name === 'navigate_page'),
       `Expected navigation call (new_page or navigate_page), but got: ${navCall?.name || 'none'}`,
     );
-    this.nextCallIndex++;
+    this.#nextCallIndex++;
 
-    if (this.calls[this.nextCallIndex]?.name === 'list_pages') {
-      this.nextCallIndex++;
+    if (this.calls[this.#nextCallIndex]?.name === 'list_pages') {
+      this.#nextCallIndex++;
     }
 
     const isNewPage = navCall.name === 'new_page';
@@ -73,15 +73,15 @@ export class Result {
     name: string,
     expectedArgs?: Record<string, unknown>,
   ): CapturedFunctionCall {
-    const call = this.calls[this.nextCallIndex];
+    const call = this.calls[this.#nextCallIndex];
     assert.ok(
       call,
-      `Expected call at index ${this.nextCallIndex} (name: '${name}') to exist`,
+      `Expected call at index ${this.#nextCallIndex} (name: '${name}') to exist`,
     );
     assert.strictEqual(
       call.name,
       name,
-      `Expected call at index ${this.nextCallIndex} to be '${name}', but got '${call.name}'`,
+      `Expected call at index ${this.#nextCallIndex} to be '${name}', but got '${call.name}'`,
     );
 
     if (expectedArgs) {
@@ -96,7 +96,7 @@ export class Result {
       }
     }
 
-    this.nextCallIndex++;
+    this.#nextCallIndex++;
     return call;
   }
 

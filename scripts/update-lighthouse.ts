@@ -21,6 +21,9 @@ function main() {
   console.log('Running yarn in lighthouse directory...');
   execSync('yarn', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
 
+  console.log('Building lighthouse report...');
+  execSync('yarn build-report', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
+
   console.log('Building lighthouse-devtools-mcp bundle...');
   execSync('yarn build-devtools-mcp', {cwd: LIGHTHOUSE_DIR, stdio: 'inherit'});
 

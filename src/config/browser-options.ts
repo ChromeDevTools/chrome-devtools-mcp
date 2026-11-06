@@ -4,9 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {YargsOptions} from '../third_party/index.js';
+import type {McpOptionsFor} from './category-options.js';
 
-export const browserOptions = {
+export interface BrowserArguments {
+  autoConnect: boolean;
+  browserUrl?: string;
+  wsEndpoint?: string;
+  wsHeaders?: Record<string, string>;
+  headless: boolean;
+  executablePath?: string;
+  isolated: boolean;
+  userDataDir?: string;
+  channel?: 'canary' | 'dev' | 'beta' | 'stable';
+  proxyServer?: string;
+  chromeArg?: string[];
+  ignoreDefaultChromeArg?: string[];
+}
+
+export type BrowserOptions = McpOptionsFor<BrowserArguments>;
+
+export const browserOptions: BrowserOptions = {
   autoConnect: {
     type: 'boolean',
     description:
@@ -112,8 +129,8 @@ export const browserOptions = {
     type: 'string',
     description:
       'Specify a different Chrome channel that should be used. The default is the stable channel version.',
-    choices: ['canary', 'dev', 'beta', 'stable'] as const,
-    default: 'stable' as const,
+    choices: ['canary', 'dev', 'beta', 'stable'],
+    default: 'stable',
   },
   proxyServer: {
     type: 'string',
@@ -131,8 +148,8 @@ export const browserOptions = {
     describe:
       'Explicitly disable default arguments for Chrome. Only applies when Chrome is launched by chrome-devtools-mcp.',
   },
-} satisfies Record<string, YargsOptions>;
+};
 
-export function getBrowserOptions(): typeof browserOptions {
+export function getBrowserOptions(): BrowserOptions {
   return browserOptions;
 }

@@ -6,22 +6,24 @@
 
 import zlib from 'node:zlib';
 
+import type {ParsedArguments} from '../config/mcp-options.js';
 import {zod, DevTools} from '../third_party/index.js';
-import type {InsightName, TraceResult} from '../processors/PerformanceTrace.js';
 import {
   parseRawTraceBuffer,
   traceResultIsSuccess,
+  type InsightName,
+  type TraceResult,
 } from '../processors/PerformanceTrace.js';
 import {logger} from '../utils/logger.js';
 
 import {ToolCategory} from './categories.js';
-import type {
-  Context,
-  Response,
-  ContextPage,
-  PageToolFactory,
+import {
+  definePageTool,
+  type Context,
+  type Response,
+  type ContextPage,
+  type PageToolFactory,
 } from './ToolDefinition.js';
-import {definePageTool} from './ToolDefinition.js';
 
 const filePathSchema = zod
   .string()
@@ -147,38 +149,55 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
   },
 }));
 
-export const stopTrace: PageToolFactory = definePageTool(() => ({
-  name: 'performance_stop_trace',
-  description:
-    'Stop the active performance trace recording on the target webpage.',
-  annotations: {
-    category: ToolCategory.PERFORMANCE,
-    readOnlyHint: false,
-  },
-  schema: {
-    filePath: filePathSchema,
-  },
-  blockedByDialog: true,
-  concurrency: 'exclusive',
-  verifyFilesSchema: {
-    filePath: true,
-  },
-  handler: async (request, response, context) => {
-    if (!context.isRunningPerformanceTrace()) {
-      response.appendResponseLine(
-        'Error: no active performance trace recording to stop.',
+export const stopTrace: PageToolFactory = definePageTool(
+  (args: ParsedArguments) => ({
+    name: 'performance_stop_trace',
+    description:
+      'Stop the active performance trace recording on the target webpage.',
+    annotations: {
+      category: ToolCategory.PERFORMANCE,
+      readOnlyHint: false,
+    },
+    schema: {
+      filePath: filePathSchema,
+    },
+    blockedByDialog: true,
+    concurrency: 'exclusive',
+    verifyFilesSchema: {
+      filePath: true,
+    },
+    handler: async (request, response, context) => {
+      if (!context.isRunningPerformanceTrace()) {
+        response.appendResponseLine(
+          'Error: no active performance trace recording to stop.',
+        );
+        return;
+      }
+      const page = request.page;
+      if (!page.isRunningPerformanceTrace()) {
+        const tracedPage = context
+          .getPages()
+          .find(p => p.isRunningPerformanceTrace());
+        const pageHint = tracedPage ? ` on page ${tracedPage.id}` : '';
+        const actionHint = tracedPage
+          ? args.pageIdRouting
+            ? `Pass pageId: ${tracedPage.id} to performance_stop_trace to stop it.`
+            : `Select page ${tracedPage.id} with select_page first, then call performance_stop_trace.`
+          : 'Select the page that started the trace and try again.';
+        response.appendResponseLine(
+          `Error: the active performance trace is running${pageHint}, not on page ${page.id}. ${actionHint}`,
+        );
+        return;
+      }
+      await stopTracingAndAppendOutput(
+        page,
+        response,
+        context,
+        request.params.filePath,
       );
-      return;
-    }
-    const page = request.page;
-    await stopTracingAndAppendOutput(
-      page,
-      response,
-      context,
-      request.params.filePath,
-    );
-  },
-}));
+    },
+  }),
+);
 
 export const analyzeInsight: PageToolFactory = definePageTool(() => ({
   name: 'performance_analyze_insight',

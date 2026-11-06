@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import ts from 'typescript';
 
 const BUILD_DIR = path.join(process.cwd(), 'build');
 
@@ -18,7 +19,7 @@ function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const devtoolsTs = path.join(
     process.cwd(),
     'src',
@@ -151,32 +152,38 @@ export const ExperimentName = {
   `;
   writeFile(runtimeFile, runtimeContent);
 
-  // Copy missing CodeMirror .mjs files that tsc ignores due to .d.mts renames
-  const codemirrorDir = path.join(
-    BUILD_DIR,
-    devtoolsThirdPartyPath,
-    'codemirror',
-  );
-  const codemirrorSrcDir = path.join(
-    process.cwd(),
-    'third_party',
-    'devtools-frontend',
-    'front_end',
-    'third_party',
-    'codemirror',
-  );
-  const filesToCopy = [
-    'package/addon/runmode/runmode-standalone.mjs',
-    'package/mode/css/css.mjs',
-    'package/mode/javascript/javascript.mjs',
-    'package/mode/xml/xml.mjs',
+  // Temporary fix: without allowJs in tsconfig.json, tsc ignores pre-built
+  // DevTools third_party .mjs/.js files, and transpileModule formats minified
+  // single-line files so rollup-plugin-cleanup (skip-regex) does not hang on
+  // catastrophic regex backtracking during bundling.
+  const devtoolsJsFiles = [
+    'acorn/package/dist/acorn.mjs',
+    'codemirror/package/addon/runmode/runmode-standalone.mjs',
+    'codemirror/package/mode/css/css.mjs',
+    'codemirror/package/mode/javascript/javascript.mjs',
+    'codemirror/package/mode/xml/xml.mjs',
+    'diff/diff_match_patch.js',
+    'intl-messageformat/package/intl-messageformat.esm.js',
+    'legacy-javascript/lib/legacy-javascript.js',
+    'marked/package/lib/marked.esm.js',
+    'third-party-web/lib/nostats-subset.js',
   ];
-  for (const file of filesToCopy) {
-    const src = path.join(codemirrorSrcDir, file);
-    const dest = path.join(codemirrorDir, file);
-    fs.mkdirSync(path.dirname(dest), {recursive: true});
-    fs.copyFileSync(src, dest);
-  }
+  await Promise.all(
+    devtoolsJsFiles.map(async file => {
+      const relPath = path.join(devtoolsThirdPartyPath, file);
+      const src = path.join(process.cwd(), relPath);
+      const dest = path.join(BUILD_DIR, relPath);
+      const source = await fs.promises.readFile(src, 'utf-8');
+      const {outputText} = ts.transpileModule(source, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2023,
+          module: ts.ModuleKind.ESNext,
+        },
+      });
+      await fs.promises.mkdir(path.dirname(dest), {recursive: true});
+      await fs.promises.writeFile(dest, outputText, 'utf-8');
+    }),
+  );
 
   // Copy lighthouse bundle that tsc ignores due to lighthouse-devtools-mcp-bundle.d.ts
   const lighthouseBundle = 'src/third_party/lighthouse-devtools-mcp-bundle.js';
@@ -203,4 +210,4 @@ function copyDevToolsDescriptionFiles(): void {
   fs.cpSync(sourceDir, destDir, {recursive: true});
 }
 
-main();
+await main();

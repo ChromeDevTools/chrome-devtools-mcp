@@ -59,7 +59,7 @@ describe('memory', () => {
           context,
         );
         const canonicalFilePath = await resolveCanonicalPath(filePath);
-        assert.equal(
+        assert.strictEqual(
           response.responseLines.at(0),
           `Heap snapshot saved to ${canonicalFilePath}`,
         );

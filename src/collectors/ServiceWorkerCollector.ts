@@ -14,8 +14,11 @@ import type {
   Browser,
 } from '../third_party/index.js';
 import type {McpWorker} from '../McpWorker.js';
-import type {WithSymbolId} from '../utils/id.js';
-import {createIdGenerator, stableIdSymbol} from '../utils/id.js';
+import {
+  createIdGenerator,
+  stableIdSymbol,
+  type WithSymbolId,
+} from '../utils/id.js';
 
 const CHROME_EXTENSION_PREFIX = 'chrome-extension://';
 

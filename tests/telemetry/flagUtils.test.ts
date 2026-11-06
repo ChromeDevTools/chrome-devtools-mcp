@@ -38,32 +38,32 @@ describe('computeFlagUsage', () => {
   it('logs boolean flags directly with snake_case keys', () => {
     const args = {boolFlag: true};
     const usage = computeFlagUsage(args, mockOptions);
-    assert.equal(usage.bool_flag, true);
+    assert.strictEqual(usage.bool_flag, true);
   });
 
   it('logs boolean flags as false when false', () => {
     const args = {boolFlag: false};
     const usage = computeFlagUsage(args, mockOptions);
-    assert.equal(usage.bool_flag, false);
+    assert.strictEqual(usage.bool_flag, false);
   });
 
   it('logs enum flags as uppercase strings prefixed by snake case flag name', () => {
     const args = {enumFlag: 'a'};
     const usage = computeFlagUsage(args, mockOptions);
-    assert.equal(usage.enum_flag, 'ENUM_FLAG_A');
+    assert.strictEqual(usage.enum_flag, 'ENUM_FLAG_A');
   });
 
   it('logs other flags as present with snake_case keys', () => {
     const args = {stringFlag: 'value'};
     const usage = computeFlagUsage(args, mockOptions);
-    assert.equal(usage.string_flag, undefined);
-    assert.equal(usage.string_flag_present, true);
+    assert.strictEqual(usage.string_flag, undefined);
+    assert.strictEqual(usage.string_flag_present, true);
   });
 
   it('handles undefined/null values', () => {
     const args = {stringFlag: undefined};
     const usage = computeFlagUsage(args, mockOptions);
-    assert.equal(usage.string_flag_present, false);
+    assert.strictEqual(usage.string_flag_present, false);
   });
 
   describe('defaults behavior', () => {
@@ -72,8 +72,8 @@ describe('computeFlagUsage', () => {
       // default is false, user provides true.
       const args = {flagWithDefault: true};
       const usage = computeFlagUsage(args, mockOptions);
-      assert.equal(usage.flag_with_default, true);
-      assert.equal(usage.flag_with_default_present, true);
+      assert.strictEqual(usage.flag_with_default, true);
+      assert.strictEqual(usage.flag_with_default_present, true);
     });
 
     it('does not log presence when default exists and user provides no value', () => {
@@ -81,30 +81,30 @@ describe('computeFlagUsage', () => {
       // Argument parsing would populate with default.
       const args = {flagWithDefault: false};
       const usage = computeFlagUsage(args, mockOptions);
-      assert.equal(usage.flag_with_default, false);
-      assert.equal(usage.flag_with_default_present, undefined);
+      assert.strictEqual(usage.flag_with_default, false);
+      assert.strictEqual(usage.flag_with_default_present, undefined);
     });
 
     it('does not log presence when default exists and user explicitly provides the default value', () => {
       // Case 2b: User explicitly provides 'false', which matches default.
       const args = {flagWithDefault: false};
       const usage = computeFlagUsage(args, mockOptions);
-      assert.equal(usage.flag_with_default, false);
-      assert.equal(usage.flag_with_default_present, undefined);
+      assert.strictEqual(usage.flag_with_default, false);
+      assert.strictEqual(usage.flag_with_default_present, undefined);
     });
 
     it('logs presence when no default exists and user provides value', () => {
       // Case 3: No default, user provides value.
       const args = {stringFlag: 'value'};
       const usage = computeFlagUsage(args, mockOptions);
-      assert.equal(usage.string_flag_present, true);
+      assert.strictEqual(usage.string_flag_present, true);
     });
 
     it('logs non-presence when no default exists and user provides no value', () => {
       // Case 4: No default, user provides nothing.
       const args = {};
       const usage = computeFlagUsage(args, mockOptions);
-      assert.equal(usage.string_flag_present, false);
+      assert.strictEqual(usage.string_flag_present, false);
     });
 
     it('sanitizes flag names containing underscores before numbers', () => {
@@ -116,7 +116,7 @@ describe('computeFlagUsage', () => {
       } as unknown as typeof mcpOptions;
       const args = {experimental3pTool: true};
       const usage = computeFlagUsage(args, mock3pOptions);
-      assert.equal(usage.experimental3p_tool, true);
+      assert.strictEqual(usage.experimental3p_tool, true);
     });
   });
 });

@@ -21,7 +21,7 @@ import type {
   HeapQueryOptions,
 } from './processors/HeapSnapshotManager.js';
 import {McpPage} from './McpPage.js';
-import {type UncaughtError} from './collectors/PageCollector.js';
+import type {UncaughtError} from './collectors/PageCollector.js';
 import {ServiceWorkerConsoleCollector} from './collectors/ServiceWorkerCollector.js';
 import {
   Locator,
@@ -42,7 +42,7 @@ import {
   type Root,
   type DevTools,
 } from './third_party/index.js';
-import type {ParsedArguments} from './config/ConfigParser.js';
+import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
 import {ToolCategory} from './tools/categories.js';
 import {
@@ -251,16 +251,16 @@ export class McpContext implements Context, BrowserlessContext {
    */
   async syncNetworkRestrictions(): Promise<void> {
     const {blockedUrlPattern, allowedUrlPattern} = this.#config.resolved;
+    if (blockedUrlPattern || allowedUrlPattern) {
+      for (const mcpPage of this.#allMcpPages()) {
+        await mcpPage.clearNetworkConditions();
+      }
+    }
     if (this.#browser) {
       await this.#browser.restrictNetwork({
         blocklist: blockedUrlPattern,
         allowlist: allowedUrlPattern,
       });
-    }
-    if (blockedUrlPattern || allowedUrlPattern) {
-      for (const mcpPage of this.#allMcpPages()) {
-        mcpPage.clearNetworkConditions();
-      }
     }
   }
 
@@ -537,9 +537,14 @@ export class McpContext implements Context, BrowserlessContext {
 
       if (result.status === 'fulfilled') {
         const canonicalRoot = result.value;
+        // A filesystem root such as `/` or `C:\` already ends with the
+        // separator; appending another one would match no path below it.
+        const rootPrefix = canonicalRoot.endsWith(path.sep)
+          ? canonicalRoot
+          : canonicalRoot + path.sep;
         if (
           canonicalPath === canonicalRoot ||
-          canonicalPath.startsWith(canonicalRoot + path.sep)
+          canonicalPath.startsWith(rootPrefix)
         ) {
           allowed = true;
           break;

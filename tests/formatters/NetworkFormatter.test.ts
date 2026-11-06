@@ -25,7 +25,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [pending]',
       );
@@ -38,7 +38,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 POST http://example.com [pending]',
       );
@@ -52,7 +52,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [200]',
       );
@@ -68,7 +68,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [199]',
       );
@@ -84,7 +84,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [300]',
       );
@@ -103,7 +103,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [Error in Network]',
       );
@@ -118,7 +118,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         'reqid=1 GET http://example.com [pending] [selected in the DevTools Network panel]',
       );
@@ -133,12 +133,12 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         `reqid=1 GET ${longUrl.substring(0, 255)}... <truncated> [pending]`,
       );
       // The structured data keeps the full URL.
-      assert.equal(formatter.toJSON().url, longUrl);
+      assert.strictEqual(formatter.toJSON().url, longUrl);
     });
 
     it('does not split a surrogate pair when truncating a url', async () => {
@@ -152,7 +152,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         `reqid=1 GET ${prefix}... <truncated> [pending]`,
       );
@@ -167,7 +167,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(
+      assert.strictEqual(
         formatter.toString(),
         `reqid=1 GET ${dataUrl.substring(0, 255)}... <truncated> [pending]`,
       );
@@ -183,7 +183,7 @@ describe('NetworkFormatter', () => {
         redactNetworkHeaders: false,
       });
 
-      assert.equal(formatter.toString(), `reqid=1 GET ${url} [pending]`);
+      assert.strictEqual(formatter.toString(), `reqid=1 GET ${url} [pending]`);
     });
   });
 
@@ -286,6 +286,38 @@ describe('NetworkFormatter', () => {
       assert.strictEqual(json.responseBodyFilePath, resPath);
       assert.strictEqual(json.requestBody, undefined);
       assert.strictEqual(json.responseBody, undefined);
+    });
+
+    it('should save binary request bodies byte for byte', async () => {
+      const bytes = new Uint8Array([0, 159, 146, 150, 255, 10, 13]);
+      const request = {
+        method: () => 'POST',
+        url: () => 'http://example.com',
+        headers: () => ({}),
+        hasPostData: () => true,
+        postData: () => new TextDecoder().decode(bytes),
+        content: async () => bytes,
+        response: () => null,
+        failure: () => null,
+        redirectChain: () => [],
+        fetchPostData: async () => undefined,
+      } as unknown as HTTPRequest;
+
+      using tmpDir = createTempDir('network-formatter-test-');
+      const reqPath = join(tmpDir.path, 'binary_req');
+      let saved: Uint8Array | undefined;
+      await NetworkFormatter.from(request, {
+        fetchData: true,
+        requestFilePath: reqPath,
+        saveFile: async (data, filename) => {
+          saved = data;
+          return {filename};
+        },
+        redactNetworkHeaders: false,
+      });
+
+      assert.ok(saved);
+      assert.deepStrictEqual([...saved], [...bytes]);
     });
 
     it('should not truncate large bodies when saving to file', async () => {

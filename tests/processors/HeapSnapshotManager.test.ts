@@ -92,8 +92,8 @@ describe('HeapSnapshotManager', () => {
       );
       assert.ok(firstNewObjectDiff);
       assert.ok(secondNewObjectDiff);
-      assert.equal(firstNewObjectDiff.addedCount, 7);
-      assert.equal(secondNewObjectDiff.addedCount, 5);
+      assert.strictEqual(firstNewObjectDiff.addedCount, 7);
+      assert.strictEqual(secondNewObjectDiff.addedCount, 5);
     });
 
     it('throws when getDetailedClassDiff is called with an invalid classIndex', async () => {

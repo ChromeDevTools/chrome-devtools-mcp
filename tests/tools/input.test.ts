@@ -11,6 +11,7 @@ import sinon from 'sinon';
 
 import {McpResponse} from '../../src/McpResponse.js';
 import {TextSnapshot} from '../../src/TextSnapshot.js';
+import {TimeoutError} from '../../src/third_party/index.js';
 import {
   click,
   hover,
@@ -1174,6 +1175,40 @@ describe('input', () => {
       });
     });
 
+    it('reports failure when the locator rejects a fill', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new TimeoutError('Timed out'));
+
+      await assert.rejects(
+        fill(args).handler(
+          {
+            params: {uid: '1_1', value: 'changed', includeSnapshot: true},
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to interact with the element with uid 1_1. ' +
+            'The element did not become interactive within the configured timeout.',
+        },
+      );
+
+      sinon.assert.calledOnceWithExactly(locator.setTimeout, 5070);
+      sinon.assert.calledOnceWithMatch(
+        locator.fill,
+        'changed',
+        sinon.match({signal: sinon.match.instanceOf(AbortSignal)}),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
     it('does not fail when filling opens a dialog', async () => {
       const {page, context, response, args} = createHandlerMocks();
       const {handle, locator} = createMockElementHandle();
@@ -1296,6 +1331,47 @@ describe('input', () => {
   });
 
   describe('fill form', () => {
+    it('stops when the locator rejects a form value', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const {handle, locator} = createMockElementHandle();
+      page.getElementByUid.resolves(handle);
+      page.pptrPage.getDefaultTimeout.returns(5000);
+      locator.fill.rejects(new TimeoutError('Timed out'));
+
+      await assert.rejects(
+        fillForm(args).handler(
+          {
+            params: {
+              elements: [
+                {uid: '1_1', value: 'abc'},
+                {uid: '1_2', value: 'next'},
+              ],
+              includeSnapshot: true,
+            },
+            page,
+          },
+          response,
+          context,
+        ),
+        {
+          message:
+            'Failed to interact with the element with uid 1_1. ' +
+            'The element did not become interactive within the configured timeout.',
+        },
+      );
+
+      sinon.assert.calledOnceWithExactly(page.getElementByUid, '1_1');
+      sinon.assert.calledOnceWithExactly(locator.setTimeout, 5030);
+      sinon.assert.calledOnceWithMatch(
+        locator.fill,
+        'abc',
+        sinon.match({signal: sinon.match.instanceOf(AbortSignal)}),
+      );
+      sinon.assert.notCalled(response.appendResponseLine);
+      sinon.assert.notCalled(response.attachWaitForResult);
+      sinon.assert.notCalled(response.includeSnapshot);
+    });
+
     it('successfully fills out the form', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;
@@ -1780,7 +1856,7 @@ describe('input', () => {
 
         // Simulate the main key press failing mid-sequence (e.g. a CDP
         // hiccup) after the modifiers have already been pressed down.
-        sinon
+        const pressStub = sinon
           .stub(page.keyboard, 'press')
           .throws(new Error('injected press failure'));
 
@@ -1798,7 +1874,7 @@ describe('input', () => {
             ),
           );
         } finally {
-          sinon.restore();
+          pressStub.restore();
         }
 
         // The modifiers were pressed down; both must be released even though

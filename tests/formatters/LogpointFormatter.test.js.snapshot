@@ -1,0 +1,58 @@
+exports[`LogpointFormatter > formats an empty logpoint list toJSON 1`] = `
+[]
+`;
+
+exports[`LogpointFormatter > formats an empty logpoint list toString 1`] = `
+No logpoints are set on the page.
+`;
+
+exports[`LogpointFormatter > formats bound, source-mapped and unbound logpoints toJSON 1`] = `
+[
+  {
+    "url": "http://example.com/app.js",
+    "lineNumber": 4,
+    "expression": "'greeting for', name",
+    "sourceMapped": false,
+    "generatedLocations": [
+      {
+        "url": "http://example.com/app.js",
+        "lineNumber": 4,
+        "columnNumber": 3
+      }
+    ]
+  },
+  {
+    "url": "webpack:///src/cart.ts",
+    "lineNumber": 42,
+    "columnNumber": 7,
+    "expression": "'cart total:', cart.total, cart.items.length",
+    "sourceMapped": true,
+    "generatedLocations": [
+      {
+        "url": "http://example.com/bundle.js",
+        "lineNumber": 17,
+        "columnNumber": 25
+      },
+      {
+        "url": "http://example.com/bundle.js",
+        "lineNumber": 90,
+        "columnNumber": 1
+      }
+    ]
+  },
+  {
+    "url": "http://example.com/late.js",
+    "lineNumber": 1,
+    "expression": "'not parsed yet'",
+    "sourceMapped": false,
+    "generatedLocations": []
+  }
+]
+`;
+
+exports[`LogpointFormatter > formats bound, source-mapped and unbound logpoints toString 1`] = `
+3 logpoint(s) set on the page:
+- http://example.com/app.js:4 logging \`'greeting for', name\` [bound]
+- webpack:///src/cart.ts:42:7 logging \`'cart total:', cart.total, cart.items.length\` [bound via source map at http://example.com/bundle.js:17:25, http://example.com/bundle.js:90:1]
+- http://example.com/late.js:1 logging \`'not parsed yet'\` [not bound (no parsed script contains the location)]
+`;

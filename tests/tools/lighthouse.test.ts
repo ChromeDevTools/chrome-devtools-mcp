@@ -46,8 +46,8 @@ describe('lighthouse', () => {
             maxTouchPoints: navigator.maxTouchPoints,
           }));
         const emulated = await readViewport();
-        assert.equal(emulated.width, 390);
-        assert.equal(emulated.deviceScaleFactor, 3);
+        assert.strictEqual(emulated.width, 390);
+        assert.strictEqual(emulated.deviceScaleFactor, 3);
         assert.ok(emulated.maxTouchPoints > 0);
 
         await lighthouseAudit(args).handler(
@@ -70,10 +70,13 @@ describe('lighthouse', () => {
         assert.ok(data);
 
         assert.ok(data.summary);
-        assert.equal(data.summary.mode, 'navigation');
-        assert.equal(data.summary.device, 'desktop');
+        assert.strictEqual(data.summary.mode, 'navigation');
+        assert.strictEqual(data.summary.device, 'desktop');
         assert.ok(data.reports.length === 2); // json, html
-        assert.equal(data.failedAudits.length, data.summary.audits.failed);
+        assert.strictEqual(
+          data.failedAudits.length,
+          data.summary.audits.failed,
+        );
 
         // Verify files exist
         for (const reportPath of data.reports) {
@@ -230,7 +233,7 @@ describe('lighthouse', () => {
       );
 
       const [flags] = page.lighthouseNavigation.firstCall.args;
-      assert.equal(flags?.formFactor, 'desktop');
+      assert.strictEqual(flags?.formFactor, 'desktop');
       assert.match(String(flags?.emulatedUserAgent), /Macintosh/);
       assert.doesNotMatch(String(flags?.emulatedUserAgent), /Mobile/);
     });
@@ -253,7 +256,7 @@ describe('lighthouse', () => {
       );
 
       const [flags] = page.lighthouseSnapshot.firstCall.args;
-      assert.equal(flags?.formFactor, 'mobile');
+      assert.strictEqual(flags?.formFactor, 'mobile');
       assert.match(String(flags?.emulatedUserAgent), /Mobile Safari/);
     });
 
@@ -280,7 +283,7 @@ describe('lighthouse', () => {
       );
 
       sinon.assert.calledOnce(response.attachLighthouseResult);
-      assert.equal(
+      assert.strictEqual(
         response.attachLighthouseResult.firstCall.args[0].summary.url,
         'https://example.com/page',
       );
@@ -315,8 +318,8 @@ describe('lighthouse', () => {
       sinon.assert.calledOnce(response.attachLighthouseResult);
       const {summary, reports} =
         response.attachLighthouseResult.firstCall.args[0];
-      assert.equal(summary.mode, 'snapshot');
-      assert.equal(summary.device, 'mobile');
+      assert.strictEqual(summary.mode, 'snapshot');
+      assert.strictEqual(summary.device, 'mobile');
       assert.deepEqual(reports, ['/tmp/report.json', '/tmp/report.html']);
     });
 
@@ -350,8 +353,8 @@ describe('lighthouse', () => {
       sinon.assert.calledOnce(response.attachLighthouseResult);
       const {summary, reports} =
         response.attachLighthouseResult.firstCall.args[0];
-      assert.equal(summary.mode, 'snapshot');
-      assert.equal(summary.device, 'mobile');
+      assert.strictEqual(summary.mode, 'snapshot');
+      assert.strictEqual(summary.device, 'mobile');
       assert.deepEqual(reports, [`${reportPath}.json`, `${reportPath}.html`]);
     });
 
@@ -473,24 +476,24 @@ describe('lighthouse', () => {
       const {summary, failedAudits} =
         response.attachLighthouseResult.firstCall.args[0];
       assert.deepEqual(summary.audits, {failed: 2, passed: 1});
-      assert.equal(failedAudits.length, 2);
+      assert.strictEqual(failedAudits.length, 2);
 
       const [contrast, title] = failedAudits;
-      assert.equal(contrast.id, 'color-contrast');
+      assert.strictEqual(contrast.id, 'color-contrast');
       assert.deepEqual(contrast.categories, ['accessibility']);
-      assert.equal(
+      assert.strictEqual(
         contrast.description,
         'Low-contrast text is difficult to read.',
       );
-      assert.equal(contrast.totalNodes, 13);
-      assert.equal(contrast.nodes.length, 10);
+      assert.strictEqual(contrast.totalNodes, 13);
+      assert.strictEqual(contrast.nodes.length, 10);
       assert.deepEqual(contrast.nodes[0], {
         selector: 'div.item-1',
         snippet: '<div class="item-1">',
         nodeLabel: 'Item 1',
         explanation: 'Fix any of the following: contrast',
       });
-      assert.equal(contrast.nodes[1].selector, 'div.item-3');
+      assert.strictEqual(contrast.nodes[1].selector, 'div.item-3');
       assert.ok(!contrast.nodes.some(n => n.selector === 'div.item-2'));
       assert.ok(!contrast.nodes.some(n => n.selector === 'div.item-99'));
 

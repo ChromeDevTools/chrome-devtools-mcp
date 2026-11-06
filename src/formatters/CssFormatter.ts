@@ -13,8 +13,8 @@ export type ContainerQuery =
 
 export interface ResolvedContainerDetails {
   container?: {
-    uid?: string;
     selector: string;
+    uid?: string;
   };
 }
 
@@ -52,8 +52,8 @@ export type AncestorCSSRule =
       query: string;
       name?: string;
       container?: {
-        uid?: string;
         selector: string;
+        uid?: string;
       };
     }
   | {
@@ -102,8 +102,8 @@ export interface MatchedRule {
 export interface InheritedRule {
   type: 'inherited';
   node: {
-    uid?: string;
     selector: string;
+    uid?: string;
   };
   selector?: string;
   matchingSelectors?: string[];
@@ -116,8 +116,8 @@ export interface PseudoElementRule {
   type: 'pseudo';
   pseudoType: string;
   node?: {
-    uid?: string;
     selector: string;
+    uid?: string;
   };
   selector?: string;
   matchingSelectors?: string[];
@@ -504,7 +504,7 @@ function getParentNodeInfo(
   style: DevTools.CSSStyleDeclaration.CSSStyleDeclaration,
   matchedStyles: MatchedStyles,
   resolveUid?: UidResolver,
-): {uid?: string; selector: string} | undefined {
+): {selector: string; uid?: string} | undefined {
   if (!matchedStyles.isInherited?.(style)) {
     return undefined;
   }
@@ -550,8 +550,8 @@ function getCascadeRuleHeader(rule: CascadeRule): string {
 }
 
 function formatAncestorRuleHeader(ancestor: AncestorCSSRule): {
-  comment?: string;
   header: string;
+  comment?: string;
 } {
   switch (ancestor.type) {
     case 'layer':

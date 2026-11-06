@@ -44,9 +44,9 @@ export class TextSnapshot {
     root: TextSnapshotNode;
     idToNode: Map<string, TextSnapshotNode>;
     snapshotId: string;
-    selectedElementUid?: string;
     hasSelectedElement: boolean;
     verbose: boolean;
+    selectedElementUid?: string;
   }) {
     this.root = data.root;
     this.idToNode = data.idToNode;
@@ -135,7 +135,7 @@ export class TextSnapshot {
 
     const rootNodeWithId = assignIds(rootNode);
 
-    await TextSnapshot.insertExtraNodes(
+    await TextSnapshot.#insertExtraNodes(
       page,
       idToNode,
       seenUniqueIds,
@@ -195,7 +195,7 @@ export class TextSnapshot {
   // ExtraHandles represent DOM nodes which might not be part of the accessibility tree, e.g. DOM nodes
   // returned by third-party developer tools. We insert them into the tree by finding the closest ancestor
   // in the tree and inserting the node as a child. The ancestor's child nodes are re-parented if necessary.
-  private static async insertExtraNodes(
+  static async #insertExtraNodes(
     page: McpPage,
     idToNode: Map<string, TextSnapshotNode>,
     seenUniqueIds: Set<string>,

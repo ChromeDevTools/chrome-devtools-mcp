@@ -779,7 +779,7 @@ describe('ToolHandler', () => {
       }
 
       const logSpy = sinon.spy();
-      sinon.stub(ClearcutLogger, 'get').returns({
+      const getLoggerStub = sinon.stub(ClearcutLogger, 'get').returns({
         logToolInvocation: logSpy,
       } as unknown as ClearcutLogger);
 
@@ -800,7 +800,7 @@ describe('ToolHandler', () => {
       assert.strictEqual(logSpy.firstCall.args[0].pageUrl, testCase.pageUrl);
       assert.strictEqual(handlerCalled, true);
 
-      sinon.restore();
+      getLoggerStub.restore();
       ClearcutLogger.resetForTesting();
     }
   });
@@ -997,6 +997,48 @@ describe('ToolHandler', () => {
     assert.strictEqual(disabledHandler.disabled, true);
   });
 
+  it('disables set_logpoints when javascriptEvaluation is false', async () => {
+    const mockContext = createMockMcpContext();
+
+    const defaultConfig = parseConfig();
+    const defaultTool = createTools(defaultConfig.resolved).find(
+      t => t.name === 'set_logpoints',
+    );
+    if (!defaultTool) {
+      assert.fail('set_logpoints not found');
+    }
+    const defaultHandler = new ToolHandler(
+      defaultTool,
+      defaultConfig,
+      async () => mockContext,
+      sinon.spy(),
+    );
+    assert.strictEqual(defaultHandler.disabled, false);
+
+    const disabledConfig = parseConfig(['--no-javascript-evaluation']);
+    const disabledTool = createTools(disabledConfig.resolved).find(
+      t => t.name === 'set_logpoints',
+    );
+    if (!disabledTool) {
+      assert.fail('set_logpoints not found');
+    }
+    const disabledHandler = new ToolHandler(
+      disabledTool,
+      disabledConfig,
+      async () => mockContext,
+      sinon.spy(),
+    );
+    assert.strictEqual(disabledHandler.disabled, true);
+    const disabledResult = await disabledHandler.handle({logpoints: []});
+    assert.strictEqual(disabledResult.isError, true);
+    assert.match(
+      disabledResult.content[0].type === 'text'
+        ? disabledResult.content[0].text
+        : '',
+      /Tool set_logpoints requires flag --javascriptEvaluation and is currently disabled/,
+    );
+  });
+
   describe('slim mode', () => {
     function createHandler(toolName: string, argv: string[]) {
       const config = parseConfig(argv);
@@ -1115,7 +1157,7 @@ describe('ToolHandler', () => {
 
     assert.strictEqual(result.isError, undefined);
     assert.strictEqual(handlerCalled, true);
-    assert.strictEqual(mockContext.validatePath.callCount, 3);
+    sinon.assert.callCount(mockContext.validatePath, 3);
     assert.strictEqual(mockContext.validatePath.calledWith(testFile), true);
     assert.strictEqual(
       mockContext.validatePath.calledWith(testListFile1),
@@ -1184,6 +1226,44 @@ describe('ToolHandler', () => {
     );
     assert.strictEqual(handlerCalled, false);
   });
+
+  for (const thrown of ['str-thrown', 0]) {
+    it(`reports non-Error values thrown by a handler: ${thrown}`, async () => {
+      const tool: ToolDefinition = {
+        name: 'throwing_tool',
+        description: 'A tool that throws a non-Error value',
+        annotations: {
+          category: ToolCategory.INPUT,
+          readOnlyHint: true,
+        },
+        schema: {},
+        blockedByDialog: false,
+        concurrency: 'exclusive',
+        verifyFilesSchema: {},
+        handler: async () => {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error
+          throw thrown;
+        },
+      };
+      const mockContext = createMockMcpContext();
+      mockContext.ensureBrowser.resolves(
+        getMockBrowser({process: sinon.createStubInstance(ChildProcess)}),
+      );
+      const toolHandler = new ToolHandler(
+        tool,
+        parseConfig(),
+        async () => mockContext,
+        sinon.spy(),
+      );
+
+      const result = await toolHandler.handle({});
+
+      assert.strictEqual(result.isError, true);
+      assert.deepStrictEqual(result.content, [
+        {type: 'text', text: `Error: ${thrown}`},
+      ]);
+    });
+  }
 
   it('validates evaluate_script sourcePath before reading the file', async () => {
     const config = parseConfig();
@@ -1328,6 +1408,53 @@ describe('ToolHandler', () => {
     assert.deepStrictEqual(receivedParams, {
       installUrlOrBundleUrl: pathToFileURL(canonicalBundlePath).href,
     });
+  });
+
+  it('validates local-only verifyFilesSchema when browser is connected to a 0.0.0.0 wsEndpoint', async () => {
+    const handler = sinon.stub().resolves();
+    const tool: ToolDefinition = {
+      name: 'upload_tool',
+      description: 'A tool with local-only file verification',
+      annotations: {
+        category: ToolCategory.INPUT,
+        readOnlyHint: false,
+      },
+      schema: {
+        filePaths: zod.array(zod.string()),
+      },
+      blockedByDialog: false,
+      concurrency: 'exclusive',
+      verifyFilesSchema: {
+        filePaths: {
+          local: true,
+          remote: false,
+        },
+      },
+      handler,
+    };
+
+    const mockContext = createMockMcpContext();
+    mockContext.ensureBrowser.resolves(
+      getMockBrowser({
+        wsEndpoint: 'ws://0.0.0.0:9222/devtools/browser/test',
+      }),
+    );
+    mockContext.validatePath.rejects(new Error('Access denied'));
+
+    const toolHandler = new ToolHandler(
+      tool,
+      parseConfig(),
+      async () => mockContext,
+      sinon.spy(),
+    );
+
+    const result = await toolHandler.handle({
+      filePaths: ['/etc/passwd'],
+    });
+
+    assert.strictEqual(result.isError, true);
+    sinon.assert.calledOnceWithExactly(mockContext.validatePath, '/etc/passwd');
+    sinon.assert.notCalled(handler);
   });
 
   it('skips local-only verifyFilesSchema when browser is remote', async () => {

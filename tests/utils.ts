@@ -17,18 +17,18 @@ import type {TestContext} from 'node:test';
 import type {Browser} from 'puppeteer';
 import puppeteer, {Locator} from 'puppeteer';
 
-import type {CallToolResult} from '../src/third_party/index.js';
 import type {
   Frame,
   HTTPRequest,
   HTTPResponse,
   LaunchOptions,
   Page,
+  Protocol,
   Target,
 } from 'puppeteer-core';
 import sinon from 'sinon';
 
-import type {ParsedArguments} from '../src/config/ConfigParser.js';
+import type {ParsedArguments} from '../src/config/mcp-options.js';
 import {stopDaemon} from '../src/daemon/client.js';
 import {isDaemonRunning} from '../src/daemon/utils.js';
 import {McpContext, type McpContextOptions} from '../src/McpContext.js';
@@ -36,7 +36,7 @@ import {McpResponse} from '../src/McpResponse.js';
 import {HeapSnapshotManager} from '../src/processors/HeapSnapshotManager.js';
 import {TaskRunner} from '../src/utils/TaskRunner.js';
 import {TextSnapshot} from '../src/TextSnapshot.js';
-import {DevTools} from '../src/third_party/index.js';
+import {DevTools, type CallToolResult} from '../src/third_party/index.js';
 import {stableIdSymbol} from '../src/utils/id.js';
 
 import {
@@ -54,7 +54,7 @@ export function assertNoServiceWorkerReported(
   const target = targets.find(target => {
     return target.url().includes(id) && target.type() === 'service_worker';
   });
-  assert(target === undefined);
+  assert.strictEqual(target, undefined);
 }
 
 export function getTextContent(
@@ -278,6 +278,7 @@ export function getMockRequest(
     frame?: Frame;
     redirectChain?: HTTPRequest[];
     headers?: Record<string, string>;
+    initiator?: Protocol.Network.Initiator;
   } = {},
 ): HTTPRequest {
   return {
@@ -323,6 +324,9 @@ export function getMockRequest(
     },
     frame() {
       return options.frame ?? ({} as Frame);
+    },
+    initiator() {
+      return options.initiator;
     },
     [stableIdSymbol]: options.stableId ?? 1,
   } as unknown as HTTPRequest;
