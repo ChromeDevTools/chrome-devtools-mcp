@@ -1,0 +1,44 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import { DevTools } from '../third_party/index.js';
+const { StringUtilities } = DevTools.Platform;
+const VALID_PLACEHOLDER_MATCH_PATTERN = /\{(PLACEHOLDER_[a-zA-Z][a-zA-Z0-9_]*)\}/g;
+export function substitutePlaceholders(rawMarkdown, substitutions) {
+    if (!substitutions) {
+        return rawMarkdown;
+    }
+    return rawMarkdown.replace(VALID_PLACEHOLDER_MATCH_PATTERN, (_, placeholder) => {
+        return substitutions.get(placeholder) ?? '';
+    });
+}
+/**
+ * Truncates `text` to at most `maxLength` UTF-16 code units and appends
+ * `ellipsis` when anything was cut off. The cut uses devtools-frontend's
+ * `StringUtilities.truncateToCodeUnitLength`, which moves back to the last
+ * grapheme boundary at or before the limit, so surrogate pairs and emoji
+ * sequences stay whole and the result never contains a lone surrogate, which
+ * `JSON.stringify` serializes as an escape like `\ud83d` that strict JSON
+ * parsers (such as the one the Python MCP SDK uses) reject.
+ *
+ * With `includeEllipsisInLength`, the ellipsis counts toward `maxLength`.
+ */
+export function truncateText(text, maxLength, { ellipsis = '...', includeEllipsisInLength = false, } = {}) {
+    if (text.length <= maxLength) {
+        return text;
+    }
+    const keep = includeEllipsisInLength
+        ? Math.max(0, maxLength - ellipsis.length)
+        : maxLength;
+    return StringUtilities.truncateToCodeUnitLength(text, keep) + ellipsis;
+}
+const URL_SIZE_LIMIT = 255;
+/**
+ * Truncates a URL for tool output, such as a `data:` URL with a base64 payload.
+ */
+export function truncateUrl(url) {
+    return truncateText(url, URL_SIZE_LIMIT, { ellipsis: '... <truncated>' });
+}
+//# sourceMappingURL=text.js.map
