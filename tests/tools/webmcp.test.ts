@@ -146,18 +146,20 @@ describe('webmcp', () => {
         output: {ok: true},
       });
       page.getWebMcpTools.returns([tool]);
+      const {signal} = new AbortController();
 
       await executeWebMcpTool(args).handler(
         {
           params: {toolName: 'my_tool', input: '{"key":"val"}'},
           page,
+          signal,
         },
         response,
         context,
       );
 
       sinon.assert.calledOnceWithExactly(page.getWebMcpTools);
-      sinon.assert.calledOnceWithExactly(tool.execute, {key: 'val'});
+      sinon.assert.calledOnceWithExactly(tool.execute, {key: 'val'}, {signal});
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         JSON.stringify(
@@ -195,7 +197,7 @@ describe('webmcp', () => {
         context,
       );
 
-      sinon.assert.calledOnceWithExactly(tool.execute, {});
+      sinon.assert.calledOnceWithExactly(tool.execute, {}, {signal: undefined});
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         JSON.stringify(
@@ -227,7 +229,7 @@ describe('webmcp', () => {
         context,
       );
 
-      sinon.assert.calledOnceWithExactly(tool.execute, {});
+      sinon.assert.calledOnceWithExactly(tool.execute, {}, {signal: undefined});
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
         JSON.stringify(

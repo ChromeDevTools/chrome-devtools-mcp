@@ -359,10 +359,11 @@ export class ToolHandler {
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
+    signal: AbortSignal | undefined,
   ): ReturnType<McpResponse['handle']> {
     try {
       await validateToolFiles(tool, params, context, true);
-      await tool.handler({params}, response, context);
+      await tool.handler({params, signal}, response, context);
     } catch (err) {
       response.setError(toError(err));
     }
@@ -377,6 +378,7 @@ export class ToolHandler {
     params: Record<string, unknown>,
     response: McpResponse,
     context: McpContext,
+    signal: AbortSignal | undefined,
     onTelemetryData: (
       devToolsData: DevToolsData | undefined,
       pageUrl: string | undefined,
@@ -413,6 +415,7 @@ export class ToolHandler {
           {
             params,
             page,
+            signal,
           },
           response,
           context,
@@ -421,6 +424,7 @@ export class ToolHandler {
         await tool.handler(
           {
             params,
+            signal,
           },
           response,
           context,
@@ -466,7 +470,7 @@ export class ToolHandler {
 
   handle = async (
     rawArgs: Record<string, unknown> = {},
-    options?: {viaMcp?: boolean},
+    options?: {viaMcp?: boolean; signal?: AbortSignal},
   ): Promise<CallToolResult> => {
     const context = await this.getContext();
     let queueGuard: Disposable | undefined;
@@ -505,12 +509,19 @@ export class ToolHandler {
         ? new SlimMcpResponse(this.#config)
         : new McpResponse(this.#config);
       const {content, structuredContent} = isBrowserlessTool(tool)
-        ? await this.#runBrowserlessTool(tool, params, response, context)
+        ? await this.#runBrowserlessTool(
+            tool,
+            params,
+            response,
+            context,
+            options?.signal,
+          )
         : await this.#runBrowserTool(
             tool,
             params,
             response,
             context,
+            options?.signal,
             (data, url) => {
               devToolsData = data;
               pageUrl = url;

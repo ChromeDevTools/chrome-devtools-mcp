@@ -132,6 +132,7 @@ export const executeThirdPartyDeveloperTool: PageToolFactory = definePageTool(
         toolName,
         params,
         response,
+        request.signal,
       );
     },
   }),
