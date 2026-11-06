@@ -23,7 +23,7 @@ export async function getTempFilePath(filename: string): Promise<string> {
  * server. Callers resolve the result against the working directory, which for
  * a server started from WSL is `\\wsl.localhost\<distro>\...`.
  */
-export function fileUrlToPath(
+export function fileUrlToPathWithPosixFallback(
   url: string | URL,
   windows: boolean = process.platform === 'win32',
 ): string {
