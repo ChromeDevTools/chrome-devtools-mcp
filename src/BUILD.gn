@@ -151,6 +151,7 @@ ts_library("mcp_lib") {
     "utils/id.ts",
     "utils/keyboard.ts",
     "utils/logger.ts",
+    "utils/network.ts",
     "utils/pagination.ts",
     "utils/polyfill.ts",
     "utils/resourceType.ts",
