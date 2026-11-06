@@ -22,12 +22,14 @@ import {
   getTabId,
 } from '../../src/tools/pages.js';
 import {zod} from '../../src/third_party/index.js';
+import {withTimeout} from '../../src/utils/timeout.js';
 import {
   createHandlerMocks,
   createMockDialog,
   createMockMcpPage,
   createMockParsedArguments,
 } from '../mocks.js';
+import {serverHooks} from '../server.js';
 import {assertNoServiceWorkerReported, html, withMcpContext} from '../utils.js';
 
 const EXTENSION_SW_PATH = path.join(
@@ -786,6 +788,51 @@ describe('pages', () => {
   });
 
   describe('close_page', () => {
+    const server = serverHooks();
+
+    it('closes a page that showed a dialog before init', async () => {
+      server.addHtmlRoute(
+        '/popup',
+        html`<script>
+          alert('blocked');
+        </script>`,
+      );
+      await withMcpContext(async (response, context, args) => {
+        const opener = context.getSelectedMcpPage().pptrPage;
+        const [target] = await Promise.all([
+          context.browser.waitForTarget(target => {
+            return target.opener() === opener.target();
+          }),
+          opener.evaluate(() => {
+            window.open('about:blank', 'popup');
+          }),
+        ]);
+        const session = await target.createCDPSession();
+        await session.send('Page.enable');
+        const dialogOpened = new Promise(resolve => {
+          session.once('Page.javascriptDialogOpening', resolve);
+        });
+        await opener.evaluate(url => {
+          window.open(url, 'popup');
+        }, server.getRoute('/popup'));
+        await withTimeout(dialogOpened, {
+          timeout: 5000,
+          message: 'The popup did not open a dialog.',
+        });
+        const popup = context.getPages().find(page => page.target === target);
+        assert.ok(popup);
+
+        await closePage(args).handler(
+          {params: {pageId: popup.id}},
+          response,
+          context,
+        );
+
+        assert.ok(popup.isClosed());
+        assert.ok(!context.browser.targets().includes(target));
+      });
+    });
+
     it('closes a page', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = await context.newPage();
