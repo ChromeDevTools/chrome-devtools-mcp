@@ -28,12 +28,12 @@ if (retryIndex !== -1) {
 
 if (userArgs.length > 0) {
   for (const arg of userArgs) {
-    // Map .ts files to build/ .js files
+    // Map .ts files to out/Default/gen/ .js files
     let testPath = arg;
     if (testPath.endsWith('.ts')) {
       testPath = testPath.replace(/\.ts$/, '.js');
-      if (!testPath.startsWith('build/')) {
-        testPath = path.join('build', testPath);
+      if (!testPath.startsWith('out/Default/gen/')) {
+        testPath = path.join('out/Default/gen', testPath);
       }
     }
     files.push(testPath);
@@ -43,7 +43,7 @@ if (userArgs.length > 0) {
   for await (const tsFile of glob('tests/**/*.test.ts')) {
     const content = await readFile(tsFile, 'utf8');
     if (content.includes('.only(')) {
-      files.push(path.join('build', tsFile.replace(/\.ts$/, '.js')));
+      files.push(path.join('out/Default/gen', tsFile.replace(/\.ts$/, '.js')));
     }
   }
   if (files.length === 0) {
@@ -51,7 +51,7 @@ if (userArgs.length > 0) {
     process.exit(0);
   }
 } else if (files.length === 0) {
-  files.push('build/tests/**/*.test.js');
+  files.push('out/Default/gen/tests/**/*.test.js');
 }
 
 // Node runs `availableParallelism() - 1` test files at a time by default, so
@@ -66,7 +66,7 @@ if (!flags.some(flag => flag.startsWith('--test-concurrency'))) {
 
 const nodeArgs = [
   '--import',
-  './build/tests/setup.js',
+  './out/Default/gen/tests/setup.js',
   '--no-warnings=ExperimentalWarning',
   '--test-reporter',
   (process.env['NODE_TEST_REPORTER'] ?? process.env['CI']) ? 'spec' : 'dot',
