@@ -634,7 +634,7 @@ export const uploadFile: PageToolFactory = definePageTool(() => ({
 
 export const pressKey: PageToolFactory = definePageTool(() => ({
   name: 'press_key',
-  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations).`,
+  description: `Press a key or key combination. Use this when other input methods like fill() cannot be used (e.g., keyboard shortcuts, navigation keys, or special key combinations). Note: On macOS, native <select> elements cannot be operated with ArrowDown/Enter via press_key; use fill() on the combobox or click() on the option instead.`,
   annotations: {
     category: ToolCategory.INPUT,
     readOnlyHint: false,
