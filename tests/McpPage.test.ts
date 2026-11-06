@@ -287,6 +287,110 @@ describe('replaceHtmlElementsWithUids', () => {
 });
 
 describe('McpPage', () => {
+  describe('network overrides', () => {
+    it('rejects changing overrides during recording and allows clearing after stopping', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      await page.mockNetwork({
+        kind: 'file',
+        urlPattern: '*.js',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      page.setIsRunningPerformanceTrace(true);
+      await assert.rejects(
+        page.mockNetwork({
+          urlPattern: '*.js',
+          kind: 'file',
+          responseFilePath: '/tmp/app.js',
+          loadResponseFile: async () => new Uint8Array(),
+        }),
+        /trace is running/,
+      );
+      await assert.rejects(page.removeNetworkMocks({}), /trace is running/);
+      page.setIsRunningPerformanceTrace(false);
+      await page.removeNetworkMocks({});
+      assert.deepStrictEqual(page.listNetworkOverrides(), []);
+      page.dispose();
+    });
+    it('initializes interception and releases it when overrides are cleared', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const overrides = await page.mockNetwork({
+        kind: 'file',
+        urlPattern: '*.js',
+        responseFilePath: '/tmp/replacement.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      assert.deepStrictEqual(page.listNetworkOverrides(), [overrides]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setCacheEnabled, false);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      await page.removeNetworkMocks({});
+      assert.deepStrictEqual(page.listNetworkOverrides(), []);
+      sinon.assert.calledWithExactly(
+        pptrPage.setRequestInterception.secondCall,
+        false,
+      );
+      sinon.assert.calledWithExactly(pptrPage.setCacheEnabled.secondCall, true);
+      page.dispose();
+    });
+
+    it('rejects setting overrides after disposal', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      page.dispose();
+      await assert.rejects(
+        page.mockNetwork({
+          kind: 'file',
+          urlPattern: '*.js',
+          responseFilePath: '/tmp/replacement.js',
+          loadResponseFile: async () => new Uint8Array(),
+        }),
+        /already been disposed/,
+      );
+      sinon.assert.notCalled(pptrPage.setRequestInterception);
+    });
+
+    it('filters and removes network mocks without clearing unrelated routes', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const page = new McpPage(createMockPuppeteerTarget({page: pptrPage}), 1, {
+        config: createMockServerConfig(),
+        locatorClass: Locator,
+      });
+      const script = await page.mockNetwork({
+        urlPattern: '*app.js',
+        resourceType: 'script',
+        kind: 'file',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      await page.mockNetwork({
+        resourceType: 'image',
+        kind: 'file',
+        responseFilePath: '/tmp/app.js',
+        loadResponseFile: async () => new Uint8Array(),
+      });
+      assert.deepStrictEqual(
+        page.listNetworkOverrides({resourceType: 'script'}),
+        [script],
+      );
+      assert.equal(await page.removeNetworkMocks({resourceType: 'image'}), 1);
+      assert.deepStrictEqual(page.listNetworkOverrides(), [script]);
+      sinon.assert.calledOnceWithExactly(pptrPage.setRequestInterception, true);
+      await page.removeNetworkMocks({});
+      page.dispose();
+    });
+  });
+
   async function createMcpPage(options: {config?: ReadonlyServerConfig} = {}) {
     const pptrPage = createMockPuppeteerPage();
     pptrPage.emulateFocusedPage.resolves();

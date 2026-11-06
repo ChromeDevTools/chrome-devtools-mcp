@@ -15,6 +15,7 @@ import {
   type TraceResult,
 } from '../processors/PerformanceTrace.js';
 import {logger} from '../utils/logger.js';
+import {NetworkOverridesFormatter} from '../formatters/NetworkOverridesFormatter.js';
 
 import {ToolCategory} from './categories.js';
 import {
@@ -56,7 +57,7 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
       .boolean()
       .optional()
       .describe(
-        'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true.',
+        'Whether to bypass the HTTP cache when reloading the page, to measure a cold page load. Only applies if reload is true. Active network overrides always disable the page HTTP cache.',
       ),
     filePath: filePathSchema,
   },
@@ -73,6 +74,11 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
       return;
     }
     const page = request.page;
+    const networkOverrides = page.listNetworkOverrides();
+    const {warning} = new NetworkOverridesFormatter(networkOverrides).toJSON();
+    if (warning) {
+      response.appendResponseLine(warning);
+    }
     page.setIsRunningPerformanceTrace(true);
 
     const pageUrlForTracing = page.pptrPage.url();
@@ -99,7 +105,8 @@ export const startTrace: PageToolFactory = definePageTool(() => ({
       });
 
       if (request.params.reload) {
-        const ignoreCache = request.params.ignoreCache ?? false;
+        const ignoreCache =
+          request.params.ignoreCache === true && networkOverrides.length === 0;
         if (ignoreCache) {
           // Disable the HTTP cache so that the main document and all
           // subresources are fetched from the network, like a hard reload.
@@ -188,6 +195,12 @@ export const stopTrace: PageToolFactory = definePageTool(
           `Error: the active performance trace is running${pageHint}, not on page ${page.id}. ${actionHint}`,
         );
         return;
+      }
+      const {warning} = new NetworkOverridesFormatter(
+        page.listNetworkOverrides(),
+      ).toJSON();
+      if (warning) {
+        response.appendResponseLine(warning);
       }
       await stopTracingAndAppendOutput(
         page,

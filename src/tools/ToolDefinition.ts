@@ -19,6 +19,11 @@ import type {Logpoint, LogpointOptions} from '../LogpointManager.js';
 import type {DevToolsCommentBridge} from '../devtools/DevToolsCommentBridge.js';
 import type {CssFormatterOptions} from '../formatters/CssFormatter.js';
 import type {
+  NetworkOverride,
+  NetworkMockFilter,
+  NetworkMockInput,
+} from '../NetworkOverrideManager.js';
+import type {
   ContextFilterOptions,
   HeapSnapshotFormatOptions,
 } from '../formatters/HeapSnapshotFormatter.js';
@@ -356,6 +361,7 @@ export type Context = Readonly<{
   uninstallPWA(options: UninstallPWAOptions): Promise<void>;
   launchPWA(options: LaunchPWAOptions): Promise<Page>;
   getPWAState(options: GetPWAStateOptions): Promise<PWAState>;
+  validatePath(filePath: string): Promise<string>;
   ensureExtension<Extension extends `.${string}`>(
     filePath: string,
     extension: Extension,
@@ -573,6 +579,9 @@ export type ContextPage = Readonly<{
   ): Promise<DevToolsCommentBridge | undefined>;
   lighthouseNavigation(flags?: Flags): Promise<RunnerResult | undefined>;
   lighthouseSnapshot(flags?: Flags): Promise<RunnerResult | undefined>;
+  mockNetwork(input: NetworkMockInput): Promise<NetworkOverride>;
+  listNetworkOverrides(filter?: NetworkMockFilter): NetworkOverride[];
+  removeNetworkMocks(filter: NetworkMockFilter): Promise<number>;
 }>;
 
 export type ToolFactory<Schema extends ToolSchema = ToolSchema> = (
