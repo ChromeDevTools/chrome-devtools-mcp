@@ -9,6 +9,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 
 import {BrowserManager} from './BrowserManager.js';
+import {CapabilityManager} from './capabilities/CapabilityManager.js';
 import {ConfigParser} from './config/ConfigParser.js';
 import {ConfigWatcher} from './config/ConfigWatcher.js';
 import {
@@ -57,13 +58,14 @@ export interface McpServerOptions {
   logFile?: fs.WriteStream;
 }
 
-interface ToolEntry {
+export interface ToolEntry {
   handler: ToolHandler;
   registeredTool: RegisteredTool;
 }
 
 export class McpServer {
   readonly server: SdkMcpServer;
+  readonly capabilityManager: CapabilityManager;
   #config: ServerConfig;
   #browserManager: BrowserManager;
   #context: McpContext;
@@ -86,10 +88,46 @@ export class McpServer {
   #configWatcher?: ConfigWatcher;
   #tools = new Map<string, ToolEntry>();
 
+  get clientSupportsListChanged(): boolean {
+    const caps = this.server.server.getClientCapabilities();
+    if (!caps) {
+      return false;
+    }
+    const toolsCap = (caps as Record<string, unknown>).tools;
+    if (
+      toolsCap &&
+      typeof toolsCap === 'object' &&
+      'listChanged' in toolsCap &&
+      (toolsCap as {listChanged?: unknown}).listChanged === false
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  get telemetry(): ClearcutLogger | undefined {
+    return ClearcutLogger.get();
+  }
+
+  get isPipeConnection(): boolean {
+    const serverArgs = this.#config.resolved;
+    return (
+      !serverArgs.autoConnect &&
+      !serverArgs.browserUrl &&
+      !serverArgs.wsEndpoint
+    );
+  }
+
   private constructor(config: ServerConfig, options: McpServerOptions) {
     this.#config = config;
     this.#browserManager = options.browserManager;
     const serverArgs = this.#config.resolved;
+
+    this.capabilityManager = new CapabilityManager({
+      metaFeatureSystem: serverArgs.metaFeatureSystem,
+      packPolicy: serverArgs.packPolicy,
+      toolPolicy: serverArgs.toolPolicy,
+    });
 
     if (serverArgs.usageStatistics) {
       ClearcutLogger.initialize({
@@ -117,10 +155,12 @@ export class McpServer {
 
     this.#context = McpContext.create(logger, {
       config: this.#config,
+      mcpServer: this,
       heapSnapshotManager: this.#heapSnapshotManager,
       taskRunner: this.#taskRunner,
       getBrowser: () => this.#browserManager.ensureBrowser(),
     });
+    this.#context.mcpServer = this;
     this.#context.setRoots(this.#combinedRoots());
 
     this.server.server.setRequestHandler('logging/setLevel', () => {
@@ -212,6 +252,17 @@ export class McpServer {
     }
 
     this.#config.commit(nextConfig);
+    if (
+      previousArgs.metaFeatureSystem !== nextArgs.metaFeatureSystem ||
+      previousArgs.packPolicy !== nextArgs.packPolicy ||
+      previousArgs.toolPolicy !== nextArgs.toolPolicy
+    ) {
+      this.capabilityManager.reconfigure({
+        metaFeatureSystem: nextArgs.metaFeatureSystem,
+        packPolicy: nextArgs.packPolicy,
+        toolPolicy: nextArgs.toolPolicy,
+      });
+    }
     for (const {entry, tool} of updates) {
       if (entry.handler.update(tool)) {
         entry.registeredTool.update({
@@ -389,7 +440,22 @@ export class McpServer {
       this.#config,
       () => this.#getContext(),
       () => this.#browserManager.abandonPendingAttempt(),
+      this,
     );
+  }
+
+  getRegisteredTools(): ToolEntry[] {
+    return Array.from(this.#tools.values());
+  }
+
+  updateToolCapabilities(): void {
+    for (const entry of this.#tools.values()) {
+      if (entry.handler.refreshStatus()) {
+        entry.registeredTool.update({
+          enabled: !entry.handler.disabled,
+        });
+      }
+    }
   }
 
   /**

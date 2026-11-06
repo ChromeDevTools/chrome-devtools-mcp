@@ -30,7 +30,7 @@
 - **[Network](#network)** (2 tools)
   - [`get_network_request`](#get_network_request)
   - [`list_network_requests`](#list_network_requests)
-- **[Debugging](#debugging)** (10 tools)
+- **[Debugging](#debugging)** (11 tools)
   - [`evaluate_script`](#evaluate_script)
   - [`get_console_message`](#get_console_message)
   - [`get_css_styles`](#get_css_styles)
@@ -41,6 +41,7 @@
   - [`set_logpoints`](#set_logpoints)
   - [`take_screenshot`](#take_screenshot)
   - [`take_snapshot`](#take_snapshot)
+  - [`manage_capabilities`](#manage_capabilities)
 - **[Memory](#memory)** (14 tools)
   - [`take_heapsnapshot`](#take_heapsnapshot)
   - [`analyze_heapsnapshot_contexts`](#analyze_heapsnapshot_contexts)
@@ -516,6 +517,20 @@ in the DevTools Elements panel (if any).
 - **pageId** (number) **(required)**: Targets a specific page by ID.
 - **filePath** (string) _(optional)_: The absolute path, or a path relative to the current working directory, to save the snapshot to instead of attaching it to the response.
 - **verbose** (boolean) _(optional)_: Whether to include all possible information available in the full a11y tree. Default is false.
+
+---
+
+### `manage_capabilities`
+
+**Description:** Manage on-demand capability packs. list, enable, disable, or call fallback. (requires flag: --metaFeatureSystem=true)
+
+**Parameters:**
+
+- **action** (enum: "list", "enable", "disable", "call") **(required)**: Action to perform.
+- **capabilities** (array) _(optional)_: Multiple capability pack IDs to enable/disable.
+- **capability** (string) _(optional)_: Single capability pack ID to enable/disable (e.g. memory, performance, audits, debugger, webauthn, screencast, pwa, webmcp; locked by default: extensions).
+- **tool** (string) _(optional)_: Tool name to call (only for action: "call").
+- **toolArgs** (object) _(optional)_: Arguments for the tool (only for action: "call").
 
 ---
 

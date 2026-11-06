@@ -6,6 +6,7 @@
 
 import type {ParsedArguments} from './config/mcp-options.js';
 import type {ReadonlyServerConfig} from './config/ServerConfig.js';
+import type {McpServer} from './index.js';
 import type {McpContext} from './McpContext.js';
 import type {McpPage} from './McpPage.js';
 import {McpResponse, type DataFormat} from './McpResponse.js';
@@ -19,7 +20,10 @@ import {
   type CallToolResult,
 } from './third_party/index.js';
 import {labels} from './tools/categories.js';
-import {categoryToFlagName} from './config/category-options.js';
+import {
+  categoryToFlagName,
+  isCategoryOffByDefault,
+} from './config/category-options.js';
 import {
   isAvailableInMode,
   isBrowserlessTool,
@@ -71,6 +75,7 @@ function buildDisabledMessage(
 function getDisabledReason(
   tool: AnyToolDefinition,
   serverArgs: ParsedArguments,
+  mcpServer?: McpServer,
 ): string | undefined {
   if (!isAvailableInMode(tool, serverArgs)) {
     return isSlimTool(tool)
@@ -78,15 +83,48 @@ function getDisabledReason(
       : `Tool ${tool.name} is not available with --slim.`;
   }
 
+  const isMetaEnabled = Boolean(
+    mcpServer?.capabilityManager?.isMetaFeatureSystemEnabled,
+  );
+  if (mcpServer) {
+    if (tool.name === 'manage_capabilities') {
+      if (isMetaEnabled) {
+        return undefined;
+      }
+      return buildDisabledMessage(tool.name, '--metaFeatureSystem');
+    }
+    const policy = mcpServer.capabilityManager.getToolPolicy(tool.name);
+    if (policy === 'locked') {
+      return `Tool '${tool.name}' is locked by security policy and cannot be invoked or enabled.`;
+    }
+    if (!mcpServer.capabilityManager.isToolActive(tool.name)) {
+      return `Tool '${tool.name}' is in an on-demand capability pack and is not currently active. Enable its pack via manage_capabilities first.`;
+    }
+  }
+
+  const isDynamicallyActive =
+    isMetaEnabled &&
+    (mcpServer?.capabilityManager?.isToolActive(tool.name) ?? false);
+
   const category = tool.annotations.category;
   if (category) {
     const flag = categoryToFlagName(category);
-    if (!serverArgs[flag]) {
+    if (
+      isDynamicallyActive &&
+      isCategoryOffByDefault(category) &&
+      serverArgs[flag] !== false
+    ) {
+      // Allowed dynamically via domain pack unless explicitly disabled via --no-category-*
+    } else if (!serverArgs[flag]) {
       return buildDisabledMessage(tool.name, `--${flag}`, labels[category]);
     }
   }
 
   for (const condition of tool.annotations.conditions || []) {
+    if (isDynamicallyActive && condition === 'memoryDebugging') {
+      // Allowed dynamically via memory domain pack
+      continue;
+    }
     if (!serverArgs[condition]) {
       return buildDisabledMessage(tool.name, `--${condition}`);
     }
@@ -240,6 +278,7 @@ function routedPageId(
 export class ToolHandler {
   #tool: AnyToolDefinition;
   #config: ReadonlyServerConfig;
+  #mcpServer?: McpServer;
   #registeredInputSchema: zod.ZodObject<zod.ZodRawShape, zod.core.$strict>;
   #disabled = false;
   #disabledReason?: string;
@@ -249,11 +288,17 @@ export class ToolHandler {
     config: ReadonlyServerConfig,
     private readonly getContext: () => Promise<McpContext>,
     private readonly abandonPendingBrowserAttemptOnTimeout: () => void,
+    mcpServer?: McpServer,
   ) {
     this.#tool = tool;
     this.#config = config;
+    this.#mcpServer = mcpServer;
     this.#registeredInputSchema = zod.object(tool.schema).strict();
     this.#updateStatus(tool);
+  }
+
+  get tool(): AnyToolDefinition {
+    return this.#tool;
   }
 
   get registeredInputSchema(): zod.ZodObject<
@@ -272,10 +317,20 @@ export class ToolHandler {
 
   #updateStatus(tool: AnyToolDefinition): void {
     const serverArgs = this.#config.resolved;
-    this.#disabledReason = getDisabledReason(tool, serverArgs);
+    this.#disabledReason = getDisabledReason(tool, serverArgs, this.#mcpServer);
     this.#disabled =
       Boolean(this.#disabledReason) &&
       (!isAvailableInMode(tool, serverArgs) || !serverArgs.viaCli);
+  }
+
+  /**
+   * Re-evaluates whether the tool is disabled against the current server
+   * config and capability manager state. Returns true if its visibility changed.
+   */
+  refreshStatus(): boolean {
+    const previousDisabled = this.#disabled;
+    this.#updateStatus(this.#tool);
+    return previousDisabled !== this.#disabled;
   }
 
   /**
