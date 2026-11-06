@@ -991,6 +991,67 @@ describe('pages', () => {
     });
   });
   describe('navigate_page', () => {
+    for (const {name, error, message} of [
+      {
+        name: 'string',
+        error: 'Navigation failed',
+        message: 'Navigation failed',
+      },
+      {
+        name: 'object with a message',
+        error: {message: 'Navigation failed'},
+        message: 'Navigation failed',
+      },
+      {name: 'null', error: null, message: 'null'},
+      {name: 'undefined', error: undefined, message: 'undefined'},
+    ]) {
+      it(`preserves ${name} navigation errors`, async () => {
+        const {page, context, response, args} = createHandlerMocks();
+        page.pptrPage.goto.callsFake(() => Promise.reject(error));
+
+        await navigatePage(args).handler(
+          {params: {url: 'https://example.com/'}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(
+          page.pptrPage.goto,
+          'https://example.com/',
+          {timeout: undefined},
+        );
+        sinon.assert.calledOnceWithExactly(
+          response.setError,
+          sinon.match
+            .instanceOf(Error)
+            .and(sinon.match.has('message', message)),
+        );
+        sinon.assert.calledOnceWithExactly(
+          response.appendResponseLine,
+          `Unable to navigate in the selected page: ${message}.`,
+        );
+        sinon.assert.calledOnceWithExactly(response.setIncludePages, true);
+      });
+    }
+
+    it('marks navigation failures as tool errors', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const error = new Error('Navigation failed');
+      page.pptrPage.goto.rejects(error);
+
+      await navigatePage(args).handler(
+        {params: {url: 'http://example.com'}, page},
+        response,
+        context,
+      );
+
+      sinon.assert.calledOnceWithExactly(response.setError, error);
+      sinon.assert.calledOnceWithExactly(
+        response.appendResponseLine,
+        'Unable to navigate in the selected page: Navigation failed.',
+      );
+    });
+
     it('navigates to correct page', async () => {
       await withMcpContext(async (response, context, args) => {
         await navigatePage(args).handler(
@@ -1218,6 +1279,7 @@ describe('pages', () => {
           response.responseLines.join('\n'),
           'Unable to reload the selected page: Navigation timeout of 500 ms exceeded.\nDismissed a beforeunload dialog.',
         );
+        assert.ok(response.error);
       });
     });
 
@@ -1234,6 +1296,7 @@ describe('pages', () => {
             .at(0)
             ?.startsWith('Unable to navigate forward in the selected page:'),
         );
+        assert.ok(response.error);
         assert.ok(response.includePages);
       });
     });
@@ -1250,6 +1313,7 @@ describe('pages', () => {
             .at(0)
             ?.startsWith('Unable to navigate back in the selected page:'),
         );
+        assert.ok(response.error);
         assert.ok(response.includePages);
       });
     });
@@ -1712,6 +1776,39 @@ describe('pages', () => {
   });
 
   describe('dialogs', () => {
+    for (const action of ['accept', 'dismiss'] as const) {
+      it(`marks ${action} failures as tool errors`, async () => {
+        const {page, context, response, args} = createHandlerMocks();
+        const dialog = createMockDialog();
+        const error = new Error('Dialog handling failed');
+        page.getDialog.returns(dialog);
+        if (action === 'accept') {
+          dialog.accept.rejects(error);
+        } else {
+          dialog.dismiss.rejects(error);
+        }
+
+        await handleDialog(args).handler(
+          {params: {action}, page},
+          response,
+          context,
+        );
+
+        sinon.assert.calledOnceWithExactly(response.setError, error);
+        sinon.assert.calledOnceWithExactly(
+          response.appendResponseLine,
+          `Unable to ${action} the dialog: Dialog handling failed.`,
+        );
+        if (action === 'accept') {
+          sinon.assert.calledOnceWithExactly(dialog.accept, undefined);
+          sinon.assert.notCalled(dialog.dismiss);
+        } else {
+          sinon.assert.calledOnceWithExactly(dialog.dismiss);
+          sinon.assert.notCalled(dialog.accept);
+        }
+      });
+    }
+
     it('can accept dialogs', async () => {
       await withMcpContext(async (response, context, args) => {
         const page = context.getSelectedMcpPage().pptrPage;

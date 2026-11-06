@@ -237,6 +237,7 @@ export interface DevToolsData {
 
 export interface Response {
   appendResponseLine(value: string): void;
+  setError(error: Error): void;
   setHeapSnapshotAggregates(
     aggregateData: HeapSnapshotAggregateData,
     options?: PaginationOptions & HeapSnapshotFormatOptions,
