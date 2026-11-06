@@ -20,6 +20,12 @@ import type {Logpoint, LogpointOptions} from './LogpointManager.js';
 import {LogpointManager} from './LogpointManager.js';
 import {TextSnapshot} from './TextSnapshot.js';
 import {
+  NetworkOverrideManager,
+  type NetworkOverride,
+  type NetworkMockFilter,
+  type NetworkMockInput,
+} from './NetworkOverrideManager.js';
+import {
   type Locator,
   PredefinedNetworkConditions,
   type Dialog,
@@ -226,6 +232,7 @@ export class McpPage implements ContextPage {
   #navigationTimeout: number;
   #config: ReadonlyServerConfig;
   #commentBridge?: DevToolsCommentBridge;
+  #networkOverrideManager?: NetworkOverrideManager;
 
   constructor(
     target: Target,
@@ -367,6 +374,7 @@ export class McpPage implements ContextPage {
         return;
       }
       this.#pptrPage = page;
+      this.#networkOverrideManager = new NetworkOverrideManager(page);
       page.on('dialog', this.#dialogHandler);
       this.#networkCollector = new NetworkCollector(page, {
         maxNavigationSaved: this.#config.resolved.maxNavigationSaved,
@@ -909,6 +917,7 @@ export class McpPage implements ContextPage {
       });
     }
     this.#pptrPage?.off('dialog', this.#dialogHandler);
+    void this.#networkOverrideManager?.dispose();
     this.#networkCollector?.dispose();
     this.#consoleCollector?.dispose();
     this.#logpointManager?.dispose();
@@ -920,6 +929,33 @@ export class McpPage implements ContextPage {
     void devtoolsUniverse?.session.detach().catch(e => {
       logger?.('Failed to detach DevTools session', e);
     });
+  }
+
+  async mockNetwork(input: NetworkMockInput): Promise<NetworkOverride> {
+    const manager = await this.#getNetworkOverrideManagerForChanges();
+    return await manager.mock(input);
+  }
+
+  async #getNetworkOverrideManagerForChanges(): Promise<NetworkOverrideManager> {
+    if (this.#isRunningPerformanceTrace) {
+      throw new Error(
+        'Cannot change network overrides while a performance trace is running.',
+      );
+    }
+    await this.init();
+    if (!this.#networkOverrideManager) {
+      throw new Error(`McpPage (id=${this.id}) is not initialized.`);
+    }
+    return this.#networkOverrideManager;
+  }
+
+  listNetworkOverrides(filter?: NetworkMockFilter): NetworkOverride[] {
+    return this.#networkOverrideManager?.list(filter) ?? [];
+  }
+
+  async removeNetworkMocks(filter: NetworkMockFilter): Promise<number> {
+    const manager = await this.#getNetworkOverrideManagerForChanges();
+    return await manager.remove(filter);
   }
 
   async executeThirdPartyDeveloperTool(
