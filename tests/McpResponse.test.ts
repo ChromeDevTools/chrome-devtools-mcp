@@ -2044,6 +2044,7 @@ describe('McpResponse heap snapshot formatting', () => {
       return new TextSnapshot({
         root: rootNode,
         idToNode,
+        backendNodeIdToId: new Map<number, string>(),
         snapshotId: '1',
         hasSelectedElement: false,
         verbose,

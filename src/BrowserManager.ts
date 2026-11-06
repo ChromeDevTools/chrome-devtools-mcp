@@ -380,35 +380,19 @@ export class BrowserManager {
     } else if (channel || userDataDir) {
       autoConnect = true;
       if (userDataDir) {
-        // TODO: re-expose this logic via Puppeteer.
-        const portPath = path.join(userDataDir, 'DevToolsActivePort');
-        try {
-          const fileContent = await fs.promises.readFile(portPath, 'utf8');
-          const [rawPort, rawPath] = fileContent
-            .split('\n')
-            .map(line => {
-              return line.trim();
-            })
-            .filter(line => {
-              return !!line;
-            });
-          if (!rawPort || !rawPath) {
-            throw new Error(
-              `Invalid DevToolsActivePort '${fileContent}' found`,
-            );
-          }
-          const port = parseInt(rawPort, 10);
-          if (isNaN(port) || port <= 0 || port > 65535) {
-            throw new Error(`Invalid port '${rawPort}' found`);
-          }
-          const browserWSEndpoint = `ws://127.0.0.1:${port}${rawPath}`;
-          connectOptions.browserWSEndpoint = browserWSEndpoint;
-        } catch (error) {
+        // Use Puppeteer's wsEndpoint instead of manually reading DevToolsActivePort
+        // The browser was already launched with pipe: true, so wsEndpoint is available
+        if (!this.#browser) {
           throw new Error(
-            `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
-            {
-              cause: error,
-            },
+            `Browser not available in ${userDataDir}. Check if Chrome is running and remote debugging is enabled.`,
+          );
+        }
+        const wsEndpoint = this.#browser.wsEndpoint?.()
+        if (wsEndpoint) {
+          connectOptions.browserWSEndpoint = wsEndpoint;
+        } else {
+          throw new Error(
+            `Could not get wsEndpoint from browser in ${userDataDir}. Check if Chrome is running and remote debugging is enabled.`,
           );
         }
       } else {

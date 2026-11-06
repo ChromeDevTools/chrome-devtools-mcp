@@ -1653,6 +1653,7 @@ describe('McpPage', () => {
       return new TextSnapshot({
         root: rootNode,
         idToNode,
+        backendNodeIdToId: new Map<number, string>(),
         snapshotId: '1',
         hasSelectedElement: false,
         verbose,
@@ -1778,6 +1779,7 @@ describe('McpPage', () => {
       mcpPage.textSnapshot = new TextSnapshot({
         root: rootNode,
         idToNode: new Map<string, TextSnapshotNode>(),
+        backendNodeIdToId: new Map<number, string>(),
         snapshotId: '1',
         hasSelectedElement: false,
         verbose: false,
@@ -1800,6 +1802,7 @@ describe('McpPage', () => {
       mcpPage.textSnapshot = new TextSnapshot({
         root: node,
         idToNode,
+        backendNodeIdToId: new Map<number, string>(),
         snapshotId: '1',
         hasSelectedElement: false,
         verbose: false,
