@@ -1722,7 +1722,8 @@ export const commands: Commands = {
       className: {
         name: 'className',
         type: 'string',
-        description: 'Optional regex or text matching object class name.',
+        description:
+          'Optional case-insensitive regex matching object class name. Escape special characters to match them literally.',
         required: false,
         positional: false,
       },
@@ -1730,7 +1731,7 @@ export const commands: Commands = {
         name: 'propertyName',
         type: 'string',
         description:
-          'Optional property name filter for outgoing reference edges.',
+          'Optional case-insensitive regex matching property names of outgoing reference edges. Escape special characters to match them literally.',
         required: false,
         positional: false,
       },
