@@ -5,12 +5,13 @@
  */
 
 import assert from 'node:assert';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
 
-import {resolveCanonicalPath} from '../../src/utils/files.js';
+import {getTempFilePath, resolveCanonicalPath} from '../../src/utils/files.js';
 import {createTempDir} from '../utils.js';
 
 async function createSymlinkOrSkip(
@@ -160,4 +161,33 @@ describe('resolveCanonicalPath', () => {
       path.join(canonicalTmpDir, 'dangling-dir', 'file.txt'),
     );
   });
+});
+
+async function createDisposableTempFile(filename: string): Promise<{
+  path: string;
+  [Symbol.dispose]: () => void;
+}> {
+  const filepath = await getTempFilePath(filename);
+  return {
+    path: filepath,
+    [Symbol.dispose](): void {
+      fsSync.rmSync(path.dirname(filepath), {recursive: true, force: true});
+    },
+  };
+}
+
+describe('getTempFilePath', () => {
+  it('keeps the file under the created temp directory', async () => {
+    using tempFile = await createDisposableTempFile('shot.png');
+    const dir = path.dirname(tempFile.path);
+    assert.strictEqual(path.basename(tempFile.path), 'shot.png');
+    assert.ok(path.basename(dir).startsWith('chrome-devtools-mcp-'));
+    assert.strictEqual(path.relative(dir, tempFile.path), 'shot.png');
+  });
+
+  for (const name of ['../escape.png', 'sub/shot.png', '..', '.', '']) {
+    it(`rejects ${JSON.stringify(name)} instead of writing outside the temp directory`, async () => {
+      await assert.rejects(getTempFilePath(name), /Invalid temp file name/);
+    });
+  }
 });
